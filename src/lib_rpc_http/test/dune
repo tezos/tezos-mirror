@@ -1,19 +1,27 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name test_rpc_http)
- (package tezos-rpc-http-server)
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-stdlib
   tezos-stdlib-unix
-  tezos-rpc-http-server
-  tezos-base-test-helpers
   tezos-test-helpers
+  tezos-base-test-helpers
+  tezos-rpc-http-server
   qcheck-alcotest
   alcotest-lwt)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib
    -open Lib_test
    -open Tezos_base_test_helpers
    -open Tezos_rpc_http_server)))
+
+(rule
+ (alias runtest)
+ (package tezos-rpc-http-server)
+ (action (run %{dep:./test_rpc_http.exe})))

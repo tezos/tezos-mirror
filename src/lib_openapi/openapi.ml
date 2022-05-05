@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Json
 module String_set = Set.Make (String)
 module String_map = Map.Make (String)
 
@@ -52,9 +53,13 @@ let obj ll : Json.u = `O (List.flatten ll)
 module Schema = struct
   type kind =
     | Boolean
-    | Integer of {minimum : int option; maximum : int option; enum : int list}
+    | Integer of {
+        minimum : int option;
+        maximum : int option;
+        enum : int list option;
+      }
     | Number of {minimum : float option; maximum : float option}
-    | String of {enum : string list; pattern : string option}
+    | String of {enum : string list option; pattern : string option}
     | Array of t
     | Object of {properties : property list; additional_properties : t option}
     | One_of of t list
@@ -92,18 +97,22 @@ module Schema = struct
                 typ "integer";
                 field_opt "minimum" minimum int;
                 field_opt "maximum" maximum int;
-                field_list "enum" (List.map int enum);
+                (match enum with
+                | None -> []
+                | Some enum -> field "enum" (`A (List.map int enum)));
               ]
           | Number {minimum; maximum} ->
               [
-                typ "integer";
+                typ "number";
                 field_opt "minimum" minimum float;
                 field_opt "maximum" maximum float;
               ]
           | String {enum; pattern} ->
               [
                 typ "string";
-                field_list "enum" (List.map string enum);
+                (match enum with
+                | None -> []
+                | Some enum -> field "enum" (`A (List.map string enum)));
                 field_opt "pattern" pattern string;
               ]
           | Array item_schema ->
@@ -146,21 +155,105 @@ module Schema = struct
           | One_of schemas -> [field "oneOf" (array (List.map to_json schemas))]
           | Any -> []))
 
+  let rec of_json json =
+    match unannotate json with
+    | `O [("$ref", `String str)] ->
+        let n = String.length "#/components/schemas/" in
+        if String.sub str 0 n = "#/components/schemas/" then
+          Ref (String.sub str n (String.length str - n))
+        else
+          error
+            json
+            "unsupported reference: %s - expected a reference to \
+             /components/schemas/..."
+            str
+    | `Null -> error json "Schema not found"
+    | `O _ -> (
+        let title = json |-> "title" |> as_string_opt in
+        let description = json |-> "description" |> as_string_opt in
+        let nullable =
+          let nullable = json |-> "nullable" in
+          match unannotate nullable with
+          | `Null -> false
+          | _ -> as_bool nullable
+        in
+        let make kind = Other {title; description; nullable; kind} in
+        match json |-> "type" |> unannotate with
+        | `String "boolean" -> make Boolean
+        | `String "integer" ->
+            let enum =
+              json |-> "enum" |> function
+              | enum when is_null enum -> None
+              | enum -> Some (as_list enum |> List.map as_int)
+            in
+            let minimum = json |-> "minimum" |> as_int_opt in
+            let maximum = json |-> "maximum" |> as_int_opt in
+            make (Integer {minimum; maximum; enum})
+        | `String "number" ->
+            let minimum = json |-> "minimum" |> as_float_opt in
+            let maximum = json |-> "maximum" |> as_float_opt in
+            make (Number {minimum; maximum})
+        | `String "string" ->
+            let pattern = json |-> "pattern" |> as_string_opt in
+            let enum =
+              json |-> "enum" |> function
+              | enum when is_null enum -> None
+              | enum -> Some (as_list enum |> List.map as_string)
+            in
+            make (String {enum; pattern})
+        | `String "object" ->
+            let properties_list =
+              List.map
+                (fun (name, property) -> (name, of_json property))
+                (json |-> "properties" |> as_object)
+            in
+            let additional_properties =
+              let additional_properties = json |-> "additionalProperties" in
+              match unannotate additional_properties with
+              | `Null -> None
+              | _ -> Some (of_json additional_properties)
+            in
+            let required =
+              json |-> "required" |> as_list |> List.map as_string
+            in
+            let properties =
+              List.map
+                (fun (name, schema) ->
+                  {name; required = List.mem name required; schema})
+                properties_list
+            in
+            make (Object {properties; additional_properties})
+        | `String "array" ->
+            let items =
+              let items = json |-> "items" in
+              match unannotate items with
+              | `Null -> error items "items not found"
+              | _ -> of_json items
+            in
+            make (Array items)
+        | _ -> (
+            let oneOf = json |-> "oneOf" in
+            match json |-> "oneOf" |> unannotate with
+            | `A _ -> make (One_of (List.map of_json (as_list oneOf)))
+            | `Null -> make Any
+            | _ -> error json "Invalid oneOf"))
+    | _ -> error json "Invalid schema"
+
   type maker =
     ?title:string -> ?description:string -> ?nullable:bool -> unit -> t
 
   let boolean ?title ?description ?(nullable = false) () =
     Other {title; description; nullable; kind = Boolean}
 
-  let integer ?minimum ?maximum ?(enum = []) ?title ?description
-      ?(nullable = false) () =
+  let integer ?minimum ?maximum ?enum ?title ?description ?(nullable = false) ()
+      =
     Other
       {title; description; nullable; kind = Integer {minimum; maximum; enum}}
 
   let number ?minimum ?maximum ?title ?description ?(nullable = false) () =
     Other {title; description; nullable; kind = Number {minimum; maximum}}
 
-  let string ?(enum = []) ?pattern ?title ?description ?(nullable = false) () =
+  let string ?enum ?pattern ?title ?description ?(nullable = false) () =
     Other {title; description; nullable; kind = String {enum; pattern}}
 
   let array ~items ?title ?description ?(nullable = false) () =
@@ -207,6 +300,37 @@ module Response = struct
                    (obj [field "schema" (Schema.to_json schema)]);
                ]);
         ] )
+
+  let of_json (code, json) =
+    let description = json |-> "description" |> as_string in
+    let schema_json =
+      let content = json |-> "content" in
+      match unannotate content with
+      | `Null -> error content "content not found"
+      | _ -> (
+          let application = content |-> "application/json" in
+          match unannotate application with
+          | `Null -> error application "application/json not found"
+          | _ -> (
+              let schema = application |-> "schema" in
+              match unannotate schema with
+              | `Null -> error schema "schema not found"
+              | _ -> schema))
+    in
+    let schema = Schema.of_json schema_json in
+    let code =
+      match code with
+      | "default" -> None
+      | _ -> (
+          match int_of_string_opt code with
+          | None ->
+              error
+                schema_json
+                "expected response code to be an integer or \"default\", got %S"
+                code
+          | code_opt -> code_opt)
+    in
+    {code; description; schema}
 end
 
 module Parameter = struct
@@ -221,6 +345,14 @@ module Parameter = struct
         field "required" (bool required);
         field "schema" (Schema.to_json dynamic.schema);
       ]
+
+  let of_json json =
+    let name = json |-> "name" |> as_string in
+    let description = json |-> "description" |> as_string_opt in
+    let required = json |-> "required" |> as_bool in
+    let in_ = json |-> "in" |> as_string in
+    let schema = json |-> "schema" |> Schema.of_json in
+    (required, {name; description; schema}, in_)
 end
 
 module Service = struct
@@ -232,6 +364,9 @@ module Service = struct
     responses : Response.t list;
     query : query_parameter list;
   }
+
+  let compare_query_parameter =
+    (Stdlib.compare : query_parameter -> query_parameter -> int)
 
   let make ~description ?request_body ?(query = []) responses =
     {description; request_body; responses; query}
@@ -264,6 +399,33 @@ module Service = struct
         field_opt "requestBody" service.request_body schema_in_content;
         field "responses" (obj [List.map Response.to_json service.responses]);
       ]
+
+  let parameters_of_json in_ json =
+    List.filter_map
+      (fun query_json ->
+        let (required, parameter, in_result) = Parameter.of_json query_json in
+        if String.equal in_result in_ then Some {required; parameter} else None)
+      json
+
+  let of_json json =
+    let description = json |-> "description" |> as_string in
+    let request_body =
+      try
+        Some
+          (json |-> "requestBody" |~> "content" |~> "application/json"
+         |~> "schema" |> Schema.of_json)
+      with _ -> None
+    in
+    let responses =
+      json |-> "responses" |> as_object |> List.map Response.of_json
+    in
+    let query =
+      json |-> "parameters" |> as_list |> parameters_of_json "query"
+    in
+    let parameters =
+      json |-> "parameters" |> as_list |> parameters_of_json "path"
+    in
+    ({description; request_body; responses; query}, parameters)
 end
 
 module Path = struct
@@ -277,9 +439,34 @@ module Path = struct
     | Static name -> name
     | Dynamic dynamic -> "{" ^ dynamic.name ^ "}"
 
+  let item_of_string string (parameters : Service.query_parameter list) =
+    let get_parameter str =
+      List.find_map (fun {Service.required = _; parameter} ->
+          if String.equal str parameter.name then Some parameter else None)
+    in
+    if
+      String.length string >= 2
+      && string.[0] = '{'
+      && string.[String.length string - 1] = '}'
+    then
+      let n = String.sub string 1 (String.length string - 2) in
+      let parameter = get_parameter n parameters in
+      match parameter with
+      | Some parameter ->
+          let description = parameter.description in
+          dynamic ?description ~schema:parameter.schema n
+      | None -> static string
+    else static string
+
   type t = item list
 
   let to_string path = "/" ^ String.concat "/" (List.map string_of_item path)
+
+  let of_string path parameters =
+    match String.split_on_char '/' path with
+    | [] -> failwith "empty path"
+    | "" :: tail -> List.map (fun str -> item_of_string str parameters) tail
+    | _ -> failwith (Format.asprintf "Invalid path %s" path)
 
   let get_dynamics path =
     path
@@ -288,32 +475,67 @@ module Path = struct
 end
 
 module Endpoint = struct
-  type t = {
-    path : Path.t;
-    get : Service.t option;
-    post : Service.t option;
-    put : Service.t option;
-    delete : Service.t option;
-    patch : Service.t option;
-  }
+  type methods = (Method.t * Service.t) list
+
+  type t = {path : Path.t; methods : methods}
 
   let make ?get ?post ?put ?delete ?patch path =
-    {path; get; post; put; delete; patch}
+    {
+      path;
+      methods =
+        List.filter_map
+          (function
+            | ((_ : Method.t), None) -> None | (m, Some s) -> Some (m, s))
+          [
+            (GET, get);
+            (POST, post);
+            (PUT, put);
+            (DELETE, delete);
+            (PATCH, patch);
+          ];
+    }
+
+  let get_method endpoint meth = List.assq_opt meth endpoint.methods
 
   let to_json endpoint =
     (* Note: we force path parameters to be the same for all methods. *)
+    let encode_parameters methods parameters =
+      let method_ m =
+        field_opt
+          (Method.to_openapi_string m)
+          (List.assoc_opt m methods)
+          (Service.to_json parameters)
+      in
+      obj (List.map method_ Method.list)
+    in
     let parameters =
       Path.get_dynamics endpoint.path |> List.map (Parameter.to_json "path")
     in
-    ( Path.to_string endpoint.path,
-      obj
-        [
-          field_opt "get" endpoint.get (Service.to_json parameters);
-          field_opt "post" endpoint.post (Service.to_json parameters);
-          field_opt "put" endpoint.put (Service.to_json parameters);
-          field_opt "delete" endpoint.delete (Service.to_json parameters);
-          field_opt "patch" endpoint.patch (Service.to_json parameters);
-        ] )
+    (Path.to_string endpoint.path, encode_parameters endpoint.methods parameters)
+
+  let of_json (path, json) =
+    let (methods, p) =
+      let get_service method_ =
+        let service = json |-> Method.to_openapi_string method_ in
+        match unannotate service with
+        | `Null -> []
+        | _ ->
+            let (service, parameters) = Service.of_json service in
+            [((method_, service), parameters)]
+      in
+      get_service Method.GET @ get_service Method.POST @ get_service Method.PUT
+      @ get_service Method.DELETE @ get_service Method.PATCH
+      |> List.split
+    in
+    let parameters =
+      match List.sort_uniq (List.compare Service.compare_query_parameter) p with
+      | [] -> []
+      | [e] -> e
+      | _ ->
+          error json "path %s parameters must be the same for all methods" path
+    in
+    let path = Path.of_string path parameters in
+    {path; methods}
 end
 
 module Server = struct
@@ -327,6 +549,11 @@ module Server = struct
         field "url" (string server.url);
         field_opt "description" server.description string;
       ]
+
+  let of_json json =
+    let url = json |-> "url" |> as_string in
+    let description = json |-> "description" |> as_string_opt in
+    {url; description}
 end
 
 type t = {
@@ -366,3 +593,27 @@ let to_json openapi =
           in
           field "components" (obj [field "schemas" (obj definitions)]));
     ]
+
+let of_json (json : Json.t) =
+  let (title, description, version) =
+    let info = json |-> "info" in
+    let title = info |-> "title" |> as_string in
+    let description = info |-> "description" |> as_string_opt in
+    let version = info |-> "version" |> as_string in
+    (title, description, version)
+  in
+  let servers = json |-> "servers" |> as_list |> List.map Server.of_json in
+  let definitions =
+    let components = json |-> "components" in
+    match unannotate components with
+    | `Null -> []
+    | _ ->
+        components |-> "schemas" |> as_object_opt |> Option.value ~default:[]
+        |> List.map (fun (name, schema_json) ->
+               (name, Schema.of_json schema_json))
+  in
+  let endpoints =
+    json |-> "paths" |> as_object_opt |> Option.value ~default:[]
+    |> List.map Endpoint.of_json
+  in
+  {title; description; version; servers; definitions; endpoints}

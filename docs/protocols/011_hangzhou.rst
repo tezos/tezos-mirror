@@ -22,6 +22,36 @@ This protocol requires a different protocol environment than Granada.
 It requires protocol environment V3, compared to V2 for Granada.
 (MR :gl:`!3040`)
 
+- Removed legacy logging interface. (MR :gl:`!2876`)
+
+- Removed data-encoding backwards compatibility layer. (MR :gl:`!2686`)
+
+- Reintroduced ``tag_size``. (MR :gl:`!2948`)
+
+- Exposed ``Lwtreslib.List``. (MR :gl:`!3116`)
+
+- Environment now uses ``Map`` and ``Set`` from ``Lwtreslib``. (MR :gl:`!3124`)
+
+- Updated to data-encoding version 0.4. (MR :gl:`!3149`)
+
+- Documented and renamed operation ordering in ``Updater``. (MR :gl:`!3179`)
+
+- ``Lwtreslib``: now provides exception-catching functions. (MR :gl:`!2886`)
+
+- Added context hash version. (MR :gl:`!3163`)
+
+- Removed the ``fork_test_chain`` function. (MR :gl:`!3213`)
+
+- Added ``Result`` and catching helpers. (MR :gl:`!3154`)
+
+- Added support for chunking in RPCs. (MR :gl:`!3189`)
+
+- Source of the Alpha protocol can mostly be compiled into Coq with ``coq-of-ocaml``. (MR :gl:`!3152`)
+
+- Encapsulated script caching. (MR :gl:`!3352`)
+
+- Updated Zarith to version 1.12. (MR :gl:`!2970`)
+
 Receipts, Balance Updates
 -------------------------
 
@@ -62,7 +92,7 @@ Timelock
 Michelson On-Chain Views
 ------------------------
 
-:ref:`Views <MichelsonViews_011>` are a new mechanism for contract calls that:
+:ref:`Views <MichelsonViews>` are a new mechanism for contract calls that:
 
 - are read-only: they may depend on the contract storage but cannot
   modify it nor emit operations (but they can call other views);

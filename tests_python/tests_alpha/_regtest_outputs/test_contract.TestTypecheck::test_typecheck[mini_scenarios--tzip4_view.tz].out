@@ -1,21 +1,20 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/tzip4_view.tz]
 
 Well typed
-Gas remaining: 1039984.179 units remaining
+Gas remaining: 1039986.099 units remaining
 { parameter
     (or (pair %view_const unit (contract nat))
         (pair %view_add (pair int int) (contract int))) ;
   storage unit ;
   code { CAR
-         /* [ @parameter or (pair %view_const unit (contract nat))
-               (pair %view_add (pair int int) (contract int)) ] */ ;
+         /* [ or (pair unit (contract nat)) (pair (pair int int) (contract int)) ] */ ;
          IF_LEFT
            { CDR
              /* [ contract nat ] */ ;
              AMOUNT
-             /* [ @amount mutez : contract nat ] */ ;
+             /* [ mutez : contract nat ] */ ;
              PUSH nat 5
-             /* [ nat : @amount mutez : contract nat ] */ ;
+             /* [ nat : mutez : contract nat ] */ ;
              TRANSFER_TOKENS
              /* [ operation ] */ ;
              NIL operation
@@ -37,9 +36,9 @@ Gas remaining: 1039984.179 units remaining
              ADD
              /* [ int : contract int ] */ ;
              AMOUNT
-             /* [ @amount mutez : int : contract int ] */ ;
+             /* [ mutez : int : contract int ] */ ;
              SWAP
-             /* [ int : @amount mutez : contract int ] */ ;
+             /* [ int : mutez : contract int ] */ ;
              TRANSFER_TOKENS
              /* [ operation ] */ ;
              NIL operation

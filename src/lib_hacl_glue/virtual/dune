@@ -1,5 +1,0 @@
-(library
- (name tezos_hacl_glue)
- (public_name tezos-hacl-glue)
- (instrumentation (backend bisect_ppx))
- (virtual_modules hacl))

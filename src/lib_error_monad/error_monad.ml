@@ -33,15 +33,11 @@ type error_category = [`Branch | `Temporary | `Permanent]
 include (
   TzCore : module type of TzCore with type error_category := error_category)
 
-include TzMonad
 module TzTrace = TzTrace
 
-(* We offer shorter names for monads. These short names only make sense in the
-   context of Tezos' error-monads which is why it is defined here. *)
-module Tzresult_syntax = Traced_result_syntax
-module Lwt_tzresult_syntax = Lwt_traced_result_syntax
-
 type 'error trace = 'error TzTrace.trace
+
+include TzMonad
 
 type error += Exn of exn
 
@@ -59,9 +55,11 @@ let () =
       | _ -> None)
     (fun msg -> Exn (Failure msg))
 
-let error_with fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
+let error_with fmt =
+  Format.kasprintf (fun s -> Result_syntax.tzfail (Exn (Failure s))) fmt
 
-let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
+let failwith fmt =
+  Format.kasprintf (fun s -> Lwt_result_syntax.tzfail (Exn (Failure s))) fmt
 
 let error_of_exn e = Exn e
 
@@ -88,21 +86,28 @@ let () =
     (fun () -> Canceled)
 
 let protect_no_canceler ?on_error t =
-  let res = Lwt.catch t (fun exn -> fail (Exn exn)) in
-  res >>= function
+  let open Lwt_result_syntax in
+  let res = Lwt.catch t (fun exn -> tzfail (Exn exn)) in
+  let*! r = res in
+  match r with
   | Ok _ -> res
   | Error trace -> (
       match on_error with
       | None -> res
       | Some on_error ->
-          Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)))
+          Lwt.catch (fun () -> on_error trace) (fun exn -> tzfail (Exn exn)))
 
 let protect_canceler ?on_error canceler t =
+  let open Lwt_result_syntax in
   let cancellation =
-    Lwt_canceler.when_canceling canceler >>= fun () -> fail Canceled
+    let*! () = Lwt_canceler.when_canceling canceler in
+    tzfail Canceled
   in
-  let res = Lwt.pick [cancellation; Lwt.catch t (fun exn -> fail (Exn exn))] in
-  res >>= function
+  let res =
+    Lwt.pick [cancellation; Lwt.catch t (fun exn -> tzfail (Exn exn))]
+  in
+  let*! r = res in
+  match r with
   | Ok _ -> res
   | Error trace -> (
       let trace =
@@ -111,7 +116,7 @@ let protect_canceler ?on_error canceler t =
       match on_error with
       | None -> Lwt.return_error trace
       | Some on_error ->
-          Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)))
+          Lwt.catch (fun () -> on_error trace) (fun exn -> tzfail (Exn exn)))
 
 let protect ?on_error ?canceler t =
   match canceler with
@@ -132,22 +137,31 @@ let () =
     (fun () -> Timeout)
 
 let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
+  let open Lwt_result_syntax in
   let target = f canceler in
-  Lwt.choose [timeout; (target >|= fun _ -> ())] >>= fun () ->
+  let*! () =
+    Lwt.choose
+      [
+        timeout;
+        (let*! _ = target in
+         Lwt.return_unit);
+      ]
+  in
   if Lwt.state target <> Lwt.Sleep then (
     Lwt.cancel timeout ;
     target)
   else
-    Lwt_canceler.cancel canceler >>= function
-    | Ok () | Error [] -> fail Timeout
+    let*! r = Lwt_canceler.cancel canceler in
+    match r with
+    | Ok () | Error [] -> tzfail Timeout
     | Error (h :: _) -> raise h
 
 let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_trace
 
 let cancel_with_exceptions canceler =
-  Lwt_canceler.cancel canceler >>= function
-  | Ok () | Error [] -> Lwt.return_unit
-  | Error (h :: _) -> raise h
+  let open Lwt_syntax in
+  let* r = Lwt_canceler.cancel canceler in
+  match r with Ok () | Error [] -> Lwt.return_unit | Error (h :: _) -> raise h
 
 let catch ?catch_only f = TzLwtreslib.Result.catch_f ?catch_only f trace_of_exn
 
@@ -159,9 +173,21 @@ let catch_f ?catch_only f exc_mapper =
       TzTrace.make (exc_mapper exc))
 
 let catch_s ?catch_only f =
-  TzLwtreslib.Result.catch_s ?catch_only f >|= Result.map_error trace_of_exn
+  let open Lwt_syntax in
+  let+ r = TzLwtreslib.Result.catch_s ?catch_only f in
+  Result.map_error trace_of_exn r
 
 let catch_es ?catch_only f =
-  TzLwtreslib.Result.catch_s ?catch_only f
-  >|= Result.map_error trace_of_exn
-  >|= Result.join
+  let open Lwt_syntax in
+  let+ r = TzLwtreslib.Result.catch_s ?catch_only f in
+  let r = Result.map_error trace_of_exn r in
+  Result.join r
+
+let either_f (left : 'a tzresult Lwt.t) (right : unit -> 'a tzresult Lwt.t) =
+  let open Lwt_syntax in
+  let* l = left in
+  match l with
+  | Ok x -> return_ok x
+  | Error tr -> (
+      let* r = right () in
+      match r with Ok x -> return_ok x | Error e -> return_error (tr @ e))

@@ -162,8 +162,9 @@ module Internal_validator_process = struct
          operation_metadata_size_limit;
        } :
         validator_environment) chain_store =
-    Events.(emit init ()) >>= fun () ->
-    return
+    let open Lwt_syntax in
+    let* () = Events.(emit init ()) in
+    return_ok
       {
         chain_store;
         user_activated_upgrades;
@@ -185,15 +186,19 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
         _;
       } chain_store predecessor max_operations_ttl =
+    let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
     let context_hash = predecessor_block_header.shell.context in
     let context_index = get_context_index chain_store in
-    (Context.checkout context_index context_hash >>= function
-     | None ->
-         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
-     | Some ctx -> return ctx)
-    >>=? fun predecessor_context ->
+    let* predecessor_context =
+      let*! o = Context.checkout context_index context_hash in
+      match o with
+      | None ->
+          tzfail
+            (Block_validator_errors.Failed_to_checkout_context context_hash)
+      | Some ctx -> return ctx
+    in
     let predecessor_block_metadata_hash =
       Store.Block.block_metadata_hash predecessor
     in
@@ -215,46 +220,57 @@ module Internal_validator_process = struct
 
   let apply_block validator chain_store ~predecessor ~max_operations_ttl
       block_header operations =
-    make_apply_environment validator chain_store predecessor max_operations_ttl
-    >>=? fun env ->
-    let now = Systime_os.now () in
+    let open Lwt_result_syntax in
+    let* env =
+      make_apply_environment
+        validator
+        chain_store
+        predecessor
+        max_operations_ttl
+    in
+    let now = Time.System.now () in
     let block_hash = Block_header.hash block_header in
     let predecessor_context_hash = Store.Block.context_hash predecessor in
-    Events.(emit validation_request (block_hash, env.chain_id)) >>= fun () ->
+    let*! () = Events.(emit validation_request (block_hash, env.chain_id)) in
     let cache =
       match validator.cache with
       | None -> `Load
       | Some block_cache -> `Inherited (block_cache, predecessor_context_hash)
     in
-    Block_validation.apply
-      ?cached_result:validator.preapply_result
-      env
-      block_header
-      operations
-      ~cache
-    >>=? fun {result; cache} ->
+    let* {result; cache} =
+      Block_validation.apply
+        ?cached_result:validator.preapply_result
+        env
+        block_header
+        operations
+        ~cache
+    in
     let timespan =
-      let then_ = Systime_os.now () in
+      let then_ = Time.System.now () in
       Ptime.diff then_ now
     in
     validator.cache <- Some {context_hash = block_header.shell.context; cache} ;
     validator.preapply_result <- None ;
-    Events.(emit validation_success (block_hash, timespan)) >>= fun () ->
+    let*! () = Events.(emit validation_success (block_hash, timespan)) in
     return result
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash operations =
+    let open Lwt_result_syntax in
     let context_index =
       Store.context_index (Store.Chain.global_store validator.chain_store)
     in
     let context_hash = predecessor_shell_header.Block_header.context in
-    (Context.checkout context_index context_hash >>= function
-     | None ->
-         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
-     | Some ctx -> return ctx)
-    >>=? fun predecessor_context ->
+    let* predecessor_context =
+      let*! o = Context.checkout context_index context_hash in
+      match o with
+      | None ->
+          tzfail
+            (Block_validator_errors.Failed_to_checkout_context context_hash)
+      | Some ctx -> return ctx
+    in
     let user_activated_upgrades = validator.user_activated_upgrades in
     let user_activated_protocol_overrides =
       validator.user_activated_protocol_overrides
@@ -262,39 +278,44 @@ module Internal_validator_process = struct
     let operation_metadata_size_limit =
       validator.operation_metadata_size_limit
     in
-    Block_validation.preapply
-      ~chain_id
-      ~user_activated_upgrades
-      ~user_activated_protocol_overrides
-      ~operation_metadata_size_limit
-      ~timestamp
-      ~protocol_data
-      ~live_blocks
-      ~live_operations
-      ~predecessor_context
-      ~predecessor_shell_header
-      ~predecessor_hash
-      ~predecessor_max_operations_ttl
-      ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash
-      operations
-    >>=? fun (result, apply_result) ->
+    let* (result, apply_result) =
+      Block_validation.preapply
+        ~chain_id
+        ~user_activated_upgrades
+        ~user_activated_protocol_overrides
+        ~operation_metadata_size_limit
+        ~timestamp
+        ~protocol_data
+        ~live_blocks
+        ~live_operations
+        ~predecessor_context
+        ~predecessor_shell_header
+        ~predecessor_hash
+        ~predecessor_max_operations_ttl
+        ~predecessor_block_metadata_hash
+        ~predecessor_ops_metadata_hash
+        operations
+    in
     validator.preapply_result <- Some apply_result ;
     return result
 
   let precheck_block validator chain_store ~predecessor header _hash operations
       =
+    let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
     let context_index =
       Store.context_index (Store.Chain.global_store validator.chain_store)
     in
     let predecessor_block_header = Store.Block.header predecessor in
     let context_hash = predecessor_block_header.Block_header.shell.context in
-    (Context.checkout context_index context_hash >>= function
-     | None ->
-         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
-     | Some ctx -> return ctx)
-    >>=? fun predecessor_context ->
+    let* predecessor_context =
+      let*! o = Context.checkout context_index context_hash in
+      match o with
+      | None ->
+          tzfail
+            (Block_validator_errors.Failed_to_checkout_context context_hash)
+      | Some ctx -> return ctx
+    in
     let cache =
       match validator.cache with
       | None -> `Lazy
@@ -321,11 +342,12 @@ module Internal_validator_process = struct
       ~protocol:genesis.protocol
 
   let init_test_chain validator forking_block =
+    let open Lwt_result_syntax in
     let forked_header = Store.Block.header forking_block in
-    Store.Block.context validator.chain_store forking_block >>=? fun context ->
+    let* context = Store.Block.context validator.chain_store forking_block in
     Block_validation.init_test_chain context forked_header
 
-  let reconfigure_event_logging _ _ = return_unit
+  let reconfigure_event_logging _ _ = Lwt_result_syntax.return_unit
 end
 
 (** Block validation using an external process *)
@@ -507,6 +529,7 @@ module External_validator_process = struct
     | Some _ | None -> Filename.get_temp_dir_name ()
 
   let start_process vp =
+    let open Lwt_result_syntax in
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one validation process per socket *)
     let socket_dir = get_temporary_socket_dir () in
@@ -538,23 +561,27 @@ module External_validator_process = struct
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           clean_process_fd socket_path)
     in
-    Lwt.finalize
-      (fun () ->
-        External_validation.create_socket_listen
-          ~canceler
-          ~max_requests:1
-          ~socket_path
-        >>=? fun process_socket -> Lwt_unix.accept process_socket >>= return)
-      (fun () ->
-        (* As the external validation process is now started, we can
-            unlink the named socket. Indeed, the file descriptor will
-            remain valid as long as at least one process keeps it
-            open. This method mimics an anonymous file descriptor
-            without relying on Linux specific features. It also
-            trigger the clean up procedure if some sockets related
-            errors are thrown. *)
-        clean_process_fd socket_path)
-    >>=? fun (process_socket, _) ->
+    let* (process_socket, _) =
+      Lwt.finalize
+        (fun () ->
+          let* process_socket =
+            External_validation.create_socket_listen
+              ~canceler
+              ~max_requests:1
+              ~socket_path
+          in
+          let*! v = Lwt_unix.accept process_socket in
+          return v)
+        (fun () ->
+          (* As the external validation process is now started, we can
+              unlink the named socket. Indeed, the file descriptor will
+              remain valid as long as at least one process keeps it
+              open. This method mimics an anonymous file descriptor
+              without relying on Linux specific features. It also
+              trigger the clean up procedure if some sockets related
+              errors are thrown. *)
+          clean_process_fd socket_path)
+    in
     Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
     (* Register clean up callback to ensure that the validator process
        will be terminated even if the node is brutally stopped. *)
@@ -564,7 +591,7 @@ module External_validator_process = struct
     in
     let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
     let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
-    Events.(emit validator_started process#pid) >>= fun () ->
+    let*! () = Events.(emit validator_started process#pid) in
     let parameters =
       {
         External_validation.context_root = vp.context_root;
@@ -585,82 +612,96 @@ module External_validator_process = struct
           canceler;
           clean_up_callback_id;
         } ;
-    External_validation.send
-      process_stdin
-      Data_encoding.Variable.bytes
-      External_validation.magic
-    >>= fun () ->
-    External_validation.recv process_stdout Data_encoding.Variable.bytes
-    >>= fun magic ->
-    fail_when
-      (not (Bytes.equal magic External_validation.magic))
-      (Block_validator_errors.Validation_process_failed
-         (Inconsistent_handshake "bad magic"))
-    >>=? fun () ->
-    External_validation.send
-      process_stdin
-      External_validation.parameters_encoding
-      parameters
-    >>= fun () -> return (process, process_stdin, process_stdout)
+    let*! () =
+      External_validation.send
+        process_stdin
+        Data_encoding.Variable.bytes
+        External_validation.magic
+    in
+    let*! magic =
+      External_validation.recv process_stdout Data_encoding.Variable.bytes
+    in
+    let* () =
+      fail_when
+        (not (Bytes.equal magic External_validation.magic))
+        (Block_validator_errors.Validation_process_failed
+           (Inconsistent_handshake "bad magic"))
+    in
+    let*! () =
+      External_validation.send
+        process_stdin
+        External_validation.parameters_encoding
+        parameters
+    in
+    return (process, process_stdin, process_stdout)
 
   let send_request vp request result_encoding =
-    (match vp.validator_process with
-    | Running
-        {
-          process;
-          stdin = process_stdin;
-          stdout = process_stdout;
-          canceler;
-          clean_up_callback_id;
-        } -> (
-        match process#state with
-        | Running -> return (process, process_stdin, process_stdout)
-        | Exited status ->
-            Error_monad.cancel_with_exceptions canceler >>= fun () ->
-            Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
-            vp.validator_process <- Uninitialized ;
-            Events.(emit process_exited_abnormally status) >>= fun () ->
-            start_process vp)
-    | Uninitialized -> start_process vp
-    | Exiting ->
-        Events.(emit cannot_start_process ()) >>= fun () ->
-        fail Block_validator_errors.Cannot_validate_while_shutting_down)
-    >>=? fun (process, process_stdin, process_stdout) ->
+    let open Lwt_result_syntax in
+    let* (process, process_stdin, process_stdout) =
+      match vp.validator_process with
+      | Running
+          {
+            process;
+            stdin = process_stdin;
+            stdout = process_stdout;
+            canceler;
+            clean_up_callback_id;
+          } -> (
+          match process#state with
+          | Running -> return (process, process_stdin, process_stdout)
+          | Exited status ->
+              let*! () = Error_monad.cancel_with_exceptions canceler in
+              Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
+              vp.validator_process <- Uninitialized ;
+              let*! () = Events.(emit process_exited_abnormally status) in
+              start_process vp)
+      | Uninitialized -> start_process vp
+      | Exiting ->
+          let*! () = Events.(emit cannot_start_process ()) in
+          tzfail Block_validator_errors.Cannot_validate_while_shutting_down
+    in
     Lwt.catch
       (fun () ->
         (* Make sure that the promise is not canceled between a send and recv *)
-        Lwt.protected
-          (Lwt_mutex.with_lock vp.lock (fun () ->
-               let now = Systime_os.now () in
-               Events.(emit request_for request) >>= fun () ->
-               External_validation.send
-                 process_stdin
-                 External_validation.request_encoding
-                 request
-               >>= fun () ->
-               External_validation.recv_result process_stdout result_encoding
-               >>= fun res ->
-               let timespan =
-                 let then_ = Systime_os.now () in
-                 Ptime.diff then_ now
-               in
-               Events.(emit request_result (request, timespan)) >>= fun () ->
-               Lwt.return res))
-        >>=? fun res ->
+        let* res =
+          Lwt.protected
+            (Lwt_mutex.with_lock vp.lock (fun () ->
+                 let now = Time.System.now () in
+                 let*! () = Events.(emit request_for request) in
+                 let*! () =
+                   External_validation.send
+                     process_stdin
+                     External_validation.request_encoding
+                     request
+                 in
+                 let*! res =
+                   External_validation.recv_result
+                     process_stdout
+                     result_encoding
+                 in
+                 let timespan =
+                   let then_ = Time.System.now () in
+                   Ptime.diff then_ now
+                 in
+                 let*! () = Events.(emit request_result (request, timespan)) in
+                 Lwt.return res))
+        in
         match process#state with
         | Running -> return res
         | Exited status ->
             vp.validator_process <- Uninitialized ;
-            Events.(emit process_exited_abnormally status) >>= fun () ->
+            let*! () = Events.(emit process_exited_abnormally status) in
             return res)
       (fun exn ->
-        (match process#state with
-        | Running -> Lwt.return_unit
-        | Exited status ->
-            Events.(emit process_exited_abnormally status) >>= fun () ->
-            vp.validator_process <- Uninitialized ;
-            Lwt.return_unit)
-        >>= fun () -> fail_with_exn exn)
+        let*! () =
+          match process#state with
+          | Running -> Lwt.return_unit
+          | Exited status ->
+              let*! () = Events.(emit process_exited_abnormally status) in
+              vp.validator_process <- Uninitialized ;
+              Lwt.return_unit
+        in
+        fail_with_exn exn)
 
   let init
       ({
@@ -671,7 +712,8 @@ module External_validator_process = struct
        } :
         validator_environment) ~genesis ~data_dir ~context_root ~protocol_root
       ~process_path ~sandbox_parameters =
-    Events.(emit init ()) >>= fun () ->
+    let open Lwt_result_syntax in
+    let*! () = Events.(emit init ()) in
     let validator =
       {
         data_dir;
@@ -687,8 +729,10 @@ module External_validator_process = struct
         sandbox_parameters;
       }
     in
-    send_request validator External_validation.Init Data_encoding.empty
-    >>=? fun () -> return validator
+    let* () =
+      send_request validator External_validation.Init Data_encoding.empty
+    in
+    return validator
 
   let apply_block validator chain_store ~predecessor ~max_operations_ttl
       block_header operations =
@@ -772,53 +816,62 @@ module External_validator_process = struct
       Data_encoding.unit
 
   let close vp =
-    Events.(emit close ()) >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Events.(emit close ()) in
     match vp.validator_process with
     | Running {process; stdin = process_stdin; canceler; _} ->
         let request = External_validation.Terminate in
-        Events.(emit request_for request) >>= fun () ->
-        Lwt.catch
-          (fun () ->
-            vp.validator_process <- Exiting ;
-            (* Try to trigger the clean shutdown of the validation
-               process. *)
-            External_validation.send
-              process_stdin
-              External_validation.request_encoding
-              request)
-          (function
-            | Unix.Unix_error (ECONNREFUSED, _, _)
-            | Unix.Unix_error (EPIPE, _, _)
-            | Unix.Unix_error (ENOTCONN, _, _) ->
-                (* It may fail if the validation process is not
-                   responding (connection already closed) and is
-                   killed afterward. No need to propagate the error. *)
-                Events.(emit cannot_close ()) >>= fun () -> Lwt.return_unit
-            | e -> Lwt.fail e)
-        >>= fun () ->
-        Lwt.catch
-          (fun () ->
-            Lwt_unix.with_timeout shutdown_timeout (fun () ->
-                process#status >>= function
-                | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
-                | status ->
-                    Events.(emit process_exited_abnormally status) >>= fun () ->
-                    process#terminate ;
-                    Lwt.return_unit))
-          (function
-            | Lwt_unix.Timeout -> Events.(emit unresponsive_validator) ()
-            | err -> Lwt.fail err)
-        >>= fun () ->
-        Error_monad.cancel_with_exceptions canceler >>= fun () ->
+        let* () = Events.(emit request_for request) in
+        let* () =
+          Lwt.catch
+            (fun () ->
+              vp.validator_process <- Exiting ;
+              (* Try to trigger the clean shutdown of the validation
+                 process. *)
+              External_validation.send
+                process_stdin
+                External_validation.request_encoding
+                request)
+            (function
+              | Unix.Unix_error (ECONNREFUSED, _, _)
+              | Unix.Unix_error (EPIPE, _, _)
+              | Unix.Unix_error (ENOTCONN, _, _) ->
+                  (* It may fail if the validation process is not
+                     responding (connection already closed) and is
+                     killed afterward. No need to propagate the error. *)
+                  let* () = Events.(emit cannot_close ()) in
+                  Lwt.return_unit
+              | e -> Lwt.fail e)
+        in
+        let* () =
+          Lwt.catch
+            (fun () ->
+              Lwt_unix.with_timeout shutdown_timeout (fun () ->
+                  let* s = process#status in
+                  match s with
+                  | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
+                  | status ->
+                      let* () =
+                        Events.(emit process_exited_abnormally status)
+                      in
+                      process#terminate ;
+                      Lwt.return_unit))
+            (function
+              | Lwt_unix.Timeout -> Events.(emit unresponsive_validator) ()
+              | err -> Lwt.fail err)
+        in
+        let* () = Error_monad.cancel_with_exceptions canceler in
         Lwt.return_unit
     | Uninitialized | Exiting -> Lwt.return_unit
 end
 
 let init validator_environment validator_kind =
+  let open Lwt_result_syntax in
   match validator_kind with
   | Internal chain_store ->
-      Internal_validator_process.init validator_environment chain_store
-      >>=? fun (validator : 'a) ->
+      let* (validator : 'a) =
+        Internal_validator_process.init validator_environment chain_store
+      in
       let validator_process : (module S with type t = 'a) =
         (module Internal_validator_process)
       in
@@ -832,15 +885,16 @@ let init validator_environment validator_kind =
         process_path;
         sandbox_parameters;
       } ->
-      External_validator_process.init
-        validator_environment
-        ~genesis
-        ~data_dir
-        ~context_root
-        ~protocol_root
-        ~process_path
-        ~sandbox_parameters
-      >>=? fun (validator : 'b) ->
+      let* (validator : 'b) =
+        External_validator_process.init
+          validator_environment
+          ~genesis
+          ~data_dir
+          ~context_root
+          ~protocol_root
+          ~process_path
+          ~sandbox_parameters
+      in
       let validator_process : (module S with type t = 'b) =
         (module External_validator_process)
       in
@@ -854,17 +908,20 @@ let reconfigure_event_logging (E {validator_process = (module VP); validator})
 
 let apply_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header operations =
-  Store.Block.get_block_metadata chain_store predecessor >>=? fun metadata ->
+  let open Lwt_result_syntax in
+  let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
-  Store.Chain.compute_live_blocks chain_store ~block:predecessor
-  >>=? fun (live_blocks, live_operations) ->
+  let* (live_blocks, live_operations) =
+    Store.Chain.compute_live_blocks chain_store ~block:predecessor
+  in
   let block_hash = Block_header.hash header in
-  Block_validation.check_liveness
-    ~live_operations
-    ~live_blocks
-    block_hash
-    operations
-  >>?= fun () ->
+  let*? () =
+    Block_validation.check_liveness
+      ~live_operations
+      ~live_blocks
+      block_hash
+      operations
+  in
   VP.apply_block
     validator
     chain_store
@@ -886,9 +943,11 @@ let init_test_chain (E {validator_process = (module VP); validator})
 
 let preapply_block (E {validator_process = (module VP); validator} : t)
     chain_store ~predecessor ~protocol_data ~timestamp operations =
+  let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
-  Store.Chain.compute_live_blocks chain_store ~block:predecessor
-  >>=? fun (live_blocks, live_operations) ->
+  let* (live_blocks, live_operations) =
+    Store.Chain.compute_live_blocks chain_store ~block:predecessor
+  in
   let predecessor_shell_header = Store.Block.shell_header predecessor in
   let predecessor_hash = Store.Block.hash predecessor in
   let predecessor_block_metadata_hash =
@@ -897,7 +956,7 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let predecessor_ops_metadata_hash =
     Store.Block.all_operations_metadata_hash predecessor
   in
-  Store.Block.get_block_metadata chain_store predecessor >>=? fun metadata ->
+  let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let predecessor_max_operations_ttl =
     Store.Block.max_operations_ttl metadata
   in

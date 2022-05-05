@@ -112,6 +112,7 @@ end
 open Filename.Infix
 
 let load_protocol proto protocol_root =
+  let open Lwt_result_syntax in
   if Registered_protocol.mem proto then return_unit
   else
     let cmxs_file =
@@ -119,54 +120,69 @@ let load_protocol proto protocol_root =
       // Protocol_hash.to_short_b58check proto
       // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp proto
     in
-    Events.(emit dynload_protocol proto) >|= fun () ->
-    try
-      Dynlink.loadfile_private cmxs_file ;
-      Result.return_unit
-    with Dynlink.Error err ->
-      Format.ksprintf
-        (fun msg ->
-          error
-            Block_validator_errors.(
-              Validation_process_failed (Protocol_dynlink_failure msg)))
-        "Cannot load file: %s. (Expected location: %s.)"
-        (Dynlink.error_message err)
-        cmxs_file
+    let*! () = Events.(emit dynload_protocol proto) in
+    match Dynlink.loadfile_private cmxs_file with
+    | () -> return_unit
+    | exception Dynlink.Error err ->
+        Format.ksprintf
+          (fun msg ->
+            tzfail
+              Block_validator_errors.(
+                Validation_process_failed (Protocol_dynlink_failure msg)))
+          "Cannot load file: %s. (Expected location: %s.)"
+          (Dynlink.error_message err)
+          cmxs_file
+
+let with_retry_to_load_protocol protocol_root f =
+  let open Lwt_syntax in
+  let* r = f () in
+  match r with
+  | Error [Block_validator_errors.Unavailable_protocol {protocol; _}] as
+    original_error -> (
+      (* If `next_protocol` is missing, try to load it *)
+      let* r = load_protocol protocol protocol_root in
+      match r with Error _ -> Lwt.return original_error | Ok () -> f ())
+  | _ -> Lwt.return r
 
 let inconsistent_handshake msg =
   Block_validator_errors.(
     Validation_process_failed (Inconsistent_handshake msg))
 
 let handshake input output =
-  External_validation.send
-    output
-    Data_encoding.Variable.bytes
-    External_validation.magic
-  >>= fun () ->
-  External_validation.recv input Data_encoding.Variable.bytes >>= fun magic ->
+  let open Lwt_syntax in
+  let* () =
+    External_validation.send
+      output
+      Data_encoding.Variable.bytes
+      External_validation.magic
+  in
+  let* magic = External_validation.recv input Data_encoding.Variable.bytes in
   fail_when
     (not (Bytes.equal magic External_validation.magic))
     (inconsistent_handshake "bad magic")
 
 let init input =
-  Events.(emit initialization_request ()) >>= fun () ->
-  External_validation.recv input External_validation.parameters_encoding
-  >>= fun {
-            context_root;
-            protocol_root;
-            sandbox_parameters;
-            genesis;
-            user_activated_upgrades;
-            user_activated_protocol_overrides;
-            operation_metadata_size_limit;
-          } ->
-  let sandbox_param =
+  let open Lwt_syntax in
+  let* () = Events.(emit initialization_request ()) in
+  let* {
+         context_root;
+         protocol_root;
+         sandbox_parameters;
+         genesis;
+         user_activated_upgrades;
+         user_activated_protocol_overrides;
+         operation_metadata_size_limit;
+       } =
+    External_validation.recv input External_validation.parameters_encoding
+  in
+  let sandbox_parameters =
     Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
   in
-  Context.init
-    ~patch_context:(Patch_context.patch_context genesis sandbox_param)
-    context_root
-  >>= fun context_index ->
+  let* context_index =
+    Context.init
+      ~patch_context:(Patch_context.patch_context genesis sandbox_parameters)
+      context_root
+  in
   Lwt.return
     ( context_index,
       protocol_root,
@@ -176,18 +192,22 @@ let init input =
       operation_metadata_size_limit )
 
 let run input output =
-  handshake input output >>=? fun () ->
-  init input
-  >>= fun ( context_index,
-            protocol_root,
-            genesis,
-            user_activated_upgrades,
-            user_activated_protocol_overrides,
-            operation_metadata_size_limit ) ->
+  let open Lwt_result_syntax in
+  let* () = handshake input output in
+  let*! ( context_index,
+          protocol_root,
+          genesis,
+          user_activated_upgrades,
+          user_activated_protocol_overrides,
+          operation_metadata_size_limit ) =
+    init input
+  in
   let rec loop (cache : Environment_context.Context.block_cache option)
       cached_result =
-    External_validation.recv input External_validation.request_encoding
-    >>= function
+    let*! recved =
+      External_validation.recv input External_validation.request_encoding
+    in
+    match recved with
     | External_validation.Init ->
         let init : unit Lwt.t =
           External_validation.send
@@ -195,23 +215,25 @@ let run input output =
             (Error_monad.result_encoding Data_encoding.empty)
             (Ok ())
         in
-        init >>= fun () -> loop cache None
+        let*! () = init in
+        loop cache None
     | External_validation.Commit_genesis {chain_id} ->
-        let commit_genesis : unit Lwt.t =
-          Events.(emit commit_genesis_request genesis.block) >>= fun () ->
-          Error_monad.protect (fun () ->
+        let*! () = Events.(emit commit_genesis_request genesis.block) in
+        let*! commit =
+          Error_monad.catch_es (fun () ->
               Context.commit_genesis
                 context_index
                 ~chain_id
                 ~time:genesis.time
                 ~protocol:genesis.protocol)
-          >>= fun commit ->
+        in
+        let*! () =
           External_validation.send
             output
             (Error_monad.result_encoding Context_hash.encoding)
             commit
         in
-        commit_genesis >>= fun () -> loop cache None
+        loop cache None
     | External_validation.Validate
         {
           chain_id;
@@ -222,78 +244,71 @@ let run input output =
           operations;
           max_operations_ttl;
         } ->
-        let validate =
-          Events.(emit validation_request block_header) >>= fun () ->
-          ( Error_monad.protect (fun () ->
+        let*! () = Events.(emit validation_request block_header) in
+        let*! block_application_result =
+          let* predecessor_context =
+            Error_monad.catch_es (fun () ->
                 let pred_context_hash =
                   predecessor_block_header.shell.context
                 in
-                Context.checkout context_index pred_context_hash >>= function
+                let*! o = Context.checkout context_index pred_context_hash in
+                match o with
                 | Some context -> return context
                 | None ->
-                    fail
+                    tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          pred_context_hash))
-          >>=? fun predecessor_context ->
-            Context.get_protocol predecessor_context >>= fun protocol_hash ->
-            load_protocol protocol_hash protocol_root >>=? fun () ->
-            let env =
-              {
-                Block_validation.chain_id;
-                user_activated_upgrades;
-                user_activated_protocol_overrides;
-                operation_metadata_size_limit;
-                max_operations_ttl;
-                predecessor_block_header;
-                predecessor_block_metadata_hash;
-                predecessor_ops_metadata_hash;
-                predecessor_context;
-              }
-            in
-            let predecessor_context = predecessor_block_header.shell.context in
-            let cache =
-              match cache with
-              | None -> `Load
-              | Some cache -> `Inherited (cache, predecessor_context)
-            in
-            Block_validation.apply
-              ?cached_result
-              env
-              block_header
-              operations
-              ~cache
-            >>= function
-            | Error [Block_validator_errors.Unavailable_protocol {protocol; _}]
-              as err -> (
-                (* If `next_protocol` is missing, try to load it *)
-                load_protocol protocol protocol_root
-                >>= function
-                | Error _ -> Lwt.return err
-                | Ok () ->
-                    Block_validation.apply env block_header operations ~cache)
-            | result -> Lwt.return result )
-          >>= fun res ->
-          let (res, cache) =
-            match res with
-            | Error [Validation_errors.Inconsistent_hash _] as err ->
-                (* This is a special case added for Hangzhou that could
-                   be removed once the successor of Hangzhou will be
-                   activated. This behavior is here to keep the
-                   compatibility with the version Octez v11 which has a
-                   buggy behavior with Hangzhou. *)
-                (err, None)
-            | Error _ as err -> (err, cache)
-            | Ok {result; cache} ->
-                ( Ok result,
-                  Some {context_hash = block_header.shell.context; cache} )
           in
+          let*! protocol_hash = Context.get_protocol predecessor_context in
+          let* () = load_protocol protocol_hash protocol_root in
+          let env =
+            {
+              Block_validation.chain_id;
+              user_activated_upgrades;
+              user_activated_protocol_overrides;
+              operation_metadata_size_limit;
+              max_operations_ttl;
+              predecessor_block_header;
+              predecessor_block_metadata_hash;
+              predecessor_ops_metadata_hash;
+              predecessor_context;
+            }
+          in
+          let predecessor_context = predecessor_block_header.shell.context in
+          let cache =
+            match cache with
+            | None -> `Load
+            | Some cache -> `Inherited (cache, predecessor_context)
+          in
+          with_retry_to_load_protocol protocol_root (fun () ->
+              Block_validation.apply
+                ?cached_result
+                env
+                block_header
+                operations
+                ~cache)
+        in
+        let (block_application_result, cache) =
+          match block_application_result with
+          | Error [Validation_errors.Inconsistent_hash _] as err ->
+              (* This is a special case added for Hangzhou that could
+                 be removed once the successor of Hangzhou will be
+                 activated. This behavior is here to keep the
+                 compatibility with the version Octez v11 which has a
+                 buggy behavior with Hangzhou. *)
+              (err, None)
+          | Error _ as err -> (err, cache)
+          | Ok {result; cache} ->
+              ( Ok result,
+                Some {context_hash = block_header.shell.context; cache} )
+        in
+        let*! () =
           External_validation.send
             output
             (Error_monad.result_encoding Block_validation.result_encoding)
-            res
-          >>= fun () -> Lwt.return cache
+            block_application_result
         in
-        validate >>= fun cache -> loop cache None
+        loop cache None
     | Preapply
         {
           chain_id;
@@ -308,64 +323,62 @@ let run input output =
           predecessor_ops_metadata_hash;
           operations;
         } ->
-        let preapply =
-          (* TODO event preapply *)
-          (( Error_monad.protect (fun () ->
-                 let pred_context_hash = predecessor_shell_header.context in
-                 Context.checkout context_index pred_context_hash >>= function
-                 | Some context -> return context
-                 | None ->
-                     fail
-                       (Block_validator_errors.Failed_to_checkout_context
-                          pred_context_hash))
-           >>=? fun predecessor_context ->
-             Context.get_protocol predecessor_context >>= fun protocol_hash ->
-             load_protocol protocol_hash protocol_root >>=? fun () ->
-             let preapply () =
-               Block_validation.preapply
-                 ~chain_id
-                 ~user_activated_upgrades
-                 ~user_activated_protocol_overrides
-                 ~operation_metadata_size_limit
-                 ~timestamp
-                 ~protocol_data
-                 ~live_blocks
-                 ~live_operations
-                 ~predecessor_context
-                 ~predecessor_shell_header
-                 ~predecessor_hash
-                 ~predecessor_max_operations_ttl
-                 ~predecessor_block_metadata_hash
-                 ~predecessor_ops_metadata_hash
-                 operations
-             in
-             preapply () >>= function
-             | Error [Block_validator_errors.Unavailable_protocol {protocol; _}]
-               as err -> (
-                 (* If `next_protocol` is missing, try to load it *)
-                 load_protocol protocol protocol_root
-                 >>= function
-                 | Error _ -> Lwt.return err
-                 | Ok () -> preapply ())
-             | result -> Lwt.return result )
-           >>= function
-           | Ok (res, last_preapplied_context) ->
-               External_validation.send
-                 output
-                 (Error_monad.result_encoding
-                    Block_validation.preapply_result_encoding)
-                 (Ok res)
-               >>= fun () -> Lwt.return_some last_preapplied_context
-           | Error _ as err ->
-               External_validation.send
-                 output
-                 (Error_monad.result_encoding
-                    Block_validation.preapply_result_encoding)
-                 err
-               >>= fun () -> Lwt.return_none)
-          >>= fun cachable_result -> Lwt.return cachable_result
+        let*! block_preapplication_result =
+          let* predecessor_context =
+            Error_monad.catch_es (fun () ->
+                let pred_context_hash = predecessor_shell_header.context in
+                let*! context =
+                  Context.checkout context_index pred_context_hash
+                in
+                match context with
+                | Some context -> return context
+                | None ->
+                    tzfail
+                      (Block_validator_errors.Failed_to_checkout_context
+                         pred_context_hash))
+          in
+          let*! protocol_hash = Context.get_protocol predecessor_context in
+          let* () = load_protocol protocol_hash protocol_root in
+          with_retry_to_load_protocol protocol_root (fun () ->
+              Block_validation.preapply
+                ~chain_id
+                ~user_activated_upgrades
+                ~user_activated_protocol_overrides
+                ~operation_metadata_size_limit
+                ~timestamp
+                ~protocol_data
+                ~live_blocks
+                ~live_operations
+                ~predecessor_context
+                ~predecessor_shell_header
+                ~predecessor_hash
+                ~predecessor_max_operations_ttl
+                ~predecessor_block_metadata_hash
+                ~predecessor_ops_metadata_hash
+                operations)
         in
-        preapply >>= fun cachable_result -> loop cache cachable_result
+        let*! cachable_result =
+          match block_preapplication_result with
+          | Ok (res, last_preapplied_context) ->
+              let*! () =
+                External_validation.send
+                  output
+                  (Error_monad.result_encoding
+                     Block_validation.preapply_result_encoding)
+                  (Ok res)
+              in
+              Lwt.return_some last_preapplied_context
+          | Error _ as err ->
+              let*! () =
+                External_validation.send
+                  output
+                  (Error_monad.result_encoding
+                     Block_validation.preapply_result_encoding)
+                  err
+              in
+              Lwt.return_none
+        in
+        loop cache cachable_result
     | External_validation.Precheck
         {
           chain_id;
@@ -375,110 +388,126 @@ let run input output =
           operations;
           hash;
         } ->
-        let validate =
-          Events.(emit precheck_request hash) >>= fun () ->
-          ( Error_monad.protect (fun () ->
-                Context.checkout
-                  context_index
-                  predecessor_block_header.shell.context
-                >>= function
+        let*! () = Events.(emit precheck_request hash) in
+        let*! block_precheck_result =
+          let* predecessor_context =
+            Error_monad.catch_es (fun () ->
+                let*! o =
+                  Context.checkout
+                    context_index
+                    predecessor_block_header.shell.context
+                in
+                match o with
                 | Some context -> return context
                 | None ->
-                    fail
+                    tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          predecessor_block_header.shell.context))
-          >>=? fun predecessor_context ->
-            let cache =
-              match cache with
-              | None -> `Lazy
-              | Some cache ->
-                  `Inherited (cache, predecessor_block_header.shell.context)
-            in
-            Block_validation.precheck
-              ~chain_id
-              ~predecessor_block_header
-              ~predecessor_block_hash
-              ~predecessor_context
-              ~cache
-              header
-              operations )
-          >>= fun res ->
+          in
+          let cache =
+            match cache with
+            | None -> `Lazy
+            | Some cache ->
+                `Inherited (cache, predecessor_block_header.shell.context)
+          in
+          Block_validation.precheck
+            ~chain_id
+            ~predecessor_block_header
+            ~predecessor_block_hash
+            ~predecessor_context
+            ~cache
+            header
+            operations
+        in
+        let*! () =
           External_validation.send
             output
             (Error_monad.result_encoding Data_encoding.unit)
-            res
+            block_precheck_result
         in
-        validate >>= fun () -> loop cache cached_result
+        loop cache cached_result
     | External_validation.Fork_test_chain {context_hash; forked_header} ->
-        let fork_test_chain : unit Lwt.t =
-          Events.(emit fork_test_chain_request forked_header) >>= fun () ->
-          Context.checkout context_index context_hash >>= function
+        let*! () = Events.(emit fork_test_chain_request forked_header) in
+        let*! context_opt = Context.checkout context_index context_hash in
+        let*! () =
+          match context_opt with
           | Some ctxt ->
-              (Block_validation.init_test_chain ctxt forked_header >>= function
-               | Error [Block_validator_errors.Missing_test_protocol protocol]
-                 ->
-                   load_protocol protocol protocol_root >>=? fun () ->
-                   Block_validation.init_test_chain ctxt forked_header
-               | result -> Lwt.return result)
-              >>= fun result ->
+              let*! test_chain_init_result =
+                with_retry_to_load_protocol protocol_root (fun () ->
+                    Block_validation.init_test_chain ctxt forked_header)
+              in
               External_validation.send
                 output
                 (Error_monad.result_encoding Block_header.encoding)
-                result
+                test_chain_init_result
           | None ->
               External_validation.send
                 output
                 (Error_monad.result_encoding Data_encoding.empty)
-                (error
+                (Result_syntax.tzfail
                    (Block_validator_errors.Failed_to_checkout_context
                       context_hash))
         in
-        fork_test_chain >>= fun () -> loop cache None
+        loop cache None
     | External_validation.Terminate ->
-        Lwt_io.flush_all () >>= fun () -> Events.(emit termination_request ())
+        let*! () = Lwt_io.flush_all () in
+        Events.(emit termination_request ())
     | External_validation.Reconfigure_event_logging config ->
-        Internal_event_unix.Configuration.reapply config >>= fun res ->
-        External_validation.send
-          output
-          (Error_monad.result_encoding Data_encoding.empty)
-          res
-        >>= fun () -> loop cache None
+        let*! res =
+          Tezos_base_unix.Internal_event_unix.Configuration.reapply config
+        in
+        let*! () =
+          External_validation.send
+            output
+            (Error_monad.result_encoding Data_encoding.empty)
+            res
+        in
+        loop cache None
   in
-  loop None None >>= fun () -> return_unit
+  let*! () = loop None None in
+  return_unit
 
 let main ?socket_dir () =
+  let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
-  (match socket_dir with
-  | Some socket_dir ->
-      Internal_event_unix.init () >>= fun () ->
-      let pid = Unix.getpid () in
-      let socket_path = External_validation.socket_path ~socket_dir ~pid in
-      External_validation.create_socket_connect ~canceler ~socket_path
-      >>= fun socket_process ->
-      let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
-      let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
-      Lwt.return (socket_in, socket_out)
-  | None -> Lwt.return (Lwt_io.stdin, Lwt_io.stdout))
-  >>= fun (in_channel, out_channel) ->
-  Events.(emit initialized ()) >>= fun () ->
-  Lwt.catch
-    (fun () ->
-      run in_channel out_channel >>=? fun () ->
-      Lwt_canceler.cancel canceler >>= function
-      | Ok () | Error [] -> return_unit
-      | Error (exc :: excs) ->
-          let texc = TzTrace.make (Error_monad.Exn exc) in
-          let texcs =
-            List.map (fun exc -> TzTrace.make (Error_monad.Exn exc)) excs
-          in
-          let t = List.fold_left TzTrace.conp texc texcs in
-          Lwt.return (Error t))
-    fail_with_exn
-  >>= function
-  | Ok () -> Events.(emit terminated ()) >>= fun () -> return_unit
+  let*! (in_channel, out_channel) =
+    match socket_dir with
+    | Some socket_dir ->
+        let*! () = Tezos_base_unix.Internal_event_unix.init () in
+        let pid = Unix.getpid () in
+        let socket_path = External_validation.socket_path ~socket_dir ~pid in
+        let*! socket_process =
+          External_validation.create_socket_connect ~canceler ~socket_path
+        in
+        let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
+        let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
+        Lwt.return (socket_in, socket_out)
+    | None -> Lwt.return (Lwt_io.stdin, Lwt_io.stdout)
+  in
+  let*! () = Events.(emit initialized ()) in
+  let*! r =
+    Error_monad.catch_es (fun () ->
+        let* () = run in_channel out_channel in
+        let*! r = Lwt_canceler.cancel canceler in
+        match r with
+        | Ok () | Error [] -> return_unit
+        | Error (exc :: excs) ->
+            let texc = TzTrace.make (Error_monad.Exn exc) in
+            let texcs =
+              List.map (fun exc -> TzTrace.make (Error_monad.Exn exc)) excs
+            in
+            let t = TzTrace.conp_list texc texcs in
+            Lwt.return (Error t))
+  in
+  match r with
+  | Ok () ->
+      let*! () = Events.(emit terminated ()) in
+      return_unit
   | Error _ as errs ->
-      External_validation.send
-        out_channel
-        (Error_monad.result_encoding Data_encoding.unit)
-        errs
-      >>= fun () -> Lwt.return errs
+      let*! () =
+        External_validation.send
+          out_channel
+          (Error_monad.result_encoding Data_encoding.unit)
+          errs
+      in
+      Lwt.return errs

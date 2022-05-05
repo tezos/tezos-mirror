@@ -25,4 +25,4 @@
 
 let build_node_directory config dir =
   RPC_directory.register0 dir Node_services.S.config (fun () () ->
-      return config)
+      Lwt.return_ok config)

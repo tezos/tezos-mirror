@@ -8,7 +8,8 @@ How to get Tezos
 In this how-to we explain how to get up-to-date binaries to run Tezos
 (more precisely, the "Octez" implementation of Tezos software)
 on any network (either on the mainnet or on one of the test networks).
-Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable files), including: a client, a node, a baker, and an endorser.
+Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable files), including: a client, a node, and a baker.
+(Before the :doc:`Ithaca protocol<../protocols/012_ithaca>` it also included an endorser.)
 
 There are several options for getting the binaries, depending on how you plan to use Tezos:
 
@@ -73,8 +74,24 @@ binaries and their dependencies using a package manager, as follows.
 Ubuntu Launchpad PPA with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu, you can install packages with Tezos binaries from the Launchpad PPA.
-Currently it supports Focal and Bionic versions. In order to add the PPA repository to your machine and install the binaries, run the following commands:
+If you're using Ubuntu, you can install packages with Tezos binaries from a Launchpad PPA.
+Currently it supports Focal and Bionic versions.
+
+In order to add the stable release PPA repository to your machine, run:
+
+.. literalinclude:: install-bin-ubuntu.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Alternatively, to add the release candidates PPA instead, run:
+
+.. literalinclude:: install-bin-rc-ubuntu.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Then, to install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-ubuntu.sh
    :language: shell
@@ -90,8 +107,24 @@ by ``apt-get update``.
 Fedora Copr repository with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
-Currently it supports Fedora 33 and 34. In order to add the Copr repository to your machine and install the binaries, run the following commands:
+If you're using Fedora, you can install packages with Tezos binaries from a Copr repository.
+Currently it supports Fedora 34.
+
+In order to add the stable Copr repository to your machine, run:
+
+.. literalinclude:: install-bin-fedora.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Alternatively, to add the release candidates Copr repository instead, run:
+
+.. literalinclude:: install-bin-rc-fedora.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Then, to install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
@@ -112,8 +145,24 @@ Using Docker images
 For every change committed in the GitLab repository, Docker images are
 automatically generated and published on `DockerHub
 <https://hub.docker.com/r/tezos/tezos/>`_. This provides a convenient
-way to run an always up-to-date ``tezos-node``.  The script
-``tezos-docker-manager.sh`` (formally known as ``alphanet.sh``) is
+way to run an always up-to-date ``tezos-node``.
+
+One way to run those Docker images is with Docker Compose.
+An example Docker Compose script is provided in
+:src:`scripts/docker/docker-compose-generic.yml`.
+It launches a node, a baker, and an accuser for protocol Alpha.
+You can adapt it to run the baker and accuser for other protocols
+by replacing all instances of ``alpha`` to e.g. ``012-Psithaca`` for Ithaca.
+Replacing the value of the ``PROTOCOL`` environment variable is enough
+but you may want to update the ``hostname`` and the container name too.
+
+Deprecated: Tezos Docker Manager Script
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**This section is deprecated. The** ``tezos-docker-manager.sh`` **script may
+be removed from Octez version 14.0.**
+
+The script ``tezos-docker-manager.sh`` (formally known as ``alphanet.sh``) is
 provided to download the right image for each network and run a
 simple node.  Its only requirement is a working installation of
 `Docker <https://www.docker.com/>`__ (including both Docker Engine and Docker Compose) on a machine
@@ -121,12 +170,12 @@ with architecture **x86_64**.  Although we only officially support
 Linux, the script has been tested with success in the past on
 Windows, OS X, and Linux.
 
-The same script can be used to run Tezos on Mainnet, on Hangzhounet, or on other network: it
+The same script can be used to run Tezos on Mainnet, on Ithacanet, or on other network: it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Tezos on the Hangzhounet test network with the latest release:
+For example, to run Tezos on the Ithacanet test network with the latest release:
 
-.. literalinclude:: use-docker-hangzhounet.sh
+.. literalinclude:: use-docker-ithacanet.sh
    :language: shell
    :start-after: [get testnet]
    :end-before: [start testnet]
@@ -136,37 +185,37 @@ Alternatively, to run on Mainnet::
    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
    chmod +x mainnet.sh
 
-In the following we assume you are running on the Hangzhounet test network.
+In the following we assume you are running on the Ithacanet test network.
 You are now one step away from a working node:
 
-.. literalinclude:: use-docker-hangzhounet.sh
+.. literalinclude:: use-docker-ithacanet.sh
    :language: shell
    :start-after: [start testnet]
 
-This will download the right Docker image for your chosen network, launch 3
-Docker containers running the node, the baker and the endorser. Keep in mind
+This will download the right Docker image for your chosen network, launch two
+Docker containers running the node and the baker. Keep in mind
 that when a Tezos node is launched, it needs to connect to new peers and
 synchronize the chain. This can be *lengthy* on the first launch
 considering that the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``hangzhounet.sh`` will check for updates of the node and
+Every call to ``ithacanet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./hangzhounet.sh restart
+    ./ithacanet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
    export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./hangzhounet.sh --help`` for more information about the
-script. In particular see ``./hangzhounet.sh client --help`` or the
+See ``./ithacanet.sh --help`` for more information about the
+script. In particular see ``./ithacanet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed by using ``./hangzhounet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
-can be executed using ``./hangzhounet.sh admin-client``.
+executed by using ``./ithacanet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
+can be executed using ``./ithacanet.sh admin-client``.
 
 
 .. _building_with_opam:
@@ -275,7 +324,9 @@ Now, install all the binaries by:
   :start-after: [install tezos]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
-install tezos-endorser-alpha``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
+install tezos-baker-alpha``, ... In that case, it is enough to install
+the system dependencies of this package only by running ``opam depext
+tezos-node`` for example instead of ``opam depext tezos``.
 
 .. warning::
 
@@ -390,7 +441,9 @@ another location (such as ``/usr/local/bin``), the Tezos binaries may
 prompt you to install the Zcash parameter files. The easiest way is to
 download and run this script::
 
-   https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+   wget https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+   chmod +x fetch-params.sh
+   ./fetch-params.sh
 
 The node will try to find Zcash parameters in the following directories,
 in this order:

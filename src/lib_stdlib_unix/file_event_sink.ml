@@ -213,12 +213,13 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         Uri.get_query_param' uri "name-matches" |> Option.value ~default:[]
       in
       let names = Uri.get_query_param' uri "name" |> Option.value ~default:[] in
-      let levels =
-        let ( >?? ) = Option.bind in
-        Uri.get_query_param uri "level-at-least"
-        >?? Internal_event.Level.of_string
-        |> Option.fold ~none:[] ~some:(fun l -> [Event_filter.level_at_least l])
+      let level_o =
+        let open Option_syntax in
+        let* lal = Uri.get_query_param uri "level-at-least" in
+        let* lal = Internal_event.Level.of_string lal in
+        return (Event_filter.level_at_least lal)
       in
+      let levels = Option.to_list level_o in
       let sections =
         let somes =
           Uri.get_query_param' uri "section"
@@ -250,7 +251,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     let t =
       {path = Uri.path uri; lwt_bad_citizen_hack = ref []; event_filter}
     in
-    return t
+    Lwt.return_ok t
 
   let output_json ~pp file_path event_json =
     let open Lwt_syntax in
@@ -261,7 +262,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         in
         let* ru = Lwt_utils_unix.Json.write_file file_path event_json in
         match ru with
-        | Ok () -> Error_monad.return_unit
+        | Ok () -> return_ok_unit
         | Error el ->
             failwith
               "ERROR while Handling %a,@ cannot write JSON to %s:@ %a\n%!"
@@ -280,7 +281,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
 
   let handle (type a) {path; lwt_bad_citizen_hack; event_filter} m
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Micro_seconds.now () in
     let (date, time) = Micro_seconds.date_string now in
@@ -332,7 +333,7 @@ open Sink_implementation
 
 module Query = struct
   let with_file_kind dir p =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* kind =
       protect (fun () ->
           let* {Lwt_unix.st_kind; _} =
@@ -347,7 +348,7 @@ module Query = struct
         return (`Special (k, p))
 
   let fold_directory path ~init ~f =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* dirhandle =
       protect (fun () -> Lwt_result.ok @@ Lwt_unix.opendir path)
     in
@@ -469,7 +470,7 @@ module Query = struct
       | `Warning e -> fprintf fmt "@[Warning:@ %a@]" warning e
 
     let make_return m ((prev : item list), value) warning =
-      return (m warning :: prev, value)
+      Lwt.return_ok (m warning :: prev, value)
 
     let return_with_warning v e = make_return (fun e -> `Warning e) v e
 
@@ -479,6 +480,7 @@ module Query = struct
   open Report
 
   let fold_event_kind_directory ~time_query path ~init ~f =
+    let open Lwt_result_syntax in
     fold_directory path ~init:(return init) ~f:(fun previous -> function
       | `Directory "." | `Directory ".." -> return previous
       | `Directory date when Time_constraint.check_date time_query date ->
@@ -515,17 +517,21 @@ module Query = struct
     let module Event = (val ev : Internal_event.EVENT_DEFINITION with type t = a)
     in
     let handle_event_file previous path =
-      Lwt_utils_unix.Json.read_file path >>= function
+      let open Lwt_result_syntax in
+      let*! r = Lwt_utils_unix.Json.read_file path in
+      match r with
       | Ok json -> (
           try
             let {time_stamp; event; _} =
               Data_encoding.Json.destruct (wrapped_encoding Event.encoding) json
             in
-            f
-              (snd previous)
-              ~time_stamp:(time_stamp :> float)
-              (Internal_event.Generic.Event (Event.name, ev, event))
-            >>=? fun user_return -> return (fst previous, user_return)
+            let* user_return =
+              f
+                (snd previous)
+                ~time_stamp:(time_stamp :> float)
+                (Internal_event.Generic.Event (Event.name, ev, event))
+            in
+            return (fst previous, user_return)
           with e ->
             return_with_error previous (`Parsing_event (`Encoding (path, e))))
       | Error el ->
@@ -539,7 +545,7 @@ module Query = struct
 
   let fold ?on_unknown ?only_sections ?only_names ?(time_query = `All) uri ~init
       ~f =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let name_matches =
       match only_names with
       | None -> fun _ -> true

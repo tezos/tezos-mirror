@@ -24,31 +24,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Assert_lib = Lib_test_extra.Assert_lib
 open Test_utils
 
 let check_flags descr store expected_head =
+  let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  Store.Chain.current_head chain_store >>= fun current_head ->
-  Assert.equal_block
+  let*! current_head = Store.Chain.current_head chain_store in
+  Assert_lib.Crypto.equal_block
     ~msg:("head consistency: " ^ descr)
     (Store.Block.header expected_head)
     (Store.Block.header current_head) ;
   let history_mode = Store.Chain.history_mode chain_store in
-  Assert.equal_history_mode
+  Assert_lib.Shell_services.equal_history_mode
     ~msg:("history mode consistency: " ^ descr)
     history_mode
     History_mode.Archive ;
-  Store.Chain.checkpoint chain_store >>= fun checkpoint ->
-  Store.Block.get_block_metadata chain_store expected_head >>=? fun metadata ->
+  let*! checkpoint = Store.Chain.checkpoint chain_store in
+  let* metadata = Store.Block.get_block_metadata chain_store expected_head in
   let expected_checkpoint = Store.Block.last_allowed_fork_level metadata in
-  Assert.equal
-    ~prn:(Format.sprintf "%ld")
+  Assert.Int32.equal
     ~msg:("checkpoint consistency: " ^ descr)
     expected_checkpoint
     (snd checkpoint) ;
-  Store.Chain.savepoint chain_store >>= fun savepoint ->
+  let*! savepoint = Store.Chain.savepoint chain_store in
   Assert.equal ~msg:("savepoint consistency: " ^ descr) 0l (snd savepoint) ;
-  Store.Chain.caboose chain_store >>= fun caboose ->
+  let*! caboose = Store.Chain.caboose chain_store in
   Assert.equal
     ~msg:("caboose consistency: " ^ descr)
     (snd savepoint)
@@ -57,55 +58,72 @@ let check_flags descr store expected_head =
 
 let test_from_bootstrapped ~descr (store_dir, context_dir) store
     ~nb_blocks_to_bake ~patch_context =
+  let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let genesis = Store.Chain.genesis chain_store in
-  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
-  Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
-  >>=? fun (baked_blocks, last) ->
-  Store.Chain.savepoint chain_store >>= fun savepoint ->
-  Store.close_store store >>= fun () ->
-  Error_monad.protect
-    (fun () ->
-      Reconstruction.reconstruct
+  let*! genesis_block = Store.Chain.genesis_block chain_store in
+  let* (baked_blocks, last) =
+    Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
+  in
+  let*! savepoint = Store.Chain.savepoint chain_store in
+  let*! () = Store.close_store store in
+  let* expected_to_fail =
+    Error_monad.protect
+      (fun () ->
+        let* () =
+          Reconstruction.reconstruct
+            ~patch_context
+            ~store_dir
+            ~context_dir
+            genesis
+            ~user_activated_upgrades:[]
+            ~user_activated_protocol_overrides:[]
+            ~operation_metadata_size_limit:None
+            ~progress_display_mode:Animation.Auto
+        in
+        return_false)
+      ~on_error:(function
+        | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e
+          ->
+            if Compare.Int32.(snd savepoint = 0l) then
+              (* It is expected as nothing was pruned *)
+              return_true
+            else (
+              Format.printf
+                "@\nTest failed:@\n%a@."
+                Error_monad.pp_print_trace
+                e ;
+              Alcotest.fail
+                "Should not fail to reconstruct (nothing_to_reconstruct \
+                 raised).")
+        | [Reconstruction.(Cannot_reconstruct History_mode.Archive)]
+        | [Reconstruction.(Cannot_reconstruct (History_mode.Rolling _))] ->
+            (* In both Archive and Rolling _ modes, the reconstruction should fail *)
+            return_true
+        | err ->
+            Format.printf
+              "@\nTest failed:@\n%a@."
+              Error_monad.pp_print_trace
+              err ;
+            Alcotest.fail "Should not fail")
+  in
+  if expected_to_fail then return_unit
+  else
+    let* store' =
+      Store.init
         ~patch_context
         ~store_dir
         ~context_dir
+        ~allow_testchains:false
         genesis
-        ~user_activated_upgrades:[]
-        ~user_activated_protocol_overrides:[]
-        ~operation_metadata_size_limit:None
-      >>=? fun () -> return_false)
-    ~on_error:(function
-      | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e ->
-          if Compare.Int32.(snd savepoint = 0l) then
-            (* It is expected as nothing was pruned *)
-            return_true
-          else (
-            Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace e ;
-            Alcotest.fail
-              "Should not fail to reconstruct (nothing_to_reconstruct raised).")
-      | [Reconstruction.(Cannot_reconstruct History_mode.Archive)]
-      | [Reconstruction.(Cannot_reconstruct (History_mode.Rolling _))] ->
-          (* In both Archive and Rolling _ modes, the reconstruction should fail *)
-          return_true
-      | err ->
-          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
-          Alcotest.fail "Should not fail")
-  >>=? fun expected_to_fail ->
-  if expected_to_fail then return_unit
-  else
-    Store.init
-      ~patch_context
-      ~store_dir
-      ~context_dir
-      ~allow_testchains:false
-      genesis
-    >>=? fun store' ->
+    in
     let chain_store' = Store.main_chain_store store' in
-    check_flags descr store' last >>=? fun () ->
-    assert_presence_in_store ~with_metadata:true chain_store' baked_blocks
-    >>=? fun () ->
-    Store.close_store store' >>= fun () -> return_unit
+    let* () = check_flags descr store' last in
+    let* () =
+      assert_presence_in_store ~with_metadata:true chain_store' baked_blocks
+    in
+    let*! () = Store.close_store store' in
+    return_unit
 
 let make_tests_bootstrapped speed patch_context =
   let history_modes =
@@ -154,86 +172,112 @@ let make_tests_bootstrapped speed patch_context =
 
 let test_from_snapshot ~descr:_ (store_dir, context_dir) store
     ~nb_blocks_to_bake ~patch_context =
+  let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
-  Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
-  >>=? fun (baked_blocks, last) ->
-  (Store.Block.get_block_metadata_opt chain_store last >>= function
-   | Some m -> Lwt.return (Store.Block.last_allowed_fork_level m)
-   | None -> assert false)
-  >>= fun lafl ->
-  Store.Chain.savepoint chain_store >>= fun savepoint ->
-  Store.close_store store >>= fun () ->
+  let*! genesis_block = Store.Chain.genesis_block chain_store in
+  let* (baked_blocks, last) =
+    Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
+  in
+  let*! lafl =
+    let*! o = Store.Block.get_block_metadata_opt chain_store last in
+    match o with
+    | Some m -> Lwt.return (Store.Block.last_allowed_fork_level m)
+    | None -> assert false
+  in
+  let*! savepoint = Store.Chain.savepoint chain_store in
+  let*! () = Store.close_store store in
   let open Filename.Infix in
   let dir = store_dir // "imported_store" in
   let dst_store_dir = dir // "store" in
   let dst_context_dir = dir // "context" in
-  Error_monad.protect
-    (fun () ->
-      let last_hash = Store.Block.hash last in
-      let snapshot_path = store_dir // "snapshot.full" in
-      let chain_name = Distributed_db_version.Name.of_string "test" in
-      (*FIXME test over Raw formats as well *)
-      Snapshots.export
-        Snapshots.Tar
-        ~rolling:false
-        ~block:(`Hash (last_hash, 0))
-        ~store_dir
-        ~context_dir
-        ~chain_name
-        ~snapshot_path
-        genesis
-      >>=? fun () ->
-      Snapshots.import
-        ~patch_context
-        ~block:last_hash
-        ~snapshot_path
-        ~dst_store_dir
-        ~dst_context_dir
-        ~chain_name
-        ~user_activated_upgrades:[]
-        ~user_activated_protocol_overrides:[]
-        ~operation_metadata_size_limit:None
-        genesis
-      >>=? fun () ->
-      Reconstruction.reconstruct
-        ~patch_context
-        ~store_dir:dst_store_dir
-        ~context_dir:dst_context_dir
-        genesis
-        ~user_activated_upgrades:[]
-        ~user_activated_protocol_overrides:[]
-        ~operation_metadata_size_limit:None
-      >>=? fun () -> return_false)
-    ~on_error:(function
-      | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e ->
-          if Compare.Int32.(lafl = 0l) || snd savepoint = 0l then
-            (* It is expected as nothing was pruned *)
+  let* expected_to_fail =
+    Error_monad.protect
+      (fun () ->
+        let last_hash = Store.Block.hash last in
+        let snapshot_path = store_dir // "snapshot.full" in
+        let chain_name = Distributed_db_version.Name.of_string "test" in
+        (*FIXME test over Raw formats as well *)
+        let* () =
+          Snapshots.export
+            Snapshots.Tar
+            ~rolling:false
+            ~block:(`Hash (last_hash, 0))
+            ~store_dir
+            ~context_dir
+            ~chain_name
+            ~snapshot_path
+            ~on_disk:false
+            ~progress_display_mode:Animation.Auto
+            genesis
+        in
+        let* () =
+          Snapshots.import
+            ~patch_context
+            ~block:last_hash
+            ~snapshot_path
+            ~dst_store_dir
+            ~dst_context_dir
+            ~chain_name
+            ~configured_history_mode:None
+            ~user_activated_upgrades:[]
+            ~user_activated_protocol_overrides:[]
+            ~operation_metadata_size_limit:None
+            ~in_memory:true
+            ~progress_display_mode:Animation.Auto
+            genesis
+        in
+        let* () =
+          Reconstruction.reconstruct
+            ~patch_context
+            ~store_dir:dst_store_dir
+            ~context_dir:dst_context_dir
+            genesis
+            ~user_activated_upgrades:[]
+            ~user_activated_protocol_overrides:[]
+            ~operation_metadata_size_limit:None
+            ~progress_display_mode:Animation.Auto
+        in
+        return_false)
+      ~on_error:(function
+        | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e
+          ->
+            if Compare.Int32.(lafl = 0l) || snd savepoint = 0l then
+              (* It is expected as nothing was pruned *)
+              return_true
+            else (
+              Format.printf
+                "@\nTest failed:@\n%a@."
+                Error_monad.pp_print_trace
+                e ;
+              Alcotest.fail
+                "Should not fail to reconstruct (nothing_to_reconstruct \
+                 raised).")
+        | [Reconstruction.(Cannot_reconstruct History_mode.Archive)] ->
+            (* In Archive, the reconstruction should fail *)
             return_true
-          else (
-            Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace e ;
-            Alcotest.fail
-              "Should not fail to reconstruct (nothing_to_reconstruct raised).")
-      | [Reconstruction.(Cannot_reconstruct History_mode.Archive)] ->
-          (* In Archive, the reconstruction should fail *)
-          return_true
-      | Snapshots.[Invalid_export_block {reason = `Genesis; _}] -> return_true
-      | err ->
-          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
-          Alcotest.fail "Should not fail")
-  >>=? fun expected_to_fail ->
+        | Snapshots.[Invalid_export_block {reason = `Genesis; _}] -> return_true
+        | err ->
+            Format.printf
+              "@\nTest failed:@\n%a@."
+              Error_monad.pp_print_trace
+              err ;
+            Alcotest.fail "Should not fail")
+  in
   if expected_to_fail then return_unit
   else
-    Store.init
-      ~store_dir:dst_store_dir
-      ~context_dir:dst_context_dir
-      ~allow_testchains:false
-      genesis
-    >>=? fun store' ->
+    let* store' =
+      Store.init
+        ~store_dir:dst_store_dir
+        ~context_dir:dst_context_dir
+        ~allow_testchains:false
+        genesis
+    in
     let chain_store' = Store.main_chain_store store' in
-    assert_presence_in_store ~with_metadata:true chain_store' baked_blocks
-    >>=? fun () ->
-    Store.close_store store' >>= fun () -> return_unit
+    let* () =
+      assert_presence_in_store ~with_metadata:true chain_store' baked_blocks
+    in
+    let*! () = Store.close_store store' in
+    return_unit
 
 let make_tests_snapshoted speed patch_context =
   let history_modes =

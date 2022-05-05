@@ -127,6 +127,7 @@ let check_peer_option =
   let* () = Node.config_init node_2 [] in
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
+  let* () = Node.wait_for_ready node_2 in
   let* () = wait in
   let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
@@ -155,6 +156,7 @@ let test_one_connection =
   let* () = Node.config_init node_2 [] in
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
+  let* () = Node.wait_for_ready node_2 in
   let* () = wait in
   let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
@@ -290,13 +292,14 @@ let test_advertised_port () =
     Node.wait_for node_1 "maintenance_ended.v0" (fun _ -> Some ())
   in
 
-  let advertised_net_port = Node.fresh_port () in
+  let advertised_net_port = Port.fresh () in
   let node_2 = Node.create ~advertised_net_port [] in
   let* () = Node.identity_generate node_2 in
   let* () = Node.config_init node_2 [] in
   let () = Node.add_peer node_2 node_1 in
 
   let* () = Node.run node_2 [] in
+  let* () = Node.wait_for_ready node_2 in
   let* () = maintenance_p in
 
   let wait_for_save_p =
@@ -324,5 +327,5 @@ let register_protocol_independent () =
   test_advertised_port ()
 
 let register ~(protocols : Protocol.t list) =
-  check_peer_option ~protocols ;
-  test_one_connection ~protocols
+  check_peer_option protocols ;
+  test_one_connection protocols

@@ -144,8 +144,13 @@ class OriginationResult:
         pattern = r"Operation hash is '?(\w*)"
         match = re.search(pattern, client_output)
         if match is None:
-            raise InvalidClientOutput
+            raise InvalidClientOutput(client_output)
         self.operation_hash = match.groups()[0]
+        pattern = r"Storage size: (.*) bytes"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.storage_size = match.groups()[0]
 
 
 class SubmitProposalsResult:
@@ -476,7 +481,7 @@ class CreateMockupResult(Enum):
     OK = auto()
 
     def to_return_code(self) -> int:
-        """ The expected return code of the client when 'self' is returned """
+        """The expected return code of the client when 'self' is returned"""
         if self == CreateMockupResult.OK:
             return 0
         return 1

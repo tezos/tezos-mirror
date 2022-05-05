@@ -40,3 +40,13 @@ let ballot_encoding =
   splitted
     ~binary:(conv_with_guard to_int8 of_int8 int8)
     ~json:(string_enum [("yay", Yay); ("nay", Nay); ("pass", Pass)])
+
+let equal_ballot a b =
+  match (a, b) with
+  | (Yay, Yay) | (Nay, Nay) | (Pass, Pass) -> true
+  | _ -> false
+
+let pp_ballot ppf = function
+  | Yay -> Format.fprintf ppf "yay"
+  | Nay -> Format.fprintf ppf "nay"
+  | Pass -> Format.fprintf ppf "pass"

@@ -59,10 +59,28 @@ module S = struct
 
   let balance =
     RPC_service.get_service
-      ~description:"Access the balance of a contract."
+      ~description:
+        "Access the spendable balance of a contract, excluding frozen bonds."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "balance")
+
+  let frozen_bonds =
+    RPC_service.get_service
+      ~description:"Access the frozen bonds of a contract."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "frozen_bonds")
+
+  let balance_and_frozen_bonds =
+    RPC_service.get_service
+      ~description:
+        "Access the sum of the spendable balance and frozen bonds of a \
+         contract. This sum is part of the contract's stake, and it is exactly \
+         the contract's stake if the contract is not a delegate."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "balance_and_frozen_bonds")
 
   let manager_key =
     RPC_service.get_service
@@ -99,18 +117,31 @@ module S = struct
       ~output:Script.expr_encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "storage")
 
+  type normalize_types_query = {normalize_types : bool}
+
+  let normalize_types_query : normalize_types_query RPC_query.t =
+    let open RPC_query in
+    query (fun normalize_types -> {normalize_types})
+    |+ flag
+         ~descr:
+           "Whether types should be normalized (annotations removed, combs \
+            flattened) or kept as they appeared in the original script."
+         "normalize_types"
+         (fun t -> t.normalize_types)
+    |> seal
+
   let entrypoint_type =
     RPC_service.get_service
       ~description:"Return the type of the given entrypoint of the contract"
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:Script.expr_encoding
       RPC_path.(
-        custom_root /: Contract.rpc_arg / "entrypoints" /: RPC_arg.string)
+        custom_root /: Contract.rpc_arg / "entrypoints" /: Entrypoint.rpc_arg)
 
   let list_entrypoints =
     RPC_service.get_service
       ~description:"Return the list of entrypoints of the contract"
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:
         (obj2
            (dft
@@ -195,7 +226,7 @@ module S = struct
   let info =
     RPC_service.get_service
       ~description:"Access the complete status of a contract."
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:info_encoding
       RPC_path.(custom_root /: Contract.rpc_arg)
 
@@ -225,7 +256,7 @@ module S = struct
             ~allow_forged_in_storage:true
             script
           >|= fun tzresult ->
-          tzresult >>? fun (Ex_script script, ctxt) ->
+          tzresult >>? fun (Ex_script (Script script), ctxt) ->
           Script_ir_translator.get_single_sapling_state
             ctxt
             script.storage_type
@@ -261,6 +292,12 @@ let[@coq_axiom_with_reason "gadt"] register () =
     opt_register1 ~chunked s (fun ctxt contract () () ->
         Contract.exists ctxt contract >>=? function
         | true -> f ctxt contract >|=? Option.some
+        | false -> return_none)
+  in
+  let register_field_with_query ~chunked s f =
+    opt_register1 ~chunked s (fun ctxt contract query () ->
+        Contract.exists ctxt contract >>=? function
+        | true -> f ctxt contract query >|=? Option.some
         | false -> return_none)
   in
   let register_opt_field ~chunked s f =
@@ -320,6 +357,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
         >|=? fun (_ctxt, rev_values) -> List.rev rev_values
   in
   register_field ~chunked:false S.balance Contract.get_balance ;
+  register_field ~chunked:false S.frozen_bonds Contract.get_frozen_bonds ;
+  register_field
+    ~chunked:false
+    S.balance_and_frozen_bonds
+    Contract.get_balance_and_frozen_bonds ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match Contract.is_implicit contract with
       | None -> return_none
@@ -344,14 +386,13 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
-          unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
-          Script.force_decode_in_context
-            ~consume_deserialization_gas:When_needed
-            ctxt
-            script.storage
-          >>?= fun (storage, _ctxt) -> return_some storage) ;
-  opt_register2 ~chunked:true S.entrypoint_type (fun ctxt v entrypoint () () ->
+          >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+          unparse_data ctxt Readable storage_type storage
+          >|=? fun (storage, _ctxt) -> Some (Micheline.strip_locations storage)) ;
+  opt_register2
+    ~chunked:true
+    S.entrypoint_type
+    (fun ctxt v entrypoint {normalize_types} () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -364,21 +405,29 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ctxt
             expr
           >>?= fun (expr, _) ->
-          parse_toplevel ctxt ~legacy expr
-          >>=? fun ({arg_type; root_name; _}, ctxt) ->
+          parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            (( parse_parameter_ty ctxt ~legacy arg_type
-             >>? fun (Ex_ty arg_type, _) ->
-               Script_ir_translator.find_entrypoint
-                 ~root_name
-                 arg_type
-                 entrypoint )
-             |> function
-             | Ok (_f, Ex_ty ty) ->
-                 unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
-                 Some (Micheline.strip_locations ty_node)
-             | Error _ -> Result.return_none)) ;
-  opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
+            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+              ->
+              Gas_monad.run ctxt
+              @@ Script_ir_translator.find_entrypoint
+                   ~error_details:(Informative ())
+                   arg_type
+                   entrypoints
+                   entrypoint
+              >>? fun (r, ctxt) ->
+              r |> function
+              | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
+                  if normalize_types then
+                    unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _ctxt) ->
+                    Some (Micheline.strip_locations ty_node)
+                  else ok (Some (Micheline.strip_locations original_type_expr))
+              | Error _ -> Result.return_none )) ;
+  opt_register1
+    ~chunked:true
+    S.list_entrypoints
+    (fun ctxt v {normalize_types} () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -391,21 +440,28 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ctxt
             expr
           >>?= fun (expr, _) ->
-          parse_toplevel ctxt ~legacy expr
-          >>=? fun ({arg_type; root_name; _}, ctxt) ->
+          parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            ( ( parse_parameter_ty ctxt ~legacy arg_type
-              >>? fun (Ex_ty arg_type, _) ->
-                Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
-              )
-            >|? fun (unreachable_entrypoint, map) ->
-              Some
-                ( unreachable_entrypoint,
-                  Entrypoints_map.fold
-                    (fun entry (_, ty) acc ->
-                      (entry, Micheline.strip_locations ty) :: acc)
-                    map
-                    [] ) )) ;
+            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+              ->
+              let (unreachable_entrypoint, map) =
+                Script_ir_translator.list_entrypoints_uncarbonated
+                  arg_type
+                  entrypoints
+              in
+              Entrypoint.Map.fold_e
+                (fun entry (Ex_ty ty, original_type_expr) (acc, ctxt) ->
+                  (if normalize_types then
+                   unparse_ty ~loc:() ctxt ty >|? fun (ty_node, ctxt) ->
+                   (Micheline.strip_locations ty_node, ctxt)
+                  else ok (Micheline.strip_locations original_type_expr, ctxt))
+                  >|? fun (ty_expr, ctxt) ->
+                  ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+                map
+                ([], ctxt)
+              >|? fun (entrypoint_types, _ctxt) ->
+              Some (unreachable_entrypoint, entrypoint_types) )) ;
   opt_register1
     ~chunked:true
     S.contract_big_map_get_opt
@@ -427,7 +483,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
+          >>=? fun (Ex_script (Script script), ctxt) ->
           Script_ir_translator.collect_lazy_storage
             ctxt
             script.storage_type
@@ -440,7 +496,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
       do_big_map_get ctxt id key) ;
   register1 ~chunked:true S.big_map_get_all (fun ctxt id {offset; length} () ->
       do_big_map_get_all ?offset ?length ctxt id) ;
-  register_field ~chunked:false S.info (fun ctxt contract ->
+  register_field_with_query
+    ~chunked:false
+    S.info
+    (fun ctxt contract {normalize_types} ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.find ctxt contract >>=? fun delegate ->
       (match Contract.is_implicit contract with
@@ -454,21 +513,30 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | None -> return (None, ctxt)
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
-          let open Script_ir_translator in
-          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
-          unparse_script ctxt Readable script >|=? fun (script, ctxt) ->
-          (Some script, ctxt))
+          Script_ir_translator.parse_and_unparse_script_unaccounted
+            ctxt
+            ~legacy:true
+            ~allow_forged_in_storage:true
+            Readable
+            ~normalize_types
+            script
+          >|=? fun (script, ctxt) -> (Some script, ctxt))
       >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
   S.Sapling.register ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
 
-let info ctxt block contract =
-  RPC_context.make_call1 S.info ctxt block contract () ()
+let info ctxt block contract ~normalize_types =
+  RPC_context.make_call1 S.info ctxt block contract {normalize_types} ()
 
 let balance ctxt block contract =
   RPC_context.make_call1 S.balance ctxt block contract () ()
+
+let frozen_bonds ctxt block contract =
+  RPC_context.make_call1 S.frozen_bonds ctxt block contract () ()
+
+let balance_and_frozen_bonds ctxt block contract =
+  RPC_context.make_call1 S.balance_and_frozen_bonds ctxt block contract () ()
 
 let manager_key ctxt block mgr =
   RPC_context.make_call1
@@ -503,11 +571,24 @@ let script_opt ctxt block contract =
 let storage ctxt block contract =
   RPC_context.make_call1 S.storage ctxt block contract () ()
 
-let entrypoint_type ctxt block contract entrypoint =
-  RPC_context.make_call2 S.entrypoint_type ctxt block contract entrypoint () ()
+let entrypoint_type ctxt block contract entrypoint ~normalize_types =
+  RPC_context.make_call2
+    S.entrypoint_type
+    ctxt
+    block
+    contract
+    entrypoint
+    {normalize_types}
+    ()
 
-let list_entrypoints ctxt block contract =
-  RPC_context.make_call1 S.list_entrypoints ctxt block contract () ()
+let list_entrypoints ctxt block contract ~normalize_types =
+  RPC_context.make_call1
+    S.list_entrypoints
+    ctxt
+    block
+    contract
+    {normalize_types}
+    ()
 
 let storage_opt ctxt block contract =
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()

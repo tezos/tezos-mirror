@@ -42,33 +42,40 @@ type t = {
 (** Block validation *)
 
 let rec worker_loop bv =
-  (match Protocol_hash.Map.choose bv.pending with
-  | None -> Lwt_condition.wait bv.request >>= return
-  | Some (hash, (protocol, _, wakener)) ->
-      bv.pending <- Protocol_hash.Map.remove hash bv.pending ;
-      Updater.compile hash protocol >>= fun valid ->
-      if valid then (
-        Distributed_db.commit_protocol bv.db hash protocol >>=? fun _ ->
-        (match Registered_protocol.get hash with
-        | Some protocol -> Lwt.wakeup_later wakener (Ok protocol)
-        | None ->
-            Lwt.wakeup_later
-              wakener
-              (error (Invalid_protocol {hash; error = Dynlinking_failed}))) ;
-        return_unit)
-      else (
-        (* no need to tag 'invalid' protocol on disk, the economic protocol
-           prevents us from being spammed with protocol validation. *)
-        Lwt.wakeup_later
-          wakener
-          (error (Invalid_protocol {hash; error = Compilation_failed})) ;
-        return_unit))
-  >>= function
+  let open Lwt_result_syntax in
+  let*! r =
+    match Protocol_hash.Map.choose bv.pending with
+    | None ->
+        let*! v = Lwt_condition.wait bv.request in
+        return v
+    | Some (hash, (protocol, _, wakener)) ->
+        bv.pending <- Protocol_hash.Map.remove hash bv.pending ;
+        let*! valid = Updater.compile hash protocol in
+        if valid then (
+          let* _ = Distributed_db.commit_protocol bv.db hash protocol in
+          (match Registered_protocol.get hash with
+          | Some protocol -> Lwt.wakeup_later wakener (Ok protocol)
+          | None ->
+              Lwt.wakeup_later
+                wakener
+                (Result_syntax.tzfail
+                   (Invalid_protocol {hash; error = Dynlinking_failed}))) ;
+          return_unit)
+        else (
+          (* no need to tag 'invalid' protocol on disk, the economic protocol
+             prevents us from being spammed with protocol validation. *)
+          Lwt.wakeup_later
+            wakener
+            (Result_syntax.tzfail
+               (Invalid_protocol {hash; error = Compilation_failed})) ;
+          return_unit)
+  in
+  match r with
   | Ok () -> worker_loop bv
   | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
       Event.(emit validator_terminated) ()
   | Error err ->
-      Event.(emit unexpected_worker_error) err >>= fun () ->
+      let*! () = Event.(emit unexpected_worker_error) err in
       Error_monad.cancel_with_exceptions bv.canceler
 
 let create db =
@@ -88,16 +95,22 @@ let create db =
   bv
 
 let shutdown {canceler; worker; _} =
-  Error_monad.cancel_with_exceptions canceler >>= fun () -> worker
+  let open Lwt_syntax in
+  let* () = Error_monad.cancel_with_exceptions canceler in
+  worker
 
 let validate state hash protocol =
+  let open Lwt_syntax in
   match Registered_protocol.get hash with
   | Some protocol ->
-      Protocol_validator_event.(emit previously_validated_protocol) hash
-      >>= fun () -> return protocol
+      let* () =
+        Protocol_validator_event.(emit previously_validated_protocol) hash
+      in
+      return_ok protocol
   | None -> (
-      Protocol_validator_event.(emit pushing_protocol_validation) hash
-      >>= fun () ->
+      let* () =
+        Protocol_validator_event.(emit pushing_protocol_validation) hash
+      in
       match Protocol_hash.Map.find hash state.pending with
       | None ->
           let (res, wakener) = Lwt.task () in
@@ -109,55 +122,67 @@ let validate state hash protocol =
       | Some (_, res, _) -> res)
 
 let fetch_and_compile_protocol pv ?peer ?timeout hash =
+  let open Lwt_result_syntax in
   match Registered_protocol.get hash with
   | Some proto -> return proto
   | None ->
-      (Distributed_db.Protocol.read_opt pv.db hash >>= function
-       | Some protocol -> return protocol
-       | None ->
-           Event.(emit fetching_protocol) (hash, peer) >>= fun () ->
-           Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ())
-      >>=? fun protocol ->
-      validate pv hash protocol >>=? fun proto -> return proto
+      let* protocol =
+        let*! o = Distributed_db.Protocol.read_opt pv.db hash in
+        match o with
+        | Some protocol -> return protocol
+        | None ->
+            let*! () = Event.(emit fetching_protocol) (hash, peer) in
+            Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ()
+      in
+      let* proto = validate pv hash protocol in
+      return proto
 
 let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
+  let open Lwt_result_syntax in
   let protocol_level = Store.Block.proto_level block in
   let hash = Store.Block.hash block in
   let state = Distributed_db.store pv.db in
-  Store.all_chain_stores state >>= fun chain_stores ->
-  Lwt_utils.find_map_s
-    (fun chain_store ->
-      Store.Block.is_known chain_store hash >>= function
-      | false -> Lwt.return_none
-      | true -> Lwt.return_some chain_store)
-    chain_stores
-  >>= function
+  let*! chain_stores = Store.all_chain_stores state in
+  let*! o =
+    List.find_map_s
+      (fun chain_store ->
+        let*! b = Store.Block.is_known chain_store hash in
+        match b with
+        | false -> Lwt.return_none
+        | true -> Lwt.return_some chain_store)
+      chain_stores
+  in
+  match o with
   | None ->
       failwith
         "protocol_validator.fetch_and_compile_protocols: chain state not found"
   | Some chain_store ->
-      Store.Block.context chain_store block >>=? fun context ->
+      let* context = Store.Block.context chain_store block in
       let protocol =
-        Context.get_protocol context >>= fun protocol_hash ->
-        fetch_and_compile_protocol pv ?peer ?timeout protocol_hash
-        >>=? fun _p ->
+        let*! protocol_hash = Context.get_protocol context in
+        let* _p = fetch_and_compile_protocol pv ?peer ?timeout protocol_hash in
         Store.Chain.may_update_protocol_level
           chain_store
           ~protocol_level
           (block, protocol_hash)
       and test_protocol =
-        Context.get_test_chain context >>= function
+        let*! v = Context.get_test_chain context in
+        match v with
         | Not_running -> return_unit
         | Forking {protocol; _} | Running {protocol; _} -> (
-            fetch_and_compile_protocol pv ?peer ?timeout protocol >>=? fun _ ->
-            Store.Chain.testchain chain_store >>= function
+            let* _ = fetch_and_compile_protocol pv ?peer ?timeout protocol in
+            let*! o = Store.Chain.testchain chain_store in
+            match o with
             | None -> return_unit
             | Some test_chain ->
                 let test_chain_store = Store.Chain.testchain_store test_chain in
-                Store.Chain.may_update_protocol_level
-                  test_chain_store
-                  ~protocol_level
-                  (block, protocol)
-                >>=? fun () -> return_unit)
+                let* () =
+                  Store.Chain.may_update_protocol_level
+                    test_chain_store
+                    ~protocol_level
+                    (block, protocol)
+                in
+                return_unit)
       in
-      protocol >>=? fun () -> test_protocol
+      let* () = protocol in
+      test_protocol

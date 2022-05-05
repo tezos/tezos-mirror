@@ -47,16 +47,13 @@ let log _channel msg =
   Lwt.return_unit
 
 class faked_ctxt (hooks : Faked_services.hooks) (chain_id : Chain_id.t) :
-  RPC_context.json =
+  RPC_context.generic =
   let local_ctxt =
     let module Services = Faked_services.Make ((val hooks)) in
     Tezos_mockup_proxy.RPC_client.local_ctxt (Services.directory chain_id)
   in
   object
     method base = local_ctxt#base
-
-    method generic_json_call meth ?body uri =
-      local_ctxt#generic_json_call meth ?body uri
 
     method generic_media_type_call meth ?body uri =
       local_ctxt#generic_media_type_call meth ?body uri
@@ -97,7 +94,7 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
     method read_file fname =
       match String.Hashtbl.find filesystem fname with
       | None -> failwith "faked_wallet: cannot ead file (%s)" fname
-      | Some content -> return content
+      | Some (content, _mtime) -> return content
 
     method private filename alias_name =
       Filename.concat
@@ -134,8 +131,20 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
         let filename = self#filename alias_name in
         let json = Data_encoding.Json.construct encoding list in
         let str = Ezjsonm.value_to_string (json :> Ezjsonm.value) in
-        String.Hashtbl.replace filesystem filename str ;
+        String.Hashtbl.replace
+          filesystem
+          filename
+          (str, Some (Ptime.to_float_s (Ptime_clock.now ()))) ;
         return_unit
+
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      let open Lwt_result_syntax in
+      fun alias_name ->
+        let filename = self#filename alias_name in
+        let file = String.Hashtbl.find_opt filesystem filename in
+        match file with
+        | None -> return_none
+        | Some (_content, mtime) -> return mtime
   end
 
 class faked_io_wallet ~base_dir ~filesystem : Client_context.io_wallet =
@@ -160,4 +169,6 @@ class unix_faked ~base_dir ~filesystem ~chain_id ~hooks : Client_context.full =
     method block = `Head 0
 
     method confirmations = None
+
+    method verbose_rpc_error_diagnostics = false
   end

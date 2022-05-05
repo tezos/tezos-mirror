@@ -37,9 +37,13 @@ module Schema : sig
   (** Nullable (i.e. non-ref) schemas. *)
   type kind =
     | Boolean
-    | Integer of {minimum : int option; maximum : int option; enum : int list}
+    | Integer of {
+        minimum : int option;
+        maximum : int option;
+        enum : int list option;
+      }
     | Number of {minimum : float option; maximum : float option}
-    | String of {enum : string list; pattern : string option}
+    | String of {enum : string list option; pattern : string option}
     | Array of t
     | Object of {properties : property list; additional_properties : t option}
     | One_of of t list
@@ -120,14 +124,16 @@ module Path : sig
 end
 
 module Endpoint : sig
-  type t = {
-    path : Path.t;
-    get : Service.t option;
-    post : Service.t option;
-    put : Service.t option;
-    delete : Service.t option;
-    patch : Service.t option;
-  }
+  (** API endpoints, i.e. paths associated with one or more HTTP methods. *)
+
+  (** Associative lists for methods and their implementation. *)
+  type methods = (Method.t * Service.t) list
+
+  (** API endpoints specifications. *)
+  type t = {path : Path.t; methods : methods}
+
+  (** Get the service associated to a method for a given endpoint, if any. *)
+  val get_method : t -> Method.t -> Service.t option
 
   val make :
     ?get:Service.t ->
@@ -164,3 +170,5 @@ val make :
   t
 
 val to_json : t -> Json.u
+
+val of_json : Json.t -> t

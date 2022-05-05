@@ -1,100 +1,77 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/scrutable_reservoir.tz]
 
 Well typed
-Gas remaining: 1039876.691 units remaining
+Gas remaining: 1039889.171 units remaining
 { parameter unit ;
   storage
     (pair string
           (pair timestamp (pair (pair mutez mutez) (pair address (pair address address))))) ;
   code { DUP
-         /* [ pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address)
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+         /* [ pair unit string timestamp (pair mutez mutez) address address address
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          CDAR ;
          PUSH string
               "open"
          /* [ string : string
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          COMPARE
          /* [ int
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          NEQ
          /* [ bool
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          IF { FAIL }
             { DUP
-              /* [ pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address)
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+              /* [ pair unit string timestamp (pair mutez mutez) address address address
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               CDDAR ;
               NOW
-              /* [ @now timestamp : timestamp
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+              /* [ timestamp : timestamp
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               COMPARE
               /* [ int
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               LT
               /* [ bool
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               IF { PUSH mutez
                         0
                    /* [ mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    DIP { DUP
-                         /* [ pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address)
-                            : pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                         /* [ pair unit string timestamp (pair mutez mutez) address address address
+                            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                          CDDDAAR }
                    /* [ mutez : mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    ADD
                    /* [ mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    DIP { DUP
-                         /* [ pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address)
-                            : pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                         /* [ pair unit string timestamp (pair mutez mutez) address address address
+                            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                          CDDDADR }
                    /* [ mutez : mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    ADD
                    /* [ mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    BALANCE
-                   /* [ @balance mutez : mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                   /* [ mutez : mutez
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    COMPARE
                    /* [ int
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    LT
                    /* [ bool
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    IF { CDR
-                        /* [ @storage pair string timestamp (pair mutez mutez) address address address ] */ ;
+                        /* [ pair string timestamp (pair mutez mutez) address address address ] */ ;
                         NIL operation
                         /* [ list operation
-                           : @storage pair string timestamp (pair mutez mutez) address address address ] */ ;
+                           : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         PAIR
-                        /* [ pair (list operation)
-                                (pair @storage string timestamp (pair mutez mutez) address address address) ] */ }
+                        /* [ pair (list operation) string timestamp (pair mutez mutez) address address address ] */ }
                       { CDDR ;
                         PUSH string
                              "success"
@@ -113,13 +90,13 @@ Gas remaining: 1039876.691 units remaining
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         DIP { CONTRACT
                                 unit
-                              /* [ @contract option (contract unit)
+                              /* [ option (contract unit)
                                  : pair string timestamp (pair mutez mutez) address address address ] */ ;
                               ASSERT_SOME }
-                        /* [ mutez : @contract.some contract unit
+                        /* [ mutez : contract unit
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         UNIT
-                        /* [ unit : mutez : @contract.some contract unit
+                        /* [ unit : mutez : contract unit
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         TRANSFER_TOKENS
                         /* [ operation
@@ -136,13 +113,13 @@ Gas remaining: 1039876.691 units remaining
                                  : pair string timestamp (pair mutez mutez) address address address ] */ ;
                               DIP { CONTRACT
                                       unit
-                                    /* [ @contract option (contract unit)
+                                    /* [ option (contract unit)
                                        : pair string timestamp (pair mutez mutez) address address address ] */ ;
                                     ASSERT_SOME }
-                              /* [ mutez : @contract.some contract unit
+                              /* [ mutez : contract unit
                                  : pair string timestamp (pair mutez mutez) address address address ] */ ;
                               UNIT
-                              /* [ unit : mutez : @contract.some contract unit
+                              /* [ unit : mutez : contract unit
                                  : pair string timestamp (pair mutez mutez) address address address ] */ ;
                               TRANSFER_TOKENS
                               /* [ operation
@@ -173,36 +150,34 @@ Gas remaining: 1039876.691 units remaining
                    PAIR
                    /* [ pair string timestamp (pair mutez mutez) address address address ] */ ;
                    BALANCE
-                   /* [ @balance mutez
-                      : pair string timestamp (pair mutez mutez) address address address ] */ ;
+                   /* [ mutez : pair string timestamp (pair mutez mutez) address address address ] */ ;
                    DIP { DUP
                          /* [ pair string timestamp (pair mutez mutez) address address address
                             : pair string timestamp (pair mutez mutez) address address address ] */ ;
                          CDDAAR }
-                   /* [ @balance mutez : mutez
+                   /* [ mutez : mutez
                       : pair string timestamp (pair mutez mutez) address address address ] */ ;
                    COMPARE
                    /* [ int : pair string timestamp (pair mutez mutez) address address address ] */ ;
                    LT
                    /* [ bool : pair string timestamp (pair mutez mutez) address address address ] */ ;
                    IF { BALANCE
-                        /* [ @balance mutez
-                           : pair string timestamp (pair mutez mutez) address address address ] */ ;
+                        /* [ mutez : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         DIP { DUP
                               /* [ pair string timestamp (pair mutez mutez) address address address
                                  : pair string timestamp (pair mutez mutez) address address address ] */ ;
                               CDDDAR }
-                        /* [ @balance mutez : address
+                        /* [ mutez : address
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         DIP { CONTRACT
                                 unit
-                              /* [ @contract option (contract unit)
+                              /* [ option (contract unit)
                                  : pair string timestamp (pair mutez mutez) address address address ] */ ;
                               ASSERT_SOME }
-                        /* [ @balance mutez : @contract.some contract unit
+                        /* [ mutez : contract unit
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         UNIT
-                        /* [ unit : @balance mutez : @contract.some contract unit
+                        /* [ unit : mutez : contract unit
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         TRANSFER_TOKENS
                         /* [ operation
@@ -219,35 +194,34 @@ Gas remaining: 1039876.691 units remaining
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         DIP { CONTRACT
                                 unit
-                              /* [ @contract option (contract unit)
+                              /* [ option (contract unit)
                                  : pair string timestamp (pair mutez mutez) address address address ] */ ;
                               ASSERT_SOME }
-                        /* [ mutez : @contract.some contract unit
+                        /* [ mutez : contract unit
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         UNIT
-                        /* [ unit : mutez : @contract.some contract unit
+                        /* [ unit : mutez : contract unit
                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
                         TRANSFER_TOKENS
                         /* [ operation
                            : pair string timestamp (pair mutez mutez) address address address ] */ } ;
                    DIP { BALANCE
-                         /* [ @balance mutez
-                            : pair string timestamp (pair mutez mutez) address address address ] */ ;
+                         /* [ mutez : pair string timestamp (pair mutez mutez) address address address ] */ ;
                          DIP { DUP
                                /* [ pair string timestamp (pair mutez mutez) address address address
                                   : pair string timestamp (pair mutez mutez) address address address ] */ ;
                                CDDDDDR }
-                         /* [ @balance mutez : address
+                         /* [ mutez : address
                             : pair string timestamp (pair mutez mutez) address address address ] */ ;
                          DIP { CONTRACT
                                  unit
-                               /* [ @contract option (contract unit)
+                               /* [ option (contract unit)
                                   : pair string timestamp (pair mutez mutez) address address address ] */ ;
                                ASSERT_SOME }
-                         /* [ @balance mutez : @contract.some contract unit
+                         /* [ mutez : contract unit
                             : pair string timestamp (pair mutez mutez) address address address ] */ ;
                          UNIT
-                         /* [ unit : @balance mutez : @contract.some contract unit
+                         /* [ unit : mutez : contract unit
                             : pair string timestamp (pair mutez mutez) address address address ] */ ;
                          TRANSFER_TOKENS
                          /* [ operation

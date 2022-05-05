@@ -23,7 +23,6 @@ distinguish the following components:
  - Networked nodes
  - Client
  - Ledger application
- - Endorser
  - Baker
 
 Secondly, these components can be tested at different levels of
@@ -256,13 +255,14 @@ References:
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
  - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 
-Long Tests
-""""""""""
+Long Tests and Performance regression Test Framework
+""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Tezt is also used for tests that are too long to run in the CI. Those
 tests are run on dedicated machines and can send data points to an
-InfluxDB instance to produce graphs using Grafana and/or detect
-performance regressions. See :doc:`long-tezts`.
+`InfluxDB <https://github.com/influxdata/influxdb>`__ instance to produce
+graphs using `Grafana <https://github.com/grafana/grafana>`__ and/or
+detect performance regressions. See :doc:`long-tezts`.
 
 ..
    .. _michelson_unit_tests:
@@ -515,7 +515,7 @@ pipeline. The grain used varies slightly for different types of
 tests:
 
 Python integration and regression tests
-   Python tests are grouped in a number of batch jobs (chosen in ``.gitlab/ci/integration.yml``). This number is
+   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/test/integration.yml`). This number is
    chosen to keep the duration of job each lower under 10 minutes on
    average, and to accommodate the addition of new protocol test
    suites.
@@ -544,7 +544,7 @@ Python integration and regression tests
   New Pytest tests will be included automatically in the CI.
   To rebalance the Pytest batches based on a previous pipeline,
   run (from the root of the Tezos repository):
-  ``cd tests_python && poetry run ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
+  ``cd tests_python && poetry run python ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
   setting ``<PROJECT_ID>`` to a GitLab project id (e.g. ``3836952`` or `tezos/tezos <https://gitlab.com/tezos/tezos>`_)
   and ``<PIPELINE_ID>`` to the id of a pipeline in this project for which integration tests have executed
   (e.g. `391861162 <https://gitlab.com/tezos/tezos/-/pipelines/391861162>`_).
@@ -560,7 +560,7 @@ The OCaml package tests (Alcotest & QCheck)
   Any non-protocol tests located in a folder named ``src/**/test/`` will be
   picked up automatically by the CI. No intervention is necessary.
 
-  Protocol tests must be added to :src:`.gitlab/ci/unittest.yml` under the
+  Protocol tests must be added to :src:`.gitlab/ci/test/unit.yml` under the
   protocol that they are testing. For example, to run a new protocol test for
   ``proto_XXX_YYYYYYYY``, add the corresponding
   ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``

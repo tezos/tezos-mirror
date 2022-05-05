@@ -1,14 +1,14 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/level.tz]
 
 Well typed
-Gas remaining: 1039996.803 units remaining
+Gas remaining: 1039997.443 units remaining
 { parameter unit ;
   storage nat ;
   code { DROP
          /* [] */ ;
          LEVEL
-         /* [ @level nat ] */ ;
+         /* [ nat ] */ ;
          NIL operation
-         /* [ list operation : @level nat ] */ ;
+         /* [ list operation : nat ] */ ;
          PAIR
-         /* [ pair (list operation) (nat @level) ] */ } }
+         /* [ pair (list operation) nat ] */ } }

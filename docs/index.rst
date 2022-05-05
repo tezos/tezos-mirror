@@ -3,7 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
+.. TODO https://gitlab.com/tezos/tezos/-/issues/2170:
+   search shifted protocol name/number & adapt
 
 Welcome to the Tezos Developer Documentation!
 =============================================
@@ -22,11 +23,11 @@ The website https://tezos.com/ contains more information about the project.
 Octez
 -----
 
-Octez is an implementation of Tezos software, including a node, a client, a baker, an endorser, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
+Octez is an implementation of Tezos software, including a node, a client, a baker, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
 This implementation is available at https://gitlab.com/tezos/tezos.
 The source code is placed under the MIT Open Source License.
 
-The current release of Octez is :doc:`../releases/version-11`.
+The current release of Octez is :doc:`../releases/version-12`.
 
 This website
 ------------
@@ -136,6 +137,7 @@ in the :ref:`introduction <howtoget>`.
 
    shell/the_big_picture
    shell/validation
+   shell/prevalidation
    shell/storage
    shell/sync
    shell/p2p
@@ -146,28 +148,21 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 011 Hangzhou Protocol doc:
+   :caption: Ithaca Protocol doc:
 
-   active/michelson
-   active/proof_of_stake
-   active/consensus
-   active/sapling
-   active/voting
-   active/liquidity_baking
-   active/timelock
-   active/plugins
+   active/protocol
    active/glossary
    active/cli-commands
    active/rpc
 
 .. toctree::
    :maxdepth: 2
-   :caption: 012 Ithaca Protocol doc:
+   :caption: Jakarta Protocol doc:
 
-   012/protocol
-   012/glossary
-   012/cli-commands
-   012/rpc
+   jakarta/protocol
+   jakarta/glossary
+   jakarta/cli-commands
+   jakarta/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -187,9 +182,11 @@ in the :ref:`introduction <howtoget>`.
    developer/data_encoding
    developer/gadt
    developer/error_monad
+   developer/clic
    developer/michelson_anti_patterns
    developer/michelson_instructions
    developer/entering_alpha
+   developer/protocol_release_checklist
    developer/howto-freeze-protocols
    developer/protocol_environment
    developer/protocol_environment_upgrade
@@ -200,7 +197,9 @@ in the :ref:`introduction <howtoget>`.
    developer/contributing
    developer/merge_team
    developer/guidelines
+   developer/repository_scope
    developer/time_measurement_ppx
+   developer/openmetrics
    README
 
 .. toctree::
@@ -218,6 +217,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/010_granada
    protocols/011_hangzhou
    protocols/012_ithaca
+   protocols/013_jakarta
    protocols/alpha
 
 .. toctree::

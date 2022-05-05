@@ -51,4 +51,4 @@ let additional_bootstrap_accounts =
     ~receiver:bootstrap7.public_key_hash
     client
 
-let register ~protocols = additional_bootstrap_accounts ~protocols
+let register ~protocols = additional_bootstrap_accounts protocols

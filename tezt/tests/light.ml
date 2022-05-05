@@ -86,7 +86,7 @@ let test_no_endpoint () =
   in
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
-  let process = RPC.Contracts.spawn_get_all (* ?endpoint omitted *) client in
+  let*? process = RPC.Contracts.get_all (* ?endpoint omitted *) client in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
   let regexp =
     rex "Value of --endpoint is .*. If you did not specify --endpoint, .*"
@@ -119,7 +119,7 @@ let test_endpoint_not_in_sources () =
   in
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
-  let process = RPC.Contracts.spawn_get_all ~endpoint client in
+  let*? process = RPC.Contracts.get_all ~endpoint client in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
   let regexp =
     rex "Value of --endpoint is .*. If you did not specify --endpoint, .*"
@@ -297,9 +297,9 @@ let register_protocol_independent () =
   Proxy.test_support_four_protocols `Light
 
 let register ~protocols =
-  test_transfer ~protocols ;
-  test_bake ~protocols ;
-  NoUselessRpc.test ~protocols ;
-  test_wrong_proto ~protocols ;
-  test_locations ~protocols ;
-  test_compare_light ~protocols
+  test_transfer protocols ;
+  test_bake protocols ;
+  NoUselessRpc.test protocols ;
+  test_wrong_proto protocols ;
+  test_locations protocols ;
+  test_compare_light protocols

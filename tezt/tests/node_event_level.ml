@@ -408,5 +408,5 @@ let test_event_levels =
   unit
 
 let register ~protocols =
-  test_debug_level_misc ~protocols ;
-  test_event_levels ~protocols
+  test_debug_level_misc protocols ;
+  test_event_levels protocols

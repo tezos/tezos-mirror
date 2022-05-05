@@ -1,16 +1,16 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self.tz]
 
 Well typed
-Gas remaining: 1039996.340 units remaining
+Gas remaining: 1039996.945 units remaining
 { parameter unit ;
   storage address ;
   code { DROP
          /* [] */ ;
          SELF
-         /* [ @self contract unit ] */ ;
+         /* [ contract unit ] */ ;
          ADDRESS
-         /* [ @self.address address ] */ ;
+         /* [ address ] */ ;
          NIL operation
-         /* [ list operation : @self.address address ] */ ;
+         /* [ list operation : address ] */ ;
          PAIR
-         /* [ pair (list operation) (address @self.address) ] */ } }
+         /* [ pair (list operation) address ] */ } }

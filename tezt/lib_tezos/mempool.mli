@@ -44,3 +44,17 @@ val empty : t
 
 (** Symetric difference (union(a, b) - intersection(a, b)) *)
 val symmetric_diff : t -> t -> t
+
+(** Call [RPC.get_mempool_pending_operations] and wrap the result in a
+    value of type [Mempool.t] *)
+val get_mempool :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?applied:bool ->
+  ?branch_delayed:bool ->
+  ?branch_refused:bool ->
+  ?refused:bool ->
+  ?outdated:bool ->
+  Client.t ->
+  t Lwt.t

@@ -1,0 +1,21 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_size.tz-111-{ Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 ;             Elt "d" 4 ; Elt "e" 5 ; Elt "f" 6 }-6]
+
+storage
+  6
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039993.264 units remaining)
+    [ (Pair { Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 ; Elt "d" 4 ; Elt "e" 5 ; Elt "f" 6 } 111) ]
+  - location: 9 (remaining gas: 1039993.254 units remaining)
+    [ { Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 ; Elt "d" 4 ; Elt "e" 5 ; Elt "f" 6 } ]
+  - location: 10 (remaining gas: 1039993.244 units remaining)
+    [ 6 ]
+  - location: 11 (remaining gas: 1039993.234 units remaining)
+    [ {}
+      6 ]
+  - location: 13 (remaining gas: 1039993.224 units remaining)
+    [ (Pair {} 6) ]
+

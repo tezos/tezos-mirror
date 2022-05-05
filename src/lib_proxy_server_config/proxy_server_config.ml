@@ -28,13 +28,18 @@ type t = {
   rpc_addr : Uri.t option;
   rpc_tls : string option;
   sym_block_caching_time : int option;
+  data_dir : string option;
 }
 
-let pp ppf {endpoint; rpc_addr; rpc_tls; sym_block_caching_time} =
+let pp ppf {endpoint; rpc_addr; rpc_tls; sym_block_caching_time; data_dir} =
   let pp_uri_opt = Format.pp_print_option Uri.pp in
   Format.fprintf
     ppf
-    "@[<v>endpoint=%a@,rpc_addr=%a@,rpc_tls=%a@,sym_block_caching_time=%a@]"
+    "@[<v>endpoint=%a@,\
+     rpc_addr=%a@,\
+     rpc_tls=%a@,\
+     sym_block_caching_time=%a@,\
+     data_dir=%a@]"
     pp_uri_opt
     endpoint
     pp_uri_opt
@@ -43,6 +48,8 @@ let pp ppf {endpoint; rpc_addr; rpc_tls; sym_block_caching_time} =
     rpc_tls
     (Format.pp_print_option Format.pp_print_int)
     sym_block_caching_time
+    (Format.pp_print_option Format.pp_print_string)
+    data_dir
 
 let example_config =
   {|{"endpoint": "http://127.0.0.1:18731", "rpc_addr": "http://127.0.0.1:18732", "sym_block_caching_time": 60}|}
@@ -54,22 +61,25 @@ let encoding : t Data_encoding.t =
       ( Option.map Uri.to_string t.endpoint,
         Option.map Uri.to_string t.rpc_addr,
         t.rpc_tls,
-        Option.map Int32.of_int t.sym_block_caching_time ))
-    (fun (endpoint, rpc_addr, rpc_tls, sym_block_caching_time) ->
+        Option.map Int32.of_int t.sym_block_caching_time,
+        t.data_dir ))
+    (fun (endpoint, rpc_addr, rpc_tls, sym_block_caching_time, data_dir) ->
       {
         endpoint = Option.map Uri.of_string endpoint;
         rpc_addr = Option.map Uri.of_string rpc_addr;
         rpc_tls;
         sym_block_caching_time = Option.map Int32.to_int sym_block_caching_time;
+        data_dir;
       })
-    (obj4
+    (obj5
        (opt "endpoint" string)
        (opt "rpc_addr" string)
        (opt "rpc_tls" string)
-       (opt "sym_block_caching_time" int32))
+       (opt "sym_block_caching_time" int32)
+       (opt "data_dir" string))
 
-let make ~endpoint ~rpc_addr ~rpc_tls ~sym_block_caching_time : t =
-  {endpoint; rpc_addr; rpc_tls; sym_block_caching_time}
+let make ~endpoint ~rpc_addr ~rpc_tls ~sym_block_caching_time ~data_dir : t =
+  {endpoint; rpc_addr; rpc_tls; sym_block_caching_time; data_dir}
 
 let sym_block_caching_time_error sym_block_caching_time =
   match sym_block_caching_time with
@@ -97,6 +107,7 @@ let union_right_bias (t1 : t) (t2 : t) =
     rpc_tls = Option.either t2.rpc_tls t1.rpc_tls;
     sym_block_caching_time =
       Option.either t2.sym_block_caching_time t1.sym_block_caching_time;
+    data_dir = Option.either t2.data_dir t1.data_dir;
   }
 
 type runtime = {
@@ -105,6 +116,7 @@ type runtime = {
   rpc_server_port : int;
   rpc_server_tls : (string * string) option;
   sym_block_caching_time : int option;
+  data_dir : string option;
 }
 
 (** Given the value of the [--rpc-addr] argument (or the [rpc_addr] CONFIG field),
@@ -160,25 +172,29 @@ let opt_res_to_res_opt = function
       (* Data could not be successfully validated: an error and no data *)
       Error x
 
-let to_runtime ({endpoint; rpc_addr; rpc_tls; sym_block_caching_time} : t) :
+let to_runtime
+    ({endpoint; rpc_addr; rpc_tls; sym_block_caching_time; data_dir} : t) :
     (runtime, string) result =
   (* Validating sym_block_caching_time is required if it was specified
      on the command line. In this case it wasn't validated yet. *)
+  let open Result_syntax in
   match
     (endpoint, rpc_addr, sym_block_caching_time_error sym_block_caching_time)
   with
   | (None, _, _) ->
-      Error
+      fail
         {|Endpoint not specified: pass argument --endpoint or specify "endpoint" field in CONFIG file|}
   | (_, None, _) ->
-      Error
+      fail
         {|RPC address not specified: pass argument --rpc-addr or specify "rpc_addr" field in CONFIG file|}
-  | (_, _, Some err) -> Error err
+  | (_, _, Some err) -> fail err
   | (Some endpoint, Some rpc_addr, None) ->
-      address_and_port_for_runtime rpc_addr
-      >>? fun (rpc_server_address, rpc_server_port) ->
-      Option.map tls_for_runtime rpc_tls |> opt_res_to_res_opt
-      >>? fun rpc_server_tls ->
+      let* (rpc_server_address, rpc_server_port) =
+        address_and_port_for_runtime rpc_addr
+      in
+      let* rpc_server_tls =
+        Option.map tls_for_runtime rpc_tls |> opt_res_to_res_opt
+      in
       Ok
         {
           endpoint;
@@ -186,4 +202,5 @@ let to_runtime ({endpoint; rpc_addr; rpc_tls; sym_block_caching_time} : t) :
           rpc_server_port;
           rpc_server_tls;
           sym_block_caching_time;
+          data_dir;
         }

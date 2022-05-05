@@ -1,15 +1,15 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/ticket_split.tz]
 
 Well typed
-Gas remaining: 1039978.358 units remaining
+Gas remaining: 1039979.558 units remaining
 { parameter (ticket nat) ;
   storage unit ;
   code { CAR
-         /* [ @parameter ticket nat ] */ ;
+         /* [ ticket nat ] */ ;
          PUSH (pair nat nat) (Pair 1 2)
-         /* [ pair nat nat : @parameter ticket nat ] */ ;
+         /* [ pair nat nat : ticket nat ] */ ;
          SWAP
-         /* [ @parameter ticket nat : pair nat nat ] */ ;
+         /* [ ticket nat : pair nat nat ] */ ;
          SPLIT_TICKET
          /* [ option (pair (ticket nat) (ticket nat)) ] */ ;
          ASSERT_SOME ;

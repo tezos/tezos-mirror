@@ -47,8 +47,26 @@ val one : t
 (** Convert [t] to a string. *)
 val to_string : t -> string
 
+(** Convert [t] to a mutez integer. *)
+val mutez_int64 : t -> int64
+
 (** Convert [t] to a float of tez. *)
 val to_float : t -> float
 
+(** Convert [t] to an [int]. *)
+val to_mutez : t -> int
+
 (** Addition. This doesn't perform any bounds checks. *)
 val ( + ) : t -> t -> t
+
+(** Subtraction. This doesn't perform any bound checks. *)
+val ( - ) : t -> t -> t
+
+(** Parsing. Parse a floating point number of tez.
+
+    Any string of digits followed by an optional point and another string
+    of digits should parse successfully, provided that the expressed number
+    is within bounds allowed for tez (up to 6 decimal places). For example:
+    "123.4356" will parse, while
+    "1.24723953794217492" won't, because it's too precise. *)
+val parse_floating : string -> t

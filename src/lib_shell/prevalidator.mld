@@ -1,0 +1,295 @@
+{0 Overview of the prevalidator implementation }
+
+This page details the internals of the prevalidator component. It explains the
+complete lifecycle of an operation in the prevalidator, from its reception to
+its classification and advertisement to the neighborhood.
+See {{: https://tezos.gitlab.io/shell/prevalidation.html } the online documentation}
+for a more user-friendly introduction to the prevalidator.
+
+The roles of the prevalidator are: fetching and receiving operations, checking
+their validity (classification) in the current context; and advertising valid
+operations through the node's gossip network.
+
+The baker also uses the prevalidator via the
+{{!Tezos_shell_services.module-Block_services.module-Make.module-Mempool.monitor_operations} monitor_operations}
+RPC to filter operations that can be included in blocks.
+
+{1 Operations life cycle }
+
+This section describes the different stages in the lifecycle of an operation.
+
+{2 Operations arrival }
+
+The prevalidator handles operations injected by users or advertised by the
+gossip network. Users inject operations directly using the [injection/operation]
+RPC or indirectly via a Client or a Wallet.
+
+The {{!Tezos_base.module-Mempool.type-t} mempool} data structure is used for
+advertising operations between peers on the gossip network. This data
+structure only contains hashes of operations. The prevalidator starts by
+checking that an incoming operation has not yet been handled. If not, the
+operation is fetched from the
+{{!Tezos_shell.module-Distributed_db} distributed database} component
+(aka [ddb]). In turn, if the operation is not known by the [ddb], it fetches it
+from the peers through the {{!Tezos_p2p.module-P2p} p2p} network.
+Finally, once the operation has been fetched, it is parsed. If an error occurs
+during parsing, the operation is rejected with an [unparsable] classification.
+Otherwise, it is pre-filtered (see
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.pre_filter} pre_filter} and
+filter section) before being added to a set of pending operations that await to
+be classified.
+
+The content of operations injected by users being provided, there is no need to
+fetch them. Moreover, they are classified immediately to provide feedback for
+the user (See Classification section below).
+
+{2 Pending operations }
+
+Pending operations are those known by the prevalidator but not classified yet.
+They are stored in the
+{{!Tezos_shell.module-Prevalidator_pending_operations.type-t} pending} data
+structure. This structure
+{{!Tezos_shell.module-Prevalidator_pending_operations.type-priority} prioritizes}
+operations depending on their kind. For example, a consensus operation will have
+a High priority and a manager operation will have a Low priority. Manager
+operations are themselves prioritized based on their fee/size ratio. This
+prioritization allows to classify and advertise consensus operations faster.
+Note that user injected operations have a High priority regardless of
+their kind.
+
+{2 Classification}
+
+The prevalidator manages a validation state based on the current head chosen
+by the validation sub-system. Processing a pending operation by the prevalidator
+amounts to classify it on top of the current validation state. An operation
+classification consists of precheck, application, and post-filtering phases.
+
+The goal of
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.precheck} precheck}
+is to check the
+{{: https://tezos.gitlab.io/alpha/precheck.html#solvable-operations } solvability}
+of the operation (see {!section-precheck}) within the
+validation state. If the check fails, the operation is classified according to the
+error returned by the [precheck] function (see
+{{!Tezos_shell.module-Prevalidator_classification.type-error_classification} error_classification}).
+If the operation passes the [precheck], it is classified as [Prechecked] in
+the classification data structure (detailed below) and advertised. As for now
+only manager operations are [Prechecked], other operations are
+set to [Undecided] and go to the next phase.
+
+Operations for which [precheck] returns [Undecided] are applied in order to be classified.
+Operation application consists of checking if it is solvable and if its effects could be
+applied on top of the current validation state (see
+{{!Tezos_shell.module-Prevalidation.T.apply_operation} Prevalidation.apply_operation}).
+If operation application succeeds, the validation state is updated
+accordingly. Otherwise, the operation handling depends on the error
+classification:
+
+- An operation is {{!Tezos_shell.module-Prevalidation.T.result.Refused} Refused}
+if the protocol rejects this operation with an error classified as [Permanent];
+
+- An operation is {{!Tezos_shell.module-Prevalidation.T.result.Outdated} Outdated}
+if it is too old to be included in a block or if the protocol rejects
+this operation with an [Outdated] classification;
+
+- An operation is
+{{!Tezos_shell.module-Prevalidation.T.result.Branch_refused} Branch_refused}
+if it is anchored on a block that has not been validated by the node but could
+be in the future, or if the protocol rejects this operation classified
+as [Branch]. This classification from the protocol can also appear if all
+operations are invalid in the current branch but could be valid in a different
+branch. An example of such a situation is a manager operation with a counter
+in the past. This semantics is likely to be weakened to also consider [Outdated]
+operations;
+
+- An operation is
+{{!Tezos_shell.module-Prevalidation.T.result.Branch_delayed} Branch_delayed}
+if the initialization of the validation state failed (which presumably cannot
+happen currently) or if the protocol rejects this operation with an error
+classified as [Temporary].
+
+Once they are [Applied], operations are then post-filtered (see
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.post_filter} post_filter}).
+Like for the [pre_filter], [apply_operation] and [precheck], an operation
+post_filtering can return an error: the operation is then classified according to
+this error (see
+{{!Tezos_shell.module-Prevalidator_classification.type-error_classification} error_classification}).
+If the post-filtering of the operation succeeds, then the operation is
+classified as [applied] and is advertised.
+
+{3 Classification data structure}
+
+The {{!Tezos_shell.module-Prevalidator} Prevalidator} uses the
+{{!Tezos_shell.module-Prevalidator_classification.t} classification} data
+structure (implemented in
+{{!Tezos_shell.module-Prevalidator_classification} Prevalidator_classification})
+to store operations classified either by the plugin or the economic protocol.
+One important property of this data structure is to answer quickly if an
+operation is already classified or not.
+
+The operations'
+{{!Tezos_shell.module-Prevalidator_classification.type-classification} classifications}
+in this data structure are based on the one from
+{{!Tezos_shell.module-Prevalidation.T.apply_operation} Prevalidation.apply_operation}
+and extended with [prechecked]. The
+{{!Tezos_shell.module-Prevalidator_classification.type-classification} classification}
+type does not include an [unparsable] case since we only keep track of
+operations' hashes for this error.
+
+The interaction between the
+{{!Tezos_shell.module-Prevalidator_classification} Prevalidator_classification}
+module and the {{!Tezos_shell.module-Prevalidator} Prevalidator} maintains the
+invariant that the different classifications are {e disjoint}: an operation
+cannot be in two (or more) of these subfields at the same time. The rationale
+to not make this invariant explicit is for performances reasons.
+
+{3 Flush }
+
+Given an operation, its classification may change if the head changes. When the
+validation sub-system switches its head, it notifies the prevalidator with the
+new [live_blocks] and [live_operations], triggering also a
+{{!Tezos_shell.module-Prevalidator.flush} flush} of the mempool: every operation
+classified as {{!Tezos_shell.module-Prevalidation.T.result.Applied} Applied} or
+{{!Tezos_shell.module-Prevalidation.T.result.Branch_delayed} Branch_delayed}
+which is anchored (to the {{!Tezos_crypto.module-Block_hash.type-t} block_hash}
+on which the operation is based on when it was created) on a [live block] and
+which is not in the [live operations] (operations which are included in
+[live_blocks]) is set
+{{!Tezos_shell.module-Prevalidator_pending_operations.type-t} pending}, meaning
+it is waiting to be classified again.
+
+Operations classified as
+{{!Tezos_shell.module-Prevalidation.T.result.Branch_refused} Branch_refused} are
+reclassified only if the old head is not the predecessor block of the new head.
+
+We use the
+{{!Tezos_shell_services.module-Chain_validator_worker_state.module-Event.type-update} Chain_validator_worker_state.Event.update}
+for that purpose (see [on_flush]).
+
+{{!Tezos_shell.module-Prevalidation.T.result.Refused} Refused} and
+{{!Tezos_shell.module-Prevalidation.T.result.Outdated} Outdated} operations are
+never reclassified. We keep track of them until their TTL expires, to avoid
+unnecessarily re-processing in case they are advertised again.
+
+For each call to [flush] the set of
+{{!Tezos_shell.module-Prevalidator_classification.type-t.unparsable} unparsable}
+operations is reset.
+
+{3 Filters}
+
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool} Prevalidator filters}, implemented in protocol plugins, are used as an
+anti-spam protection mechanism. These plugins are provided as extensions of the protocol and are more restrictive but not mandatory: without them, the prevalidator still works but may propagate outdate operations and be slower. The plugin comes with three functions:
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.pre_filter } pre_filter},
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.precheck } precheck} and
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.post_filter } post_filter}.
+
+Except for locally injected operations, pending operations are first
+pre-filtered. The [precheck] is called before trying to apply an operation.
+The [post_filter] is called every time an operation is classified as
+{{!Tezos_shell.module-Prevalidation.T.result.Applied} Applied} by
+[apply_operation].
+
+{4 Precheck}
+
+As explained before,
+{{!Tezos_shell.Prevalidator_filters.FILTER.Mempool.precheck} precheck} can
+either return an error, [Undecided] if the operation is not precheckable
+(i.e. not a manager operation), or can return [Passed_precheck].
+[Passed_precheck] can contain a replacement information [Replace (oph,error)].
+In this case, the filter only accepts the operation [prechecked] if the old
+one is dismissed. The classification of the replaced operation needs to be
+updated following the [error] returned.
+
+{2 Operation status}
+
+Operations are uniquely identified by their hash. Given an operation hash,
+the status can be either: [fetching],
+{{!Tezos_shell.module-Prevalidator_pending_operations.type-t} pending},
+{{!Tezos_shell.module-Prevalidator_classification.type-classification} classified},
+or [banned].
+
+- An operation is [fetching] if we only know its hash, but we did
+not receive the corresponding operation yet.
+
+- An operation is {{!Tezos_shell.module-Prevalidator_pending_operations.type-t} pending}
+if we know its hash and the related content, but not its classification yet.
+
+- An operation is
+{{!Tezos_shell.module-Prevalidator_classification.type-classification} classified}
+if we know its hash and the corresponding operation, and it has been classified
+according to the classification given above. Note that for a
+{{!Tezos_shell.module-Prevalidation.T.result.Branch_refused} Branch_refused}
+operation, the classification may date back to before the last flush.
+
+- We may also ban an operation locally (through the
+{{!Tezos_shell_services.module-Block_services.module-Make.module-Mempool.ban_operation} ban_operation}
+RPC). A [banned] operation is removed from all other fields. It is ignored
+when received in any form (its hash, the corresponding operation, or an
+injection from the node).
+
+The prevalidator ensures that an operation cannot be in two of
+the following fields at the same time: [fetching], [pending], [in_mempool]
+(containing the [classified] operations), and [banned_operations].
+
+{2 Operations propagation }
+
+An operation is propagated through the {{!Tezos_shell.module-Distributed_db} distributed database}
+component which interacts directly with the {{!Tezos_p2p.module-P2p} p2p}
+network. The prevalidator advertises its
+{{!Tezos_base.module-Mempool.type-t} mempool} (containing only operation hashes)
+through the [ddb]. If a remote peer requests an operation, such request will be
+handled directly by the [ddb] without going to the prevalidator. For this
+reason, every operation that is propagated by the prevalidator should also be in
+the [ddb]. Conversely, an operation that we do not want to advertise should be
+removed explicitly from the [ddb] via the
+{{!Tezos_shell.module-Distributed_db.Operation.clear_or_cancel} Distributed_db.Operation.clear_or_cancel}
+function. In practice, operations we do not want to propagate are those
+classified as [Refused] or [Outdated], already included in a block, or filtered
+out by the plugin.
+
+The {{!Tezos_base.module-Mempool.type-t} mempool} only contains operations
+which are in the
+{{!Tezos_shell.module-Prevalidator_classification.type-t.in_mempool} in_mempool}
+field and that we accept to propagate. In particular, we do not propagate
+operations classified as [Refused] or [Outdated].
+
+There are two ways to propagate our mempool:
+
+- Either when we classify operations as [Applied]
+
+- Or when a peer requests explicitly our mempool
+
+In the first case, only the newly classified operations are propagated. In the
+second case, current applied operations and pending operations are sent to the
+peer. Every time an operation is removed from the
+{{!Tezos_shell.module-Prevalidator_classification.type-t.in_mempool} in_mempool}
+field, it should be cleaned up in the
+{{!Tezos_shell.module-Distributed_db.Operations} Distributed_db.Operations}
+{{!Tezos_requester.Requester.REQUESTER} requester}.
+
+There is an [advertisement_delay] to postpone the next mempool advertisement if
+we advertised our mempool not long ago. Early consensus operations will be
+propagated once the block is validated. Every time an operation is [classified],
+it is recorded into the [operation_stream]. Such a stream can be used by an
+external service to get the classification of an operation (via the
+{{!Tezos_shell_services.module-Block_services.module-Make.module-Mempool.monitor_operations} monitor_operations} RPC).
+Note that an operation can be notified several times if it is classified
+again after a {{!Tezos_shell.module-Prevalidator.flush} flush} or a replacement.
+
+{1 Implementation architecture}
+
+Internally, the prevalidator implementation is split into the [Requests] and the
+[Handlers] modules. The [Requests] module contains the top-level functions
+implementing the various requests defined in
+{{!Tezos_shell_services.Prevalidator_worker_state} Prevalidator_worker_state}.
+These transitions form the meat of the prevalidator implementation: that is
+where the logic lies. The implementation of the module is imperative: most
+functions return [unit] instead of returning an updated value.
+We aim to make it functional in the future, to enforce invariants on how and
+where the global state is updated.
+
+The [Handlers] module implement the functions needed by the
+{{!Tezos_workers.Worker.Make.HANDLERS} Worker Handlers} API. These functions
+concern the lifecycle of a [Worker], such as what happens when it starts and
+when it is shut down. Except for initialization, the [Handlers] module is mostly
+boilerplate.

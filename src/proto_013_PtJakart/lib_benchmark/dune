@@ -1,0 +1,36 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_013_PtJakart)
+ (public_name tezos-benchmark-013-PtJakart)
+ (libraries
+  tezos-stdlib
+  tezos-base
+  tezos-error-monad
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-benchmark
+  tezos-benchmark-type-inference-013-PtJakart
+  tezos-protocol-013-PtJakart
+  tezos-crypto
+  tezos-protocol-013-PtJakart-parameters
+  hashcons
+  benchmark-utils
+  tezos-013-PtJakart-test-helpers
+  prbnmcn-stats)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_base
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_error_monad
+   -open Tezos_micheline
+   -open Tezos_micheline_rewriting
+   -open Tezos_benchmark
+   -open Tezos_benchmark_type_inference_013_PtJakart
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_crypto
+   -open Tezos_013_PtJakart_test_helpers))
+ (private_modules kernel rules state_space))

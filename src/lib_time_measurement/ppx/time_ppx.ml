@@ -329,9 +329,10 @@ let bind_with_flush_call expr loc =
   let id_pattern = Pat.var {txt = identifier; loc} in
   let id_expr = Exp.ident {txt = Lident identifier; loc} in
   [%expr
-    [%e expr] >>= fun [%p id_pattern] ->
-    Tezos_time_measurement_runtime.Default.Time_measurement.flush ()
-    >|= fun () -> [%e id_expr]]
+    Lwt.bind [%e expr] (fun [%p id_pattern] ->
+        Lwt.map
+          (fun () -> [%e id_expr])
+          (Tezos_time_measurement_runtime.Default.Time_measurement.flush ()))]
 
 (** [rewrite rewriters initial_expr] sequentially interpretes
     the given rewriters in order to rewrite the given expression

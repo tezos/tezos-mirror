@@ -23,16 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_protocol_environment_sigs_stdlib_compat.V3
+
 (* From Lwtreslib *)
 
 module type S = sig
   type elt
 
   type t
-
-  (**/**)
-  module Legacy : Stdlib.Set.S with type elt = elt and type t = t
-  (**/**)
 
   val empty : t
 

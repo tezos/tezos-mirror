@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.voting_period.out
+encoding/alpha.voting_period.out
 
 ./tezos-codec encode alpha.voting_period from '{
   "start_position": 1159026,

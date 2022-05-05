@@ -106,14 +106,7 @@ val receive : ('sent, 'b, 'c) t -> 'sent tzresult Lwt.t
    *)
 val wait_result : ('a, 'b, 'result) t -> 'result tzresult Lwt.t
 
-(** {2} Working with list of detached process  *)
-
-(** Gathering a list of error happening in parallel.
-    First value is the number of the detached process,
-    Second value is its prefix,
-    Third value is the error returned by the process.
- *)
-type error += Par of (int * string * error) list
+(** {2 Working with list of detached process} *)
 
 (** Waiting for all the detached function to finish, unless one
     of the function return an error.
@@ -122,8 +115,7 @@ type error += Par of (int * string * error) list
     values.
 
     If at least one function end with en error, cancel all the
-    unfinished process, and return a [Par] error gathering the list of
-    errors for unsuccesful process.
+    unfinished process, and return the trace of errors of unsuccesful process.
 
   *)
 val wait_all_results : ('a, 'b, 'c) t list -> 'c list tzresult Lwt.t

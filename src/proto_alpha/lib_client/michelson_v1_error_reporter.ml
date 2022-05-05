@@ -32,24 +32,13 @@ open Michelson_v1_printer
 
 let print_ty ppf ty = Michelson_v1_printer.print_expr_unwrapped ppf ty
 
-let print_var_annot ppf annot = List.iter (Format.fprintf ppf "@ %s") annot
-
 let print_stack_ty ?(depth = max_int) ppf s =
   let rec loop depth ppf = function
     | [] -> ()
     | _ when depth <= 0 -> Format.fprintf ppf "..."
-    | [(last, annot)] ->
-        Format.fprintf ppf "%a%a" print_ty last print_var_annot annot
-    | (last, annot) :: rest ->
-        Format.fprintf
-          ppf
-          "%a%a@ :@ %a"
-          print_ty
-          last
-          print_var_annot
-          annot
-          (loop (depth - 1))
-          rest
+    | [last] -> print_ty ppf last
+    | last :: rest ->
+        Format.fprintf ppf "%a@ :@ %a" print_ty last (loop (depth - 1)) rest
   in
   match s with
   | [] -> Format.fprintf ppf "[]"
@@ -80,8 +69,8 @@ let collect_error_locations errs =
     | Environment.Ecoproto_error
         ( Ill_formed_type (_, _, _)
         | No_such_entrypoint _ | Duplicate_entrypoint _
-        | Unreachable_entrypoint _
-        | Runtime_contract_error (_, _)
+        | Unreachable_entrypoint _ | Tx_rollup_invalid_ticket_amount _
+        | Runtime_contract_error _
         | Michelson_v1_primitives.Invalid_primitive_name (_, _)
         | Ill_typed_data (_, _, _)
         | Ill_typed_contract (_, _) )
@@ -91,7 +80,6 @@ let collect_error_locations errs =
     | Environment.Ecoproto_error
         ( Invalid_arity (loc, _, _, _)
         | Invalid_seq_arity (loc, _, _)
-        | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
         | Ungrouped_annotations loc
         | Type_too_large (loc, _)
@@ -127,6 +115,43 @@ let collect_error_locations errs =
 let string_of_context_desc = function
   | Script_tc_errors.Lambda -> "lambda"
   | Script_tc_errors.View -> "view"
+
+(* Error raised while fetching the script of a contract for error reporting when the script is not found. *)
+type error += Fetch_script_not_found_meta_error of Contract.t
+
+(* Errors raised while fetching the script of a contract for error reporting. *)
+type error += Fetch_script_meta_error of error trace
+
+let fetch_script (cctxt : #Protocol_client_context.rpc_context) ~chain ~block
+    contract =
+  Plugin.RPC.Contract.get_script_normalized
+    cctxt
+    (chain, block)
+    ~unparsing_mode:Readable
+    ~normalize_types:true
+    ~contract
+  >>=? function
+  | None -> fail (Fetch_script_not_found_meta_error contract)
+  | Some {code; storage = _} ->
+      Lwt.return @@ Environment.wrap_tzresult @@ Script_repr.force_decode code
+
+type error +=
+  | Rich_runtime_contract_error of Contract.t * Michelson_v1_parser.parsed
+
+let enrich_runtime_errors cctxt ~chain ~block ~parsed =
+  List.map_s (function
+      | Environment.Ecoproto_error (Runtime_contract_error contract) -> (
+          (* If we know the script already, we don't fetch it *)
+          match parsed with
+          | Some parsed ->
+              Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
+          | None -> (
+              fetch_script cctxt ~chain ~block contract >|= function
+              | Ok script ->
+                  let parsed = Michelson_v1_printer.unparse_toplevel script in
+                  Rich_runtime_contract_error (contract, parsed)
+              | Error err -> Fetch_script_meta_error err))
+      | e -> Lwt.return e)
 
 let report_errors ~details ~show_source ?parsed ppf errs =
   let rec print_trace locations errs =
@@ -209,11 +234,19 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
     | Environment.Ecoproto_error (No_such_entrypoint entrypoint) :: rest ->
-        Format.fprintf ppf "Contract has no entrypoint named %s" entrypoint ;
+        Format.fprintf
+          ppf
+          "Contract has no entrypoint named %a"
+          Entrypoint.pp
+          entrypoint ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Duplicate_entrypoint entrypoint) :: rest ->
-        Format.fprintf ppf "Contract has two entrypoints named %s" entrypoint ;
+        Format.fprintf
+          ppf
+          "Contract has two entrypoints named %a"
+          Entrypoint.pp
+          entrypoint ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Unreachable_entrypoint path) :: rest ->
@@ -223,6 +256,28 @@ let report_errors ~details ~show_source ?parsed ppf errs =
             (List.map Michelson_v1_primitives.string_of_prim path)
         in
         Format.fprintf ppf "Entrypoint at path %s is not reachable" path ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Tx_rollup_bad_deposit_parameter (loc, expr))
+      :: rest ->
+        Format.fprintf
+          ppf
+          "@[<v 2>%aTrying to call the deposit entrypoint of a transaction \
+           rollup with an ill-formed parameter:@ %a@]"
+          print_loc
+          loc
+          print_expr
+          expr ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Tx_rollup_invalid_ticket_amount amount)
+      :: rest ->
+        Format.fprintf
+          ppf
+          "Amount of tickets to deposit to a transaction rollup needs to fit \
+           in a 64-bit integer, but %a is too big"
+          Z.pp_print
+          amount ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
@@ -326,14 +381,15 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Environment.Ecoproto_error (Runtime_contract_error (contract, expr))
-      :: rest ->
-        let parsed =
-          match parsed with
-          | Some parsed when expr = parsed.Michelson_v1_parser.expanded ->
-              parsed
-          | Some _ | None -> Michelson_v1_printer.unparse_toplevel expr
-        in
+    | Environment.Ecoproto_error (Runtime_contract_error contract) :: rest ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Runtime error in unknown contract %a@]"
+          Contract.pp
+          contract ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Rich_runtime_contract_error (contract, parsed) :: rest ->
         let hilights = collect_error_locations rest in
         Format.fprintf
           ppf
@@ -348,7 +404,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Format.fprintf
           ppf
           "@[<v 2>Internal operation replay attempt:@,%a@]"
-          Operation_result.pp_internal_operation
+          Operation_result.pp_internal_operation_result
           op ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
@@ -530,7 +586,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               print_loc
               loc
               (fun ppf -> print_stack_ty ppf)
-              [(exp, [])]
+              [exp]
               (fun ppf -> print_stack_ty ppf)
               got
         | Bad_stack (loc, name, depth, sty) ->
@@ -585,34 +641,6 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "@[<v 2> A view name, \"%s\", exceeds the maximum length of 31 \
                characters."
               name
-        | Inconsistent_annotations (annot1, annot2) ->
-            Format.fprintf
-              ppf
-              "@[<v 2>The two annotations do not match:@,\
-               - @[<v>%s@]@,\
-               - @[<v>%s@]@]"
-              annot1
-              annot2
-        | Inconsistent_field_annotations (annot1, annot2) ->
-            Format.fprintf
-              ppf
-              "@[<v 2>The field access annotation does not match:@,\
-               - @[<v>%s@]@,\
-               - @[<v>%s@]@]"
-              annot1
-              annot2
-        | Inconsistent_type_annotations (loc, ty1, ty2) ->
-            Format.fprintf
-              ppf
-              "@[<v 2>%athe two types contain incompatible annotations:@,\
-               - @[<hov>%a@]@,\
-               - @[<hov>%a@]@]"
-              print_loc
-              loc
-              print_ty
-              ty1
-              print_ty
-              ty2
         | Inconsistent_type_sizes (size1, size2) ->
             Format.fprintf
               ppf
@@ -717,13 +745,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
               print_ty
               ty
-        | Inconsistent_types (opt_loc, tya, tyb) ->
+        | Inconsistent_types (loc, tya, tyb) ->
             Format.fprintf
               ppf
               "@[<hov 0>@[<hov 2>%aType@ %a@]@ @[<hov 2>is not compatible with \
                type@ %a.@]@]"
-              (fun fmt -> function None -> () | Some loc -> print_loc fmt loc)
-              opt_loc
+              print_loc
+              loc
               print_ty
               tya
               print_ty

@@ -15,6 +15,7 @@ Adding a new instruction requires providing the following elements (detailed in 
 3. :ref:`a translation rule <script_translator>`
 4. :ref:`an execution rule <add_mich_execution_rule>`
 5. :ref:`a gas cost model <add_mich_gas_model>`
+6. :ref:`some documentation <add_mich_documentation>`
 
 Once all of the above are provided, we may try compiling the protocol. We will
 most likely encounter some non-exhaustive pattern matching errors, but after the
@@ -404,3 +405,16 @@ comparable results.
 
 More information on the gas model and on benchmarking the interpreter can be
 found on the pages dedicated to the ``snoop`` library: :doc:`snoop_interpreter`.
+
+.. _add_mich_documentation:
+
+Documentation
+-------------
+
+Last but not least, the new instruction needs to be documented.
+After all, nobody will ever use it otherwise!
+
+Documenting the instruction may involve:
+
+- Editing the :doc:`Michelson language page <../alpha/michelson>` (only the page corresponding to the Alpha protocol needs be changed, because injected protocols cannot be extended with new instructions). The source for this page is :src:`docs/alpha/michelson.rst`.
+- Updating the `Michelson reference website <https://tezos.gitlab.io/michelson-reference/>`__, by modifying the associated `repository <https://gitlab.com/tezos/michelson-reference>`__.

@@ -1,19 +1,17 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_car.tz]
 
 Well typed
-Gas remaining: 1039991.314 units remaining
+Gas remaining: 1039992.274 units remaining
 { parameter string ;
   storage (pair (string %s) (nat %n)) ;
   code { DUP
-         /* [ pair (string @parameter) (pair @storage (string %s) (nat %n))
-            : pair (string @parameter) (pair @storage (string %s) (nat %n)) ] */ ;
+         /* [ pair string string nat : pair string string nat ] */ ;
          CDR
-         /* [ @storage pair (string %s) (nat %n)
-            : pair (string @parameter) (pair @storage (string %s) (nat %n)) ] */ ;
-         DIP { CAR /* [ @parameter string ] */ }
-         /* [ @storage pair (string %s) (nat %n) : @parameter string ] */ ;
+         /* [ pair string nat : pair string string nat ] */ ;
+         DIP { CAR /* [ string ] */ }
+         /* [ pair string nat : string ] */ ;
          SET_CAR %s ;
          NIL operation
-         /* [ list operation : @storage pair (string %s @parameter) (nat %n @storage.n) ] */ ;
+         /* [ list operation : pair string nat ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage (string %s @parameter) (nat %n @storage.n)) ] */ } }
+         /* [ pair (list operation) string nat ] */ } }

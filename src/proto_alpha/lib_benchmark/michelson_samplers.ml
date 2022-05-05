@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -49,11 +49,6 @@ let parameters_encoding =
           (req "map_size" range_encoding)))
 
 (* ------------------------------------------------------------------------- *)
-(* Helpers. *)
-
-let comparable_downcast = Script_ir_translator.ty_of_comparable_ty
-
-(* ------------------------------------------------------------------------- *)
 (* Type names. *)
 
 (* We only want to generated inhabited types, hence Never is not included. *)
@@ -70,6 +65,7 @@ type type_name =
   | `TKey
   | `TTimestamp
   | `TAddress
+  | `TTx_rollup_l2_address
   | `TBool
   | `TPair
   | `TUnion
@@ -81,6 +77,7 @@ type type_name =
   | `TBig_map
   | `TContract
   | `TSapling_transaction
+  | `TSapling_transaction_deprecated
   | `TSapling_state
   | `TOperation
   | `TChain_id
@@ -101,8 +98,10 @@ type atomic_type_name =
   | `TKey
   | `TTimestamp
   | `TAddress
+  | `TTx_rollup_l2_address
   | `TBool
   | `TSapling_transaction
+  | `TSapling_transaction_deprecated
   | `TSapling_state
   | `TChain_id
   | `TBls12_381_g1
@@ -140,8 +139,10 @@ let all_atomic_type_names : atomic_type_name array =
     `TKey;
     `TTimestamp;
     `TAddress;
+    `TTx_rollup_l2_address;
     `TBool;
     `TSapling_transaction;
+    `TSapling_transaction_deprecated;
     `TSapling_state;
     `TChain_id;
     `TBls12_381_g1;
@@ -177,6 +178,7 @@ type comparable_type_name =
   | `TTimestamp
   | `TChain_id
   | `TAddress
+  | `TTx_rollup_l2_address
   | `TPair
   | `TUnion
   | `TOption ]
@@ -202,6 +204,7 @@ let all_comparable_atomic_type_names : 'a comparable_and_atomic array =
     `TTimestamp;
     `TChain_id;
     `TAddress;
+    `TTx_rollup_l2_address;
   |]
 
 type 'a comparable_and_non_atomic = 'a
@@ -248,7 +251,7 @@ module type S = sig
   end
 
   module rec Random_value : sig
-    val value : 'a Script_typed_ir.ty -> 'a sampler
+    val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
 
@@ -289,43 +292,46 @@ end)
     let type_of_atomic_type_name (at_tn : atomic_type_name) :
         Script_ir_translator.ex_ty =
       match at_tn with
-      | `TString -> Ex_ty (string_t ~annot:None)
-      | `TNat -> Ex_ty (nat_t ~annot:None)
-      | `TKey -> Ex_ty (key_t ~annot:None)
-      | `TBytes -> Ex_ty (bytes_t ~annot:None)
-      | `TBool -> Ex_ty (bool_t ~annot:None)
-      | `TAddress -> Ex_ty (address_t ~annot:None)
-      | `TTimestamp -> Ex_ty (timestamp_t ~annot:None)
-      | `TKey_hash -> Ex_ty (key_hash_t ~annot:None)
-      | `TMutez -> Ex_ty (mutez_t ~annot:None)
-      | `TSignature -> Ex_ty (signature_t ~annot:None)
-      | `TUnit -> Ex_ty (unit_t ~annot:None)
-      | `TInt -> Ex_ty (int_t ~annot:None)
-      | `TSapling_state -> Ex_ty (sapling_state_t ~memo_size ~annot:None)
-      | `TSapling_transaction ->
-          Ex_ty (sapling_transaction_t ~memo_size ~annot:None)
-      | `TChain_id -> Ex_ty (chain_id_t ~annot:None)
-      | `TBls12_381_g1 -> Ex_ty (bls12_381_g1_t ~annot:None)
-      | `TBls12_381_g2 -> Ex_ty (bls12_381_g2_t ~annot:None)
-      | `TBls12_381_fr -> Ex_ty (bls12_381_fr_t ~annot:None)
+      | `TString -> Ex_ty string_t
+      | `TNat -> Ex_ty nat_t
+      | `TKey -> Ex_ty key_t
+      | `TBytes -> Ex_ty bytes_t
+      | `TBool -> Ex_ty bool_t
+      | `TAddress -> Ex_ty address_t
+      | `TTx_rollup_l2_address -> Ex_ty tx_rollup_l2_address_t
+      | `TTimestamp -> Ex_ty timestamp_t
+      | `TKey_hash -> Ex_ty key_hash_t
+      | `TMutez -> Ex_ty mutez_t
+      | `TSignature -> Ex_ty signature_t
+      | `TUnit -> Ex_ty unit_t
+      | `TInt -> Ex_ty int_t
+      | `TSapling_state -> Ex_ty (sapling_state_t ~memo_size)
+      | `TSapling_transaction -> Ex_ty (sapling_transaction_t ~memo_size)
+      | `TSapling_transaction_deprecated ->
+          Ex_ty (sapling_transaction_deprecated_t ~memo_size)
+      | `TChain_id -> Ex_ty chain_id_t
+      | `TBls12_381_g1 -> Ex_ty bls12_381_g1_t
+      | `TBls12_381_g2 -> Ex_ty bls12_381_g2_t
+      | `TBls12_381_fr -> Ex_ty bls12_381_fr_t
 
     let comparable_type_of_comparable_atomic_type_name
         (cmp_tn : 'a comparable_and_atomic) :
         Script_ir_translator.ex_comparable_ty =
       match cmp_tn with
-      | `TString -> Ex_comparable_ty (string_key ~annot:None)
-      | `TNat -> Ex_comparable_ty (nat_key ~annot:None)
-      | `TBytes -> Ex_comparable_ty (bytes_key ~annot:None)
-      | `TBool -> Ex_comparable_ty (bool_key ~annot:None)
-      | `TAddress -> Ex_comparable_ty (address_key ~annot:None)
-      | `TTimestamp -> Ex_comparable_ty (timestamp_key ~annot:None)
-      | `TKey_hash -> Ex_comparable_ty (key_hash_key ~annot:None)
-      | `TMutez -> Ex_comparable_ty (mutez_key ~annot:None)
-      | `TInt -> Ex_comparable_ty (int_key ~annot:None)
-      | `TUnit -> Ex_comparable_ty (unit_key ~annot:None)
-      | `TSignature -> Ex_comparable_ty (signature_key ~annot:None)
-      | `TKey -> Ex_comparable_ty (key_key ~annot:None)
-      | `TChain_id -> Ex_comparable_ty (chain_id_key ~annot:None)
+      | `TString -> Ex_comparable_ty string_t
+      | `TNat -> Ex_comparable_ty nat_t
+      | `TBytes -> Ex_comparable_ty bytes_t
+      | `TBool -> Ex_comparable_ty bool_t
+      | `TAddress -> Ex_comparable_ty address_t
+      | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_t
+      | `TTimestamp -> Ex_comparable_ty timestamp_t
+      | `TKey_hash -> Ex_comparable_ty key_hash_t
+      | `TMutez -> Ex_comparable_ty mutez_t
+      | `TInt -> Ex_comparable_ty int_t
+      | `TUnit -> Ex_comparable_ty unit_t
+      | `TSignature -> Ex_comparable_ty signature_t
+      | `TKey -> Ex_comparable_ty key_t
+      | `TChain_id -> Ex_comparable_ty chain_id_t
 
     let rec m_type ~size : Script_ir_translator.ex_ty sampler =
       let open Script_ir_translator in
@@ -340,27 +346,27 @@ end)
         @@ function
         | `TOption -> (
             let* (Ex_ty t) = m_type ~size:1 in
-            match option_t (-1) t ~annot:None with
+            match option_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TList -> (
             let* (Ex_ty t) = m_type ~size:1 in
-            match list_t (-1) t ~annot:None with
+            match list_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TSet -> (
             let* (Ex_comparable_ty t) = m_comparable_type ~size:1 in
-            match set_t (-1) t ~annot:None with
+            match set_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TTicket -> (
             let* (Ex_comparable_ty contents) = m_comparable_type ~size:1 in
-            match ticket_t (-1) contents ~annot:None with
+            match ticket_t (-1) contents with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TContract -> (
             let* (Ex_ty t) = m_type ~size:1 in
-            match contract_t (-1) t ~annot:None with
+            match contract_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
       else
@@ -369,59 +375,57 @@ end)
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
-            match
-              pair_t (-1) (left, None, None) (right, None, None) ~annot:None
-            with
+            match pair_t (-1) left right with
             | Error _ -> assert false
-            | Ok res_ty -> return @@ Ex_ty res_ty)
+            | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TLambda -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty domain) = m_type ~size:lsize in
             let* (Ex_ty range) = m_type ~size:rsize in
-            match lambda_t (-1) domain range ~annot:None with
+            match lambda_t (-1) domain range with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TUnion -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
-            match union_t (-1) (left, None) (right, None) ~annot:None with
+            match union_t (-1) left right with
             | Error _ -> assert false
-            | Ok res_ty -> return @@ Ex_ty res_ty)
+            | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TOption -> (
             let* (Ex_ty t) = m_type ~size:(size - 1) in
-            match option_t (-1) t ~annot:None with
+            match option_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TMap -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_comparable_ty key) = m_comparable_type ~size:lsize in
             let* (Ex_ty elt) = m_type ~size:rsize in
-            match map_t (-1) key elt ~annot:None with
+            match map_t (-1) key elt with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TSet -> (
             let* (Ex_comparable_ty key_ty) =
               m_comparable_type ~size:(size - 1)
             in
-            match set_t (-1) key_ty ~annot:None with
+            match set_t (-1) key_ty with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TList -> (
             let* (Ex_ty elt) = m_type ~size:(size - 1) in
-            match list_t (-1) elt ~annot:None with
+            match list_t (-1) elt with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TTicket -> (
             let* (Ex_comparable_ty contents) =
               m_comparable_type ~size:(size - 1)
             in
-            match ticket_t (-1) contents ~annot:None with
+            match ticket_t (-1) contents with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TContract -> (
             let* (Ex_ty t) = m_type ~size:(size - 1) in
-            match contract_t (-1) t ~annot:None with
+            match contract_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TBig_map ->
@@ -439,7 +443,7 @@ end)
       let option_case size =
         let size = size - 1 in
         let* (Ex_comparable_ty t) = m_comparable_type ~size in
-        match option_key (-1) t ~annot:None with
+        match comparable_option_t (-1) t with
         | Error _ -> (* what should be done here? *) assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -451,7 +455,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match pair_key (-1) (l, None) (r, None) ~annot:None with
+        match comparable_pair_t (-1) l r with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -463,7 +467,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match union_key (-1) (l, None) (r, None) ~annot:None with
+        match comparable_union_t (-1) l r with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -480,7 +484,7 @@ end)
 
   (* Type-directed generation of random values. *)
   module rec Random_value : sig
-    val value : 'a Script_typed_ir.ty -> 'a sampler
+    val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
 
@@ -488,9 +492,14 @@ end)
   end = struct
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
-        ( Alpha_context.Contract.implicit_contract
-            (Crypto_samplers.pkh rng_state),
-          "default" )
+        let contract =
+          Alpha_context.Contract.implicit_contract
+            (Crypto_samplers.pkh rng_state)
+        in
+        {
+          destination = Contract contract;
+          entrypoint = Alpha_context.Entrypoint.default;
+        }
       else
         (* For a description of the format, see
            tezos-codec describe alpha.contract binary encoding *)
@@ -502,42 +511,58 @@ end)
             Alpha_context.Contract.encoding
             string
         in
-        let ep = Base_samplers.string ~size:{min = 1; max = 31} rng_state in
-        (contract, ep)
+        let ep =
+          Alpha_context.Entrypoint.of_string_strict_exn
+          @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
+        in
+        {destination = Contract contract; entrypoint = ep}
+
+    let tx_rollup_l2_address rng_state =
+      let seed =
+        Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
+      in
+      let secret_key = Bls12_381.Signature.generate_sk seed in
+      Tx_rollup_l2_address.Indexable.value
+        (Tx_rollup_l2_address.of_bls_pk
+        @@ Bls12_381.Signature.MinPk.derive_pk secret_key)
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
-      Data_encoding.Binary.of_string_exn Chain_id.encoding string
+      Data_encoding.Binary.of_string_exn Script_chain_id.encoding string
 
-    let rec value : type a. a Script_typed_ir.ty -> a sampler =
+    let signature rng_state =
+      Script_signature.make (Michelson_base.signature rng_state)
+
+    let rec value : type a ac. (a, ac) Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
       fun typ ->
         match typ with
-        | Never_t _ -> assert false
-        | Unit_t _ -> M.return ()
-        | Int_t _ -> Michelson_base.int
-        | Nat_t _ -> Michelson_base.nat
-        | Signature_t _ -> Michelson_base.signature
-        | String_t _ -> Michelson_base.string
-        | Bytes_t _ -> Michelson_base.bytes
-        | Mutez_t _ -> Michelson_base.tez
-        | Key_hash_t _ -> Crypto_samplers.pkh
-        | Key_t _ -> Crypto_samplers.pk
-        | Timestamp_t _ -> Michelson_base.timestamp
-        | Bool_t _ -> Base_samplers.uniform_bool
-        | Address_t _ -> address
-        | Pair_t ((left_t, _, _), (right_t, _, _), _) ->
+        | Never_t -> assert false
+        | Unit_t -> M.return ()
+        | Int_t -> Michelson_base.int
+        | Nat_t -> Michelson_base.nat
+        | Signature_t -> signature
+        | String_t -> Michelson_base.string
+        | Bytes_t -> Michelson_base.bytes
+        | Mutez_t -> Michelson_base.tez
+        | Key_hash_t -> Crypto_samplers.pkh
+        | Key_t -> Crypto_samplers.pk
+        | Timestamp_t -> Michelson_base.timestamp
+        | Bool_t -> Base_samplers.uniform_bool
+        | Address_t -> address
+        | Tx_rollup_l2_address_t -> tx_rollup_l2_address
+        | Pair_t (left_t, right_t, _, _) ->
             M.(
               let* left_v = value left_t in
               let* right_v = value right_t in
               return (left_v, right_v))
-        | Union_t ((left_t, _), (right_t, _), _) ->
+        | Union_t (left_t, right_t, _, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then
                 L (value left_t rng_state)
               else R (value right_t rng_state)
         | Lambda_t (arg_ty, ret_ty, _) -> generate_lambda arg_ty ret_ty
-        | Option_t (ty, _) ->
+        | Option_t (ty, _, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then None
               else Some (value ty rng_state)
@@ -545,35 +570,37 @@ end)
         | Set_t (elt_ty, _) -> generate_set elt_ty
         | Map_t (key_ty, val_ty, _) -> generate_map key_ty val_ty
         | Contract_t (arg_ty, _) -> generate_contract arg_ty
-        | Operation_t _ -> generate_operation
+        | Operation_t -> generate_operation
         | Big_map_t (key_ty, val_ty, _) -> generate_big_map key_ty val_ty
-        | Chain_id_t _ -> chain_id
-        | Bls12_381_g1_t _ -> generate_bls12_381_g1
-        | Bls12_381_g2_t _ -> generate_bls12_381_g2
-        | Bls12_381_fr_t _ -> generate_bls12_381_fr
-        | Ticket_t (contents_ty, _) ->
-            let ty = comparable_downcast contents_ty in
-            generate_ticket ty
+        | Chain_id_t -> chain_id
+        | Bls12_381_g1_t -> generate_bls12_381_g1
+        | Bls12_381_g2_t -> generate_bls12_381_g2
+        | Bls12_381_fr_t -> generate_bls12_381_fr
+        | Ticket_t (contents_ty, _) -> generate_ticket contents_ty
         | Sapling_transaction_t _ ->
+            fail_sampling
+              "Michelson_samplers: sapling transactions not handled yet"
+        | Sapling_transaction_deprecated_t _ ->
             fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"
         | Sapling_state_t _ ->
             fail_sampling "Michelson_samplers: sapling state not handled yet"
-        | Chest_key_t _ ->
+        | Chest_key_t ->
             fail_sampling "Michelson_samplers: chest key not handled yet"
-        | Chest_t _ -> fail_sampling "Michelson_samplers: chest not handled yet"
+        | Chest_t -> fail_sampling "Michelson_samplers: chest not handled yet"
 
     and generate_lambda :
-        type arg ret.
-        arg Script_typed_ir.ty ->
-        ret Script_typed_ir.ty ->
+        type arg argc ret retc.
+        (arg, argc) Script_typed_ir.ty ->
+        (ret, retc) Script_typed_ir.ty ->
         (arg, ret) Script_typed_ir.lambda sampler =
      fun _arg_ty _ret_ty _rng_state ->
       fail_sampling "Michelson_samplers: lambda not handled yet"
 
     and generate_list :
-        type elt.
-        elt Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler =
+        type elt eltc.
+        (elt, eltc) Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler
+        =
      fun elt_type ->
       let open M in
       let* (length, elements) =
@@ -590,11 +617,10 @@ end)
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
      fun elt_ty ->
       let open M in
-      let ety = comparable_downcast elt_ty in
       let* (_, elements) =
         Structure_samplers.list
           ~range:P.parameters.set_size
-          ~sampler:(value ety)
+          ~sampler:(value elt_ty)
       in
       return
       @@ List.fold_left
@@ -603,16 +629,15 @@ end)
            elements
 
     and generate_map :
-        type key elt.
+        type key elt eltc.
         key Script_typed_ir.comparable_ty ->
-        elt Script_typed_ir.ty ->
+        (elt, eltc) Script_typed_ir.ty ->
         (key, elt) Script_typed_ir.map sampler =
      fun key_ty elt_ty rng_state ->
       let size =
         Base_samplers.sample_in_interval rng_state ~range:P.parameters.map_size
       in
-      let kty = comparable_downcast key_ty in
-      let keys = List.init size (fun _ -> value kty rng_state) in
+      let keys = List.init size (fun _ -> value key_ty rng_state) in
       let elts = List.init size (fun _ -> value elt_ty rng_state) in
       List.fold_left2
         (fun map key elt -> Script_map.update key (Some elt) map)
@@ -621,9 +646,9 @@ end)
         elts
 
     and generate_big_map :
-        type key elt.
+        type key elt eltc.
         key Script_typed_ir.comparable_ty ->
-        elt Script_typed_ir.ty ->
+        (elt, eltc) Script_typed_ir.ty ->
         (key, elt) Script_typed_ir.big_map sampler =
       let open Script_typed_ir in
       fun key_ty elt_ty rng_state ->
@@ -633,7 +658,7 @@ end)
             ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
               let big_map = Script_ir_translator.empty_big_map key_ty elt_ty in
               (* Cannot have big maps under big maps *)
-              option_t (-1) elt_ty ~annot:None |> Environment.wrap_tzresult
+              option_t (-1) elt_ty |> Environment.wrap_tzresult
               >>?= fun opt_elt_ty ->
               let map = generate_map key_ty opt_elt_ty rng_state in
               Script_map.fold
@@ -655,48 +680,47 @@ end)
             fail_sampling "raise_if_error"
 
     and generate_contract :
-        type arg.
-        arg Script_typed_ir.ty -> arg Script_typed_ir.typed_contract sampler =
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
       let open M in
-      let* addr = value (address_t ~annot:None) in
-      return (arg_ty, addr)
+      let* address = value address_t in
+      return (Typed_contract {arg_ty; address})
 
-    and generate_operation :
-        (Alpha_context.packed_internal_operation
-        * Alpha_context.Lazy_storage.diffs option)
-        sampler =
+    and generate_operation : Script_typed_ir.operation sampler =
      fun rng_state ->
       let transfer = generate_transfer_tokens rng_state in
-      (transfer, None)
+      Script_typed_ir.{piop = transfer; lazy_storage_diff = None}
 
     and generate_transfer_tokens :
-        Alpha_context.packed_internal_operation sampler =
+        Script_typed_ir.packed_internal_operation sampler =
      fun _rng_state -> fail_sampling "generate_transfer_tokens: unimplemented"
 
-    and generate_bls12_381_g1 : Environment.Bls12_381.G1.t sampler =
+    and generate_bls12_381_g1 : Script_bls.G1.t sampler =
      fun rng_state ->
       let b = Bls12_381.G1.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.G1.of_bytes_opt b with
+      match Script_bls.G1.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 
-    and generate_bls12_381_g2 : Environment.Bls12_381.G2.t sampler =
+    and generate_bls12_381_g2 : Script_bls.G2.t sampler =
      fun rng_state ->
       let b = Bls12_381.G2.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.G2.of_bytes_opt b with
+      match Script_bls.G2.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 
-    and generate_bls12_381_fr : Environment.Bls12_381.Fr.t sampler =
+    and generate_bls12_381_fr : Script_bls.Fr.t sampler =
      fun rng_state ->
       let b = Bls12_381.Fr.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.Fr.of_bytes_opt b with
+      match Script_bls.Fr.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 
     and generate_ticket :
-        type a. a Script_typed_ir.ty -> a Script_typed_ir.ticket sampler =
+        type a ac.
+        (a, ac) Script_typed_ir.ty -> a Script_typed_ir.ticket sampler =
      fun ty rng_state ->
       let contents = value ty rng_state in
       let ticketer =
@@ -705,7 +729,7 @@ end)
       let amount = Michelson_base.nat rng_state in
       Script_typed_ir.{ticketer; contents; amount}
 
-    let comparable ty = value (comparable_downcast ty)
+    let comparable ty = value ty
 
     (* Random stack generation. *)
     let rec stack : type a b. (a, b) Script_typed_ir.stack_ty -> (a * b) sampler
@@ -714,7 +738,7 @@ end)
       let open Script_typed_ir in
       fun stack_ty ->
         match stack_ty with
-        | Item_t (ty, tl, _) ->
+        | Item_t (ty, tl) ->
             let* elt = value ty in
             let* tl = stack tl in
             return ((elt, tl) : a * b)

@@ -29,6 +29,7 @@
 open Client_context_unix
 
 let builtin_commands =
+  let open Lwt_syntax in
   let open Clic in
   [
     command
@@ -36,10 +37,12 @@ let builtin_commands =
       no_options
       (fixed ["list"; "understood"; "protocols"])
       (fun () (cctxt : #Client_context.full) ->
-        Seq.iter_s
-          (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
-          (Client_commands.get_versions ())
-        >>= fun () -> return_unit);
+        let* () =
+          Seq.iter_s
+            (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
+            (Client_commands.get_versions ())
+        in
+        return_ok_unit);
   ]
 
 module type M = sig
@@ -58,7 +61,7 @@ module type M = sig
 
   val default_base_dir : string
 
-  val default_media_type : Media_type.t list
+  val default_media_type : Media_type.Command_line.t
 
   val other_registrations :
     (Client_config.Cfg_file.t -> (module Client_config.Remote_params) -> unit)
@@ -79,7 +82,8 @@ let setup_remote_signer (module C : M) client_config
     (rpc_config : RPC_client_unix.config) parsed_config_file =
   let module Remote_params = struct
     let authenticate pkhs payload =
-      Client_keys.list_keys client_config >>=? fun keys ->
+      let open Lwt_result_syntax in
+      let* keys = Client_keys.list_keys client_config in
       match
         List.filter_map
           (function
@@ -111,9 +115,11 @@ let setup_remote_signer (module C : M) client_config
   let module Socket = Tezos_signer_backends_unix.Socket.Make (Remote_params) in
   Client_keys.register_signer
     (module Tezos_signer_backends.Encrypted.Make (struct
-      let cctxt = (client_config :> Client_context.io)
+      let cctxt = (client_config :> Client_context.io_wallet)
     end)) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
+  Client_keys.register_aggregate_signer
+    (module Tezos_signer_backends.Unencrypted.Aggregate) ;
   Client_keys.register_signer
     (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
   Client_keys.register_signer (module Socket.Unix) ;
@@ -155,14 +161,17 @@ let warn_if_duplicates_light_sources (printer : unix_logger) uris =
   else Lwt.return_unit
 
 let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
+  let open Lwt_result_syntax in
   (* Make sure that base_dir is not a mockup. *)
-  (Tezos_mockup.Persistence.classify_base_dir base_dir >>=? function
-   | Base_dir_is_mockup ->
-       failwith
-         "%s is setup as a mockup, yet mockup mode is not active"
-         base_dir
-   | _ -> return_unit)
-  >>=? fun () ->
+  let* () =
+    let* b = Tezos_mockup.Persistence.classify_base_dir base_dir in
+    match b with
+    | Base_dir_is_mockup ->
+        failwith
+          "%s is setup as a mockup, yet mockup mode is not active"
+          base_dir
+    | _ -> return_unit
+  in
   let (chain, block, confirmations, password_filename, protocol, sources) =
     match parsed_args with
     | None ->
@@ -180,6 +189,11 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
           p.Client_config.protocol,
           p.Client_config.sources )
   in
+  let verbose_rpc_error_diagnostics =
+    match parsed_args with
+    | None -> false
+    | Some parsed_args -> parsed_args.better_errors
+  in
   match mode with
   | `Mode_client ->
       return
@@ -190,6 +204,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~password_filename
            ~base_dir
            ~rpc_config
+           ~verbose_rpc_error_diagnostics
   | (`Mode_light | `Mode_proxy) as mode ->
       let printer = new unix_logger ~base_dir in
       let rpc_context =
@@ -204,12 +219,13 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             failwith
               "--sources MUST be specified when --mode light is specified"
         | (`Mode_light, Some sources_config) ->
-            warn_if_duplicates_light_sources printer sources_config.uris
-            >>= fun () ->
+            let*! () =
+              warn_if_duplicates_light_sources printer sources_config.uris
+            in
             let rpc_builder endpoint =
               (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
                  {rpc_config with endpoint}
-                 rpc_config.media_type
+                 (Media_type.Command_line.of_command_line rpc_config.media_type)
                 :> RPC_context.simple)
             in
             let sources =
@@ -219,15 +235,16 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             in
             return (Tezos_proxy.Proxy_services.Light_client sources)
       in
-      Tezos_proxy.Registration.get_registered_proxy
-        printer
-        rpc_context
-        mode
-        ~chain
-        ~block
-        protocol
-      >>=? fun proxy_env ->
-      get_mode () >>=? fun mode ->
+      let* proxy_env =
+        Tezos_proxy.Registration.get_registered_proxy
+          printer
+          rpc_context
+          mode
+          ~chain
+          ~block
+          protocol
+      in
+      let* mode = get_mode () in
       return
       @@ new unix_proxy
            ~chain
@@ -242,6 +259,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
 let setup_mockup_rpc_client_config
     (cctxt : Tezos_client_base.Client_context.printer)
     (args : Client_config.cli_args) base_dir =
+  let open Lwt_result_syntax in
   let in_memory_mockup (args : Client_config.cli_args) =
     match args.protocol with
     | None -> Tezos_mockup.Persistence.default_mockup_context cctxt
@@ -252,22 +270,27 @@ let setup_mockup_rpc_client_config
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
   in
-  (Tezos_mockup.Persistence.classify_base_dir base_dir >>=? function
-   | Tezos_mockup.Persistence.Base_dir_is_empty
-   | Tezos_mockup.Persistence.Base_dir_is_file
-   | Tezos_mockup.Persistence.Base_dir_is_nonempty
-   | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
-       let mem_only = true in
-       in_memory_mockup args >>=? fun res -> return (res, mem_only)
-   | Tezos_mockup.Persistence.Base_dir_is_mockup ->
-       let mem_only = false in
-       Tezos_mockup.Persistence.get_mockup_context_from_disk
-         ~base_dir
-         ~protocol_hash:args.protocol
-         cctxt
-       >>=? fun res -> return (res, mem_only))
-  >>=? fun ( (mockup_env, {chain = chain_id; rpc_context; protocol_data}),
-             mem_only ) ->
+  let* b = Tezos_mockup.Persistence.classify_base_dir base_dir in
+  let* ((mockup_env, {chain = chain_id; rpc_context; protocol_data}), mem_only)
+      =
+    match b with
+    | Tezos_mockup.Persistence.Base_dir_is_empty
+    | Tezos_mockup.Persistence.Base_dir_is_file
+    | Tezos_mockup.Persistence.Base_dir_is_nonempty
+    | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
+        let mem_only = true in
+        let* res = in_memory_mockup args in
+        return (res, mem_only)
+    | Tezos_mockup.Persistence.Base_dir_is_mockup ->
+        let mem_only = false in
+        let* res =
+          Tezos_mockup.Persistence.get_mockup_context_from_disk
+            ~base_dir
+            ~protocol_hash:args.protocol
+            cctxt
+        in
+        return (res, mem_only)
+  in
   return
     (new unix_mockup
        ~base_dir
@@ -292,6 +315,7 @@ let setup_client_config (cctxt : Tezos_client_base.Client_context.printer)
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
+  let open Lwt_result_syntax in
   let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
   let (original_args, autocomplete) =
@@ -320,151 +344,159 @@ let main (module C : M) ~select_commands =
         Format.err_formatter
         (if Unix.isatty Unix.stderr then Ansi else Plain)
         Short) ;
-  Internal_event_unix.init () >>= fun () ->
-  Lwt.catch
-    (fun () ->
-      let full =
-        new unix_full
-          ~chain:C.default_chain
-          ~block:C.default_block
-          ~confirmations:None
-          ~password_filename:None
-          ~base_dir:C.default_base_dir
-          ~rpc_config:RPC_client_unix.default_config
-      in
-      ( C.parse_config_args full original_args >>=? fun (parsed, remaining) ->
-        let parsed_config_file = parsed.Client_config.parsed_config_file
-        and parsed_args = parsed.Client_config.parsed_args
-        and config_commands = parsed.Client_config.config_commands in
-        let base_dir : string =
-          match parsed.Client_config.base_dir with
-          | Some p -> p
-          | None -> (
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
+  let*! retcode =
+    Lwt.catch
+      (fun () ->
+        let full =
+          new unix_full
+            ~chain:C.default_chain
+            ~block:C.default_block
+            ~confirmations:None
+            ~password_filename:None
+            ~base_dir:C.default_base_dir
+            ~rpc_config:RPC_client_unix.default_config
+            ~verbose_rpc_error_diagnostics:false
+        in
+        let*! r =
+          let* (parsed, remaining) = C.parse_config_args full original_args in
+          let parsed_config_file = parsed.Client_config.parsed_config_file
+          and parsed_args = parsed.Client_config.parsed_args
+          and config_commands = parsed.Client_config.config_commands in
+          let base_dir : string =
+            match parsed.Client_config.base_dir with
+            | Some p -> p
+            | None -> (
+                match parsed_config_file with
+                | None -> C.default_base_dir
+                | Some p -> p.Client_config.Cfg_file.base_dir)
+          and require_auth = parsed.Client_config.require_auth in
+          let rpc_config =
+            let rpc_config : RPC_client_unix.config =
               match parsed_config_file with
-              | None -> C.default_base_dir
-              | Some p -> p.Client_config.Cfg_file.base_dir)
-        and require_auth = parsed.Client_config.require_auth in
-        let rpc_config =
-          let rpc_config : RPC_client_unix.config =
-            match parsed_config_file with
-            | None -> RPC_client_unix.default_config
-            | Some cfg ->
-                {
-                  RPC_client_unix.default_config with
-                  media_type =
-                    Option.value cfg.media_type ~default:C.default_media_type;
-                  endpoint =
-                    Option.value
-                      cfg.endpoint
-                      ~default:Client_config.default_endpoint;
-                }
+              | None -> RPC_client_unix.default_config
+              | Some cfg ->
+                  {
+                    RPC_client_unix.default_config with
+                    media_type =
+                      Option.value cfg.media_type ~default:C.default_media_type;
+                    endpoint =
+                      Option.value
+                        cfg.endpoint
+                        ~default:Client_config.default_endpoint;
+                  }
+            in
+            match parsed_args with
+            | Some parsed_args ->
+                if parsed_args.Client_config.print_timings then
+                  let gettimeofday = Unix.gettimeofday in
+                  {
+                    rpc_config with
+                    logger =
+                      RPC_client_unix.timings_logger
+                        ~gettimeofday
+                        Format.err_formatter;
+                  }
+                else if parsed_args.Client_config.log_requests then
+                  {
+                    rpc_config with
+                    logger = RPC_client_unix.full_logger Format.err_formatter;
+                  }
+                else rpc_config
+            | None -> rpc_config
           in
-          match parsed_args with
-          | Some parsed_args ->
-              if parsed_args.Client_config.print_timings then
-                let gettimeofday = Unix.gettimeofday in
-                {
-                  rpc_config with
-                  logger =
-                    RPC_client_unix.timings_logger
-                      ~gettimeofday
-                      Format.err_formatter;
-                }
-              else if parsed_args.Client_config.log_requests then
-                {
-                  rpc_config with
-                  logger = RPC_client_unix.full_logger Format.err_formatter;
-                }
-              else rpc_config
-          | None -> rpc_config
-        in
-        setup_client_config
-          (full :> Client_context.printer)
-          parsed_args
-          base_dir
-          rpc_config
-        >>=? fun client_config ->
-        setup_remote_signer
-          (module C)
-          client_config
-          rpc_config
-          parsed_config_file ;
-        (match parsed_args with
-        | Some parsed_args ->
-            select_commands
-              (client_config :> RPC_client_unix.http_ctxt)
+          let* client_config =
+            setup_client_config
+              (full :> Client_context.printer)
               parsed_args
-        | None -> return_nil)
-        >>=? fun other_commands ->
-        let commands =
-          Clic.add_manual
-            ~executable_name
-            ~global_options
-            (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
-            Format.std_formatter
-            (C.clic_commands
-               ~base_dir
-               ~config_commands
-               ~builtin_commands
-               ~other_commands
-               ~require_auth)
-        in
-        match autocomplete with
-        | Some (prev_arg, cur_arg, script) ->
-            Clic.autocompletion
-              ~script
-              ~cur_arg
-              ~prev_arg
-              ~args:original_args
+              base_dir
+              rpc_config
+          in
+          setup_remote_signer
+            (module C)
+            client_config
+            rpc_config
+            parsed_config_file ;
+          let* other_commands =
+            match parsed_args with
+            | Some parsed_args ->
+                select_commands
+                  (client_config :> RPC_client_unix.http_ctxt)
+                  parsed_args
+            | None -> return_nil
+          in
+          let commands =
+            Clic.add_manual
+              ~executable_name
               ~global_options
-              commands
-              client_config
-            >>=? fun completions ->
-            List.iter print_endline completions ;
-            return_unit
-        | None -> Clic.dispatch commands client_config remaining )
-      >>= function
-      | Ok () -> Lwt.return 0
-      | Error [Clic.Version] ->
-          let version = Tezos_version.Bin_version.version_string in
-          Format.printf "%s\n" version ;
-          Lwt.return 0
-      | Error [Clic.Help command] ->
-          Clic.usage
-            Format.std_formatter
-            ~executable_name
-            ~global_options
-            (match command with None -> [] | Some c -> [c]) ;
-          Lwt.return 0
-      | Error errs ->
-          Clic.pp_cli_errors
-            Format.err_formatter
-            ~executable_name
-            ~global_options
-            ~default:Error_monad.pp
-            errs ;
-          Lwt.return 1)
-    (function
-      | Client_commands.Version_not_found ->
-          Format.eprintf
-            "@{<error>@{<title>Fatal error@}@} unknown protocol version.@." ;
-          Lwt.return 1
-      | Failure message ->
-          Format.eprintf
-            "@{<error>@{<title>Fatal error@}@}@.  @[<h 0>%a@]@."
-            Format.pp_print_text
-            message ;
-          Lwt.return 1
-      | exn ->
-          Format.printf
-            "@{<error>@{<title>Fatal error@}@}@.  @[<h 0>%a@]@."
-            Format.pp_print_text
-            (Printexc.to_string exn) ;
-          Lwt.return 1)
-  >>= fun retcode ->
+              (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+              Format.std_formatter
+              (C.clic_commands
+                 ~base_dir
+                 ~config_commands
+                 ~builtin_commands
+                 ~other_commands
+                 ~require_auth)
+          in
+          match autocomplete with
+          | Some (prev_arg, cur_arg, script) ->
+              let* completions =
+                Clic.autocompletion
+                  ~script
+                  ~cur_arg
+                  ~prev_arg
+                  ~args:original_args
+                  ~global_options
+                  commands
+                  client_config
+              in
+              List.iter print_endline completions ;
+              return_unit
+          | None -> Clic.dispatch commands client_config remaining
+        in
+        match r with
+        | Ok () -> Lwt.return 0
+        | Error [Clic.Version] ->
+            let version = Tezos_version.Bin_version.version_string in
+            Format.printf "%s\n" version ;
+            Lwt.return 0
+        | Error [Clic.Help command] ->
+            Clic.usage
+              Format.std_formatter
+              ~executable_name
+              ~global_options
+              (match command with None -> [] | Some c -> [c]) ;
+            Lwt.return 0
+        | Error errs ->
+            Clic.pp_cli_errors
+              Format.err_formatter
+              ~executable_name
+              ~global_options
+              ~default:Error_monad.pp
+              errs ;
+            Lwt.return 1)
+      (function
+        | Client_commands.Version_not_found ->
+            Format.eprintf
+              "@{<error>@{<title>Fatal error@}@} unknown protocol version.@." ;
+            Lwt.return 1
+        | Failure message ->
+            Format.eprintf
+              "@{<error>@{<title>Fatal error@}@}@.  @[<h 0>%a@]@."
+              Format.pp_print_text
+              message ;
+            Lwt.return 1
+        | exn ->
+            Format.printf
+              "@{<error>@{<title>Fatal error@}@}@.  @[<h 0>%a@]@."
+              Format.pp_print_text
+              (Printexc.to_string exn) ;
+            Lwt.return 1)
+  in
   Format.pp_print_flush Format.err_formatter () ;
   Format.pp_print_flush Format.std_formatter () ;
-  Internal_event_unix.close () >>= fun () -> Lwt.return retcode
+  let*! () = Tezos_base_unix.Internal_event_unix.close () in
+  Lwt.return retcode
 
 (* Where all the user friendliness starts *)
 let run (module M : M)

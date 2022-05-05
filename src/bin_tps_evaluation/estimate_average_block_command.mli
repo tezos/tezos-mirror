@@ -23,5 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Cmdliner's command definition for "estimate average block" command. *)
-val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
+(** Register estimation of average block as a Tezt long test. *)
+val register : unit -> unit

@@ -119,7 +119,9 @@ let write_string ?(pos = 0) ?len descr buf =
   inner pos len
 
 let is_directory file_name =
-  Lwt_unix.lstat file_name >|= fun s -> s.st_kind = S_DIR
+  let open Lwt_syntax in
+  let+ s = Lwt_unix.lstat file_name in
+  s.st_kind = S_DIR
 
 let remove_dir dir =
   let rec remove dir =
@@ -159,9 +161,12 @@ let rec create_dir ?(perm = 0o755) dir =
     | _ -> Stdlib.failwith "Not a directory"
 
 let safe_close fd =
+  let open Lwt_result_syntax in
   Lwt.catch
-    (fun () -> Lwt_unix.close fd >>= fun () -> return_unit)
-    (fun exc -> fail (Exn exc))
+    (fun () ->
+      let*! () = Lwt_unix.close fd in
+      return_unit)
+    (fun exc -> tzfail (Exn exc))
 
 let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
   let open Lwt_syntax in
@@ -278,13 +283,16 @@ module Json = struct
     let json = to_root json in
     protect (fun () ->
         Lwt_io.with_file ~mode:Output file (fun chan ->
+            let open Lwt_result_syntax in
             let str = Data_encoding.Json.to_string ~minify:false json in
-            Lwt_io.write chan str >|= ok))
+            let*! () = Lwt_io.write chan str in
+            return_unit))
 
   let read_file file =
     protect (fun () ->
         Lwt_io.with_file ~mode:Input file (fun chan ->
-            Lwt_io.read chan >>= fun str ->
+            let open Lwt_result_syntax in
+            let*! str = Lwt_io.read chan in
             return (Ezjsonm.from_string str :> Data_encoding.json)))
 end
 
@@ -351,10 +359,11 @@ let with_open_in file task =
   with_open_file ~flags:[O_RDONLY; O_CLOEXEC] file task
 
 (* This is to avoid file corruption *)
-let with_atomic_open_out ?(overwrite = true) ?temp_dir filename f =
-  let open Lwt_tzresult_syntax in
+let with_atomic_open_out ?(overwrite = true) filename
+    ?(temp_dir = Filename.dirname filename) f =
+  let open Lwt_result_syntax in
   let temp_file =
-    Filename.temp_file ?temp_dir (Filename.basename filename) ".tmp"
+    Filename.temp_file ~temp_dir (Filename.basename filename) ".tmp"
   in
   let* res = with_open_out ~overwrite temp_file f in
   Lwt.catch

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,84 +32,78 @@ let script_string_size s = Script_string.to_string s |> string_size
 (* Memo-sizes are 16-bit integers *)
 let sapling_memo_size_size = !!0
 
-let (comparable_ty_size, ty_size) =
-  let base {annot = _; size = _} = hh3w in
-  let apply_comparable :
-      type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
-   fun accu cty ->
-    match cty with
-    | Unit_key a -> ret_succ_adding accu (base a)
-    | Int_key a -> ret_succ_adding accu (base a)
-    | Nat_key a -> ret_succ_adding accu (base a)
-    | Signature_key a -> ret_succ_adding accu (base a)
-    | String_key a -> ret_succ_adding accu (base a)
-    | Bytes_key a -> ret_succ_adding accu (base a)
-    | Mutez_key a -> ret_succ_adding accu (base a)
-    | Key_hash_key a -> ret_succ_adding accu (base a)
-    | Key_key a -> ret_succ_adding accu (base a)
-    | Timestamp_key a -> ret_succ_adding accu (base a)
-    | Address_key a -> ret_succ_adding accu (base a)
-    | Bool_key a -> ret_succ_adding accu (base a)
-    | Chain_id_key a -> ret_succ_adding accu (base a)
-    | Never_key a -> ret_succ_adding accu (base a)
-    | Pair_key ((_ty1, _fa1), (_ty2, _fa2), a) ->
-        ret_succ_adding accu @@ (base a +! hh6w)
-    | Union_key ((_ty1, _fa1), (_ty2, _fa2), a) ->
-        ret_succ_adding accu @@ (base a +! hh6w)
-    | Option_key (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
-  and apply : type a. nodes_and_size -> a ty -> nodes_and_size =
+let ty_traverse_f =
+  let base_basic =
+    !!0
+    (* Basic types count for 0 because they are all static values, hence shared
+       and not counted by `reachable_words`.
+       On the other hand compound types are functions, hence not shared. *)
+  in
+  let base_compound_no_meta = header_size in
+  let base_compound _meta = h1w in
+  let apply : type a ac. nodes_and_size -> (a, ac) ty -> nodes_and_size =
    fun accu ty ->
     match ty with
-    | Unit_t a -> ret_succ_adding accu @@ base a
-    | Int_t a -> ret_succ_adding accu @@ base a
-    | Nat_t a -> ret_succ_adding accu @@ base a
-    | Signature_t a -> ret_succ_adding accu @@ base a
-    | String_t a -> ret_succ_adding accu @@ base a
-    | Bytes_t a -> ret_succ_adding accu @@ base a
-    | Mutez_t a -> ret_succ_adding accu @@ base a
-    | Key_hash_t a -> ret_succ_adding accu @@ base a
-    | Key_t a -> ret_succ_adding accu @@ base a
-    | Timestamp_t a -> ret_succ_adding accu @@ base a
-    | Address_t a -> ret_succ_adding accu @@ base a
-    | Bool_t a -> ret_succ_adding accu @@ base a
-    | Operation_t a -> ret_succ_adding accu @@ base a
-    | Chain_id_t a -> ret_succ_adding accu @@ base a
-    | Never_t a -> ret_succ_adding accu @@ base a
-    | Bls12_381_g1_t a -> ret_succ_adding accu @@ base a
-    | Bls12_381_g2_t a -> ret_succ_adding accu @@ base a
-    | Bls12_381_fr_t a -> ret_succ_adding accu @@ base a
-    | Chest_key_t a -> ret_succ_adding accu @@ base a
-    | Chest_t a -> ret_succ_adding accu @@ base a
-    | Pair_t ((_ty1, _fa1, _va1), (_ty2, _fa2, _va2), a) ->
-        ret_succ_adding accu @@ (base a +! hh8w)
-    | Union_t ((_ty1, _fa1), (_ty2, _fa2), a) ->
-        ret_succ_adding accu @@ (base a +! hh6w)
+    | Unit_t -> ret_succ_adding accu base_basic
+    | Int_t -> ret_succ_adding accu base_basic
+    | Nat_t -> ret_succ_adding accu base_basic
+    | Signature_t -> ret_succ_adding accu base_basic
+    | String_t -> ret_succ_adding accu base_basic
+    | Bytes_t -> ret_succ_adding accu base_basic
+    | Mutez_t -> ret_succ_adding accu base_basic
+    | Key_hash_t -> ret_succ_adding accu base_basic
+    | Key_t -> ret_succ_adding accu base_basic
+    | Timestamp_t -> ret_succ_adding accu base_basic
+    | Address_t -> ret_succ_adding accu base_basic
+    | Tx_rollup_l2_address_t -> ret_succ_adding accu base_basic
+    | Bool_t -> ret_succ_adding accu base_basic
+    | Operation_t -> ret_succ_adding accu base_basic
+    | Chain_id_t -> ret_succ_adding accu base_basic
+    | Never_t -> ret_succ_adding accu base_basic
+    | Bls12_381_g1_t -> ret_succ_adding accu base_basic
+    | Bls12_381_g2_t -> ret_succ_adding accu base_basic
+    | Bls12_381_fr_t -> ret_succ_adding accu base_basic
+    | Chest_key_t -> ret_succ_adding accu base_basic
+    | Chest_t -> ret_succ_adding accu base_basic
+    | Pair_t (_ty1, _ty2, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
+    | Union_t (_ty1, _ty2, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
     | Lambda_t (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base a +! (word_size *? 2))
-    | Option_t (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
-    | List_t (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
-    | Set_t (_cty, a) -> ret_succ_adding accu @@ (base a +! word_size)
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
+    | Option_t (_ty, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
+    | List_t (_ty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
+    | Set_t (_cty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
     | Map_t (_cty, _ty, a) ->
-        ret_succ_adding accu @@ (base a +! (word_size *? 2))
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Big_map_t (_cty, _ty, a) ->
-        ret_succ_adding accu @@ (base a +! (word_size *? 2))
-    | Contract_t (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
-    | Sapling_transaction_t (_m, a) ->
-        ret_succ_adding accu @@ (base a +! sapling_memo_size_size +! word_size)
-    | Sapling_state_t (_m, a) ->
-        ret_succ_adding accu @@ (base a +! sapling_memo_size_size +! word_size)
-    | Ticket_t (_cty, a) -> ret_succ_adding accu @@ (base a +! word_size)
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
+    | Contract_t (_ty, a) ->
+        ret_succ_adding accu @@ (base_compound a +! word_size)
+    | Sapling_transaction_t _m ->
+        ret_succ_adding accu
+        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
+    | Sapling_transaction_deprecated_t _m ->
+        ret_succ_adding accu
+        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
+    | Sapling_state_t _m ->
+        ret_succ_adding accu
+        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
+    | Ticket_t (_cty, a) ->
+        ret_succ_adding accu @@ (base_compound a +! word_size)
   in
-  let f = ({apply; apply_comparable} : nodes_and_size ty_traverse) in
-  ( (fun cty -> comparable_ty_traverse cty zero f),
-    fun ty -> ty_traverse ty zero f )
+  ({apply} : nodes_and_size ty_traverse)
+
+let ty_size : type a ac. (a, ac) ty -> nodes_and_size =
+ fun ty -> ty_traverse ty zero ty_traverse_f
 
 let stack_ty_size s =
   let apply : type a s. nodes_and_size -> (a, s) stack_ty -> nodes_and_size =
    fun accu s ->
     match s with
     | Bot_t -> ret_succ accu
-    | Item_t (ty, _, _annot) -> ret_succ_adding (accu ++ ty_size ty) h3w
+    | Item_t (ty, _) -> ret_succ_adding (accu ++ ty_size ty) h2w
   in
   stack_ty_traverse s zero {apply}
 
@@ -117,34 +111,34 @@ let script_nat_size n = Script_int.to_zint n |> z_size
 
 let script_int_size n = Script_int.to_zint n |> z_size
 
-let signature_size = h3w +? Signature.size
+let signature_size = !!96 (* By Obj.reachable_words. *)
 
-let key_hash_size (x : Signature.public_key_hash) =
-  h1w
-  +? Signature.(
-       match x with
-       | Ed25519 _ -> Ed25519.Public_key_hash.size
-       | Secp256k1 _ -> Secp256k1.Public_key_hash.size
-       | P256 _ -> P256.Public_key_hash.size)
+let key_hash_size (_x : Signature.public_key_hash) = !!64
+(* By Obj.reachable_words. *)
 
 let public_key_size (x : public_key) =
-  let ks = Signature.Public_key.size x in
-  h1w +? ks
+  h1w +? match x with Ed25519 _ -> 64 | Secp256k1 _ -> 72 | P256 _ -> 96
 
 let mutez_size = h2w
 
 let timestamp_size x = Script_timestamp.to_zint x |> z_size
 
-let contract_size = Contract.in_memory_size
+let destination_size = Destination.in_memory_size
 
-let address_size ((c, s) : address) = h2w +! contract_size c +! string_size s
+let address_size addr =
+  h2w
+  +! destination_size addr.destination
+  +! Entrypoint.in_memory_size addr.entrypoint
+
+let tx_rollup_l2_address_size (tx : tx_rollup_l2_address) =
+  Tx_rollup_l2_address.Indexable.in_memory_size @@ Indexable.forget tx
 
 let view_signature_size (View_signature {name; input_ty; output_ty}) =
   ret_adding
     (ty_size input_ty ++ ty_size output_ty)
     (h3w +! script_string_size name)
 
-let script_expr_hash_size = Script_expr_hash.size
+let script_expr_hash_size = !!64
 
 let peano_shape_proof =
   let scale = header_size +! h1w in
@@ -165,7 +159,7 @@ let comb_set_gadt_witness_size = peano_shape_proof
 
 let dup_n_gadt_witness_size = peano_shape_proof
 
-let contract_size (arg_ty, address) =
+let contract_size (Typed_contract {arg_ty; address}) =
   ret_adding (ty_size arg_ty) (h2w +! address_size address)
 
 let sapling_state_size {Sapling.id; diff; memo_size = _} =
@@ -174,18 +168,9 @@ let sapling_state_size {Sapling.id; diff; memo_size = _} =
   +! Sapling.diff_in_memory_size diff
   +! sapling_memo_size_size
 
-let operation_size
-    (operation :
-      packed_internal_operation * Lazy_storage.diffs_item list option) =
-  let (poi, diffs) = operation in
-  ret_adding
-    (Operation.packed_internal_operation_in_memory_size poi
-    ++ option_size_vec Lazy_storage.diffs_in_memory_size diffs)
-    h2w
+let chain_id_size = !!16 (* by Obj.reachable_words. *)
 
-let chain_id_size = h1w +? Chain_id.size
-
-(* [contents] is handle by the recursion scheme in [value_size] *)
+(* [contents] is handled by the recursion scheme in [value_size]. *)
 let ticket_size {ticketer; contents = _; amount} =
   h3w +! Contract.in_memory_size ticketer +! script_nat_size amount
 
@@ -199,7 +184,7 @@ let chest_size chest =
   *)
   let locked_value_size = 256 in
   let rsa_public_size = 256 in
-  let ciphertext_size = Timelock.get_plaintext_size chest in
+  let ciphertext_size = Script_timelock.get_plaintext_size chest in
   h3w +? (locked_value_size + rsa_public_size + ciphertext_size)
 
 let chest_key_size _ =
@@ -213,18 +198,6 @@ let chest_key_size _ =
   let proof_size = 256 in
   h2w +? (unlocked_value_size + proof_size)
 
-let view_size {input_ty; output_ty; view_code} =
-  ret_adding
-    (node_size input_ty ++ node_size output_ty ++ node_size view_code)
-    h3w
-
-let views_size views =
-  SMap.fold
-    (fun k view accu ->
-      ret_adding (accu ++ view_size view) (script_string_size k +! h4w))
-    views
-    zero
-
 let kinfo_size {iloc = _; kstack_ty = _} = h2w
 
 (* The following mutually recursive functions are mostly
@@ -232,41 +205,43 @@ let kinfo_size {iloc = _; kstack_ty = _} = h2w
    cannot be nested. (See [big_map_size].) For this reason, these
    functions should not trigger stack overflows. *)
 let rec value_size :
-    type a.
+    type a ac.
     count_lambda_nodes:bool ->
     nodes_and_size ->
-    (a ty, a comparable_ty) union ->
+    (a, ac) ty ->
     a ->
     nodes_and_size =
  fun ~count_lambda_nodes accu ty x ->
-  let apply : type a. nodes_and_size -> a ty -> a -> nodes_and_size =
+  let apply : type a ac. nodes_and_size -> (a, ac) ty -> a -> nodes_and_size =
    fun accu ty x ->
     match ty with
-    | Unit_t _ -> ret_succ accu
-    | Int_t _ -> ret_succ_adding accu (script_int_size x)
-    | Nat_t _ -> ret_succ_adding accu (script_nat_size x)
-    | Signature_t _ -> ret_succ_adding accu signature_size
-    | String_t _ -> ret_succ_adding accu (script_string_size x)
-    | Bytes_t _ -> ret_succ_adding accu (bytes_size x)
-    | Mutez_t _ -> ret_succ_adding accu mutez_size
-    | Key_hash_t _ -> ret_succ_adding accu (key_hash_size x)
-    | Key_t _ -> ret_succ_adding accu (public_key_size x)
-    | Timestamp_t _ -> ret_succ_adding accu (timestamp_size x)
-    | Address_t _ -> ret_succ_adding accu (address_size x)
-    | Bool_t _ -> ret_succ accu
-    | Pair_t (_, _, _) -> ret_succ_adding accu h2w
-    | Union_t (_, _, _) -> ret_succ_adding accu h1w
+    | Unit_t -> ret_succ accu
+    | Int_t -> ret_succ_adding accu (script_int_size x)
+    | Nat_t -> ret_succ_adding accu (script_nat_size x)
+    | Signature_t -> ret_succ_adding accu signature_size
+    | String_t -> ret_succ_adding accu (script_string_size x)
+    | Bytes_t -> ret_succ_adding accu (bytes_size x)
+    | Mutez_t -> ret_succ_adding accu mutez_size
+    | Key_hash_t -> ret_succ_adding accu (key_hash_size x)
+    | Key_t -> ret_succ_adding accu (public_key_size x)
+    | Timestamp_t -> ret_succ_adding accu (timestamp_size x)
+    | Address_t -> ret_succ_adding accu (address_size x)
+    | Tx_rollup_l2_address_t ->
+        ret_succ_adding accu (tx_rollup_l2_address_size x)
+    | Bool_t -> ret_succ accu
+    | Pair_t (_, _, _, _) -> ret_succ_adding accu h2w
+    | Union_t (_, _, _, _) -> ret_succ_adding accu h1w
     | Lambda_t (_, _, _) ->
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes (ret_succ accu) x
-    | Option_t (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
+    | Option_t (_, _, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
-        let module M = (val x) in
-        let boxing_space = !!300 in
+        let module M = (val Script_set.get x) in
+        let boxing_space = !!536 (* By Obj.reachable_words. *) in
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
-        let module M = (val x) in
-        let boxing_space = !!300 in
+        let module M = (val Script_map.get_module x) in
+        let boxing_space = !!696 (* By Obj.reachable_words. *) in
         ret_succ_adding accu (boxing_space +! (h5w *? M.size))
     | Big_map_t (cty, ty', _) ->
         (big_map_size [@ocaml.tailcall])
@@ -276,92 +251,62 @@ let rec value_size :
           ty'
           x
     | Contract_t (_, _) -> ret_succ (accu ++ contract_size x)
-    | Sapling_transaction_t (_, _) ->
+    | Sapling_transaction_t _ ->
         ret_succ_adding accu (Sapling.transaction_in_memory_size x)
-    | Sapling_state_t (_, _) -> ret_succ_adding accu (sapling_state_size x)
-    | Operation_t _ -> ret_succ (accu ++ operation_size x)
-    | Chain_id_t _ -> ret_succ_adding accu chain_id_size
-    | Never_t _ -> ( match x with _ -> .)
-    (* Related to https://gitlab.com/dannywillems/ocaml-bls12-381/-/issues/56.
-       Since the update to blst as a backend for bls12-381, size_in_bytes is not
-       the correct value for the allocated memory.
-       There is 1 word for the OCaml block header, 1 word for the C pointer and
-       a certain number of words for the actual value of the algebraic object
-       whose size is fixed and defined by the object itself.
-       For G1, it allocates 3 C values of type blst_fp which is 48 bytes.
-       For G2, it allocates 3 C values of type blst_fp2 which is 48 * 2 bytes.
-       For Fr, it allocates 1 C value of type blst_fr which is 32 bytes.
-    *)
-    | Bls12_381_g1_t _ -> ret_succ_adding accu !!((2 * 8) + (3 * 48))
-    | Bls12_381_g2_t _ -> ret_succ_adding accu !!((2 * 8) + (3 * 48 * 2))
-    | Bls12_381_fr_t _ -> ret_succ_adding accu !!((2 * 8) + 32)
+    | Sapling_transaction_deprecated_t _ ->
+        ret_succ_adding accu (Sapling.Legacy.transaction_in_memory_size x)
+    | Sapling_state_t _ -> ret_succ_adding accu (sapling_state_size x)
+    (* Operations are neither storable nor pushable, so they can appear neither
+       in the storage nor in the script. Hence they cannot appear in the cache
+       and we never need to measure their size. *)
+    | Operation_t -> assert false
+    | Chain_id_t -> ret_succ_adding accu chain_id_size
+    | Never_t -> ( match x with _ -> .)
+    | Bls12_381_g1_t -> ret_succ_adding accu !!Bls12_381.G1.size_in_memory
+    | Bls12_381_g2_t -> ret_succ_adding accu !!Bls12_381.G2.size_in_memory
+    | Bls12_381_fr_t -> ret_succ_adding accu !!Bls12_381.Fr.size_in_memory
     | Ticket_t (_, _) -> ret_succ_adding accu (ticket_size x)
-    | Chest_key_t _ -> ret_succ_adding accu (chest_key_size x)
-    | Chest_t _ -> ret_succ_adding accu (chest_size x)
+    | Chest_key_t -> ret_succ_adding accu (chest_key_size x)
+    | Chest_t -> ret_succ_adding accu (chest_size x)
   in
-  let apply_comparable :
-      type a. nodes_and_size -> a comparable_ty -> a -> nodes_and_size =
-   fun accu ty x ->
-    match ty with
-    | Unit_key _ -> ret_succ accu
-    | Int_key _ -> ret_succ_adding accu (script_int_size x)
-    | Nat_key _ -> ret_succ_adding accu (script_nat_size x)
-    | Signature_key _ -> ret_succ_adding accu signature_size
-    | String_key _ -> ret_succ_adding accu (script_string_size x)
-    | Bytes_key _ -> ret_succ_adding accu (bytes_size x)
-    | Mutez_key _ -> ret_succ_adding accu mutez_size
-    | Key_hash_key _ -> ret_succ_adding accu (key_hash_size x)
-    | Key_key _ -> ret_succ_adding accu (public_key_size x)
-    | Timestamp_key _ -> ret_succ_adding accu (timestamp_size x)
-    | Address_key _ -> ret_succ_adding accu (address_size x)
-    | Bool_key _ -> ret_succ accu
-    | Pair_key (_, _, _) -> ret_succ_adding accu h2w
-    | Union_key (_, _, _) -> ret_succ_adding accu h1w
-    | Option_key (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
-    | Chain_id_key _ -> ret_succ_adding accu chain_id_size
-    | Never_key _ -> ( match x with _ -> .)
-  in
-  value_traverse ty x accu {apply; apply_comparable}
+  value_traverse ty x accu {apply}
  [@@coq_axiom_with_reason "unreachable expressions '.' not handled for now"]
 
 and big_map_size :
-    type a b.
+    type a b bc.
     count_lambda_nodes:bool ->
     nodes_and_size ->
     a comparable_ty ->
-    b ty ->
+    (b, bc) ty ->
     (a, b) big_map ->
     nodes_and_size =
- fun ~count_lambda_nodes accu cty ty' {id; diff; key_type; value_type} ->
+ fun ~count_lambda_nodes accu cty ty' (Big_map {id; diff; key_type; value_type}) ->
   (* [Map.bindings] cannot overflow and only consumes a
      logarithmic amount of stack. *)
   let diff_size =
     let map_size =
       Big_map_overlay.fold
         (fun _key_hash (key, value) accu ->
-          let accu = ret_succ_adding accu !!script_expr_hash_size in
+          let base = h5w +! (word_size *? 3) +! script_expr_hash_size in
+          let accu = ret_succ_adding accu base in
           (* The following recursive call cannot introduce a stack
              overflow because this would require a key of type
              big_map while big_map is not comparable. *)
-          let accu = value_size ~count_lambda_nodes accu (R cty) key in
+          let accu = value_size ~count_lambda_nodes accu cty key in
           match value with
           | None -> accu
           | Some value ->
-              (value_size [@ocaml.tailcall])
-                ~count_lambda_nodes
-                accu
-                (L ty')
-                value)
+              let accu = ret_succ_adding accu h1w in
+              (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu ty' value)
         diff.map
         accu
     in
-
     ret_adding map_size h2w
   in
   let big_map_id_size s = z_size (Big_map.Id.unparse_to_z s) in
   let id_size = option_size big_map_id_size id in
   ret_adding
-    (comparable_ty_size key_type ++ ty_size value_type ++ diff_size)
+    (ty_size key_type ++ ty_size value_type ++ diff_size)
     (h4w +! id_size)
 
 and lambda_size :
@@ -405,11 +350,8 @@ and kinstr_size :
     | ISwap (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IConst (kinfo, x, k) ->
         let accu = ret_succ_adding accu (base kinfo +! word_size) in
-        (value_size [@ocaml.tailcall])
-          ~count_lambda_nodes
-          accu
-          (L (stack_top_ty (kinfo_of_kinstr k).kstack_ty))
-          x
+        let (Ty_ex_c top_ty) = stack_top_ty (kinfo_of_kinstr k).kstack_ty in
+        (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu top_ty x
     | ICons_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICar (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICdr (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -428,17 +370,13 @@ and kinstr_size :
     | IList_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
     | IList_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEmpty_set (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | ISet_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
     | ISet_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISet_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISet_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEmpty_map (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | IMap_map (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
     | IMap_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
     | IMap_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -448,7 +386,7 @@ and kinstr_size :
     | IMap_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEmpty_big_map (kinfo, cty, ty, _) ->
         ret_succ_adding
-          (accu ++ comparable_ty_size cty ++ ty_size ty)
+          (accu ++ ty_size cty ++ ty_size ty)
           (base kinfo +! (word_size *? 2))
     | IBig_map_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IBig_map_get (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -508,9 +446,7 @@ and kinstr_size :
     | IFailwith (kinfo, _, ty) ->
         ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
     | ICompare (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | IEq (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | INeq (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ILt (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -521,22 +457,18 @@ and kinstr_size :
     | IContract (kinfo, ty, s, _) ->
         ret_succ_adding
           (accu ++ ty_size ty)
-          (base kinfo +! string_size s +! (word_size *? 2))
+          (base kinfo +! Entrypoint.in_memory_size s +! (word_size *? 2))
     | IView (kinfo, s, _) ->
         ret_succ_adding (accu ++ view_signature_size s) (base kinfo +! word_size)
     | ITransfer_tokens (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IImplicit_account (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICreate_contract
-        {kinfo; storage_type; arg_type; lambda; root_name = _; views; k = _} ->
-        let accu =
-          ret_succ_adding
-            (accu ++ ty_size storage_type ++ ty_size arg_type
-           ++ views_size views)
-            (base kinfo +! (word_size *? 4))
-        in
-        (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
+    | ICreate_contract {kinfo; storage_type; code; k = _} ->
+        ret_succ_adding
+          (accu ++ ty_size storage_type ++ expr_size code)
+          (base kinfo +! (word_size *? 2))
     | ISet_delegate (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | INow (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | IMin_block_time (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IBalance (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ILevel (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICheck_signature (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -553,12 +485,14 @@ and kinstr_size :
     | ISelf (kinfo, ty, s, _) ->
         ret_succ_adding
           (accu ++ ty_size ty)
-          (base kinfo +! (word_size *? 2) +! string_size s)
+          (base kinfo +! (word_size *? 2) +! Entrypoint.in_memory_size s)
     | ISelf_address (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IAmount (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISapling_empty_state (kinfo, _m, _) ->
         ret_succ_adding accu (base kinfo +! word_size +! sapling_memo_size_size)
     | ISapling_verify_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | ISapling_verify_update_deprecated (kinfo, _) ->
+        ret_succ_adding accu (base kinfo)
     | IDig (kinfo, n, _, _) ->
         ret_succ_adding
           accu
@@ -622,9 +556,7 @@ and kinstr_size :
     | IRead_ticket (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISplit_ticket (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IJoin_tickets (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | IOpen_chest (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IHalt kinfo -> ret_succ_adding accu (h1w +! kinfo_size kinfo)
     | ILog (_, _, _, _) ->
@@ -643,10 +575,6 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
     let stack_prefix_preservation_witness_size n = ret_zero (!!24 *? n) in
     let dup_n_gadt_witness_size n = ret_zero (!!16 *? n) in
     let comb n = ret_zero (!!16 *? n) in
-    let if_join k =
-      let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-      stack_ty_size kinfo.kstack_ty
-    in
     let self_size =
       match t with
       (* Op n *)
@@ -659,54 +587,8 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
       | IComb_get (_, n, _, _) -> comb (n / 2)
       | IComb_set (_, n, _, _) -> comb (n / 2)
       | IDup_n (_, n, _, _) -> dup_n_gadt_witness_size n
-      (* Whole stack types after conditionals and loops. *)
-      | IIf {k; _} -> if_join k
-      | IIf_cons {k; _} -> if_join k
-      | IIf_none {k; _} -> if_join k
-      | IIf_left {k; _} -> if_join k
-      (* Every instruction whose elaboration uses [merge_types],
-         [check_item_ty], [comparable_of_ty], or [ty_of_comparable_ty]
-         to create a type that is embedded in the IR. *)
-      | IJoin_tickets (_, _, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | ITicket (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IRead_ticket (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | ICons_list (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IMap_update (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IMap_get_and_update (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IBig_map_get_and_update (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IApply (_, ty, _) -> ty_size ty
-      | ICompare (_, ty, _) -> comparable_ty_size ty
-      | IList_iter (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IList_map (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | ISet_iter (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IMap_map (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
-      | IMap_iter (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+      (* Other extra *)
       | ILambda (_, lambda, _) -> lambda_extra_size lambda
-      | ICreate_contract {lambda; _} -> lambda_extra_size lambda
       | _ -> zero
     in
     ret_succ (accu ++ self_size)
@@ -738,4 +620,10 @@ let kinstr_size kinstr =
   let size = (kinstr_size *? 157 /? 100) +! (kinstr_extra_size *? 18 /? 100) in
   (Nodes.add kinstr_nodes kinstr_extra_size_nodes, size)
 
-let value_size ty x = value_size ~count_lambda_nodes:true zero (L ty) x
+let value_size ty x = value_size ~count_lambda_nodes:true zero ty x
+
+module Internal_for_tests = struct
+  let ty_size = ty_size
+
+  let kinstr_size = kinstr_size
+end

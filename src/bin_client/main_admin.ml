@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 let select_commands _ _ =
-  return
+  Lwt.return_ok
     (List.flatten
        [
          Client_report_commands.commands ();

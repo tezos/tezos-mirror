@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component: Node
-   Invocation: dune exec tezt/tests/main.exe -- --file qcheck_rpc.ml
+   Invocation: dune exec tezt/long_tests/main.exe -- --file qcheck_rpc.ml
    Subject: Property testing the RPC server
   *)
 
@@ -180,9 +180,9 @@ module RPC_Index = struct
     | Ref "micheline.alpha.michelson_v1.expression" -> Ok Mich_exp
     | Ref str -> parse_input env @@ String_map.find str env
     | Other {kind = Boolean; _} -> Ok Boolean
-    | Other {kind = Integer {minimum; maximum; enum = []}; _} ->
+    | Other {kind = Integer {minimum; maximum; enum = None}; _} ->
         Ok (Integer {min = minimum; max = maximum})
-    | Other {kind = Integer {enum; _}; _} -> Ok (Int_enum enum)
+    | Other {kind = Integer {enum = Some enum; _}; _} -> Ok (Int_enum enum)
     | Other {kind = Number {minimum; maximum}; _} ->
         Ok (Float {min = minimum; max = maximum})
     | Other {kind = String {pattern = Some s; _}; _} -> (
@@ -190,8 +190,8 @@ module RPC_Index = struct
         match s with
         | "^([a-zA-Z0-9][a-zA-Z0-9])*$" -> Ok Even_alphanum
         | _ -> Error ("Unexpected regexp: " ^ s))
-    | Other {kind = String {enum = []; _}; _} -> Ok Rand_string
-    | Other {kind = String {enum; _}; _} -> Ok (String_enum enum)
+    | Other {kind = String {enum = None; _}; _} -> Ok Rand_string
+    | Other {kind = String {enum = Some enum; _}; _} -> Ok (String_enum enum)
     | Other {kind = Array schema'; _} -> (
         match parse_input env schema' with Ok x -> Ok (Array x) | err -> err)
     | Other {kind = Object {additional_properties = Some _; _}; _} ->
@@ -240,11 +240,11 @@ module RPC_Index = struct
     let services =
       Client.
         [
-          (GET, endpoint.get);
-          (POST, endpoint.post);
-          (PUT, endpoint.put);
-          (DELETE, endpoint.delete);
-          (PATCH, endpoint.patch);
+          (GET, Openapi.(Endpoint.get_method endpoint GET));
+          (POST, Openapi.(Endpoint.get_method endpoint POST));
+          (PUT, Openapi.(Endpoint.get_method endpoint PUT));
+          (DELETE, Openapi.(Endpoint.get_method endpoint DELETE));
+          (PATCH, Openapi.(Endpoint.get_method endpoint PATCH));
         ]
     in
     let opt_convert (meth, opt_service) =
@@ -445,7 +445,22 @@ module Test = struct
   *)
   let call_rpc client {meth; full_path; input; _} :
       (JSON.t, Unix.process_status) result Lwt.t =
-    let proc = Client.spawn_rpc ?data:input meth full_path client in
+    let proc =
+      (* As this test performs many RPC calls, we don't want to log,
+         to avoid consuming a lot of storage space on the CI.
+         Only checking if the node stays alive matters.
+
+         In case this test needs to be debugged, set all three [log_*] flags
+         to [true], to get feedback on the faulty RPC. *)
+      Client.spawn_rpc
+        ~log_command:false
+        ~log_status_on_exit:false
+        ~log_output:false
+        ?data:input
+        meth
+        full_path
+        client
+    in
     let* exit_code = Process.wait proc in
     match exit_code with
     | WEXITED 0 ->
@@ -470,7 +485,8 @@ module Test = struct
          }
 
   let test_instance client rpc_instance : unit Lwt.t =
-    let () = Log.info "%s" (show_rpc_instance rpc_instance) in
+    (* To see the RPC being called: *)
+    (* let () = Log.info "%s" (show_rpc_instance rpc_instance) in *)
     let* _ = call_rpc client rpc_instance in
     let* node_alive = check_node_alive client in
     match node_alive with

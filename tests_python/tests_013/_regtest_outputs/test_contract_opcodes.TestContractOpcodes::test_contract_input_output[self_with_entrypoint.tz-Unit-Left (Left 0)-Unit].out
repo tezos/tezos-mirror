@@ -1,0 +1,93 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[self_with_entrypoint.tz-Unit-Left (Left 0)-Unit]
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 13 (remaining gas: 1039957.971 units remaining)
+    [ (Pair (Left (Left 0)) Unit) ]
+  - location: 13 (remaining gas: 1039957.961 units remaining)
+    [  ]
+  - location: 14 (remaining gas: 1039957.951 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A" ]
+  - location: 15 (remaining gas: 1039956.795 units remaining)
+    [ 0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 16 (remaining gas: 1039956.785 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 17 (remaining gas: 1039955.662 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 18 (remaining gas: 1039955.652 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 19 (remaining gas: 1039955.642 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
+  - location: 21 (remaining gas: 1039955.632 units remaining)
+    [ 0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 19 (remaining gas: 1039955.612 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 24 (remaining gas: 1039955.577 units remaining)
+    [ -1
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 25 (remaining gas: 1039955.567 units remaining)
+    [ True
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 26 (remaining gas: 1039955.557 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 26 (remaining gas: 1039955.547 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 32 (remaining gas: 1039955.537 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 33 (remaining gas: 1039954.414 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 36 (remaining gas: 1039954.379 units remaining)
+    [ 0 ]
+  - location: 37 (remaining gas: 1039954.369 units remaining)
+    [ True ]
+  - location: 38 (remaining gas: 1039954.359 units remaining)
+    [  ]
+  - location: 38 (remaining gas: 1039954.349 units remaining)
+    [  ]
+  - location: 44 (remaining gas: 1039954.339 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A" ]
+  - location: 48 (remaining gas: 1039954.329 units remaining)
+    [  ]
+  - location: 49 (remaining gas: 1039954.319 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%B" ]
+  - location: 53 (remaining gas: 1039954.309 units remaining)
+    [  ]
+  - location: 54 (remaining gas: 1039954.299 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%maybe_C" ]
+  - location: 60 (remaining gas: 1039954.289 units remaining)
+    [  ]
+  - location: 61 (remaining gas: 1039954.279 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%Z" ]
+  - location: 65 (remaining gas: 1039954.269 units remaining)
+    [  ]
+  - location: 66 (remaining gas: 1039954.259 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 76 (remaining gas: 1039954.249 units remaining)
+    [  ]
+  - location: 77 (remaining gas: 1039954.239 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 87 (remaining gas: 1039954.229 units remaining)
+    [  ]
+  - location: 88 (remaining gas: 1039954.219 units remaining)
+    [ Unit ]
+  - location: 89 (remaining gas: 1039954.209 units remaining)
+    [ {}
+      Unit ]
+  - location: 91 (remaining gas: 1039954.199 units remaining)
+    [ (Pair {} Unit) ]
+

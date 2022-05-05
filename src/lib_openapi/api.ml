@@ -187,15 +187,6 @@ let flatten tree = flatten_tree [] [] tree |> List.rev
 
 type schemas = {json_schema : Json.t; binary_schema : Json.t}
 
-type meth = GET | POST | PUT | DELETE | PATCH
-
-let show_method = function
-  | GET -> "GET"
-  | POST -> "POST"
-  | PUT -> "PUT"
-  | DELETE -> "DELETE"
-  | PATCH -> "PATCH"
-
 type query_parameter_kind =
   | Optional of {name : string}
   | Multi of {name : string}
@@ -210,7 +201,7 @@ type query_parameter = {
 }
 
 type service = {
-  meth : meth;
+  meth : Method.t;
   path : path_item list;
   description : string;
   query : query_parameter list;
@@ -218,14 +209,6 @@ type service = {
   output : schemas option;
   error : schemas option;
 }
-
-let parse_meth = function
-  | "GET" -> GET
-  | "POST" -> POST
-  | "PUT" -> PUT
-  | "DELETE" -> DELETE
-  | "PATCH" -> PATCH
-  | meth -> failwith ("unsupported HTTP method: " ^ meth)
 
 let parse_schemas (json : Json.t) : schemas =
   Json.as_record json @@ fun get ->
@@ -291,7 +274,8 @@ let parse_service (json : Json.t) : service =
   Json.as_record json @@ fun get ->
   {
     meth =
-      get "meth" |> opt_mandatory "meth" json |> Json.as_string |> parse_meth;
+      get "meth" |> opt_mandatory "meth" json |> Json.as_string
+      |> Method.of_http_string;
     path = get "path" |> opt_mandatory "path" json |> parse_path;
     description =
       get "description" |> Option.map Json.as_string

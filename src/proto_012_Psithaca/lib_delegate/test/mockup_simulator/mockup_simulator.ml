@@ -1006,7 +1006,7 @@ let default_config =
     (* Rounds should be long enough for the bakers to
        exchange all the necessary messages. *)
     round1 = 3L (* No real need to increase round durations. *);
-    timeout = 10;
+    timeout = 30;
     delegate_selection = Random;
     consensus_committee_size =
       Default_parameters.constants_mainnet.consensus_committee_size;
@@ -1043,7 +1043,8 @@ let run ?(config = default_config) bakers_spec =
 
        In particular, it seems that when logging is enabled the baker
        process can get cancelled without executing its Lwt finalizer. *)
-    (if config.debug then Internal_event_unix.init () else Lwt.return_unit)
+    (if config.debug then Tezos_base_unix.Internal_event_unix.init ()
+    else Lwt.return_unit)
     >>= fun () ->
     let total_bakers = List.length bakers_spec in
     (List.init ~when_negative_length:() total_bakers (fun _ ->
@@ -1076,7 +1077,7 @@ let run ?(config = default_config) bakers_spec =
     Lwt.pick
       [
         timeout_process ();
-        Lwt_tzresult_syntax.join
+        Lwt_result_syntax.tzjoin
           (take_third
              (List.fold_left
                 (fun (i, delegates_acc, ms) (n, user_hooks) ->

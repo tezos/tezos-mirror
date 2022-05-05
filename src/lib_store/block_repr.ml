@@ -264,49 +264,54 @@ let block_metadata metadata = metadata.block_metadata
 let operations_metadata metadata = metadata.operations_metadata
 
 let check_block_consistency ?genesis_hash ?pred_block block =
+  let open Lwt_result_syntax in
   let block_header = header block in
   let block_hash = hash block in
   let result_hash = Block_header.hash block_header in
-  fail_unless
-    (Block_hash.equal block_hash result_hash
-    ||
-    match genesis_hash with
-    | Some genesis_hash -> Block_hash.equal block_hash genesis_hash
-    | None -> false)
-    (Inconsistent_block_hash
-       {
-         level = level block;
-         expected_hash = block_hash;
-         computed_hash = result_hash;
-       })
-  >>=? fun () ->
-  (match pred_block with
-  | None -> return_unit
-  | Some pred_block ->
-      fail_unless
-        (Block_hash.equal (hash pred_block) (predecessor block)
-        && Compare.Int32.(level block = Int32.succ (level pred_block)))
-        (Inconsistent_block_predecessor
-           {
-             block_hash;
-             level = level block;
-             expected_hash = hash pred_block;
-             computed_hash = predecessor block;
-           }))
-  >>=? fun () ->
+  let* () =
+    fail_unless
+      (Block_hash.equal block_hash result_hash
+      ||
+      match genesis_hash with
+      | Some genesis_hash -> Block_hash.equal block_hash genesis_hash
+      | None -> false)
+      (Inconsistent_block_hash
+         {
+           level = level block;
+           expected_hash = block_hash;
+           computed_hash = result_hash;
+         })
+  in
+  let* () =
+    match pred_block with
+    | None -> return_unit
+    | Some pred_block ->
+        fail_unless
+          (Block_hash.equal (hash pred_block) (predecessor block)
+          && Compare.Int32.(level block = Int32.succ (level pred_block)))
+          (Inconsistent_block_predecessor
+             {
+               block_hash;
+               level = level block;
+               expected_hash = hash pred_block;
+               computed_hash = predecessor block;
+             })
+  in
   let computed_operations_hash =
     Operation_list_list_hash.compute
       (List.map
          Operation_list_hash.compute
          (List.map (List.map Operation.hash) (operations block)))
   in
-  fail_unless
-    (Operation_list_list_hash.equal
-       computed_operations_hash
-       (operations_hash block))
-    (Store_errors.Inconsistent_operations_hash
-       {expected = operations_hash block; got = computed_operations_hash})
-  >>=? fun () -> return_unit
+  let* () =
+    fail_unless
+      (Operation_list_list_hash.equal
+         computed_operations_hash
+         (operations_hash block))
+      (Store_errors.Inconsistent_operations_hash
+         {expected = operations_hash block; got = computed_operations_hash})
+  in
+  return_unit
 
 let convert_legacy_metadata (legacy_metadata : legacy_metadata) : metadata =
   let {
@@ -373,33 +378,36 @@ let decode_block_repr encoding block_bytes =
 
 (* FIXME handle I/O errors *)
 let read_next_block_exn fd =
+  let open Lwt_syntax in
   (* Read length *)
   let length_bytes = Bytes.create 4 in
-  Lwt_utils_unix.read_bytes ~pos:0 ~len:4 fd length_bytes >>= fun () ->
+  let* () = Lwt_utils_unix.read_bytes ~pos:0 ~len:4 fd length_bytes in
   let block_length_int32 = Bytes.get_int32_be length_bytes 0 in
   let block_length = Int32.to_int block_length_int32 in
   let block_bytes = Bytes.extend length_bytes 0 block_length in
-  Lwt_utils_unix.read_bytes ~pos:4 ~len:block_length fd block_bytes
-  >>= fun () ->
+  let* () = Lwt_utils_unix.read_bytes ~pos:4 ~len:block_length fd block_bytes in
   Lwt.return (decode_block_repr encoding block_bytes, 4 + block_length)
 
 let read_next_block fd = Option.catch_s (fun () -> read_next_block_exn fd)
 
 let pread_block_exn fd ~file_offset =
+  let open Lwt_syntax in
   (* Read length *)
   let length_bytes = Bytes.create 4 in
-  Lwt_utils_unix.read_bytes ~file_offset ~pos:0 ~len:4 fd length_bytes
-  >>= fun () ->
+  let* () =
+    Lwt_utils_unix.read_bytes ~file_offset ~pos:0 ~len:4 fd length_bytes
+  in
   let block_length_int32 = Bytes.get_int32_be length_bytes 0 in
   let block_length = Int32.to_int block_length_int32 in
   let block_bytes = Bytes.extend length_bytes 0 block_length in
-  Lwt_utils_unix.read_bytes
-    ~file_offset:(file_offset + 4)
-    ~pos:4
-    ~len:block_length
-    fd
-    block_bytes
-  >>= fun () ->
+  let* () =
+    Lwt_utils_unix.read_bytes
+      ~file_offset:(file_offset + 4)
+      ~pos:4
+      ~len:block_length
+      fd
+      block_bytes
+  in
   Lwt.return (decode_block_repr encoding block_bytes, 4 + block_length)
 
 let pread_block fd ~file_offset =

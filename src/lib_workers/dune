@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_workers)
  (public_name tezos-workers)
@@ -8,6 +11,8 @@
   ringo)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base
    -open Tezos_stdlib_unix)))
+
+(documentation)

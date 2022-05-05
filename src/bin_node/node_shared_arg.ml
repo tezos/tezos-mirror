@@ -62,6 +62,8 @@ type t = {
   synchronisation_threshold : int option;
   latency : int option;
   allow_all_rpc : P2p_point.Id.addr_port_id list;
+  media_type : Media_type.Command_line.t;
+  metrics_addr : string list;
   operation_metadata_size_limit : int option option;
 }
 
@@ -106,35 +108,45 @@ let () =
     (fun (status, body) -> Network_http_error (status, body))
 
 let decode_net_config source json =
-  try
+  let open Result_syntax in
+  match
     Data_encoding.Json.destruct
       Node_config_file.blockchain_network_encoding
       json
-    |> return
   with
-  | Json_encoding.Cannot_destruct (path, exn) ->
+  | net_cfg -> return net_cfg
+  | exception Json_encoding.Cannot_destruct (path, exn) ->
       let path = Json_query.json_pointer_of_path path in
-      fail (Invalid_network_config (path, Printexc.to_string exn))
-  | ( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
-    | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
-    | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn ->
-      fail (Invalid_network_config (source, Printexc.to_string exn))
+      tzfail (Invalid_network_config (path, Printexc.to_string exn))
+  | exception
+      (( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
+       | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
+       | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn)
+    ->
+      tzfail (Invalid_network_config (source, Printexc.to_string exn))
 
-let load_net_config = function
+let load_net_config =
+  let open Lwt_result_syntax in
+  function
   | BuiltIn net -> return net
   | Url uri ->
-      Cohttp_lwt_unix.Client.get uri >>= fun (resp, body) ->
-      Cohttp_lwt.Body.to_string body >>= fun body_str ->
-      (match resp.status with
-      | `OK -> (
-          try return (Ezjsonm.from_string body_str)
-          with Ezjsonm.Parse_error (_, msg) ->
-            fail (Invalid_network_config (Uri.to_string uri, msg)))
-      | #Cohttp.Code.status_code ->
-          fail (Network_http_error (resp.status, body_str)))
-      >>=? decode_net_config (Uri.to_string uri)
+      let*! (resp, body) = Cohttp_lwt_unix.Client.get uri in
+      let*! body_str = Cohttp_lwt.Body.to_string body in
+      let* netconfig =
+        match resp.status with
+        | `OK -> (
+            try return (Ezjsonm.from_string body_str)
+            with Ezjsonm.Parse_error (_, msg) ->
+              tzfail (Invalid_network_config (Uri.to_string uri, msg)))
+        | #Cohttp.Code.status_code ->
+            tzfail (Network_http_error (resp.status, body_str))
+      in
+      let*? net_config = decode_net_config (Uri.to_string uri) netconfig in
+      return net_config
   | Filename filename ->
-      Lwt_utils_unix.Json.read_file filename >>=? decode_net_config filename
+      let* netconfig = Lwt_utils_unix.Json.read_file filename in
+      let*? net_config = decode_net_config filename netconfig in
+      return net_config
 
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
@@ -142,7 +154,8 @@ let wrap data_dir config_file network connections max_download_speed
     bootstrap_threshold private_mode disable_mempool disable_mempool_precheck
     enable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
     cors_headers log_output history_mode synchronisation_threshold latency
-    disable_config_validation allow_all_rpc operation_metadata_size_limit =
+    disable_config_validation allow_all_rpc media_type metrics_addr
+    operation_metadata_size_limit =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -184,8 +197,15 @@ let wrap data_dir config_file network connections max_download_speed
     synchronisation_threshold;
     latency;
     allow_all_rpc;
+    media_type;
+    metrics_addr;
     operation_metadata_size_limit;
   }
+
+let process_command run =
+  match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
+  | Ok () -> `Ok ()
+  | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
 
 module Manpage = struct
   let misc_section = "MISC OPTIONS"
@@ -331,7 +351,7 @@ module Term = struct
       "The directory where the Tezos node will store all its data. Parent \
        directories are created if necessary."
     in
-    let env = Arg.env_var Node_config_file.data_dir_env_name in
+    let env = Cmd.Env.info ~doc Node_config_file.data_dir_env_name in
     Arg.(
       value
       & opt (some string) None
@@ -364,6 +384,17 @@ module Term = struct
       value
       & opt (some (conv network_parser)) None
       & info ~docs ~doc ~docv:"NETWORK" ["network"])
+
+  let metrics_addr =
+    let doc = "Port on which to provide metrics over HTTP." in
+    Arg.(
+      value & opt_all string []
+      & info
+          ~docs
+          ~doc
+          ~docv:
+            "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9932)"
+          ["metrics-addr"])
 
   let operation_metadata_size_limit =
     let converter =
@@ -612,6 +643,20 @@ module Term = struct
       & opt_all (addr_port_id, P2p_point.Id.pp_addr_port_id) []
       & info ~docs ~doc ~docv:"ADDR:PORT" ["allow-all-rpc"])
 
+  let media_type =
+    let media_type str =
+      match Media_type.Command_line.parse_cli_parameter str with
+      | Some media_type -> `Ok media_type
+      | None -> `Error "media-type parameter must be `json`, `binary`, or `any`"
+    in
+    let doc = "Set the media-types supported by the server." in
+    Arg.(
+      value
+      & opt
+          (media_type, Media_type.Command_line.pp_parameter)
+          Media_type.Command_line.Any
+      & info ~docs ~doc ~docv:"MEDIATYPE" ["media-type"])
+
   (* Args. *)
 
   let args =
@@ -623,16 +668,19 @@ module Term = struct
     $ disable_mempool $ disable_mempool_precheck $ enable_testchain
     $ expected_pow $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
     $ log_output $ history_mode $ synchronisation_threshold $ latency
-    $ disable_config_validation $ allow_all_rpc $ operation_metadata_size_limit
+    $ disable_config_validation $ allow_all_rpc $ media_type $ metrics_addr
+    $ operation_metadata_size_limit
 end
 
 let read_config_file args =
+  let open Lwt_result_syntax in
   if Sys.file_exists args.config_file then
     Node_config_file.read args.config_file
   else return Node_config_file.default_config
 
 let read_data_dir args =
-  read_config_file args >>=? fun cfg ->
+  let open Lwt_result_syntax in
+  let* cfg = read_config_file args in
   let {data_dir; _} = args in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
   return data_dir
@@ -707,7 +755,8 @@ end
 
 let read_and_patch_config_file ?(may_override_network = false)
     ?(ignore_bootstrap_peers = false) args =
-  read_config_file args >>=? fun cfg ->
+  let open Lwt_result_syntax in
+  let* cfg = read_config_file args in
   let {
     data_dir;
     disable_config_validation;
@@ -738,73 +787,84 @@ let read_and_patch_config_file ?(may_override_network = false)
     synchronisation_threshold;
     latency;
     allow_all_rpc;
+    media_type;
+    metrics_addr;
     operation_metadata_size_limit;
   } =
     args
   in
-  (match (bootstrap_threshold, synchronisation_threshold) with
-  | (Some _, Some _) ->
-      fail
-        (Invalid_command_line_arguments
-           "--bootstrap-threshold is deprecated; use \
-            --synchronisation-threshold instead. Do not use both at the same \
-            time.")
-  | (None, Some threshold) | (Some threshold, None) -> return_some threshold
-  | (None, None) -> return_none)
-  >>=? fun synchronisation_threshold ->
-  (match network with
-  | None -> return None
-  | Some n -> load_net_config n >>=? fun x -> return (Some x))
-  >>=? fun network_data ->
+  let* synchronisation_threshold =
+    match (bootstrap_threshold, synchronisation_threshold) with
+    | (Some _, Some _) ->
+        tzfail
+          (Invalid_command_line_arguments
+             "--bootstrap-threshold is deprecated; use \
+              --synchronisation-threshold instead. Do not use both at the same \
+              time.")
+    | (None, Some threshold) | (Some threshold, None) -> return_some threshold
+    | (None, None) -> return_none
+  in
+  let* network_data =
+    match network with
+    | None -> return None
+    | Some n ->
+        let* x = load_net_config n in
+        return (Some x)
+  in
   (* Overriding the network with [--network] is a bad idea if the configuration
      file already specifies it. Essentially, [--network] tells the node
      "if there is no config file, use this network; otherwise, check that the
      config file uses the network I expect". This behavior can be overridden
      by [may_override_network], which is used when doing [config init]. *)
-  (match network_data with
-  | None -> return_unit
-  | Some net ->
-      if may_override_network then return_unit
-      else if
-        Distributed_db_version.Name.equal
-          cfg.blockchain_network.chain_name
-          net.chain_name
-      then return_unit
-      else
-        fail
-          (Network_configuration_mismatch
-             {
-               configuration_file_chain_name = cfg.blockchain_network.chain_name;
-               command_line_chain_name = net.chain_name;
-             }))
-  >>=? fun () ->
+  let* () =
+    match network_data with
+    | None -> return_unit
+    | Some net ->
+        if may_override_network then return_unit
+        else if
+          Distributed_db_version.Name.equal
+            cfg.blockchain_network.chain_name
+            net.chain_name
+        then return_unit
+        else
+          tzfail
+            (Network_configuration_mismatch
+               {
+                 configuration_file_chain_name =
+                   cfg.blockchain_network.chain_name;
+                 command_line_chain_name = net.chain_name;
+               })
+  in
   (* Update bootstrap peers must take into account the updated config file
      with the [--network] argument, so we cannot use [Node_config_file]. *)
-  (if no_bootstrap_peers || ignore_bootstrap_peers then
-   Event.(emit disabled_bootstrap_peers) () >>= fun () -> return peers
-  else
-    let cfg_peers =
-      match cfg.p2p.bootstrap_peers with
-      | Some peers -> peers
-      | None -> (
-          match network_data with
-          | Some net -> net.default_bootstrap_peers
-          | None -> cfg.blockchain_network.default_bootstrap_peers)
-    in
-    return (cfg_peers @ peers))
-  >>=? fun bootstrap_peers ->
-  Option.iter_es
-    (fun connections ->
-      fail_when
-        (connections > 100 && disable_config_validation = false)
-        (Invalid_command_line_arguments
-           "The number of expected connections is limited to `100`. This \
-            maximum cap may be overridden by manually modifying the \
-            configuration file. However, this should be done carefully. \
-            Exceeding this number of connections may degrade the performance \
-            of your node."))
-    connections
-  >>=? fun () ->
+  let* bootstrap_peers =
+    if no_bootstrap_peers || ignore_bootstrap_peers then
+      let*! () = Event.(emit disabled_bootstrap_peers) () in
+      return peers
+    else
+      let cfg_peers =
+        match cfg.p2p.bootstrap_peers with
+        | Some peers -> peers
+        | None -> (
+            match network_data with
+            | Some net -> net.default_bootstrap_peers
+            | None -> cfg.blockchain_network.default_bootstrap_peers)
+      in
+      return (cfg_peers @ peers)
+  in
+  let* () =
+    Option.iter_es
+      (fun connections ->
+        fail_when
+          (connections > 100 && disable_config_validation = false)
+          (Invalid_command_line_arguments
+             "The number of expected connections is limited to `100`. This \
+              maximum cap may be overridden by manually modifying the \
+              configuration file. However, this should be done carefully. \
+              Exceeding this number of connections may degrade the performance \
+              of your node."))
+      connections
+  in
   (* when `--connections` is used,
      override all the bounds defined in the configuration file. *)
   let ( synchronisation_threshold,
@@ -861,6 +921,8 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?discovery_addr
     ~rpc_listen_addrs
     ~allow_all_rpc
+    ~media_type
+    ~metrics_addr
     ?operation_metadata_size_limit
     ~private_mode
     ~disable_mempool

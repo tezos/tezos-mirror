@@ -97,4 +97,4 @@ let () =
     (function Rejecting {motive} -> Some motive | _ -> None)
     (fun motive -> Rejecting {motive})
 
-let rejecting motive = error (Rejecting {motive})
+let rejecting motive = Result_syntax.tzfail (Rejecting {motive})

@@ -24,13 +24,13 @@
 (*****************************************************************************)
 
 (* The functions below could be put in the Tezt library. *)
-let get_savepoint ?endpoint client =
+let get_checkpoint ?endpoint client =
   let* json = RPC.get_checkpoint ?endpoint client in
-  return JSON.(json |-> "savepoint" |> as_int)
+  return JSON.(json |-> "level" |> as_int)
 
 let get_caboose ?endpoint client =
-  let* json = RPC.get_checkpoint ?endpoint client in
-  return JSON.(json |-> "caboose" |> as_int)
+  let* json = RPC.get_caboose ?endpoint client in
+  return JSON.(json |-> "level" |> as_int)
 
 let is_connected ?endpoint client ~peer_id =
   let* connections = RPC.get_connections ?endpoint client in
@@ -182,11 +182,10 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let last_cycle_being_merged = ref false in
   let on_starting_merge_event node =
     Node.on_event node @@ fun Node.{name; value} ->
-    if name = "start_merging_stores.v0" then (
+    if name = "start_merging_stores.v0" then
       let level = JSON.(value |> as_int) in
-      Log.info "COUCOU: %d" level ;
       if level = bakes_during_kill + 1 + bakes_before_kill - 16 then
-        last_cycle_being_merged := true)
+        last_cycle_being_merged := true
   in
   let wait_for_end_merge_event node last_cycle_being_merged =
     Node.wait_for node "end_merging_stores.v0" @@ fun _json ->
@@ -269,10 +268,10 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () =
     match hmode1 with
     | Full _ ->
-        let* savepoint = get_savepoint ~endpoint:endpoint_1 client in
+        let* savepoint = get_checkpoint ~endpoint:endpoint_1 client in
         if savepoint <= bakes_before_kill then
           Test.fail
-            "savepoint level (%d) is lower or equal to the starting level (%d)"
+            "checkpoint level (%d) is lower or equal to the starting level (%d)"
             savepoint
             bakes_before_kill ;
         return ()
@@ -321,14 +320,14 @@ let register ~protocols =
      blocks. Putting the number `0` in parameters allows to
      save 16 blocks. *)
   let rolling_0 = Node.Rolling (Some 0) in
-  check_bootstrap_with_history_modes archive archive ~protocols ;
-  check_bootstrap_with_history_modes archive full ~protocols ;
-  check_bootstrap_with_history_modes archive rolling ~protocols ;
-  check_bootstrap_with_history_modes full archive ~protocols ;
-  check_bootstrap_with_history_modes full full ~protocols ;
-  check_bootstrap_with_history_modes full rolling ~protocols ;
-  check_bootstrap_with_history_modes rolling_0 Archive ~protocols ;
-  check_bootstrap_with_history_modes rolling_0 rolling_0 ~protocols ;
-  check_bootstrap_with_history_modes rolling_0 full ~protocols
+  check_bootstrap_with_history_modes archive archive protocols ;
+  check_bootstrap_with_history_modes archive full protocols ;
+  check_bootstrap_with_history_modes archive rolling protocols ;
+  check_bootstrap_with_history_modes full archive protocols ;
+  check_bootstrap_with_history_modes full full protocols ;
+  check_bootstrap_with_history_modes full rolling protocols ;
+  check_bootstrap_with_history_modes rolling_0 Archive protocols ;
+  check_bootstrap_with_history_modes rolling_0 rolling_0 protocols ;
+  check_bootstrap_with_history_modes rolling_0 full protocols
 
 let register_protocol_independent () = check_rpc_force_bootstrapped ()

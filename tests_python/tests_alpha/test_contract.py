@@ -156,7 +156,7 @@ class TestManager:
         utils.bake(client, bake_for='bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.000584
+        fee = 0.000587
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
         assert (
@@ -180,7 +180,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.000787
+        fee = 0.000731
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
         assert balance_dest + amount_mutez == new_balance_dest
@@ -506,7 +506,10 @@ class TestContracts:
                 "invalid_self_entrypoint.tz",
                 r'Contract has no entrypoint named D',
             ),
-            ("contract_annotation_default.tz", r'unexpected annotation'),
+            (
+                "contract_annotation_default.tz",
+                r'unexpected_default_entrypoint',
+            ),
             # Missing field
             (
                 "missing_only_storage_field.tz",
@@ -536,7 +539,7 @@ class TestContracts:
             # error message for set update on non-comparable type
             (
                 "set_update_non_comparable.tz",
-                r'Type nat is not compatible with type list operation',
+                r'Type nat\s+is not compatible with type list operation',
             ),
             # error message for the arity of the chain_id type
             (
@@ -547,18 +550,8 @@ class TestContracts:
             ("big_dip.tz", r'expected a positive 10-bit integer'),
             # error message for DROP over the limit
             ("big_drop.tz", r'expected a positive 10-bit integer'),
-            # error message for set update on non-comparable type
-            (
-                "set_update_non_comparable.tz",
-                r'Type nat is not compatible with type list operation',
-            ),
             # error message for attempting to push a value of type never
             ("never_literal.tz", r'type never has no inhabitant.'),
-            # field annotation mismatch with UNPAIR
-            (
-                "unpair_field_annotation_mismatch.tz",
-                r'The field access annotation does not match',
-            ),
             # COMB, UNCOMB, and DUP cannot take 0 as argument
             ("comb0.tz", r"PAIR expects an argument of at least 2"),
             ("comb1.tz", r"PAIR expects an argument of at least 2"),
@@ -1221,6 +1214,37 @@ class TestNonRegression:
     def test_issue_242_assert_balance(self, client: Client):
         assert client.get_balance('bug_262') == 1
 
+    def test_issue_843(self, client: Client, session: dict):
+        """Regression test for the following bug:
+        https://gitlab.com/tezos/tezos/-/issues/843
+
+        This test checks that before origination the script, storage,
+        and the lambdas inside the storage are all normalized. To test
+        this we define them in readable mode and compare the storage
+        size of the origination operations when the readable script
+        and storage are used directly and when they are first
+        normalized to optimized format before origination.
+        """
+        path = os.path.join(CONTRACT_PATH, 'non_regression', 'bug_843.tz')
+        addr1 = '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+        op1 = originate(
+            client,
+            session,
+            path,
+            f'Pair {addr1} {{PUSH address {addr1}; DROP}}',
+            0,
+        )
+        normalized_script = client.normalize_script(path, mode='Optimized')
+        addr2 = client.normalize(addr1, 'address', mode='Optimized').strip()
+        op2 = originate(
+            client,
+            session,
+            normalized_script,
+            f'Pair {addr2} {{PUSH address {addr2}; DROP}}',
+            0,
+        )
+        assert op1.storage_size == op2.storage_size
+
 
 @pytest.mark.incremental
 @pytest.mark.contract
@@ -1413,7 +1437,7 @@ class TestMiniScenarios:
 
     def test_vote_for_delegate_wrong_identity1(self, client: Client):
         # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
-        with utils.assert_run_failure("At line 15 characters 57 to 61"):
+        with utils.assert_run_failure("At line 14 characters 9 to 12"):
             client.transfer(
                 0,
                 "bootstrap1",
@@ -1423,7 +1447,7 @@ class TestMiniScenarios:
 
     def test_vote_for_delegate_wrong_identity2(self, client: Client):
         # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
-        with utils.assert_run_failure("At line 15 characters 57 to 61"):
+        with utils.assert_run_failure("At line 14 characters 9 to 12"):
             client.transfer(
                 0,
                 "bootstrap2",
@@ -1983,14 +2007,11 @@ expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod
     def test_contract_hashes_for_script(
         self, client: Client, for_script, display_names, results
     ):
-        assert (
-            client.hash_script(
-                [ID_SCRIPT_LITERAL],
-                display_names=display_names,
-                for_script=for_script,
-            )
-            == [results]
-        )
+        assert client.hash_script(
+            [ID_SCRIPT_LITERAL],
+            display_names=display_names,
+            for_script=for_script,
+        ) == [results]
 
 
 @pytest.mark.contract
@@ -2123,13 +2144,14 @@ class TestContractTypeChecking:
         client.typecheck_data(f'{address_opt}', 'address')
         client.typecheck_data(f'{address_opt_a}', 'address')
 
-        unexpected_annotation_error = "unexpected annotation."
+        unexpected_default_error = "unexpected_default_entrypoint"
+        not_an_address_error = "not an expression of type address"
 
-        with utils.assert_run_failure(unexpected_annotation_error):
+        with utils.assert_run_failure(unexpected_default_error):
             client.typecheck_data(f'"{address}%default"', 'address')
 
         # 64656661756c74 is "default" in hexa
-        with utils.assert_run_failure(unexpected_annotation_error):
+        with utils.assert_run_failure(not_an_address_error):
             client.typecheck_data(address_opt + '64656661756c74', 'address')
 
     def check_contract_ok(self, client, address, entrypoint, typ):
@@ -2294,3 +2316,89 @@ code {{
         self.check_contract_ko(
             client, kt1, None, root_type, type_mismatch_error
         )
+
+
+@pytest.mark.incremental
+@pytest.mark.contract
+@pytest.mark.regression
+class TestOriginateContractFromContract:
+    def test_originate_contract_from_contract_origination(
+        self, client_regtest_scrubbed, session
+    ):
+        client = client_regtest_scrubbed
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'originate_contract.tz'
+        )
+        originate(client, session, path, 'Unit', 200)
+
+    def test_originate_contract_from_contract_transfer(
+        self, client_regtest_scrubbed
+    ):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'originate_contract',
+            ['--arg', 'Unit', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
+
+
+@pytest.mark.incremental
+@pytest.mark.contract
+@pytest.mark.regression
+class TestCreateRemoveTickets:
+    def test_add_clear_tickets_origination(
+        self, client_regtest_scrubbed, session
+    ):
+        client = client_regtest_scrubbed
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'add_clear_tickets.tz'
+        )
+        originate(client, session, path, '{}', 200)
+
+    def test_add_clear_tickets_add_first_transfer(
+        self, client_regtest_scrubbed
+    ):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'add', '--arg', 'Pair 1 "A"', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
+
+    def test_add_clear_tickets_clear_transfer(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'clear', '--arg', 'Unit', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
+
+    def test_add_clear_tickets_add_second_transfer(
+        self, client_regtest_scrubbed
+    ):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'add', '--arg', 'Pair 1 "B"', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
+
+    def test_add_clear_tickets_add_third_transfer(
+        self, client_regtest_scrubbed
+    ):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'add', '--arg', 'Pair 1 "C"', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')

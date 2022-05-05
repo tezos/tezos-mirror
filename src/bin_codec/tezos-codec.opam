@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -7,13 +9,13 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "data-encoding" { >= "0.4" & < "0.5" }
+  "data-encoding" { >= "0.5.3" & < "0.6" }
   "tezos-base"
+  "tezos-client-base-unix"
+  "tezos-client-base"
+  "tezos-clic"
   "tezos-stdlib-unix"
   "tezos-event-logging"
-  "tezos-client-base"
-  "tezos-client-base-unix"
-  "tezos-clic"
   "tezos-signer-services"
 ]
 depopts: [
@@ -25,6 +27,7 @@ depopts: [
   "tezos-client-010-PtGRANAD"
   "tezos-client-011-PtHangz2"
   "tezos-client-012-Psithaca"
+  "tezos-client-013-PtJakart"
   "tezos-client-alpha"
 ]
 build: [

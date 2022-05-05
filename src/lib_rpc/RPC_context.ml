@@ -89,15 +89,9 @@ type generic_call_result =
   | `Binary of (string, string option) rest
   | `Other of (string * string) option * (string, string option) rest ]
 
-class type json =
+class type generic =
   object
     inherit t
-
-    method generic_json_call :
-      RPC_service.meth ->
-      ?body:Data_encoding.json ->
-      Uri.t ->
-      (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
 
     method generic_media_type_call :
       RPC_service.meth ->
@@ -119,19 +113,19 @@ let not_found s p q =
   let {RPC_service.meth; uri; _} =
     RPC_service.forge_partial_request s ~base p q
   in
-  fail (Not_found {meth; uri})
+  Lwt_result_syntax.tzfail (Not_found {meth; uri})
 
 let gone s p q =
   let {RPC_service.meth; uri; _} =
     RPC_service.forge_partial_request s ~base p q
   in
-  fail (Gone {meth; uri})
+  Lwt_result_syntax.tzfail (Gone {meth; uri})
 
 let error_with s p q =
   let {RPC_service.meth; uri; _} =
     RPC_service.forge_partial_request s ~base p q
   in
-  fail (Generic_error {meth; uri})
+  Lwt_result_syntax.tzfail (Generic_error {meth; uri})
 
 class ['pr] of_directory (dir : 'pr RPC_directory.t) =
   object
@@ -143,13 +137,16 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
           'i ->
           'o tzresult Lwt.t =
       fun s p q i ->
-        RPC_directory.transparent_lookup dir s p q i >>= function
-        | `Ok v | `OkChunk v -> return v
+        let open Lwt_syntax in
+        let* r = RPC_directory.transparent_lookup dir s p q i in
+        match r with
+        | `Ok v | `OkChunk v -> return_ok v
         | `OkStream {next; shutdown} -> (
-            next () >>= function
+            let* o = next () in
+            match o with
             | Some v ->
                 shutdown () ;
-                return v
+                return_ok v
             | None ->
                 shutdown () ;
                 not_found s p q)
@@ -161,7 +158,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
         | `Not_found (Some err)
         | `Conflict (Some err)
         | `Error (Some err) ->
-            Lwt.return_error err
+            return_error err
         | `Unauthorized None
         | `Error None
         | `Forbidden None
@@ -180,23 +177,26 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
           'i ->
           (unit -> unit) tzresult Lwt.t =
       fun s ~on_chunk ~on_close p q i ->
-        RPC_directory.transparent_lookup dir s p q i >>= function
+        let open Lwt_syntax in
+        let* r = RPC_directory.transparent_lookup dir s p q i in
+        match r with
         | `OkStream {next; shutdown} ->
             let rec loop () =
-              next () >>= function
+              let* o = next () in
+              match o with
               | None ->
                   on_close () ;
-                  Lwt.return_unit
+                  return_unit
               | Some v ->
                   on_chunk v ;
                   loop ()
             in
             let _ = loop () in
-            return shutdown
+            return_ok shutdown
         | `Ok v | `OkChunk v ->
             on_chunk v ;
             on_close () ;
-            return (fun () -> ())
+            return_ok (fun () -> ())
         | `Gone None -> gone s p q
         | `Not_found None -> not_found s p q
         | `Unauthorized (Some err)
@@ -205,7 +205,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
         | `Not_found (Some err)
         | `Conflict (Some err)
         | `Error (Some err) ->
-            Lwt.return_error err
+            return_error err
         | `Unauthorized None
         | `Error None
         | `Forbidden None
@@ -226,9 +226,20 @@ let make_call3 s ctxt x y z = make_call s ctxt ((((), x), y), z)
 type stopper = unit -> unit
 
 let make_streamed_call s (ctxt : #streamed) p q i =
+  let open Lwt_result_syntax in
   let (stream, push) = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
-  ctxt#call_streamed_service s ~on_chunk ~on_close p q i >>=? fun close ->
+  let* spill_all = ctxt#call_streamed_service s ~on_chunk ~on_close p q i in
+  let close () =
+    spill_all () ;
+    (* Resto returns a function which is essentially
+       [Lwt_stream.junk_while (Fun.const true)], but the function doesn't
+       actually close the stream, nor does it uninstalls handlers. Hence we
+       need to call [on_close] here.
+       Before we close, we check wether the stream has been closed (by one of
+       the values being junked). *)
+    if Lwt_stream.is_closed stream then () else on_close ()
+  in
   return (stream, close)
 
 let () =

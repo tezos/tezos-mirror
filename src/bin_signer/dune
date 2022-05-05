@@ -1,6 +1,7 @@
-(env
- (static
-  (flags (:standard -ccopt -static))))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (static (flags (:standard -ccopt -static))))
 
 (executable
  (name main_signer)
@@ -14,13 +15,15 @@
   tezos-client-base-unix
   tezos-client-commands
   tezos-signer-services
+  tezos-rpc-http
   tezos-rpc-http-server
   tezos-rpc-http-client-unix
   tezos-stdlib-unix
+  tezos-stdlib
   tezos-signer-backends.unix)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_client_base
    -open Tezos_client_base_unix
    -open Tezos_client_commands

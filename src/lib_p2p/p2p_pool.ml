@@ -79,7 +79,7 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
       let current_size = P2p_point.Table.length known_points in
       if current_size > target then (
         let to_remove_target = current_size - target in
-        let now = Systime_os.now () in
+        let now = Time.System.now () in
         (* TODO: maybe time of discovery? *)
         let table = Gc_point_set.create to_remove_target in
         P2p_point.Table.iter
@@ -157,7 +157,8 @@ let register_new_point ?trusted t point =
   else None
 
 let register_list_of_new_points ?trusted ~medium ~source t point_list =
-  Event.(emit get_points) (medium, source, point_list) >>= fun () ->
+  let open Lwt_syntax in
+  let* () = Event.(emit get_points) (medium, source, point_list) in
   let f point = register_new_point ?trusted t point |> ignore in
   Lwt.return (List.iter f point_list)
 
@@ -207,7 +208,7 @@ let register_peer pool peer_id =
   match P2p_peer.Table.find pool.known_peer_ids peer_id with
   | None ->
       P2p_trigger.broadcast_new_peer pool.triggers ;
-      let created = Systime_os.now () in
+      let created = Time.System.now () in
       let peer =
         P2p_peer_state.Info.create
           ~created
@@ -273,6 +274,8 @@ module Points = struct
       (P2p_point.Table.find pool.known_points point)
 
   let fold_known pool ~init ~f = P2p_point.Table.fold f pool.known_points init
+
+  let iter_known f pool = P2p_point.Table.iter f pool.known_points
 
   let fold_connected pool ~init ~f =
     P2p_point.Table.fold f pool.connected_points init
@@ -349,8 +352,12 @@ module Peers = struct
 
   let fold_known pool ~init ~f = P2p_peer.Table.fold f pool.known_peer_ids init
 
+  let iter_known f pool = P2p_peer.Table.iter f pool.known_peer_ids
+
   let fold_connected pool ~init ~f =
     P2p_peer.Table.fold f pool.connected_peer_ids init
+
+  let iter_connected f pool = P2p_peer.Table.iter f pool.connected_peer_ids
 
   let add_connected pool peer_id peer_info =
     P2p_peer.Table.add pool.connected_peer_ids peer_id peer_info
@@ -384,6 +391,14 @@ module Connection = struct
         match P2p_peer_state.get peer_info with
         | Running {data; _} -> f peer_id data acc
         | _ -> acc)
+
+  let iter f pool =
+    Peers.iter_connected
+      (fun peer_id peer_info ->
+        match P2p_peer_state.get peer_info with
+        | Running {data; _} -> f peer_id data
+        | _ -> ())
+      pool
 
   let list pool =
     fold pool ~init:[] ~f:(fun peer_id c acc -> (peer_id, c) :: acc)
@@ -430,10 +445,11 @@ module Connection = struct
     random_elt candidates
 
   let propose_swap_request pool =
-    let ( >?? ) = Option.bind in
-    random_connection ~no_private:true pool >?? fun recipient ->
-    random_addr ~different_than:recipient ~no_private:true pool
-    >?? fun (proposed_point, proposed_peer_id) ->
+    let open Option_syntax in
+    let* recipient = random_connection ~no_private:true pool in
+    let* (proposed_point, proposed_peer_id) =
+      random_addr ~different_than:recipient ~no_private:true pool
+    in
     Some (proposed_point, proposed_peer_id, recipient)
 
   let find_by_peer_id pool peer_id =
@@ -471,6 +487,7 @@ let score {peer_meta_config = {score; _}; _} meta = score meta
 let active_connections pool = P2p_peer.Table.length pool.connected_peer_ids
 
 let create config peer_meta_config triggers ~log =
+  let open Lwt_syntax in
   let pool =
     {
       config;
@@ -490,14 +507,17 @@ let create config peer_meta_config triggers ~log =
     }
   in
   List.iter (Points.set_trusted pool) config.trusted_points ;
-  P2p_peer_state.Info.File.load
-    config.peers_file
-    peer_meta_config.peer_meta_encoding
-  >>= function
+  let* r =
+    P2p_peer_state.Info.File.load
+      config.peers_file
+      peer_meta_config.peer_meta_encoding
+  in
+  match r with
   | Ok peer_ids ->
-      Event.(emit create_pool)
-        (pool.known_points |> P2p_point.Table.to_seq_keys |> List.of_seq)
-      >>= fun () ->
+      let* () =
+        Event.(emit create_pool)
+          (pool.known_points |> P2p_point.Table.to_seq_keys |> List.of_seq)
+      in
       List.iter
         (fun peer_info ->
           let peer_id = P2p_peer_state.Info.peer_id peer_info in
@@ -508,27 +528,32 @@ let create config peer_meta_config triggers ~log =
               register_point pool (addr, port) |> ignore)
         peer_ids ;
       Lwt.return pool
-  | Error err -> Event.(emit parse_error) err >>= fun () -> Lwt.return pool
+  | Error err ->
+      let* () = Event.(emit parse_error) err in
+      Lwt.return pool
 
 let save_peers {config; peer_meta_config; known_peer_ids; _} =
-  Event.(emit saving_metadata) config.peers_file >>= fun () ->
-  P2p_peer_state.Info.File.save
-    config.peers_file
-    peer_meta_config.peer_meta_encoding
-    (P2p_peer.Table.fold (fun _ a b -> a :: b) known_peer_ids [])
-  >>= function
-  | Error err -> Event.(emit save_peers_error) err >>= fun () -> Lwt.return_unit
-  | Ok () -> Lwt.return_unit
+  let open Lwt_syntax in
+  let* () = Event.(emit saving_metadata) config.peers_file in
+  let* r =
+    P2p_peer_state.Info.File.save
+      config.peers_file
+      peer_meta_config.peer_meta_encoding
+      (P2p_peer.Table.fold (fun _ a b -> a :: b) known_peer_ids [])
+  in
+  Result.iter_error_s Event.(emit save_peers_error) r
 
 let tear_down_connections {known_peer_ids; known_points; _} =
-  P2p_peer.Table.iter_p
-    (fun _peer_id peer_info ->
-      match P2p_peer_state.get peer_info with
-      | Accepted {cancel; _} -> Error_monad.cancel_with_exceptions cancel
-      | Running {data = conn; _} -> P2p_conn.disconnect conn
-      | Disconnected -> Lwt.return_unit)
-    known_peer_ids
-  >>= fun () ->
+  let open Lwt_syntax in
+  let* () =
+    P2p_peer.Table.iter_p
+      (fun _peer_id peer_info ->
+        match P2p_peer_state.get peer_info with
+        | Accepted {cancel; _} -> Error_monad.cancel_with_exceptions cancel
+        | Running {data = conn; _} -> P2p_conn.disconnect conn
+        | Disconnected -> Lwt.return_unit)
+      known_peer_ids
+  in
   P2p_point.Table.iter_p
     (fun _point point_info ->
       match P2p_point_state.get point_info with
@@ -538,7 +563,10 @@ let tear_down_connections {known_peer_ids; known_points; _} =
       | Disconnected -> Lwt.return_unit)
     known_points
 
-let destroy pool = save_peers pool >>= fun () -> tear_down_connections pool
+let destroy pool =
+  let open Lwt_syntax in
+  let* () = save_peers pool in
+  tear_down_connections pool
 
 let add_to_id_points t point =
   P2p_point.Table.add t.my_id_points point () ;
@@ -550,7 +578,7 @@ let add_to_id_points t point =
    Note that it might select fewer elements than [other] if it the same index
    close to the end of the list is picked multiple times.
 
-   @raise [Invalid_argument] if either [best] or [other] is strictly negative.
+   @raise Invalid_argument if either [best] or [other] is strictly negative.
    *)
 let sample best other points =
   if best < 0 || other < 0 then raise (Invalid_argument "P2p_pool.sample") ;

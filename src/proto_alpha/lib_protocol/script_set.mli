@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,14 +25,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** Functions to ease the manipulation of sets of values in Michelson.
 
-val empty : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
+    A set in Michelson is a collection of type-homegeneous values along with the
+    functions that operate on the structure (through a first-class module). In
+    particular, the {!size} function runs in constant time.
+*)
 
-val fold : ('elt -> 'acc -> 'acc) -> 'elt Script_typed_ir.set -> 'acc -> 'acc
+open Script_typed_ir
 
-val update : 'a -> bool -> 'a Script_typed_ir.set -> 'a Script_typed_ir.set
+val make : (module Boxed_set with type elt = 'elt) -> 'elt set
 
-val mem : 'elt -> 'elt Script_typed_ir.set -> bool
+val get : 'elt set -> (module Boxed_set with type elt = 'elt)
 
-val size : 'elt Script_typed_ir.set -> Script_int.n Script_int.num
+(** [empty cmp_ty] creates a set module where elements have size
+    [Gas_comparable_input_size.size_of_comparable_value cmp_ty] and are compared
+    with [Script_comparable.compare_comparable cmp_ty] (used for sorting values,
+    which ensures a reasonable complexity of the set functions).
+    The function returns an empty set packaged as a first-class set module. *)
+val empty : 'a comparable_ty -> 'a set
+
+val fold : ('elt -> 'acc -> 'acc) -> 'elt set -> 'acc -> 'acc
+
+(** [update v true set] adds [v] to [set], and [update v false set] removes [v]
+    from [set]. *)
+val update : 'a -> bool -> 'a set -> 'a set
+
+val mem : 'elt -> 'elt set -> bool
+
+(** [size set] runs in constant time. *)
+val size : 'elt set -> Script_int.n Script_int.num

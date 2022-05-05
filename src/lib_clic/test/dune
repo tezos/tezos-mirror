@@ -1,7 +1,17 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name test_clic)
- (package tezos-clic)
  (libraries
+  tezos-stdlib
   tezos-clic
   alcotest-lwt)
- (flags (:standard -open Tezos_stdlib -open Tezos_clic)))
+ (flags (:standard
+         -open Tezos_stdlib
+         -open Tezos_clic)))
+
+(rule
+ (alias runtest)
+ (package tezos-clic)
+ (action (run %{dep:./test_clic.exe})))

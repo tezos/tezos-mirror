@@ -55,7 +55,7 @@ module type S = sig
   val full_logger : Format.formatter -> logger
 
   type config = {
-    media_type : Media_type.t list;
+    media_type : Media_type.Command_line.t;
     endpoint : Uri.t;
     logger : logger;
   }
@@ -64,7 +64,7 @@ module type S = sig
 
   val default_config : config
 
-  class http_ctxt : config -> Media_type.t list -> RPC_context.json
+  class http_ctxt : config -> Media_type.t list -> RPC_context.generic
 
   (**/**)
 
@@ -91,14 +91,6 @@ module type S = sig
     'q ->
     'i ->
     (unit -> unit) tzresult Lwt.t
-
-  val generic_json_call :
-    ?headers:(string * string) list ->
-    ?body:Data_encoding.json ->
-    [< RPC_service.meth] ->
-    Uri.t ->
-    (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
-    Lwt.t
 
   val generic_media_type_call :
     ?headers:(string * string) list ->

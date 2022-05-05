@@ -23,6 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Assert = Lib_test.Assert
+
+let equal_block ?msg st1 st2 =
+  let eq st1 st2 = Block_header.equal st1 st2 in
+  let pp ppf st =
+    Format.fprintf
+      ppf
+      "%a (%ld)"
+      Block_hash.pp
+      (Block_header.hash st)
+      st.shell.level
+  in
+  Assert.equal ?msg ~pp ~eq st1 st2
+
 let () =
   let speed =
     try
@@ -32,17 +46,18 @@ let () =
       | _ -> `Quick
     with Not_found -> `Quick
   in
+  let open Lwt_syntax in
   Lwt_main.run
-    ( Internal_event_unix.init () >>= fun () ->
-      Alcotest_lwt.run
-        "tezos-store"
-        [
-          Test_cemented_store.tests;
-          Test_block_store.tests;
-          Test_store.tests;
-          Test_protocol_store.tests;
-          Test_testchain.tests;
-          Test_snapshots.tests speed;
-          Test_reconstruct.tests speed;
-          Test_history_mode_switch.tests speed;
-        ] )
+    (let* () = Tezos_base_unix.Internal_event_unix.init () in
+     Alcotest_lwt.run
+       "tezos-store"
+       [
+         Test_cemented_store.tests;
+         Test_block_store.tests;
+         Test_store.tests;
+         Test_protocol_store.tests;
+         Test_testchain.tests;
+         Test_snapshots.tests speed;
+         Test_reconstruct.tests speed;
+         Test_history_mode_switch.tests speed;
+       ])

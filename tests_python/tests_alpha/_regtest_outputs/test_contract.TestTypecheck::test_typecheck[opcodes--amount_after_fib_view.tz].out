@@ -1,38 +1,38 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/amount_after_fib_view.tz]
 
 Well typed
-Gas remaining: 1039985.607 units remaining
+Gas remaining: 1039986.567 units remaining
 { parameter address ;
   storage mutez ;
   code { CAR
-         /* [ @parameter address ] */ ;
+         /* [ address ] */ ;
          DUP
-         /* [ @parameter address : @parameter address ] */ ;
+         /* [ address : address ] */ ;
          PUSH nat 3
-         /* [ nat : @parameter address : @parameter address ] */ ;
+         /* [ nat : address : address ] */ ;
          VIEW "fib" nat
-         /* [ @parameter.contract option nat : @parameter address ] */ ;
+         /* [ option nat : address ] */ ;
          ASSERT_SOME ;
          DROP
-         /* [ @parameter address ] */ ;
+         /* [ address ] */ ;
          CONTRACT nat
-         /* [ @parameter.contract option (contract nat) ] */ ;
+         /* [ option (contract nat) ] */ ;
          ASSERT_SOME ;
          PUSH mutez 15000000
-         /* [ mutez : @parameter.contract.some contract nat ] */ ;
+         /* [ mutez : contract nat ] */ ;
          PUSH nat 0
-         /* [ nat : mutez : @parameter.contract.some contract nat ] */ ;
+         /* [ nat : mutez : contract nat ] */ ;
          TRANSFER_TOKENS
          /* [ operation ] */ ;
          AMOUNT
-         /* [ @amount mutez : operation ] */ ;
+         /* [ mutez : operation ] */ ;
          SWAP
-         /* [ operation : @amount mutez ] */ ;
+         /* [ operation : mutez ] */ ;
          NIL operation
-         /* [ list operation : operation : @amount mutez ] */ ;
+         /* [ list operation : operation : mutez ] */ ;
          SWAP
-         /* [ operation : list operation : @amount mutez ] */ ;
+         /* [ operation : list operation : mutez ] */ ;
          CONS
-         /* [ list operation : @amount mutez ] */ ;
+         /* [ list operation : mutez ] */ ;
          PAIR
-         /* [ pair (list operation) (mutez @amount) ] */ } }
+         /* [ pair (list operation) mutez ] */ } }

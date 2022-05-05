@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/alpha.client.contracts.out
+rpc/alpha.client.contracts.out
 
 ./tezos-client rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",
@@ -69,11 +69,11 @@ Fatal error:
   
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-{ "balance": "99999383", "delegate": "[PUBLIC_KEY_HASH]",
+{ "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"99999383"
+"99999393"
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "4"

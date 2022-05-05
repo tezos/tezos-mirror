@@ -86,6 +86,8 @@ class type wallet =
     method write :
       string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 
+    method last_modification_time : string -> float option tzresult Lwt.t
+
     method get_base_dir : string
   end
 
@@ -116,7 +118,7 @@ class type io_rpcs =
 
     inherit prompter
 
-    inherit RPC_context.json
+    inherit RPC_context.generic
   end
 
 class type ui =
@@ -128,6 +130,11 @@ class type ui =
     method now : unit -> Ptime.t
   end
 
+class type ux_options =
+  object
+    method verbose_rpc_error_diagnostics : bool
+  end
+
 class type full =
   object
     inherit printer
@@ -136,13 +143,15 @@ class type full =
 
     inherit wallet
 
-    inherit RPC_context.json
+    inherit RPC_context.generic
 
     inherit chain
 
     inherit block
 
     inherit ui
+
+    inherit ux_options
   end
 
 class proxy_context (obj : full) =
@@ -183,8 +192,6 @@ class proxy_context (obj : full) =
 
     method error : type a b. (a, b) lwt_format -> a = obj#error
 
-    method generic_json_call = obj#generic_json_call
-
     method generic_media_type_call = obj#generic_media_type_call
 
     method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = obj#with_lock
@@ -203,6 +210,9 @@ class proxy_context (obj : full) =
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
       obj#write
 
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      obj#last_modification_time
+
     method prompt : type a. (a, string tzresult) lwt_format -> a = obj#prompt
 
     method prompt_password : type a. (a, Bytes.t tzresult) lwt_format -> a =
@@ -217,6 +227,8 @@ class proxy_context (obj : full) =
     method now : unit -> Ptime.t = obj#now
 
     method get_base_dir : string = obj#get_base_dir
+
+    method verbose_rpc_error_diagnostics = obj#verbose_rpc_error_diagnostics
   end
 
 let log _ _ = Lwt.return_unit

@@ -1,47 +1,38 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/map_iter.tz]
 
 Well typed
-Gas remaining: 1039985.509 units remaining
+Gas remaining: 1039986.949 units remaining
 { parameter (map (int :k) (int :e)) ;
   storage (pair (int :k) (int :e)) ;
   code { CAR
-         /* [ @parameter map (int :k) (int :e) ] */ ;
+         /* [ map int int ] */ ;
          PUSH @acc_e (int :e) 0
-         /* [ @acc_e int :e : @parameter map (int :k) (int :e) ] */ ;
-         PUSH @acc_k
-           (int :k)
-           0
-         /* [ @acc_k int :k : @acc_e int :e : @parameter map (int :k) (int :e) ] */ ;
+         /* [ int : map int int ] */ ;
+         PUSH @acc_k (int :k) 0
+         /* [ int : int : map int int ] */ ;
          PAIR % %r
-         /* [ pair (int :k @acc_k) (int :e %r @acc_e)
-            : @parameter map (int :k) (int :e) ] */ ;
+         /* [ pair int int : map int int ] */ ;
          SWAP
-         /* [ @parameter map (int :k) (int :e)
-            : pair (int :k @acc_k) (int :e %r @acc_e) ] */ ;
+         /* [ map int int : pair int int ] */ ;
          ITER { DIP { DUP
-                      /* [ pair (int :k @acc_k) (int :e %r @acc_e)
-                         : pair (int :k @acc_k) (int :e %r @acc_e) ] */ ;
+                      /* [ pair int int : pair int int ] */ ;
                       CAR
-                      /* [ @acc_k int :k : pair (int :k @acc_k) (int :e %r @acc_e) ] */ ;
-                      DIP { CDR /* [ @acc_e int :e ] */ }
-                      /* [ @acc_k int :k : @acc_e int :e ] */ }
-                /* [ pair (int :k @key) (int :e @elt) : @acc_k int :k : @acc_e int :e ] */ ;
+                      /* [ int : pair int int ] */ ;
+                      DIP { CDR /* [ int ] */ }
+                      /* [ int : int ] */ }
+                /* [ pair int int : int : int ] */ ;
                 DUP
-                /* [ pair (int :k @key) (int :e @elt) : pair (int :k @key) (int :e @elt)
-                   : @acc_k int :k : @acc_e int :e ] */ ;
-                DIP { CAR
-                      /* [ @key int :k : @acc_k int :k : @acc_e int :e ] */ ;
-                      ADD
-                      /* [ int :k : @acc_e int :e ] */ }
-                /* [ pair (int :k @key) (int :e @elt) : int :k : @acc_e int :e ] */ ;
+                /* [ pair int int : pair int int : int : int ] */ ;
+                DIP { CAR /* [ int : int : int ] */ ; ADD /* [ int : int ] */ }
+                /* [ pair int int : int : int ] */ ;
                 SWAP
-                /* [ int :k : pair (int :k @key) (int :e @elt) : @acc_e int :e ] */ ;
-                DIP { CDR /* [ @elt int :e : @acc_e int :e ] */ ; ADD /* [ int :e ] */ }
-                /* [ int :k : int :e ] */ ;
+                /* [ int : pair int int : int ] */ ;
+                DIP { CDR /* [ int : int ] */ ; ADD /* [ int ] */ }
+                /* [ int : int ] */ ;
                 PAIR % %r
-                /* [ pair (int :k) (int :e %r) ] */ }
-         /* [ pair (int :k) (int :e %r) ] */ ;
+                /* [ pair int int ] */ }
+         /* [ pair int int ] */ ;
          NIL operation
-         /* [ list operation : pair (int :k) (int :e %r) ] */ ;
+         /* [ list operation : pair int int ] */ ;
          PAIR
-         /* [ pair (list operation) (int :k) (int :e %r) ] */ } }
+         /* [ pair (list operation) int int ] */ } }

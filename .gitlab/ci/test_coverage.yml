@@ -1,0 +1,29 @@
+# This job fetchs coverage files by precedent test stage. It creates the html,
+# summary and cobertura reports. It also provide a coverage % for the merge request.
+
+unified_coverage:
+  extends:
+    - .default_settings_template
+    - .rules_template__development_unified_coverage
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__coverage
+  stage: test_coverage
+  # This job requires all artifacts from the stage test, so we override
+  # the `dependencies: []` in `.default_settings` by setting `dependencies` 
+  # to `null`.
+  dependencies:
+  before_script:
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . "$HOME"/.venv/bin/activate
+  script:
+    - ./scripts/ci/report_coverage.sh
+  coverage: '/Coverage: ([^%]+%)/'
+  artifacts:
+    expose_as: 'Coverage report'
+    when: always
+    reports:
+      cobertura: _coverage_report/cobertura.xml
+    paths:
+      - _coverage_report/
+    expire_in: 15 days

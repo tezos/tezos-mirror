@@ -37,56 +37,46 @@
 module Internal = Tezos_proxy.Light_internal
 module Merkle = Internal.Merkle
 module Store = Tezos_proxy.Local_context
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 
-(** [list1_arb arb] generates non-empty lists using [arb]. *)
-let list1_arb arb =
-  QCheck.(
-    list_of_size Gen.(1 -- 100) arb |> add_shrink_invariant (fun l -> l <> []))
+(** [list1_gen gen] generates non-empty lists using [gen]. *)
+let list1_gen gen =
+  QCheck2.Gen.(
+    list_size (1 -- 20) gen |> add_shrink_invariant (fun l -> l <> []))
 
-let irmin_tree_arb =
+let irmin_tree_gen =
   let module StringList = struct
     type t = string list
 
     let compare = Stdlib.compare
   end in
   let module StringListMap = Stdlib.Map.Make (StringList) in
-  let open MakeMapArb (StringListMap) in
-  let open QCheck in
-  map
-    ~rev:(fun tree ->
-      Store.Tree.fold
-        tree
-        []
-        ~order:`Sorted
-        ~init:[]
-        ~f:(fun path sub_tree acc ->
-          Store.Tree.to_value sub_tree >|= function
-          | None -> acc
-          | Some bytes -> (path, bytes) :: acc)
-      |> Lwt_main.run)
-    (fun entries ->
-      List.fold_left_s
-        (fun built_tree (path, bytes) -> Store.Tree.add built_tree path bytes)
-        (Store.Tree.empty Store.empty)
-        entries
-      |> Lwt_main.run)
-    (small_list (pair (small_list string) bytes_arb))
+  let open MakeMapGen (StringListMap) in
+  let open QCheck2.Gen in
+  let+ entries = small_list (pair (small_list string) bytes_gen) in
+  List.fold_left_s
+    (fun built_tree (path, bytes) -> Store.Tree.add built_tree path bytes)
+    (Store.Tree.empty Store.empty)
+    entries
+  |> Lwt_main.run
 
-let get_ok = function Ok x -> x | Error s -> QCheck.Test.fail_report s
+let print_tree = Format.asprintf "%a" Store.Tree.pp
+
+let get_ok = function Ok x -> x | Error s -> QCheck2.Test.fail_report s
 
 (** Test that [merkle_tree_to_irmin_tree] preserves the tree's structure
     by checking that it yields the same [simple_tree]
     as when using [merkle_tree_to_simple_tree]
   *)
 let test_merkle_tree_to_irmin_tree_preserves_simple_tree =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:
       "merkle_tree_to_irmin_tree mtree |> irmin_tree_to_simple_tree = \
        merkle_tree_to_simple_tree mtree"
-    merkle_tree_arb
+    ~print:print_merkle_tree
+    merkle_tree_gen
   @@ fun mtree ->
   let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let merkle_irmin_tree =
@@ -113,24 +103,25 @@ let rec remove_data_in_node =
   | Data _ -> None
   | Continue mtree ->
       let mtree' = remove_data_in_tree mtree in
-      if TzString.Map.is_empty mtree' then None else Some (Continue mtree')
+      if String.Map.is_empty mtree' then None else Some (Continue mtree')
 
 and remove_data_in_tree mtree =
-  let pairs = TzString.Map.bindings mtree in
+  let pairs = String.Map.bindings mtree in
   let pairs' = Light_lib.Bifunctor.second remove_data_in_node pairs in
   let lift_opt (x, y_opt) =
     match y_opt with None -> None | Some y -> Some (x, y)
   in
   let pairs'' = List.map lift_opt pairs' |> filter_none in
-  List.to_seq pairs'' |> TzString.Map.of_seq
+  List.to_seq pairs'' |> String.Map.of_seq
 
 (** Test that translating a [merkle_tree] to an Irmin tree yields
     an Irmin tree that is included in the original [merkle_tree].
     This function specifically tests function [merkle_tree_to_irmin_tree]. *)
 let test_contains_merkle_tree =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"contains_merkle_tree (merkle_tree_to_irmin_tree mtree) mtree = true"
-    merkle_tree_arb
+    ~print:print_merkle_tree
+    merkle_tree_gen
   @@ fun mtree ->
   (* Because contains_merkle_tree doesn't support Data nodes, we need to
      remove them. That's because contains_merkle_tree is only called
@@ -146,16 +137,17 @@ let test_contains_merkle_tree =
   in
   match contains_res with
   | Ok _ -> true
-  | Error msg -> QCheck.Test.fail_report msg
+  | Error msg -> QCheck2.Test.fail_report msg
 
 (** Test that unioning an empty irmin tree and a merkle tree should yield
     the same irmin tree as if it was built directly from the merkle tree *)
 let test_union_irmin_empty =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:
       "union_irmin_tree_merkle_tree empty mtree = merkle_tree_to_irmin_tree \
        mtree"
-    merkle_tree_arb
+    ~print:print_merkle_tree
+    merkle_tree_gen
   @@ fun mtree ->
   let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let direct_tree =
@@ -173,11 +165,12 @@ let test_union_irmin_empty =
     Tests both [Merkle.merkle_tree_to_irmin_tree]
     and [Merkle.union_irmin_tree_merkle_tree] *)
 let test_union_translation =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:
       "union_irmin_tree_merkle_tree (merkle_tree_to_irmin_tree mtree) mtree = \
        merkle_tree_to_irmin_tree mtree"
-    merkle_tree_arb
+    ~print:print_merkle_tree
+    merkle_tree_gen
   @@ fun mtree ->
   let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let direct_tree =
@@ -206,7 +199,7 @@ let rec union_merkle_node n1 n2 =
 and union_merkle_tree t1 t2 =
   let conflict = ref false in
   let merge =
-    TzString.Map.union
+    String.Map.union
       (fun _key val1 val2 ->
         let node = union_merkle_node val1 val2 in
         if Option.is_none node then conflict := true ;
@@ -225,16 +218,18 @@ and union_merkle_tree t1 t2 =
     added in two steps, the second call to [union_irmin_tree_merkle_tree]
     fails. *)
 let _test_union_direct =
-  QCheck.Test.make
+  let open QCheck2 in
+  Test.make
     ~name:
       "union_irmin_tree_merkle_tree (merkle_tree_to_irmin_tree mtree) mtree = \
        merkle_tree_to_irmin_tree mtree"
-    (QCheck.pair merkle_tree_arb merkle_tree_arb)
+    ~print:(Print.pair print_merkle_tree print_merkle_tree)
+    (Gen.pair merkle_tree_gen merkle_tree_gen)
   @@ fun (mtree1, mtree2) ->
   match union_merkle_tree mtree1 mtree2 with
   | None ->
       (* trees are incompatible *)
-      QCheck.assume_fail ()
+      assume_fail ()
   | Some merkle_union ->
       let repo = Lwt_main.run (Store.Tree.make_repo ()) in
       let irmin_union1 =
@@ -263,17 +258,19 @@ let _test_union_direct =
     Commented out for similar reasons as [test_union_direct] above: we cannot
     build trees that correspond to valid merkle trees in two steps. *)
 let _test_union_commutation =
-  QCheck.Test.make
+  let open QCheck2 in
+  Test.make
     ~name:
       "union_irmin_tree_merkle_tree (union_irmin_tree_merkle_tree empty \
        mtree1) mtree2 = union_irmin_tree_merkle_tree \
        (union_irmin_tree_merkle_tree empty mtree2) mtree1"
-    (QCheck.pair merkle_tree_arb merkle_tree_arb)
+    ~print:(Print.pair print_merkle_tree print_merkle_tree)
+    (Gen.pair merkle_tree_gen merkle_tree_gen)
   @@ fun (mtree1, mtree2) ->
   match union_merkle_tree mtree1 mtree2 with
   | None ->
       (* rule out incompatible trees *)
-      QCheck.assume_fail ()
+      assume_fail ()
   | Some _ ->
       let repo = Lwt_main.run (Store.Tree.make_repo ()) in
       let union2 t1 t2 =
@@ -295,40 +292,44 @@ let _test_union_commutation =
 (** Test that unioning an irmin tree with an empty merkle tree yield
     the input irmin tree *)
 let test_union_merkle_empty =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"union_irmin_tree_merkle_tree tree empty = tree"
-    irmin_tree_arb
+    irmin_tree_gen
   @@ fun tree ->
   let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let res =
     Lwt_main.run
-    @@ Merkle.union_irmin_tree_merkle_tree repo tree TzString.Map.empty
+    @@ Merkle.union_irmin_tree_merkle_tree repo tree String.Map.empty
     |> get_ok
   in
   Light_lib.check_irmin_tree_eq tree res
 
 (** Test that comparing the tree shape correctly ignores the key *)
 let test_shape_ignores_key =
-  QCheck.Test.make
+  let open QCheck2 in
+  Test.make
     ~name:"trees_shape_match ignores the key"
-    QCheck.(quad merkle_tree_arb (list string) merkle_node_arb merkle_node_arb)
+    ~print:
+      Print.(
+        quad print_merkle_tree (list string) print_merkle_node print_merkle_node)
+    Gen.(quad merkle_tree_gen (list string) merkle_node_gen merkle_node_gen)
   @@ fun (tree, key, node1, node2) ->
   let open Tezos_shell_services.Block_services in
   let is_continue = function Continue _ -> true | _ -> false in
   (* If both are [Continue] then they are trees with child nodes, hence
      shape comparison will fail. *)
-  QCheck.assume @@ not (is_continue node1 && is_continue node2) ;
+  assume @@ not (is_continue node1 && is_continue node2) ;
   let rec deep_add current_key value mtree =
     match current_key with
-    | [last_fragment] -> TzString.Map.add last_fragment value mtree
+    | [last_fragment] -> String.Map.add last_fragment value mtree
     | hd_key :: tl_key ->
-        TzString.Map.update
+        String.Map.update
           hd_key
           (fun mnode_opt ->
             let subtree =
               match mnode_opt with
               | Some (Continue subtree) -> subtree
-              | _ -> TzString.Map.empty
+              | _ -> String.Map.empty
             in
             Some (Continue (deep_add tl_key value subtree)))
           mtree
@@ -352,7 +353,7 @@ module HashStability = struct
     let hash = Store.Tree.hash tree in
     let data =
       match Store.Tree.kind tree with
-      | `Value -> `Contents hash
+      | `Value -> `Value hash
       | `Tree -> `Node hash
     in
     Store.Tree.shallow repo data
@@ -381,13 +382,13 @@ module HashStability = struct
       Randomization of shallowing is sub-par (based on tree hash) because
       otherwise it would be very difficult to provide shrinking. Note that
       this will no be a problem once QCheck provides integrated shrinking. *)
-  let tree_and_shallow_arb =
-    let open QCheck in
+  let tree_and_shallow_gen =
+    let open QCheck2.Gen in
     let repo = Lwt_main.run (Store.Tree.make_repo ()) in
-    map_keep_input
-      ~print:(Format.asprintf "%a" Store.Tree.pp)
-      (fun tree -> Lwt_main.run (make_partial_shallow_tree repo tree))
-      irmin_tree_arb
+    let+ tree = irmin_tree_gen in
+    (tree, Lwt_main.run (make_partial_shallow_tree repo tree))
+
+  let print_tree_and_shallow = QCheck2.Print.pair print_tree print_tree
 
   (** Test that replacing Irmin subtrees by their [Store.Tree.shallow]
       value leaves the top-level [Store.Tree.hash] unchanged.
@@ -395,15 +396,17 @@ module HashStability = struct
       This test was also proposed to Irmin in
       https://github.com/mirage/irmin/pull/1291 *)
   let test_hash_stability =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"Shallowing trees does not change their top-level hash"
-      tree_and_shallow_arb
+      ~print:print_tree_and_shallow
+      tree_and_shallow_gen
     @@ fun (tree, shallow_tree) ->
     let hash = Store.Tree.hash tree in
     let shallow_hash = Store.Tree.hash shallow_tree in
     if Context_hash.equal hash shallow_hash then true
     else
-      QCheck.Test.fail_reportf
+      Test.fail_reportf
         "@[<v 2>Equality check failed!@,\
          expected:@,\
          %a@,\
@@ -431,15 +434,19 @@ module AddTree = struct
       This test was also proposed to Irmin in
       https://github.com/mirage/irmin/pull/1291 *)
   let test_add_tree =
-    let open QCheck in
+    let open QCheck2 in
     Test.make
       ~name:
         "let tree' = Store.Tree.add_tree tree key at_key in \
          Store.Tree.find_tree tree' key = at_key"
-      (triple
-         HashStability.tree_and_shallow_arb
-         (list1_arb string)
-         irmin_tree_arb)
+      ~print:
+        Print.(
+          triple HashStability.print_tree_and_shallow (list string) print_tree)
+      Gen.(
+        triple
+          HashStability.tree_and_shallow_gen
+          (list1_gen string)
+          irmin_tree_gen)
       (fun ( ((_, tree) : _ * Store.tree),
              (key : Store.key),
              (added : Store.tree) ) ->
@@ -474,15 +481,15 @@ module Consensus = struct
     let rec gen_rec ~rand attempts_left =
       if attempts_left = 0 then Error "mk_rogue_tree: giving up"
       else
-        let gen = QCheck.(gen merkle_tree_arb) in
-        let generated = QCheck.Gen.generate1 ~rand gen in
+        let gen = merkle_tree_gen in
+        let generated = QCheck2.Gen.generate1 ~rand gen in
         if merkle_tree_eq mtree generated then gen_rec ~rand (attempts_left - 1)
         else Ok generated
     in
     let rand = Random.State.make (Array.of_list seed) in
-    if (not TzString.Map.(is_empty mtree)) && Random.State.int rand 10 = 0 then
+    if (not String.Map.(is_empty mtree)) && Random.State.int rand 10 = 0 then
       (* The empty tree is an important edge case, hence this conditional *)
-      Ok TzString.Map.empty
+      Ok String.Map.empty
     else gen_rec ~rand 128
 
   (* [mock_light_rpc mtree [(endpoint1, true); (endpoint2, false)] seed]
@@ -498,9 +505,9 @@ module Consensus = struct
                if is_rogue then
                  match mk_rogue_tree mtree seed with
                  | Ok rogue_mtree -> rogue_mtree
-                 | _ -> QCheck.assume_fail ()
+                 | _ -> QCheck2.assume_fail ()
                else mtree)
-        |> return
+        |> Lwt.return_ok
     end : Tezos_proxy.Light_proto.PROTO_RPCS)
 
   let mock_printer () =
@@ -545,9 +552,8 @@ module Consensus = struct
     let module Consensus = Tezos_proxy.Light_consensus.Make (Light_proto) in
     let printer = mock_printer () in
     let repo = Lwt_main.run (Store.Tree.make_repo ()) in
-    let* tree =
-      Internal.Merkle.merkle_tree_to_irmin_tree repo mtree >|= get_ok
-    in
+    let* tree_r = Internal.Merkle.merkle_tree_to_irmin_tree repo mtree in
+    let tree = get_ok tree_r in
     let input : Tezos_proxy.Light_consensus.input =
       {
         printer = (printer :> Tezos_client_base.Client_context.printer);
@@ -571,7 +577,7 @@ module Consensus = struct
 end
 
 let add_test_consensus (min_agreement, honest, rogue, consensus_expected) =
-  let open QCheck in
+  let open QCheck2 in
   (* Because the node providing data always agrees, [honest] must be > 0 *)
   assert (honest > 0) ;
   (* Because we test consensus, to which the node providing data
@@ -585,7 +591,12 @@ let add_test_consensus (min_agreement, honest, rogue, consensus_expected) =
          honest
          rogue
          consensus_expected)
-    (triple merkle_tree_arb (list string) (list int))
+    ~print:Print.(triple print_merkle_tree (list string) (list int))
+    Gen.(
+      triple
+        merkle_tree_gen
+        (small_list (small_string ?gen:None))
+        (small_list int))
   @@ fun (mtree, key, randoms) ->
   Consensus.test_consensus
     min_agreement
@@ -598,18 +609,24 @@ let add_test_consensus (min_agreement, honest, rogue, consensus_expected) =
   |> Lwt_main.run
 
 let test_consensus_spec =
-  let open QCheck in
-  let min_agreement_arb = 0 -- 100 in
-  let honest_arb = 1 -- 1000 in
-  let rogue_arb = 0 -- 1000 in
-  let key_arb = list string in
+  let open QCheck2 in
+  let open Gen in
+  let min_agreement_gen = 0 -- 100 in
+  let honest_gen = 1 -- 1000 in
+  let rogue_gen = 0 -- 1000 in
+  let key_gen = small_list (small_string ?gen:None) in
   Test.make
     ~name:
       "test_consensus min_agreement honest rogue ... = min_agreeing_endpoints \
        min_agreement (honest + rogue + 1) <= honest"
+    ~print:
+      Print.(
+        pair
+          (quad int int int (list string))
+          (pair print_merkle_tree (list int)))
     (pair
-       (quad min_agreement_arb honest_arb rogue_arb key_arb)
-       (pair merkle_tree_arb (list int)))
+       (quad min_agreement_gen honest_gen rogue_gen key_gen)
+       (pair merkle_tree_gen (small_list int)))
   @@ fun ((min_agreement_int, honest, rogue, key), (mtree, seed)) ->
   assert (0 <= min_agreement_int && min_agreement_int <= 100) ;
   let min_agreement = Float.of_int min_agreement_int /. 100. in

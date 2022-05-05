@@ -1,61 +1,54 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/data_publisher.tz]
 
 Well typed
-Gas remaining: 1039974.524 units remaining
+Gas remaining: 1039975.804 units remaining
 { parameter (pair signature (pair string nat)) ;
   storage (pair (pair key nat) string) ;
   code { DUP
-         /* [ pair (pair @parameter signature string nat) (pair @storage (pair key nat) string)
-            : pair (pair @parameter signature string nat) (pair @storage (pair key nat) string) ] */ ;
+         /* [ pair (pair signature string nat) (pair key nat) string
+            : pair (pair signature string nat) (pair key nat) string ] */ ;
          CAR
-         /* [ @parameter pair signature string nat
-            : pair (pair @parameter signature string nat) (pair @storage (pair key nat) string) ] */ ;
+         /* [ pair signature string nat
+            : pair (pair signature string nat) (pair key nat) string ] */ ;
          DIP { CDR
-               /* [ @storage pair (pair key nat) string ] */ ;
+               /* [ pair (pair key nat) string ] */ ;
                DUP
-               /* [ @storage pair (pair key nat) string : @storage pair (pair key nat) string ] */ }
-         /* [ @parameter pair signature string nat : @storage pair (pair key nat) string
-            : @storage pair (pair key nat) string ] */ ;
+               /* [ pair (pair key nat) string : pair (pair key nat) string ] */ }
+         /* [ pair signature string nat : pair (pair key nat) string
+            : pair (pair key nat) string ] */ ;
          SWAP
-         /* [ @storage pair (pair key nat) string : @parameter pair signature string nat
-            : @storage pair (pair key nat) string ] */ ;
+         /* [ pair (pair key nat) string : pair signature string nat
+            : pair (pair key nat) string ] */ ;
          DIP { DUP
-               /* [ @parameter pair signature string nat : @parameter pair signature string nat
-                  : @storage pair (pair key nat) string ] */ }
-         /* [ @storage pair (pair key nat) string : @parameter pair signature string nat
-            : @parameter pair signature string nat
-            : @storage pair (pair key nat) string ] */ ;
+               /* [ pair signature string nat : pair signature string nat
+                  : pair (pair key nat) string ] */ }
+         /* [ pair (pair key nat) string : pair signature string nat
+            : pair signature string nat : pair (pair key nat) string ] */ ;
          CAAR ;
          DIP { DUP
-               /* [ @parameter pair signature string nat : @parameter pair signature string nat
-                  : @parameter pair signature string nat
-                  : @storage pair (pair key nat) string ] */ ;
+               /* [ pair signature string nat : pair signature string nat
+                  : pair signature string nat : pair (pair key nat) string ] */ ;
                CAR
-               /* [ signature : @parameter pair signature string nat
-                  : @parameter pair signature string nat
-                  : @storage pair (pair key nat) string ] */ ;
+               /* [ signature : pair signature string nat : pair signature string nat
+                  : pair (pair key nat) string ] */ ;
                DIP { CDR
-                     /* [ pair string nat : @parameter pair signature string nat
-                        : @storage pair (pair key nat) string ] */ ;
+                     /* [ pair string nat : pair signature string nat : pair (pair key nat) string ] */ ;
                      PACK
-                     /* [ @packed bytes : @parameter pair signature string nat
-                        : @storage pair (pair key nat) string ] */ ;
+                     /* [ bytes : pair signature string nat : pair (pair key nat) string ] */ ;
                      BLAKE2B
-                     /* [ bytes : @parameter pair signature string nat
-                        : @storage pair (pair key nat) string ] */ }
-               /* [ signature : bytes : @parameter pair signature string nat
-                  : @storage pair (pair key nat) string ] */ }
-         /* [ key : signature : bytes : @parameter pair signature string nat
-            : @storage pair (pair key nat) string ] */ ;
+                     /* [ bytes : pair signature string nat : pair (pair key nat) string ] */ }
+               /* [ signature : bytes : pair signature string nat
+                  : pair (pair key nat) string ] */ }
+         /* [ key : signature : bytes : pair signature string nat
+            : pair (pair key nat) string ] */ ;
          CHECK_SIGNATURE
-         /* [ bool : @parameter pair signature string nat
-            : @storage pair (pair key nat) string ] */ ;
+         /* [ bool : pair signature string nat : pair (pair key nat) string ] */ ;
          IF { CDR
-              /* [ pair string nat : @storage pair (pair key nat) string ] */ ;
+              /* [ pair string nat : pair (pair key nat) string ] */ ;
               DUP
-              /* [ pair string nat : pair string nat : @storage pair (pair key nat) string ] */ ;
+              /* [ pair string nat : pair string nat : pair (pair key nat) string ] */ ;
               DIP { CAR
-                    /* [ string : @storage pair (pair key nat) string ] */ ;
+                    /* [ string : pair (pair key nat) string ] */ ;
                     DIP { CAAR }
                     /* [ string : key ] */ }
               /* [ pair string nat : string : key ] */ ;

@@ -1,0 +1,24 @@
+opam:create_pipeline:
+  extends:
+    - .default_settings_template
+    - .image_template__alpine
+    - .rules_template__trigger_opam_pipeline
+  stage: packaging
+  script:
+    - ./scripts/generate_opam_pipeline.sh | tee opam-ci.yml
+  needs: []
+  artifacts:
+    paths:
+      - opam-ci.yml
+
+opam:trigger:
+  extends:
+    - .rules_template__trigger_opam_pipeline
+  stage: packaging
+  needs:
+    - "opam:create_pipeline"
+  trigger:
+    include:
+      - artifact: opam-ci.yml
+        job: "opam:create_pipeline"
+    strategy: depend

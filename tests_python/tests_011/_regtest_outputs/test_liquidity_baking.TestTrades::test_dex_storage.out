@@ -1,7 +1,0 @@
-tests_011/test_liquidity_baking.py::TestTrades::test_dex_storage
-
-Pair 462
-     14117137204
-     72107
-     "[CONTRACT_HASH]"
-     "[CONTRACT_HASH]"

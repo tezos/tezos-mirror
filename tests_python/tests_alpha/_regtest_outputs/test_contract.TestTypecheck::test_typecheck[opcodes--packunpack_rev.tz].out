@@ -1,26 +1,24 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/packunpack_rev.tz]
 
 Well typed
-Gas remaining: 1039885.614 units remaining
+Gas remaining: 1039888.774 units remaining
 { parameter (pair int nat string bytes mutez bool key_hash timestamp address) ;
   storage unit ;
   code { CAR
-         /* [ @parameter pair int nat string bytes mutez bool key_hash timestamp address ] */ ;
+         /* [ pair int nat string bytes mutez bool key_hash timestamp address ] */ ;
          DUP
-         /* [ @parameter pair int nat string bytes mutez bool key_hash timestamp address
-            : @parameter pair int nat string bytes mutez bool key_hash timestamp address ] */ ;
+         /* [ pair int nat string bytes mutez bool key_hash timestamp address
+            : pair int nat string bytes mutez bool key_hash timestamp address ] */ ;
          CAR
-         /* [ int
-            : @parameter pair int nat string bytes mutez bool key_hash timestamp address ] */ ;
+         /* [ int : pair int nat string bytes mutez bool key_hash timestamp address ] */ ;
          DIP { UNPAIR
                /* [ int : pair nat string bytes mutez bool key_hash timestamp address ] */ }
          /* [ int : int : pair nat string bytes mutez bool key_hash timestamp address ] */ ;
          PACK
-         /* [ @packed bytes : int
-            : pair nat string bytes mutez bool key_hash timestamp address ] */ ;
+         /* [ bytes : int : pair nat string bytes mutez bool key_hash timestamp address ] */ ;
          UNPACK
            int
-         /* [ @packed.unpacked option int : int
+         /* [ option int : int
             : pair nat string bytes mutez bool key_hash timestamp address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
@@ -32,11 +30,10 @@ Gas remaining: 1039885.614 units remaining
          DIP { UNPAIR /* [ nat : pair string bytes mutez bool key_hash timestamp address ] */ }
          /* [ nat : nat : pair string bytes mutez bool key_hash timestamp address ] */ ;
          PACK
-         /* [ @packed bytes : nat
-            : pair string bytes mutez bool key_hash timestamp address ] */ ;
+         /* [ bytes : nat : pair string bytes mutez bool key_hash timestamp address ] */ ;
          UNPACK
            nat
-         /* [ @packed.unpacked option nat : nat
+         /* [ option nat : nat
             : pair string bytes mutez bool key_hash timestamp address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
@@ -48,11 +45,10 @@ Gas remaining: 1039885.614 units remaining
          DIP { UNPAIR /* [ string : pair bytes mutez bool key_hash timestamp address ] */ }
          /* [ string : string : pair bytes mutez bool key_hash timestamp address ] */ ;
          PACK
-         /* [ @packed bytes : string : pair bytes mutez bool key_hash timestamp address ] */ ;
+         /* [ bytes : string : pair bytes mutez bool key_hash timestamp address ] */ ;
          UNPACK
            string
-         /* [ @packed.unpacked option string : string
-            : pair bytes mutez bool key_hash timestamp address ] */ ;
+         /* [ option string : string : pair bytes mutez bool key_hash timestamp address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
          DUP
@@ -63,11 +59,10 @@ Gas remaining: 1039885.614 units remaining
          DIP { UNPAIR /* [ bytes : pair mutez bool key_hash timestamp address ] */ }
          /* [ bytes : bytes : pair mutez bool key_hash timestamp address ] */ ;
          PACK
-         /* [ @packed bytes : bytes : pair mutez bool key_hash timestamp address ] */ ;
+         /* [ bytes : bytes : pair mutez bool key_hash timestamp address ] */ ;
          UNPACK
            bytes
-         /* [ @packed.unpacked option bytes : bytes
-            : pair mutez bool key_hash timestamp address ] */ ;
+         /* [ option bytes : bytes : pair mutez bool key_hash timestamp address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
          DUP
@@ -78,11 +73,9 @@ Gas remaining: 1039885.614 units remaining
          DIP { UNPAIR /* [ mutez : pair bool key_hash timestamp address ] */ }
          /* [ mutez : mutez : pair bool key_hash timestamp address ] */ ;
          PACK
-         /* [ @packed bytes : mutez : pair bool key_hash timestamp address ] */ ;
-         UNPACK
-           mutez
-         /* [ @packed.unpacked option mutez : mutez
-            : pair bool key_hash timestamp address ] */ ;
+         /* [ bytes : mutez : pair bool key_hash timestamp address ] */ ;
+         UNPACK mutez
+         /* [ option mutez : mutez : pair bool key_hash timestamp address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
          DUP
@@ -93,10 +86,9 @@ Gas remaining: 1039885.614 units remaining
          DIP { UNPAIR /* [ bool : pair key_hash timestamp address ] */ }
          /* [ bool : bool : pair key_hash timestamp address ] */ ;
          PACK
-         /* [ @packed bytes : bool : pair key_hash timestamp address ] */ ;
-         UNPACK
-           bool
-         /* [ @packed.unpacked option bool : bool : pair key_hash timestamp address ] */ ;
+         /* [ bytes : bool : pair key_hash timestamp address ] */ ;
+         UNPACK bool
+         /* [ option bool : bool : pair key_hash timestamp address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
          DUP
@@ -106,10 +98,9 @@ Gas remaining: 1039885.614 units remaining
          DIP { UNPAIR /* [ key_hash : pair timestamp address ] */ }
          /* [ key_hash : key_hash : pair timestamp address ] */ ;
          PACK
-         /* [ @packed bytes : key_hash : pair timestamp address ] */ ;
-         UNPACK
-           key_hash
-         /* [ @packed.unpacked option key_hash : key_hash : pair timestamp address ] */ ;
+         /* [ bytes : key_hash : pair timestamp address ] */ ;
+         UNPACK key_hash
+         /* [ option key_hash : key_hash : pair timestamp address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
          DUP
@@ -119,49 +110,49 @@ Gas remaining: 1039885.614 units remaining
          DIP { UNPAIR /* [ timestamp : address ] */ }
          /* [ timestamp : timestamp : address ] */ ;
          PACK
-         /* [ @packed bytes : timestamp : address ] */ ;
+         /* [ bytes : timestamp : address ] */ ;
          UNPACK timestamp
-         /* [ @packed.unpacked option timestamp : timestamp : address ] */ ;
+         /* [ option timestamp : timestamp : address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
          DUP
          /* [ address : address ] */ ;
          PACK
-         /* [ @packed bytes : address ] */ ;
+         /* [ bytes : address ] */ ;
          UNPACK address
-         /* [ @packed.unpacked option address : address ] */ ;
+         /* [ option address : address ] */ ;
          ASSERT_SOME ;
          ASSERT_CMPEQ ;
          PUSH int 0
          /* [ int ] */ ;
          PACK
-         /* [ @packed bytes ] */ ;
+         /* [ bytes ] */ ;
          UNPACK nat
-         /* [ @packed.unpacked option nat ] */ ;
+         /* [ option nat ] */ ;
          ASSERT_SOME ;
          DROP
          /* [] */ ;
          PUSH int -1
          /* [ int ] */ ;
          PACK
-         /* [ @packed bytes ] */ ;
+         /* [ bytes ] */ ;
          UNPACK nat
-         /* [ @packed.unpacked option nat ] */ ;
+         /* [ option nat ] */ ;
          ASSERT_NONE ;
          PUSH bytes 0x
          /* [ bytes ] */ ;
          UNPACK nat
-         /* [ @unpacked option nat ] */ ;
+         /* [ option nat ] */ ;
          ASSERT_NONE ;
          PUSH bytes 0x04
          /* [ bytes ] */ ;
          UNPACK nat
-         /* [ @unpacked option nat ] */ ;
+         /* [ option nat ] */ ;
          ASSERT_NONE ;
          PUSH bytes 0x05
          /* [ bytes ] */ ;
          UNPACK nat
-         /* [ @unpacked option nat ] */ ;
+         /* [ option nat ] */ ;
          ASSERT_NONE ;
          UNIT
          /* [ unit ] */ ;

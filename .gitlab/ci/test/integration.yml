@@ -1,0 +1,139 @@
+# integration:proto:sandbox and integration:compiler-rejections do not
+# require access to the binaries like the "true" integration tests
+# below. Therefore, they do not extend the .integration_template.
+
+integration:proto:sandbox:
+  extends: .test_template
+  script:
+    - dune build @runtest_sandbox
+
+integration:compiler-rejections:
+  extends: .test_template
+  script:
+    - dune build @runtest_rejections
+
+############################################################
+## Stage: run scripts to check they are working properly  ##
+############################################################
+
+script:prepare_migration_test:
+  extends: .test_template
+  before_script:
+    - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
+    - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
+    - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
+    - make
+  script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - ./scripts/prepare_migration_test.sh manual "next_$new_proto_version" 1
+
+script:snapshot_alpha_and_link:
+  extends: .test_template
+  script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
+    - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
+    - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
+    - make tezos-protocol-compiler
+    - ./scripts/snapshot_alpha_and_link.sh "$new_proto_version" next
+    - make
+    - dune build src/proto_"$new_proto_version"_*/
+
+script:test-gen-genesis:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
+  stage: test
+  needs: []
+  before_script:
+    - cd scripts/gen-genesis
+  script:
+    - dune build gen_genesis.exe
+
+script:test_release_versions:
+  extends: .test_template
+  script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - ./scripts/test_release_version.sh
+
+############################################################
+## Stage: run OCaml integration tests                     ##
+############################################################
+
+integration:sandboxes:acc-endorsement:
+  extends: .integration_template
+  script:
+    - TMP=$PWD make -f sandbox.Makefile accusations_simple_double_endorsing
+  artifacts:
+    paths:
+      - flextesa-acc-sde
+      - $BISECT_FILE
+    expire_in: 1 day
+    when: always
+
+############################################################
+## Stage: run python integration tests                    ##
+############################################################
+
+# definition for the environment to run all integration tests
+# integration tests are run only on x86_64 architectures (for now)
+.integration_python_template:
+  extends:
+    - .test_template
+  needs:
+    - build_x86_64
+  dependencies:
+    - build_x86_64
+  before_script:
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+    - mkdir tests_python/tmp
+    - cd tests_python
+  # python scripts don't need the _build directory
+  # but only the binaries in the artifacts
+  cache: {}
+
+integration:static-binaries:
+  extends:
+    - .integration_python_template
+  allow_failure: true
+  needs:
+    - build:static-x86_64-linux-binaries
+  dependencies:
+    - build:static-x86_64-linux-binaries
+  script:
+    - sudo cp -a ../tezos-binaries/x86_64/* ../
+    - make -C ../ build-parameters
+    - poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
+
+integration:pytest:
+  extends:
+    - .integration_python_template
+    - .template__coverage_files
+  # the number of jobs have been choosen to give jobs of maximal
+  # length ~10 minutes and to accommodate the addition of new protocol
+  # test suites without increasing wall time of the test stage.
+  parallel: 25
+  script:
+    - poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800
+    - ../scripts/ci/merge_coverage.sh
+  artifacts:
+    paths:
+      - tests_python/tmp/
+      - tests_python/reports/*.xml
+      - $BISECT_FILE
+    reports:
+      junit: tests_python/reports/*.xml
+    expire_in: 7 day
+    when: always
+
+integration:pytest_examples:
+  extends: .integration_python_template
+  script:
+    - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
+    - PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py

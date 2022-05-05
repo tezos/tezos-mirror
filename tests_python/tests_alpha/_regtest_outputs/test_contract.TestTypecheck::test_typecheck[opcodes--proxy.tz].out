@@ -1,20 +1,20 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/proxy.tz]
 
 Well typed
-Gas remaining: 1039994.321 units remaining
+Gas remaining: 1039995.281 units remaining
 { parameter (contract unit) ;
   storage unit ;
   code { UNPAIR
-         /* [ @parameter contract unit : @storage unit ] */ ;
+         /* [ contract unit : unit ] */ ;
          AMOUNT
-         /* [ @amount mutez : @parameter contract unit : @storage unit ] */ ;
+         /* [ mutez : contract unit : unit ] */ ;
          UNIT
-         /* [ unit : @amount mutez : @parameter contract unit : @storage unit ] */ ;
+         /* [ unit : mutez : contract unit : unit ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : @storage unit ] */ ;
-         DIP { NIL operation /* [ list operation : @storage unit ] */ }
-         /* [ operation : list operation : @storage unit ] */ ;
+         /* [ operation : unit ] */ ;
+         DIP { NIL operation /* [ list operation : unit ] */ }
+         /* [ operation : list operation : unit ] */ ;
          CONS
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

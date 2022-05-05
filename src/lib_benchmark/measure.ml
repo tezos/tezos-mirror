@@ -352,9 +352,10 @@ let save :
         exit 1
     | Ok res -> res
   in
-  Lwt_main.run
-    ( Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
-    >>= fun _nwritten -> Lwt.return_unit )
+  let _nwritten =
+    Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
+  in
+  ()
 
 let load : filename:string -> packed_measurement =
  fun ~filename ->
@@ -365,31 +366,30 @@ let load : filename:string -> packed_measurement =
       err ;
     exit 1
   in
-  Lwt_main.run
-  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
-       Format.eprintf "Measure.load: loaded %s\n" filename ;
-       match
-         Data_encoding.Binary.of_string serialized_workload_encoding str
-       with
-       | Ok {bench_name; measurement_bytes} -> (
-           match Registration.find_benchmark bench_name with
-           | None ->
-               Format.eprintf
-                 "Measure.load: workload file requires unregistered benchmark \
-                  %s, aborting@."
-                 bench_name ;
-               exit 1
-           | Some bench -> (
-               match Benchmark.ex_unpack bench with
-               | Ex ((module Bench) as bench) -> (
-                   match
-                     Data_encoding.Binary.of_bytes
-                       (measurement_encoding Bench.workload_encoding)
-                       measurement_bytes
-                   with
-                   | Error err -> cant_load err
-                   | Ok m -> Lwt.return (Measurement (bench, m)))))
-       | Error err -> cant_load err )
+  let str =
+    Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file filename
+  in
+  Format.eprintf "Measure.load: loaded %s\n" filename ;
+  match Data_encoding.Binary.of_string serialized_workload_encoding str with
+  | Ok {bench_name; measurement_bytes} -> (
+      match Registration.find_benchmark bench_name with
+      | None ->
+          Format.eprintf
+            "Measure.load: workload file requires unregistered benchmark %s, \
+             aborting@."
+            bench_name ;
+          exit 1
+      | Some bench -> (
+          match Benchmark.ex_unpack bench with
+          | Ex ((module Bench) as bench) -> (
+              match
+                Data_encoding.Binary.of_bytes
+                  (measurement_encoding Bench.workload_encoding)
+                  measurement_bytes
+              with
+              | Error err -> cant_load err
+              | Ok m -> Measurement (bench, m))))
+  | Error err -> cant_load err
 
 let to_csv :
     type c t.

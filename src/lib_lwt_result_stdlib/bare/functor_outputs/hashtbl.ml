@@ -36,19 +36,21 @@ module type S = sig
 
   type !'a t
 
-  module Legacy : Stdlib.Hashtbl.S with type key = key and type 'a t = 'a t
-
   val create : int -> 'a t
 
   val clear : 'a t -> unit
 
   val reset : 'a t -> unit
 
+  val copy : 'a t -> 'a t
+
   val add : 'a t -> key -> 'a -> unit
 
   val remove : 'a t -> key -> unit
 
   val find : 'a t -> key -> 'a option
+
+  val find_opt : 'a t -> key -> 'a option
 
   val find_all : 'a t -> key -> 'a list
 
@@ -125,20 +127,21 @@ module type SeededS = sig
 
   type !'a t
 
-  module Legacy :
-    Stdlib.Hashtbl.SeededS with type key = key and type 'a t = 'a t
-
   val create : ?random:bool -> int -> 'a t
 
   val clear : 'a t -> unit
 
   val reset : 'a t -> unit
 
+  val copy : 'a t -> 'a t
+
   val add : 'a t -> key -> 'a -> unit
 
   val remove : 'a t -> key -> unit
 
   val find : 'a t -> key -> 'a option
+
+  val find_opt : 'a t -> key -> 'a option
 
   val find_all : 'a t -> key -> 'a list
 

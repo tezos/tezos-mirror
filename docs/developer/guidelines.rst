@@ -9,6 +9,8 @@ License
 The Tezos software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
 
 .. literalinclude:: LICENSE.ml
+   :language: ocaml
+
 
 Note that:
 
@@ -107,51 +109,85 @@ Interface (``.mli``) file comments:
 - Brief description of each module, type, function, data, as described for :ref:`comments in the code<in_code_comments>`
 - If applicable, external invariants (i.e., visible to the user).
 
+index.mld files
+---------------
+
+At the granularity of the library, you can optionally include an ``index.mld`` file.
+This file is used to generate the landing page for the online API of the library.
+If you do not include this file, the landing page is automatically generated and only includes a list of all top-level modules.
+
+An ``mld`` file is written in the `ocamldoc markup language <https://ocaml.org/manual/ocamldoc.html#s%3Aocamldoc-comments>`_.
+
+Because it is used for the online API of the library it should contain information that might be of interest to the users.
+This includes
+
+- A general introduction to the library.
+- Design decisions for the API.
+- Usage recommendations including the security model and assumptions.
+- Example uses.
+- Links to related documents (such as RFC and ISO standards).
+
+The file should also include a link to all of the modules that are intended entry-points for the users.
+You can include those with ``{!module:Foo}`` inline in an appropriate paragraph of the documentation.
+You can also include those with a dedicated block::
+
+  {!modules:
+  Foo
+  Bar
+  Blah
+  }
+
+.. warning::
+   When you add an ``index.mld`` file, don't forget to add a ``~documentation:[]`` parameter to the package's manifest which adds a documentation stanza in the corresponding dune file.
+   Otherwise, your ``index.mld`` file will be ignored by ``odoc`` and the API page will be the default one!
+
+
 README files
 ------------
 
-At coarser levels, source file directories should be documented by Markdown files called ``README.md``. Such files are mandatory in top-level directories of the Tezos codebase (such as ``src/`` and ``docs/``), and at least in immediate sub-directories of the source directory (``src/*/``).
+Also at the level of the library, you should include a ``README.md`` in `Markdown format <https://daringfireball.net/projects/markdown/>`_.
+Such files are mandatory in top-level directories of the Tezos codebase (such as ``src/`` and ``docs/``), and at least in immediate sub-directories of the source directory (``src/*/``).
+Because it is accessible only in the source tree, the file should contain information that might be of interest to the maintainers and contributors.
 
-Source directories must instantiate the following ``README.md`` template::
+You must instantiate the ``README.md`` file with the following template::
 
   # Component Name
   <!-- Summary line: One sentence about this component. -->
 
+  ## API Documentation
+  <!--
+  - Link to the external API.
+  -->
+
   ## Overview
   <!--
-  - Describe the purpose of this component and how the code in this directory
-    works. If needed, design rationale for its API.
+  - Describe the purpose of this component.
   - Describe the interaction of the code in this directory with the other
     components. This includes dependencies on other components, for instance.
-  - Describe the security model and assumptions about the crates in this
-    directory.
   -->
 
   ## Implementation Details
   <!--
-  - Describe how the component is modeled.
-  - Describe the code structure and implementation design rationale.
-  - Other relevant implementation details (e.g. global invariants).
-  - Testing specifics, if needed.
+  - Describe the file structure and the location of the main components.
+  - Other relevant implementation details (e.g., global invariants,
+    implementation design rationale, etc.).
+  - Testing specifics, build-system specifics, etc. as needed.
   -->
 
-  ## API Documentation
-  <!--
-  - Link to the external API.
-  - For the top-level source directory, link to the most important APIs within.
-  -->
-
-The rationale of this template is that a README file addresses two different kinds of developers:
-
-#. the users of the module, which are concerned only about the component
-   concepts and API, and not about its implementations details, and
-#. the developers and maintainers of the module, which are also concerned about
-   implementation details.
+The rationale of this template is that a README file addresses the developers
+that are not just using the library but also fixing or modifying it.
+To avoid duplication between the ``index.mld`` and ``README.md`` files, follow
+this simple rule-of-thumb: the ``index.mld`` contains information for the users
+(how to use the API) whereas the ``README.md`` file contains information for the
+maintainers (how are the files organised, are there any build-system quirks,
+etc.).
 
 When filling in the template, you should keep untouched the guidelines within
 HTML comments (which are visible to the document maintainers but invisible to
 end-users), so that any maintainer can check how well the README instantiates
 the template, and address any gap if needed.
+
+
 
 Logging Levels
 --------------
@@ -458,6 +494,120 @@ like the two examples below.
         "baz": 10
       }
     }
+
+
+Linting
+-------
+
+The OCaml part of Octez code is analysed by a linter. You can check more details
+in :src:`scripts/semgrep/README.md`. Below are explanations for the different
+rules that may trigger linting errors.
+
+.. _linting-list-lengths-comparison:
+
+Comparing the length of two lists
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects inefficient comparisons between two list lengths and suggests
+more efficient specialised functions.
+
+When comparing the lengths of two lists it might be tempting to compute the
+lengths and compare them. This seems the most straightforward approach.
+Unfortunately, this approach is costly. Specifically,
+``List.length xs > List.length ys`` is O(``length(xs)``+``length(ys)``) because
+each list is traversed in full.
+
+The OCaml ``Stdlib.List`` module provides the function
+``compare_lengths : 'a list -> 'b list -> int`` which traverses both lists at
+once, and only as much of it as is necessary to determine which is longer.
+Consequently, the cost of
+``List.compare_lengths xs ys`` is O(min(``length(xs)``, ``length(ys)``) because
+the function stops when it reaches the end of one list.
+
+The value returned by ``compare_lengths`` is compatible with the semantic of
+other comparison functions in the Stdlib. This means that the naive comparison
+``List.length xs > List.length ys`` can be rewritten more efficiently as
+``List.compare_lengths xs ys > 0`` (note the same comparison operator is used).
+
+In Octez, there is also ``Compare.List_lengths`` which provides infix operators
+to compare the lengths of two lists directly. The same example can be rewritten
+``Compare.List_lengths.(xs > ys)``.
+
+
+.. _linting-list-length-comparison:
+
+Comparing the length of a list to a constant
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects inefficient comparisons between a list length and a constant
+and suggests more efficient specialised functions.
+
+When comparing the length of a list to a constant it might be tempting to
+compute the length and compare it to the constant. This seems the most
+straightforward approach. Unfortunately, this approach is costly. Specifically,
+``List.length xs > k`` is O(``length(xs)``) because the expression traverses the
+entirety of ``xs``.
+
+The OCaml ``Stdlib.List`` module provides the function
+``compare_length_with : 'a list -> int -> int`` which only traverses as much of
+the list as is necessary to determine if it is longer than the constant. The
+cost of ``List.compare_length_with xs k`` is O(min(``length(xs)``, ``k``)
+because it stops when it reaches the end of ``xs`` or after traversing ``k``
+elements.
+
+The value returned by ``compare_length_with`` is compatible with the semantic of
+other comparison functions in the Stdlib. This means that the expression
+``List.length xs > k`` can be rewritten more efficiently as
+``List.compare_length_with xs k > 0`` (note the same comparison operator is
+used).
+
+In Octez, there is also ``Compare.List_length_with`` which provides infix
+operators to compare the length of a list to a constant directly. The same
+example can be written ``Compare.List_length_with.(xs > k)``.
+
+
+.. _linting-folding-over-a-promise:
+
+Folding over a promise or a result
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects difficult-to-read patterns of code wherein you traverse a
+list, with an Lwt promise or a result as accumulator.
+
+When folding over a list (using ``List.fold_left`` or ``List.fold_right``), the
+accumulator can be of any type. In particular, it can be an Lwt promise or a
+result, and the folding can perform some additional control-flow.
+
+This is valid code accepted by the compiler. But it often produces code which is
+difficult to read. For example, when folding over a promise, a small change can
+affect whether the traversal sequential (one element at a time) or concurrent
+(all elements treated at the same time).
+
+To make the code more readable, you should use the functions provided in the
+Octez support libraries. Specifically, the ``List`` module in Octez includes
+Lwt-, Result-, and Lwt-Result-specific variants of all the traversal functions
+(``map``, ``iter``, ``for_all``, ``exists``, etc.)
+
+Check the
+`online documentation for a full list of the content of the ``List`` module <https://tezos.gitlab.io/api/odoc/_html/tezos-base/Tezos_base/TzPervasives/List/index.html>`_.
+
+.. _chaining_concat_map:
+
+Chaining List.concat and List.map
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects compositions of ``List.concat`` and ``List.map`` that are
+suboptimal.
+
+The specialised ``List.concat_map`` function is equivalent to, but more
+efficient than, the composition of ``List.concat`` and ``List.map``. The
+specialised traversor is even tail-recursive.
+
+Lwtreslib provides additional combinators ``List.concat_map_s``,
+``List.concat_map_e``, and ``List.concat_map_es`` to replace the non-vanilla
+compositions.
+
+Check the `online documentation <https://tezos.gitlab.io/api/odoc/_html/tezos-lwt-result-stdlib/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`_.
 
 Coding conventions
 ------------------

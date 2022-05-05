@@ -1,21 +1,21 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/packunpack.tz]
 
 Well typed
-Gas remaining: 1039986.390 units remaining
+Gas remaining: 1039987.310 units remaining
 { parameter (pair (pair (pair string (list int)) (set nat)) bytes) ;
   storage unit ;
   code { CAR
-         /* [ @parameter pair (pair (pair string (list int)) (set nat)) bytes ] */ ;
+         /* [ pair (pair (pair string (list int)) (set nat)) bytes ] */ ;
          UNPAIR
          /* [ pair (pair string (list int)) (set nat) : bytes ] */ ;
          DIP { DUP /* [ bytes : bytes ] */ }
          /* [ pair (pair string (list int)) (set nat) : bytes : bytes ] */ ;
          PACK
-         /* [ @packed bytes : bytes : bytes ] */ ;
+         /* [ bytes : bytes : bytes ] */ ;
          ASSERT_CMPEQ ;
          UNPACK
            (pair (pair string (list int)) (set nat))
-         /* [ @unpacked option (pair (pair string (list int)) (set nat)) ] */ ;
+         /* [ option (pair (pair string (list int)) (set nat)) ] */ ;
          ASSERT_SOME ;
          DROP
          /* [] */ ;

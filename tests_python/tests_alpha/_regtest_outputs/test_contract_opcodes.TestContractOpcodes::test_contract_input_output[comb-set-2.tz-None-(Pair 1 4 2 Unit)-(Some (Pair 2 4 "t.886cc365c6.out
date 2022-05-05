@@ -7,30 +7,30 @@ emitted operations
 big_map diff
   
 trace
-  - location: 16 (remaining gas: 1039985.116 units remaining)
-    [ (Pair (Pair 1 4 2 Unit) None)  	 ]
-  - location: 16 (remaining gas: 1039985.106 units remaining)
-    [ (Pair 1 4 2 Unit)  	@parameter ]
-  - location: 17 (remaining gas: 1039985.096 units remaining)
-    [ 2  	
-      (Pair 1 4 2 Unit)  	@parameter ]
-  - location: 20 (remaining gas: 1039985.055 units remaining)
-    [ (Pair 2 4 2 Unit)  	 ]
-  - location: 22 (remaining gas: 1039985.045 units remaining)
-    [ "toto"  	
-      (Pair 2 4 2 Unit)  	 ]
-  - location: 25 (remaining gas: 1039984.999 units remaining)
-    [ (Pair 2 4 "toto" Unit)  	 ]
-  - location: 27 (remaining gas: 1039984.989 units remaining)
-    [ 0x01  	
-      (Pair 2 4 "toto" Unit)  	 ]
-  - location: 30 (remaining gas: 1039984.942 units remaining)
-    [ (Pair 2 4 "toto" 0x01)  	 ]
-  - location: 32 (remaining gas: 1039984.927 units remaining)
-    [ (Some (Pair 2 4 "toto" 0x01))  	 ]
-  - location: 33 (remaining gas: 1039984.912 units remaining)
-    [ {}  	
-      (Some (Pair 2 4 "toto" 0x01))  	 ]
-  - location: 35 (remaining gas: 1039984.897 units remaining)
-    [ (Pair {} (Some (Pair 2 4 "toto" 0x01)))  	 ]
+  - location: 16 (remaining gas: 1039986.841 units remaining)
+    [ (Pair (Pair 1 4 2 Unit) None) ]
+  - location: 16 (remaining gas: 1039986.831 units remaining)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 17 (remaining gas: 1039986.821 units remaining)
+    [ 2
+      (Pair 1 4 2 Unit) ]
+  - location: 20 (remaining gas: 1039986.800 units remaining)
+    [ (Pair 2 4 2 Unit) ]
+  - location: 22 (remaining gas: 1039986.790 units remaining)
+    [ "toto"
+      (Pair 2 4 2 Unit) ]
+  - location: 25 (remaining gas: 1039986.764 units remaining)
+    [ (Pair 2 4 "toto" Unit) ]
+  - location: 27 (remaining gas: 1039986.754 units remaining)
+    [ 0x01
+      (Pair 2 4 "toto" Unit) ]
+  - location: 30 (remaining gas: 1039986.727 units remaining)
+    [ (Pair 2 4 "toto" 0x01) ]
+  - location: 32 (remaining gas: 1039986.717 units remaining)
+    [ (Some (Pair 2 4 "toto" 0x01)) ]
+  - location: 33 (remaining gas: 1039986.707 units remaining)
+    [ {}
+      (Some (Pair 2 4 "toto" 0x01)) ]
+  - location: 35 (remaining gas: 1039986.697 units remaining)
+    [ (Pair {} (Some (Pair 2 4 "toto" 0x01))) ]
 

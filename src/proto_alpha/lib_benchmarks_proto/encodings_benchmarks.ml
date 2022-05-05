@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+module Size = Gas_input_size
 
 module Micheline_common = struct
   let make_printable node =
@@ -80,11 +81,13 @@ module Micheline_common = struct
   let workload_to_vector (workload : workload) =
     let keys =
       [
-        ("encoding_micheline_traversal", Size.to_float workload.size.traversal);
-        ("encoding_micheline_int_bytes", Size.to_float workload.size.int_bytes);
+        ( "encoding_micheline_traversal",
+          float_of_int (Size.to_int workload.size.traversal) );
+        ( "encoding_micheline_int_bytes",
+          float_of_int (Size.to_int workload.size.int_bytes) );
         ( "encoding_micheline_string_bytes",
-          Size.to_float workload.size.string_bytes );
-        ("encoding_micheline_bytes", Size.to_float workload.bytes);
+          float_of_int (Size.to_int workload.size.string_bytes) );
+        ("encoding_micheline_bytes", float_of_int (Size.to_int workload.bytes));
       ]
     in
     Sparse_vec.String.of_list keys
@@ -267,12 +270,10 @@ module Timestamp = struct
       ~generator:(fun rng_state ->
         let seconds_in_year = 30_000_000 in
         let offset = Random.State.int rng_state seconds_in_year in
-        Alpha_context.Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
+        Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
       ~make_bench:(fun generator () ->
         let tstamp_string = generator () in
-        let closure () =
-          ignore (Alpha_context.Script_timestamp.to_string tstamp_string)
-        in
+        let closure () = ignore (Script_timestamp.to_string tstamp_string) in
         Generator.Plain {workload = (); closure})
 
   let () =
@@ -285,19 +286,16 @@ module Timestamp = struct
         let seconds_in_year = 30_000_000 in
         let offset = Random.State.int rng_state seconds_in_year in
         let tstamp =
-          Alpha_context.Script_timestamp.of_zint
-            (Z.of_int (1597764116 + offset))
+          Script_timestamp.of_zint (Z.of_int (1597764116 + offset))
         in
-        Alpha_context.Script_timestamp.to_string tstamp)
+        Script_timestamp.to_string tstamp)
       ~make_bench:(fun generator () ->
         let tstamp_string = generator () in
-        let closure () =
-          ignore (Alpha_context.Script_timestamp.of_string tstamp_string)
-        in
+        let closure () = ignore (Script_timestamp.of_string tstamp_string) in
         Generator.Plain {workload = (); closure})
 end
 
-(* when benchmarking, compile bls12-381-unix without ADX, see
+(* when benchmarking, compile bls12-381 without ADX, see
    https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
 *)
 module BLS = struct

@@ -31,6 +31,9 @@
     choose default process names. *)
 val declare_reset_function : (unit -> unit) -> unit
 
+(** Add a function to be called by [Test.run] before it does anything. *)
+val before_test_run : (unit -> unit) -> unit
+
 (** Log an error and stop the test right here.
 
     If the optional location [__LOC__] is provided,
@@ -84,3 +87,13 @@ val register :
     This will check command-line options and run the tests that have been selected,
     or display the list of tests. *)
 val run : unit -> unit
+
+(** Get the current worker id.
+
+    In single-process mode (with [-j 1]), this always returns [None].
+
+    In multi-process mode, this returns either:
+    - [None] (if called in the scheduler process, i.e. outside of a test);
+    - or [Some id] where [0 <= id < Cli.options.job_count] and where [id]
+      uniquely identifies the current worker process that is running the current test. *)
+val current_worker_id : unit -> int option

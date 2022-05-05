@@ -32,6 +32,7 @@ You may also want to fix some typos and minor errors or incoherencies in the *do
 This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
 This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
 Of course, all these commits will be reviewed before being integrated.
+The current edition of the typo train MR can be found in meta-issue :gl:`#2329`.
 
 To directly contribute to the *codebase*, expertise in a few areas is necessary.
 
@@ -97,43 +98,54 @@ This Git strategy is a variant of the `git rebase workflow <https://www.atlassia
 Workflow of an MR
 -----------------
 
-This section presents a global view of our MR workflow. Details about the
-individual steps in this workflow are described in the following sections.
+This section presents a global view of our MR workflow. Details about
+the individual steps in this workflow are described in the following
+sections.
 
 Our code review process uses GitLab. First a developer creates a new
-branch for :ref:`preparing the MR <preparing_MR>`.
-As this is a private new branch, the developer is free to
-rebase, squash commits, rewrite history (``git push --force``), etc. at will.
+branch for :ref:`preparing the MR <preparing_MR>`.  As this is a
+private new branch, the developer is free to rebase, squash commits,
+rewrite history (``git push --force``), etc. at will.
 
-Once the code is ready to be shared with the rest of the team, the developer
-:ref:`opens a Merge Request <creating_MR>`.
-It is useful to explain why the MR is created, to
-add a precise description of the code
-changes, and to check if those are in line with the initial
-requirements (if responding to an issue), or to the stated reasons (otherwise).
-Dependencies on other merge requests, other relationships to MRs, to
-issues, etc, should also be mentioned.
+Once the code is ready to be shared with the rest of the team, the
+developer :ref:`opens a Merge Request <creating_MR>`.  It is useful to
+explain why the MR is created, to add a precise description of the
+code changes, and to check if those are in line with the initial
+requirements (if responding to an issue), or to the stated reasons
+(otherwise).  Dependencies on other merge requests, other
+relationships to MRs, to issues, etc, should also be mentioned.
 
-While the code is still not ready to be peer reviewed, but it is merely a
-work in progress, the developer prefixes the MR with ``Draft:``. This will tell everybody
-they can look at the code, comment, but there is still work to be done and the
-branch can change and history be rewritten.
+While the code is still not ready to be peer reviewed, but it is
+merely a work in progress, the developer prefixes the MR with
+``Draft:`` and assigns it to themselves.  This will tell everybody
+they can look at the code, comment, but there is still work to be done
+and the branch can change and history be rewritten. Alternatively, the
+MR title can be prefixed with ``WIP:``.  ``Draft:`` prefix is
+sometimes set automatically by GitLab, so ``WIP:`` is in a sense less
+ambiguous.
 
-Finally, when the code is ready for the :ref:`code review <code_review>`, the developer removes the Draft status of the
-MR and freezes the branch. From this moment on, the developer will refrain to
-rewrite history, but he/she can add new commits and rebase the branch for
-syncing it with master (this can be done regularly to make sure the branch does
-not get stale). At this point the developer interacts with the reviewers to
-address their comments and suggestions.
+Finally, when the code is ready for the :ref:`code review
+<code_review>`, the developer removes the Draft status (or ``WIP:``
+prefix) of the MR and freezes the branch. From this moment on, the
+developer will refrain from rewriting history, but he/she can add new
+commits and rebase the branch for syncing it with master (this can be
+done regularly to make sure the branch does not get stale). At this
+point the developer interacts with the reviewers to address their
+comments and suggestions.
 
-GitLab allows both to comment on the code and to add general comments on the
-MR.  Each comment should be addressed by the developer. He/she can add
-additional commits to address each comment. This incremental approach will make
-it easier for the reviewer to keep interacting till each discussion is
-resolved. When the reviewer is satisfied, he/she will mark the discussion resolved.
+GitLab allows both to comment on the code and to add general comments
+on the MR.  Each comment should be addressed by the developer. He/she
+can add additional commits to address each comment. This incremental
+approach will make it easier for the reviewer to keep interacting till
+each discussion is resolved. When the reviewer is satisfied, he/she
+will mark the discussion resolved.
 
-When all discussions are resolved, you should squash any fix-up commits that were applied (don't forget to edit the commit message appropriately).
-Then, the reviewer will rebase the branch and merge the MR in the master branch.
+When all discussions are resolved, and the MR has got at least two
+approvals from Octez Merge Team members, the developer should squash
+any fix-up commits that were applied (remembering to edit the commit
+message appropriately). Then anyone can assign the MR to the `Nomadic
+Margebot <https://gitlab.com/nomadic-margebot>`__, which will
+automatically rebase the branch on top of master and finally merge it.
 
 .. _preparing_MR:
 
@@ -199,6 +211,10 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    corresponding README files.
 -  For parts that have specifications in the repository (e.g., Michelson),
    make sure to keep them in sync with the implementation.
+-  If your contribution has an impact on users, e.g. if it fixes a bug,
+   adds a new feature, changes an RPC or the command-line interface,
+   add an item to the changelog in the :src:`CHANGES.rst` file located
+   at the root of the repository.
 
 .. _creating_MR:
 
@@ -354,7 +370,7 @@ must be mitigated as follows:
 - Have the entire piece of work described or done somewhere. For example in
   an issue, or a branch containing the entire change, or a
   large (unsplit) work as a draft merge request.
-  For complex works, an external document may be referred in the issue/MR, detailing the design/implementation rationale; if such documents are only targeted to reviewers and/or are only describing a *change*, they should not go in the online documentation. 
+  For complex works, an external document may be referred in the issue/MR, detailing the design/implementation rationale; if such documents are only targeted to reviewers and/or are only describing a *change*, they should not go in the online documentation.
 - Include a link to the entire piece of work in the description of each
   small merge requests created by splitting the large piece of work.
   This will help reviewers get the big picture.
@@ -409,7 +425,7 @@ To find reviewers, either:
   - Look at authors of the code you are modifying using
     `git blame <https://git-scm.com/docs/git-blame>`_.
   - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
-    by asking him/here on Slack or mentioning them in a comment (see next paragraph).
+    by asking him/her on Slack or mentioning them in a comment (see next paragraph).
 
 Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
 you may or may not be able to use the *Reviewers* field for specifying
@@ -425,10 +441,29 @@ Merge Request "Draft" Mode
 A merge request that is not yet ready for review should be marked
 as `draft <https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
 by prefixing its title with ``Draft:``.
-On ``tezos/tezos`` draft merge requests are ignored by reviewers.
+On ``tezos/tezos`` draft merge requests that are assigned to their owners
+are ignored by reviewers.
 Marking merge requests as draft hence helps lower
 the number of merge requests that require attention from the
 :doc:`Octez merge team<merge_team>`.
+
+Merge Request's owner
+~~~~~~~~~~~~~~~~~~~~~
+
+Usually the person who has created a Merge Request is also responsible for
+pushing it forward: finding reviewers, addressing their comments and so on.
+Occasionally though it happens that the author has to move to more pressing
+tasks and hands his MR over to another person to finish. This is a problem,
+because an MR assigned to its author has sort of a special status – it
+informs everyone that the branch is likely to change at any moment. When an
+MR is handed over, we lose that important information.
+
+For this reason, when take-over happens, it's useful to make that explicit.
+The person taking over should put a comment informing about this so that
+everyone knows that the person attending to the MR changes. Also the
+description should be updated to reflect that information. It is suggested to
+prefix the description with a line specifying the MR's owner if that's
+different to the author indicated by GitLab.
 
 .. _adding_new_dependencies:
 

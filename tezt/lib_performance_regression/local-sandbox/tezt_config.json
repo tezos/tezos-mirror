@@ -1,0 +1,14 @@
+{
+    "influxdb": {
+        "url": "http://localhost:8086",
+        "database": "performance_regression",
+        "measurement_prefix": "",
+        "timeout": 20
+    },
+    "grafana": {
+        "url": "http://localhost:3000/api",
+        "data_source": "InfluxDB",
+        "timeout": 20
+    },
+    "test_data_path" : "/path/to/your/folder"
+}

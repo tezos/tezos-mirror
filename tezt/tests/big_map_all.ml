@@ -61,7 +61,7 @@ let all_values = List.init big_map_size Fun.id
 let any_in_range_inclusive min max = Random.int (max + 1 - min) + min
 
 let rpc_big_map_get_all ?offset ?length client =
-  let* json = RPC.Big_maps.get_all ~big_map_id:"4" ?offset ?length client in
+  let*! json = RPC.Big_maps.get_all ~big_map_id:"4" ?offset ?length client in
   Lwt.return
     (json |> JSON.as_list
     |> List.map (fun elem ->
@@ -165,8 +165,10 @@ let test_2_pivots actual_all_values client =
 
 let test_invalid_input_fail client =
   let must_fail ?offset ?length () =
-    RPC.Big_maps.spawn_get_all ~big_map_id:"0" ?offset ?length client
-    |> Process.check ~expect_failure:true
+    let*? process =
+      RPC.Big_maps.get_all ~big_map_id:"0" ?offset ?length client
+    in
+    Process.check ~expect_failure:true process
   in
   let* _ = must_fail ?offset:None ~length:(-1) () in
   let* _ = must_fail ~offset:(-1) ?length:None () in

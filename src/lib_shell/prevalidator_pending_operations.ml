@@ -49,8 +49,8 @@ module Priority_map : Map.S with type key = priority = Map.Make (struct
     | (`Medium, `Low _) -> -1
 end)
 
-module Set = Operation_hash.Set
 module Map = Operation_hash.Map
+module Sized_set = Tezos_base.Sized.MakeSizedSet (Operation_hash.Set)
 
 (*
    The type below is used for representing pending operations data of the
@@ -63,20 +63,24 @@ module Map = Operation_hash.Map
 *)
 type 'a t = {
   (* The main map *)
-  pending : 'a Prevalidation.operation Operation_hash.Map.t Priority_map.t;
+  pending : 'a Prevalidation.operation Map.t Priority_map.t;
   (* Used for advertising *)
-  hashes : Operation_hash.Set.t;
+  hashes : Sized_set.t;
   (* We need to remember the priority of each hash, to be used when removing
      without providing the priority *)
-  priority_of : priority Operation_hash.Map.t;
+  priority_of : priority Map.t;
 }
 
 let empty =
-  {pending = Priority_map.empty; hashes = Set.empty; priority_of = Map.empty}
+  {
+    pending = Priority_map.empty;
+    hashes = Sized_set.empty;
+    priority_of = Map.empty;
+  }
 
-let is_empty {pending = _; priority_of = _; hashes} = Set.is_empty hashes
+let is_empty {pending = _; priority_of = _; hashes} = Sized_set.is_empty hashes
 
-let hashes {pending = _; priority_of = _; hashes} = hashes
+let hashes {pending = _; priority_of = _; hashes} = Sized_set.to_set hashes
 
 let operations {pending; priority_of = _; hashes = _} =
   (* Build a flag map [oph -> op] from pending. Needed when re-cycling
@@ -86,7 +90,7 @@ let operations {pending; priority_of = _; hashes = _} =
     pending
     Map.empty
 
-let mem oph {hashes; priority_of = _; pending = _} = Set.mem oph hashes
+let mem oph {hashes; priority_of = _; pending = _} = Sized_set.mem oph hashes
 
 let get_priority_map prio pending =
   match Priority_map.find prio pending with None -> Map.empty | Some mp -> mp
@@ -96,7 +100,7 @@ let add op prio {pending; hashes; priority_of} =
   let mp = get_priority_map prio pending |> Map.add oph op in
   {
     pending = Priority_map.add prio mp pending;
-    hashes = Set.add oph hashes;
+    hashes = Sized_set.add oph hashes;
     priority_of = Map.add oph prio priority_of;
   }
 
@@ -109,11 +113,11 @@ let remove oph ({pending; hashes; priority_of} as t) =
         pending =
           (if Map.is_empty mp then Priority_map.remove prio pending
           else Priority_map.add prio mp pending);
-        hashes = Set.remove oph hashes;
+        hashes = Sized_set.remove oph hashes;
         priority_of = Map.remove oph priority_of;
       }
 
-let cardinal {pending = _; hashes; priority_of = _} = Set.cardinal hashes
+let cardinal {pending = _; hashes; priority_of = _} = Sized_set.cardinal hashes
 
 let fold_es f {pending; hashes = _; priority_of = _} acc =
   Priority_map.fold_es

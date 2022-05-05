@@ -43,23 +43,23 @@ let get_proposals ctxt =
         ( acc >|? fun acc ->
           let previous =
             match Protocol_hash.Map.find proposal acc with
-            | None -> 0l
+            | None -> 0L
             | Some x -> x
           in
-          Protocol_hash.Map.add proposal (Int32.add weight previous) acc ))
+          Protocol_hash.Map.add proposal (Int64.add weight previous) acc ))
 
 let clear_proposals ctxt =
   Storage.Vote.Proposals_count.clear ctxt >>= fun ctxt ->
   Storage.Vote.Proposals.clear ctxt
 
-type ballots = {yay : int32; nay : int32; pass : int32}
+type ballots = {yay : int64; nay : int64; pass : int64}
 
 let ballots_encoding =
   let open Data_encoding in
   conv
     (fun {yay; nay; pass} -> (yay, nay, pass))
     (fun (yay, nay, pass) -> {yay; nay; pass})
-  @@ obj3 (req "yay" int32) (req "nay" int32) (req "pass" int32)
+  @@ obj3 (req "yay" int64) (req "nay" int64) (req "pass" int64)
 
 let has_recorded_ballot = Storage.Vote.Ballots.mem
 
@@ -72,14 +72,14 @@ let get_ballots ctxt =
     ~f:(fun delegate ballot (ballots : ballots tzresult) ->
       (* Assuming the same listings is used at votings *)
       Storage.Vote.Listings.get ctxt delegate >>=? fun weight ->
-      let count = Int32.add weight in
+      let count = Int64.add weight in
       Lwt.return
         ( ballots >|? fun ballots ->
           match ballot with
           | Yay -> {ballots with yay = count ballots.yay}
           | Nay -> {ballots with nay = count ballots.nay}
           | Pass -> {ballots with pass = count ballots.pass} ))
-    ~init:(ok {yay = 0l; nay = 0l; pass = 0l})
+    ~init:(ok {yay = 0L; nay = 0L; pass = 0L})
 
 let get_ballot_list = Storage.Vote.Ballots.bindings
 
@@ -88,34 +88,120 @@ let clear_ballots = Storage.Vote.Ballots.clear
 let listings_encoding =
   Data_encoding.(
     list
-      (obj2 (req "pkh" Signature.Public_key_hash.encoding) (req "rolls" int32)))
+      (obj2
+         (req "pkh" Signature.Public_key_hash.encoding)
+         (req "voting_power" int64)))
 
 let update_listings ctxt =
   Storage.Vote.Listings.clear ctxt >>= fun ctxt ->
-  let tokens_per_roll =
-    Tez_repr.to_mutez (Constants_storage.tokens_per_roll ctxt)
-  in
   Stake_storage.fold
     ctxt
-    (ctxt, 0l)
+    (ctxt, 0L)
     ~order:`Sorted
     ~f:(fun (delegate, stake) (ctxt, total) ->
-      let nb_rolls =
-        Int64.to_int32 @@ Int64.div (Tez_repr.to_mutez stake) tokens_per_roll
-      in
-      Storage.Vote.Listings.init ctxt delegate nb_rolls >|=? fun ctxt ->
-      (ctxt, Int32.add total nb_rolls))
+      let weight = Tez_repr.to_mutez stake in
+      Storage.Vote.Listings.init ctxt delegate weight >>=? fun ctxt ->
+      return (ctxt, Int64.add total weight))
   >>=? fun (ctxt, total) ->
-  Storage.Vote.Listings_size.add ctxt total >>= fun ctxt -> return ctxt
+  Storage.Vote.Voting_power_in_listings.add ctxt total >>= fun ctxt ->
+  return ctxt
 
-let listing_size = Storage.Vote.Listings_size.get
+type delegate_info = {
+  voting_power : Int64.t option;
+  current_ballot : Vote_repr.ballot option;
+  current_proposals : Protocol_hash.t list;
+  remaining_proposals : int;
+}
+
+let pp_delegate_info ppf info =
+  match info.voting_power with
+  | None -> Format.fprintf ppf "Voting power: none"
+  | Some p -> (
+      Format.fprintf
+        ppf
+        "Voting power: %a"
+        Tez_repr.pp
+        (Tez_repr.of_mutez_exn p) ;
+      (match info.current_ballot with
+      | None -> ()
+      | Some ballot ->
+          Format.fprintf ppf "@,Current ballot: %a" Vote_repr.pp_ballot ballot) ;
+      match info.current_proposals with
+      | [] ->
+          if Compare.Int.(info.remaining_proposals <> 0) then
+            Format.fprintf
+              ppf
+              "@,Remaining proposals: %d"
+              info.remaining_proposals
+      | proposals ->
+          Format.fprintf ppf "@,@[<v 2>Current proposals:" ;
+          List.iter
+            (fun p -> Format.fprintf ppf "@,- %a" Protocol_hash.pp p)
+            proposals ;
+          Format.fprintf ppf "@]" ;
+          Format.fprintf
+            ppf
+            "@,Remaining proposals: %d"
+            info.remaining_proposals)
+
+let delegate_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {voting_power; current_ballot; current_proposals; remaining_proposals} ->
+      (voting_power, current_ballot, current_proposals, remaining_proposals))
+    (fun (voting_power, current_ballot, current_proposals, remaining_proposals) ->
+      {voting_power; current_ballot; current_proposals; remaining_proposals})
+    (obj4
+       (opt "voting_power" int64)
+       (opt "current_ballot" Vote_repr.ballot_encoding)
+       (dft "current_proposals" (list Protocol_hash.encoding) [])
+       (dft "remaining_proposals" int31 0))
 
 let in_listings = Storage.Vote.Listings.mem
 
 let get_listings = Storage.Vote.Listings.bindings
 
+let get_delegate_info ctxt delegate =
+  Storage.Vote.Listings.find ctxt delegate >>=? fun voting_power ->
+  match voting_power with
+  | None ->
+      return
+        {
+          voting_power;
+          current_proposals = [];
+          current_ballot = None;
+          remaining_proposals = 0;
+        }
+  | Some _ ->
+      Voting_period_storage.get_current_kind ctxt >>=? fun period ->
+      (match period with
+      | Exploration | Promotion -> Storage.Vote.Ballots.find ctxt delegate
+      | Proposal | Cooldown | Adoption -> return None)
+      >>=? fun current_ballot ->
+      (match period with
+      | Exploration | Promotion | Cooldown | Adoption -> Lwt.return []
+      | Proposal ->
+          Storage.Vote.Proposals.fold
+            ctxt
+            ~order:`Undefined
+            ~init:[]
+            ~f:(fun (h, d) acc ->
+              if Signature.Public_key_hash.equal d delegate then
+                Lwt.return (h :: acc)
+              else Lwt.return acc))
+      >>= fun current_proposals ->
+      let remaining_proposals =
+        match period with
+        | Proposal ->
+            Constants_repr.max_proposals_per_delegate
+            - List.length current_proposals
+        | _ -> 0
+      in
+      return
+        {voting_power; current_ballot; current_proposals; remaining_proposals}
+
 let get_voting_power_free ctxt owner =
-  Storage.Vote.Listings.find ctxt owner >|=? Option.value ~default:0l
+  Storage.Vote.Listings.find ctxt owner >|=? Option.value ~default:0L
 
 (* This function bypasses the carbonated functors to account for gas consumption.
    This is a temporary situation intended to be fixed by adding the right
@@ -123,22 +209,22 @@ let get_voting_power_free ctxt owner =
 let get_voting_power ctxt owner =
   let open Raw_context in
   (* Always consume read access to memory *)
-  (* Accessing an int32 at /votes/listings/<KeyKind>/<hash> *)
-  consume_gas ctxt (Storage_costs.read_access ~path_length:4 ~read_bytes:4)
+  (* Accessing an int64 at /votes/listings/<KeyKind>/<hash> *)
+  consume_gas ctxt (Storage_costs.read_access ~path_length:4 ~read_bytes:8)
   >>?= fun ctxt ->
   Storage.Vote.Listings.find ctxt owner >|=? function
-  | None -> (ctxt, 0l)
+  | None -> (ctxt, 0L)
   | Some power -> (ctxt, power)
 
-let get_total_voting_power_free = listing_size
+let get_total_voting_power_free = Storage.Vote.Voting_power_in_listings.get
 
 (* This function bypasses the carbonated functors to account for gas consumption.
    This is a temporary situation intended to be fixed by adding the right
    carbonated functors in a future amendment *)
 let get_total_voting_power ctxt =
   let open Raw_context in
-  (* Accessing an int32 at /votes/listings_size *)
-  consume_gas ctxt (Storage_costs.read_access ~path_length:2 ~read_bytes:4)
+  (* Accessing an int64 at /votes/total_voting_power *)
+  consume_gas ctxt (Storage_costs.read_access ~path_length:2 ~read_bytes:8)
   >>?= fun ctxt ->
   get_total_voting_power_free ctxt >|=? fun total_voting_power ->
   (ctxt, total_voting_power)

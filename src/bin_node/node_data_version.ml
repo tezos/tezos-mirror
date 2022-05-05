@@ -51,8 +51,9 @@ let version_file_name = "version.json"
  *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2)
  *  - 0.0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
  *  - 0.0.6 : store upgrade (switching from LMDB)
- *  - 0.0.7 : new store metadata representation *)
-let data_version = "0.0.7"
+ *  - 0.0.7 : new store metadata representation
+ *  - 0.0.8 : context upgrade (upgrade to irmin.3.0) *)
+let data_version = "0.0.8"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -60,8 +61,11 @@ let data_version = "0.0.7"
    converter), and to sequence them dynamically instead of
    statically. *)
 let upgradable_data_version =
+  let open Lwt_result_syntax in
   [
     ( "0.0.6",
+      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
+    ( "0.0.7",
       fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
   ]
 
@@ -241,86 +245,110 @@ let write_version_file data_dir =
   |> trace (Could_not_write_version_file version_file)
 
 let read_version_file version_file =
-  Lwt_utils_unix.Json.read_file version_file
-  |> trace (Could_not_read_data_dir_version version_file)
-  >>=? fun json ->
+  let open Lwt_result_syntax in
+  let* json =
+    trace
+      (Could_not_read_data_dir_version version_file)
+      (Lwt_utils_unix.Json.read_file version_file)
+  in
   try return (Data_encoding.Json.destruct version_encoding json)
   with
   | Data_encoding.Json.Cannot_destruct _ | Data_encoding.Json.Unexpected _
   | Data_encoding.Json.No_case_matched _ | Data_encoding.Json.Bad_array_size _
   | Data_encoding.Json.Missing_field _ | Data_encoding.Json.Unexpected_field _
   ->
-    fail (Could_not_read_data_dir_version version_file)
+    tzfail (Could_not_read_data_dir_version version_file)
 
 let check_data_dir_version files data_dir =
+  let open Lwt_result_syntax in
   let version_file = version_file data_dir in
-  Lwt_unix.file_exists version_file >>= function
-  | false ->
-      let msg = Some (clean_directory files) in
-      fail (Invalid_data_dir {data_dir; msg})
-  | true -> (
-      read_version_file version_file >>=? fun version ->
-      if String.equal version data_version then return_none
-      else
-        match
-          List.find_opt
-            (fun (v, _) -> String.equal v version)
-            upgradable_data_version
-        with
-        | Some f -> return_some f
-        | None -> fail (Invalid_data_dir_version (data_version, version)))
+  let*! file_exists = Lwt_unix.file_exists version_file in
+  if not file_exists then
+    let msg = Some (clean_directory files) in
+    tzfail (Invalid_data_dir {data_dir; msg})
+  else
+    let* version = read_version_file version_file in
+    if String.equal version data_version then return_none
+    else
+      match
+        List.find_opt
+          (fun (v, _) -> String.equal v version)
+          upgradable_data_version
+      with
+      | Some f -> return_some f
+      | None -> tzfail (Invalid_data_dir_version (data_version, version))
 
 let ensure_data_dir bare data_dir =
+  let open Lwt_result_syntax in
   let write_version () =
-    write_version_file data_dir >>=? fun () -> return_none
+    let* () = write_version_file data_dir in
+    return_none
   in
   Lwt.catch
     (fun () ->
-      Lwt_unix.file_exists data_dir >>= function
-      | true -> (
+      let*! file_exists = Lwt_unix.file_exists data_dir in
+      if file_exists then
+        let*! files =
           Lwt_stream.to_list (Lwt_unix.files_of_directory data_dir)
-          >|= List.filter (fun s ->
-                  s <> "." && s <> ".." && s <> version_file_name
-                  && s <> default_identity_file_name
-                  && s <> default_config_file_name
-                  && s <> default_peers_file_name)
-          >>= function
-          | [] -> write_version ()
-          | files when bare ->
-              let msg = Some (clean_directory files) in
-              fail (Invalid_data_dir {data_dir; msg})
-          | files -> check_data_dir_version files data_dir)
-      | false ->
-          Lwt_utils_unix.create_dir ~perm:0o700 data_dir >>= fun () ->
-          write_version ())
+        in
+        let files =
+          List.filter
+            (fun s ->
+              s <> "." && s <> ".." && s <> version_file_name
+              && s <> default_identity_file_name
+              && s <> default_config_file_name
+              && s <> default_peers_file_name)
+            files
+        in
+        match files with
+        | [] -> write_version ()
+        | files when bare ->
+            let msg = Some (clean_directory files) in
+            tzfail (Invalid_data_dir {data_dir; msg})
+        | files -> check_data_dir_version files data_dir
+      else
+        let*! () = Lwt_utils_unix.create_dir ~perm:0o700 data_dir in
+        write_version ())
     (function
-      | Unix.Unix_error _ -> fail (Invalid_data_dir {data_dir; msg = None})
+      | Unix.Unix_error _ -> tzfail (Invalid_data_dir {data_dir; msg = None})
       | exc -> raise exc)
 
 let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
-  ensure_data_dir false data_dir >>=? function
-  | None -> Events.(emit dir_is_up_to_date ()) >>= return
+  let open Lwt_result_syntax in
+  let* o = ensure_data_dir false data_dir in
+  match o with
+  | None ->
+      let*! () = Events.(emit dir_is_up_to_date ()) in
+      return_unit
   | Some (version, upgrade) -> (
-      Events.(emit upgrading_node (version, data_version)) >>= fun () ->
-      upgrade ~data_dir genesis ~chain_name ~sandbox_parameters >>= function
+      let*! () = Events.(emit upgrading_node (version, data_version)) in
+      let*! r = upgrade ~data_dir genesis ~chain_name ~sandbox_parameters in
+      match r with
       | Ok _success_message ->
-          write_version_file data_dir >>=? fun () ->
-          Events.(emit update_success ()) >>= fun () -> return_unit
+          let* () = write_version_file data_dir in
+          let*! () = Events.(emit update_success ()) in
+          return_unit
       | Error e ->
-          Events.(emit aborting_upgrade e) >>= fun () -> Lwt.return (Error e))
+          let*! () = Events.(emit aborting_upgrade e) in
+          Lwt.return (Error e))
 
 let ensure_data_dir ?(bare = false) data_dir =
-  ensure_data_dir bare data_dir >>=? function
+  let open Lwt_result_syntax in
+  let* o = ensure_data_dir bare data_dir in
+  match o with
   | None -> return_unit
-  (* Here, we enable the automatic upgrade from "0.0.6" to
-     "0.0.7". This should be removed as soon as the "0.0.7" version or
+  (* Here, we enable the automatic upgrade from "0.0.6" and "0.0.7" to
+     "0.0.8". This should be removed as soon as the "0.0.8" version or
      above is mandatory. *)
-  | Some ("0.0.6", _upgrade) ->
+  | Some (v, _upgrade) when String.(equal "0.0.6" v) || String.(equal "0.0.7" v)
+    ->
       upgrade_data_dir ~data_dir () ~chain_name:() ~sandbox_parameters:()
   | Some (version, _) ->
-      fail (Data_dir_needs_upgrade {expected = data_version; actual = version})
+      tzfail
+        (Data_dir_needs_upgrade {expected = data_version; actual = version})
 
 let upgrade_status data_dir =
-  read_version_file (version_file data_dir) >>=? fun data_dir_version ->
-  Events.(emit upgrade_status (data_dir_version, data_version)) >>= fun () ->
+  let open Lwt_result_syntax in
+  let* data_dir_version = read_version_file (version_file data_dir) in
+  let*! () = Events.(emit upgrade_status (data_dir_version, data_version)) in
   return_unit

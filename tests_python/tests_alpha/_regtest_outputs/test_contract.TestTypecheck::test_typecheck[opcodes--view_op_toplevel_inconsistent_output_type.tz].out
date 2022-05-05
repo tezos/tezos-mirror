@@ -1,15 +1,15 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_op_toplevel_inconsistent_output_type.tz]
 
 Well typed
-Gas remaining: 1039993.119 units remaining
+Gas remaining: 1039993.919 units remaining
 { parameter (pair nat address) ;
   storage bool ;
   code { CAR
-         /* [ @parameter pair nat address ] */ ;
+         /* [ pair nat address ] */ ;
          UNPAIR
          /* [ nat : address ] */ ;
          VIEW "add" bool
-         /* [ @contract option bool ] */ ;
+         /* [ option bool ] */ ;
          IF_SOME
            { DROP /* [] */ ; PUSH bool True /* [ bool ] */ }
            { PUSH bool False /* [ bool ] */ } ;

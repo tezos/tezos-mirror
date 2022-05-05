@@ -34,11 +34,11 @@ Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Hangzhounet::
+option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Ithacanet::
 
-  tezos-node config init --data-dir ~/tezos-hangzhounet --network hangzhounet
-  tezos-node identity generate --data-dir ~/tezos-hangzhounet
-  tezos-node run --data-dir ~/tezos-hangzhounet
+  tezos-node config init --data-dir ~/tezos-ithacanet --network ithacanet
+  tezos-node identity generate --data-dir ~/tezos-ithacanet
+  tezos-node run --data-dir ~/tezos-ithacanet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -56,21 +56,21 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``hangzhounet`` (available from version 11.0~rc2)
-
 - ``ithacanet`` (available from version 12.0~rc1 but 12.0~rc2 updated
   it to refer to the second version of Ithacanet which runs
   ``Psithaca2`` instead of ``PsiThaCa``)
+
+- ``jakartanet`` (available from version 13.0)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``tezos-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
-it runs on Hangzhounet::
+it runs on Ithacanet::
 
-  tezos-node run --data-dir ~/tezos-hangzhounet --network hangzhounet
+  tezos-node run --data-dir ~/tezos-ithacanet --network ithacanet
 
-This command will fail with an error if the configured network is not Hangzhounet.
+This command will fail with an error if the configured network is not Ithacanet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
 Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
 
@@ -203,11 +203,11 @@ Alias Versus Explicit Configuration
 
 If you use one of the `Built-In Networks`_, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
-to connect to Hangzhounet, it will contain something like::
+to connect to Ithacanet, it will contain something like::
 
   {
     "p2p": {},
-    "network": "hangzhounet"
+    "network": "ithacanet"
   }
 
 For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
@@ -219,7 +219,7 @@ overrides may be added. Because the configuration file only contains the name
 of the network and not its parameters, it will automatically use the updated values.
 
 However, if you configure `Custom Networks`_, the configuration file will
-no longer contain an alias such as ``mainnet`` or ``hangzhounet``. Instead,
+no longer contain an alias such as ``mainnet`` or ``ithacanet``. Instead,
 it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, updates to built-in network parameters will have no effect.
@@ -237,7 +237,7 @@ Edit the ``builtin_blockchain_networks_with_tags`` variable in this file to
 add or remove built-in networks.
 
 To be able to connect to multiple networks without having to download the protocols,
-and to provide all the relevant baker / endorser / accuser binaries, all current and
+and to provide all the relevant baker / accuser (/ endorser) binaries, all current and
 past protocols are compiled and linked. This means that if you patch the client commands
 for a protocol, you should patch the other protocols as well (at least the ones which
 are still in use).

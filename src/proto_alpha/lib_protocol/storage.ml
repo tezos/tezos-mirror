@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,34 +28,32 @@ open Storage_functors
 open Storage_sigs
 
 module Encoding = struct
-  module UInt16 = struct
+  module UInt16 : VALUE with type t = int = struct
     type t = int
 
     let encoding = Data_encoding.uint16
   end
 
-  module Int32 = struct
+  module Int32 : VALUE with type t = Int32.t = struct
     type t = Int32.t
 
     let encoding = Data_encoding.int32
   end
 
-  module Int64 = struct
+  module Int64 : VALUE with type t = Int64.t = struct
     type t = Int64.t
 
     let encoding = Data_encoding.int64
   end
 
-  module Z = struct
+  module Z : VALUE with type t = Z.t = struct
     type t = Z.t
 
     let encoding = Data_encoding.z
   end
 end
 
-module Int31_index : sig
-  include INDEX with type t = int
-end = struct
+module Int31_index : INDEX with type t = int = struct
   type t = int
 
   let path_length = 1
@@ -93,14 +92,6 @@ module type Simple_single_data_storage = sig
   val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
 end
 
-module Legacy_block_priority :
-  Simple_single_data_storage with type value = int =
-  Make_single_data_storage (Registered) (Raw_context)
-    (struct
-      let name = ["block_priority"]
-    end)
-    (Encoding.UInt16)
-
 module Block_round : Simple_single_data_storage with type value = Round_repr.t =
   Make_single_data_storage (Registered) (Raw_context)
     (struct
@@ -109,10 +100,10 @@ module Block_round : Simple_single_data_storage with type value = Round_repr.t =
     (Round_repr)
 
 module Tenderbake = struct
-  module First_level =
+  module First_level_of_protocol =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["first_level_of_Tenderbake"]
+        let name = ["first_level_of_protocol"]
       end)
       (Raw_level_repr)
 
@@ -197,7 +188,7 @@ module Contract = struct
 
   let list = Indexed_context.keys
 
-  module Balance =
+  module Spendable_balance =
     Indexed_context.Make_map
       (struct
         let name = ["balance"]
@@ -210,35 +201,6 @@ module Contract = struct
         let name = ["missed_endorsements"]
       end)
       (Missed_endorsements_info)
-
-  module Legacy_frozen_balance_index =
-    Make_indexed_subcontext
-      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
-         (struct
-           let name = ["frozen_balance"]
-         end))
-         (Make_index (Cycle_repr.Index))
-
-  module Legacy_frozen_deposits =
-    Legacy_frozen_balance_index.Make_map
-      (struct
-        let name = ["deposits"]
-      end)
-      (Tez_repr)
-
-  module Legacy_frozen_fees =
-    Legacy_frozen_balance_index.Make_map
-      (struct
-        let name = ["fees"]
-      end)
-      (Tez_repr)
-
-  module Legacy_frozen_rewards =
-    Legacy_frozen_balance_index.Make_map
-      (struct
-        let name = ["rewards"]
-      end)
-      (Tez_repr)
 
   module Manager =
     Indexed_context.Make_map
@@ -261,9 +223,10 @@ module Contract = struct
         let name = ["inactive_delegate"]
       end)
 
-  module Delegate_desactivation =
+  module Delegate_last_cycle_before_deactivation =
     Indexed_context.Make_map
       (struct
+        (* FIXME? Change the key name to reflect the functor's name *)
         let name = ["delegate_desactivation"]
       end)
       (Cycle_repr)
@@ -373,20 +336,6 @@ module Contract = struct
       end)
       (Encoding.Z)
 
-  module Roll_list_legacy =
-    Indexed_context.Make_map
-      (struct
-        let name = ["roll_list"]
-      end)
-      (Roll_repr_legacy)
-
-  module Change_legacy =
-    Indexed_context.Make_map
-      (struct
-        let name = ["change"]
-      end)
-      (Tez_repr)
-
   module Frozen_deposits =
     Indexed_context.Make_map
       (struct
@@ -400,6 +349,30 @@ module Contract = struct
         let name = ["frozen_deposits_limit"]
       end)
       (Tez_repr)
+
+  module Bond_id_index =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["bond_id_index"]
+         end))
+         (Make_index (Bond_id_repr.Index))
+
+  module Frozen_bonds =
+    Bond_id_index.Make_carbonated_map
+      (struct
+        let name = ["frozen_bonds"]
+      end)
+      (Tez_repr)
+
+  let fold_bond_ids = Bond_id_index.fold_keys
+
+  module Total_frozen_bonds =
+    Indexed_context.Make_map
+      (struct
+        let name = ["total_frozen_bonds"]
+      end)
+      (Tez_repr)
 end
 
 module type NEXT = sig
@@ -411,7 +384,11 @@ module type NEXT = sig
 end
 
 module Global_constants = struct
-  module Map =
+  module Map :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Script_expr_hash.t
+       and type value = Script_repr.expr =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
@@ -886,18 +863,9 @@ module Public_key_hash = struct
 
   let to_path (key : public_key_hash) l =
     match key with
-    | Ed25519 h -> (
-        match Path_Ed25519.to_path h l with
-        | [s] -> ["ed25519"; s]
-        | _ -> assert false)
-    | Secp256k1 h -> (
-        match Path_Secp256k1.to_path h l with
-        | [s] -> ["secp256k1"; s]
-        | _ -> assert false)
-    | P256 h -> (
-        match Path_P256.to_path h l with
-        | [s] -> ["p256"; s]
-        | _ -> assert false)
+    | Ed25519 h -> "ed25519" :: Path_Ed25519.to_path h l
+    | Secp256k1 h -> "secp256k1" :: Path_Secp256k1.to_path h l
+    | P256 h -> "p256" :: Path_P256.to_path h l
 
   let of_path : _ -> public_key_hash option = function
     | "ed25519" :: rest -> (
@@ -918,13 +886,13 @@ module Public_key_hash = struct
     let l1 = Path_Ed25519.path_length
     and l2 = Path_Secp256k1.path_length
     and l3 = Path_P256.path_length in
-    assert (match (l1, l2, l3) with (1, 1, 1) -> true | _ -> false) ;
-    2
+    assert (Compare.Int.(l1 = l2 && l2 = l3)) ;
+    l1 + 1
 end
 
 module Public_key_hash_index = Make_index (Public_key_hash)
 
-module Protocol_hash = struct
+module Protocol_hash_with_path_encoding = struct
   include Protocol_hash
   include Path_encoding.Make_hex (Protocol_hash)
 end
@@ -936,27 +904,6 @@ module Delegates =
          let name = ["delegates"]
        end))
        (Public_key_hash_index)
-
-module Legacy_active_delegates_with_rolls =
-  Make_data_set_storage
-    (Make_subcontext (Registered) (Raw_context)
-       (struct
-         let name = ["active_delegates_with_rolls"]
-       end))
-       (Public_key_hash_index)
-
-module Legacy_delegates_with_frozen_balance_index =
-  Make_indexed_subcontext
-    (Make_subcontext (Registered) (Raw_context)
-       (struct
-         let name = ["delegates_with_frozen_balance"]
-       end))
-       (Make_index (Cycle_repr.Index))
-
-module Legacy_delegates_with_frozen_balance =
-  Make_data_set_storage
-    (Legacy_delegates_with_frozen_balance_index.Raw_context)
-    (Public_key_hash_index)
 
 (** Per cycle storage *)
 
@@ -992,22 +939,6 @@ module Cycle = struct
          end))
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
             (Slashed_level)
-
-  module Last_roll_legacy =
-    Make_indexed_data_storage
-      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
-         (struct
-           let name = ["last_roll"]
-         end))
-         (Int31_index)
-      (Roll_repr_legacy)
-
-  module Roll_snapshot_legacy =
-    Indexed_context.Make_map
-      (struct
-        let name = ["roll_snapshot"]
-      end)
-      (Encoding.UInt16)
 
   module Selected_stake_distribution =
     Indexed_context.Make_map
@@ -1092,48 +1023,6 @@ module Cycle = struct
            let encoding = nonce_status_encoding
          end)
 
-  let nonce_status_encoding_legacy =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"Unrevealed"
-          (tup4
-             Nonce_hash.encoding
-             Signature.Public_key_hash.encoding
-             Tez_repr.encoding
-             Tez_repr.encoding)
-          (function
-            | Unrevealed _ ->
-                assert false (* only used in read only for migration *)
-            | _ -> None)
-          (fun (nonce_hash, delegate, _, _) ->
-            Unrevealed {nonce_hash; delegate});
-        case
-          (Tag 1)
-          ~title:"Revealed"
-          Seed_repr.nonce_encoding
-          (function
-            | Revealed _ ->
-                assert false (* only used in read only for migration *)
-            | _ -> None)
-          (fun nonce -> Revealed nonce);
-      ]
-
-  module Nonce_legacy =
-    Make_indexed_data_storage
-      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
-         (struct
-           let name = ["nonces"]
-         end))
-         (Make_index (Raw_level_repr.Index))
-         (struct
-           type t = nonce_status
-
-           let encoding = nonce_status_encoding_legacy
-         end)
-
   module Seed =
     Indexed_context.Make_map
       (struct
@@ -1175,6 +1064,22 @@ module Stake = struct
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
 
+  (* This is an index that is set to 0 by calls to
+     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and incremented
+     (by 1) by calls to {!val:Stake_storage.snapshot}.
+
+     {!val:Stake_storage.snapshot} is called in relation with constant
+     [blocks_per_stake_snapshot] in {!val:Level_storage.may_snapshot_rolls}.
+
+     That is, the increment is done every [blocks_per_stake_snaphot] blocks and
+     reset at the end of cycles. So, it goes up to [blocks_per_cycle /
+     blocks_per_stake_snaphot], which is currently 16 (= 8192/512 -- the
+     concrete values can be found in
+     {!val:Default_parameters.constants_mainnet}), then comes back to 0, so that
+     a UInt16 is big enough.
+
+     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is checked
+     in {!val:Constants_repr.check_constants} to fit in a UInt16. *)
   module Last_snapshot =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
@@ -1185,117 +1090,6 @@ end
 
 module Total_active_stake = Cycle.Total_active_stake
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
-
-module Roll_legacy = struct
-  module Raw_context =
-    Make_subcontext (Ghost) (Raw_context)
-      (struct
-        let name = ["rolls"]
-      end)
-
-  module Indexed_context =
-    Make_indexed_subcontext
-      (Make_subcontext (Registered) (Raw_context)
-         (struct
-           let name = ["index"]
-         end))
-         (Make_index (Roll_repr_legacy.Index))
-
-  module Next =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["next"]
-      end)
-      (Roll_repr_legacy)
-
-  module Limbo =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["limbo"]
-      end)
-      (Roll_repr_legacy)
-
-  module Delegate_roll_list =
-    Wrap_indexed_data_storage
-      (Contract.Roll_list_legacy)
-      (struct
-        type t = Signature.Public_key_hash.t
-
-        let wrap = Contract_repr.implicit_contract
-
-        let unwrap = Contract_repr.is_implicit
-      end)
-
-  module Successor =
-    Indexed_context.Make_map
-      (struct
-        let name = ["successor"]
-      end)
-      (Roll_repr_legacy)
-
-  module Delegate_change =
-    Wrap_indexed_data_storage
-      (Contract.Change_legacy)
-      (struct
-        type t = Signature.Public_key_hash.t
-
-        let wrap = Contract_repr.implicit_contract
-
-        let unwrap = Contract_repr.is_implicit
-      end)
-
-  module Snapshoted_owner_index : INDEX with type t = Cycle_repr.t * int =
-  struct
-    type t = Cycle_repr.t * int
-
-    let path_length = Cycle_repr.Index.path_length + 1
-
-    let to_path (c, n) s = Cycle_repr.Index.to_path c (string_of_int n :: s)
-
-    let of_path l =
-      match Misc.take Cycle_repr.Index.path_length l with
-      | None | Some (_, ([] | _ :: _ :: _)) -> None
-      | Some (l1, [l2]) -> (
-          match (Cycle_repr.Index.of_path l1, int_of_string_opt l2) with
-          | (None, _) | (_, None) -> None
-          | (Some c, Some i) -> Some (c, i))
-
-    type 'a ipath = ('a * Cycle_repr.t) * int
-
-    let left_args =
-      Storage_description.One
-        {
-          rpc_arg = Cycle_repr.rpc_arg;
-          encoding = Cycle_repr.encoding;
-          compare = Cycle_repr.compare;
-        }
-
-    let right_args =
-      Storage_description.One
-        {
-          rpc_arg = RPC_arg.int;
-          encoding = Data_encoding.int31;
-          compare = Compare.Int.compare;
-        }
-
-    let args = Storage_description.(Pair (left_args, right_args))
-  end
-
-  module Owner =
-    Make_indexed_data_snapshotable_storage
-      (Make_subcontext (Registered) (Raw_context)
-         (struct
-           let name = ["owner"]
-         end))
-         (Snapshoted_owner_index)
-      (Make_index (Roll_repr_legacy.Index))
-      (Signature.Public_key)
-
-  module Snapshot_for_cycle = Cycle.Roll_snapshot_legacy
-  module Last_for_snapshot = Cycle.Last_roll_legacy
-
-  let clear = Indexed_context.clear
-end
 
 (** Votes *)
 
@@ -1342,12 +1136,12 @@ module Vote = struct
       end)
       (Protocol_hash)
 
-  module Listings_size =
+  module Voting_power_in_listings =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["listings_size"]
+        let name = ["voting_power_in_listings"]
       end)
-      (Encoding.Int32)
+      (Encoding.Int64)
 
   module Listings =
     Make_indexed_data_storage
@@ -1356,7 +1150,7 @@ module Vote = struct
            let name = ["listings"]
          end))
          (Public_key_hash_index)
-      (Encoding.Int32)
+      (Encoding.Int64)
 
   module Proposals =
     Make_data_set_storage
@@ -1364,7 +1158,10 @@ module Vote = struct
          (struct
            let name = ["proposals"]
          end))
-         (Pair (Make_index (Protocol_hash)) (Public_key_hash_index))
+         (Pair
+            (Make_index
+               (Protocol_hash_with_path_encoding))
+               (Public_key_hash_index))
 
   module Proposals_count =
     Make_indexed_data_storage
@@ -1448,39 +1245,6 @@ module Seed = struct
 
     let remove ctxt (l : Level_repr.t) =
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
-  end
-
-  module Nonce_legacy = struct
-    open Level_repr
-
-    type context = Raw_context.t
-
-    let mem ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.mem (ctxt, l.cycle) l.level
-
-    let get ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.get (ctxt, l.cycle) l.level
-
-    let find ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.find (ctxt, l.cycle) l.level
-
-    let update ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.update (ctxt, l.cycle) l.level v
-
-    let init ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.init (ctxt, l.cycle) l.level v
-
-    let add ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.add (ctxt, l.cycle) l.level v
-
-    let add_or_remove ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.add_or_remove (ctxt, l.cycle) l.level v
-
-    let remove_existing ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.remove_existing (ctxt, l.cycle) l.level
-
-    let remove ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.remove (ctxt, l.cycle) l.level
   end
 
   module For_cycle : FOR_CYCLE = Cycle.Seed
@@ -1589,9 +1353,10 @@ module Pending_migration = struct
 end
 
 module Liquidity_baking = struct
-  module Escape_ema =
+  module Toggle_ema =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
+        (* The old "escape" name is kept here to avoid migrating this. *)
         let name = ["liquidity_baking_escape_ema"]
       end)
       (Encoding.Int32)
@@ -1609,17 +1374,107 @@ module Ticket_balance = struct
     let name = ["ticket_balance"]
   end
 
-  module Sub_context = Make_subcontext (Registered) (Raw_context) (Name)
-  module Index = Make_index (Script_expr_hash)
+  module Raw_context = Make_subcontext (Registered) (Raw_context) (Name)
+
+  module Paid_storage_space =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["paid_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Used_storage_space =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["used_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Table_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["table"]
+      end)
+
+  module Index = Make_index (Ticket_hash_repr.Index)
   module Table =
-    Make_indexed_carbonated_data_storage (Sub_context) (Index) (Encoding.Z)
+    Make_indexed_carbonated_data_storage (Table_context) (Index) (Encoding.Z)
 end
 
 module Tx_rollup = struct
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["tx_rollup"]
+         end))
+         (Make_index (Tx_rollup_repr.Index))
+
+  module State =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["state"]
+      end)
+      (Tx_rollup_state_repr)
+
+  module Level_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["tx_level"]
+         end))
+         (Make_index (Tx_rollup_level_repr.Index))
+
+  module Inbox =
+    Level_context.Make_carbonated_map
+      (struct
+        let name = ["inbox"]
+      end)
+      (struct
+        type t = Tx_rollup_inbox_repr.t
+
+        let encoding = Tx_rollup_inbox_repr.encoding
+      end)
+
+  module Revealed_withdrawals =
+    Level_context.Make_carbonated_map
+      (struct
+        let name = ["withdrawals"]
+      end)
+      (Bitset)
+
+  module Commitment =
+    Level_context.Make_carbonated_map
+      (struct
+        let name = ["commitment"]
+      end)
+      (Tx_rollup_commitment_repr.Submitted_commitment)
+
+  module Bond_indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["bond"]
+         end))
+         (Public_key_hash_index)
+
+  module Commitment_bond =
+    Bond_indexed_context.Make_carbonated_map
+      (struct
+        let name = ["commitment"]
+      end)
+      (struct
+        type t = int
+
+        let encoding = Data_encoding.int31
+      end)
+end
+
+module Sc_rollup = struct
   module Raw_context =
     Make_subcontext (Registered) (Raw_context)
       (struct
-        let name = ["tx_rollup"]
+        let name = ["sc_rollup"]
       end)
 
   module Indexed_context =
@@ -1628,16 +1483,123 @@ module Tx_rollup = struct
          (struct
            let name = ["index"]
          end))
-         (Make_index (Tx_rollup_repr.Index))
+         (Make_index (Sc_rollup_repr.Index))
 
-  module State =
+  module PVM_kind =
     Indexed_context.Make_map
       (struct
-        let name = ["state"]
+        let name = ["kind"]
       end)
       (struct
-        type t = Tx_rollup_repr.state
+        type t = Sc_rollup_repr.Kind.t
 
-        let encoding = Tx_rollup_repr.state_encoding
+        let encoding = Sc_rollup_repr.Kind.encoding
       end)
+
+  module Boot_sector =
+    Indexed_context.Make_map
+      (struct
+        let name = ["boot_sector"]
+      end)
+      (struct
+        type t = string
+
+        let encoding = Data_encoding.string
+      end)
+
+  module Initial_level =
+    Indexed_context.Make_map
+      (struct
+        let name = ["initial_level"]
+      end)
+      (struct
+        type t = Raw_level_repr.t
+
+        let encoding = Raw_level_repr.encoding
+      end)
+
+  module Inbox =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["inbox"]
+      end)
+      (struct
+        type t = Sc_rollup_inbox_repr.t
+
+        let encoding = Sc_rollup_inbox_repr.encoding
+      end)
+
+  module Last_cemented_commitment =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["last_cemented_commitment"]
+      end)
+      (struct
+        type t = Sc_rollup_repr.Commitment_hash.t
+
+        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+      end)
+
+  module Stakers =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["stakers"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = Sc_rollup_repr.Commitment_hash.t
+
+        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+      end)
+
+  module Staker_count =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["staker_count"]
+      end)
+      (struct
+        type t = int32
+
+        let encoding = Data_encoding.int32
+      end)
+
+  module Commitments =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitments"]
+         end))
+         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (struct
+           type t = Sc_rollup_repr.Commitment.t
+
+           let encoding = Sc_rollup_repr.Commitment.encoding
+         end)
+
+  module Commitment_stake_count =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_stake_count"]
+         end))
+         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (struct
+           type t = int32
+
+           let encoding = Data_encoding.int32
+         end)
+
+  module Commitment_added =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_added"]
+         end))
+         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (struct
+           type t = Raw_level_repr.t
+
+           let encoding = Raw_level_repr.encoding
+         end)
 end

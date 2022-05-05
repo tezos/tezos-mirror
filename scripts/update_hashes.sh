@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..

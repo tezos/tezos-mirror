@@ -127,9 +127,22 @@ let error_encoding =
            ~schema:Json_schema.any
            (fun errors -> `A (List.map Error_monad.json_of_error errors))
            (function
-             | `A [] -> [Empty_error_list]
-             | `A errors -> List.map Error_monad.error_of_json errors
-             | msg -> [Unparsable_RPC_error msg])
+             | `A [] | `O [] -> [Empty_error_list]
+             | json -> (
+                 (* in BSON, which is used as an intermediate step when
+                    serialising in binary, [`A _] and [`O _] are
+                    indistinguishable. For this reason, we set [bson_relaxation]
+                    when destructing the JSON. *)
+                 match
+                   Json.destruct
+                     ~bson_relaxation:true
+                     Error_monad.trace_encoding
+                     json
+                 with
+                 | [] -> assert false (* see [`A [] | `O []] above *)
+                 | trace -> trace
+                 | exception Json.Cannot_destruct _ ->
+                     [Unparsable_RPC_error json]))
            json)
 
 let error_opt_encoding =
@@ -153,15 +166,22 @@ let error_opt_encoding =
              | Some (_ :: _ as errors) ->
                  `A (List.map Error_monad.json_of_error errors))
            (function
-             | `A [] | `Null | `O [] ->
+             | `Null | `A [] | `O [] -> None
+             | json -> (
                  (* in BSON, which is used as an intermediate step when
-                    serialising in binary, [`A []] and [`O []] are
-                    indistinguishable. For this reason, we add [`O []] as a
-                    pattern to match. *)
-                 None
-             | `A (_ :: _ as errors) ->
-                 Some (List.map Error_monad.error_of_json errors)
-             | msg -> Some [Unparsable_RPC_error msg])
+                    serialising in binary, [`A _] and [`O _] are
+                    indistinguishable. For this reason, we set [bson_relaxation]
+                    when destructing the JSON. *)
+                 match
+                   Json.destruct
+                     ~bson_relaxation:true
+                     Error_monad.trace_encoding
+                     json
+                 with
+                 | [] -> assert false (* see [`A [] | `O []] above *)
+                 | trace -> Some trace
+                 | exception Json.Cannot_destruct _ ->
+                     Some [Unparsable_RPC_error json]))
            json)
 
 let get_service = get_service ~error:error_encoding

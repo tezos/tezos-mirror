@@ -107,7 +107,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   let* (endpoint : Client.endpoint option) =
     match mode with
     | `Node -> return None
-    | `Proxy_server ->
+    | (`Proxy_server_rpc | `Proxy_server_data_dir) as proxy_server_mode ->
         (* When checking the split_key heuristic with {!heuristic_event_handler},
            we don't want data to be discarded. Hence we keep data for
            60 seconds. Any duration longer than the test duration is fine. As
@@ -117,6 +117,10 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
         let sym_block_caching_time = 6 * approximate_test_duration in
         let args =
           Proxy_server.[Symbolic_block_caching_time sym_block_caching_time]
+          @
+          match proxy_server_mode with
+          | `Proxy_server_rpc -> []
+          | `Proxy_server_data_dir -> Proxy_server.[Data_dir]
         in
         let* () = Client.bake_for client in
         (* We want Debug level events, for [heuristic_event_handler]
@@ -145,8 +149,8 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let* () = Client.bake_for client in
   let* mockup_client = Client.init_mockup ~protocol () in
-  let* _ = RPC.Contracts.get_script ?endpoint ~contract_id client in
-  let* _ = RPC.Contracts.get_storage ?endpoint ~contract_id client in
+  let*! _ = RPC.Contracts.get_script ?endpoint ~contract_id client in
+  let*! _ = RPC.Contracts.get_storage ?endpoint ~contract_id client in
   let* indices_exprs =
     let compute_index_expr index =
       let* key_value_list =
@@ -199,18 +203,43 @@ let test_equivalence =
   let tz_log = [("alpha.proxy_rpc", "debug"); ("proxy_getter", "debug")] in
   check_equivalence ~tz_log alt_mode clients
 
+let test_wrong_data_dir =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"proxy_server wrong data_dir"
+    ~tags:["data_dir"]
+  @@ fun protocol ->
+  let* (node, _client) = Client.init_with_protocol `Client ~protocol () in
+  let wrong_data_dir = Temp.dir "empty" in
+  let args = ["--data-dir"; wrong_data_dir] in
+  let process = Proxy_server.spawn ~args node in
+  let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
+  let re_str = "error reading data-dir.*" in
+  let good_match = stderr =~ rex re_str in
+  if not good_match then
+    Test.fail
+      "Unexpected error message: %s. It doesn't match the regexp %S"
+      stderr
+      re_str
+  else Lwt.return_unit
+
 let register ~protocols =
   let register mode =
     let mode_tag =
-      match mode with `Node -> "node" | `Proxy_server -> "proxy_server"
+      match mode with
+      | `Node -> "node"
+      | `Proxy_server_rpc -> "proxy_server"
+      | `Proxy_server_data_dir -> "proxy_server_data_dir"
     in
     Protocol.register_test
       ~__FILE__
       ~title:(sf "big_map_perf (%s)" mode_tag)
       ~tags:["bigmapperf"; mode_tag]
       (fun protocol -> big_map_get ~protocol mode ())
-      ~protocols
+      protocols
   in
   register `Node ;
-  register `Proxy_server ;
-  test_equivalence ~protocols
+  register `Proxy_server_data_dir ;
+  register `Proxy_server_rpc ;
+  test_equivalence protocols ;
+  test_wrong_data_dir protocols

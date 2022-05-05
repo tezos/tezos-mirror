@@ -21,7 +21,7 @@
  (action
   (write-file %{targets}
               "module Name = struct let name = \"demo-counter\" end
-include Tezos_protocol_environment.MakeV0(Name)()
+include Tezos_protocol_environment.MakeV5(Name)()
 module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 ")))
 
@@ -122,7 +122,7 @@ include Tezos_raw_protocol_demo_counter.Main
  (public_name tezos-protocol-demo-counter)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_demo_counter)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
@@ -137,7 +137,7 @@ include Tezos_raw_protocol_demo_counter.Main
  (public_name tezos-protocol-functor-demo-counter)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-demo-counter.raw)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"

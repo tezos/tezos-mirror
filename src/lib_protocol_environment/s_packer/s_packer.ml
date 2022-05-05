@@ -67,7 +67,11 @@ let () =
   in
   (match mode with
   | Struct -> Printf.fprintf stdout "module M = struct\n"
-  | Sig -> Printf.fprintf stdout "module type T = sig\n") ;
+  | Sig ->
+      Printf.fprintf
+        stdout
+        "open Tezos_protocol_environment_sigs_stdlib_compat.V_all\n" ;
+      Printf.fprintf stdout "module type T = sig\n") ;
   for i = 2 to Array.length Sys.argv - 1 do
     let file = Sys.argv.(i) in
     include_ mode stdout file

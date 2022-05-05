@@ -31,3 +31,13 @@ val make_sk : Signature.secret_key -> Client_keys.sk_uri tzresult
 
 val make_sapling_key :
   Tezos_sapling.Core.Wallet.Spending_key.t -> Client_keys.sapling_uri tzresult
+
+module Aggregate : sig
+  include Client_keys.AGGREGATE_SIGNER
+
+  val make_sk :
+    Aggregate_signature.secret_key -> Client_keys.aggregate_sk_uri tzresult
+
+  val make_pk :
+    Aggregate_signature.public_key -> Client_keys.aggregate_pk_uri tzresult
+end

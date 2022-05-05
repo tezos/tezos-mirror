@@ -33,20 +33,20 @@
 let make_directory n f =
   let rec aux acc n =
     if n <= 0 then acc
-    else aux (TzString.Map.add (string_of_int n) (f n) acc) (n - 1)
+    else aux (String.Map.add (string_of_int n) (f n) acc) (n - 1)
   in
-  Block_services.Dir (aux TzString.Map.empty n)
+  Block_services.Dir (aux String.Map.empty n)
 
 (** Check that JSON-encoding for a large directory never stack-overflows.
     This test fails for json-data-encoding.0.9.1 and older. *)
-let test_json_encoding_of_large_directory _ () =
+let test_json_encoding_of_large_directory () =
   let dir = make_directory 1_000_000 (fun _ -> Block_services.Cut) in
   let _ =
     Data_encoding.Json.construct Block_services.raw_context_encoding dir
   in
-  Lwt.return ()
+  ()
 
-let tests : (string * (Lwt_switch.t -> unit -> unit Lwt.t)) list =
+let tests : (string * _) list =
   [("json-encoding of large directory", test_json_encoding_of_large_directory)]
 
-let tests = List.map (fun (s, f) -> Alcotest_lwt.test_case s `Quick f) tests
+let tests = List.map (fun (s, f) -> Alcotest.test_case s `Quick f) tests

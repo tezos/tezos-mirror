@@ -1,6 +1,8 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
@@ -8,14 +10,17 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
-  "tezos-protocol-environment"
   "tezos-protocol-005-PsBabyM1"
+  "tezos-stdlib-unix"
+  "tezos-protocol-environment"
   "tezos-shell-services"
-  "tezos-client-base-unix"
+  "tezos-client-base"
   "tezos-client-005-PsBabyM1"
   "tezos-client-commands"
+  "tezos-rpc"
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: protocol-specific commands for `tezos-client`"

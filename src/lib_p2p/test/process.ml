@@ -55,49 +55,58 @@ let dummy_encoding flags : 'a Data_encoding.encoding =
     Data_encoding.bytes
 
 let write ~value_encoding ~flags outch v =
+  let open Lwt_result_syntax in
   let value_encoding =
     Option.value ~default:(dummy_encoding flags) value_encoding
   in
   protect
     (fun () ->
-      (match Data_encoding.Binary.to_bytes value_encoding v with
-      | Ok encoded_v -> Lwt_io.write_value outch encoded_v
-      | Error err ->
-          Stdlib.failwith
-          @@ Format.asprintf
-               "Value encoding failed %a"
-               Data_encoding.Binary.pp_write_error
-               err)
-      >>= return)
-    ~on_error:(fun err ->
-      Lwt.return @@ Error (Exn (Failure ("write error " ^ __LOC__)) :: err))
+      let*! () =
+        match Data_encoding.Binary.to_bytes value_encoding v with
+        | Ok encoded_v -> Lwt_io.write_value outch encoded_v
+        | Error err ->
+            Stdlib.failwith
+            @@ Format.asprintf
+                 "Value encoding failed %a"
+                 Data_encoding.Binary.pp_write_error
+                 err
+      in
+      return_unit)
+    ~on_error:(fun trace ->
+      Lwt.return_error
+      @@ TzTrace.cons (error_of_fmt "write error %s" __LOC__) trace)
 
 let read ~value_encoding ~flags inch =
+  let open Lwt_result_syntax in
   let value_encoding =
     Option.value ~default:(dummy_encoding flags) value_encoding
   in
   protect
     (fun () ->
-      Lwt_io.read_value inch >>= fun encoded_v ->
-      (match Data_encoding.Binary.of_bytes value_encoding encoded_v with
-      | Ok decoded_v -> Lwt.return decoded_v
-      | Error err ->
-          Stdlib.failwith
-          @@ Format.asprintf
-               "Value encoding failed %a"
-               Data_encoding.Binary.pp_read_error
-               err)
-      >>= return)
-    ~on_error:(fun err ->
-      Lwt.return @@ Error (Exn (Failure ("read error " ^ __LOC__)) :: err))
+      let*! encoded_v = Lwt_io.read_value inch in
+      let*! v =
+        match Data_encoding.Binary.of_bytes value_encoding encoded_v with
+        | Ok decoded_v -> Lwt.return decoded_v
+        | Error err ->
+            Stdlib.failwith
+            @@ Format.asprintf
+                 "Value encoding failed %a"
+                 Data_encoding.Binary.pp_read_error
+                 err
+      in
+      return v)
+    ~on_error:(fun trace ->
+      Lwt.return_error
+      @@ TzTrace.cons (error_of_fmt "read error %s" __LOC__) trace)
 
 let received_result ~value_encoding ~flags child_exit =
+  let open Lwt_syntax in
   let value_encoding =
     Option.some @@ Error_monad.result_encoding
     @@ Option.value ~default:(dummy_encoding flags) value_encoding
   in
-  read ~value_encoding ~flags child_exit >>= function
-  | Ok (Ok _ as res) | (Error _ as res) | Ok (Error _ as res) -> Lwt.return res
+  let+ r = read ~value_encoding ~flags child_exit in
+  Result.join r
 
 let send_result ~value_encoding ~flags child_exit result =
   let value_encoding =
@@ -107,29 +116,35 @@ let send_result ~value_encoding ~flags child_exit result =
   write ~value_encoding ~flags child_exit result
 
 let handle_result ~value_encoding ~flags canceler f child_exit =
-  protect
-    ~canceler
-    (fun () ->
-      f () >>=? fun v ->
-      send_result ~value_encoding ~flags child_exit (Ok v) >>=? fun () ->
-      return 0)
-    ~on_error:(fun err ->
-      lwt_log_error
-        "@[<v 2>Detached process ended with error.@[%a@]@]@."
-        pp_print_trace
-        err
-      >>= fun () ->
-      send_result ~value_encoding ~flags child_exit (Error err) >>=? fun () ->
-      return 0)
-  >>= function
+  let open Lwt_result_syntax in
+  let*! r =
+    protect
+      ~canceler
+      (fun () ->
+        let* v = f () in
+        let* () = send_result ~value_encoding ~flags child_exit (Ok v) in
+        return 0)
+      ~on_error:(fun err ->
+        let*! () =
+          lwt_log_error
+            "@[<v 2>Detached process ended with error.@[%a@]@]@."
+            pp_print_trace
+            err
+        in
+        let* () = send_result ~value_encoding ~flags child_exit (Error err) in
+        return 0)
+  in
+  match r with
   | Ok exit_code -> Lwt.return exit_code
   | Error err ->
-      lwt_log_error
-        "@[<v 2>Unexpected error when handling detached function result: \
-         @[%a@]@]@."
-        Error_monad.pp_print_trace
-        err
-      >>= fun () -> Lwt.return 255
+      let*! () =
+        lwt_log_error
+          "@[<v 2>Unexpected error when handling detached function result: \
+           @[%a@]@]@."
+          Error_monad.pp_print_trace
+          err
+      in
+      Lwt.return 255
 
 module Channel = struct
   type ('a, 'b) t = {
@@ -148,38 +163,38 @@ module Channel = struct
     {inch; outch; input_encoding; output_encoding; flags}
 
   let push {outch; output_encoding; flags; _} v =
-    Lwt.catch
-      (fun () ->
+    Error_monad.catch_es (fun () ->
         let value_encoding = output_encoding in
         write ~value_encoding ~flags outch v)
-      (fun exn -> Lwt.return_error [Exn exn])
 
   let pop {inch; input_encoding; flags; _} =
-    Lwt.catch
-      (fun () ->
+    Error_monad.catch_es (fun () ->
         let value_encoding = input_encoding in
         read ~value_encoding ~flags inch)
-      (fun exn -> Lwt.return_error [Exn exn])
 end
 
 let terminate pid =
-  (try Unix.kill pid Sys.sigkill with _ -> ()) ;
-  ignore (Lwt_unix.waitpid [] pid)
+  let open Lwt_syntax in
+  (try Unix.kill pid Sys.sigterm with _ -> ()) ;
+  let* (_pid, _status) = Lwt_unix.waitpid [] pid in
+  Lwt.return_unit
 
 let wait ~value_encoding ~flags pid result_ch =
+  let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
-      Lwt_unix.waitpid [] pid >>= function
+      let*! s = Lwt_unix.waitpid [] pid in
+      match s with
       | (_, Lwt_unix.WEXITED 0) ->
           received_result ~value_encoding ~flags result_ch
-      | (_, Lwt_unix.WEXITED n) -> Lwt.return (error (Exn (Exited n)))
-      | (_, Lwt_unix.WSIGNALED n) -> Lwt.return (error (Exn (Signaled n)))
-      | (_, Lwt_unix.WSTOPPED n) -> Lwt.return (error (Exn (Stopped n))))
+      | (_, Lwt_unix.WEXITED n) -> fail_with_exn (Exited n)
+      | (_, Lwt_unix.WSIGNALED n) -> fail_with_exn (Signaled n)
+      | (_, Lwt_unix.WSTOPPED n) -> fail_with_exn (Stopped n))
     (function
       | Lwt.Canceled ->
-          terminate pid ;
-          Error_monad.fail Canceled
-      | exn -> Error_monad.fail (Exn exn))
+          let*! () = terminate pid in
+          tzfail Canceled
+      | exn -> fail_with_exn exn)
 
 type ('a, 'b, 'c) t = {
   termination : 'c tzresult Lwt.t;
@@ -196,8 +211,9 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
     ?value_encoding ?flags
     (f : ('sent, 'received) Channel.t -> 'result tzresult Lwt.t) :
     ('sent, 'received, 'result) t tzresult Lwt.t =
-  let canceler = Option.value ~default:(Lwt_canceler.create ()) canceler in
-  Lwt_io.flush_all () >>= fun () ->
+  let open Lwt_syntax in
+  let canceler = Option.value_f ~default:Lwt_canceler.create canceler in
+  let* () = Lwt_io.flush_all () in
   protect
     ~canceler
     (fun () ->
@@ -214,41 +230,41 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
               () ;
           Random.self_init () ;
           (* Lwt_main.run *)
-          (let template = Format.asprintf "%s$(message)" prefix in
-           Lwt_io.close main_in >>= fun () ->
-           Lwt_io.close main_out >>= fun () ->
-           Lwt_io.close main_result >>= fun () ->
-           Lwt_log.default :=
-             Lwt_log.channel
-               ~template
-               ~close_mode:`Keep
-               ~channel:Lwt_io.stderr
-               () ;
-           lwt_log_notice "PID: %d" (Unix.getpid ()) >>= fun () ->
-           handle_result
-             ~value_encoding
-             ~flags
-             canceler
-             (fun () ->
-               let chans =
-                 Channel.make
-                   ?input_encoding
-                   ?output_encoding
-                   child_in
-                   child_out
-               in
-               f chans)
-             child_exit)
-          >>= exit
+          let* i =
+            let template = Format.asprintf "%s$(message)" prefix in
+            let* () = Lwt_io.close main_in in
+            let* () = Lwt_io.close main_out in
+            let* () = Lwt_io.close main_result in
+            Lwt_log.default :=
+              Lwt_log.channel
+                ~template
+                ~close_mode:`Keep
+                ~channel:Lwt_io.stderr
+                () ;
+            let* () = lwt_log_notice "PID: %d" (Unix.getpid ()) in
+            handle_result
+              ~value_encoding
+              ~flags
+              canceler
+              (fun () ->
+                let chans =
+                  Channel.make
+                    ?input_encoding
+                    ?output_encoding
+                    child_in
+                    child_out
+                in
+                f chans)
+              child_exit
+          in
+          exit i
       | pid ->
-          Lwt_canceler.on_cancel canceler (fun () ->
-              terminate pid ;
-              Lwt.return_unit) ;
+          Lwt_canceler.on_cancel canceler (fun () -> terminate pid) ;
           let termination = wait ~value_encoding ~flags pid main_result in
-          Lwt_io.close child_in >>= fun () ->
-          Lwt_io.close child_out >>= fun () ->
-          Lwt_io.close child_exit >>= fun () ->
-          return
+          let* () = Lwt_io.close child_in in
+          let* () = Lwt_io.close child_out in
+          let* () = Lwt_io.close child_exit in
+          return_ok
             {
               termination;
               channel =
@@ -263,7 +279,8 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
               value_encoding;
             })
     ~on_error:(fun err ->
-      Lwt_canceler.cancel canceler >>= fun _ -> Lwt.return (Error err))
+      let* (_ : (unit, exn list) result) = Lwt_canceler.cancel canceler in
+      return_error err)
 
 let signal_names =
   [
@@ -387,36 +404,12 @@ let receive {channel; _} = Channel.pop channel
 
 let wait_result {termination; _} : 'result tzresult Lwt.t = termination
 
-type error += Par of (int * string * error) list
-
-let pp_par_error ppf plist =
-  pp_grouped ppf plist (fun plural ppf err -> pp_trace plural ppf [err])
-
-let () =
-  register_recursive_error_kind
-    `Temporary
-    ~id:"parallel_errors"
-    ~title:"Parallel errors"
-    ~description:
-      "An error occured in at least one thread of a paralle\n  execution."
-    ~pp:(fun ppf s -> Format.fprintf ppf "@[%a@]@." pp_par_error s)
-    Data_encoding.(
-      fun error_encoding ->
-        obj1
-          (req
-             "error_list"
-             (list
-                (obj3
-                   (req "processor" int16)
-                   (req "prefix" string)
-                   (req "error" error_encoding)))))
-    (function Par lst -> Some lst | _ -> None)
-    (fun lst -> Par lst)
-
 let join_process (plist : ('a, 'b, 'c) t list) =
+  let open Lwt_syntax in
   List.map_p
     (fun {termination; prefix; _} ->
-      termination >>= fun t -> Lwt.return (prefix, t))
+      let* t = termination in
+      return (prefix, t))
     plist
 
 (** Wait for all processes to terminate.
@@ -425,34 +418,39 @@ let join_process (plist : ('a, 'b, 'c) t list) =
     are canceled and an exception is raised *)
 let wait_all_results (processes : ('a, 'b, 'c) t list) =
   let rec loop processes =
+    let open Lwt_syntax in
     match processes with
-    | [] -> Lwt.return_none
-    | processes -> (
-        Lwt.nchoose_split processes >>= function
-        | (finished, remaining) ->
-            let rec handle = function
-              | [] -> loop remaining
-              | Ok _ :: finished -> handle finished
-              | Error err :: _ ->
-                  Lwt.return_some
-                    ( err,
-                      List.map
-                        (fun remain -> remain >>= fun _ -> return_unit)
-                        remaining )
-            in
-            handle finished)
+    | [] -> return_none
+    | processes ->
+        let* (finished, remaining) = Lwt.nchoose_split processes in
+        let rec handle = function
+          | [] -> loop remaining
+          | Ok _ :: finished -> handle finished
+          | Error err :: _ ->
+              return_some
+                ( err,
+                  List.map
+                    (fun remain ->
+                      let* _ = remain in
+                      return_ok_unit)
+                    remaining )
+        in
+        handle finished
   in
+  let open Lwt_syntax in
   let terminations = List.map (fun p -> p.termination) processes in
-  loop terminations >>= function
-  | None ->
-      lwt_log_info "All done!" >>= fun () ->
-      Error_monad.Lwt_syntax.all terminations >>= fun terminated ->
-      return
-      @@ List.map (function Ok a -> a | Error _ -> assert false) terminated
-  | Some (_err, remaining) ->
-      lwt_log_error "Early error! Canceling remaining process." >>= fun () ->
+  let* o = loop terminations in
+  match o with
+  | None -> (
+      let* () = lwt_log_info "All done!" in
+      let* terminated = all terminations in
+      match List.partition_result terminated with
+      | (_, _ :: _) -> assert false
+      | (terminated, []) -> return_ok terminated)
+  | Some (_err, remaining) -> (
+      let* () = lwt_log_error "Early error! Canceling remaining process." in
       List.iter Lwt.cancel remaining ;
-      join_process processes >>= fun terminated ->
+      let* terminated = join_process processes in
       let terminated =
         List.mapi (fun i (prefix, a) -> (i, prefix, a)) terminated
       in
@@ -460,19 +458,30 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
         List.filter_map
           (function
             | (_, _, Ok _) -> None
-            | (i, prefix, Error (err :: _)) -> Some (i, prefix, err)
             | (i, prefix, Error []) ->
                 Some
-                  ( i,
-                    prefix,
-                    Exn
-                      (Invalid_argument "process returned an empty error trace")
-                  ))
+                  (TzTrace.make
+                     (Exn
+                        (Invalid_argument
+                           (Format.asprintf
+                              "process %d(%s) returned an empty error trace"
+                              i
+                              (String.trim prefix)))))
+            | (i, prefix, Error trace) ->
+                Some
+                  (TzTrace.cons
+                     (Exn
+                        (Failure
+                           (Format.asprintf "%d(%s)" i (String.trim prefix))))
+                     trace))
           terminated
       in
-      print_results terminated >>= fun _ -> Lwt.return @@ error (Par errors)
+      let* _ = print_results terminated in
+      match errors with
+      | [] -> assert false
+      | err :: errs -> Lwt.return_error (TzTrace.conp_list err errs))
 
 let wait_all pl =
-  wait_all_results pl >>= function
-  | Ok _ -> return_unit
-  | Error err -> Lwt.return_error err
+  let open Lwt_result_syntax in
+  let* _ = wait_all_results pl in
+  return_unit

@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -8,8 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
-  "tezos-client-base"
   "tezos-rpc"
+  "tezos-client-base"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

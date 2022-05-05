@@ -24,22 +24,24 @@
 (*****************************************************************************)
 
 open Protocol
-open Error_monad
 
 type context = Alpha_context.context * Script_interpreter.step_constants
 
+let initial_balance = 4_000_000_000_000L
+
 let context_init_memory ~rng_state =
-  Context.init
+  Context.init_n
     ~rng_state
     ~initial_balances:
       [
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
+        initial_balance;
+        initial_balance;
+        initial_balance;
+        initial_balance;
+        initial_balance;
       ]
     5
+    ()
   >>=? fun (block, accounts) ->
   match accounts with
   | [bs1; bs2; bs3; bs4; bs5] ->
@@ -52,8 +54,8 @@ let make ~rng_state =
   context_init_memory ~rng_state >>=? fun context ->
   let amount = Alpha_context.Tez.one in
   let chain_id = Chain_id.zero in
-  let now = Alpha_context.Script_timestamp.of_zint Z.zero in
-  let level = Alpha_context.Script_int.zero_n in
+  let now = Script_timestamp.of_zint Z.zero in
+  let level = Script_int.zero_n in
   let open Script_interpreter in
   (match context with
   | `Mem_block (block, (bs1, bs2, bs3, _, _)) ->
@@ -61,17 +63,40 @@ let make ~rng_state =
       let payer = bs2 in
       let self = bs3 in
       let step_constants =
-        {source; payer; self; amount; chain_id; now; level}
+        {
+          source;
+          payer;
+          self;
+          amount;
+          balance = Alpha_context.Tez.of_mutez_exn initial_balance;
+          chain_id;
+          now;
+          level;
+        }
       in
       return (block, step_constants)
   | `Disk_block (block, source) ->
       let step_constants =
-        {source; payer = source; self = source; amount; chain_id; now; level}
+        {
+          source;
+          payer = source;
+          self = source;
+          amount;
+          balance = Alpha_context.Tez.of_mutez_exn initial_balance;
+          chain_id;
+          now;
+          level;
+        }
       in
       return (block, step_constants))
   >>=? fun (block, step_constants) ->
+  Context.get_constants (B block) >>=? fun csts ->
+  let minimal_block_delay =
+    Protocol.Alpha_context.Period.to_seconds csts.parametric.minimal_block_delay
+  in
   Incremental.begin_construction
-    ~timestamp:(Time.Protocol.add block.header.shell.timestamp 30L)
+    ~timestamp:
+      (Time.Protocol.add block.header.shell.timestamp minimal_block_delay)
     block
   >>=? fun vs ->
   let ctxt = Incremental.alpha_ctxt vs in

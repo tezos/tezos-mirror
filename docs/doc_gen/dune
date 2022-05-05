@@ -7,8 +7,8 @@
             tezos-rpc-http-server
             tezos-protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
-            tezos-embedded-protocol-011-PtHangz2
             tezos-embedded-protocol-012-Psithaca
+            tezos-embedded-protocol-013-PtJakart
             tezos-embedded-protocol-alpha
             data-encoding
             re)
@@ -18,9 +18,3 @@
                    -open Tezos_store
                    -open Tezos_protocol_updater
                    -linkall)))
-
-(rule
- (alias buildtest)
- (deps rpc_doc.exe
-       p2p_doc.exe)
- (action (progn)))

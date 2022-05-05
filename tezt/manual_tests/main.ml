@@ -28,8 +28,7 @@
    as functions to be called here. *)
 
 let () =
-  Cli.init () ;
   Migration.register () ;
-  Migration_voting.register () ;
+  Migration_voting.register [Jakarta] ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

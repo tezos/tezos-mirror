@@ -36,7 +36,7 @@ open Lib_test
 open Tezos_proxy_server_config
 
 (** Lift an arbitrary of ['a] to ['a option] by always creating [Some] values *)
-let to_some gen = QCheck.Gen.(gen >|= Option.some)
+let to_some gen = QCheck.Gen.(map Option.some gen)
 
 (** A generator that generates valid values for the [rpc_addr] field *)
 let rpc_addr_gen =
@@ -52,33 +52,45 @@ let rpc_addr_gen =
     Uri.of_string str)
   <$> octet <*> octet <*> octet <*> octet <*> 1 -- 32768
 
+let path_gen =
+  let open QCheck.Gen in
+  (* Generate something that looks like a Unix path *)
+  let* size = 1 -- 8 in
+  let+ s = list_repeat size (string_size ~gen:(char_range 'a' 'z') (1 -- 8)) in
+  String.concat "/" ("" :: s)
+
 (** A generator that generates valid values for the [rpc_tls] field *)
 let rpc_tls_gen =
-  let open QCheck.Gen in
-  let path_gen =
-    (* Generate something that looks like a Unix path *)
-    list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
-    >|= fun s -> "/" ^ String.concat "/" s
-  in
-  pair path_gen path_gen >|= fun (cert, key) -> cert ^ "," ^ key
+  QCheck.Gen.(
+    let+ (cert, key) = pair path_gen path_gen in
+    cert ^ "," ^ key)
 
 (** A generator that generates valid values for the
     [sym_block_caching_time] field *)
 let sym_block_caching_time_gen = QCheck.Gen.(1 -- 256)
 
+(** A generator that generates random strings for the
+    [data_dir_gen] field. This is still useful, since we are only
+    checking command-line option handling here. *)
+let data_dir_gen = path_gen
+
 (** An arbitrary for [Proxy_server_config.t] that is parameterized
     by the subgenerators *)
 let proxy_server_config_arb endpoint_gen rpc_addr_gen rpc_tls_gen
-    sym_block_caching_time_gen =
+    sym_block_caching_time_gen data_dir_gen =
   let gen =
     QCheck.Gen.(
-      quad endpoint_gen rpc_addr_gen rpc_tls_gen sym_block_caching_time_gen
-      >|= fun (endpoint, rpc_addr, rpc_tls, sym_block_caching_time) ->
+      let* endpoint = endpoint_gen in
+      let* rpc_addr = rpc_addr_gen in
+      let* rpc_tls = rpc_tls_gen in
+      let* sym_block_caching_time = sym_block_caching_time_gen in
+      let+ data_dir = data_dir_gen in
       Proxy_server_config.make
         ~endpoint
         ~rpc_addr
         ~rpc_tls
-        ~sym_block_caching_time)
+        ~sym_block_caching_time
+        ~data_dir)
   in
   let print config = Format.asprintf "%a" Proxy_server_config.pp config in
   QCheck.make ~print gen
@@ -90,7 +102,8 @@ module UnionRightBias = struct
         (opt @@ QCheck.gen Qcheck_helpers.endpoint_arb)
         (opt @@ QCheck.gen Qcheck_helpers.endpoint_arb)
         (opt rpc_tls_gen)
-        (opt sym_block_caching_time_gen))
+        (opt sym_block_caching_time_gen)
+        (opt data_dir_gen))
 
   let reflexive =
     QCheck.Test.make ~name:"[union_right_bias t t] = t" arb @@ fun expected ->
@@ -116,11 +129,13 @@ module UnionRightBias = struct
         ({sym_block_caching_time = x; _} : Proxy_server_config.t) =
       x
     in
+    let data_dir ({data_dir = x; _} : Proxy_server_config.t) = x in
     let check_field f =
       Qcheck_helpers.qcheck_eq (right (f config1) (f config2)) (f union)
     in
     check_field endpoint && check_field rpc_addr && check_field rpc_tls
     && check_field sym_block_caching_time
+    && check_field data_dir
 
   let associative =
     QCheck.Test.make
@@ -144,6 +159,7 @@ module UnionRightBias = struct
       Field t.rpc_addr;
       Field t.rpc_tls;
       Field t.sym_block_caching_time;
+      Field t.data_dir;
     ]
 
   let common_some t1 t2 =
@@ -206,6 +222,7 @@ let good_proxy_server_config_arb
     (to_some rpc_addr_gen)
     QCheck.Gen.(opt rpc_tls_gen)
     sym_block_caching_time_gen
+    QCheck.Gen.(opt data_dir_gen)
 
 let test_good_arb_to_runtime_ok =
   QCheck.Test.make
@@ -250,6 +267,7 @@ let test_to_runtime_err_implies_union_to_runtime_err =
       (opt rpc_addr_gen)
       (opt rpc_tls_gen)
       (opt int)
+      (opt data_dir_gen)
   in
   let to_runtime_is_err config =
     Proxy_server_config.to_runtime config |> Result.is_error

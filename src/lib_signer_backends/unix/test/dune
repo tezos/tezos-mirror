@@ -1,7 +1,13 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name test_crouching)
- (package tezos-signer-backends)
  (libraries
+  tezos-error-monad
+  tezos-stdlib
+  tezos-crypto
+  tezos-client-base
   tezos-signer-backends.unix
   alcotest-lwt)
  (flags
@@ -11,3 +17,8 @@
    -open Tezos_crypto
    -open Tezos_client_base
    -open Tezos_signer_backends_unix)))
+
+(rule
+ (alias runtest)
+ (package tezos-signer-backends)
+ (action (run %{dep:./test_crouching.exe})))

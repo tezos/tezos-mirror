@@ -50,7 +50,7 @@ let () =
     (fun we -> Encoding_error we) ;
   register_error_kind
     `Permanent
-    ~id:"unexepcted_size_of_encoded_value"
+    ~id:"unexpected_size_of_encoded_value"
     ~title:"Unexpected size of encoded value"
     ~description:"An encoded value is not of the expected size."
     ~pp:(fun ppf () ->
@@ -74,7 +74,7 @@ let () =
     (fun re -> Decoding_error re) ;
   register_error_kind
     `Permanent
-    ~id:"socket.unexepcted_size_of_decoded_value"
+    ~id:"socket.unexpected_size_of_decoded_value"
     ~title:"Unexpected size of decoded value"
     ~description:"A decoded value comes from a buffer of unexpected size."
     ~pp:(fun ppf () ->
@@ -84,3 +84,15 @@ let () =
     Data_encoding.empty
     (function Unexpected_size_of_decoded_buffer -> Some () | _ -> None)
     (fun () -> Unexpected_size_of_decoded_buffer)
+
+let () =
+  Printexc.register_printer (function
+      | Json_encoding.Cannot_destruct (path, exc) ->
+          Format.kasprintf
+            Option.some
+            "Json_encoding.Cannot_destruct at %a: %a"
+            (Json_query.print_path_as_json_path ~wildcards:true)
+            path
+            (Data_encoding.Json.print_error ?print_unknown:None)
+            exc
+      | _ -> None)

@@ -1,6 +1,7 @@
-(env
- (static
-  (flags (:standard -ccopt -static))))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (static (flags (:standard -ccopt -static))))
 
 (executable
  (name codec)
@@ -10,11 +11,12 @@
  (libraries
   data-encoding
   tezos-base
+  tezos-base.unix
+  tezos-client-base-unix
+  tezos-client-base
+  tezos-clic
   tezos-stdlib-unix
   tezos-event-logging
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-clic
   tezos-signer-services
   (select void_for_linking-tezos-client-005-PsBabyM1 from
    (tezos-client-005-PsBabyM1 -> void_for_linking-tezos-client-005-PsBabyM1.empty)
@@ -40,14 +42,17 @@
   (select void_for_linking-tezos-client-012-Psithaca from
    (tezos-client-012-Psithaca -> void_for_linking-tezos-client-012-Psithaca.empty)
    (-> void_for_linking-tezos-client-012-Psithaca.empty))
+  (select void_for_linking-tezos-client-013-PtJakart from
+   (tezos-client-013-PtJakart -> void_for_linking-tezos-client-013-PtJakart.empty)
+   (-> void_for_linking-tezos-client-013-PtJakart.empty))
   (select void_for_linking-tezos-client-alpha from
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty)))
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Data_encoding
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_client_base_unix
    -open Tezos_client_base
    -open Tezos_clic
@@ -65,4 +70,5 @@
    (write-file void_for_linking-tezos-client-010-PtGRANAD.empty "")
    (write-file void_for_linking-tezos-client-011-PtHangz2.empty "")
    (write-file void_for_linking-tezos-client-012-Psithaca.empty "")
+   (write-file void_for_linking-tezos-client-013-PtJakart.empty "")
    (write-file void_for_linking-tezos-client-alpha.empty ""))))

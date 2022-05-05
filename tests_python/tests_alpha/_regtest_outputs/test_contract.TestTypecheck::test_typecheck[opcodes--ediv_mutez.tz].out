@@ -1,11 +1,11 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/ediv_mutez.tz]
 
 Well typed
-Gas remaining: 1039987.261 units remaining
+Gas remaining: 1039990.621 units remaining
 { parameter (pair mutez (or mutez nat)) ;
   storage (or (option (pair nat mutez)) (option (pair mutez mutez))) ;
   code { CAR
-         /* [ @parameter pair mutez (or mutez nat) ] */ ;
+         /* [ pair mutez (or mutez nat) ] */ ;
          UNPAIR
          /* [ mutez : or mutez nat ] */ ;
          SWAP

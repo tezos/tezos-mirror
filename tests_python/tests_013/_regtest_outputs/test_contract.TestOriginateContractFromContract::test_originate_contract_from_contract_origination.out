@@ -1,0 +1,56 @@
+tests_013/test_contract.py::TestOriginateContractFromContract::test_originate_contract_from_contract_origination
+
+Node is bootstrapped.
+Estimated gas: 1425.542 units (will add 100 for safety)
+Estimated storage: 350 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.000476
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 1526
+    Storage limit: 370 bytes
+    Balance updates:
+      [CONTRACT_HASH] ... -ꜩ0.000476
+      payload fees(the block proposer) ....... +ꜩ0.000476
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ200
+      Script:
+        { parameter unit ;
+          storage unit ;
+          code { DROP ;
+                 UNIT ;
+                 AMOUNT ;
+                 NONE key_hash ;
+                 CREATE_CONTRACT
+                   { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } } ;
+                 DIP { DROP ; PUSH unit Unit ; NIL operation } ;
+                 CONS ;
+                 PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 93 bytes
+        Paid storage size diff: 93 bytes
+        Consumed gas: 1425.542
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.02325
+          storage fees ........................... +ꜩ0.02325
+          [CONTRACT_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
+          [CONTRACT_HASH] ... -ꜩ200
+          [CONTRACT_HASH] ... +ꜩ200
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as originate_contract.
+Injected block at minimal timestamp
+[ [], [], [], [ "[BLOCK_HASH]" ] ]

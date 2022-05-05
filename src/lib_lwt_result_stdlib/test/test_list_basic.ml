@@ -57,6 +57,20 @@ end
 
 open ListGen
 
+module IsEmpty = struct
+  let is_empty _ =
+    assert (is_empty [] = true) ;
+    assert (is_empty ['a'] = false) ;
+    assert (is_empty [0] = false) ;
+    assert (is_empty [0; 1; 2] = false) ;
+    assert (is_empty [[]] = false) ;
+    assert (is_empty [None] = false) ;
+    assert (is_empty [""] = false) ;
+    ()
+
+  let tests = [Alcotest.test_case "is_empty" `Quick is_empty]
+end
+
 module Nth = struct
   let nth _ =
     assert (nth (up 10) 0 = Some 0) ;
@@ -73,7 +87,7 @@ module Nth = struct
     assert (nth (up 0) (-100) = None) ;
     ()
 
-  let tests = [Alcotest_lwt.test_case_sync "nth" `Quick nth]
+  let tests = [Alcotest.test_case "nth" `Quick nth]
 end
 
 module Last = struct
@@ -91,76 +105,8 @@ module Last = struct
 
   let tests =
     [
-      Alcotest_lwt.test_case_sync "last" `Quick last;
-      Alcotest_lwt.test_case_sync "last_opt" `Quick last_opt;
-    ]
-end
-
-module Init = struct
-  let init () =
-    assert (assert_err @@ init ~when_negative_length:() (-10) Fun.id) ;
-    assert (init ~when_negative_length:() 0 Fun.id = Ok []) ;
-    assert (init ~when_negative_length:() 11 Fun.id = Ok (up 10)) ;
-    ()
-
-  let init_e () =
-    assert (assert_err @@ init_e ~when_negative_length:() (-10) Result.ok) ;
-    assert (init_e ~when_negative_length:() 0 Result.ok = nil_e) ;
-    assert (init_e ~when_negative_length:() 11 Result.ok = Result.ok @@ up 10) ;
-    ()
-
-  let init_s _ () =
-    let open Lwt.Infix in
-    assert_err_s (init_s ~when_negative_length:() (-10) Lwt.return)
-    >>= fun () ->
-    assert_eq_s (init_s ~when_negative_length:() 0 Lwt.return) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_s ~when_negative_length:() 11 Lwt.return)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
-
-  let init_es _ () =
-    let open Lwt.Infix in
-    assert_err_s (init_es ~when_negative_length:() (-10) Lwt.return_ok)
-    >>= fun () ->
-    assert_eq_s (init_es ~when_negative_length:() 0 Lwt.return_ok) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_es ~when_negative_length:() 11 Lwt.return_ok)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
-
-  let init_p _ () =
-    let open Lwt.Infix in
-    assert_err_s (init_p ~when_negative_length:() (-10) Lwt.return)
-    >>= fun () ->
-    assert_eq_s (init_p ~when_negative_length:() 0 Lwt.return) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_p ~when_negative_length:() 11 Lwt.return)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
-
-  let init_ep _ () =
-    let open Lwt.Infix in
-    assert_err_p (init_ep ~when_negative_length:() (-10) Lwt.return_ok)
-    >>= fun () ->
-    assert_eq_s (init_ep ~when_negative_length:() 0 Lwt.return_ok) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_ep ~when_negative_length:() 11 Lwt.return_ok)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
-
-  let tests =
-    [
-      Alcotest_lwt.test_case_sync "init" `Quick init;
-      Alcotest_lwt.test_case_sync "init_e" `Quick init_e;
-      Alcotest_lwt.test_case "init_s" `Quick init_s;
-      Alcotest_lwt.test_case "init_es" `Quick init_es;
-      Alcotest_lwt.test_case "init_p" `Quick init_p;
-      Alcotest_lwt.test_case "init_ep" `Quick init_ep;
+      Alcotest.test_case "last" `Quick last;
+      Alcotest.test_case "last_opt" `Quick last_opt;
     ]
 end
 
@@ -212,129 +158,9 @@ module FilterSmthg = struct
 
   let tests =
     [
-      Alcotest_lwt.test_case_sync "filter_some" `Quick filter_some;
-      Alcotest_lwt.test_case_sync "filter_ok" `Quick filter_ok;
-      Alcotest_lwt.test_case_sync "filter_error" `Quick filter_error;
-    ]
-end
-
-module ConcatMap = struct
-  let concat_map () =
-    assert (concat_map Fun.id [] = []) ;
-    assert (concat_map Fun.id [[]; []; []; []] = []) ;
-    assert (concat_map (fun _ -> assert false) [] = []) ;
-    assert (concat_map (fun _ -> []) [1] = []) ;
-    assert (concat_map (fun x -> [x]) [1] = [1]) ;
-    assert (concat_map (fun x -> [x; 0; x; x]) [1] = [1; 0; 1; 1]) ;
-    assert (concat_map (fun _ -> []) [1; 2; 3] = []) ;
-    assert (concat_map (fun x -> [x]) [1; 2; 3] = [1; 2; 3]) ;
-    assert (
-      concat_map (fun x -> [x; x; 2 * x]) [1; 2; 3]
-      = [1; 1; 2; 2; 2; 4; 3; 3; 6]) ;
-    ()
-
-  let concat_map_e () =
-    assert (concat_map_e Result.ok [] = Ok []) ;
-    assert (concat_map_e Result.ok [[]; []; []; []] = Ok []) ;
-    assert (concat_map_e (fun _ -> assert false) [] = Ok []) ;
-    assert (concat_map_e (fun _ -> Ok []) [1] = Ok []) ;
-    assert (concat_map_e (fun x -> Ok [x]) [1] = Ok [1]) ;
-    assert (concat_map_e (fun x -> Ok [x; 0; x; x]) [1] = Ok [1; 0; 1; 1]) ;
-    assert (concat_map_e (fun _ -> Ok []) [1; 2; 3] = Ok []) ;
-    assert (concat_map_e (fun x -> Ok [x]) [1; 2; 3] = Ok [1; 2; 3]) ;
-    assert (
-      concat_map_e (fun x -> Ok [x; x; 2 * x]) [1; 2; 3]
-      = Ok [1; 1; 2; 2; 2; 4; 3; 3; 6]) ;
-    assert (concat_map_e (fun _ -> Error ()) [] = Ok []) ;
-    assert (concat_map_e (fun _ -> Error ()) [[]; []; []; []] = Error ()) ;
-    assert (concat_map_e (fun _ -> Error ()) [1] = Error ()) ;
-    assert (concat_map_e (fun _ -> Error ()) [1; 2; 3] = Error ()) ;
-    assert (concat_map_e (fun x -> Error x) [1; 2; 3] = Error 1) ;
-    assert (
-      concat_map_e (fun x -> if x <= 1 then Ok [x] else Error x) [1; 2; 3]
-      = Error 2) ;
-    ()
-
-  let concat_map_s _ () =
-    let open Lwt.Infix in
-    assert_eq_s (concat_map_s Lwt.return []) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s Lwt.return [[]; []; []; []]) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s (fun _ -> assert false) []) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1]) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s (fun x -> Lwt.return [x]) [1]) (Lwt.return [1])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_s (fun x -> Lwt.return [x; 0; x; x]) [1])
-      (Lwt.return [1; 0; 1; 1])
-    >>= fun () ->
-    assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1; 2; 3]) nil_s
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_s (fun x -> Lwt.return [x]) [1; 2; 3])
-      (Lwt.return [1; 2; 3])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_s (fun x -> Lwt.return [x; x; 2 * x]) [1; 2; 3])
-      (Lwt.return [1; 1; 2; 2; 2; 4; 3; 3; 6])
-    >>= fun () -> Lwt.return_unit
-
-  let concat_map_es _ () =
-    let open Lwt.Infix in
-    assert_eq_s (concat_map_es Lwt.return_ok []) nil_es >>= fun () ->
-    assert_eq_s (concat_map_es Lwt.return_ok [[]; []; []; []]) nil_es
-    >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> assert false) []) nil_es >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1]) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x]) [1])
-      (Lwt.return_ok [1])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x; 0; x; x]) [1])
-      (Lwt.return_ok [1; 0; 1; 1])
-    >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1; 2; 3]) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x]) [1; 2; 3])
-      (Lwt.return_ok [1; 2; 3])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x; x; 2 * x]) [1; 2; 3])
-      (Lwt.return_ok [1; 1; 2; 2; 2; 4; 3; 3; 6])
-    >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> Lwt.return_error ()) []) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun _ -> Lwt.return_error ()) [[]; []; []; []])
-      (Lwt.return_error ())
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun _ -> Lwt.return_error ()) [1])
-      (Lwt.return_error ())
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun _ -> Lwt.return_error ()) [1; 2; 3])
-      (Lwt.return_error ())
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_error x) [1; 2; 3])
-      (Lwt.return_error 1)
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es
-         (fun x -> if x <= 1 then Lwt.return_ok [x] else Lwt.return_error x)
-         [1; 2; 3])
-      (Lwt.return_error 2)
-    >>= fun () -> Lwt.return_unit
-
-  let tests =
-    [
-      Alcotest_lwt.test_case_sync "concat_map" `Quick concat_map;
-      Alcotest_lwt.test_case_sync "concat_map_e" `Quick concat_map_e;
-      Alcotest_lwt.test_case "concat_map_s" `Quick concat_map_s;
-      Alcotest_lwt.test_case "concat_map_es" `Quick concat_map_es;
+      Alcotest.test_case "filter_some" `Quick filter_some;
+      Alcotest.test_case "filter_ok" `Quick filter_ok;
+      Alcotest.test_case "filter_error" `Quick filter_error;
     ]
 end
 
@@ -372,22 +198,19 @@ module Combine = struct
           @@ init ~when_negative_length:() 101 (fun i -> (i, 100 - i)),
           None )) ;
     assert (combine_with_leftovers [0] [1] = ([(0, 1)], None)) ;
-    assert (combine_with_leftovers [] [0] = ([], Some (`Right [0]))) ;
-    assert (combine_with_leftovers [0] [] = ([], Some (`Left [0]))) ;
+    assert (combine_with_leftovers [] [0] = ([], Some (Either.Right [0]))) ;
+    assert (combine_with_leftovers [0] [] = ([], Some (Either.Left [0]))) ;
     assert (
       combine_with_leftovers (up 100) (up 99)
-      = (map (fun i -> (i, i)) (up 99), Some (`Left [100]))) ;
+      = (map (fun i -> (i, i)) (up 99), Some (Either.Left [100]))) ;
     ()
 
   let tests =
     [
-      Alcotest_lwt.test_case_sync "combine-error" `Quick combine_error;
-      Alcotest_lwt.test_case_sync "combine-ok" `Quick combine_ok;
-      Alcotest_lwt.test_case_sync "combine_drop" `Quick combine_drop;
-      Alcotest_lwt.test_case_sync
-        "combine_with_leftovers"
-        `Quick
-        combine_with_leftovers;
+      Alcotest.test_case "combine-error" `Quick combine_error;
+      Alcotest.test_case "combine-ok" `Quick combine_ok;
+      Alcotest.test_case "combine_drop" `Quick combine_drop;
+      Alcotest.test_case "combine_with_leftovers" `Quick combine_with_leftovers;
     ]
 end
 
@@ -405,89 +228,120 @@ module Partition = struct
       partition_result input = (filter_ok input, filter_error input)) ;
     ()
 
-  let tests =
-    [Alcotest_lwt.test_case_sync "partition-result" `Quick partition_result]
+  let tests = [Alcotest.test_case "partition-result" `Quick partition_result]
 end
 
-module Fold = struct
-  let list = [1; 2; 3; 4]
+module Product = struct
+  let empty_single () =
+    assert (product [] [] = []) ;
+    assert (product [0] [] = []) ;
+    assert (product [] [0] = []) ;
+    assert (product ['a'] [0] = [('a', 0)]) ;
+    ()
 
-  let list_sum = 10
-
-  let test_fold_left_map () =
-    assert (List.fold_left_map (fun _ _ -> assert false) 0 [] = (0, [])) ;
-    assert (List.fold_left_map (fun a b -> (a + b, b)) 0 list = (list_sum, list))
-
-  let test_fold_left_map_e () =
+  let big () =
     assert (
-      fold_left_map_e (fun a b -> Ok (a + b, b)) 0 list = Ok (list_sum, list)) ;
-    assert (fold_left_map_e (fun _ _ -> assert false) 0 [] = Ok (0, [])) ;
-    let x =
-      fold_left_map_e (fun s x -> if x < 3 then Ok (s, x) else Error x) 0 list
-    in
-    assert (x = Error 3)
-
-  let test_fold_left_map_s _ () =
-    let open Lwt_syntax in
-    let* () =
-      assert_eq_s
-        (fold_left_map_s (fun _ _ -> assert false) 0 [])
-        (Lwt.return (0, []))
-    in
-    let* () =
-      assert_eq_s
-        (fold_left_map_s (fun a b -> Lwt.return (a + b, b)) 0 list)
-        (Lwt.return (list_sum, list))
-    in
-    let p =
-      fold_left_map_s
-        (fun a b -> if a < 3 then Lwt.return (a + 1, b) else Lwt.fail Exit)
-        0
-        list
-    in
-    assert (Lwt.state p = Lwt.Fail Exit) ;
-    Lwt.return ()
-
-  let test_fold_left_map_es _ () =
-    let open Lwt_syntax in
-    let* () =
-      assert_eq_s
-        (fold_left_map_es (fun _ _ -> assert false) 0 [])
-        (return_ok (0, []))
-    in
-    let* () =
-      assert_eq_s
-        (fold_left_map_es (fun a b -> return_ok (a + b, b)) 0 list)
-        (return_ok (list_sum, list))
-    in
-    let open Lwt_result_syntax in
-    assert_eq_s
-      (fold_left_map_es
-         (fun s x -> if x < 3 then return (s, x) else fail x)
-         0
-         list)
-      (fail 3)
+      sort Stdlib.compare @@ product ['a'; 'b'; 'c'] [0]
+      = [('a', 0); ('b', 0); ('c', 0)]) ;
+    assert (sort Stdlib.compare @@ product ['a'] [0; 1] = [('a', 0); ('a', 1)]) ;
+    assert (
+      sort Stdlib.compare @@ product ['a'; 'b'; 'c'] [0; 1]
+      = [('a', 0); ('a', 1); ('b', 0); ('b', 1); ('c', 0); ('c', 1)]) ;
+    ()
 
   let tests =
     [
-      Alcotest_lwt.test_case_sync "fold_left-map" `Quick test_fold_left_map;
-      Alcotest_lwt.test_case_sync "fold_left_map_e" `Quick test_fold_left_map_e;
-      Alcotest_lwt.test_case "fold_left_map_s" `Quick test_fold_left_map_s;
-      Alcotest_lwt.test_case "fold_left_map_es" `Quick test_fold_left_map_es;
+      Alcotest.test_case "empty and singleton" `Quick empty_single;
+      Alcotest.test_case "big" `Quick big;
+    ]
+end
+
+module Shuffle = struct
+  let test_small () =
+    let rng = Random.State.make_self_init () in
+    assert (shuffle ~rng [] = []) ;
+    assert (shuffle ~rng [0] = [0]) ;
+    assert (shuffle ~rng [0; 0] = [0; 0]) ;
+    ()
+
+  let pp_int_list =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+      Format.pp_print_int
+
+  let list_size = QCheck.Gen.int_range 2 50
+
+  let count = 50
+
+  let test_shuffle_preserves_values =
+    QCheck.Test.make
+      ~name:"shuffle preserves value sets"
+      ~count
+      QCheck.(pair (list_of_size list_size int) int)
+      (fun (l, seed) ->
+        let rng = Random.State.make [|seed|] in
+        let l1 = sort Int.compare l in
+        let l2 = sort Int.compare (shuffle ~rng l) in
+        Lib_test.Qcheck_helpers.qcheck_eq'
+          ~pp:pp_int_list
+          ~eq:( = )
+          ~actual:l2
+          ~expected:l1
+          ())
+
+  let test_determinism_eq seed =
+    let rng1 = Random.State.make [|seed|] in
+    let rng2 = Random.State.make [|seed|] in
+    let input = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] in
+    let output1 = shuffle ~rng:rng1 input in
+    let output2 = shuffle ~rng:rng2 input in
+    assert (equal Int.equal output1 output2)
+
+  let test_determinism_eq () =
+    test_determinism_eq 0 ;
+    test_determinism_eq 1 ;
+    test_determinism_eq 3421304 ;
+    test_determinism_eq 3021782487 ;
+    test_determinism_eq 3421452345304 ;
+    test_determinism_eq 30214780913782487 ;
+    ()
+
+  let test_determinism_neq seed =
+    let rng1 = Random.State.make [|seed|] in
+    let rng2 = Random.State.make [|seed + 17|] in
+    let input = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] in
+    let output1 = shuffle ~rng:rng1 input in
+    let output2 = shuffle ~rng:rng2 input in
+    assert (not (equal Int.equal output1 output2))
+
+  let test_determinism_neq () =
+    test_determinism_neq 0 ;
+    test_determinism_neq 1 ;
+    test_determinism_neq 3421304 ;
+    test_determinism_neq 3021782487 ;
+    test_determinism_neq 3421452345304 ;
+    test_determinism_neq 30214780913782487 ;
+    ()
+
+  let tests =
+    [
+      Alcotest.test_case "small" `Quick test_small;
+      QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
+      Alcotest.test_case "determinism(eq)" `Quick test_determinism_eq;
+      Alcotest.test_case "determinism(neq)" `Quick test_determinism_neq;
     ]
 end
 
 let () =
-  Alcotest_lwt.run
+  Alcotest.run
     "list-basic"
     [
+      ("is_empty", IsEmpty.tests);
       ("nth", Nth.tests);
       ("last", Last.tests);
-      ("init", Init.tests);
       ("filter_*", FilterSmthg.tests);
-      ("concat_map_*", ConcatMap.tests);
       ("combine_*", Combine.tests);
       ("partition_*", Partition.tests);
-      ("fold", Fold.tests);
+      ("shuffle", Shuffle.tests);
+      ("product", Product.tests);
     ]
-  |> Lwt_main.run

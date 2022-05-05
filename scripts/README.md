@@ -1,5 +1,4 @@
-This directory contains various utility scripts related to the project
-lifecycle.
+This directory contains various utility scripts related to the project lifecycle.
 
 # Overview
 
@@ -16,7 +15,6 @@ In particular, this includes scripts for:
 * generate configuration code (in OCaml) to bootstrap a new network (`gen-genesis/`)
 * running quick checks as a git hook before commiting (`pre_commit/`)
 * preparing the environment for migration tests (`prepare_migration_test.ml`)
-* printing the version of the Octez release (`print_version.ml`)
 * releasing static Octez binaries (`release/`)
 * snapshotting protocols, linking them to the build system (`snapshot_alpha.sh`, `link_protocol.sh`, `snapshot_alpha_and_link.sh`)
 * getting baker version stats from a range of blocks (`baker-version-stats.sh`)

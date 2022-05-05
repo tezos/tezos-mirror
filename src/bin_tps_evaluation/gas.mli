@@ -24,13 +24,24 @@
 (*****************************************************************************)
 
 (** Calculate the average transaction cost. *)
-val average_transaction_cost : Average_block.t -> int
+val average_transaction_cost :
+  Client.stresstest_gas_estimation -> Average_block.t -> int
 
 (** Deduce the maximal theoretical TPS based on hard gas limit per block and
    the gas cost of the average operation. *)
 val deduce_tps :
   protocol:Protocol.t ->
-  constants:Protocol.constants ->
-  transaction_cost:int ->
+  protocol_constants:Protocol.constants ->
+  average_transaction_cost:int ->
   unit ->
   int
+
+(** Calculate fee and gas limit given gas cost estimation. *)
+val deduce_fee_and_gas_limit : int -> Tez.t * int
+
+(** Calculate probabilities of smart contracts in a form suitable for
+    passing to the client stresstest command. *)
+val calculate_smart_contract_parameters :
+  Average_block.t ->
+  Client.stresstest_gas_estimation ->
+  (string * Client.stresstest_contract_parameters) list

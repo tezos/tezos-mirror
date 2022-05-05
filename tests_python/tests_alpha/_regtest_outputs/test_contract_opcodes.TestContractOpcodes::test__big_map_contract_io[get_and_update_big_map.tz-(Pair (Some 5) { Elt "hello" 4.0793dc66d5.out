@@ -9,28 +9,28 @@ big_map diff
   Set map(4)["hello"] to 4
   Set map(4)["hi"] to 5
 trace
-  - location: 13 (remaining gas: 1039987.946 units remaining)
-    [ (Pair "hi" (Some 5) { Elt "hello" 4 })  	 ]
-  - location: 13 (remaining gas: 1039987.936 units remaining)
-    [ "hi"  	@parameter
-      (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
-  - location: 14 (remaining gas: 1039987.921 units remaining)
-    [ (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
-  - location: 16 (remaining gas: 1039987.911 units remaining)
-    [ (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039987.881 units remaining)
-    [ "hi"  	@parameter
-      (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039986.906 units remaining)
-    [ None  	
-      { Elt "hello" 4 ; Elt "hi" 5 }  	 ]
-  - location: 18 (remaining gas: 1039986.891 units remaining)
-    [ (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 19 (remaining gas: 1039986.876 units remaining)
-    [ {}  	
-      (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 21 (remaining gas: 1039986.861 units remaining)
-    [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
+  - location: 13 (remaining gas: 1039989.836 units remaining)
+    [ (Pair "hi" (Some 5) { Elt "hello" 4 }) ]
+  - location: 13 (remaining gas: 1039989.826 units remaining)
+    [ "hi"
+      (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 14 (remaining gas: 1039989.816 units remaining)
+    [ (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 16 (remaining gas: 1039989.806 units remaining)
+    [ (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 14 (remaining gas: 1039989.786 units remaining)
+    [ "hi"
+      (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 17 (remaining gas: 1039988.871 units remaining)
+    [ None
+      { Elt "hello" 4 ; Elt "hi" 5 } ]
+  - location: 18 (remaining gas: 1039988.861 units remaining)
+    [ (Pair None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+  - location: 19 (remaining gas: 1039988.851 units remaining)
+    [ {}
+      (Pair None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+  - location: 21 (remaining gas: 1039988.841 units remaining)
+    [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 }) ]
 

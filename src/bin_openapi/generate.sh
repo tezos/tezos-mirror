@@ -17,9 +17,9 @@ tezos_node=./tezos-node
 tezos_client=./tezos-client
 
 # Protocol configuration.
-protocol_hash=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
-protocol_parameters=src/proto_010_PtGRANAD/parameters/sandbox-parameters.json
-protocol_name=granada
+protocol_hash=Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+protocol_parameters=src/proto_012_Psithaca/parameters/sandbox-parameters.json
+protocol_name=ithaca
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -41,7 +41,7 @@ proto_openapi_json=docs/api/$protocol_name-openapi.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 
 # Get version number.
-version=$(ocaml scripts/print_version.ml)
+version=$(dune exec tezos-version)
 
 # Start a sandbox node.
 $tezos_node config init --data-dir $data_dir \

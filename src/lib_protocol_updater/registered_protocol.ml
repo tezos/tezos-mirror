@@ -143,6 +143,26 @@ let build hash =
 
           let complete_b58prefix = Env.Context.complete
         end : T)
+  | Some (V5 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.MakeV5 (Name) () in
+      Some
+        (module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
+
+          let complete_b58prefix = Env.Context.complete
+        end : T)
 
 module VersionTable = Protocol_hash.Table
 
@@ -183,9 +203,10 @@ let () =
     (fun hash -> Unregistered_protocol hash)
 
 let get_result hash =
+  let open Lwt_result_syntax in
   match get hash with
   | Some hash -> return hash
-  | None -> fail (Unregistered_protocol hash)
+  | None -> tzfail (Unregistered_protocol hash)
 
 let seq () = VersionTable.to_seq_values versions
 
@@ -317,6 +338,35 @@ end
 
 module Register_embedded_V4
     (Env : Tezos_protocol_environment.V4)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
+struct
+  let hash =
+    match Source.hash with
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
+
+  module Self = struct
+    module P = struct
+      let hash = hash
+
+      include Env.Lift (Proto)
+    end
+
+    include P
+
+    let complete_b58prefix = Env.Context.complete
+  end
+
+  let () =
+    VersionTable.add sources hash Source.sources ;
+    VersionTable.add versions hash (module Self : T)
+
+  include Self
+end
+
+module Register_embedded_V5
+    (Env : Tezos_protocol_environment.V5)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct

@@ -8,9 +8,15 @@ sanity_ci:
   before_script:
     - . ./scripts/version.sh
   script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - make -C manifest check
     - src/tooling/lint.sh --check-gitlab-ci-yml
 
-docker-hadolint:
+docker:hadolint:
+  extends:
+    - .default_settings_template
+    - .rules_template__development_dockerfile
   image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   needs: []

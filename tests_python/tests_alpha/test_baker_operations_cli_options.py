@@ -335,7 +335,12 @@ class TestBakerExternalOperations:
             ALL_BOOTSTRAP_ACCOUNTS,
             proto=protocol.DAEMON,
             log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
-            run_params=['--operations-pool', session['operations_file']],
+            run_params=[
+                '--operations-pool',
+                session['operations_file'],
+                '--liquidity-baking-toggle-vote',
+                'pass',
+            ],
         )
 
     @pytest.mark.timeout(30)

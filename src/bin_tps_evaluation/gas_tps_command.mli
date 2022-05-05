@@ -23,5 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Cmdliner's command definition for the "gas TPS" command. *)
-val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
+(** Results of running a gas TPS estimation. *)
+type gas_estimation_results = {
+  average_block : Average_block.t;  (** A description of the average block. *)
+  transaction_costs : Client.stresstest_gas_estimation;
+      (** Costs of various types of transactions. *)
+  average_transaction_cost : int;  (** Cost of the average transaction. *)
+  gas_tps : int;  (** Maximal TPS calculated based on gas. *)
+}
+
+(** Estimate gas TPS. *)
+val estimate_gas_tps :
+  average_block_path:string option -> unit -> gas_estimation_results Lwt.t
+
+(** Register gas estimation of TPS as a Tezt long test. *)
+val register : unit -> unit

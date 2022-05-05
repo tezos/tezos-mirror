@@ -24,7 +24,7 @@
 
 let rpc_directory net =
   let dir = RPC_directory.empty in
-  let version = Version.current in
+  let version = Current_git_info.version in
   let network_version = P2p.announced_version net in
   let commit_hash = Current_git_info.commit_hash in
   let commit_date = Current_git_info.committer_date in

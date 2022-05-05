@@ -49,6 +49,40 @@ module type CORE = sig
 
   val string_of_category : error_category -> string
 
+  (** The encoding for errors.
+
+      Note that this encoding has a few peculiarities, some of which may impact
+      your code. These peculiarities are due to the type [error] being an
+      extensible variant.
+
+      Because the [error] type is an extensible variant, you must register an
+      encoding for each error constructor you add to [error]. This is done via
+      {!register_error_kind}.
+
+      Because the [error] type is an extensible variant, with dynamically
+      registered errors (see peculiarity above), there are no tags
+      associated with each error. This does not affect the JSON encoding, but it
+      does impose restrictions on the binary encoding. The chosen workaround is
+      to encode errors as JSON and to encode the JSON to binary form. As a
+      result, errors can be somewhat large in binary: they include field names
+      and such.
+
+      Because the [error] type is an extensible variant, with dynamically
+      registered errors (see peculiarity above), the encoding must be recomputed
+      when a new error is registered. This is achieved by the means of a
+      {!Data_encoding.delayed} combinator: the encoding is recomputed on-demand.
+      There is a caching mechanism so that, in the case where no new errors have
+      been registered since the last use, the last result is used.
+
+      This last peculiarity imposes a limit on the use of [error_encoding]
+      itself. Specifically, it is invalid to use [error_encoding] inside the
+      [~json] argument of a {!Data_encoding.splitted}. This is because
+      [splitted] evaluates the [delayed] combinator once-and-for-all to produce
+      a json encoding. (Note that the following
+      data-encoding combinators use [splitted] internally:
+      {!Data_encoding.Compact.make}, {!Data_encoding.assoc}, and
+      {!Data_encoding.lazy_encoding}. As a result, it is invalid to use
+      [error_encoding] within the arguments of these combinators as well.) *)
   val error_encoding : error Data_encoding.t
 
   val pp : Format.formatter -> error -> unit
@@ -72,32 +106,14 @@ module type CORE = sig
     ('err -> error) ->
     unit
 
-  (** Same as [register_error_kind] but allow errors to wrap other errors.
-
-      The encoding argument is a function which will be given the encoding of
-      errors as argument so that you can encode errors in errors using a fixpoint.
-
-      Another difference with [register_error_kind] is that [pp] is mandatory. *)
-  val register_recursive_error_kind :
-    error_category ->
-    id:string ->
-    title:string ->
-    description:string ->
-    pp:(Format.formatter -> 'err -> unit) ->
-    (error Data_encoding.t -> 'err Data_encoding.t) ->
-    (error -> 'err option) ->
-    ('err -> error) ->
-    unit
-
   (** Classify an error using the registered kinds *)
   val classify_error : error -> Error_classification.t
 
   (** Catch all error when 'serializing' an error. *)
-  type error +=
-    private
-    | Unclassified of string
-          (** Catch all error when 'deserializing' an error. *)
+  type error += private Unclassified of string
+  (**)
 
+  (** Catch all error when 'deserializing' an error. *)
   type error += private Unregistered_error of Data_encoding.json
 
   (** An error serializer *)
@@ -118,11 +134,12 @@ module type CORE = sig
 
   val pp_info : Format.formatter -> error_info -> unit
 
-  (**
-     [find_info_of_error e] retrieves the `error_info` associated with the
-     given error `e`.
-     @raise [Invalid_argument] if the error is a wrapped error from another monad
-     @raise [Not_found] if the error's constructor has not been registered
+  (** [find_info_of_error e] retrieves the `error_info` associated with the
+      given error `e`.
+
+      @raise Invalid_argument if the error is a wrapped error from another monad
+
+      @raise Not_found if the error's constructor has not been registered
   *)
   val find_info_of_error : error -> error_info
 
@@ -134,21 +151,19 @@ module type WITH_WRAPPED = sig
   type error
 
   module type Wrapped_error_monad = sig
-    (**
-       The purpose of this module is to wrap a specific error monad [E]
-       into a more general error monad [Eg].
+    (** The purpose of this module is to wrap a specific error monad [E]
+        into a more general error monad [Eg].
 
-       The user implementing such an interface is responsible to
-       maintain the following assertions
-       - The [Eg] error is extended locally with a specific constructor [C]
-       - [unwrapped] is equal to the [error] type of [E]
-       - [wrap] builds an [Eg] [error] value from an [E] [error] value
-       - [unwrap] matches on [Eg] error cases and extracts [E]
-         error value from [C]
+        The user implementing such an interface is responsible to
+        maintain the following assertions
+        - The [Eg] error is extended locally with a specific constructor [C]
+        - [unwrapped] is equal to the [error] type of [E]
+        - [wrap] builds an [Eg] [error] value from an [E] [error] value
+        - [unwrap] matches on [Eg] error cases and extracts [E]
+          error value from [C]
 
-       As a reference implementation,
-       see src/lib_protocol_environment/environment_V3.ml
-    *)
+        As a reference implementation,
+        see src/lib_protocol_environment/environment_V3.ml *)
 
     type unwrapped = ..
 
@@ -165,8 +180,7 @@ module type WITH_WRAPPED = sig
 
   (** Same as [register_error_kind] but for a wrapped error monad.
       The codec is defined in the module parameter. It makes the category
-      of the error [Wrapped] instead of [Main].
-  *)
+      of the error [Wrapped] instead of [Main]. *)
   val register_wrapped_error_kind :
     (module Wrapped_error_monad) ->
     id:string ->
@@ -222,46 +236,47 @@ module type MONAD_EXTENSION = sig
 
   val classify_trace : tztrace -> Error_classification.t
 
-  val return : 'a -> ('a, 'e) result Lwt.t
+  module Legacy_monad_globals : sig
+    val return : 'a -> ('a, 'e) result Lwt.t
 
-  val return_unit : (unit, 'e) result Lwt.t
+    val return_unit : (unit, 'e) result Lwt.t
 
-  val return_none : ('a option, 'e) result Lwt.t
+    val return_none : ('a option, 'e) result Lwt.t
 
-  val return_some : 'a -> ('a option, 'e) result Lwt.t
+    val return_some : 'a -> ('a option, 'e) result Lwt.t
 
-  val return_nil : ('a list, 'e) result Lwt.t
+    val return_nil : ('a list, 'e) result Lwt.t
 
-  val return_true : (bool, 'e) result Lwt.t
+    val return_true : (bool, 'e) result Lwt.t
 
-  val return_false : (bool, 'e) result Lwt.t
+    val return_false : (bool, 'e) result Lwt.t
 
-  (** more globals *)
-  val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+    val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
-  val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+    val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
-  val ok : 'a -> ('a, 'e) result
+    val ok : 'a -> ('a, 'e) result
 
-  val error : 'e -> ('a, 'e trace) result
+    val error : 'e -> ('a, 'e trace) result
 
-  val ( >>? ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+    val ( >>? ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
 
-  val ( >|? ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+    val ( >|? ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
 
-  val fail : 'e -> ('a, 'e trace) result Lwt.t
+    val fail : 'e -> ('a, 'e trace) result Lwt.t
 
-  val ( >>=? ) :
-    ('a, 'e) result Lwt.t ->
-    ('a -> ('b, 'e) result Lwt.t) ->
-    ('b, 'e) result Lwt.t
+    val ( >>=? ) :
+      ('a, 'e) result Lwt.t ->
+      ('a -> ('b, 'e) result Lwt.t) ->
+      ('b, 'e) result Lwt.t
 
-  val ( >|=? ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
+    val ( >|=? ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
 
-  val ( >>?= ) :
-    ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
+    val ( >>?= ) :
+      ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
 
-  val ( >|?= ) : ('a, 'e) result -> ('a -> 'b Lwt.t) -> ('b, 'e) result Lwt.t
+    val ( >|?= ) : ('a, 'e) result -> ('a -> 'b Lwt.t) -> ('b, 'e) result Lwt.t
+  end
 
   (* Pretty-prints an error trace. *)
   val pp_print_trace : Format.formatter -> error trace -> unit
@@ -346,7 +361,8 @@ match res with
       You can achieve the same effect by hand with
 
 {[
-p >>= function
+let* r = p in
+match r with
 | Ok _ -> p
 | Error tr ->
    Lwt.return (Error (Trace.cons (mkerr ()) tr))

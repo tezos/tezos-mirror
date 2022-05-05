@@ -159,7 +159,9 @@ module S = struct
            "min_date"
            ~descr:
              "When `min_date` is provided, blocks with a timestamp before \
-              `min_date` are filtered out"
+              `min_date` are filtered out. However, if the `length` parameter \
+              is also provided, then up to that number of predecessors will be \
+              returned regardless of their date."
            Time.Protocol.rpc_arg
            (fun x -> x#min_date)
       |> seal
@@ -218,7 +220,7 @@ let make_call1 s ctxt chain a q p =
 let chain_id ctxt =
   let f = make_call0 S.chain_id ctxt in
   fun ?(chain = `Main) () ->
-    match chain with `Hash h -> return h | _ -> f chain () ()
+    match chain with `Hash h -> Lwt.return_ok h | _ -> f chain () ()
 
 let checkpoint ctxt ?(chain = `Main) () =
   make_call0 S.checkpoint ctxt chain () ()

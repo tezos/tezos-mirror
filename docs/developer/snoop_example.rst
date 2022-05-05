@@ -11,16 +11,16 @@ is used among other things to hash blocks, operations and contexts:
 
 At the time of writing, this function is a thin wrapper which
 concatenates the list of bytes and passes it to the ``blake2b``
-implementation provided by `HACL *`.
+implementation provided by `HACL* <https://github.com/project-everest/hacl-star>`_.
 
-Step 1: defining the benchmark
+Step 1: Defining the benchmark
 ------------------------------
 
 Benchmarks correspond to OCaml modules implementing the ``Benchmark.S`` signature.
 These must then be registered via the ``Registration.register`` function.
 Of course, for this registration to happen, the file containing the benchmark
 and the call to ``Registration.register`` should be linked with ``tezos-snoop``.
-See the :doc:`architecture of tezos-snoop <snoop_arch>` for complementary details.
+See :doc:`snoop_arch` for complementary details.
 
 We'll define the benchmark module chunk by chunk and describe each part.
 Benchmarks are referenced by ``name``. The ``info`` field is a brief
@@ -34,7 +34,7 @@ that allows listing benchmarks by kind.
      let info = "Illustrating tezos-benchmark by benchmarking blake2b"
      let tags = ["example"]
 
-Typically, a benchmark will depend on a set of parameters corresponding eg to
+Typically, a benchmark will depend on a set of parameters corresponding e.g. to
 the parameters of the samplers used to generate input data to the function
 being benchmarked. This corresponds to the type ``config``. A ``default_config``
 is provided, which can be overridden by specifying a well-formatted JSON file.
@@ -54,7 +54,7 @@ This is made possible by defining a ``config_encoding`` using the
 
 Benchmarking involves measuring the execution time of some piece of code
 and using the recorded execution time to fit a model.
-As explained in the :doc:`architecture of tezos-snoop <snoop_arch>`,
+As explained in :doc:`snoop_arch`,
 a model is in fact a function of two parameters: a ``workload`` and the
 vector of free parameters to be fitted. The ``workload`` corresponds to
 the information on the input of the function being benchmarked required
@@ -80,9 +80,9 @@ not interested in plotting, this function can be made to always return
        Sparse_vec.String.of_list [("nbytes", float_of_int nbytes)]
 
 We expect the execution time of ``Blake2b.hash_bytes`` to be proportional
-to the number of bytes being hashed, with possibly a small constant time overhead.
+to the number of bytes being hashed, with possibly a small constant-time overhead.
 Hence, we pick an ``affine`` model. The ``affine`` model is generic, of the form
-:math:`affine(n) = \theta_0 + \theta_1 \times n` with :math:`\theta_i` the free
+:math:`\text{affine}(n) = \theta_0 + \theta_1 \times n` with :math:`\theta_i` the free
 parameters. One must explain how to convert the ``workload`` to the argument ``n``.
 This is the purpose of the ``conv`` parameter.
 
@@ -151,15 +151,15 @@ For illustrative purposes, we also make the ``blake2b`` available for code gener
        "blake2b_codegen"
        (Model.For_codegen (List.assoc "blake2b" Blake2b_bench.models))
 
-Step 2: checking the timer
+Step 2: Checking the timer
 --------------------------
 
 Before we perform the benchmarks, we need to ensure that the system timer
 is sufficiently precise. This data is also useful to subtract the latency
-of time timer for very small duration benchmarks (which is not required here).
+of the timer for benchmarks of very small duration (which is not required here).
 We invoke the tool on the built-in benchmark ``TIMER_LATENCY`` and specify
-that we want only one closure to benchmark (since all closures are identical
-for this benchmark) but execute this closure ``100000`` times.
+(through ``--bench-num``) that we want only one closure to benchmark (since all closures are identical
+for this benchmark) but to execute this closure ``100000`` times (through ``--nsamples``).
 
 .. code-block:: shell
 
@@ -186,9 +186,9 @@ The tool returns the following on standard output:
    benchmarking 1/1
    stats over all benchmarks: { max_time = 25.000000 ; min_time = 25.000000 ; mean_time = 25.000000 ; sigma = 0.000000 }
 
-This commands measures `100000` times the latency of the timer, that is
+This commands measures ``100000`` times the latency of the timer, that is
 the minimum time between two timing measurements. This yields an empirical distribution
-on timings. The tool takes the 50th percentile (ie the median) of the empirical distribution
+on timings. The tool takes the 50th percentile (i.e. the median) of the empirical distribution
 and returns the result: 25ns latency. This is reasonable.
 Since there's only one benchmark (with many samples), the standard deviation is by definition
 zero. One could also run many benchmarks with fewer samples per benchmark:
@@ -224,23 +224,23 @@ A reliable timer should have a latency of the order of 20 to 30 nanoseconds, wit
 It can happen on some hardware or software configurations that the timer latency is of the order of
 *microseconds* or worse: this makes benchmarking short-lived computations impossible.
 
-Step 3: benchmarking
+Step 3: Benchmarking
 --------------------
 
 If the results obtained in the previous section are reasonable,
 we can proceed to the generation of raw timing data. We want
 to invoke the ``Blake2b_example`` benchmark and save the resulting data to ``./blake2b.workload``.
-We want `500` distinct random inputs, and for each stack we will perform
-the timing measurement `3000` times. The ``--determinizer`` option specifies
-how the empirical timing distribution corresponding to the per-stack `3000` samples
-will be converted to a fixed value: here we pick the 50th percentile, ie the median
-(which happens to also be the default, so this last option could have been omitted).
+We want ``500`` distinct random inputs, and for each input we will perform
+the timing measurement ``3000`` times. The ``--determinizer`` option specifies
+how the empirical timing distribution corresponding to the per-input ``3000`` samples
+will be converted to a fixed value: here we pick the 50th percentile, i.e. the median
+(which happens to also be the default, so this option could have been omitted).
 We also use an explicit random seed in case we want to reproduce the exact same benchmarks.
 If not specified, the PRNG will self-initialize using an unknown seed.
 
 .. code-block:: shell
 
-   tezos-snoop benchmark Blake2b_example and save to blake2b.workload --bench-num 500 --nsamples 3000 --seed 12897
+   tezos-snoop benchmark Blake2b_example and save to blake2b.workload --bench-num 500 --nsamples 3000 --determinizer percentile@50 --seed 12897
 
 Here's the output:
 
@@ -265,7 +265,7 @@ Here's the output:
 
 Since the size of inputs varies a lot, the statistics over all benchmarks are less useful.
 
-Step 3.5: (optional) removing outliers
+Step 3.5: (optional) Removing outliers
 --------------------------------------
 
 It is possible to remove outliers from the raw benchmark data. The command is the following:
@@ -288,11 +288,11 @@ The best defense against outliers is to have clean data in the first place: use 
 
 .. _Fitting the model:
 
-Step 4: fitting the model
+Step 4: Fitting the model
 -------------------------
 
 We can now proceed to inferring the free parameters from the model using the data.
-At the time of writing, the tool offloads the regression problem to the scikit-learn
+At the time of writing, the tool offloads the regression problem to the `scikit-learn <https://scikit-learn.org/>`_
 (aka sklearn) Python library: install it before proceeding. Let's execute the following command:
 
 .. code-block:: shell
@@ -347,7 +347,7 @@ if the model is good, one should observe that the empirical data lies
 along a linear subspace. Here, the model is trivial so the central plot
 is less interesting.
 
-Step 5: generating code
+Step 5: Generating code
 -----------------------
 
 As a final step, we demonstrate how to generate code corresponding to the

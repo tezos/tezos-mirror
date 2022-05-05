@@ -85,14 +85,14 @@ type ciphertext
     The size works only if we use them for a small amount of time.
     !!! NEW KEYS SHOULD BE GENERATED FOR EACH LOCKING !!!
 
-    @raise [Failure] if there is not enough entropy available. *)
+    @raise Failure if there is not enough entropy available. *)
 val gen_rsa_keys : unit -> rsa_public * rsa_secret
 
 (** Generates almost uniformly an integer mod n.
     It is in the RSA group with overwhelming probability.
     We use this since we want to lock symmetric keys, not pre-determined messages.
 
-    @raise [Failure] if there is not enough entropy available. *)
+    @raise Failure if there is not enough entropy available. *)
 val gen_locked_value : rsa_public -> locked_value
 
 (** Hashes a number mod n to a symmetric key for authenticated encryption. *)

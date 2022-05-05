@@ -325,11 +325,11 @@ let estimated_gas_single (type kind)
     | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
-  List.fold_left
+  consumed_gas operation_result >>? fun acc ->
+  List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc ->
       consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
-    (consumed_gas operation_result)
+    acc
     internal_operation_results
 
 let estimated_storage_single (type kind) origination_size
@@ -356,11 +356,11 @@ let estimated_storage_single (type kind) origination_size
     | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
-  List.fold_left
+  storage_size_diff operation_result >>? fun acc ->
+  List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc ->
       storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
-    (storage_size_diff operation_result)
+    acc
     internal_operation_results
 
 let estimated_storage origination_size res =
@@ -395,12 +395,13 @@ let originated_contracts_single (type kind)
     | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
-  List.fold_left
+  originated_contracts operation_result >>? fun acc ->
+  let acc = List.rev acc in
+  List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc ->
       originated_contracts r >>? fun contracts ->
       Ok (List.rev_append contracts acc))
-    (originated_contracts operation_result >|? List.rev)
+    acc
     internal_operation_results
 
 let rec originated_contracts : type kind. kind contents_result_list -> _ =
@@ -441,10 +442,9 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
               (error_of_fmt "The transfer simulation failed.")
               (Error (Environment.wrap_tztrace errs))
       in
-      List.fold_left
-        (fun acc (Internal_operation_result (_, r)) ->
-          acc >>? fun () -> detect_script_failure r)
-        (detect_script_failure operation_result)
+      detect_script_failure operation_result >>? fun () ->
+      List.iter_e
+        (fun (Internal_operation_result (_, r)) -> detect_script_failure r)
         internal_operation_results
     in
     function
@@ -666,10 +666,20 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                 (Limit.known Gas.Arith.zero)
                 op)
          else
+           let safety_guard =
+             match c.operation with
+             | Transaction {destination; _}
+               when Option.is_some (Contract.is_implicit destination) ->
+                 Gas.Arith.zero
+             | Reveal _ | Delegation _ | Set_deposits_limit _ -> Gas.Arith.zero
+             | _ -> safety_guard
+           in
            cctxt#message
-             "Estimated gas: %a units (will add 100 for safety)"
+             "Estimated gas: %a units (will add %a for safety)"
              Gas.Arith.pp
              gas
+             Gas.Arith.pp
+             safety_guard
            >>= fun () ->
            let safe_gas = Gas.Arith.(add (ceil gas) safety_guard) in
            let patched_gas =

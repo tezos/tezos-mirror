@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_benchmark_examples)
  (public_name tezos-benchmark-examples)
@@ -7,4 +10,5 @@
   tezos-stdlib-unix
   tezos-crypto
   tezos-benchmark)
- (flags (:standard -open Tezos_base__TzPervasives)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))

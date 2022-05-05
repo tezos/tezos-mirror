@@ -200,7 +200,7 @@ let of_encoded_value :
 (* Sapling-related *)
 
 let sapling_transaction_inputs : Alpha_context.Sapling.transaction -> t =
- fun tx -> List.length tx.Tezos_sapling.Core.Client.UTXO.inputs
+ fun tx -> List.length tx.Tezos_sapling.Core.Client.UTXO.Legacy.inputs
 
 let sapling_transaction_outputs : Alpha_context.Sapling.transaction -> t =
- fun tx -> List.length tx.Tezos_sapling.Core.Client.UTXO.outputs
+ fun tx -> List.length tx.Tezos_sapling.Core.Client.UTXO.Legacy.outputs

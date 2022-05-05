@@ -1,16 +1,46 @@
-(test
- (name test_consensus_filter)
- (package tezos-protocol-plugin-alpha)
- (libraries tezos-base
-            alcotest-lwt
-            tezos-test-helpers
-            qcheck-alcotest
-            tezos-stdlib-unix
-            tezos-protocol-alpha-parameters
-            tezos-protocol-plugin-alpha)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_micheline
-                   -open Tezos_protocol_alpha
-                   -open Tezos_protocol_plugin_alpha
-                   -open Tezos_protocol_environment_alpha
-                   -open Tezos_protocol_alpha.Protocol)))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test_consensus_filter test_filter_state test_plugin)
+ (libraries
+  tezos-base
+  tezos-base-test-helpers
+  tezos-base.unix
+  alcotest-lwt
+  tezos-test-helpers
+  qcheck-alcotest
+  tezos-stdlib-unix
+  tezos-micheline
+  tezos-protocol-plugin-alpha
+  tezos-protocol-alpha.environment
+  tezos-protocol-alpha
+  tezos-protocol-alpha-parameters
+  tezos-alpha-test-helpers)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_base_test_helpers
+   -open Tezos_micheline
+   -open Tezos_protocol_plugin_alpha
+   -open Tezos_protocol_environment_alpha
+   -open Tezos_protocol_alpha
+   -open Tezos_protocol_alpha.Protocol
+   -open Tezos_protocol_alpha_parameters
+   -open Tezos_alpha_test_helpers)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-alpha-tests)
+ (action (run %{dep:./test_consensus_filter.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-alpha-tests)
+ (action (run %{dep:./test_filter_state.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-alpha-tests)
+ (action (run %{dep:./test_plugin.exe})))

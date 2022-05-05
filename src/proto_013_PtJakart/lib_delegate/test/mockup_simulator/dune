@@ -1,0 +1,31 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_013_PtJakart_mockup_simulator)
+ (public_name tezos-baking-013-PtJakart.mockup-simulator)
+ (libraries
+  tezos-base
+  tezos-protocol-013-PtJakart
+  tezos-client-013-PtJakart
+  tezos-client-commands
+  tezos-baking-013-PtJakart
+  tezos-stdlib-unix
+  tezos-client-base-unix
+  tezos-protocol-013-PtJakart-parameters
+  tezos-mockup
+  tezos-mockup-proxy
+  tezos-mockup-commands
+  tezos-baking-013-PtJakart.tenderbrute)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_client_013_PtJakart
+   -open Tezos_client_commands
+   -open Tezos_baking_013_PtJakart
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base_unix
+   -open Tezos_protocol_013_PtJakart_parameters
+   -open Tezos_protocol_013_PtJakart.Protocol)))

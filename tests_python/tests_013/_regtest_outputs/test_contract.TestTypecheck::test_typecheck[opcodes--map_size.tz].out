@@ -1,0 +1,14 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/map_size.tz]
+
+Well typed
+Gas remaining: 1039997.277 units remaining
+{ parameter (map string nat) ;
+  storage nat ;
+  code { CAR
+         /* [ map string nat ] */ ;
+         SIZE
+         /* [ nat ] */ ;
+         NIL operation
+         /* [ list operation : nat ] */ ;
+         PAIR
+         /* [ pair (list operation) nat ] */ } }

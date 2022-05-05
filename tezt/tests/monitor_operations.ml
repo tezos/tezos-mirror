@@ -128,4 +128,4 @@ let monitor_operations =
     in
     Test.fail "%s" error_msg
 
-let register ~protocols = monitor_operations ~protocols
+let register ~protocols = monitor_operations protocols

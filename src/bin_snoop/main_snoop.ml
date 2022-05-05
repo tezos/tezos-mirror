@@ -156,8 +156,9 @@ and infer_cmd_one_shot model_name workload_data solver
         | Cmdline.ReportToFile output_file ->
             let s = perform_report () in
             Lwt_main.run
-              ( Lwt_utils_unix.create_file output_file s >>= fun _nwritten ->
-                Lwt.return_unit ) ;
+              (let open Lwt_syntax in
+              let* _nwritten = Lwt_utils_unix.create_file output_file s in
+              Lwt.return_unit) ;
             Format.eprintf "Produced report on %s@." output_file
       in
       process_output measure model_name problem solution infer_opts
@@ -254,8 +255,9 @@ and infer_cmd_full_auto model_name workload_data solver
   | (Cmdline.ReportToFile output_file, Some report) ->
       let s = Report.to_latex report in
       Lwt_main.run
-        ( Lwt_utils_unix.create_file output_file s >>= fun _nwritten ->
-          Lwt.return_unit ) ;
+        (let open Lwt_syntax in
+        let* _nwritten = Lwt_utils_unix.create_file output_file s in
+        Lwt.return_unit) ;
       Format.eprintf "Produced report on %s@." output_file
   | _ -> assert false
 
@@ -397,7 +399,7 @@ let codegen_all_cmd solution regexp codegen_options =
 (* Activate logging system. *)
 let () =
   Lwt_main.run
-  @@ Internal_event_unix.(
+  @@ Tezos_base_unix.Internal_event_unix.(
        init
          ~lwt_log_sink:Lwt_log_sink_unix.default_cfg
          ~configuration:Configuration.default)

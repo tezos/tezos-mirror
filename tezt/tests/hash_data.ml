@@ -49,13 +49,12 @@ let hooks = Tezos_regression.hooks
     Call `tezos-client hash data ... of type ...` with data on which
     it must return 0. In addition, regression is activated.
     to check that returned values remain constant over time. *)
-let test_good_hash_data ~protocols =
+let test_good_hash_data =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"hash data ... of type ... (good)"
     ~tags:["hash"; "data"; "mockup"]
-    ~output_file:("hash_data" // "good")
-    ~protocols
+    ~output_file:(fun _ -> "hash_data" // "good")
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
@@ -147,13 +146,12 @@ let test_good_hash_data ~protocols =
 (** Test.
     Call `tezos-client hash data ... of type ...` with data on which it
     must fail (non-zero exit code). *)
-let test_bad_hash_data ~protocols =
+let test_bad_hash_data =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"hash data ... of type ... (bad)"
     ~tags:["hash"; "data"; "mockup"]
-    ~output_file:("hash_data" // "bad")
-    ~protocols
+    ~output_file:(fun _ -> "hash_data" // "bad")
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
@@ -195,6 +193,6 @@ let test_ugly_hash_data =
   Lwt_list.iter_s hash_data data_n_type
 
 let register ~protocols =
-  test_good_hash_data ~protocols ;
-  test_bad_hash_data ~protocols ;
-  test_ugly_hash_data ~protocols
+  test_good_hash_data protocols ;
+  test_bad_hash_data protocols ;
+  test_ugly_hash_data protocols

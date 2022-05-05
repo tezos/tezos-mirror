@@ -65,6 +65,10 @@ let pp_entry ppf (entry : value_metadata) =
     Hex.pp
     (Hex.of_bytes entry.cache_nonce)
 
+let equal_value_metadata m1 m2 =
+  m1.size = m2.size && m1.birth = m2.birth
+  && Bytes.equal m1.cache_nonce m2.cache_nonce
+
 module Int64Map = Map.Make (Int64)
 
 type 'a cache = {
@@ -159,6 +163,11 @@ let empty_cache =
   }
 
 let make_caches (layout : size list) =
+  List.iter
+    (fun size ->
+      if size < 0 then
+        invalid_arg_with_callstack "sizes in layout must be nonnegative")
+    layout ;
   let default = FunctionalArray.make (List.length layout) empty_cache in
   let folder index array limit =
     FunctionalArray.set array index {empty_cache with limit; index}
@@ -194,7 +203,10 @@ let dean cache : (int64 * key) option = Int64Map.min_binding cache.lru
 
 let remove_dean cache =
   match dean cache with
-  | None -> cache
+  | None ->
+      (* This case is unreachable because [remove_dean] is always called
+         by [enforce_size_limit] with a nonempty cache. *)
+      cache
   | Some (_, key) -> (
       match KeyMap.find key cache.map with
       | None -> assert false
@@ -360,6 +372,9 @@ let subcache_domain_encoding : subcache_domain Data_encoding.t =
 let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list subcache_domain_encoding)
 
+let equal_subdomain s1 s2 =
+  s1.counter = s2.counter && KeyMap.equal equal_value_metadata s1.keys s2.keys
+
 let empty_domain = List.is_empty
 
 let sync t ~cache_nonce =
@@ -411,15 +426,18 @@ let from_cache initial domain ~value_of_key =
       caches
   in
   let fold_cache_keys subdomain cache =
+    let open Lwt_result_syntax in
     KeyMap.fold_es
       (fun key entry cache ->
-        (match lookup initial key with
-        | None -> value_of_key key
-        | Some (value, entry') ->
-            if Bytes.equal entry.cache_nonce entry'.cache_nonce then
-              return value
-            else value_of_key key)
-        >>=? fun value -> return (update_cache_key cache key value entry))
+        let* value =
+          match lookup initial key with
+          | None -> value_of_key key
+          | Some (value, entry') ->
+              if Bytes.equal entry.cache_nonce entry'.cache_nonce then
+                return value
+              else value_of_key key
+        in
+        return (update_cache_key cache key value entry))
       subdomain.keys
       cache
   in
@@ -462,3 +480,7 @@ let key_rank ctxt key =
   in
   if not @@ KeyMap.mem key cache.map then None
   else Int64Map.bindings cache.lru |> List.map snd |> length_until key 0
+
+module Internal_for_tests = struct
+  let equal_domain d1 d2 = List.equal equal_subdomain d1 d2
+end

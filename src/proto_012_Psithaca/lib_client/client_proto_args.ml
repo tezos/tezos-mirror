@@ -143,9 +143,20 @@ let bytes_of_prefixed_string s =
 let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
 let data_parameter =
-  parameter (fun _ data ->
-      Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
-      @@ Michelson_v1_parser.parse_expression data)
+  let parse input =
+    Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+    @@ Michelson_v1_parser.parse_expression input
+  in
+  parameter (fun (cctxt : #Client_context.full) ->
+      Client_aliases.parse_alternatives
+        [
+          ( "file",
+            fun filename ->
+              let open Lwt_result_syntax in
+              let* input = catch_es (fun () -> cctxt#read_file filename) in
+              parse input );
+          ("text", parse);
+        ])
 
 let init_arg =
   default_arg
@@ -449,39 +460,12 @@ let burn_cap_arg =
          | Some t -> return t
          | None -> failwith "Bad burn cap"))
 
-let no_waiting_for_endorsements_arg =
-  switch
-    ~long:"no-waiting-for-late-endorsements"
-    ~doc:"Disable waiting for late endorsements"
-    ()
-
-let await_endorsements_arg =
-  switch
-    ~long:"await-late-endorsements"
-    ~doc:"Await late endorsements when baking a block"
-    ()
-
-let endorsement_delay_arg =
-  default_arg
-    ~long:"endorsement-delay"
-    ~placeholder:"seconds"
-    ~doc:
-      "delay before endorsing blocks\n\
-       Delay between notifications of new blocks from the node and production \
-       of endorsements for these blocks."
-    ~default:"0"
-    (parameter (fun _ s ->
-         try
-           let i = int_of_string s in
-           fail_when (i < 0) (Bad_endorsement_delay s) >>=? fun () ->
-           return (int_of_string s)
-         with _ -> fail (Bad_endorsement_delay s)))
-
 let preserved_levels_arg =
-  arg
+  default_arg
     ~long:"preserved-levels"
     ~placeholder:"threshold"
     ~doc:"Number of effective levels kept in the accuser's memory"
+    ~default:"200"
     (parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in

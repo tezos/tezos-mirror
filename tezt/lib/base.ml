@@ -42,7 +42,7 @@ let ( let* ) = Lwt.bind
 
 let ( and* ) = Lwt.both
 
-let ( and*! ) a b =
+let lwt_both_fail_early a b =
   let (main_promise, main_awakener) = Lwt.task () in
   let already_woke_up = ref false in
   Lwt.on_failure a (fun exn ->
@@ -90,6 +90,11 @@ let rec take n l =
   else if n = 0 then []
   else match l with [] -> [] | hd :: rest -> hd :: take (n - 1) rest
 
+let rec drop n l =
+  if n < 0 then invalid_arg "Tezt.Base.drop: argument cannot be negative"
+  else if n = 0 then l
+  else match l with [] -> [] | _ :: rest -> drop (n - 1) rest
+
 let rex ?opts r = (r, Re.compile (Re.Perl.re ?opts r))
 
 let show_rex = fst
@@ -116,6 +121,23 @@ let ( =~** ) s (_, r) =
   | None -> None
   | Some group -> Some (get_group group 1, get_group group 2)
 
+let ( =~*** ) s (_, r) =
+  match Re.exec_opt r s with
+  | None -> None
+  | Some group -> Some (get_group group 1, get_group group 2, get_group group 3)
+
+let ( =~**** ) s (_, r) =
+  match Re.exec_opt r s with
+  | None -> None
+  | Some group ->
+      Some
+        ( get_group group 1,
+          get_group group 2,
+          get_group group 3,
+          get_group group 4 )
+
+let matches s (_, r) = Re.all r s |> List.map (fun g -> get_group g 1)
+
 let replace_string ?pos ?len ?all (_, r) ~by s =
   Re.replace_string ?pos ?len ?all r ~by s
 
@@ -124,6 +146,15 @@ let rec repeat n f =
   else
     let* () = f () in
     repeat (n - 1) f
+
+let fold n init f =
+  let rec aux k accu =
+    if k >= n then return accu
+    else
+      let* accu = f k accu in
+      aux (k + 1) accu
+  in
+  aux 0 init
 
 let with_open_out file write_f =
   let chan = open_out file in
@@ -144,9 +175,35 @@ let with_open_in file read_f =
     close_in chan ;
     raise x
 
+let write_file filename ~contents =
+  with_open_out filename @@ fun ch -> output_string ch contents
+
 let read_file filename =
-  let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in
-  Lwt_io.read ic
+  with_open_in filename @@ fun ch ->
+  let buffer = Buffer.create 512 in
+  let bytes = Bytes.create 512 in
+  let rec loop () =
+    let len = input ch bytes 0 512 in
+    if len > 0 then (
+      Buffer.add_subbytes buffer bytes 0 len ;
+      loop ())
+  in
+  loop () ;
+  Buffer.contents buffer
 
 module String_map = Map.Make (String)
-module String_set = Set.Make (String)
+
+module String_set = struct
+  include Set.Make (String)
+
+  let pp fmt set =
+    if is_empty set then Format.fprintf fmt "{}"
+    else
+      Format.fprintf
+        fmt
+        "@[<hov 2>{ %a }@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+           (fun fmt -> Format.fprintf fmt "%S"))
+        (elements set)
+end

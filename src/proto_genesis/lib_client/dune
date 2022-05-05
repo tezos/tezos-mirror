@@ -1,18 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_genesis)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-genesis)
- (libraries tezos-base
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-commands
-            tezos-protocol-environment
-            tezos-protocol-genesis
-            tezos-proxy
-            tezos-stdlib-unix)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-environment
+  tezos-protocol-genesis
+  tezos-client-commands
+  tezos-proxy
+  tezos-stdlib-unix)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_genesis
-                   -open Tezos_client_commands)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_genesis
+   -open Tezos_client_commands)))

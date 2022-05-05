@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/macro_annotations.tz]
 
 Well typed
-Gas remaining: 1039992.402 units remaining
+Gas remaining: 1039993.362 units remaining
 { parameter unit ;
   storage (pair (unit %truc) unit) ;
   code { DROP
@@ -11,14 +11,14 @@ Gas remaining: 1039992.402 units remaining
          UNIT
          /* [ unit : unit ] */ ;
          PAIR %truc
-         /* [ pair (unit %truc) unit ] */ ;
+         /* [ pair unit unit ] */ ;
          UNIT
-         /* [ unit : pair (unit %truc) unit ] */ ;
+         /* [ unit : pair unit unit ] */ ;
          DUUP @new_storage
-         /* [ @new_storage pair (unit %truc) unit : unit : pair (unit %truc) unit ] */ ;
-         DIP { DROP /* [ pair (unit %truc) unit ] */ ; DROP /* [] */ }
-         /* [ @new_storage pair (unit %truc) unit ] */ ;
+         /* [ pair unit unit : unit : pair unit unit ] */ ;
+         DIP { DROP /* [ pair unit unit ] */ ; DROP /* [] */ }
+         /* [ pair unit unit ] */ ;
          NIL operation
-         /* [ list operation : @new_storage pair (unit %truc) unit ] */ ;
+         /* [ list operation : pair unit unit ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @new_storage (unit %truc) unit) ] */ } }
+         /* [ pair (list operation) unit unit ] */ } }

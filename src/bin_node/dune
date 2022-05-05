@@ -1,14 +1,7 @@
-; This file abuses the alternative dependency mechanism of dune to
-; implement optional dependencies.
-; The semantic of `(select a from (b -> c) (-> d))` is: if libraries
-; `b` are present, `cp c a` and link `b` else `cp d a`. Here, we don't
-; care about the cp part as we are not using the file obtained at
-; all. So, we give them names only meant to not clash with anything
-; and copy always the same (generated itself) empty file
-; "void_for_linking".
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
-(env
- (static (flags (:standard -ccopt -static))))
+(env (static (flags (:standard -ccopt -static))))
 
 (executable
  (name main)
@@ -21,7 +14,7 @@
   tezos-version
   tezos-stdlib-unix
   tezos-shell-services
-  tezos-workers
+  tezos-rpc-http
   tezos-rpc-http-server
   tezos-p2p
   tezos-shell
@@ -30,27 +23,24 @@
   tezos-validator
   tezos-validation
   tezos-shell-context
+  tezos-workers
   tezos-protocol-updater
   cmdliner
   fmt.cli
   fmt.tty
   tls
+  prometheus-app.unix
   lwt-exit
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)
    (-> void_for_linking-tezos-embedded-protocol-genesis.empty))
-  (select void_for_linking-tezos-embedded-protocol-genesis-carthagenet from
-   (tezos-embedded-protocol-genesis-carthagenet -> void_for_linking-tezos-embedded-protocol-genesis-carthagenet.empty)
-   (-> void_for_linking-tezos-embedded-protocol-genesis-carthagenet.empty))
   (select void_for_linking-tezos-embedded-protocol-demo-noops from
    (tezos-embedded-protocol-demo-noops -> void_for_linking-tezos-embedded-protocol-demo-noops.empty)
    (-> void_for_linking-tezos-embedded-protocol-demo-noops.empty))
   (select void_for_linking-tezos-embedded-protocol-demo-counter from
    (tezos-embedded-protocol-demo-counter -> void_for_linking-tezos-embedded-protocol-demo-counter.empty)
    (-> void_for_linking-tezos-embedded-protocol-demo-counter.empty))
-  (select void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa from
-   (tezos-embedded-protocol-000-Ps9mPmXa -> void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa.empty)
-   (-> void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa.empty))
+  tezos-embedded-protocol-000-Ps9mPmXa
   (select void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo from
    (tezos-embedded-protocol-001-PtCJ7pwo -> void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo.empty)
    (-> void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo.empty))
@@ -75,52 +65,50 @@
   (select void_for_linking-tezos-embedded-protocol-007-PsDELPH1 from
    (tezos-embedded-protocol-007-PsDELPH1 -> void_for_linking-tezos-embedded-protocol-007-PsDELPH1.empty)
    (-> void_for_linking-tezos-embedded-protocol-007-PsDELPH1.empty))
+  (select void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer from
+   (tezos-protocol-plugin-007-PsDELPH1-registerer -> void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer.empty)
+   (-> void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer.empty))
   (select void_for_linking-tezos-embedded-protocol-008-PtEdoTez from
    (tezos-embedded-protocol-008-PtEdoTez -> void_for_linking-tezos-embedded-protocol-008-PtEdoTez.empty)
    (-> void_for_linking-tezos-embedded-protocol-008-PtEdoTez.empty))
   (select void_for_linking-tezos-embedded-protocol-008-PtEdo2Zk from
    (tezos-embedded-protocol-008-PtEdo2Zk -> void_for_linking-tezos-embedded-protocol-008-PtEdo2Zk.empty)
    (-> void_for_linking-tezos-embedded-protocol-008-PtEdo2Zk.empty))
-  (select void_for_linking-tezos-embedded-protocol-009-PsFLoren from
-   (tezos-embedded-protocol-009-PsFLoren -> void_for_linking-tezos-embedded-protocol-009-PsFLoren.empty)
-   (-> void_for_linking-tezos-embedded-protocol-009-PsFLoren.empty))
-  (select void_for_linking-tezos-embedded-protocol-010-PtGRANAD from
-   (tezos-embedded-protocol-010-PtGRANAD -> void_for_linking-tezos-embedded-protocol-010-PtGRANAD.empty)
-   (-> void_for_linking-tezos-embedded-protocol-010-PtGRANAD.empty))
-  (select void_for_linking-tezos-embedded-protocol-011-PtHangz2 from
-   (tezos-embedded-protocol-011-PtHangz2 -> void_for_linking-tezos-embedded-protocol-011-PtHangz2.empty)
-   (-> void_for_linking-tezos-embedded-protocol-011-PtHangz2.empty))
-  (select void_for_linking-tezos-embedded-protocol-012-Psithaca from
-   (tezos-embedded-protocol-012-Psithaca -> void_for_linking-tezos-embedded-protocol-012-Psithaca.empty)
-   (-> void_for_linking-tezos-embedded-protocol-012-Psithaca.empty))
-  (select void_for_linking-tezos-embedded-protocol-alpha from
-   (tezos-embedded-protocol-alpha -> void_for_linking-tezos-embedded-protocol-alpha.empty)
-   (-> void_for_linking-tezos-embedded-protocol-alpha.empty))
-  (select void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer from
-   (tezos-protocol-plugin-007-PsDELPH1-registerer -> void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer.empty)
-   (-> void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer.empty))
   (select void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk-registerer from
    (tezos-protocol-plugin-008-PtEdo2Zk-registerer -> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk-registerer.empty))
+  (select void_for_linking-tezos-embedded-protocol-009-PsFLoren from
+   (tezos-embedded-protocol-009-PsFLoren -> void_for_linking-tezos-embedded-protocol-009-PsFLoren.empty)
+   (-> void_for_linking-tezos-embedded-protocol-009-PsFLoren.empty))
   (select void_for_linking-tezos-protocol-plugin-009-PsFLoren-registerer from
    (tezos-protocol-plugin-009-PsFLoren-registerer -> void_for_linking-tezos-protocol-plugin-009-PsFLoren-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-009-PsFLoren-registerer.empty))
+  (select void_for_linking-tezos-embedded-protocol-010-PtGRANAD from
+   (tezos-embedded-protocol-010-PtGRANAD -> void_for_linking-tezos-embedded-protocol-010-PtGRANAD.empty)
+   (-> void_for_linking-tezos-embedded-protocol-010-PtGRANAD.empty))
   (select void_for_linking-tezos-protocol-plugin-010-PtGRANAD-registerer from
    (tezos-protocol-plugin-010-PtGRANAD-registerer -> void_for_linking-tezos-protocol-plugin-010-PtGRANAD-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-010-PtGRANAD-registerer.empty))
+  (select void_for_linking-tezos-embedded-protocol-011-PtHangz2 from
+   (tezos-embedded-protocol-011-PtHangz2 -> void_for_linking-tezos-embedded-protocol-011-PtHangz2.empty)
+   (-> void_for_linking-tezos-embedded-protocol-011-PtHangz2.empty))
   (select void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer from
    (tezos-protocol-plugin-011-PtHangz2-registerer -> void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer.empty))
-  (select void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer from
-   (tezos-protocol-plugin-012-Psithaca-registerer -> void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty)
-   (-> void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty))
+  tezos-embedded-protocol-012-Psithaca
+  tezos-protocol-plugin-012-Psithaca-registerer
+  tezos-embedded-protocol-013-PtJakart
+  tezos-protocol-plugin-013-PtJakart-registerer
+  (select void_for_linking-tezos-embedded-protocol-alpha from
+   (tezos-embedded-protocol-alpha -> void_for_linking-tezos-embedded-protocol-alpha.empty)
+   (-> void_for_linking-tezos-embedded-protocol-alpha.empty))
   (select void_for_linking-tezos-protocol-plugin-alpha-registerer from
    (tezos-protocol-plugin-alpha-registerer -> void_for_linking-tezos-protocol-plugin-alpha-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-alpha-registerer.empty)))
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base
    -open Tezos_stdlib_unix
    -open Tezos_shell_services
@@ -140,10 +128,8 @@
  (action
   (progn
    (write-file void_for_linking-tezos-embedded-protocol-genesis.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-genesis-carthagenet.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-demo-noops.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-demo-counter.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-002-PsYLVpVv.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-003-PsddFKi3.empty "")
@@ -152,19 +138,17 @@
    (write-file void_for_linking-tezos-embedded-protocol-005-PsBabyM1.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-006-PsCARTHA.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-007-PsDELPH1.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-008-PtEdoTez.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-009-PsFLoren.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-010-PtGRANAD.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-011-PtHangz2.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-012-Psithaca.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-alpha.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-007-PsDELPH1-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk-registerer.empty "")
+   (write-file void_for_linking-tezos-embedded-protocol-009-PsFLoren.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-009-PsFLoren-registerer.empty "")
+   (write-file void_for_linking-tezos-embedded-protocol-010-PtGRANAD.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-010-PtGRANAD-registerer.empty "")
+   (write-file void_for_linking-tezos-embedded-protocol-011-PtHangz2.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty "")
+   (write-file void_for_linking-tezos-embedded-protocol-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha-registerer.empty ""))))
 
 (install

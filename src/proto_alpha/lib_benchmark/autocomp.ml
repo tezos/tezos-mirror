@@ -172,11 +172,11 @@ struct
     | Unit_t -> return Mikhailsky.Data.unit
     | Int_t ->
         sample @@ Michelson_base.int >>= fun i ->
-        let i = Protocol.Script_int_repr.to_zint i in
+        let i = Protocol.Script_int.to_zint i in
         return (Mikhailsky.Data.big_integer i)
     | Nat_t ->
         sample @@ Michelson_base.nat >>= fun n ->
-        let n = Protocol.Script_int_repr.to_zint n in
+        let n = Protocol.Script_int.to_zint n in
         return (Mikhailsky.Data.big_natural n)
     | Bool_t ->
         sample Base_samplers.uniform_bool >>= fun b ->
@@ -184,7 +184,7 @@ struct
         else return Mikhailsky.Data.false_
     | String_t ->
         sample Michelson_base.string >>= fun str ->
-        let str = Protocol.Script_string_repr.to_string str in
+        let str = Protocol.Script_string.to_string str in
         return (Mikhailsky.Data.string str)
     | Bytes_t ->
         sample Michelson_base.bytes >>= fun bytes ->

@@ -1,379 +1,215 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/accounts.tz]
 
 Well typed
-Gas remaining: 1039925.145 units remaining
+Gas remaining: 1039932.585 units remaining
 { parameter
     (or (key_hash %Initialize)
         (pair %Withdraw (key %from) (pair (mutez %withdraw_amount) (signature %sig)))) ;
   storage (map :stored_balance key_hash mutez) ;
   code { DUP
-         /* [ pair (or @parameter
-                    (key_hash %Initialize)
-                    (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                 (map :stored_balance @stored_balance key_hash mutez)
-            : pair (or @parameter
-                    (key_hash %Initialize)
-                    (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                 (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+         /* [ pair (or key_hash (pair key mutez signature)) (map key_hash mutez)
+            : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
          CAR
-         /* [ @parameter or (key_hash %Initialize)
-               (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig))
-            : pair (or @parameter
-                    (key_hash %Initialize)
-                    (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                 (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+         /* [ or key_hash (pair key mutez signature)
+            : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
          IF_LEFT
            { DUP
-             /* [ @parameter.Initialize key_hash : @parameter.Initialize key_hash
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+             /* [ key_hash : key_hash
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              DIIP { CDR %stored_balance
-                    /* [ @stored_balance map :stored_balance key_hash mutez ] */ ;
+                    /* [ map key_hash mutez ] */ ;
                     DUP
-                    /* [ @stored_balance map :stored_balance key_hash mutez
-                       : @stored_balance map :stored_balance key_hash mutez ] */ }
-             /* [ @parameter.Initialize key_hash : @parameter.Initialize key_hash
-                : @stored_balance map :stored_balance key_hash mutez
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
-             DIP { SWAP
-                   /* [ @stored_balance map :stored_balance key_hash mutez
-                      : @parameter.Initialize key_hash
-                      : @stored_balance map :stored_balance key_hash mutez ] */ }
-             /* [ @parameter.Initialize key_hash
-                : @stored_balance map :stored_balance key_hash mutez
-                : @parameter.Initialize key_hash
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                    /* [ map key_hash mutez : map key_hash mutez ] */ }
+             /* [ key_hash : key_hash : map key_hash mutez : map key_hash mutez ] */ ;
+             DIP { SWAP /* [ map key_hash mutez : key_hash : map key_hash mutez ] */ }
+             /* [ key_hash : map key_hash mutez : key_hash : map key_hash mutez ] */ ;
              GET @opt_prev_balance
-             /* [ @opt_prev_balance option mutez : @parameter.Initialize key_hash
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+             /* [ option mutez : key_hash : map key_hash mutez ] */ ;
              IF_SOME
                { RENAME @previous_balance
-                 /* [ @previous_balance mutez : @parameter.Initialize key_hash
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ mutez : key_hash : map key_hash mutez ] */ ;
                  AMOUNT
-                 /* [ @amount mutez : @previous_balance mutez : @parameter.Initialize key_hash
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ mutez : mutez : key_hash : map key_hash mutez ] */ ;
                  ADD
-                 /* [ mutez : @parameter.Initialize key_hash
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ mutez : key_hash : map key_hash mutez ] */ ;
                  SOME
-                 /* [ option mutez : @parameter.Initialize key_hash
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ option mutez : key_hash : map key_hash mutez ] */ ;
                  SWAP
-                 /* [ @parameter.Initialize key_hash : option mutez
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ key_hash : option mutez : map key_hash mutez ] */ ;
                  UPDATE
-                 /* [ @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ map key_hash mutez ] */ ;
                  NIL operation
-                 /* [ list operation : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ list operation : map key_hash mutez ] */ ;
                  PAIR
-                 /* [ pair (list operation) (map :stored_balance @stored_balance key_hash mutez) ] */ }
+                 /* [ pair (list operation) (map key_hash mutez) ] */ }
                { DIP { AMOUNT
-                       /* [ @amount mutez : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                       /* [ mutez : map key_hash mutez ] */ ;
                        SOME
-                       /* [ option mutez : @stored_balance map :stored_balance key_hash mutez ] */ }
-                 /* [ @parameter.Initialize key_hash : option mutez
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                       /* [ option mutez : map key_hash mutez ] */ }
+                 /* [ key_hash : option mutez : map key_hash mutez ] */ ;
                  UPDATE
-                 /* [ @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ map key_hash mutez ] */ ;
                  NIL operation
-                 /* [ list operation : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ list operation : map key_hash mutez ] */ ;
                  PAIR
-                 /* [ pair (list operation) (map :stored_balance @stored_balance key_hash mutez) ] */ } }
+                 /* [ pair (list operation) (map key_hash mutez) ] */ } }
            { DUP
-             /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              DUP
-             /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              DUP
-             /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair key mutez signature : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              DUP
-             /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair key mutez signature : pair key mutez signature
+                : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              CAR %from
-             /* [ key
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+             /* [ key : pair key mutez signature : pair key mutez signature
+                : pair key mutez signature : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              DIIP { CDAR %withdraw_amount ;
                     PACK
-                    /* [ @packed bytes
-                       : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (or @parameter
-                               (key_hash %Initialize)
-                               (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                            (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                    /* [ bytes : pair key mutez signature : pair key mutez signature
+                       : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
                     BLAKE2B @signed_amount
-                    /* [ @signed_amount bytes
-                       : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (or @parameter
-                               (key_hash %Initialize)
-                               (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                            (map :stored_balance @stored_balance key_hash mutez) ] */ }
-             /* [ key
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @signed_amount bytes
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                    /* [ bytes : pair key mutez signature : pair key mutez signature
+                       : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ }
+             /* [ key : pair key mutez signature : bytes : pair key mutez signature
+                : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              DIP { CDDR %sig }
-             /* [ key : signature : @signed_amount bytes
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+             /* [ key : signature : bytes : pair key mutez signature
+                : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
              CHECK_SIGNATURE
-             /* [ bool
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
-             IF { /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (or @parameter
-                             (key_hash %Initialize)
-                             (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                          (map :stored_balance @stored_balance key_hash mutez) ] */ }
+             /* [ bool : pair key mutez signature : pair key mutez signature
+                : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
+             IF { /* [ pair key mutez signature : pair key mutez signature
+                     : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ }
                 { PUSH string
                        "Bad signature"
-                  /* [ string
-                     : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (or @parameter
-                             (key_hash %Initialize)
-                             (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                          (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                  /* [ string : pair key mutez signature : pair key mutez signature
+                     : pair (or key_hash (pair key mutez signature)) (map key_hash mutez) ] */ ;
                   FAILWITH
                   /* [] */ } ;
              DIIP { CDR %stored_balance
-                    /* [ @stored_balance map :stored_balance key_hash mutez ] */ ;
+                    /* [ map key_hash mutez ] */ ;
                     DUP
-                    /* [ @stored_balance map :stored_balance key_hash mutez
-                       : @stored_balance map :stored_balance key_hash mutez ] */ }
-             /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @stored_balance map :stored_balance key_hash mutez
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                    /* [ map key_hash mutez : map key_hash mutez ] */ }
+             /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez
+                : map key_hash mutez ] */ ;
              CAR %from
-             /* [ key
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @stored_balance map :stored_balance key_hash mutez
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+             /* [ key : pair key mutez signature : map key_hash mutez : map key_hash mutez ] */ ;
              HASH_KEY @from_hash
-             /* [ @from_hash key_hash
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @stored_balance map :stored_balance key_hash mutez
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+             /* [ key_hash : pair key mutez signature : map key_hash mutez
+                : map key_hash mutez ] */ ;
              DUP
-             /* [ @from_hash key_hash : @from_hash key_hash
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @stored_balance map :stored_balance key_hash mutez
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+             /* [ key_hash : key_hash : pair key mutez signature : map key_hash mutez
+                : map key_hash mutez ] */ ;
              DIP { DIP { SWAP
-                         /* [ @stored_balance map :stored_balance key_hash mutez
-                            : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                            : @stored_balance map :stored_balance key_hash mutez ] */ }
-                   /* [ @from_hash key_hash : @stored_balance map :stored_balance key_hash mutez
-                      : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                      : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                         /* [ map key_hash mutez : pair key mutez signature : map key_hash mutez ] */ }
+                   /* [ key_hash : map key_hash mutez : pair key mutez signature
+                      : map key_hash mutez ] */ ;
                    SWAP
-                   /* [ @stored_balance map :stored_balance key_hash mutez : @from_hash key_hash
-                      : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                      : @stored_balance map :stored_balance key_hash mutez ] */ }
-             /* [ @from_hash key_hash : @stored_balance map :stored_balance key_hash mutez
-                : @from_hash key_hash
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                   /* [ map key_hash mutez : key_hash : pair key mutez signature
+                      : map key_hash mutez ] */ }
+             /* [ key_hash : map key_hash mutez : key_hash : pair key mutez signature
+                : map key_hash mutez ] */ ;
              GET
-             /* [ option mutez : @from_hash key_hash
-                : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : @stored_balance map :stored_balance key_hash mutez ] */ ;
+             /* [ option mutez : key_hash : pair key mutez signature : map key_hash mutez ] */ ;
              IF_NONE
                { PUSH string
                       "Account does not exist"
-                 /* [ string : @from_hash key_hash
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ string : key_hash : pair key mutez signature : map key_hash mutez ] */ ;
                  PAIR
-                 /* [ pair string (key_hash @from_hash)
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ pair string key_hash : pair key mutez signature : map key_hash mutez ] */ ;
                  FAILWITH
                  /* [] */ }
                { RENAME @previous_balance
-                 /* [ @previous_balance mutez : @from_hash key_hash
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
-                 DIP { DROP
-                       /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                          : @stored_balance map :stored_balance key_hash mutez ] */ }
-                 /* [ @previous_balance mutez
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ mutez : key_hash : pair key mutez signature : map key_hash mutez ] */ ;
+                 DIP { DROP /* [ pair key mutez signature : map key_hash mutez ] */ }
+                 /* [ mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  DUP
-                 /* [ @previous_balance mutez : @previous_balance mutez
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ mutez : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  DIIP { DUP
-                        /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                           : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                           : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                        /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
                         CDAR %withdraw_amount ;
                         DUP
-                        /* [ mutez : mutez
-                           : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                           : @stored_balance map :stored_balance key_hash mutez ] */ }
-                 /* [ @previous_balance mutez : @previous_balance mutez : mutez : mutez
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                        /* [ mutez : mutez : pair key mutez signature : map key_hash mutez ] */ }
+                 /* [ mutez : mutez : mutez : mutez : pair key mutez signature
+                    : map key_hash mutez ] */ ;
                  DIP { CMPLT @not_enough }
-                 /* [ @previous_balance mutez : @not_enough bool : mutez
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ mutez : bool : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  SWAP
-                 /* [ @not_enough bool : @previous_balance mutez : mutez
-                    : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                 /* [ bool : mutez : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  IF { PUSH string
                            "Not enough funds"
-                      /* [ string : @previous_balance mutez : mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ string : mutez : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                       FAILWITH
                       /* [] */ }
                     { SUB_MUTEZ @new_balance
-                      /* [ @new_balance option mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ option mutez : pair key mutez signature : map key_hash mutez ] */ ;
                       ASSERT_SOME ;
                       DIP { DUP
-                            /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                               : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                               : @stored_balance map :stored_balance key_hash mutez ] */ ;
-                            DIP { SWAP
-                                  /* [ @stored_balance map :stored_balance key_hash mutez
-                                     : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ }
-                            /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                               : @stored_balance map :stored_balance key_hash mutez
-                               : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ }
-                      /* [ @new_balance.some mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @stored_balance map :stored_balance key_hash mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                            /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
+                            DIP { SWAP /* [ map key_hash mutez : pair key mutez signature ] */ }
+                            /* [ pair key mutez signature : map key_hash mutez : pair key mutez signature ] */ }
+                      /* [ mutez : pair key mutez signature : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       DUP
-                      /* [ @new_balance.some mutez : @new_balance.some mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @stored_balance map :stored_balance key_hash mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ mutez : mutez : pair key mutez signature : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       PUSH @zero
                         mutez
                         0
-                      /* [ @zero mutez : @new_balance.some mutez : @new_balance.some mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @stored_balance map :stored_balance key_hash mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ mutez : mutez : mutez : pair key mutez signature : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       CMPEQ @null_balance ;
                       IF { DROP
-                           /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                              : @stored_balance map :stored_balance key_hash mutez
-                              : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                           /* [ pair key mutez signature : map key_hash mutez : pair key mutez signature ] */ ;
                            NONE @new_balance
                              mutez
-                           /* [ @new_balance option mutez
-                              : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                              : @stored_balance map :stored_balance key_hash mutez
-                              : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ }
+                           /* [ option mutez : pair key mutez signature : map key_hash mutez
+                              : pair key mutez signature ] */ }
                          { SOME @new_balance
-                           /* [ @new_balance option mutez
-                              : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                              : @stored_balance map :stored_balance key_hash mutez
-                              : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ } ;
+                           /* [ option mutez : pair key mutez signature : map key_hash mutez
+                              : pair key mutez signature ] */ } ;
                       SWAP
-                      /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @new_balance option mutez
-                         : @stored_balance map :stored_balance key_hash mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ pair key mutez signature : option mutez : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       CAR %from
-                      /* [ key : @new_balance option mutez
-                         : @stored_balance map :stored_balance key_hash mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ key : option mutez : map key_hash mutez : pair key mutez signature ] */ ;
                       HASH_KEY @from_hash
-                      /* [ @from_hash key_hash : @new_balance option mutez
-                         : @stored_balance map :stored_balance key_hash mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ key_hash : option mutez : map key_hash mutez : pair key mutez signature ] */ ;
                       UPDATE
-                      /* [ @stored_balance map :stored_balance key_hash mutez
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ map key_hash mutez : pair key mutez signature ] */ ;
                       SWAP
-                      /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ pair key mutez signature : map key_hash mutez ] */ ;
                       DUP
-                      /* [ @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @parameter.Withdraw pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
                       CDAR %withdraw_amount ;
                       DIP { CAR %from
-                            /* [ key : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                            /* [ key : map key_hash mutez ] */ ;
                             HASH_KEY @from_hash
-                            /* [ @from_hash key_hash : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                            /* [ key_hash : map key_hash mutez ] */ ;
                             IMPLICIT_ACCOUNT @from_account
-                            /* [ @from_account contract unit
-                               : @stored_balance map :stored_balance key_hash mutez ] */ }
-                      /* [ mutez : @from_account contract unit
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                            /* [ contract unit : map key_hash mutez ] */ }
+                      /* [ mutez : contract unit : map key_hash mutez ] */ ;
                       UNIT
-                      /* [ unit : mutez : @from_account contract unit
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ unit : mutez : contract unit : map key_hash mutez ] */ ;
                       TRANSFER_TOKENS @withdraw_transfer_op
-                      /* [ @withdraw_transfer_op operation
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ operation : map key_hash mutez ] */ ;
                       NIL operation
-                      /* [ list operation : @withdraw_transfer_op operation
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ list operation : operation : map key_hash mutez ] */ ;
                       SWAP
-                      /* [ @withdraw_transfer_op operation : list operation
-                         : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ operation : list operation : map key_hash mutez ] */ ;
                       CONS
-                      /* [ list operation : @stored_balance map :stored_balance key_hash mutez ] */ ;
+                      /* [ list operation : map key_hash mutez ] */ ;
                       PAIR
-                      /* [ pair (list operation) (map :stored_balance @stored_balance key_hash mutez) ] */ } } } } }
+                      /* [ pair (list operation) (map key_hash mutez) ] */ } } } } }

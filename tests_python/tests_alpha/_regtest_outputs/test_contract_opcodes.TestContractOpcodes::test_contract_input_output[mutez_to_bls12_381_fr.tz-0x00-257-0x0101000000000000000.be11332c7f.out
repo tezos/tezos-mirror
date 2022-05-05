@@ -7,32 +7,32 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039987.713 units remaining)
-    [ (Pair 257 0x0000000000000000000000000000000000000000000000000000000000000000)  	 ]
-  - location: 7 (remaining gas: 1039987.703 units remaining)
-    [ 257  	@parameter ]
-  - location: 8 (remaining gas: 1039987.693 units remaining)
-    [ 1  	
-      257  	@parameter ]
-  - location: 11 (remaining gas: 1039987.683 units remaining)
-    [ 257  	@parameter
-      1  	 ]
-  - location: 12 (remaining gas: 1039987.543 units remaining)
-    [ (Some (Pair 257 0))  	 ]
-  - location: 14 (remaining gas: 1039987.533 units remaining)
-    [ (Pair 257 0)  	@some ]
-  - location: 14 (remaining gas: 1039987.518 units remaining)
-    [ (Pair 257 0)  	@some ]
-  - location: 20 (remaining gas: 1039987.508 units remaining)
-    [ 257  	 ]
-  - location: 21 (remaining gas: 1039987.498 units remaining)
-    [ 0x0100000000000000000000000000000000000000000000000000000000000000  	
-      257  	 ]
-  - location: 24 (remaining gas: 1039987.166 units remaining)
-    [ 0x0101000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 25 (remaining gas: 1039987.151 units remaining)
-    [ {}  	
-      0x0101000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 27 (remaining gas: 1039987.136 units remaining)
-    [ (Pair {} 0x0101000000000000000000000000000000000000000000000000000000000000)  	 ]
+  - location: 7 (remaining gas: 1039988.603 units remaining)
+    [ (Pair 257 0x0000000000000000000000000000000000000000000000000000000000000000) ]
+  - location: 7 (remaining gas: 1039988.593 units remaining)
+    [ 257 ]
+  - location: 8 (remaining gas: 1039988.583 units remaining)
+    [ 1
+      257 ]
+  - location: 11 (remaining gas: 1039988.573 units remaining)
+    [ 257
+      1 ]
+  - location: 12 (remaining gas: 1039988.493 units remaining)
+    [ (Some (Pair 257 0)) ]
+  - location: 14 (remaining gas: 1039988.483 units remaining)
+    [ (Pair 257 0) ]
+  - location: 14 (remaining gas: 1039988.473 units remaining)
+    [ (Pair 257 0) ]
+  - location: 20 (remaining gas: 1039988.463 units remaining)
+    [ 257 ]
+  - location: 21 (remaining gas: 1039988.453 units remaining)
+    [ 0x0100000000000000000000000000000000000000000000000000000000000000
+      257 ]
+  - location: 24 (remaining gas: 1039988.186 units remaining)
+    [ 0x0101000000000000000000000000000000000000000000000000000000000000 ]
+  - location: 25 (remaining gas: 1039988.176 units remaining)
+    [ {}
+      0x0101000000000000000000000000000000000000000000000000000000000000 ]
+  - location: 27 (remaining gas: 1039988.166 units remaining)
+    [ (Pair {} 0x0101000000000000000000000000000000000000000000000000000000000000) ]
 

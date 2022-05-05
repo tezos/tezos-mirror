@@ -7,31 +7,31 @@ emitted operations
 big_map diff
   
 trace
-  - location: 10 (remaining gas: 1039988.942 units remaining)
-    [ (Pair (Pair 1 3) (Some 0xaabbcc))  	 ]
-  - location: 10 (remaining gas: 1039988.932 units remaining)
-    [ (Pair 1 3)  	@parameter
-      (Some 0xaabbcc)  	@storage ]
-  - location: 11 (remaining gas: 1039988.922 units remaining)
-    [ (Some 0xaabbcc)  	@storage
-      (Pair 1 3)  	@parameter ]
-  - location: 13 (remaining gas: 1039988.912 units remaining)
-    [ 0xaabbcc  	@storage.some
-      (Pair 1 3)  	@parameter ]
-  - location: 19 (remaining gas: 1039988.902 units remaining)
-    [ (Pair 1 3)  	@parameter
-      0xaabbcc  	@storage.some ]
-  - location: 20 (remaining gas: 1039988.892 units remaining)
-    [ 1  	
-      3  	
-      0xaabbcc  	@storage.some ]
-  - location: 21 (remaining gas: 1039988.852 units remaining)
-    [ None  	 ]
-  - location: 13 (remaining gas: 1039988.837 units remaining)
-    [ None  	 ]
-  - location: 22 (remaining gas: 1039988.822 units remaining)
-    [ {}  	
-      None  	 ]
-  - location: 24 (remaining gas: 1039988.807 units remaining)
-    [ (Pair {} None)  	 ]
+  - location: 10 (remaining gas: 1039990.207 units remaining)
+    [ (Pair (Pair 1 3) (Some 0xaabbcc)) ]
+  - location: 10 (remaining gas: 1039990.197 units remaining)
+    [ (Pair 1 3)
+      (Some 0xaabbcc) ]
+  - location: 11 (remaining gas: 1039990.187 units remaining)
+    [ (Some 0xaabbcc)
+      (Pair 1 3) ]
+  - location: 13 (remaining gas: 1039990.177 units remaining)
+    [ 0xaabbcc
+      (Pair 1 3) ]
+  - location: 19 (remaining gas: 1039990.167 units remaining)
+    [ (Pair 1 3)
+      0xaabbcc ]
+  - location: 20 (remaining gas: 1039990.157 units remaining)
+    [ 1
+      3
+      0xaabbcc ]
+  - location: 21 (remaining gas: 1039990.132 units remaining)
+    [ None ]
+  - location: 13 (remaining gas: 1039990.122 units remaining)
+    [ None ]
+  - location: 22 (remaining gas: 1039990.112 units remaining)
+    [ {}
+      None ]
+  - location: 24 (remaining gas: 1039990.102 units remaining)
+    [ (Pair {} None) ]
 

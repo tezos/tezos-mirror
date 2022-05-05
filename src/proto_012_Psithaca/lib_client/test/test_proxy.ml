@@ -30,13 +30,12 @@
     Subject:      Test of --mode proxy and tezos-proxy-server heuristic
 *)
 
-let proxy_mode_arb =
-  QCheck.make (QCheck.Gen.oneofl Tezos_proxy.Proxy.[Client; Server])
+let proxy_mode_gen = QCheck2.Gen.oneofl Tezos_proxy.Proxy.[Client; Server]
 
-let key_gen : string list QCheck.Gen.t =
+let key_gen : string list QCheck2.Gen.t =
   (* Segments taken from the implementation of split_key in src/proto_alpha/lib_client/proxy.ml *)
   let keys =
-    QCheck.Gen.oneofl
+    QCheck2.Gen.oneofl
       [
         "big_maps";
         "index";
@@ -49,9 +48,9 @@ let key_gen : string list QCheck.Gen.t =
         "snapshot";
         "v1";
       ]
-    |> QCheck.Gen.list
+    |> QCheck2.Gen.list
   in
-  QCheck.Gen.frequency QCheck.Gen.[(9, keys); (1, list string)]
+  QCheck2.Gen.frequency QCheck2.Gen.[(9, keys); (1, list string)]
 
 (** Whether [t1] is a prefix of [t2] *)
 let rec is_prefix t1 t2 =
@@ -66,16 +65,16 @@ let test_split_key =
     let pp_sep fmt () = Format.fprintf fmt "/" in
     Format.pp_print_list ~pp_sep Format.pp_print_string
   in
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"[fst (split_key s)] is a prefix of [s]"
-    QCheck.(pair proxy_mode_arb (QCheck.make key_gen))
+    QCheck2.Gen.(pair proxy_mode_gen key_gen)
   @@ fun (mode, key) ->
   match Proxy.ProtoRpc.split_key mode key with
   | None -> true
   | Some (shorter, _) ->
       if is_prefix shorter key then true
       else
-        QCheck.Test.fail_reportf
+        QCheck2.Test.fail_reportf
           "Expected result of split_key to be a prefix of the input key. But \
            %a is not a prefix of %a."
           fmt

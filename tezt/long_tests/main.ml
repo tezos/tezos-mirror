@@ -36,13 +36,18 @@
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
+(* Warning: Please, be sure this function is called at first before using
+   any function from [Long_test] to avoid undesired behaviour regarding
+   the loading of the configuration. *)
+let () = Long_test.init ()
+
 let () =
   Long_test.update_grafana_dashboard
     {
       uid = "longtezts";
       title = "Long Tezts";
       description = "Measurements from tests in tezt/long_tests.";
-      panels = Prt_client.grafana_panels;
+      panels = Prt_client.grafana_panels @ Block_validation.grafana_panels;
     }
 
 (* Executor for tests that don't take that long to run.
@@ -50,10 +55,11 @@ let () =
 let default_executors = Long_test.[x86_executor1]
 
 let () =
-  Cli.init () ;
   (* Register your tests here. *)
   (* This test depends on [Tezos_protocol_alpha.*] Tezos libraries *)
   Qcheck_rpc.register ~executors:default_executors () ;
   Prt_client.register ~executors:default_executors () ;
+  Script_cache.register ~executors:default_executors () ;
+  Block_validation.register ~executors:default_executors () ;
   (* [Test.run] must be the last function to be called. *)
   Test.run ()

@@ -20,11 +20,11 @@ synchronised with respect to its peers.
 The current synchronisation heuristic uses a **synchronisation
 status** as follows:
 
-- ``Unsynced``: Not synchronised
+- ``Unsynced``: not synchronised
 
-- ``Synced``: Synchronised and the chain is not stuck
+- ``Synced``: synchronised and the chain is not stuck
 
-- ``Stuck``: Synchronised and the chain is stuck
+- ``Stuck``: synchronised and the chain is stuck
 
 Bootstrapped
 ------------
@@ -33,7 +33,7 @@ We consider a node bootstrapped if the heuristic's status has been
 ``Synced`` or ``Stuck`` at least once.
 
 Once the node is bootstrapped, the synchronisation status is still
-updated and is accessible via the RPC
+updated (at least after each change of head) and is accessible via the RPC
 ``/chains/<chain>/is_bootstrapped``. This RPC returns a pair where the
 first component indicates if the node is bootstrapped and the second
 component is the current status.
@@ -49,17 +49,23 @@ most-recent such block advertised by the peer.
 
 The heuristic is parameterised by two values (see :doc:`node configuration <../user/node-configuration>`):
 
-- A ``threshold`` (configuration parameter ``synchronisation_threshold``): The
-  number of candidates kept by the heuristic
-- A ``latency`` (configuration parameter ``latency``): A delay in seconds to
+- a ``threshold`` (configuration parameter ``synchronisation_threshold``): the
+  number of candidates kept by the heuristic;
+- a ``latency`` (configuration parameter ``latency``): a delay in seconds to
   control possible forks and the
   latency of the network (see :ref:`Acceptable values for
-  parameters<acceptable_values>`)
+  parameters<acceptable_values>`).
 
-The heuristic status is ``Synced`` if ``threshold`` candidates
-timestamp are aged more than ``latency`` seconds from now. The
-heuristic status is ``Stuck`` if ``threshold`` candidates have the
-same timestamp.
+The heuristic maintains the most recent ``threshold`` candidates it is
+aware of, with the constraint that there is at most one candidate per
+peer.
+
+The heuristic status is ``Synced`` if the ``threshold`` kept
+candidates are all recent enough: their age is less than ``latency``
+seconds (the age is counted with respect to the current local
+time). Otherwise, the heuristic status is ``Stuck`` if the
+``threshold`` kept candidates all have the same timestamp. Otherwise,
+the status is ``Unsynced``.
 
 .. _acceptable_values:
 
@@ -69,11 +75,11 @@ Acceptable values for parameters
 The heuristic accepts any value for the ``threshold``, but values
 of ``1`` or less are mainly used for testing and debugging:
 
--  If ``threshold`` is negative, then the status is always ``Unsynced``
+- If ``threshold`` is negative, then the status is always ``Unsynced``.
 
--  If ``threshold`` is ``0``, then the status is always ``Synced``
+- If ``threshold`` is ``0``, then the status is always ``Synced``.
 
-- If ``threshold`` is ``1``, then the status cannot be ``Stuck``
+- If ``threshold`` is ``1``, then the status cannot be ``Stuck``.
 
 Other values are acceptable for ``threshold``, but a small
 ``threshold`` (between ``2`` and ``10``; the default being ``4``) is
@@ -87,10 +93,10 @@ but not so long that the node considers itself bootstrapped even
 though it is many blocks away from the chain's head.
 
 A good value for ``latency`` is ``2`` to ``5`` times the time between
-blocks, plus a small delta for network delays. At time of writing,
-because of the baking priority system (see :doc:`Proof of stake in
-Tezos <../active/proof_of_stake>`) the time between two consecutive blocks is
-close to ``60`` seconds when the chain is healthy.
+blocks, plus a small delta for network delays. At the time of
+writing, the time between two consecutive blocks is ``30`` seconds
+when the chain is healthy (see :doc:`the consensus algorithm
+<../active/consensus>`).
 
 A shorter ``latency`` might give false negatives: delays from a few
 neighbours might result in the node considering itself not
@@ -122,4 +128,4 @@ bootstrapped, when actually it should be.  The administrator of the
 node can use the RPC ``patch /chains/main {"bootstrapped": true}`` to
 force the node bootstrapped state, but this should be used carefully.
 If you see an issue with the current heuristic, please `report it
-<https://gitlab.com/tezos/tezos/-/issues>`.
+<https://gitlab.com/tezos/tezos/-/issues>`_.

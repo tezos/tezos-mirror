@@ -93,6 +93,16 @@ let tezos_protocol_env =
   let open Embedded_cmis in
   [
     ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
+    ( "Tezos_protocol_environment_sigs_stdlib_compat",
+      tezos_protocol_environment_sigs_stdlib_compat_cmi );
+    ( "Tezos_protocol_environment_sigs_stdlib_compat__V_all",
+      tezos_protocol_environment_sigs_stdlib_compat__V_all_cmi );
+    ( "Tezos_protocol_environment_sigs_stdlib_compat__V2",
+      tezos_protocol_environment_sigs_stdlib_compat__V2_cmi );
+    ( "Tezos_protocol_environment_sigs_stdlib_compat__V3",
+      tezos_protocol_environment_sigs_stdlib_compat__V3_cmi );
+    ( "Tezos_protocol_environment_sigs_stdlib_compat__V4",
+      tezos_protocol_environment_sigs_stdlib_compat__V4_cmi );
     ("Tezos_protocol_environment_sigs", tezos_protocol_environment_sigs_cmi);
     ( "Tezos_protocol_environment_sigs__V0",
       tezos_protocol_environment_sigs__V0_cmi );
@@ -104,6 +114,8 @@ let tezos_protocol_env =
       tezos_protocol_environment_sigs__V3_cmi );
     ( "Tezos_protocol_environment_sigs__V4",
       tezos_protocol_environment_sigs__V4_cmi );
+    ( "Tezos_protocol_environment_sigs__V5",
+      tezos_protocol_environment_sigs__V5_cmi );
   ]
 
 let register_env =

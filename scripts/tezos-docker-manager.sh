@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -59,6 +59,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
+EOF
+
+if [ "$need_upgrader" = true ]; then
+    cat >> "$docker_compose_yml" <<EOF
+
   upgrader:
     image: $docker_image
     hostname: node
@@ -69,6 +74,7 @@ services:
     restart: on-failure
 
 EOF
+fi
 
 if [ -n "$local_snapshot_path" ]; then
     cat >> "$docker_compose_yml" <<EOF
@@ -103,18 +109,6 @@ for proto in $(cat "$active_protocol_versions") ; do
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser-$proto:
-    image: $docker_image
-    hostname: endorser-$proto
-    environment:
-      - PROTOCOL=$proto
-    command: tezos-endorser
-    links:
-      - node
-    volumes:
-      - client_data:/var/run/tezos/client
-    restart: on-failure
-
   accuser-$proto:
     image: $docker_image
     hostname: accuser-$proto
@@ -137,18 +131,6 @@ for proto in $(cat "$active_protocol_versions") ; do
       - node
     volumes:
       - node_data:/var/run/tezos/node:ro
-      - client_data:/var/run/tezos/client
-    restart: on-failure
-
-  endorser-$proto-test:
-    image: $docker_image
-    hostname: endorser-$proto-test
-    environment:
-      - PROTOCOL=$proto
-    command: tezos-endorser-test
-    links:
-      - node
-    volumes:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
@@ -412,73 +394,6 @@ stop_baker() {
     call_docker_compose stop $bakers
 }
 
-## Endorser ###################################################################
-
-check_endorser() {
-    update_active_protocol_version
-    endorsers="$(sed "s/^\(.*\)$/endorser-\1 endorser-\1-test/g" "$active_protocol_versions")"
-    docker_endorser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_endorser-\1_1 ${docker_compose_name}_endorser-\1-test_1/g" "$active_protocol_versions")"
-    for docker_endorser_container in $docker_endorser_containers; do
-        res=$(docker inspect \
-                     --format="{{ .State.Running }}" \
-                     --type=container "$(container_name "$docker_endorser_container")" 2>/dev/null || echo false)
-        if ! [ "$res" = "true" ]; then return 1; fi
-    done
-}
-
-assert_endorser() {
-    if ! check_endorser; then
-        echo -e "\033[31mEndorser is not running!\033[0m"
-        exit 0
-    fi
-}
-
-assert_endorser_uptodate() {
-    assert_endorser
-    if ! uptodate_containers $docker_endorser_containers; then
-        echo -e "\033[33mThe current endorser is not the latest available.\033[0m"
-        exit 1
-    fi
-}
-
-status_endorser() {
-    if check_endorser; then
-        echo -e "\033[32mEndorser is running\033[0m"
-        may_pull_image
-        if ! uptodate_containers $docker_endorser_containers; then
-            echo -e "\033[33mThe current endorser is not the latest available.\033[0m"
-        fi
-    else
-        echo -e "\033[33mEndorser is not running\033[0m"
-    fi
-}
-
-start_endorser() {
-    if check_endorser; then
-        echo -e "\033[31mEndorser is already running\033[0m"
-        exit 1
-    fi
-    pull_image
-    assert_node_uptodate
-    call_docker_compose start $endorsers
-    echo -e "\033[32mThe endorser is now running.\033[0m"
-}
-
-log_endorser() {
-    may_pull_image
-    assert_endorser_uptodate
-    call_docker_compose logs -f $endorsers
-}
-
-stop_endorser() {
-    if ! check_endorser; then
-        echo -e "\033[31mNo endorser to kill!\033[0m"
-        exit 1
-    fi
-    echo -e "\033[32mStopping the endorser...\033[0m"
-    call_docker_compose stop $endorsers
-}
-
 ## Accuser ###################################################################
 
 check_accuser() {
@@ -593,7 +508,6 @@ kill_() {
 status() {
     status_node
     status_baker
-    status_endorser
     warn_script_uptodate verbose
 }
 
@@ -602,8 +516,30 @@ snapshot_import() {
     local_snapshot_path="$1"
     shift
     update_compose_file "$@"
+    clear_node_storage
     call_docker_compose up importer
     warn_script_uptodate
+}
+
+clear_node_storage(){
+    tmp_dir="/var/run/tezos/node/tmp"
+    data_dir="/var/run/tezos/node/data"
+
+    docker run \
+    -v $docker_node_volume:/var/run/tezos/node \
+    -v $docker_client_volume:/var/run/tezos/client \
+    --entrypoint /bin/sh "$docker_image" \
+    -c " 
+    if [ -d "$data_dir" ]; then 
+        mkdir -p $tmp_dir
+        if [ -f "$data_dir/config.json" ]; then 
+            mv $data_dir/config.json $tmp_dir
+        fi
+        if [ -f "$data_dir/peers.json" ]; then 
+            mv $data_dir/peers.json $tmp_dir
+        fi
+        rm -r $data_dir && mv $tmp_dir $data_dir
+    fi"
 }
 
 warn_script_uptodate() {
@@ -635,7 +571,7 @@ update_script() {
 
 upgrade_node_storage() {
     pull_image
-    local_snapshot_path="$1"
+    need_upgrader=true
     update_compose_file
     call_docker_compose up upgrader
     warn_script_uptodate
@@ -677,7 +613,6 @@ usage() {
     echo "    $0 node upgrade"
     echo "    $0 snapshot import <snapshot_file>"
     echo "    $0 baker <start|stop|status|log>"
-    echo "    $0 endorser <start|stop|status|log>"
     echo "    $0 shell"
     echo "Node configuration backup directory: $data_dir"
     echo "Global options are currently limited to:"
@@ -702,23 +637,23 @@ command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
 case $(basename "$0") in
-    hangzhounet.sh)
-        docker_base_dir="$HOME/.tezos-hangzhounet"
-        docker_image=tezos/tezos:v12.3
-        docker_compose_base_name=hangzhounet
-        default_port=9732
-        network=hangzhounet
-        ;;
     ithacanet.sh)
         docker_base_dir="$HOME/.tezos-ithacanet"
-        docker_image=tezos/tezos:v12.3
+        docker_image=tezos/tezos:v13.0
         docker_compose_base_name=ithacanet
         default_port=9732
         network=ithacanet
         ;;
+    jakartanet.sh)
+        docker_base_dir="$HOME/.tezos-jakartanet"
+        docker_image=tezos/tezos:v13.0
+        docker_compose_base_name=jakartanet
+        default_port=9732
+        network=jakartanet
+        ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:v12.3
+        docker_image=tezos/tezos:v13.0
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet
@@ -832,29 +767,6 @@ case "$command" in
                 ;;
             stop)
                 stop_baker
-                ;;
-            *)
-                usage
-                exit 1
-        esac ;;
-
-    ## Endorser
-
-    endorser)
-        subcommand="$1"
-        if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
-        case "$subcommand" in
-            status)
-                status_endorser
-                ;;
-            start)
-                start_endorser
-                ;;
-            log)
-                log_endorser
-                ;;
-            stop)
-                stop_endorser
                 ;;
             *)
                 usage

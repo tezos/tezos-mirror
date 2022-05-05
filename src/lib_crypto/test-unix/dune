@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_crypto_box)
+ (libraries
+  tezos-stdlib
+  tezos-crypto
+  tezos-error-monad
+  zarith
+  zarith_stubs_js
+  tezos-hacl
+  data-encoding
+  alcotest
+  alcotest-lwt
+  lwt.unix
+  qcheck-alcotest
+  tezos-test-helpers)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_crypto
+   -open Tezos_error_monad.TzLwtreslib
+   -open Data_encoding)))
+
+(rule
+ (alias runtest)
+ (package tezos-crypto)
+ (action (run %{dep:./test_crypto_box.exe})))

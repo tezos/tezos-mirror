@@ -8,7 +8,7 @@ explicitly accepted by the community before nodes actually employ them. For this
 reason the protocol is versioned independently from the rest of the software
 engaged in running Tezos. Each protocol version is being proposed to the
 community for acceptance. The community then decides whether to accept the new
-protocol or keep the old one. This is done through a `voting procedure`_, which
+protocol or keep the old one. This is done through a :doc:`voting procedure <../active/voting>`, which
 takes place within the blockchain itself, so its rules are also a part of the
 protocol.
 
@@ -35,6 +35,8 @@ sequence:
 * 009 Florence
 * 010 Granada
 * 011 Hangzhou
+* 012 Ithaca
+* 013 Jakarta
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol
@@ -59,11 +61,12 @@ in-use and upcoming protocols:
 External resources
 ------------------
 
-The current protocol status can be found at tz-stats.com_ election page.
+The current protocol status can be found at election pages such as: tzstats.com_, tzkt.io_, or tezosagora.org_.
 
 An interesting blog post on the history of the initial Tezos economic protocols
 is: `A quick history of past upgrades
 <https://blog.nomadic-labs.com/amendments-at-work-in-tezos.html#a-quick-history-of-past-upgrades>`_.
 
-.. _`voting procedure`: ../alpha/voting.html
-.. _tz-stats.com: https://tzstats.com/election/head
+.. _tzstats.com: https://tzstats.com/election/head
+.. _tzkt.io: https://tzkt.io/governance/current/exploration
+.. _tezosagora.org: https://www.tezosagora.org/period

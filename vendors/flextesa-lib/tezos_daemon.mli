@@ -1,5 +1,7 @@
+type baker_args = {key : string; lb_vote : string option}
+
 type args = private
-  | Baker : string -> args
+  | Baker : baker_args -> args
   | Endorser : string -> args
   | Accuser : args
 
@@ -22,6 +24,7 @@ val baker_of_node :
      ?name_tag:string
   -> Tezos_node.t
   -> key:string
+  -> lb_vote:string option
   -> exec:Tezos_executable.t
   -> client:Tezos_client.t
   -> t

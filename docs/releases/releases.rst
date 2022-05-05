@@ -79,7 +79,7 @@ The packaged forms are updated from the source form as follows:
 
 -  APT and DNF binary packages:
 
-   -  at each stable release
+   -  at each release, including release candidates
    -  The process is currently performed manually by
       `Serokell <https://serokell.io>`_.
 

@@ -41,6 +41,9 @@ type hooks = {
 
     Usage: [spawn command arguments]
 
+    If [log_command] is [true] (which is the default), log the command
+    being executed.
+
     If [log_status_on_exit] is [true] (which is the default), log the exit code
     when the process terminates.
 
@@ -52,6 +55,10 @@ type hooks = {
     output lines.
 
     Parameter [hooks] allows to attach some hooks to the process.
+    Warning: if you use [hooks], all the process output is stored in memory
+    until it finishes. So this can use a lot of memory. Also, note that [stdout]
+    is sent to the hook first, then [stderr]. The two outputs are not interleaved.
+    This is to make it more predictable for regression tests.
 
     Note that this function can only be called if [Background.register] is
     allowed (which is the case inside functions given to [Test.register]).
@@ -63,6 +70,7 @@ type hooks = {
     Example: [spawn "git" [ "log"; "-p" ]] *)
 val spawn :
   ?runner:Runner.t ->
+  ?log_command:bool ->
   ?log_status_on_exit:bool ->
   ?log_output:bool ->
   ?name:string ->
@@ -76,6 +84,7 @@ val spawn :
 (** Same as {!spawn}, but with a channel to send data to the process [stdin]. *)
 val spawn_with_stdin :
   ?runner:Runner.t ->
+  ?log_command:bool ->
   ?log_status_on_exit:bool ->
   ?log_output:bool ->
   ?name:string ->
@@ -95,11 +104,20 @@ val kill : t -> unit
 (** Wait until a process terminates and return its status. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Wait until a process terminates and check its status.
+(** Check the exit status of a process.
 
     If [not expect_failure] and exit code is not 0,
     or if [expect_failure] and exit code is 0,
-    or if the process was killed, fail the test. *)
+    or if the process was killed, return [Error (`Invalid_status reason)].
+    Else, return [Ok ()]. *)
+val validate_status :
+  ?expect_failure:bool ->
+  Unix.process_status ->
+  (unit, [`Invalid_status of string]) result
+
+(** Wait until a process terminates and check its status.
+
+    See [validate_status] to see status validation rules. *)
 val check : ?expect_failure:bool -> t -> unit Lwt.t
 
 (** Wait until a process terminates and check its status.
@@ -136,6 +154,7 @@ val run :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:string Base.String_map.t ->
+  ?hooks:hooks ->
   ?expect_failure:bool ->
   string ->
   string list ->
@@ -153,6 +172,9 @@ val stderr : t -> Lwt_io.input_channel
 (** Get the name which was given to {!spawn}. *)
 val name : t -> string
 
+(** Get the PID of the given process. *)
+val pid : t -> int
+
 (** Spawn a process such as [run] and return its standard output.
 
     Fail the test if the process failed, unless [expect_failure],
@@ -162,6 +184,7 @@ val run_and_read_stdout :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:string Base.String_map.t ->
+  ?hooks:hooks ->
   ?expect_failure:bool ->
   string ->
   string list ->
@@ -176,7 +199,12 @@ val run_and_read_stderr :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:string Base.String_map.t ->
+  ?hooks:hooks ->
   ?expect_failure:bool ->
   string ->
   string list ->
   string Lwt.t
+
+(** [program_path p] returns [Some path] if the shell command [command -v p]
+    succeeds and prints [path]. Returns [None] otherwise. *)
+val program_path : string -> string option Lwt.t

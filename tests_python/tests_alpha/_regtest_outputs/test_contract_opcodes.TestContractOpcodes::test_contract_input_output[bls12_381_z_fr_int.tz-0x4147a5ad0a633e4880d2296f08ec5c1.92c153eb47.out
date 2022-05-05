@@ -7,20 +7,20 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039994.200 units remaining)
+  - location: 7 (remaining gas: 1039994.835 units remaining)
     [ (Pair 22620284817922784902564672469917992996328211127984472897491698543785655336309
-            0x4147a5ad0a633e4880d2296f08ec5c12d03e3fa4a6b49ecbd16a30a3cfcdbe3f)  	 ]
-  - location: 7 (remaining gas: 1039994.190 units remaining)
-    [ 22620284817922784902564672469917992996328211127984472897491698543785655336309  	@parameter
-      0x4147a5ad0a633e4880d2296f08ec5c12d03e3fa4a6b49ecbd16a30a3cfcdbe3f  	@storage ]
-  - location: 8 (remaining gas: 1039994.180 units remaining)
-    [ 0x4147a5ad0a633e4880d2296f08ec5c12d03e3fa4a6b49ecbd16a30a3cfcdbe3f  	@storage
-      22620284817922784902564672469917992996328211127984472897491698543785655336309  	@parameter ]
-  - location: 9 (remaining gas: 1039993.816 units remaining)
-    [ 0x4e387e0ebfb3d1633153c195036e0c0b672955c4a0e420f93ec20a76fe677c62  	 ]
-  - location: 10 (remaining gas: 1039993.801 units remaining)
-    [ {}  	
-      0x4e387e0ebfb3d1633153c195036e0c0b672955c4a0e420f93ec20a76fe677c62  	 ]
-  - location: 12 (remaining gas: 1039993.786 units remaining)
-    [ (Pair {} 0x4e387e0ebfb3d1633153c195036e0c0b672955c4a0e420f93ec20a76fe677c62)  	 ]
+            0x4147a5ad0a633e4880d2296f08ec5c12d03e3fa4a6b49ecbd16a30a3cfcdbe3f) ]
+  - location: 7 (remaining gas: 1039994.825 units remaining)
+    [ 22620284817922784902564672469917992996328211127984472897491698543785655336309
+      0x4147a5ad0a633e4880d2296f08ec5c12d03e3fa4a6b49ecbd16a30a3cfcdbe3f ]
+  - location: 8 (remaining gas: 1039994.815 units remaining)
+    [ 0x4147a5ad0a633e4880d2296f08ec5c12d03e3fa4a6b49ecbd16a30a3cfcdbe3f
+      22620284817922784902564672469917992996328211127984472897491698543785655336309 ]
+  - location: 9 (remaining gas: 1039994.516 units remaining)
+    [ 0x4e387e0ebfb3d1633153c195036e0c0b672955c4a0e420f93ec20a76fe677c62 ]
+  - location: 10 (remaining gas: 1039994.506 units remaining)
+    [ {}
+      0x4e387e0ebfb3d1633153c195036e0c0b672955c4a0e420f93ec20a76fe677c62 ]
+  - location: 12 (remaining gas: 1039994.496 units remaining)
+    [ (Pair {} 0x4e387e0ebfb3d1633153c195036e0c0b672955c4a0e420f93ec20a76fe677c62) ]
 

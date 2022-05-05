@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** This module provides the gas costs for typechecking Michelson scripts,
+    parsing and unparsing Michelson values, and interpreting Michelson
+    instructions.
+*)
 
 open Alpha_context
 
@@ -147,7 +153,7 @@ module Cost_of : sig
 
     val is_nat : Gas.cost
 
-    val abs_int : Alpha_context.Script_int.z Script_int.num -> Gas.cost
+    val abs_int : Script_int.z Script_int.num -> Gas.cost
 
     val int_nat : Gas.cost
 
@@ -156,16 +162,13 @@ module Cost_of : sig
     val add_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
     val add_nat :
-      Alpha_context.Script_int.n Script_int.num ->
-      Alpha_context.Script_int.n Script_int.num ->
-      Gas.cost
+      Script_int.n Script_int.num -> Script_int.n Script_int.num -> Gas.cost
 
     val sub_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
     val mul_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
-    val mul_nat :
-      Alpha_context.Script_int.n Script_int.num -> 'a Script_int.num -> Gas.cost
+    val mul_nat : Script_int.n Script_int.num -> 'a Script_int.num -> Gas.cost
 
     val ediv_teznat : 'a -> 'b Script_int.num -> Gas.cost
 
@@ -173,8 +176,7 @@ module Cost_of : sig
 
     val ediv_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
-    val ediv_nat :
-      Alpha_context.Script_int.n Script_int.num -> 'a Script_int.num -> Gas.cost
+    val ediv_nat : Script_int.n Script_int.num -> 'a Script_int.num -> Gas.cost
 
     val eq : Gas.cost
 
@@ -187,9 +189,7 @@ module Cost_of : sig
     val and_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
     val and_int_nat :
-      Alpha_context.Script_int.z Script_int.num ->
-      Alpha_context.Script_int.n Script_int.num ->
-      Gas.cost
+      Script_int.z Script_int.num -> Script_int.n Script_int.num -> Gas.cost
 
     val xor_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
@@ -301,14 +301,9 @@ module Cost_of : sig
 
     val view : Gas.cost
 
-    val view_mem :
-      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+    val view_get : Script_string.t -> Script_typed_ir.view_map -> Gas.cost
 
-    val view_get :
-      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
-
-    val view_update :
-      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+    val view_update : Script_string.t -> Script_typed_ir.view_map -> Gas.cost
 
     val transfer_tokens : Gas.cost
 
@@ -323,6 +318,8 @@ module Cost_of : sig
     val level : Gas.cost
 
     val now : Gas.cost
+
+    val min_block_time : Gas.cost
 
     val hash_key : Signature.Public_key.t -> Gas.cost
 
@@ -344,7 +341,10 @@ module Cost_of : sig
 
     val sapling_empty_state : Gas.cost
 
-    val sapling_verify_update : inputs:int -> outputs:int -> Gas.cost
+    val sapling_verify_update :
+      inputs:int -> outputs:int -> bound_data:int -> Gas.cost
+
+    val sapling_verify_update_deprecated : inputs:int -> outputs:int -> Gas.cost
 
     val ticket : Gas.cost
 
@@ -359,7 +359,8 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       Gas.cost
 
-    val open_chest : chest:Timelock.chest -> time:Z.t -> Gas.cost
+    val open_chest :
+      chest:Script_typed_ir.Script_timelock.chest -> time:Z.t -> Gas.cost
 
     module Control : sig
       val nil : Gas.cost
@@ -429,17 +430,17 @@ module Cost_of : sig
 
     val parse_data_cycle : Gas.cost
 
-    val comparable_ty_of_ty_cycle : Gas.cost
-
     val check_dupable_cycle : Gas.cost
+
+    val find_entrypoint_cycle : Gas.cost
 
     val bool : Gas.cost
 
     val unit : Gas.cost
 
-    val timestamp_readable : Gas.cost
+    val timestamp_readable : string -> Gas.cost
 
-    val contract : Gas.cost
+    val tx_rollup_l2_address : Gas.cost
 
     val contract_exists : Gas.cost
 
@@ -481,9 +482,7 @@ module Cost_of : sig
 
     val bls12_381_fr : Gas.cost
 
-    val unparse_type : 'a Script_typed_ir.ty -> Gas.cost
-
-    val unparse_comparable_type : 'a Script_typed_ir.comparable_ty -> Gas.cost
+    val unparse_type : ('a, _) Script_typed_ir.ty -> Gas.cost
 
     val unparse_instr_cycle : Gas.cost
 
@@ -491,11 +490,13 @@ module Cost_of : sig
 
     val unit : Gas.cost
 
-    val contract : Gas.cost
+    val tx_rollup_l2_address : Gas.cost
 
     val operation : bytes -> Gas.cost
 
     val sapling_transaction : Sapling.transaction -> Gas.cost
+
+    val sapling_transaction_deprecated : Sapling.Legacy.transaction -> Gas.cost
 
     val sapling_diff : Sapling.diff -> Gas.cost
 

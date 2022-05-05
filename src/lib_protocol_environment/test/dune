@@ -1,8 +1,10 @@
-(tests
- (names test test_mem_context_array_theory)
- (package tezos-protocol-environment)
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test test_mem_context_array_theory test_cache)
  (libraries
-  bls12-381-unix
+  tezos-base
   tezos-base.unix
   tezos-protocol-environment
   alcotest-lwt
@@ -10,4 +12,21 @@
   qcheck-alcotest
   lwt.unix)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_protocol_environment)))
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_environment)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-environment)
+ (action (run %{dep:./test.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-environment)
+ (action (run %{dep:./test_mem_context_array_theory.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-environment)
+ (action (run %{dep:./test_cache.exe})))

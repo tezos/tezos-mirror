@@ -296,7 +296,7 @@ struct
     instances : 'kind t Nametbl.t;
   }
 
-  let queue_item ?u r = (Systime_os.now (), Message (r, u))
+  let queue_item ?u r = (Time.System.now (), Message (r, u))
 
   let drop_request w merge message_box request =
     try
@@ -309,7 +309,7 @@ struct
       with
       | None -> ()
       | Some (Any_request neu) ->
-          Lwt_dropbox.put message_box (Systime_os.now (), Message (neu, None))
+          Lwt_dropbox.put message_box (Time.System.now (), Message (neu, None))
     with Lwt_dropbox.Closed -> ()
 
   let drop_request_and_wait w message_box request =
@@ -321,7 +321,7 @@ struct
       (function
         | Lwt_dropbox.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
-            fail (Closed {base = base_name; name})
+            Lwt_result_syntax.tzfail (Closed {base = base_name; name})
         | exn ->
             (* [Lwt_dropbox.put] can only raise [Closed] which is caught above.
                We don't want to catch any other exception but we cannot use an
@@ -385,7 +385,7 @@ struct
             t
           with Lwt_pipe.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
-            fail (Closed {base = base_name; name}))
+            Lwt_result_syntax.tzfail (Closed {base = base_name; name}))
       | Bounded_buffer message_queue ->
           let (t, u) = Lwt.wait () in
           Lwt.try_bind
@@ -395,7 +395,7 @@ struct
             (function
               | Lwt_pipe.Closed ->
                   let name = Format.asprintf "%a" Name.pp w.name in
-                  fail (Closed {base = base_name; name})
+                  Lwt_result_syntax.tzfail (Closed {base = base_name; name})
               | exn -> raise exn)
 
     let pending_requests (type a) (w : a queue t) =
@@ -426,7 +426,9 @@ struct
     let wakeup = function
       | (_, Message (_, Some u)) ->
           let name = Format.asprintf "%a" Name.pp w.name in
-          Lwt.wakeup_later u (error (Closed {base = base_name; name}))
+          Lwt.wakeup_later
+            u
+            (Result_syntax.tzfail (Closed {base = base_name; name}))
       | (_, Message (_, None)) -> ()
     in
     let close_queue message_queue =
@@ -487,7 +489,7 @@ struct
 
   let lwt_emit w (status : Logger.status) =
     let (module LogEvent) = w.logEvent in
-    let time = Systime_os.now () in
+    let time = Time.System.now () in
     Lwt.bind
       (LogEvent.emit
          ~section:(Internal_event.Section.make_sanitized Name.base)
@@ -540,10 +542,10 @@ struct
         | Running t0 -> t0
         | Launching _ | Closing _ | Closed _ -> assert false
       in
-      w.status <- Closing (t0, Systime_os.now ()) ;
+      w.status <- Closing (t0, Time.System.now ()) ;
       close w ;
       let* () = Error_monad.cancel_with_exceptions w.canceler in
-      w.status <- Closed (t0, Systime_os.now (), errs) ;
+      w.status <- Closed (t0, Time.System.now (), errs) ;
       let* () = Handlers.on_close w in
       Nametbl.remove w.table.instances w.name ;
       w.state <- None ;
@@ -563,7 +565,7 @@ struct
          recursive call to this [loop] at which point this call to [protect]
          fails immediately with [Canceled]. *)
       Lwt.bind
-        Lwt_tzresult_syntax.(
+        Lwt_result_syntax.(
           let* popped =
             protect ~canceler:w.canceler (fun () -> Lwt_result.ok @@ pop w)
           in
@@ -571,14 +573,12 @@ struct
           | None -> Handlers.on_no_request w
           | Some (pushed, Message (request, u)) -> (
               let current_request = Request.view request in
-              let treated_time = Systime_os.now () in
-              w.current_request <- Some (pushed, treated_time, current_request) ;
+              let treated = Time.System.now () in
+              w.current_request <- Some (pushed, treated, current_request) ;
               match u with
               | None ->
                   let* res = Handlers.on_request w request in
-                  let completed_time = Systime_os.now () in
-                  let treated = Ptime.diff treated_time pushed in
-                  let completed = Ptime.diff completed_time treated_time in
+                  let completed = Time.System.now () in
                   w.current_request <- None ;
                   let status = Worker_types.{pushed; treated; completed} in
                   let*! () = Handlers.on_completion w request res status in
@@ -595,9 +595,7 @@ struct
                   let*! res = Handlers.on_request w request in
                   Lwt.wakeup_later u res ;
                   let*? res = res in
-                  let completed_time = Systime_os.now () in
-                  let treated = Ptime.diff treated_time pushed in
-                  let completed = Ptime.diff completed_time treated_time in
+                  let completed = Time.System.now () in
                   let status = Worker_types.{pushed; treated; completed} in
                   w.current_request <- None ;
                   let*! () = Handlers.on_completion w request res status in
@@ -617,10 +615,8 @@ struct
           | Error errs -> (
               let* r =
                 match w.current_request with
-                | Some (pushed, treated_time, request) ->
-                    let completed_time = Systime_os.now () in
-                    let treated = Ptime.diff treated_time pushed in
-                    let completed = Ptime.diff completed_time treated_time in
+                | Some (pushed, treated, request) ->
+                    let completed = Time.System.now () in
                     w.current_request <- None ;
                     Handlers.on_error
                       w
@@ -690,15 +686,15 @@ struct
           timeout;
           current_request = None;
           logEvent = (module Logger.LogEvent);
-          status = Launching (Systime_os.now ());
+          status = Launching (Time.System.now ());
         }
       in
       Nametbl.add table.instances name w ;
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let started = if id_name = base_name then None else Some name_s in
       let*! () = lwt_emit w (Started started) in
       let* state = Handlers.on_launch w name parameters in
-      w.status <- Running (Systime_os.now ()) ;
+      w.status <- Running (Time.System.now ()) ;
       w.state <- Some state ;
       w.worker <-
         Lwt_utils.worker

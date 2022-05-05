@@ -1,12 +1,12 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[non_regression/bug_262.tz]
 
 Well typed
-Gas remaining: 1039994.949 units remaining
+Gas remaining: 1039995.909 units remaining
 { parameter unit ;
   storage unit ;
   code { DROP
          /* [] */ ;
-         LAMBDA unit unit { /* [ @arg unit ] */ }
+         LAMBDA unit unit { /* [ unit ] */ }
          /* [ lambda unit unit ] */ ;
          UNIT
          /* [ unit : lambda unit unit ] */ ;

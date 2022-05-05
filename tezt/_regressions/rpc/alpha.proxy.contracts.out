@@ -1,7 +1,6 @@
-tezt/_regressions/rpc/alpha.proxy.contracts.out
+rpc/alpha.proxy.contracts.out
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/contracts
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
@@ -10,55 +9,56 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/delegates
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "balance": "3800000000000",
   "delegate": "[PUBLIC_KEY_HASH]", "counter": "0" }
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "3800000000000"
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "0"
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "[PUBLIC_KEY]"
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "[PUBLIC_KEY_HASH]"
-
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
-{ "balance": "0", "counter": "0" }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+{ "balance": "0", "counter": "0" }
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "100000000", "counter": "1" }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 "100000000"
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 "1"
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 null
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -85,25 +85,25 @@ Fatal error:
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-{ "balance": "99999383", "delegate": "[PUBLIC_KEY_HASH]",
+{ "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+"99999393"
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-"99999383"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 "4"
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 "[PUBLIC_KEY]"
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 "[PUBLIC_KEY_HASH]"
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -124,7 +124,6 @@ Fatal error:
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "balance": "0",
   "script":
     { "code":
@@ -139,10 +138,11 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
                   { "prim": "PAIR" } ] ] } ],
       "storage":
         { "prim": "Some", "args": [ { "string": "initial storage" } ] } } }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 "0"
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -164,15 +164,14 @@ Fatal error:
     "prim": "int"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 null
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "entrypoints": {} }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "code":
     [ { "prim": "parameter", "args": [ { "prim": "string" } ] },
       { "prim": "storage",
@@ -183,13 +182,13 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
               { "prim": "NIL", "args": [ { "prim": "operation" } ] },
               { "prim": "PAIR" } ] ] } ],
   "storage": { "prim": "Some", "args": [ { "string": "initial storage" } ] } }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "prim": "Some", "args": [ { "string": "initial storage" } ] }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "balance": "0",
   "script":
     { "code":
@@ -354,10 +353,11 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
                           { "prim": "PAIR" } ] ] } ] ] } ],
       "storage":
         { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } } }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 "0"
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -379,11 +379,10 @@ Fatal error:
     "prim": "int"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 null
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "entrypoints":
     { "rem_right": { "prim": "string" }, "rem_left": { "prim": "string" },
       "rem":
@@ -413,9 +412,9 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
               { "prim": "pair",
                 "args": [ { "prim": "string" }, { "prim": "nat" } ],
                 "annots": [ "%add_right" ] } ] } } }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "code":
     [ { "prim": "storage",
         "args":
@@ -568,10 +567,11 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
                       { "prim": "NIL", "args": [ { "prim": "operation" } ] },
                       { "prim": "PAIR" } ] ] } ] ] } ],
   "storage": { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] }
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
@@ -581,8 +581,8 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
     "prim": "string"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 null
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
@@ -592,5 +592,5 @@ null
     "prim": "string"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 null
+protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK

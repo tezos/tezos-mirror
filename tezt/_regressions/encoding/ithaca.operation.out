@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.operation.out
+encoding/ithaca.operation.out
 
 ./tezos-codec encode 012-Psithaca.operation from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",

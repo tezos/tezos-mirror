@@ -221,7 +221,7 @@ called; this should include *all* the regular ``tezos-*`` binaries.
    -  rules are ordered, i.e., the first pattern that matches, from left to
       right, fires the corresponding rule.
 
-- ``TEZOS_EVENT_HOSTNAME`` is used by the file-descriptor-sink to tweak the JSON
+-  ``TEZOS_EVENT_HOSTNAME`` is used by the file-descriptor-sink to tweak the JSON
    output (see above).
 
 As the Irmin context backend uses an internal and specific logging
@@ -280,7 +280,7 @@ events) this call adds a sink to suddenly start pretty-printing all
 Client and Baking Daemons
 -------------------------
 
-For now, ``tezos-client``, ``tezos-{baker,endorser,accuser}-*``, etc.
+For now, ``tezos-client``, ``tezos-{baker,accuser}-*``, etc.
 can only be configured using the environment variables.
 
 There is one common option ``--log-requests`` which can be used to trace

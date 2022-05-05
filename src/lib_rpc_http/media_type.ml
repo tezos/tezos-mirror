@@ -205,3 +205,26 @@ let of_content_type c =
   else if c = Content_type.bson then Some bson
   else if c = Content_type.octet_stream then Some octet_stream
   else None
+
+module Command_line = struct
+  type t = Any | Json | Binary
+
+  let parse_cli_parameter = function
+    | "json" -> Some Json
+    | "binary" -> Some Binary
+    | "any" -> Some Any
+    | _ -> None
+
+  let of_command_line = function
+    | Any -> all_media_types
+    | Binary -> [octet_stream]
+    | Json -> [json; bson]
+
+  let pp_parameter ppf = function
+    | Any -> Format.fprintf ppf "any"
+    | Binary -> Format.fprintf ppf "binary"
+    | Json -> Format.fprintf ppf "json"
+
+  let encoding =
+    Data_encoding.string_enum [("json", Json); ("binary", Binary); ("any", Any)]
+end

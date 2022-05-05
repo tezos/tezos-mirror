@@ -1,15 +1,12 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/concat_hello.tz]
 
 Well typed
-Gas remaining: 1039995.099 units remaining
+Gas remaining: 1039995.899 units remaining
 { parameter (list string) ;
   storage (list string) ;
   code { CAR
-         /* [ @parameter list string ] */ ;
-         MAP { PUSH @hello string "Hello "
-               /* [ @hello string : @parameter.elt string ] */ ;
-               CONCAT
-               /* [ string ] */ }
+         /* [ list string ] */ ;
+         MAP { PUSH @hello string "Hello " /* [ string : string ] */ ; CONCAT /* [ string ] */ }
          /* [ list string ] */ ;
          NIL operation
          /* [ list operation : list string ] */ ;

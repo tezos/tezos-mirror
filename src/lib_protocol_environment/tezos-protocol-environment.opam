@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -7,24 +9,39 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "zarith" { >= "1.12" & < "1.13" } # the signature of the [Z] module has changed in 1.12
+  "ocaml" { >= "4.12" }
+  "tezos-stdlib"
+  "tezos-crypto"
+  "tezos-lwt-result-stdlib"
+  "data-encoding" { >= "0.5.3" & < "0.6" }
+  "bls12-381" { >= "3.0.0" & < "3.1.0" }
+  "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
-  "bls12-381" { >= "1.1.0" & < "1.2.0" } # for env4
+  "ringo" { = "0.8" }
+  "ringo-lwt" { = "0.8" }
   "tezos-base"
   "tezos-sapling"
-  "tezos-protocol-environment-sigs"
-  "tezos-protocol-environment-structs"
   "tezos-micheline"
   "tezos-context"
   "tezos-event-logging"
-  "bls12-381-unix" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "tezos-test-helpers" {with-test}
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
   "lwt" { with-test & >= "5.4.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: custom economic-protocols environment implementation for `tezos-client` and testing"
+synopsis: "Interface layer between the protocols and the shell"
+description: "The protocol-environment is a two-sided component sitting between the shell and
+the protocols.
+
+On one side, it provides a restricted typing environment to compile the
+protocols against. This is a series of modules which replace the standard
+library of OCaml. These modules purposefully omit many functionalities, thus
+preventing the protocols from, say, directly writing to disk.
+
+On the other side, it provides the shell with specific call-sites in the
+protocols. These are the only entry-points into the otherwise black-box
+protocols."

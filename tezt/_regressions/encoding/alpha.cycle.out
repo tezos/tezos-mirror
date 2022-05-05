@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.cycle.out
+encoding/alpha.cycle.out
 
 ./tezos-codec encode alpha.cycle from 2147483647
 7fffffff

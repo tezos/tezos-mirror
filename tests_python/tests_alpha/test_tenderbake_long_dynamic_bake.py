@@ -12,7 +12,7 @@ from launchers.sandbox import Sandbox
 from client.client import Client
 from . import protocol
 
-# This test runs NUM_NODES, and 3 bakers. It runs NUM_TEST_CYCLES test cycles
+# This test runs NUM_NODES, and 3 bakers. It runs a number of test cycles
 # (not to be confused for protocol cycle) where each cycle lasts
 # TIME_BETWEEN_CYCLE seconds, for TEST_DURATION seconds.
 # At each cycle, a random transaction is injected. Every CHECK_PROGRESS
@@ -26,13 +26,12 @@ random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
 NEXT_KEY = itertools.cycle(KEYS)
 NUM_NODES = 5
-NUM_TEST_CYCLES = 500
 TIME_BETWEEN_CYCLE = 2
 CHECK_PROGRESS = 10
 KILL_BAKER = 4
 TIMEOUT = 6
 MAX_RETRY = 6
-TEST_DURATION = 300  # duration of the main loop
+TEST_DURATION = 120  # duration of the main loop
 MINIMAL_BLOCK_DELAY = 1
 DELAY_INCREMENT_PER_ROUND = 1
 MAX_LEVEL_DURATION = 6  # that is, decision expected in at most 3 rounds
@@ -78,6 +77,7 @@ def add_bakers(sandbox: Sandbox, nodes: Iterable[int]) -> None:
             [account],
             proto=protocol.DAEMON,
             log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
 
 
@@ -155,6 +155,7 @@ class TestAllDaemonsWithOperations:
                     [f'bootstrap{dead_baker+1}'],
                     proto=protocol.DAEMON,
                     log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+                    run_params=['--liquidity-baking-toggle-vote', 'pass'],
                 )
                 # set the next baker to die
                 dead_baker = baker

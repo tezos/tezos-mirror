@@ -72,8 +72,10 @@ let filter = Some section
 let wrap f _switch () =
   Tztest.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
-          init_chain test_dir >>= fun store ->
-          init_mock_p2p Distributed_db_version.Name.zero >>= function
+          let open Lwt_syntax in
+          let* store = init_chain test_dir in
+          let* r = init_mock_p2p Distributed_db_version.Name.zero in
+          match r with
           | Ok p2p ->
               (* Create state *)
               let db = Distributed_db.create store p2p in
@@ -93,8 +95,9 @@ let wrap f _switch () =
     pushing_validation_request event. *)
 let test_pushing_validator_protocol vl _switch () =
   (* Let's validate a phony protocol *)
+  let open Lwt_syntax in
   let pt = Protocol.{expected_env = V0; components = []} in
-  Protocol_validator.validate vl Protocol_hash.zero pt >>= fun res ->
+  let* res = Protocol_validator.validate vl Protocol_hash.zero pt in
   Alcotest.(
     check (Tztestable.tzresults Alcotest_protocol_validator.registered_protocol))
     "Compilation should fail."
@@ -121,8 +124,9 @@ let test_pushing_validator_protocol vl _switch () =
     genesis protocol) emits a previously_validated_protocol event. *)
 let test_previously_validated_protocol vl _switch () =
   (* Let's request the re-validation of the genesis protocol *)
+  let open Lwt_syntax in
   let phony_pt = Protocol.{expected_env = V0; components = []} in
-  Protocol_validator.validate vl genesis_protocol_hash phony_pt >>= fun res ->
+  let* res = Protocol_validator.validate vl genesis_protocol_hash phony_pt in
   Alcotest.check
     (Tztestable.tzresults Alcotest_protocol_validator.registered_protocol)
     "Compilation should work."
@@ -143,14 +147,15 @@ let test_previously_validated_protocol vl _switch () =
 (** [fetching_protocol] tests that requesting the fetch of a protocol
     emits a fetching_protocol event. *)
 let test_fetching_protocol vl _switch () =
-  (* Let's
-     fetch a phony protocol, and timeout immediately *)
-  Protocol_validator.fetch_and_compile_protocol
-    ~peer:P2p_peer.Id.zero
-    ~timeout:Ptime.Span.zero
-    vl
-    Protocol_hash.zero
-  >>= fun _ ->
+  (* Let's fetch a phony protocol, and timeout immediately *)
+  let open Lwt_syntax in
+  let* _ =
+    Protocol_validator.fetch_and_compile_protocol
+      ~peer:P2p_peer.Id.zero
+      ~timeout:Ptime.Span.zero
+      vl
+      Protocol_hash.zero
+  in
   Mock_sink.(
     assert_has_event
       "Should have a fetching_protocol event"

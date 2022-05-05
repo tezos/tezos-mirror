@@ -92,6 +92,86 @@ let store_prechecked_block =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
+let start_updating_floating_stores =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_updating_floating_stores"
+    ~msg:"updating floating stores"
+    ()
+
+let start_cementing_blocks =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_cementing_blocks"
+    ~msg:"cementing blocks"
+    ()
+
+let start_cementing_blocks_metadata =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_cementing_blocks_metadata"
+    ~msg:"cementing blocks metadata"
+    ()
+
+let start_merging_thread =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_merging_thread"
+    ~msg:"running merging thread"
+    ()
+
+let end_merging_thread =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"end_merging_thread"
+    ~msg:"merging thread ended"
+    ()
+
+let start_store_garbage_collection =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_store_garbage_collection"
+    ~msg:"garbage-collecting the cemented store"
+    ()
+
+let start_merge_finalizer =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_merge_finalizer"
+    ~msg:"triggering merge finalizer"
+    ()
+
+let start_retreiving_predecessors =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_retreiving_predecessors"
+    ~msg:"retrieving predecessors from floating store"
+    ()
+
+let start_retreiving_cycles =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"start_retreiving_cycles"
+    ~msg:"retrieving cycles from floating store"
+    ()
+
+let store_is_consistent =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"store_is_consistent"
+    ~msg:"the store is consistent"
+    ()
+
 (* Notice *)
 let fork_testchain =
   declare_4
@@ -149,14 +229,6 @@ let switch_history_mode =
     ("old", History_mode.encoding)
     ~pp2:History_mode.pp
     ("new", History_mode.encoding)
-
-let store_is_consistent =
-  declare_0
-    ~section
-    ~level:Info
-    ~name:"store_is_consistent"
-    ~msg:"the store is consistent"
-    ()
 
 let inconsistent_store =
   declare_1

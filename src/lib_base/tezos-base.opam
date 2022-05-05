@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -9,20 +11,19 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-stdlib"
   "tezos-crypto"
-  "data-encoding" { >= "0.4" & < "0.5" }
+  "data-encoding" { >= "0.5.3" & < "0.6" }
   "tezos-error-monad"
-  "tezos-event-logging"
   "tezos-rpc"
   "tezos-clic"
   "tezos-micheline"
-  "ptime" { >= "0.8.4" }
-  "ezjsonm" { >= "0.5.0" }
-  "lwt" { >= "5.4.0" & < "5.5.0" }
+  "tezos-event-logging"
+  "ptime" { >= "1.0.0" }
+  "ezjsonm" { >= "1.1.0" }
+  "lwt" { >= "5.4.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
-  "bls12-381-unix"
-  "tezos-hacl-glue-unix"
+  "tezos-hacl"
   "tezos-stdlib-unix"
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
   "tezos-test-helpers" {with-test}
 ]
 build: [

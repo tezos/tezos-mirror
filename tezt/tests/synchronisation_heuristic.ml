@@ -111,14 +111,19 @@ let check_node_synchronization_state =
   in
   Log.info "Restarting the nodes..." ;
   let* _ =
-    Lwt_list.iter_p (fun node -> Node.restart node []) (main_node :: nodes)
+    Lwt_list.iter_p (fun node -> Node.terminate node) (main_node :: nodes)
   in
-  Log.info "Waiting for nodes to be synchronized." ;
-  let* () =
-    Lwt_list.iter_p
+  (* We register this event before restarting the node to avoid to register it too late. *)
+  let synchronisation_events =
+    List.map
       (fun node -> wait_for ~statuses:["synced"; "stuck"] node)
       (main_node :: nodes)
   in
+  let* _ =
+    Lwt_list.iter_p (fun node -> Node.run node []) (main_node :: nodes)
+  in
+  Log.info "Waiting for nodes to be synchronized." ;
+  let* () = Lwt.join synchronisation_events in
   unit
 
 (* In order to check that the prevalidator is not alive, we cannot
@@ -170,7 +175,7 @@ let check_prevalidator_start =
     Lwt_list.iter_p (fun node -> wait_for_sync node) [node1; node2]
   in
   let* client = Client.init ~endpoint:(Node node1) () in
-  let* () = Client.activate_protocol ~protocol client ~timestamp_delay:0. in
+  let* () = Client.activate_protocol ~protocol client ~timestamp:Now in
   Log.info "Activated protocol." ;
   let* () = Client.bake_for ~minimal_timestamp:false client in
   let connect node node' =
@@ -196,5 +201,5 @@ let check_prevalidator_start =
   unit
 
 let register ~protocols =
-  check_node_synchronization_state ~protocols ;
-  check_prevalidator_start ~protocols
+  check_node_synchronization_state protocols ;
+  check_prevalidator_start protocols

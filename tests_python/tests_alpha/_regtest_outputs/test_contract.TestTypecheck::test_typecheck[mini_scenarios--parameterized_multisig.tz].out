@@ -1,38 +1,32 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/parameterized_multisig.tz]
 
 Well typed
-Gas remaining: 1039928.103 units remaining
+Gas remaining: 1039940.583 units remaining
 { storage (pair bool (pair (map nat (pair bool bool)) (pair key key))) ;
   parameter (or nat (pair signature nat)) ;
   code { DUP
-         /* [ pair (or @parameter nat (pair signature nat))
-                 (pair @storage bool (map nat (pair bool bool)) key key)
-            : pair (or @parameter nat (pair signature nat))
-                 (pair @storage bool (map nat (pair bool bool)) key key) ] */ ;
+         /* [ pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key
+            : pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key ] */ ;
          CAR
-         /* [ @parameter or nat (pair signature nat)
-            : pair (or @parameter nat (pair signature nat))
-                 (pair @storage bool (map nat (pair bool bool)) key key) ] */ ;
+         /* [ or nat (pair signature nat)
+            : pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key ] */ ;
          DIP { CDDR }
-         /* [ @parameter or nat (pair signature nat)
-            : pair (map nat (pair bool bool)) key key ] */ ;
+         /* [ or nat (pair signature nat) : pair (map nat (pair bool bool)) key key ] */ ;
          IF_LEFT
            { DIP { DUP
                    /* [ pair (map nat (pair bool bool)) key key
                       : pair (map nat (pair bool bool)) key key ] */ ;
                    CAR
                    /* [ map nat (pair bool bool) : pair (map nat (pair bool bool)) key key ] */ }
-             /* [ @parameter.left nat : map nat (pair bool bool)
-                : pair (map nat (pair bool bool)) key key ] */ ;
+             /* [ nat : map nat (pair bool bool) : pair (map nat (pair bool bool)) key key ] */ ;
              GET
              /* [ option (pair bool bool) : pair (map nat (pair bool bool)) key key ] */ ;
              IF_NONE
                { PUSH bool False /* [ bool : pair (map nat (pair bool bool)) key key ] */ }
                { DUP
-                 /* [ @some pair bool bool : @some pair bool bool
-                    : pair (map nat (pair bool bool)) key key ] */ ;
+                 /* [ pair bool bool : pair bool bool : pair (map nat (pair bool bool)) key key ] */ ;
                  CAR
-                 /* [ bool : @some pair bool bool : pair (map nat (pair bool bool)) key key ] */ ;
+                 /* [ bool : pair bool bool : pair (map nat (pair bool bool)) key key ] */ ;
                  DIP { CDR /* [ bool : pair (map nat (pair bool bool)) key key ] */ }
                  /* [ bool : bool : pair (map nat (pair bool bool)) key key ] */ ;
                  AND
@@ -40,17 +34,16 @@ Gas remaining: 1039928.103 units remaining
              PAIR
              /* [ pair bool (map nat (pair bool bool)) key key ] */ }
            { DUP
-             /* [ @parameter.right pair signature nat : @parameter.right pair signature nat
+             /* [ pair signature nat : pair signature nat
                 : pair (map nat (pair bool bool)) key key ] */ ;
              CAR
-             /* [ signature : @parameter.right pair signature nat
-                : pair (map nat (pair bool bool)) key key ] */ ;
+             /* [ signature : pair signature nat : pair (map nat (pair bool bool)) key key ] */ ;
              DIP { CDR
                    /* [ nat : pair (map nat (pair bool bool)) key key ] */ ;
                    DUP
                    /* [ nat : nat : pair (map nat (pair bool bool)) key key ] */ ;
                    PACK
-                   /* [ @packed bytes : nat : pair (map nat (pair bool bool)) key key ] */ ;
+                   /* [ bytes : nat : pair (map nat (pair bool bool)) key key ] */ ;
                    BLAKE2B
                    /* [ bytes : nat : pair (map nat (pair bool bool)) key key ] */ }
              /* [ signature : bytes : nat : pair (map nat (pair bool bool)) key key ] */ ;
@@ -105,7 +98,7 @@ Gas remaining: 1039928.103 units remaining
                           { PUSH (pair bool bool)
                                  (Pair False False)
                             /* [ pair bool bool : map nat (pair bool bool) : pair key key ] */ }
-                          { /* [ @some pair bool bool : map nat (pair bool bool) : pair key key ] */ } ;
+                          { /* [ pair bool bool : map nat (pair bool bool) : pair key key ] */ } ;
                         CDR
                         /* [ bool : map nat (pair bool bool) : pair key key ] */ ;
                         PUSH bool True
@@ -145,7 +138,7 @@ Gas remaining: 1039928.103 units remaining
                          { PUSH (pair bool bool)
                                 (Pair False False)
                            /* [ pair bool bool : nat : map nat (pair bool bool) : pair key key ] */ }
-                         { /* [ @some pair bool bool : nat : map nat (pair bool bool) : pair key key ] */ } ;
+                         { /* [ pair bool bool : nat : map nat (pair bool bool) : pair key key ] */ } ;
                        CAR
                        /* [ bool : nat : map nat (pair bool bool) : pair key key ] */ ;
                        PUSH bool True

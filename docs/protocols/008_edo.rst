@@ -1,10 +1,10 @@
-Protocol 008_PtEdo2Zk Edo
-=========================
+Protocol Edo
+============
 
 **Important: revision 008_PtEdoTez of protocol Edo contains a bug that
 is corrected in the latest version 008_PtEdo2Zk**
 
-This page contains all the relevant information for protocol 008 Edo.
+This page contains all the relevant information for protocol 008 Edo (008_PtEdo2Zk).
 Each of the main changes is briefly described with links to relevant
 external documentation and merge requests.
 There are dedicated sections for all the changes to RPCs and
@@ -12,7 +12,7 @@ operations.
 The changelog section contains all the Merge Requests and instructions
 to regenerate the protocol sources from the Gitlab branch.
 
-The code can be found in the Gitlab branch `master` or in the release
+The code can be found in the directory ``../src/proto_008_PtEdo2Zk`` of branch `master` or in the release
 8.2 and its full hash is
 ``PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA``.
 

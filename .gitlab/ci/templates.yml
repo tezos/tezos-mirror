@@ -1,6 +1,6 @@
 variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: 049f2433bd7f4b4fb24dc7cb7faa4b9d77589138
+  build_deps_image_version: 845375388d477153b36344f69a23a1b34b2bf82e
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
@@ -32,8 +32,18 @@ variables:
 .image_template__runtime_prebuild_dependencies_template:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
-.image_template__latest:
-  image: docker:latest
+# Match GitLab executors version and directly use the Docker socket
+# The Docker daemon is already configured, experimental features are enabled
+# The following environment variables are already set:
+# - BUILDKIT_PROGRESS
+# - DOCKER_DRIVER
+# - DOCKER_VERSION
+# https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding
+.image_template__docker:
+  image: docker:20.10.12
+
+.image_template__alpine:
+  image: alpine:3.15
 
 # Rules template
 
@@ -47,9 +57,14 @@ variables:
       when: never
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
+    # No development jobs on test latest release
+    - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: never
+    # No development jobs on release branches
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+    # No development jobs on release tags
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - when: on_success
 
@@ -62,9 +77,14 @@ variables:
       when: never
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
+    # No development jobs on test latest release
+    - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: never
+    # No development jobs on release branches
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+    # No development jobs on release tags
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - when: manual
 
@@ -74,22 +94,30 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+    # Valid release tag: vX.Y or vX.Y-rcZ
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
       variables:
-        MASTER_OR_RELEASE: "true"
-    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+        CI_DOCKER_HUB: "true"
+    # No jobs on latest release branches
+    - if: '($CI_COMMIT_REF_NAME == "latest-release" || $CI_COMMIT_REF_NAME == "test-latest-release")'
+      when: never
+    # Match 'vX-release' branches only
+    - if: '($CI_COMMIT_BRANCH =~ /v[0-9]{1,3}-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /v[0-9]{1,3}-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
       variables:
-        MASTER_OR_RELEASE: "true"
+        CI_DOCKER_HUB: "true"
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
       variables:
-        MASTER_OR_RELEASE: "true"
+        CI_DOCKER_HUB: "true"
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
       variables:
-        MASTER_OR_RELEASE: "true"
+        CI_DOCKER_HUB: "true"
+    # Testing
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: on_success
     - when: never
 
 # Rules for all the jobs that are run only for the master branch
@@ -106,9 +134,34 @@ variables:
 # Rules for all the jobs that are run only on release tags
 .rules_template__release_tag:
   rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+    # Valid release tag: vX.Y or vX.Y-rcZ
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-rc\d+)?$/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    # Testing
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
       when: on_success
     - when: never
+
+# Rules for all the jobs that are run only on latest release branches
+.rules_template__latest_release:
+  rules:
+    # Production: push to Docker Hub
+    - if: '$CI_COMMIT_REF_NAME == "latest-release" && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+      variables:
+        CI_DOCKER_HUB: "true"
+    # Testing: push to GitLab container registry
+    - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: on_success
+    - when: never
+
+# Rules for jobs that should run all the time except on latest release branches
+.rules_template__not_on_latest_release:
+  rules:
+    # No jobs on latest release branches
+    - if: '($CI_COMMIT_REF_NAME == "latest-release" || $CI_COMMIT_REF_NAME == "test-latest-release")'
+      when: never
+    - when: on_success
 
 # Rules for specific topics: doc, opam, etc.
 .rules_template__development_documentation:
@@ -117,6 +170,10 @@ variables:
       when: always
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
+    # No development jobs on latest release branches
+    - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: never
+    # No development jobs on release branches
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
@@ -126,10 +183,10 @@ variables:
     - if: '$CI_MERGE_REQUEST_ID'
       changes:
         - docs/introduction/*.sh
-      when: always
-    # Run when there is label on the merge request.
+      when: on_success
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
-      when: always
+      when: on_success
     - when: manual
       allow_failure: true
 
@@ -139,9 +196,13 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
+    # No jobs on test latest release
+    - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: never
+    # No development jobs on release branches
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     # Disable this job when the MR has the label `ci--no-coverage`
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--no-coverage(?:$|[,])/'
@@ -152,19 +213,36 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
+    # Run when arm64 is in the branch name
     - if: '$CI_COMMIT_BRANCH =~ /arm64/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /arm64/'
-      when: always
-    # Run when there is label on the merge request.
+      when: on_success
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--arm64(?:$|[,])/'
-      when: always
+      when: on_success
+    # No development jobs on test latest release
+    - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: never
+    # No development jobs on release branches
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    # No development jobs on release tags
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
     - when: manual
       allow_failure: true
 
 .rules_template__development_docker:
   rules:
+    # No development jobs on test latest release
+    - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
+      when: never
+    # No development jobs on release branches
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    # Run when docker is in the branch name
     - if: '$CI_COMMIT_BRANCH =~ /docker/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /docker/'
       when: on_success
-    # Run when there is label on the merge request.
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docker(?:$|[,])/'
       when: on_success
     - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
@@ -172,26 +250,43 @@ variables:
       allow_failure: true
     - when: never
 
+.rules_template__development_dockerfile:
+  rules:
+    # Only run on merge requests when Dockerfiles have changed
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - build.Dockerfile
+        - Dockerfile
+    - when: never # default
+
 .rules_template__extended_test_pipeline:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
     - when: never
 
+# this template makes sure that the child pipelines ( triggered ) is always run
+.rules_template__opam:
+  rules:
+    # Run on child pipelines
+    - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
+      when: on_success
+    - when: never # default
+
 .rules_template__trigger_opam_pipeline:
   rules:
-    # Run on push to the default branch (i.e master).
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
-      when: always
     # Run on scheduled builds.
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
+    # Never run on branch pipelines for master.
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
+      when: never
     # Run when the branch name contains the `opam` keyword.
     - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
-      when: always
-    # Run when there is label on the merge request.
+      when: on_success
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
-      when: always
+      when: on_success
     # Run on merge requests when opam changes are detected.
     - if: '$CI_MERGE_REQUEST_ID'
       changes:
@@ -203,21 +298,33 @@ variables:
         - "**/*.opam"
         - scripts/version.sh
         - .gitlab-ci.yml
-      when: always
+      when: on_success
+    - when: never # default
+
+.rules_template__merge_request_only:
+  rules:
+    # Only run on merge requests
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
+    - when: never # default
+
+.rules_template__tezos_default_branch_only:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
+      when: on_success
     - when: never # default
 
 # Job templates
 
 # This template is used by the opam test jobs in the child pipeline
-# triggered by `bootstrap-opam-pipeline.yml`.
+# triggered by `packaging.yml`.
+# We extend the rules_template__opam to ensure that this pipeline is
+# always run whenever is triggered
 .opam_template:
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies_template
-    # Note that the rules for jobs in the child pipeline must be the
-    # same as that of the generator job (`opam:create_pipeline`) and
-    # the child pipeline triggerer (`opam:trigger`).
-    - .rules_template__trigger_opam_pipeline
+    - .rules_template__opam
   stage: packaging
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
@@ -230,6 +337,8 @@ variables:
     - opam depext --yes ${package}
     - opam install --yes ${package}
     - opam reinstall --yes --with-test ${package}
+  # Start immediately, don't wait for previous stages to succeeds
+  needs: []
   after_script:
     # Stores logs in opam_logs/ for artifacts and outputs an excerpt on failure.
     - OPAM_LOGS=opam_logs/ ./scripts/ci/opam_handle_output.sh
@@ -249,17 +358,32 @@ variables:
 # Merge coverage files after the execution
 .template__coverage_files:
   extends: .template__coverage
-  after_script:
-    - COVERAGE_MERGED=$(echo $CI_JOB_NAME | sed -r 's/[\/_ ]/-/g')
-    # If the merge fails, we upload a corrupted coverage file for the test job
-    - bisect-ppx-report merge --coverage-path $BISECT_FILE $COVERAGE_MERGED.coverage
-      || { COVERAGE_MERGED=$COVERAGE_MERGED.corrupted; echo "" > $COVERAGE_MERGED.coverage; }
-    # If there is nothing to remove we still want to continue and move the corrupted file
-    - rm $BISECT_FILE*.coverage || true
-    - mv $COVERAGE_MERGED.coverage $BISECT_FILE
   artifacts:
-    name: "coverage-files-$CI_JOB_NAME"
+    name: "coverage-files-$CI_JOB_ID"
     paths:
       - $BISECT_FILE
     expire_in: 1 day
     when: on_success
+
+.build_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__coverage
+    - .rules_template__not_on_latest_release
+  stage: build
+  before_script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+
+.docker_registry_auth:
+  before_script:
+    - ./scripts/ci/docker_registry_auth.sh
+
+.template__code_quality:
+  variables:
+    CODE_QUALITY_REPORT: "_reports/gl-code-quality-report.json"

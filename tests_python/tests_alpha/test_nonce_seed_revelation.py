@@ -55,11 +55,12 @@ class TestNonceSeedRevelation:
                 [f"bootstrap{i + 1}"],
                 proto=protocol.DAEMON,
                 log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+                run_params=['--liquidity-baking-toggle-vote', 'pass'],
             )
 
     @pytest.mark.timeout(2 * TEST_DURATION)
     def test_wait_for_two_cycles(self, sandbox: Sandbox):
-        """Poll the node until target level is reached """
+        """Poll the node until target level is reached"""
         target = FIRST_PROTOCOL_BLOCK + 2 * BLOCKS_PER_CYCLE
         level = target - 1
         while level < target:
@@ -73,7 +74,7 @@ class TestNonceSeedRevelation:
             sandbox.rm_baker(i, proto=protocol.DAEMON)
 
     def test_get_all_blocks(self, sandbox: Sandbox, session: dict):
-        """Retrieve all blocks for two full cycles. """
+        """Retrieve all blocks for two full cycles."""
         blocks = [
             sandbox.client(0).get_block(FIRST_PROTOCOL_BLOCK + i)
             for i in range(2 * BLOCKS_PER_CYCLE)
@@ -98,7 +99,7 @@ class TestNonceSeedRevelation:
         assert final_block_level['cycle_position'] == 0
 
     def test_collect_seed_nonce_hashes(self, session):
-        """Collect nonce hashes in the block headers in the first cycle """
+        """Collect nonce hashes in the block headers in the first cycle"""
         seed_nonce_hashes = {}
         blocks = session['blocks']
         for i in range(BLOCKS_PER_CYCLE // BLOCKS_PER_COMMITMENT):

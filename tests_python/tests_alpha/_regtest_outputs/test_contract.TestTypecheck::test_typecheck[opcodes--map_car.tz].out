@@ -1,21 +1,19 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/map_car.tz]
 
 Well typed
-Gas remaining: 1039990.103 units remaining
+Gas remaining: 1039991.063 units remaining
 { parameter bool ;
   storage (pair (bool %b) (nat %n)) ;
   code { DUP
-         /* [ pair (bool @parameter) (pair @storage (bool %b) (nat %n))
-            : pair (bool @parameter) (pair @storage (bool %b) (nat %n)) ] */ ;
+         /* [ pair bool bool nat : pair bool bool nat ] */ ;
          CAR
-         /* [ @parameter bool
-            : pair (bool @parameter) (pair @storage (bool %b) (nat %n)) ] */ ;
-         DIP { CDR /* [ @storage pair (bool %b) (nat %n) ] */ }
-         /* [ @parameter bool : @storage pair (bool %b) (nat %n) ] */ ;
+         /* [ bool : pair bool bool nat ] */ ;
+         DIP { CDR /* [ pair bool nat ] */ }
+         /* [ bool : pair bool nat ] */ ;
          SWAP
-         /* [ @storage pair (bool %b) (nat %n) : @parameter bool ] */ ;
+         /* [ pair bool nat : bool ] */ ;
          MAP_CAR @new_storage %b { AND /* [ bool ] */ } ;
          NIL operation
-         /* [ list operation : @storage pair (bool %b) (nat %n @storage.n) ] */ ;
+         /* [ list operation : pair bool nat ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage (bool %b) (nat %n @storage.n)) ] */ } }
+         /* [ pair (list operation) bool nat ] */ } }

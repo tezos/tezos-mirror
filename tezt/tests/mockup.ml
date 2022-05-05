@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -65,21 +66,23 @@ let transfer_data =
 let test_balances_after_transfer giver amount receiver =
   let (giver_balance_before, giver_balance_after) = giver in
   let (receiver_balance_before, receiver_balance_after) = receiver in
-  if not (giver_balance_after < giver_balance_before -. amount) then
+  if not Tez.(giver_balance_after < giver_balance_before - amount) then
     Test.fail
-      "Invalid balance of giver after transfer: %f (before it was %f)"
-      giver_balance_after
-      giver_balance_before ;
-  Log.info "Balance of giver after transfer is valid: %f" giver_balance_after ;
-  let receiver_expected_after = receiver_balance_before +. amount in
+      "Invalid balance of giver after transfer: %s (before it was %s)"
+      (Tez.to_string giver_balance_after)
+      (Tez.to_string giver_balance_before) ;
+  Log.info
+    "Balance of giver after transfer is valid: %s"
+    (Tez.to_string giver_balance_after) ;
+  let receiver_expected_after = Tez.(receiver_balance_before + amount) in
   if receiver_balance_after <> receiver_expected_after then
     Test.fail
-      "Invalid balance of receiver after transfer: %f (expected %f)"
-      receiver_balance_after
-      receiver_expected_after ;
+      "Invalid balance of receiver after transfer: %s (expected %s)"
+      (Tez.to_string receiver_balance_after)
+      (Tez.to_string receiver_expected_after) ;
   Log.info
-    "Balance of receiver after transfer is valid: %f"
-    receiver_balance_after
+    "Balance of receiver after transfer is valid: %s"
+    (Tez.to_string receiver_balance_after)
 
 (* Test.
    Transfer some tz and check balance changes are as expected.
@@ -108,16 +111,15 @@ let test_transfer =
   in
   test_balances_after_transfer
     (giver_balance_before, giver_balance_after)
-    (Tez.to_float amount)
+    amount
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let test_calling_contract_with_global_constant_success ~protocols =
+let test_calling_contract_with_global_constant_success =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant success"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -127,35 +129,33 @@ let test_calling_contract_with_global_constant_success ~protocols =
   let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
   let storage = "0" in
   let input = "Unit" in
-  let* result = Client.run_script ~src:script ~storage ~input client in
+  let* result = Client.run_script ~prg:script ~storage ~input client in
   let result = String.trim result in
   Log.info "Contract with constant output storage %s" result ;
   if result = value then return ()
   else Test.fail "Expected storage '%s' but got '%s'" value result
 
-let test_calling_contract_with_global_constant_failure ~protocols =
+let test_calling_contract_with_global_constant_failure =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
   let storage = "0" in
   let input = "Unit" in
-  let process = Client.spawn_run_script ~src:script ~storage ~input client in
+  let process = Client.spawn_run_script ~prg:script ~storage ~input client in
   Process.check_error
     ~exit_code:1
     ~msg:(rex "No registered global was found")
     process
 
-let test_register_global_constant_success ~protocols =
+let test_register_global_constant_success =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Register Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -165,12 +165,11 @@ let test_register_global_constant_success ~protocols =
   Log.info "Registered Global Connstant %s with hash %s" value result ;
   return ()
 
-let test_register_global_constant_failure ~protocols =
+let test_register_global_constant_failure =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Register Global Constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -184,12 +183,11 @@ let test_register_global_constant_failure ~protocols =
     ~msg:(rex "register global constant simulation failed")
     proccess
 
-let test_originate_contract_with_global_constant_success ~protocols =
+let test_originate_contract_with_global_constant_success =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Originate Contract with Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -209,12 +207,11 @@ let test_originate_contract_with_global_constant_success ~protocols =
   Log.info "result %s" result ;
   return ()
 
-let test_typechecking_and_normalization_work_with_constants ~protocols =
+let test_typechecking_and_normalization_work_with_constants =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Typechecking and normalization work with constants"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -265,10 +262,10 @@ let test_same_transfer_twice =
   let mempool_file = Client.base_dir client // "mockup" // "mempool.json" in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
-  let* mempool1 = read_file mempool_file in
+  let mempool1 = read_file mempool_file in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = transfer_expected_to_fail ~amount ~giver ~receiver client in
-  let* mempool2 = read_file mempool_file in
+  let mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
   if mempool1 <> mempool2 then
     Test.fail
@@ -292,11 +289,11 @@ let test_transfer_same_participants =
   let thrashpool_file = base_dir // "mockup" // "trashpool.json" in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
-  let* mempool1 = read_file mempool_file in
+  let mempool1 = read_file mempool_file in
   let amount = Tez.(amount + one) in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = transfer_expected_to_fail ~amount ~giver ~receiver client in
-  let* mempool2 = read_file mempool_file in
+  let mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
   if mempool1 <> mempool2 then
     Test.fail
@@ -305,7 +302,7 @@ let test_transfer_same_participants =
       mempool2 ;
   Log.info
     "Checking that last operation was discarded into a newly created trashpool" ;
-  let* str = read_file thrashpool_file in
+  let str = read_file thrashpool_file in
   if String.equal str "" then
     Test.fail "Expected thrashpool to have one operation" ;
   return ()
@@ -334,16 +331,16 @@ let test_multiple_baking =
       let* alice_balance = Client.get_balance_for ~account:alice client in
       let* bob_balance = Client.get_balance_for ~account:bob client in
       Log.info
-        "%d. Balances\n  - Alice :: %f\n  - Bob ::   %f"
+        "%d. Balances\n  - Alice :: %s\n  - Bob ::   %s"
         i
-        alice_balance
-        bob_balance ;
+        (Tez.to_string alice_balance)
+        (Tez.to_string bob_balance) ;
       if alice_balance <> bob_balance then
         Test.fail
-          "Unexpected balances for Alice (%f) and Bob (%f). They should be \
+          "Unexpected balances for Alice (%s) and Bob (%s). They should be \
            equal."
-          alice_balance
-          bob_balance ;
+          (Tez.to_string alice_balance)
+          (Tez.to_string bob_balance) ;
       return ())
     (range 1 10)
 
@@ -460,7 +457,7 @@ let test_migration_transfer ?migration_spec () =
       in
       test_balances_after_transfer
         (giver_balance_before, giver_balance_after)
-        (Tez.to_float amount)
+        amount
         (receiver_balance_before, receiver_balance_after) ;
       return ())
     ~info:"transfer"
@@ -587,25 +584,45 @@ let test_empty_block_baking =
   Log.info "Baking pending operations..." ;
   Client.bake_for ~keys:[giver] client
 
+let test_storage_from_file =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Load storage and input from file."
+    ~tags:["mockup"; "client"; "run_script"]
+  @@ fun protocol ->
+  Format.printf "%s" @@ Unix.getcwd () ;
+  let* client = Client.init_mockup ~protocol () in
+  Lwt_io.with_temp_file (fun (temp_filename, pipe) ->
+      let* () = Lwt_io.write pipe "Unit" in
+      let* _storage =
+        Client.run_script
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/very_small.tz"
+          ~storage:temp_filename
+          ~input:temp_filename
+          client
+      in
+      unit)
+
 let register ~protocols =
-  test_rpc_list ~protocols ;
-  test_same_transfer_twice ~protocols ;
-  test_transfer_same_participants ~protocols ;
-  test_transfer ~protocols ;
-  test_empty_block_baking ~protocols ;
-  test_simple_baking_event ~protocols ;
-  test_multiple_baking ~protocols ;
-  test_rpc_header_shell ~protocols ;
-  test_origination_from_unrevealed_fees ~protocols ;
-  test_multiple_transfers ~protocols
+  test_rpc_list protocols ;
+  test_same_transfer_twice protocols ;
+  test_transfer_same_participants protocols ;
+  test_transfer protocols ;
+  test_empty_block_baking protocols ;
+  test_simple_baking_event protocols ;
+  test_multiple_baking protocols ;
+  test_rpc_header_shell protocols ;
+  test_origination_from_unrevealed_fees protocols ;
+  test_multiple_transfers protocols ;
+  test_storage_from_file protocols
 
 let register_global_constants ~protocols =
-  test_register_global_constant_success ~protocols ;
-  test_register_global_constant_failure ~protocols ;
-  test_calling_contract_with_global_constant_success ~protocols ;
-  test_calling_contract_with_global_constant_failure ~protocols ;
-  test_originate_contract_with_global_constant_success ~protocols ;
-  test_typechecking_and_normalization_work_with_constants ~protocols
+  test_register_global_constant_success protocols ;
+  test_register_global_constant_failure protocols ;
+  test_calling_contract_with_global_constant_success protocols ;
+  test_calling_contract_with_global_constant_failure protocols ;
+  test_originate_contract_with_global_constant_success protocols ;
+  test_typechecking_and_normalization_work_with_constants protocols
 
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to

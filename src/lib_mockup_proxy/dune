@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_mockup_proxy)
  (public_name tezos-mockup-proxy)
@@ -10,4 +13,5 @@
   resto-cohttp-self-serving-client
   tezos-rpc-http-client
   tezos-shell-services)
- (flags (:standard -open Tezos_base__TzPervasives)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))

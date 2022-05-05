@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_clic_unix)
  (public_name tezos-clic.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-stdlib
   tezos-clic
   tezos-stdlib-unix
   tezos-error-monad

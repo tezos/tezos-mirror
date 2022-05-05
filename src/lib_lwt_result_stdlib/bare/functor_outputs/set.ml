@@ -36,8 +36,6 @@ module type S = sig
 
   type t
 
-  module Legacy : Stdlib.Set.S with type elt = elt and type t = t
-
   val empty : t
 
   val is_empty : t -> bool
@@ -101,6 +99,8 @@ module type S = sig
 
   val filter : (elt -> bool) -> t -> t
 
+  val filter_map : (elt -> elt option) -> t -> t
+
   val partition : (elt -> bool) -> t -> t * t
 
   val cardinal : t -> int
@@ -109,23 +109,37 @@ module type S = sig
 
   val min_elt : t -> elt option
 
+  val min_elt_opt : t -> elt option
+
   val max_elt : t -> elt option
 
+  val max_elt_opt : t -> elt option
+
   val choose : t -> elt option
+
+  val choose_opt : t -> elt option
 
   val split : elt -> t -> t * bool * t
 
   val find : elt -> t -> elt option
 
+  val find_opt : elt -> t -> elt option
+
   val find_first : (elt -> bool) -> t -> elt option
 
+  val find_first_opt : (elt -> bool) -> t -> elt option
+
   val find_last : (elt -> bool) -> t -> elt option
+
+  val find_last_opt : (elt -> bool) -> t -> elt option
 
   val of_list : elt list -> t
 
   val to_seq_from : elt -> t -> elt Stdlib.Seq.t
 
   val to_seq : t -> elt Stdlib.Seq.t
+
+  val to_rev_seq : t -> elt Stdlib.Seq.t
 
   val add_seq : elt Stdlib.Seq.t -> t -> t
 

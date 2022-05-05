@@ -1,16 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env
+ (_
+  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))
+  (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+
 (library
  (name tezos_client_base)
  (public_name tezos-client-base)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-rpc
   tezos-shell-services
-  tezos-sapling
-  tezos-rpc)
+  tezos-sapling)
+ (js_of_ocaml)
+ (library_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_rpc
    -open Tezos_shell_services))
  (modules :standard bip39_english))

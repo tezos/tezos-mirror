@@ -12,7 +12,12 @@ def sandbox() -> Iterator[Sandbox]:
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1, params=constants.NODE_PARAMS)
         # Empty list makes everyone bake
-        sandbox.add_baker(0, [], proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(
+            0,
+            [],
+            proto=constants.ALPHA_DAEMON,
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
+        )
         yield sandbox
         assert sandbox.are_daemons_alive()
 
@@ -36,14 +41,14 @@ class TestExample:
         receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
         session['operation_hash'] = receipt.operation_hash
 
-    @pytest.mark.timeout(5)
+    @pytest.mark.timeout(10)
     def test_inclusion(self, sandbox: Sandbox, session: dict):
         operation_hash = session['operation_hash']
         sandbox.client(0).wait_for_inclusion(
             operation_hash, branch=session['head_hash']
         )
 
-    @pytest.mark.timeout(5)
+    @pytest.mark.timeout(10)
     def test_inclusion_check_previous(self, sandbox: Sandbox, session: dict):
         operation_hash = session['operation_hash']
         sandbox.client(0).wait_for_inclusion(operation_hash, check_previous=2)

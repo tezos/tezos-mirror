@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_requester)
  (public_name tezos-requester)
@@ -6,4 +9,6 @@
   tezos-base
   tezos-stdlib-unix
   lwt-watcher)
- (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_stdlib_unix)))

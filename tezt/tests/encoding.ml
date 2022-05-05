@@ -87,99 +87,53 @@ let check_sample ~name ~file =
       (JSON.encode decoded_json) ;
   return ()
 
-(** The given samples must be included in registered encodings. These can be
+(** The given sample must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
-let check_samples_encoding ~group_name ~protocols ~samples =
-  List.iter
-    (fun sample ->
-      Protocol.register_regression_test
-        ~__FILE__
-        ~title:(sf "%s encoding regression test: %s" group_name sample)
-        ~tags:["encoding"; group_name]
-        ~output_file:("encoding" // sf "%s.%s" group_name sample)
-        ~protocols
-      @@ fun protocol ->
-      let base_path =
-        "tezt" // "tests" // "encoding_samples" // group_name // sample
-      in
-      Sys.readdir base_path |> Array.to_list |> List.sort String.compare
-      |> Lwt_list.iter_s (fun file ->
-             check_sample
-               ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample)
-               ~file:(base_path // file)))
-    samples
+let check_sample_encoding ?supports sample =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:(sf "encoding regression test: %s" sample)
+    ~tags:["encoding"]
+    ?supports
+    ~output_file:(fun p -> "encoding" // sf "%s.%s" (Protocol.tag p) sample)
+  @@ fun protocol ->
+  let base_path =
+    "tezt" // "tests" // "encoding_samples" // Protocol.tag protocol // sample
+  in
+  Sys.readdir base_path |> Array.to_list |> List.sort String.compare
+  |> Lwt_list.iter_s (fun file ->
+         check_sample
+           ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample)
+           ~file:(base_path // file))
 
-let default_samples =
-  [
-    "block_header";
-    "block_header.raw";
-    "block_header.unsigned";
-    "contract";
-    "contract.big_map_diff";
-    "cycle";
-    "delegate.frozen_balance";
-    "delegate.frozen_balance_by_cycles";
-    "fitness";
-    "gas.cost";
-    "gas";
-    "level";
-    "nonce";
-    "operation.internal";
-    "operation";
-    "operation.raw";
-    "operation.unsigned";
-    "period";
-    "raw_level";
-    "roll";
-    "seed";
-    "tez";
-    "timestamp";
-    "vote.ballot";
-    "vote.ballots";
-    "vote.listings";
-    "voting_period.kind";
-    "voting_period";
-  ]
-
-let alpha_samples =
-  [
-    "block_header";
-    "block_header.raw";
-    "block_header.unsigned";
-    "contract";
-    "contract.big_map_diff";
-    "cycle";
-    "fitness";
-    "gas.cost";
-    "gas";
-    "level";
-    "nonce";
-    "operation.internal";
-    "operation";
-    "operation.raw";
-    "operation.unsigned";
-    "period";
-    "raw_level";
-    "seed";
-    "tez";
-    "timestamp";
-    "vote.ballot";
-    "vote.ballots";
-    "vote.listings";
-    "voting_period.kind";
-    "voting_period";
-  ]
+let check_samples protocols =
+  let sample ?supports name = check_sample_encoding ?supports name protocols in
+  sample "block_header" ;
+  sample "block_header.raw" ;
+  sample "block_header.unsigned" ;
+  sample "contract" ;
+  sample "cycle" ;
+  sample "fitness" ;
+  sample "gas.cost" ;
+  sample "gas" ;
+  sample "level" ;
+  sample "nonce" ;
+  sample "operation.internal" ;
+  sample "operation" ;
+  sample "operation.raw" ;
+  sample "operation.unsigned" ;
+  sample "period" ;
+  sample "raw_level" ;
+  sample "seed" ;
+  sample "tez" ;
+  sample "timestamp" ;
+  sample "vote.ballot" ;
+  sample "vote.ballots" ;
+  sample "vote.listings" ;
+  sample "voting_period.kind" ;
+  sample "voting_period" ;
+  ()
 
 let register ~protocols =
   check_dump_encodings () ;
-  List.iter
-    (fun protocol ->
-      let samples =
-        if Protocol.(protocol = Alpha || protocol = Ithaca) then alpha_samples
-        else default_samples
-      in
-      check_samples_encoding
-        ~group_name:(Protocol.tag protocol)
-        ~protocols:[protocol]
-        ~samples)
-    protocols
+  check_samples protocols

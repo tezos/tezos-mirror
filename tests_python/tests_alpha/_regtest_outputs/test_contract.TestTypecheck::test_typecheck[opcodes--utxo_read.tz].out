@@ -1,11 +1,11 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/utxo_read.tz]
 
 Well typed
-Gas remaining: 1039984.190 units remaining
+Gas remaining: 1039985.390 units remaining
 { parameter (pair (ticket nat) nat) ;
   storage address ;
   code { CAR
-         /* [ @parameter pair (ticket nat) nat ] */ ;
+         /* [ pair (ticket nat) nat ] */ ;
          UNPAIR
          /* [ ticket nat : nat ] */ ;
          READ_TICKET

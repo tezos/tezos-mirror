@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let run () =
+let socket_dir () =
   let socket_dir = ref None in
   let args =
     Arg.
@@ -57,11 +57,17 @@ let run () =
     args
     (fun s -> raise (Arg.Bad (Format.sprintf "Unexpected argument: %s" s)))
     usage_msg ;
-  let main_promise = Validator.main ?socket_dir:!socket_dir () in
+  !socket_dir
+
+let run () =
+  let socket_dir = socket_dir () in
+  let main_promise = Validator.main ?socket_dir () in
   Stdlib.exit
     (Lwt_main.run
-       (Lwt_exit.wrap_and_exit main_promise >>= function
-        | Ok () -> Lwt_exit.exit_and_wait 0
-        | Error err ->
-            Format.eprintf "%a\n%!" pp_print_trace err ;
-            Lwt_exit.exit_and_wait 1))
+       (let open Lwt_syntax in
+       let* r = Lwt_exit.wrap_and_exit main_promise in
+       match r with
+       | Ok () -> Lwt_exit.exit_and_wait 0
+       | Error err ->
+           Format.eprintf "%a\n%!" pp_print_trace err ;
+           Lwt_exit.exit_and_wait 1))

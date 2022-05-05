@@ -51,7 +51,7 @@ let passwords =
 
 let nb_passwds = List.length passwords
 
-let fake_ctx () =
+let fake_ctx () : Client_context.io_wallet =
   object
     val mutable i = 0
 
@@ -61,7 +61,7 @@ let fake_ctx () =
 
     method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a
         =
-      Format.kasprintf (fun _ -> return "")
+      Format.kasprintf (fun _ -> Lwt.return_ok "")
 
     method prompt_password : type a.
         (a, Bytes.t tzresult) Client_context.lwt_format -> a =
@@ -70,15 +70,42 @@ let fake_ctx () =
           match distributed with
           | false ->
               distributed <- true ;
-              return
+              Lwt.return_ok
                 (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords 0)
           | true ->
               i <- (if i = nb_passwds - 1 then 0 else succ i) ;
               distributed <- false ;
-              return
+              Lwt.return_ok
                 (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords i))
 
     method multiple_password_retries = true
+
+    method get_base_dir = ""
+
+    method load
+        : 'a.
+          string ->
+          default:'a ->
+          'a Data_encoding.t ->
+          'a Tezos_base__TzPervasives.tzresult Lwt.t =
+      fun _ ~default _ -> Lwt.return_ok default
+
+    method load_passwords = None
+
+    method read_file _ = Lwt.return_ok ""
+
+    method with_lock : 'a. (unit -> 'a Lwt.t) -> 'a Lwt.t = fun f -> f ()
+
+    method write
+        : 'a.
+          string ->
+          'a ->
+          'a Data_encoding.t ->
+          unit Tezos_base__TzPervasives.tzresult Lwt.t =
+      fun _ _ _ -> Lwt.return_ok ()
+
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      fun _ -> Lwt_result_syntax.return_none
   end
 
 let make_sk_uris =
@@ -137,9 +164,11 @@ let test_vectors () =
   let open Encrypted in
   List.iter_es
     (fun (sks, encrypted_sks) ->
+      let open Lwt_result_syntax in
       let ctx = fake_ctx () in
       let sks = List.map Signature.Secret_key.of_b58check_exn sks in
-      encrypted_sks >>?= List.map_es (decrypt ctx) >>=? fun decs ->
+      let*? l = encrypted_sks in
+      let* decs = List.map_es (decrypt ctx) l in
       assert (decs = sks) ;
       return_unit)
     [
@@ -151,14 +180,16 @@ let test_vectors () =
 let test_random algo =
   let open Encrypted in
   let ctx = fake_ctx () in
-  let decrypt_ctx = (ctx :> Client_context.io) in
+  let decrypt_ctx = (ctx :> Client_context.io_wallet) in
   let rec inner i =
+    let open Lwt_result_syntax in
     if i >= loops then return_unit
     else
       let (_, _, sk) = Signature.generate_key ~algo () in
-      Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt ctx sk
-      >>=? fun sk_uri ->
-      decrypt decrypt_ctx sk_uri >>=? fun decrypted_sk ->
+      let* sk_uri =
+        Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt ctx sk
+      in
+      let* decrypted_sk = decrypt decrypt_ctx sk_uri in
       Alcotest.check sk_testable "test_encrypt: decrypt" sk decrypted_sk ;
       inner (succ i)
   in
@@ -171,7 +202,9 @@ let test_random algo =
     process is repeated 10 times.
 *)
 let test_random _switch () =
-  List.iter_es test_random Signature.[Ed25519; Secp256k1; P256] >>= function
+  let open Lwt_syntax in
+  let* r = List.iter_es test_random Signature.[Ed25519; Secp256k1; P256] in
+  match r with
   | Ok _ -> Lwt.return_unit
   | Error _ -> Lwt.fail_with "test_random"
 
@@ -181,7 +214,9 @@ let test_random _switch () =
     match the list [..._sks].
 *)
 let test_vectors _switch () =
-  test_vectors () >>= function
+  let open Lwt_syntax in
+  let* r = test_vectors () in
+  match r with
   | Ok _ -> Lwt.return_unit
   | Error _ -> Lwt.fail_with "test_vectors"
 

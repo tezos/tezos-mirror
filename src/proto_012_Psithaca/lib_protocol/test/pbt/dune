@@ -1,0 +1,26 @@
+(tests
+ (package tezos-protocol-012-Psithaca-tests)
+ (names liquidity_baking_pbt
+        saturation_fuzzing
+        test_gas_properties
+        test_sampler
+        test_script_comparison
+        test_tez_repr)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-client-base
+            tezos-test-helpers
+            tezos-012-Psithaca-test-helpers
+            alcotest
+            qcheck-alcotest
+            tezos-benchmark
+            tezos-benchmark-012-Psithaca)
+ (flags (:standard
+          -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+          -open Tezos_micheline
+          -open Tezos_client_012_Psithaca
+          -open Tezos_protocol_012_Psithaca
+          -open Tezos_012_Psithaca_test_helpers
+          -open Tezos_benchmark_012_Psithaca
+          -open Tezos_benchmark_type_inference_012_Psithaca)))

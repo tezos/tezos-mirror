@@ -48,6 +48,7 @@
    assumes that each unit test takes less than `100` to be
    executed. *)
 
+module Assert = Lib_test.Assert
 open Synchronisation_heuristic
 open Core
 
@@ -56,12 +57,14 @@ let prn = function
   | Not_synchronised -> "Not synchronised"
   | Synchronised {is_chain_stuck = false} -> "Synchronised (not stuck)"
 
+let pp ppf state = Format.pp_print_string ppf (prn state)
+
 let forge_peer_id () =
   let identity = P2p_identity.generate_with_pow_target_0 () in
   identity.peer_id
 
 let forge_timestamp ?(delay = 0) () =
-  let time = Time.System.to_protocol @@ Systime_os.now () in
+  let time = Time.System.to_protocol @@ Time.System.now () in
   Time.Protocol.add time (Int64.of_int delay)
 
 (* NOTE: timestamp supersedes delay *)
@@ -78,32 +81,32 @@ let forge_value ?delay ?timestamp ?peer () =
    Check the status is `Sync` when the threshold is negative. *)
 let test_threshold_negative () =
   let heuristic = create ~threshold:(-1) ~latency:120 in
-  Assert.equal ~prn (get_status heuristic) Not_synchronised ;
+  Assert.equal ~pp (get_status heuristic) Not_synchronised ;
   update heuristic @@ forge_value () ;
-  Assert.equal ~prn (get_status heuristic) Not_synchronised ;
+  Assert.equal ~pp (get_status heuristic) Not_synchronised ;
   update heuristic @@ forge_value () ;
   update heuristic @@ forge_value () ;
   update heuristic @@ forge_value () ;
-  Assert.equal ~prn (get_status heuristic) Not_synchronised
+  Assert.equal ~pp (get_status heuristic) Not_synchronised
 
 (* Test.
    Check the status is `Sync` when the threshold is zero. *)
 let test_threshold_is_zero () =
   let heuristic = create ~threshold:0 ~latency:120 in
   Assert.equal
-    ~prn
+    ~pp
     (get_status heuristic)
     (Synchronised {is_chain_stuck = false}) ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (get_status heuristic)
     (Synchronised {is_chain_stuck = false}) ;
   update heuristic @@ forge_value () ;
   update heuristic @@ forge_value () ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (get_status heuristic)
     (Synchronised {is_chain_stuck = false})
 
@@ -117,27 +120,27 @@ let test_threshold_is_zero () =
 *)
 let test_threshold_is_one () =
   let heuristic = create ~threshold:1 ~latency:120 in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value () ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value () ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic)
 
@@ -154,21 +157,21 @@ let test_threshold_is_one () =
 let test_threshold_is_one_update_in_the_past () =
   let latency = 120 in
   let heuristic = create ~threshold:1 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer = forge_peer_id () in
   update heuristic @@ forge_value ~peer () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -2) ~peer () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -10) ~peer () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic)
 
@@ -183,11 +186,11 @@ let test_threshold_is_one_update_in_the_past () =
 let test_threshold_is_one_value_in_the_past () =
   let latency = 120 in
   let heuristic = create ~threshold:1 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -2) () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -10) () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic)
+  Assert.equal ~pp Not_synchronised (get_status heuristic)
 
 (* Test.
 
@@ -202,25 +205,25 @@ let test_threshold_is_one_value_in_the_past () =
 let test_threshold_is_one_always_takes_best_timestamp () =
   let latency = 120 in
   let heuristic = create ~threshold:1 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -2) () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -2) () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -10) () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic)
 
@@ -242,20 +245,20 @@ let test_threshold_is_one_always_takes_best_timestamp () =
 let test_threshold_is_two () =
   let latency = 120 in
   let heuristic = create ~threshold:2 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer = forge_peer_id () in
   update heuristic @@ forge_value ~peer () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -2) () ;
   update heuristic @@ forge_value ~peer ~delay:(latency * -2) () ;
   update heuristic @@ forge_value ~delay:(latency * -10) () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic)
 
@@ -274,15 +277,15 @@ let test_threshold_is_two () =
 let test_threshold_is_two_one_in_the_past () =
   let latency = 120 in
   let heuristic = create ~threshold:2 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer = forge_peer_id () in
   update heuristic @@ forge_value ~peer ~delay:(latency * -2) () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value ~peer () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic)
 
@@ -298,12 +301,12 @@ let test_threshold_is_two_one_in_the_past () =
 let test_threshold_is_two_one_in_the_past_and_one_more () =
   let latency = 120 in
   let heuristic = create ~threshold:2 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer = forge_peer_id () in
   update heuristic @@ forge_value ~peer ~delay:(-3) () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value ~peer ~delay:(-1) () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic)
+  Assert.equal ~pp Not_synchronised (get_status heuristic)
 
 (* Test.
 
@@ -321,17 +324,14 @@ let test_threshold_is_two_one_in_the_past_and_one_more () =
 let test_threshold_is_two_two_in_the_past () =
   let latency = 120 in
   let heuristic = create ~threshold:2 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let timestamp = forge_timestamp ~delay:(latency * -3) () in
   update heuristic @@ forge_value ~timestamp () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value ~timestamp () ;
-  Assert.equal
-    ~prn
-    (Synchronised {is_chain_stuck = true})
-    (get_status heuristic) ;
+  Assert.equal ~pp (Synchronised {is_chain_stuck = true}) (get_status heuristic) ;
   update heuristic @@ forge_value ~delay:(latency * -2) () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic)
+  Assert.equal ~pp Not_synchronised (get_status heuristic)
 
 (* Test.
 
@@ -348,14 +348,14 @@ let test_threshold_is_two_two_in_the_past () =
 let test_threshold_is_three () =
   let latency = 120 in
   let heuristic = create ~threshold:3 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic)
 
@@ -380,27 +380,24 @@ let test_threshold_is_three () =
 let test_threshold_is_three_and_stuck () =
   let latency = 120 in
   let heuristic = create ~threshold:3 ~latency in
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer1 = forge_peer_id () in
   let timestamp = forge_timestamp ~delay:(latency * -2) () in
   update heuristic @@ forge_value ~peer:peer1 ~timestamp () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer2 = forge_peer_id () in
   update heuristic @@ forge_value ~peer:peer2 ~delay:(latency * -2) () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer3 = forge_peer_id () in
   update heuristic @@ forge_value ~peer:peer3 ~timestamp () ;
-  Assert.equal
-    ~prn
-    (Synchronised {is_chain_stuck = true})
-    (get_status heuristic) ;
+  Assert.equal ~pp (Synchronised {is_chain_stuck = true}) (get_status heuristic) ;
   update heuristic @@ forge_value ~peer:peer1 () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value ~peer:peer2 () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   update heuristic @@ forge_value ~peer:peer3 () ;
   Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic)
 
@@ -432,7 +429,7 @@ let test_counterexample_1 () =
   let delay = -50 in
   let peer = p8 in
   update heuristic @@ forge_value ~peer ~delay () ;
-  Assert.equal ~prn Not_synchronised (get_status heuristic)
+  Assert.equal ~pp Not_synchronised (get_status heuristic)
 
 let tests_raw : (string * (unit -> unit)) list =
   [
@@ -474,6 +471,7 @@ let test_bp_create () =
   Lwt.return_unit
 
 let test_bp_activate () =
+  let open Lwt_syntax in
   let latency = 100 in
   let called = ref false in
   let when_status_changes _ =
@@ -481,7 +479,7 @@ let test_bp_activate () =
     Lwt.return_unit
   in
   let heuristic = create ~when_status_changes ~threshold:3 ~latency () in
-  activate heuristic >>= fun () ->
+  let* () = activate heuristic in
   Assert.equal !called true ;
   Lwt.return_unit
 
@@ -511,6 +509,7 @@ let test_bp_create_2 () =
   Lwt.return_unit
 
 let test_bp_activate_2 () =
+  let open Lwt_syntax in
   let latency = 100 in
   let status_changes_called = ref false in
   let bootstrapped_changes_called = ref false in
@@ -531,12 +530,13 @@ let test_bp_activate_2 () =
       ~latency
       ()
   in
-  activate heuristic >>= fun () ->
+  let* () = activate heuristic in
   Assert.equal !status_changes_called true ;
   Assert.equal !bootstrapped_changes_called true ;
   Lwt.return_unit
 
 let test_force_bootstrapped () =
+  let open Lwt_syntax in
   let latency = 100 in
   let bootstrapped_changes_called = ref 0 in
   let when_bootstrapped_changes b =
@@ -548,12 +548,13 @@ let test_force_bootstrapped () =
     Lwt.return_unit
   in
   let heuristic = create ~when_bootstrapped_changes ~threshold:1 ~latency () in
-  activate heuristic >>= fun () ->
-  force_bootstrapped heuristic true >>= fun () ->
+  let* () = activate heuristic in
+  let* () = force_bootstrapped heuristic true in
   Assert.equal !bootstrapped_changes_called 2 ;
   Lwt.return_unit
 
 let test_force_bootstrapped_2 () =
+  let open Lwt_syntax in
   let latency = 100 in
   let bootstrapped_changes_called = ref 0 in
   let when_bootstrapped_changes b =
@@ -562,12 +563,13 @@ let test_force_bootstrapped_2 () =
     Lwt.return_unit
   in
   let heuristic = create ~when_bootstrapped_changes ~threshold:1 ~latency () in
-  activate heuristic >>= fun () ->
-  force_bootstrapped heuristic false >>= fun () ->
+  let* () = activate heuristic in
+  let* () = force_bootstrapped heuristic false in
   Assert.equal !bootstrapped_changes_called 1 ;
   Lwt.return_unit
 
 let test_force_bootstrapped_3 () =
+  let open Lwt_syntax in
   let latency = 100 in
   let bootstrapped_changes_called = ref 0 in
   let when_bootstrapped_changes _b =
@@ -575,49 +577,57 @@ let test_force_bootstrapped_3 () =
     Lwt.return_unit
   in
   let heuristic = create ~when_bootstrapped_changes ~threshold:1 ~latency () in
-  activate heuristic >>= fun () ->
-  force_bootstrapped heuristic true >>= fun () ->
-  force_bootstrapped heuristic false >>= fun () ->
+  let* () = activate heuristic in
+  let* () = force_bootstrapped heuristic true in
+  let* () = force_bootstrapped heuristic false in
   Assert.equal !bootstrapped_changes_called 3 ;
   Lwt.return_unit
 
 let test_is_bootstrapped () =
+  let open Lwt_syntax in
   let latency = 100 in
   let heuristic = create ~threshold:1 ~latency () in
-  activate heuristic >>= fun () ->
+  let* () = activate heuristic in
   Assert.equal (is_bootstrapped heuristic) false ;
   Lwt.return_unit
 
 let test_is_bootstrapped_2 () =
+  let open Lwt_syntax in
   let latency = 100 in
   let heuristic = create ~threshold:0 ~latency () in
-  activate heuristic >>= fun () ->
+  let* () = activate heuristic in
   Assert.equal (is_bootstrapped heuristic) true ;
   Lwt.return_unit
 
 let test_is_bootstrapped_3 () =
+  let open Lwt_syntax in
   let latency = 100 in
   let heuristic = create ~threshold:1 ~latency () in
-  activate heuristic >>= fun () ->
-  force_bootstrapped heuristic true >>= fun () ->
+  let* () = activate heuristic in
+  let* () = force_bootstrapped heuristic true in
   Assert.equal (is_bootstrapped heuristic) true ;
   Lwt.return_unit
 
 let test_bootstrapped () =
+  let open Lwt_syntax in
   let latency = 100 in
   let heuristic = create ~threshold:0 ~latency () in
-  activate heuristic >>= fun () -> bootstrapped heuristic
+  let* () = activate heuristic in
+  bootstrapped heuristic
 
 let test_bootstrapped_2 () =
+  let open Lwt_syntax in
   let latency = 100 in
   let heuristic = create ~threshold:1 ~latency () in
-  activate heuristic >>= fun () ->
+  let* () = activate heuristic in
   let p = bootstrapped heuristic in
   Assert.equal (Lwt.state p) Lwt.Sleep ;
-  force_bootstrapped heuristic true >>= fun () -> p
+  let* () = force_bootstrapped heuristic true in
+  p
 
 (* A copy of test_threshold_is_three_and_stuck *)
 let test_threshold_is_three_and_stuck_with_callbacks () =
+  let open Lwt_syntax in
   let latency = 120 in
   let status_changes = ref 0 in
   let when_status_changes status =
@@ -632,29 +642,27 @@ let test_threshold_is_three_and_stuck_with_callbacks () =
     Lwt.return_unit
   in
   let heuristic = create ~when_status_changes ~threshold:3 ~latency () in
-  activate heuristic >>= fun () ->
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  let* () = activate heuristic in
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer1 = forge_peer_id () in
   let timestamp = forge_timestamp ~delay:(latency * -2) () in
-  update heuristic @@ forge_value ~peer:peer1 ~timestamp () >>= fun () ->
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  let* () = update heuristic @@ forge_value ~peer:peer1 ~timestamp () in
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer2 = forge_peer_id () in
-  update heuristic @@ forge_value ~peer:peer2 ~delay:(latency * -2) ()
-  >>= fun () ->
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  let* () =
+    update heuristic @@ forge_value ~peer:peer2 ~delay:(latency * -2) ()
+  in
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
   let peer3 = forge_peer_id () in
-  update heuristic @@ forge_value ~peer:peer3 ~timestamp () >>= fun () ->
+  let* () = update heuristic @@ forge_value ~peer:peer3 ~timestamp () in
+  Assert.equal ~pp (Synchronised {is_chain_stuck = true}) (get_status heuristic) ;
+  let* () = update heuristic @@ forge_value ~peer:peer1 () in
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
+  let* () = update heuristic @@ forge_value ~peer:peer2 () in
+  Assert.equal ~pp Not_synchronised (get_status heuristic) ;
+  let* () = update heuristic @@ forge_value ~peer:peer3 () in
   Assert.equal
-    ~prn
-    (Synchronised {is_chain_stuck = true})
-    (get_status heuristic) ;
-  update heuristic @@ forge_value ~peer:peer1 () >>= fun () ->
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
-  update heuristic @@ forge_value ~peer:peer2 () >>= fun () ->
-  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
-  update heuristic @@ forge_value ~peer:peer3 () >>= fun () ->
-  Assert.equal
-    ~prn
+    ~pp
     (Synchronised {is_chain_stuck = false})
     (get_status heuristic) ;
   Assert.equal !status_changes 4 ;

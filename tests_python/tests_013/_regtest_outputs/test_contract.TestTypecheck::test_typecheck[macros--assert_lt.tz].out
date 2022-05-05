@@ -1,0 +1,23 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[macros/assert_lt.tz]
+
+Well typed
+Gas remaining: 1039991.723 units remaining
+{ parameter (pair int int) ;
+  storage unit ;
+  code { CAR
+         /* [ pair int int ] */ ;
+         DUP
+         /* [ pair int int : pair int int ] */ ;
+         CAR
+         /* [ int : pair int int ] */ ;
+         DIP { CDR /* [ int ] */ }
+         /* [ int : int ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_LT ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

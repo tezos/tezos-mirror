@@ -1,10 +1,22 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name test_unix_error)
- (package tezos-base)
  (libraries
+  tezos-base
   tezos-base.unix
+  tezos-error-monad
   data-encoding
   tezos-test-helpers
   qcheck-alcotest)
  (flags
-  (:standard -open Tezos_base -open Tezos_base_unix -open Tezos_error_monad)))
+  (:standard
+   -open Tezos_base
+   -open Tezos_base_unix
+   -open Tezos_error_monad)))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (action (run %{dep:./test_unix_error.exe})))

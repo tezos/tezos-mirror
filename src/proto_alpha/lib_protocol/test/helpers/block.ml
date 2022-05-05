@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -120,7 +121,8 @@ module Forge = struct
     Bytes.create Constants.proof_of_work_nonce_size
 
   let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ~payload_hash ~payload_round ?(liquidity_baking_escape_vote = false)
+      ~payload_hash ~payload_round
+      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
       ~seed_nonce_hash () =
     Block_header.
       {
@@ -128,7 +130,7 @@ module Forge = struct
         payload_round;
         proof_of_work_nonce;
         seed_nonce_hash;
-        liquidity_baking_escape_vote;
+        liquidity_baking_toggle_vote;
       }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
@@ -179,7 +181,7 @@ module Forge = struct
 
   let forge_header ?(locked_round = None) ?(payload_round = None)
       ?(policy = By_round 0) ?timestamp ?(operations = [])
-      ?liquidity_baking_escape_vote pred =
+      ?liquidity_baking_toggle_vote pred =
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
       | Ok pred_fitness -> pred_fitness
@@ -228,7 +230,7 @@ module Forge = struct
     let contents =
       make_contents
         ~seed_nonce_hash
-        ?liquidity_baking_escape_vote
+        ?liquidity_baking_toggle_vote
         ~payload_hash
         ~payload_round
         ()
@@ -237,12 +239,13 @@ module Forge = struct
 
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?seed_nonce_hash ?(liquidity_baking_escape_vote = false) ~payload_hash
+      ?seed_nonce_hash
+      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass) ~payload_hash
       ~payload_round () =
     {
       Block_header.proof_of_work_nonce;
       seed_nonce_hash;
-      liquidity_baking_escape_vote;
+      liquidity_baking_toggle_vote;
       payload_hash;
       payload_round;
     }
@@ -254,7 +257,7 @@ end
 let protocol_param_key = ["protocol_parameters"]
 
 let check_constants_consistency constants =
-  let open Constants in
+  let open Constants.Parametric in
   let {blocks_per_cycle; blocks_per_commitment; blocks_per_stake_snapshot; _} =
     constants
   in
@@ -321,7 +324,7 @@ let initial_alpha_context ?(commitments = []) constants
       ~legacy:true
       ~allow_forged_in_storage
       script
-    >>=? fun (Ex_script parsed_script, ctxt) ->
+    >>=? fun (Ex_script (Script parsed_script), ctxt) ->
     Script_ir_translator.extract_lazy_storage_diff
       ctxt
       Optimized
@@ -342,7 +345,6 @@ let initial_alpha_context ?(commitments = []) constants
     in
     (({script with storage}, lazy_storage_diff), ctxt)
   in
-  Main.init_cache ctxt >>= fun ctxt ->
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ctxt
   >|= Environment.wrap_tzresult
 
@@ -411,7 +413,9 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
 let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?level ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?tx_rollup_enable initial_accounts =
+    ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
+    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
+    initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -446,12 +450,29 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let blocks_per_cycle =
     Option.value ~default:constants.blocks_per_cycle blocks_per_cycle
   in
-  (* ?origination_size *)
+  let cycles_per_voting_period =
+    Option.value
+      ~default:constants.cycles_per_voting_period
+      cycles_per_voting_period
+  in
   let consensus_threshold =
     Option.value ~default:constants.consensus_threshold consensus_threshold
   in
   let tx_rollup_enable =
     Option.value ~default:constants.tx_rollup_enable tx_rollup_enable
+  in
+  let tx_rollup_sunset_level =
+    Option.value
+      ~default:constants.tx_rollup_sunset_level
+      tx_rollup_sunset_level
+  in
+  let tx_rollup_origination_size =
+    Option.value
+      ~default:constants.tx_rollup_origination_size
+      tx_rollup_origination_size
+  in
+  let sc_rollup_enable =
+    Option.value ~default:constants.sc_rollup_enable sc_rollup_enable
   in
   let constants =
     {
@@ -461,11 +482,15 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       baking_reward_fixed_portion;
       origination_size;
       blocks_per_cycle;
+      cycles_per_voting_period;
       min_proposal_quorum;
       cost_per_byte;
       liquidity_baking_subsidy;
       consensus_threshold;
       tx_rollup_enable;
+      tx_rollup_sunset_level;
+      tx_rollup_origination_size;
+      sc_rollup_enable;
     }
   in
   (* Check there is at least one roll *)
@@ -512,7 +537,9 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?bootstrap_contracts ?level ?cost_per_byte ?liquidity_baking_subsidy
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?tx_rollup_enable (initial_accounts : (Account.t * Tez.t) list) =
+    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
+    ?tx_rollup_origination_size ?sc_rollup_enable
+    (initial_accounts : (Account.t * Tez.t) list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
@@ -524,7 +551,11 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_fixed_portion
     ?origination_size
     ?blocks_per_cycle
+    ?cycles_per_voting_period
     ?tx_rollup_enable
+    ?tx_rollup_sunset_level
+    ?tx_rollup_origination_size
+    ?sc_rollup_enable
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context
@@ -624,7 +655,7 @@ let apply header ?(operations = []) pred =
   >>=? fun (t, _metadata) -> return t
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
-    ?payload_round ~baking_mode ?liquidity_baking_escape_vote pred =
+    ?payload_round ~baking_mode ?liquidity_baking_toggle_vote pred =
   let operations =
     match (operation, operations) with
     | (Some op, Some ops) -> Some (op :: ops)
@@ -638,14 +669,14 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?timestamp
     ?policy
     ?operations
-    ?liquidity_baking_escape_vote
+    ?liquidity_baking_toggle_vote
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
   apply_with_metadata ?policy ~baking_mode header ?operations pred
 
 let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
-    ?timestamp ?operation ?operations ?liquidity_baking_escape_vote pred =
+    ?timestamp ?operation ?operations ?liquidity_baking_toggle_vote pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
@@ -654,7 +685,7 @@ let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
     ?timestamp
     ?operation
     ?operations
-    ?liquidity_baking_escape_vote
+    ?liquidity_baking_toggle_vote
     pred
   >>=? fun (t, (_metadata : block_header_metadata)) -> return t
 
@@ -663,18 +694,18 @@ let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants b = Alpha_services.Constants.all rpc_ctxt b
 
-let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_escape_vote n
+let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote n
     b =
   List.fold_left_es
-    (fun b _ -> bake ~baking_mode ?policy ?liquidity_baking_escape_vote b)
+    (fun b _ -> bake ~baking_mode ?policy ?liquidity_baking_toggle_vote b)
     b
     (1 -- n)
 
 let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
-    ?liquidity_baking_escape_vote n b =
+    ?liquidity_baking_toggle_vote n b =
   List.fold_left_es
     (fun (b, balance_updates_rev) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_escape_vote b
+      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
       >>=? fun (b, metadata) ->
       let balance_updates_rev =
         List.rev_append metadata.balance_updates balance_updates_rev
@@ -683,20 +714,26 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
         List.fold_left
           (fun balance_updates_rev ->
             let open Apply_results in
-            function
-            | Successful_manager_result (Reveal_result _)
-            | Successful_manager_result (Delegation_result _)
-            | Successful_manager_result (Tx_rollup_origination_result _) ->
-                balance_updates_rev
-            | Successful_manager_result (Set_deposits_limit_result _) ->
-                balance_updates_rev
-            | Successful_manager_result
-                (Transaction_result {balance_updates; _})
-            | Successful_manager_result
-                (Origination_result {balance_updates; _})
-            | Successful_manager_result
-                (Register_global_constant_result {balance_updates; _}) ->
-                List.rev_append balance_updates balance_updates_rev)
+            fun (Successful_manager_result r) ->
+              match r with
+              | Reveal_result _ | Delegation_result _
+              | Set_deposits_limit_result _ | Tx_rollup_origination_result _
+              | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
+              | Tx_rollup_return_bond_result _
+              | Tx_rollup_finalize_commitment_result _
+              | Tx_rollup_remove_commitment_result _
+              | Tx_rollup_rejection_result _ | Transfer_ticket_result _
+              | Tx_rollup_dispatch_tickets_result _
+              | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+              | Sc_rollup_cement_result _ | Sc_rollup_publish_result _ ->
+                  balance_updates_rev
+              | Transaction_result
+                  (Transaction_to_contract_result {balance_updates; _})
+              | Transaction_result
+                  (Transaction_to_tx_rollup_result {balance_updates; _})
+              | Origination_result {balance_updates; _}
+              | Register_global_constant_result {balance_updates; _} ->
+                  List.rev_append balance_updates balance_updates_rev)
           balance_updates_rev
           metadata.implicit_operations_results
       in
@@ -719,7 +756,19 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Transaction_result _)
             | Successful_manager_result (Register_global_constant_result _)
             | Successful_manager_result (Set_deposits_limit_result _)
-            | Successful_manager_result (Tx_rollup_origination_result _) ->
+            | Successful_manager_result (Tx_rollup_origination_result _)
+            | Successful_manager_result (Tx_rollup_submit_batch_result _)
+            | Successful_manager_result (Tx_rollup_commit_result _)
+            | Successful_manager_result (Tx_rollup_return_bond_result _)
+            | Successful_manager_result (Tx_rollup_finalize_commitment_result _)
+            | Successful_manager_result (Tx_rollup_remove_commitment_result _)
+            | Successful_manager_result (Tx_rollup_rejection_result _)
+            | Successful_manager_result (Tx_rollup_dispatch_tickets_result _)
+            | Successful_manager_result (Transfer_ticket_result _)
+            | Successful_manager_result (Sc_rollup_originate_result _)
+            | Successful_manager_result (Sc_rollup_add_messages_result _)
+            | Successful_manager_result (Sc_rollup_cement_result _)
+            | Successful_manager_result (Sc_rollup_publish_result _) ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)
@@ -731,13 +780,14 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
     (1 -- n)
   >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
 
-let bake_n_with_liquidity_baking_escape_ema ?(baking_mode = Application) ?policy
-    ?liquidity_baking_escape_vote n b =
+let bake_n_with_liquidity_baking_toggle_ema ?(baking_mode = Application) ?policy
+    ?liquidity_baking_toggle_vote n b =
+  let initial_ema = Liquidity_baking.Toggle_EMA.zero in
   List.fold_left_es
-    (fun (b, _escape_ema) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_escape_vote b
-      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_escape_ema))
-    (b, 0l)
+    (fun (b, _toggle_ema) _ ->
+      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
+      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_toggle_ema))
+    (b, initial_ema)
     (1 -- n)
 
 let bake_until_cycle_end ?policy b =

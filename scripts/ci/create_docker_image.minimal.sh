@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 set -ex
 
@@ -67,6 +67,7 @@ docker build \
   --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
   --build-arg "BASE_IMAGE_VERSION_NON_MIN=$base_build_version" \
   --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+  --target=minimal \
   "$src_dir"
 
 echo

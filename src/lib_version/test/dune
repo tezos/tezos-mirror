@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+
+(executable
+ (name test_parser)
+ (modes native js)
+ (libraries
+  tezos-version
+  tezos-version.parser
+  alcotest)
+ (js_of_ocaml)
+ (flags (:standard
+         -open Tezos_version)))
+
+(rule
+ (alias runtest)
+ (package tezos-version)
+ (action (run %{dep:./test_parser.exe})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-version)
+ (action (run node %{dep:./test_parser.bc.js})))

@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
-
 type t = {
   head_hash : Block_hash.t;
   head_header : Block_header.t;
@@ -207,11 +205,13 @@ let to_steps_truncate ~limit ~save_point seed locator =
       {block; predecessor = pred; step; strict_step} :: acc)
 
 let compute ~get_predecessor ~caboose ~size head_hash head_header seed =
+  let open Error_monad.Lwt_syntax in
   let rec loop acc size state current_block_hash =
     if size = 0 then Lwt.return acc
     else
       let (step, state) = Step.next state in
-      get_predecessor current_block_hash step >>= function
+      let* o = get_predecessor current_block_hash step in
+      match o with
       | None ->
           if Block_hash.equal caboose current_block_hash then Lwt.return acc
           else Lwt.return (caboose :: acc)
@@ -224,19 +224,21 @@ let compute ~get_predecessor ~caboose ~size head_hash head_header seed =
   if size <= 0 then Lwt.return {head_hash; head_header; history = []}
   else
     let initial_state = Step.init seed head_hash in
-    loop [] size initial_state head_hash >>= fun history ->
+    let* history = loop [] size initial_state head_hash in
     let history = List.rev history in
     Lwt.return {head_hash; head_header; history}
 
 type validity = Unknown | Known_valid | Known_invalid
 
 let unknown_prefix ~is_known locator =
+  let open Error_monad.Lwt_syntax in
   let {head_hash; history; _} = locator in
   let rec loop hist acc =
     match hist with
     | [] -> Lwt.return (Unknown, locator)
     | h :: t -> (
-        is_known h >>= function
+        let* k = is_known h in
+        match k with
         | Known_valid ->
             Lwt.return
               (Known_valid, {locator with history = List.rev (h :: acc)})
@@ -245,7 +247,8 @@ let unknown_prefix ~is_known locator =
               (Known_invalid, {locator with history = List.rev (h :: acc)})
         | Unknown -> loop t (h :: acc))
   in
-  is_known head_hash >>= function
+  let* k = is_known head_hash in
+  match k with
   | Known_valid -> Lwt.return (Known_valid, {locator with history = []})
   | Known_invalid -> Lwt.return (Known_invalid, {locator with history = []})
   | Unknown -> loop history []

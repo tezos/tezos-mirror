@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error +=
-  | Too_late_revelation
-  | Too_early_revelation
-  | Previously_revealed_nonce
-  | Inconsistent_nonce
+(** This module provides types and functions to manipulate nonces.
+
+    A nonce is a byte sequence of fixed length, which is supposed to be random
+    and used only once, provided by a block producer and used to generate a
+    random seed (see {!module:Seed_repr}). *)
 
 type t = Seed_repr.nonce
 

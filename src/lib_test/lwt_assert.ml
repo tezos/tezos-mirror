@@ -49,5 +49,6 @@ let lwt_assert_catch (p : unit -> 'a Lwt.t) (e : exn) =
     Lwt.return (Alcotest.check Testable.exn "Catched unexpected assertion" e e')
   in
   Lwt.(
-    catch p catcher >>= fun () ->
+    let open Syntax in
+    let* () = catch p catcher in
     lwt_fail ("Expected an exception " ^ Printexc.to_string e))

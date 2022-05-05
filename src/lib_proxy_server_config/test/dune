@@ -1,6 +1,8 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name test_proxy_server_config)
- (package tezos-proxy-server-config)
  (libraries
   tezos-base
   tezos-base.unix
@@ -8,4 +10,10 @@
   tezos-test-helpers
   qcheck-alcotest
   alcotest-lwt)
- (flags (:standard -open Tezos_base__TzPervasives)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))
+
+(rule
+ (alias runtest)
+ (package tezos-proxy-server-config)
+ (action (run %{dep:./test_proxy_server_config.exe})))

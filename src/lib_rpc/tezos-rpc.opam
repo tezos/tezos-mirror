@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -7,7 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "data-encoding" { >= "0.4" & < "0.5" }
+  "data-encoding" { >= "0.5.3" & < "0.6" }
   "tezos-error-monad"
   "resto" { >= "0.6" & < "0.7" }
   "resto-directory" { >= "0.6" & < "0.7" }

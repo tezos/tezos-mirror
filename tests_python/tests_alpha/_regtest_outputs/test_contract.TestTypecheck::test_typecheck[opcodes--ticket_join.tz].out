@@ -1,17 +1,17 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/ticket_join.tz]
 
 Well typed
-Gas remaining: 1039990.843 units remaining
+Gas remaining: 1039992.503 units remaining
 { parameter (ticket nat) ;
   storage (option (ticket nat)) ;
   code { UNPAIR
-         /* [ @parameter ticket nat : @storage option (ticket nat) ] */ ;
+         /* [ ticket nat : option (ticket nat) ] */ ;
          SWAP
-         /* [ @storage option (ticket nat) : @parameter ticket nat ] */ ;
+         /* [ option (ticket nat) : ticket nat ] */ ;
          IF_NONE
-           { /* [ @parameter ticket nat ] */ }
+           { /* [ ticket nat ] */ }
            { PAIR
-             /* [ pair (ticket @storage.some nat) (ticket @parameter nat) ] */ ;
+             /* [ pair (ticket nat) (ticket nat) ] */ ;
              JOIN_TICKETS
              /* [ option (ticket nat) ] */ ;
              ASSERT_SOME } ;

@@ -1,5 +1,10 @@
-;; This binding assumes that librustzcash.a is installed in the system default
-;; directories or in $OPAM_SWITCH_PREFIX/lib
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env
+ (_
+  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))
+  (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
 (library
  (name tezos_sapling)
@@ -7,13 +12,15 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   integers
+  integers_stubs_js
   ctypes
-  ctypes.stubs
+  ctypes_stubs_js
   data-encoding
-  tezos-crypto
   tezos-stdlib
+  tezos-crypto
   tezos-error-monad
   tezos-lwt-result-stdlib)
+ (js_of_ocaml (javascript_files runtime.js))
  (flags
   (:standard
    -open Tezos_stdlib
@@ -27,5 +34,14 @@
  (c_library_flags
   (-L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs -lrustzcash -lpthread)))
 
-(copy_files
- bindings/{rustzcash_ctypes_c_stubs.c,rustzcash_ctypes_stubs.ml,rustzcash_ctypes_bindings.ml})
+(copy_files bindings/rustzcash_ctypes_bindings.ml)
+
+(rule
+ (target runtime.js)
+ (deps (:gen ./bindings/gen_runtime_js.exe))
+ (action (with-stdout-to %{target} (run %{gen} %{target}))))
+
+(rule
+ (targets rustzcash_ctypes_stubs.ml rustzcash_ctypes_c_stubs.c)
+ (deps (:gen ./bindings/rustzcash_ctypes_gen.exe))
+ (action (run %{gen} %{targets})))

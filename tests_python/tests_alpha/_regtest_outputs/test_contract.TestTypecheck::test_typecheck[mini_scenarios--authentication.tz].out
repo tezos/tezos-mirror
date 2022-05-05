@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/authentication.tz]
 
 Well typed
-Gas remaining: 1039978.751 units remaining
+Gas remaining: 1039979.836 units remaining
 { parameter (pair (lambda unit (list operation)) signature) ;
   storage (pair (nat %counter) key) ;
   code { UNPPAIPAIR ;
@@ -11,28 +11,25 @@ Gas remaining: 1039978.751 units remaining
          /* [ lambda unit (list operation) : nat : lambda unit (list operation)
             : signature : nat : key ] */ ;
          SELF
-         /* [ @self contract (pair (lambda unit (list operation)) signature)
+         /* [ contract (pair (lambda unit (list operation)) signature)
             : lambda unit (list operation) : nat : lambda unit (list operation)
             : signature : nat : key ] */ ;
          CHAIN_ID
-         /* [ chain_id : @self contract (pair (lambda unit (list operation)) signature)
+         /* [ chain_id : contract (pair (lambda unit (list operation)) signature)
             : lambda unit (list operation) : nat : lambda unit (list operation)
             : signature : nat : key ] */ ;
          PPAIPAIR ;
          PACK
-         /* [ @packed bytes : lambda unit (list operation) : signature : nat : key ] */ ;
+         /* [ bytes : lambda unit (list operation) : signature : nat : key ] */ ;
          DIP { SWAP /* [ signature : lambda unit (list operation) : nat : key ] */ }
-         /* [ @packed bytes : signature : lambda unit (list operation) : nat : key ] */ ;
+         /* [ bytes : signature : lambda unit (list operation) : nat : key ] */ ;
          DUUUUUP
-         /* [ key : @packed bytes : signature : lambda unit (list operation) : nat
-            : key ] */ ;
-         DIP { SWAP
-               /* [ signature : @packed bytes : lambda unit (list operation) : nat : key ] */ }
-         /* [ key : signature : @packed bytes : lambda unit (list operation) : nat
-            : key ] */ ;
+         /* [ key : bytes : signature : lambda unit (list operation) : nat : key ] */ ;
+         DIP { SWAP /* [ signature : bytes : lambda unit (list operation) : nat : key ] */ }
+         /* [ key : signature : bytes : lambda unit (list operation) : nat : key ] */ ;
          DUUUP
-         /* [ bytes : key : signature : @packed bytes : lambda unit (list operation)
-            : nat : key ] */ ;
+         /* [ bytes : key : signature : bytes : lambda unit (list operation) : nat
+            : key ] */ ;
          DIP { CHECK_SIGNATURE /* [ bool : lambda unit (list operation) : nat : key ] */ }
          /* [ bytes : bool : lambda unit (list operation) : nat : key ] */ ;
          SWAP

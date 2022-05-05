@@ -48,11 +48,14 @@ type sysname = Linux | Darwin | Unknown of string
 let uname () =
   Lwt.catch
     (fun () ->
-      Lwt_process.with_process_in
-        ~env:[|"LC_ALL=C"|]
-        ("uname", [|"uname"|])
-        (fun pc -> Lwt_io.read_line pc#stdout)
-      >>= function
+      let open Lwt_syntax in
+      let* s =
+        Lwt_process.with_process_in
+          ~env:[|"LC_ALL=C"|]
+          ("uname", [|"uname"|])
+          (fun pc -> Lwt_io.read_line pc#stdout)
+      in
+      match s with
       | "Linux" -> Lwt.return_ok Linux
       | "Darwin" -> Lwt.return_ok Darwin
       | os -> Lwt.return_ok (Unknown os))
@@ -60,17 +63,18 @@ let uname () =
       | exn -> Lwt.return_error (error_info "uname" (Printexc.to_string exn)))
 
 let page_size sysname =
+  let open Lwt_result_syntax in
   let get_conf_process =
     match sysname with
     | Linux -> Ok ("getconf", [|"getconf"; "PAGE_SIZE"|])
     | Darwin -> Ok ("pagesize", [|"pagesize"|])
     | Unknown _ -> Error (error_info "pagesize" "Unknown unix system")
   in
-  get_conf_process >>?= fun process ->
+  let*? process = get_conf_process in
   Lwt.catch
     (fun () ->
       Lwt_process.with_process_in process ~env:[|"LC_ALL=C"|] (fun pc ->
-          Lwt_io.read_line pc#stdout >>= fun ps ->
+          let*! ps = Lwt_io.read_line pc#stdout in
           Lwt.return_ok (int_of_string ps)))
     (function
       | exn -> Lwt.return_error (error_info "pagesize" (Printexc.to_string exn)))
@@ -78,15 +82,20 @@ let page_size sysname =
 let linux_statm pid =
   Lwt.catch
     (fun () ->
+      let open Lwt_syntax in
       let fname = Format.asprintf "/proc/%d/statm" pid in
-      Lwt_unix.file_exists fname >>= function
+      let* b = Lwt_unix.file_exists fname in
+      match b with
       | true ->
           Lwt_io.with_file ~mode:Input fname (fun ic ->
-              Lwt_io.read_line ic >>= fun line ->
-              match List.map Int64.of_string @@ TzString.split ' ' line with
+              let* line = Lwt_io.read_line ic in
+              match
+                List.map Int64.of_string @@ TzString.split_no_empty ' ' line
+              with
               | size :: resident :: shared :: text :: lib :: data :: dt :: _
                 -> (
-                  page_size Linux >>= function
+                  let* r = page_size Linux in
+                  match r with
                   | Error e -> Lwt.return_error e
                   | Ok page_size ->
                       Lwt.return_ok
@@ -116,25 +125,28 @@ let linux_statm pid =
 let darwin_ps pid =
   Lwt.catch
     (fun () ->
+      let open Lwt_syntax in
       Lwt_process.with_process_in
         ~env:[|"LC_ALL=C"|]
         ("ps", [|"ps"; "-o"; "pid,%mem,rss"; "-p"; string_of_int pid|])
         (fun pc ->
-          Lwt_io.read_line_opt pc#stdout >>= function
+          let* o = Lwt_io.read_line_opt pc#stdout in
+          match o with
           | None ->
               Lwt.return_error
                 (error_info "ps" "Unexpected ps answer (1st line)")
           | Some _ -> (
               (* first line is useless *)
-              Lwt_io.read_line_opt pc#stdout
-              >>= function
+              let* o = Lwt_io.read_line_opt pc#stdout in
+              match o with
               | None ->
                   Lwt.return_error
                     (error_info "ps" "Unexpected ps answer (2nd line)")
               | Some ps_stats -> (
-                  match TzString.split ' ' ps_stats with
+                  match TzString.split_no_empty ' ' ps_stats with
                   | _pid :: mem :: resident :: _ -> (
-                      page_size Darwin >>= function
+                      let* r = page_size Darwin in
+                      match r with
                       | Error e -> Lwt.return_error e
                       | Ok page_size ->
                           Lwt.return_ok
@@ -150,8 +162,10 @@ let darwin_ps pid =
       | exn -> Lwt.return_error (error_info "ps" (Printexc.to_string exn)))
 
 let memory_stats () =
+  let open Lwt_syntax in
   let pid = Unix.getpid () in
-  uname () >>= function
+  let* r = uname () in
+  match r with
   | Error e -> Lwt.return_error e
   | Ok Linux -> linux_statm pid
   | Ok Darwin -> darwin_ps pid

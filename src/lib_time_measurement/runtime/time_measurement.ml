@@ -51,8 +51,9 @@ module Make
     res
 
   let duration_lwt (label, metadata) f =
+    let open Lwt.Syntax in
     let start = C.current_time () in
-    f () >>= fun res ->
+    let* res = f () in
     let stop = C.current_time () in
     let duration = span start stop in
     let measurement = Measurement.create label metadata duration in

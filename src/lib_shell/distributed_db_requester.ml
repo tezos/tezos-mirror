@@ -61,7 +61,7 @@ end
 module Make_raw
     (Hash : Requester.HASH)
     (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
-    (Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
+    (Memory_table : Hashtbl.SeededS with type key := Hash.t)
     (Request_message : REQUEST_MESSAGE with type hash := Hash.t)
     (Probe : Requester.PROBE
                with type key := Hash.t
@@ -100,8 +100,46 @@ module Make_raw
       if keys <> [] then send state gid keys
   end
 
+  module Monitored_memory_table = struct
+    type 'a t = {
+      table : 'a Memory_table.t;
+      metrics : Shell_metrics.Distributed_db.t;
+    }
+
+    let create ~entry_type ?random s =
+      {
+        table = Memory_table.create ?random s;
+        metrics = Shell_metrics.Distributed_db.init ~kind:Hash.name ~entry_type;
+      }
+
+    let find t x = Memory_table.find t.table x
+
+    let add t k x =
+      Memory_table.add t.table k x ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
+
+    let replace t k x =
+      Memory_table.replace t.table k x ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
+
+    let remove t k =
+      Memory_table.remove t.table k ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
+
+    let length t = Memory_table.length t.table
+
+    let fold f t x = Memory_table.fold f t.table x
+  end
+
   module Table =
-    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Probe)
+    Requester.Make (Hash) (Disk_table) (Monitored_memory_table) (Request)
+      (Probe)
   include Table
 
   let state_of_t t =
@@ -116,7 +154,8 @@ module Make_raw
     Table.create ?random_table ?global_input request_param disk
 
   let shutdown t =
-    Requester_event.(emit shutting_down_requester) () >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Requester_event.(emit shutting_down_requester) () in
     Table.shutdown t
 end
 
@@ -133,7 +172,14 @@ module Fake_operation_storage = struct
 end
 
 module Raw_operation =
-  Make_raw (Operation_hash) (Fake_operation_storage) (Operation_hash.Table)
+  Make_raw
+    (struct
+      include Operation_hash
+
+      let name = "operation"
+    end)
+    (Fake_operation_storage)
+    (Operation_hash.Table)
     (struct
       type param = unit
 
@@ -157,25 +203,42 @@ module Block_header_storage = struct
   type value = Block_header.t
 
   let known chain_store hash =
-    Store.Block.is_known_valid chain_store hash >>= function
+    let open Lwt_syntax in
+    let* b = Store.Block.is_known_valid chain_store hash in
+    match b with
     | true -> Lwt.return_true
     | false -> Store.Block.is_known_prechecked chain_store hash
 
   let read chain_store h =
-    (Store.Block.read_block chain_store h >>= function
-     | Ok b -> return b
-     | Error _ -> Store.Block.read_prechecked_block chain_store h)
-    >>=? fun b -> return (Store.Block.header b)
+    let open Lwt_result_syntax in
+    let* b =
+      let*! r = Store.Block.read_block chain_store h in
+      match r with
+      | Ok b -> return b
+      | Error _ -> Store.Block.read_prechecked_block chain_store h
+    in
+    return (Store.Block.header b)
 
   let read_opt chain_store h =
-    (Store.Block.read_block_opt chain_store h >>= function
-     | Some b -> Lwt.return_some b
-     | None -> Store.Block.read_prechecked_block_opt chain_store h)
-    >>= fun b -> Lwt.return (Option.map Store.Block.header b)
+    let open Lwt_syntax in
+    let* b =
+      let* o = Store.Block.read_block_opt chain_store h in
+      match o with
+      | Some b -> Lwt.return_some b
+      | None -> Store.Block.read_prechecked_block_opt chain_store h
+    in
+    Lwt.return (Option.map Store.Block.header b)
 end
 
 module Raw_block_header =
-  Make_raw (Block_hash) (Block_header_storage) (Block_hash.Table)
+  Make_raw
+    (struct
+      include Block_hash
+
+      let name = "block_header"
+    end)
+    (Block_header_storage)
+    (Block_hash.Table)
     (struct
       type param = unit
 
@@ -209,7 +272,8 @@ module Operations_storage = struct
   let known chain_store (h, _) = Store.Block.is_known_valid chain_store h
 
   let read chain_store (h, i) =
-    Store.Block.read_block chain_store h >>=? fun b ->
+    let open Lwt_result_syntax in
+    let* b = Store.Block.read_block chain_store h in
     let ops =
       List.nth (Store.Block.operations b) i
       |> WithExceptions.Option.to_exn ~none:Not_found
@@ -217,7 +281,9 @@ module Operations_storage = struct
     return ops
 
   let read_opt chain_store (h, i) =
-    Store.Block.read_block_opt chain_store h >>= function
+    let open Lwt_syntax in
+    let* o = Store.Block.read_block_opt chain_store h in
+    match o with
     | None -> Lwt.return_none
     | Some b -> Lwt.return (List.nth (Store.Block.operations b) i)
 end
@@ -279,13 +345,20 @@ module Protocol_storage = struct
   let read_opt store ph = Store.Protocol.read store ph
 
   let read store ph =
-    read_opt store ph >>= function
-    | None -> fail_with_exn Not_found
-    | Some p -> return p
+    let open Lwt_syntax in
+    let* o = read_opt store ph in
+    match o with None -> fail_with_exn Not_found | Some p -> return_ok p
 end
 
 module Raw_protocol =
-  Make_raw (Protocol_hash) (Protocol_storage) (Protocol_hash.Table)
+  Make_raw
+    (struct
+      include Protocol_hash
+
+      let name = "protocol"
+    end)
+    (Protocol_storage)
+    (Protocol_hash.Table)
     (struct
       type param = unit
 

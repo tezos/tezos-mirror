@@ -44,27 +44,31 @@ let () =
 (** Main *)
 
 module Term = struct
-  let process args sandbox_file =
+  let process args sandbox_file progress_display_mode =
     let run =
-      Internal_event_unix.init () >>= fun () ->
-      Node_shared_arg.read_and_patch_config_file args >>=? fun node_config ->
+      let open Lwt_result_syntax in
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
+      let* node_config = Node_shared_arg.read_and_patch_config_file args in
       let data_dir = node_config.data_dir in
       let ({genesis; _} : Node_config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      (match
-         (node_config.blockchain_network.genesis_parameters, sandbox_file)
-       with
-      | (None, None) -> return_none
-      | (Some parameters, None) ->
-          return_some (parameters.context_key, parameters.values)
-      | (_, Some filename) -> (
-          Lwt_utils_unix.Json.read_file filename >>= function
-          | Error _err -> fail (Node_run_command.Invalid_sandbox_file filename)
-          | Ok json -> return_some ("sandbox_parameter", json)))
-      >>=? fun sandbox_parameters ->
+      let* sandbox_parameters =
+        match
+          (node_config.blockchain_network.genesis_parameters, sandbox_file)
+        with
+        | (None, None) -> return_none
+        | (Some parameters, None) ->
+            return_some (parameters.context_key, parameters.values)
+        | (_, Some filename) -> (
+            let*! r = Lwt_utils_unix.Json.read_file filename in
+            match r with
+            | Error _err ->
+                tzfail (Node_run_command.Invalid_sandbox_file filename)
+            | Ok json -> return_some ("sandbox_parameter", json))
+      in
       Lwt_lock_file.try_with_lock
-        ~when_locked:(fun () -> fail Locked_directory)
+        ~when_locked:(fun () -> tzfail Locked_directory)
         ~filename:(Node_data_version.lock_file data_dir)
       @@ fun () ->
       let context_dir = Node_data_version.context_dir data_dir in
@@ -83,7 +87,7 @@ module Term = struct
           node_config.blockchain_network.user_activated_protocol_overrides
         ~operation_metadata_size_limit:
           node_config.shell.block_validator_limits.operation_metadata_size_limit
-      >>=? fun () -> return_unit
+        ~progress_display_mode
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()
@@ -108,9 +112,29 @@ module Term = struct
           ~docv:"FILE.json"
           ["sandbox"])
 
+  let progress_display_mode =
+    let open Cmdliner in
+    let doc =
+      Format.sprintf
+        "Determine whether the progress animation will be displayed to the \
+         logs. 'auto' will display progress animation only to a TTY. 'always' \
+         will display progress animation to any file descriptor. 'never' will \
+         not display progress animation."
+    in
+    Arg.(
+      value
+      & opt (enum Animation.progress_display_mode_enum) Animation.Auto
+      & info
+          ~docs:Node_shared_arg.Manpage.misc_section
+          ~doc
+          ~docv:"<auto|always|never>"
+          ["progress-display-mode"])
+
   let term =
     let open Cmdliner.Term in
-    ret (const process $ Node_shared_arg.Term.args $ sandbox)
+    ret
+      (const process $ Node_shared_arg.Term.args $ sandbox
+     $ progress_display_mode)
 end
 
 module Manpage = struct
@@ -134,7 +158,7 @@ module Manpage = struct
   let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs
 
   let info =
-    Cmdliner.Term.info ~doc:"Manage storage reconstruction" ~man "reconstruct"
+    Cmdliner.Cmd.info ~doc:"Manage storage reconstruction" ~man "reconstruct"
 end
 
-let cmd = (Term.term, Manpage.info)
+let cmd = Cmdliner.Cmd.v Manpage.info Term.term

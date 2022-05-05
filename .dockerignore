@@ -14,6 +14,7 @@ docs/api/tezos-client.html
 docs/api/tezos-admin-client.html
 
 tezos-node
+tezos-tx-rollup-*
 tezos-validator
 tezos-protocol-compiler
 tezos-client
@@ -23,6 +24,8 @@ tezos-endorser-*
 tezos-accuser-*
 tezos-proxy-server
 tezos-signer
+tezos-sc-rollup-node-*
+tezos-sc-rollup-client-*
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src

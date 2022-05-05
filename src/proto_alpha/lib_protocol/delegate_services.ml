@@ -59,7 +59,7 @@ type info = {
   delegated_balance : Tez.t;
   deactivated : bool;
   grace_period : Cycle.t;
-  voting_power : int32;
+  voting_info : Vote.delegate_info;
 }
 
 let info_encoding =
@@ -75,28 +75,28 @@ let info_encoding =
            delegated_balance;
            deactivated;
            grace_period;
-           voting_power;
+           voting_info;
          } ->
-      ( full_balance,
-        current_frozen_deposits,
-        frozen_deposits,
-        staking_balance,
-        frozen_deposits_limit,
-        delegated_contracts,
-        delegated_balance,
-        deactivated,
-        grace_period,
-        voting_power ))
-    (fun ( full_balance,
-           current_frozen_deposits,
-           frozen_deposits,
-           staking_balance,
-           frozen_deposits_limit,
-           delegated_contracts,
-           delegated_balance,
-           deactivated,
-           grace_period,
-           voting_power ) ->
+      ( ( full_balance,
+          current_frozen_deposits,
+          frozen_deposits,
+          staking_balance,
+          frozen_deposits_limit,
+          delegated_contracts,
+          delegated_balance,
+          deactivated,
+          grace_period ),
+        voting_info ))
+    (fun ( ( full_balance,
+             current_frozen_deposits,
+             frozen_deposits,
+             staking_balance,
+             frozen_deposits_limit,
+             delegated_contracts,
+             delegated_balance,
+             deactivated,
+             grace_period ),
+           voting_info ) ->
       {
         full_balance;
         current_frozen_deposits;
@@ -107,19 +107,20 @@ let info_encoding =
         delegated_balance;
         deactivated;
         grace_period;
-        voting_power;
+        voting_info;
       })
-    (obj10
-       (req "full_balance" Tez.encoding)
-       (req "current_frozen_deposits" Tez.encoding)
-       (req "frozen_deposits" Tez.encoding)
-       (req "staking_balance" Tez.encoding)
-       (opt "frozen_deposits_limit" Tez.encoding)
-       (req "delegated_contracts" (list Contract.encoding))
-       (req "delegated_balance" Tez.encoding)
-       (req "deactivated" bool)
-       (req "grace_period" Cycle.encoding)
-       (req "voting_power" int32))
+    (merge_objs
+       (obj9
+          (req "full_balance" Tez.encoding)
+          (req "current_frozen_deposits" Tez.encoding)
+          (req "frozen_deposits" Tez.encoding)
+          (req "staking_balance" Tez.encoding)
+          (opt "frozen_deposits_limit" Tez.encoding)
+          (req "delegated_contracts" (list Contract.encoding))
+          (req "delegated_balance" Tez.encoding)
+          (req "deactivated" bool)
+          (req "grace_period" Cycle.encoding))
+       Vote.delegate_info_encoding)
 
 let participation_info_encoding =
   let open Data_encoding in
@@ -165,18 +166,31 @@ module S = struct
 
   open Data_encoding
 
-  type list_query = {active : bool; inactive : bool}
+  type list_query = {
+    active : bool;
+    inactive : bool;
+    with_minimal_stake : bool;
+    without_minimal_stake : bool;
+  }
 
   let list_query : list_query RPC_query.t =
     let open RPC_query in
-    query (fun active inactive -> {active; inactive})
+    query (fun active inactive with_minimal_stake without_minimal_stake ->
+        {active; inactive; with_minimal_stake; without_minimal_stake})
     |+ flag "active" (fun t -> t.active)
     |+ flag "inactive" (fun t -> t.inactive)
+    |+ flag "with_minimal_stake" (fun t -> t.with_minimal_stake)
+    |+ flag "without_minimal_stake" (fun t -> t.without_minimal_stake)
     |> seal
 
   let list_delegate =
     RPC_service.get_service
-      ~description:"Lists all registered delegates."
+      ~description:
+        "Lists all registered delegates. The arguments `active`, `inactive`, \
+         `with_minimal_stake`, and `without_minimal_stake` allow to enumerate \
+         only the delegates that are active, inactive, have at least a minimal \
+         stake to participate in consensus and in governance, or do not have \
+         such a minimal stake, respectively."
       ~query:list_query
       ~output:(list Signature.Public_key_hash.encoding)
       raw_path
@@ -194,7 +208,8 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the full balance (in mutez) of a given delegate, including \
-         the frozen deposits. It does not include its delegated balance."
+         the frozen deposits and the frozen bonds. It does not include its \
+         delegated balance."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "full_balance")
@@ -223,8 +238,8 @@ module S = struct
       ~description:
         "Returns the total amount of tokens (in mutez) delegated to a given \
          delegate. This includes the balances of all the contracts that \
-         delegate to it, but also the balance of the delegate itself and its \
-         frozen deposits."
+         delegate to it, but also the balance of the delegate itself, its \
+         frozen deposits, and its frozen bonds."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "staking_balance")
@@ -278,11 +293,19 @@ module S = struct
 
   let voting_power =
     RPC_service.get_service
-      ~description:
-        "The number of rolls in the vote listings for a given delegate"
+      ~description:"The voting power in the vote listings for a given delegate."
       ~query:RPC_query.empty
-      ~output:Data_encoding.int32
+      ~output:Data_encoding.int64
       RPC_path.(path / "voting_power")
+
+  let voting_info =
+    RPC_service.get_service
+      ~description:
+        "Returns the delegate info (e.g. voting power) found in the listings \
+         of the current voting period."
+      ~query:RPC_query.empty
+      ~output:Vote.delegate_info_encoding
+      RPC_path.(path / "voting_info")
 
   let participation =
     RPC_service.get_service
@@ -312,14 +335,35 @@ let register () =
   let open Services_registration in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
       Delegate.list ctxt >>= fun delegates ->
-      match q with
-      | {active = true; inactive = false} ->
+      (match q with
+      | {active = true; inactive = false; _} ->
           List.filter_es
             (fun pkh -> Delegate.deactivated ctxt pkh >|=? not)
             delegates
-      | {active = false; inactive = true} ->
+      | {active = false; inactive = true; _} ->
           List.filter_es (fun pkh -> Delegate.deactivated ctxt pkh) delegates
-      | _ -> return delegates) ;
+      | {active = false; inactive = false; _}
+      (* This case is counter-intuitive, but it represents the default behavior, when no arguments are given *)
+      | {active = true; inactive = true; _} ->
+          return delegates)
+      >>=? fun delegates ->
+      let tokens_per_roll = Constants.tokens_per_roll ctxt in
+      match q with
+      | {with_minimal_stake = true; without_minimal_stake = false; _} ->
+          List.filter_es
+            (fun pkh ->
+              Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
+              Tez.(staking_balance >= tokens_per_roll))
+            delegates
+      | {with_minimal_stake = false; without_minimal_stake = true; _} ->
+          List.filter_es
+            (fun pkh ->
+              Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
+              Tez.(staking_balance < tokens_per_roll))
+            delegates
+      | {with_minimal_stake = true; without_minimal_stake = true; _}
+      | {with_minimal_stake = false; without_minimal_stake = false; _} ->
+          return delegates) ;
   register1 ~chunked:false S.info (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.full_balance ctxt pkh >>=? fun full_balance ->
@@ -329,8 +373,8 @@ let register () =
       Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
       Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
       Delegate.deactivated ctxt pkh >>=? fun deactivated ->
-      Delegate.grace_period ctxt pkh >>=? fun grace_period ->
-      Vote.get_voting_power_free ctxt pkh >|=? fun voting_power ->
+      Delegate.last_cycle_before_deactivation ctxt pkh >>=? fun grace_period ->
+      Vote.get_delegate_info ctxt pkh >|=? fun voting_info ->
       {
         full_balance;
         current_frozen_deposits = frozen_deposits.current_amount;
@@ -341,7 +385,7 @@ let register () =
         delegated_balance;
         deactivated;
         grace_period;
-        voting_power;
+        voting_info;
       }) ;
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (Delegate.check_delegate ctxt pkh)
@@ -371,16 +415,25 @@ let register () =
       Delegate.deactivated ctxt pkh) ;
   register1 ~chunked:false S.grace_period (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.grace_period ctxt pkh) ;
+      Delegate.last_cycle_before_deactivation ctxt pkh) ;
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Vote.get_voting_power_free ctxt pkh) ;
+  register1 ~chunked:false S.voting_info (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
+      Vote.get_delegate_info ctxt pkh) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.delegate_participation_info ctxt pkh)
 
-let list ctxt block ?(active = true) ?(inactive = false) () =
-  RPC_context.make_call0 S.list_delegate ctxt block {active; inactive} ()
+let list ctxt block ?(active = true) ?(inactive = false)
+    ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =
+  RPC_context.make_call0
+    S.list_delegate
+    ctxt
+    block
+    {active; inactive; with_minimal_stake; without_minimal_stake}
+    ()
 
 let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
 
@@ -413,6 +466,9 @@ let grace_period ctxt block pkh =
 
 let voting_power ctxt block pkh =
   RPC_context.make_call1 S.voting_power ctxt block pkh () ()
+
+let voting_info ctxt block pkh =
+  RPC_context.make_call1 S.voting_info ctxt block pkh () ()
 
 let participation ctxt block pkh =
   RPC_context.make_call1 S.participation ctxt block pkh () ()

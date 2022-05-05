@@ -1,21 +1,22 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "tezos-tooling" { with-test }
-  "tezos-client-012-Psithaca" { with-test }
-  "dune" { >= "1.11" }
+  "dune" { >= "2.9" }
   "tezos-stdlib"
   "tezos-error-monad"
   "tezos-crypto"
-  "tezos-protocol-012-Psithaca"
   "tezos-micheline"
   "tezos-micheline-rewriting"
+  "tezos-protocol-012-Psithaca"
   "hashcons"
+  "tezos-client-012-Psithaca" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

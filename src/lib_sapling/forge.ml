@@ -123,7 +123,8 @@ let dummy_output pctx ~memo_size =
 
 let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
     (forge_inputs : Input.t list) (forge_outputs : output list)
-    (sp : Core.Spending_key.t) (anti_replay : string) (state : S.state) =
+    (sp : Core.Spending_key.t) (anti_replay : string) ~(bound_data : string)
+    (state : S.state) =
   if number_dummy_inputs < 0 then
     raise
       (Invalid_argument
@@ -223,9 +224,15 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
-        Core.Proving.make_binding_sig ctx inputs outputs ~balance anti_replay
+        Core.Proving.make_binding_sig
+          ctx
+          inputs
+          outputs
+          ~balance
+          ~bound_data
+          anti_replay
       in
-      Core.UTXO.{inputs; outputs; binding_sig; balance; root})
+      Core.UTXO.{inputs; outputs; binding_sig; bound_data; balance; root})
 
 (* Forge a transaction without sapling key (t to z). Add an optional amount
      of dummy inputs and outputs, set to 0 by default.
@@ -233,7 +240,7 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
      dummy one *)
 let forge_shield_transaction ?(number_dummy_inputs = 0)
     ?(number_dummy_outputs = 0) (forge_outputs : output list) (balance : int64)
-    (anti_replay : string) (state : S.state) =
+    (anti_replay : string) ~(bound_data : string) (state : S.state) =
   if number_dummy_inputs < 0 then
     raise
       (Invalid_argument
@@ -300,6 +307,39 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
           []
           outputs
           ~balance:balance_outputs
+          ~bound_data
           anti_replay
       in
-      Core.UTXO.{inputs = dummy_inputs; outputs; binding_sig; balance; root})
+      Core.UTXO.
+        {inputs = dummy_inputs; outputs; binding_sig; bound_data; balance; root})
+
+let forge_shield_transaction_legacy ?(number_dummy_inputs = 0)
+    ?(number_dummy_outputs = 0) (forge_outputs : output list) (balance : int64)
+    (anti_replay : string) (state : S.state) =
+  let Core.UTXO.{inputs; outputs; binding_sig; balance; root; bound_data = _} =
+    forge_shield_transaction
+      ~number_dummy_inputs
+      ~number_dummy_outputs
+      forge_outputs
+      balance
+      anti_replay
+      ~bound_data:""
+      state
+  in
+  Core.UTXO.Legacy.{inputs; outputs; binding_sig; balance; root}
+
+let forge_transaction_legacy ?number_dummy_inputs ?number_dummy_outputs
+    (forge_inputs : Input.t list) (forge_outputs : output list)
+    (sp : Core.Spending_key.t) (anti_replay : string) (state : S.state) =
+  let Core.UTXO.{inputs; outputs; binding_sig; balance; root; _} =
+    forge_transaction
+      ?number_dummy_inputs
+      ?number_dummy_outputs
+      forge_inputs
+      forge_outputs
+      sp
+      anti_replay
+      ~bound_data:""
+      state
+  in
+  Core.UTXO.Legacy.{inputs; outputs; binding_sig; balance; root}

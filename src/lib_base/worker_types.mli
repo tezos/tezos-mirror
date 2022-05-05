@@ -48,8 +48,8 @@ val worker_information_encoding :
 (** The running status of an individual request. *)
 type request_status = {
   pushed : Time.System.t;
-  treated : Time.System.Span.t;
-  completed : Time.System.Span.t;
+  treated : Time.System.t;
+  completed : Time.System.t;
 }
 
 (** Request status serializer for RPCs. *)

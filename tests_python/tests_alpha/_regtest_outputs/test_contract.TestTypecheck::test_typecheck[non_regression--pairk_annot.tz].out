@@ -1,32 +1,28 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[non_regression/pairk_annot.tz]
 
 Well typed
-Gas remaining: 1039992.198 units remaining
+Gas remaining: 1039993.678 units remaining
 { parameter unit ;
   storage unit ;
   code { SENDER
-         /* [ @sender address : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : pair unit unit ] */ ;
          SOURCE
-         /* [ @source address : @sender address
-            : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : address : pair unit unit ] */ ;
          PAIR 2
-         /* [ pair address address : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ pair address address : pair unit unit ] */ ;
          SOURCE
-         /* [ @source address : pair address address
-            : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : pair address address : pair unit unit ] */ ;
          SENDER
-         /* [ @sender address : @source address : pair address address
-            : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : address : pair address address : pair unit unit ] */ ;
          PAIR 2
-         /* [ pair address address : pair address address
-            : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ pair address address : pair address address : pair unit unit ] */ ;
          COMPARE
-         /* [ int : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ int : pair unit unit ] */ ;
          DROP
-         /* [ pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ pair unit unit ] */ ;
          CDR
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

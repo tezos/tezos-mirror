@@ -85,7 +85,7 @@ end
 let rec raw_context_size = function
   | Tezos_shell_services.Block_services.Key _ | Cut -> 0
   | Dir map ->
-      TzString.Map.fold (fun _key v acc -> acc + 1 + raw_context_size v) map 0
+      String.Map.fold (fun _key v acc -> acc + 1 + raw_context_size v) map 0
 
 let rec raw_context_to_tree
     (raw : Tezos_shell_services.Block_services.raw_context) :
@@ -103,7 +103,7 @@ let rec raw_context_to_tree
         | Some u -> Local.Tree.add_tree tree [string] u
       in
       let* dir =
-        TzString.Map.bindings map
+        String.Map.bindings map
         |> List.fold_left_s add_to_tree (Local.Tree.empty Local.empty)
       in
       if Local.Tree.is_empty dir then return_none else return_some dir
@@ -120,7 +120,45 @@ end
 
 type proxy_m = (module M)
 
-module StringMap = TzString.Map
+type proxy_builder =
+  | Of_rpc of (Proxy_proto.proto_rpc -> proxy_m Lwt.t)
+  | Of_data_dir of (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t)
+
+type rpc_context_args = {
+  printer : Tezos_client_base.Client_context.printer option;
+  proxy_builder : proxy_builder;
+  rpc_context : RPC_context.generic;
+  mode : Proxy.mode;
+  chain : Tezos_shell_services.Block_services.chain;
+  block : Tezos_shell_services.Block_services.block;
+}
+
+module StringMap = String.Map
+
+let make_delegate (ctx : rpc_context_args)
+    (proto_rpc : (module Proxy_proto.PROTO_RPC)) (hash : Context_hash.t) :
+    Proxy_delegate.t tzresult Lwt.t =
+  match ctx.proxy_builder with
+  | Of_rpc f ->
+      let open Lwt_result_syntax in
+      let*! (module Initial_context) = f proto_rpc in
+      let pgi : Proxy.proxy_getter_input =
+        {
+          rpc_context = (ctx.rpc_context :> RPC_context.simple);
+          mode = ctx.mode;
+          chain = ctx.chain;
+          block = ctx.block;
+        }
+      in
+      return
+        (module struct
+          let proxy_dir_mem = Initial_context.proxy_dir_mem pgi
+
+          let proxy_get = Initial_context.proxy_get pgi
+
+          let proxy_mem = Initial_context.proxy_mem pgi
+        end : Proxy_delegate.T)
+  | Of_data_dir f -> f hash
 
 module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key =
 struct
@@ -132,7 +170,7 @@ struct
 
   let get = Local.Tree.find_tree
 
-  let set_leaf tree key raw_context : t Proxy.update Lwt.t =
+  let add_leaf tree key raw_context : t Proxy.update Lwt.t =
     let open Lwt_syntax in
     let* tree_opt = raw_context_to_tree raw_context in
     let* updated_tree =
@@ -203,11 +241,11 @@ module Core
 
   let do_rpc : Proxy.proxy_getter_input -> Local.key -> unit tzresult Lwt.t =
    fun pgi key ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree = X.do_rpc pgi key in
     let*! current_store = lazy_load_store () in
     (* Update cache with data obtained *)
-    let*! updated = T.set_leaf current_store key tree in
+    let*! updated = T.add_leaf current_store key tree in
     (match updated with Mutation -> () | Value cache' -> store := Some cache') ;
     return_unit
 end
@@ -221,6 +259,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   (** Handles the application of [X.split_key] to optimize queries. *)
   let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
       (requested_key : Local.key) : unit tzresult Lwt.t =
+    let open Lwt_result_syntax in
     let (key_to_get, split) =
       match kind with
       | Mem ->
@@ -247,13 +286,12 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
        and hence 'key' here differs from the key received as parameter) *)
     if split && is_all key_to_get then return_unit
     else
-      let open Lwt_syntax in
-      let* () =
+      let*! () =
         if split then
           Events.(emit split_key_triggers (key_to_get, requested_key))
         else Lwt.return_unit
       in
-      let* r = C.do_rpc pgi key_to_get in
+      let*! r = C.do_rpc pgi key_to_get in
       match r with
       | Ok _ -> remember_request ()
       | Error _ when X.failure_is_permanent requested_key -> remember_request ()
@@ -274,7 +312,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
       Local.key ->
       Local.tree option tzresult Lwt.t =
    fun (kind : kind) (pgi : Proxy.proxy_getter_input) (key : Local.key) ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       if is_all key then
         (* This exact request was done already.
@@ -294,7 +332,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   let proxy_get pgi key = generic_call Get pgi key
 
   let proxy_dir_mem pgi key =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree_opt = generic_call Mem pgi key in
     match tree_opt with
     | None -> return_false
@@ -304,7 +342,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
         | `Value -> return_false)
 
   let proxy_mem pgi key =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree_opt = generic_call Mem pgi key in
     match tree_opt with
     | None -> return_false

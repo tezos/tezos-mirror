@@ -8,8 +8,8 @@ from client.client import Client
 from tools import utils, constants
 from . import protocol
 
-BLOCKS_PER_VOTING_PERIOD = 8
-OFFSET = int(BLOCKS_PER_VOTING_PERIOD / 2)
+CYCLES_PER_VOTING_PERIOD = 2
+OFFSET = 4
 POLLING_TIME = 5
 BAKING_RATE = 1
 NUM_NODES = 5
@@ -98,7 +98,7 @@ class TestVotingFull:
 
     def test_activate_proto_a(self, sandbox: Sandbox):
         parameters = protocol.get_parameters(protocol.Protocol.PREV)
-        parameters["blocks_per_voting_period"] = BLOCKS_PER_VOTING_PERIOD
+        parameters["cycles_per_voting_period"] = CYCLES_PER_VOTING_PERIOD
         utils.activate_protocol(
             sandbox.client(0),
             PROTO_A,
@@ -109,7 +109,8 @@ class TestVotingFull:
     # def test_add_bakers(self, sandbox: Sandbox):
     #     """Add a baker per node"""
     #     sandbox.add_baker(
-    #         1, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_B_DAEMON
+    #         1, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_B_DAEMON,
+    #         run_params=['--liquidity-baking-toggle-vote', 'pass'],
     #     )
 
     def test_client_knows_proto_b(self, sandbox: Sandbox):
@@ -175,15 +176,17 @@ class TestVotingFull:
         wait_until_level(clients, client.get_level())
         assert_all_clients_in_period(clients, 'adoption')
 
-    @pytest.mark.timeout(60)
+    @pytest.mark.timeout(600)
     def test_all_nodes_run_proto_b(self, sandbox: Sandbox):
         # we let a PROTO_A baker bake the last blocks of PROTO_A
         # sandbox.add_baker(
-        #     0, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_A_DAEMON
+        #     0, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_A_DAEMON,
+        #     run_params=['--liquidity-baking-toggle-vote', 'pass'],
         # )
         # for i in range(1,NUM_NODES):
         #     sandbox.add_baker(
-        #         i, [f"bootstrap{i}"], proto=PROTO_B_DAEMON
+        #         i, [f"bootstrap{i}"], proto=PROTO_B_DAEMON,
+        #         run_params=['--liquidity-baking-toggle-vote', 'pass'],
         #     )
         clients = sandbox.all_clients()
         client = clients[0]
@@ -211,6 +214,14 @@ class TestVotingFull:
         tenderbake(client)
         print(f"level before {level_before}")
         assert utils.check_level_greater_than(client, level_before + 1)
+
+    def test_submit_again(self, sandbox: Sandbox):
+        # check that the voting procedure can still be initiated
+        # after the migration
+        client = sandbox.client(0)
+        proposals = client.submit_proposals(BAKER, [PROTO_B])
+        tenderbake(client)
+        client.wait_for_inclusion(proposals.operation_hash, check_previous=1)
 
     @pytest.mark.xfail
     def test_check_logs(self, sandbox: Sandbox):

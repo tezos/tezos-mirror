@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 
 usage () {
     cat >&2 <<EOF
@@ -69,24 +69,23 @@ update_all_dot_ocamlformats () {
         say "Repository not clean, which is required by this script."
         exit 2
     fi
-    interesting_directories=$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli"  \) -type f | sed 's:/[^/]*$::' | LC_COLLATE=C sort -u)
+    find "${source_directories[@]}" -name ".ocamlformat" -exec git rm {} \;
+    # ocamlformat uses [.git], [.hg], and [dune-project] witness files
+    # to determine the project root and will not cross that boundary
+    # when computing its config. This means that we need a
+    # '.ocamlformat' config file next to each dune-project in order to
+    # cover all source code in the tree.
+    interesting_directories=$(find "${source_directories[@]}" -name "dune-project" -type f -print | sed 's:/[^/]*$::' | LC_COLLATE=C sort -u)
     for d in $interesting_directories ; do
         ofmt=$d/.ocamlformat
-        case "$d" in
-            src/proto_alpha/lib_protocol | \
-            src/proto_demo_noops/lib_protocol )
-                make_dot_ocamlformat "$ofmt"
-                ;;
-            src/proto_00{0..6}_*/lib_protocol )
-                make_dot_ocamlformat "$ofmt"
-                ( find "$d" -maxdepth 1 -name "*.ml*"  | LC_COLLATE=C sort > "$d/.ocamlformat-ignore" ; )
-                git add "$d/.ocamlformat-ignore"
-                ;;
-            * )
-                make_dot_ocamlformat "$ofmt"
-                ;;
-        esac
+        make_dot_ocamlformat "$ofmt"
         git add "$ofmt"
+    done
+    # we don't want to reformat protocols (but alpha) because it would alter its hash
+    protocols=$(find src/ -maxdepth 1 -name "proto_*" -not -name "proto_alpha")
+    for d in $protocols ; do
+        ( cd "$d/lib_protocol" && (find ./ -maxdepth 1 -name "*.ml*"  | sed 's:^./::' | LC_COLLATE=C sort > ".ocamlformat-ignore" ) )
+        git add "$d/lib_protocol/.ocamlformat-ignore"
     done
 }
 
@@ -96,7 +95,7 @@ function shellcheck_script () {
 
 check_scripts () {
     # Gather scripts
-    scripts=$(find "${source_directories[@]}" packaging/ tests_python/ scripts/ -name "*.sh" -type f -print)
+    scripts=$(find "${source_directories[@]}" packaging/ tests_python/ scripts/ docs/ -name "*.sh" -type f -print)
     exit_code=0
 
     # Check scripts do not contain the tab character
@@ -176,7 +175,10 @@ check_redirects () {
 update_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
     # one being ignored. Gitlab linter doesn't warn for it
-    repeated=$(grep '^[^ #]' .gitlab-ci.yml .gitlab/ci/*.yml | sort | uniq --repeated)
+
+    repeated=$(find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml -exec grep '^[^ #-]' \{\} \;  \
+                   | sort \
+                   | uniq --repeated)
     if [ -n "$repeated" ]; then
         echo ".gitlab-ci.yml contains repeated rules:"
         echo "$repeated"

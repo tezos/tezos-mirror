@@ -1,38 +1,38 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/balance_after_fib_view.tz]
 
 Well typed
-Gas remaining: 1039985.607 units remaining
+Gas remaining: 1039986.567 units remaining
 { parameter address ;
   storage mutez ;
   code { CAR
-         /* [ @parameter address ] */ ;
+         /* [ address ] */ ;
          DUP
-         /* [ @parameter address : @parameter address ] */ ;
+         /* [ address : address ] */ ;
          PUSH nat 3
-         /* [ nat : @parameter address : @parameter address ] */ ;
+         /* [ nat : address : address ] */ ;
          VIEW "fib" nat
-         /* [ @parameter.contract option nat : @parameter address ] */ ;
+         /* [ option nat : address ] */ ;
          ASSERT_SOME ;
          DROP
-         /* [ @parameter address ] */ ;
+         /* [ address ] */ ;
          CONTRACT nat
-         /* [ @parameter.contract option (contract nat) ] */ ;
+         /* [ option (contract nat) ] */ ;
          ASSERT_SOME ;
          PUSH mutez 15000000
-         /* [ mutez : @parameter.contract.some contract nat ] */ ;
+         /* [ mutez : contract nat ] */ ;
          PUSH nat 0
-         /* [ nat : mutez : @parameter.contract.some contract nat ] */ ;
+         /* [ nat : mutez : contract nat ] */ ;
          TRANSFER_TOKENS
          /* [ operation ] */ ;
          BALANCE
-         /* [ @balance mutez : operation ] */ ;
+         /* [ mutez : operation ] */ ;
          SWAP
-         /* [ operation : @balance mutez ] */ ;
+         /* [ operation : mutez ] */ ;
          NIL operation
-         /* [ list operation : operation : @balance mutez ] */ ;
+         /* [ list operation : operation : mutez ] */ ;
          SWAP
-         /* [ operation : list operation : @balance mutez ] */ ;
+         /* [ operation : list operation : mutez ] */ ;
          CONS
-         /* [ list operation : @balance mutez ] */ ;
+         /* [ list operation : mutez ] */ ;
          PAIR
-         /* [ pair (list operation) (mutez @balance) ] */ } }
+         /* [ pair (list operation) mutez ] */ } }

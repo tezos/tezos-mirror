@@ -211,7 +211,7 @@ class Client:
         """
         assert verb in {'put', 'get', 'post', 'delete', 'patch'}
         params = [] if params is None else params
-        params = params + ['rpc', verb, path]
+        params = params + ['--better-errors'] + ['rpc', verb, path]
         if data is not None:
             params = params + ['with', json.dumps(data)]
         compl_pr = self.run(params)
@@ -1866,7 +1866,7 @@ class Client:
         return client_output.ViewResult(self.run(cmd))
 
     def frozen_deposits(self, delegate: str, level: str = None) -> int:
-        """ returns deposits (in mutez) held for account for given level """
+        """returns deposits (in mutez) held for account for given level"""
         if level:
             level_arg = f'/?level={level}'
         else:

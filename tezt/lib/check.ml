@@ -236,6 +236,19 @@ let tuple5 a b c d e =
       Item (e, fun (_, _, _, _, x) -> x);
     ]
 
+let tuple8 a1 a2 a3 a4 a5 a6 a7 a8 =
+  tuple
+    [
+      Item (a1, fun (x, _, _, _, _, _, _, _) -> x);
+      Item (a2, fun (_, x, _, _, _, _, _, _) -> x);
+      Item (a3, fun (_, _, x, _, _, _, _, _) -> x);
+      Item (a4, fun (_, _, _, x, _, _, _, _) -> x);
+      Item (a5, fun (_, _, _, _, x, _, _, _) -> x);
+      Item (a6, fun (_, _, _, _, _, x, _, _) -> x);
+      Item (a7, fun (_, _, _, _, _, _, x, _) -> x);
+      Item (a8, fun (_, _, _, _, _, _, _, x) -> x);
+    ]
+
 let convert encode = function
   | E {pp; equal} ->
       let pp fmt x = pp fmt (encode x) in
@@ -290,17 +303,17 @@ let fail ?__LOC__ error_msg pp_a a pp_b b =
   in
   Test.fail ?__LOC__ "%s" error_msg
 
-let eq a b typ ~error_msg =
+let eq a b ?__LOC__ typ ~error_msg =
   if not (get_equal typ a b) then
     let pp = get_pp typ in
-    fail error_msg pp a pp b
+    fail ?__LOC__ error_msg pp a pp b
 
-let neq a b typ ~error_msg =
+let neq a b ?__LOC__ typ ~error_msg =
   if get_equal typ a b then
     let pp = get_pp typ in
-    fail error_msg pp a pp b
+    fail ?__LOC__ error_msg pp a pp b
 
-let comparison function_name predicate a b typ ~error_msg =
+let comparison function_name predicate a b ?__LOC__ typ ~error_msg =
   match typ with
   | E _ ->
       let pp = get_pp typ in
@@ -315,11 +328,11 @@ let comparison function_name predicate a b typ ~error_msg =
           b
           error_msg
       in
-      Test.fail "%s" message
+      Test.fail ?__LOC__ "%s" message
   | C {pp = _; compare} ->
       if not (predicate (compare a b)) then
         let pp = get_pp typ in
-        fail error_msg pp a pp b
+        fail ?__LOC__ error_msg pp a pp b
 
 let lt x = comparison "(<)" (fun c -> c < 0) x
 
@@ -350,6 +363,19 @@ let list_not_mem typ ?__LOC__ a l ~error_msg =
     let pp = get_pp typ in
     let pp_list = get_pp (list typ) in
     fail ?__LOC__ error_msg pp a pp_list l
+
+let pp_exn fmt exn = Format.pp_print_string fmt (Printexc.to_string exn)
+
+let pp_exn_option fmt = function
+  | None -> Format.pp_print_string fmt "no exception"
+  | Some exn -> pp_exn fmt exn
+
+let raises ?__LOC__ expected_exn f ~error_msg =
+  match f () with
+  | exception exn when exn = expected_exn -> ()
+  | exception exn ->
+      fail ?__LOC__ error_msg pp_exn expected_exn pp_exn_option (Some exn)
+  | _ -> fail ?__LOC__ error_msg pp_exn expected_exn pp_exn_option None
 
 (* We define infix operators at the end to avoid using them accidentally. *)
 

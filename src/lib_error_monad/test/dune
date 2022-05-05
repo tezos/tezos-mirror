@@ -1,14 +1,33 @@
-(test
- (name test_registration)
- (package tezos-error-monad)
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test_registration test_splitted_error_encoding)
  (modes native js)
  (libraries
   tezos-error-monad
   data-encoding
   alcotest)
- (flags (:standard -open Tezos_error_monad)))
+ (js_of_ocaml)
+ (flags (:standard
+         -open Tezos_error_monad)))
+
+(rule
+ (alias runtest)
+ (package tezos-error-monad)
+ (action (run %{dep:./test_registration.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-error-monad)
+ (action (run %{dep:./test_splitted_error_encoding.exe})))
 
 (rule
  (alias runtest_js)
  (package tezos-error-monad)
  (action (run node %{dep:./test_registration.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-error-monad)
+ (action (run node %{dep:./test_splitted_error_encoding.bc.js})))

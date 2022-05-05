@@ -1,3 +1,8 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (_ (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
+
 (library
  (name tezos_clic)
  (public_name tezos-clic)
@@ -8,6 +13,7 @@
   re
   tezos-error-monad
   tezos-lwt-result-stdlib)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib

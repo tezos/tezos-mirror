@@ -1,4 +1,14 @@
-trap 'exit $?' ERR
+#!/usr/bin/env bash
+# shellcheck source=/dev/null
+# for not checking the existence of sourced file $HOME/.cargo/env
+# shellcheck disable=SC2154
+# for undefined variable in: opam switch create for_tezos $ocaml_version
+# shellcheck disable=SC2086
+# for omitting quotes in: opam switch create for_tezos $ocaml_version
+# shellcheck disable=SC2046
+# for omitting quotes in: eval $(opam env)
+
+set -e
 set -x
 sudo apt-get update
 sudo apt-get install wget
@@ -15,7 +25,7 @@ source latest-release:version.sh
 opam switch create for_tezos $ocaml_version
 eval $(opam env)
 # [get system dependencies]
-opam install depext
+# depext handling is done directly by opam 2.1 and later
 opam depext tezos
 # [install tezos]
 opam install tezos

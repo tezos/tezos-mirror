@@ -1,9 +1,12 @@
 (rule
  (targets v4.ml)
  (deps
-   v4/hex.ml
+   v3/data_encoding.ml
+   v3/replicated_signatures.ml
+   v3/lwtreslib_list_combine.ml
+   v0/error_monad_infix_globals.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}
- (run %{libexec:tezos-protocol-environment-packer:s_packer} "structs" %{deps})))))
+ (run %{libexec:tezos-protocol-environment:s_packer} "structs" %{deps})))))
 

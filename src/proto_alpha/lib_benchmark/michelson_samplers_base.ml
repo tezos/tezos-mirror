@@ -49,19 +49,19 @@ let parameters_encoding =
 
 (** A module of type [S] packs samplers used to construct basic Michelson values. *)
 module type S = sig
-  val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
+  val int : Script_int.z Script_int.num sampler
 
-  val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
+  val nat : Script_int.n Script_int.num sampler
 
   val signature : Tezos_crypto.Signature.t sampler
 
-  val string : Alpha_context.Script_string.t sampler
+  val string : Script_string.t sampler
 
   val bytes : bytes sampler
 
   val tez : Alpha_context.Tez.tez sampler
 
-  val timestamp : Alpha_context.Script_timestamp.t sampler
+  val timestamp : Script_timestamp.t sampler
 end
 
 (* Samplers for basic Michelson types. *)
@@ -71,11 +71,11 @@ module Make (P : sig
 end) : S = struct
   let int rng_state =
     let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
-    Alpha_context.Script_int.of_zint i
+    Script_int.of_zint i
 
   let nat rng_state =
     let i = Base_samplers.nat ~size:P.parameters.int_size rng_state in
-    Alpha_context.Script_int.abs (Alpha_context.Script_int.of_zint i)
+    Script_int.abs (Script_int.of_zint i)
 
   let signature rng_state =
     let i = Random.State.int rng_state 4 in
@@ -109,7 +109,7 @@ end) : S = struct
         ~size:P.parameters.string_size
         rng_state
     in
-    match Protocol.Alpha_context.Script_string.of_string s with
+    match Protocol.Script_string.of_string s with
     | Ok s -> s
     | Error _ -> assert false
 
@@ -123,5 +123,5 @@ end) : S = struct
 
   let timestamp rng_state =
     let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
-    Protocol.Alpha_context.Script_timestamp.of_zint i
+    Script_timestamp.of_zint i
 end

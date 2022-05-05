@@ -1,0 +1,111 @@
+misc_checks:
+  extends: .test_template
+  # These tests are not flaky at all so we overwrite the retry value
+  retry: 1
+  needs: []
+  script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    # misc linting
+    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
+    - make check-linting
+    - make check-python-linting
+    # python checks
+    - make -C tests_python typecheck
+    # Ensure that all unit tests are restricted to their opam package
+    - make lint-tests-pkg
+    # Ensure there are no mli docstring syntax errors in alpha protocol
+    - ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
+    # check that the hack-module patch applies cleanly
+    - git apply devtools/protocol-print/add-hack-module.patch
+    # check that yes-wallet builds correctly
+    - dune build scripts/yes-wallet/yes_wallet.exe
+
+misc_opam_checks:
+  extends: .test_template
+  needs: []
+  script:
+    # checks that all deps of opam packages are already installed
+    - ./scripts/opam-check.sh
+  artifacts:
+    when: always
+    paths:
+      - opam_repo.patch
+    expire_in: 1 days
+
+semgrep:
+  extends:
+    - .rules_template__development
+  # We specify the image by hash to avoid flakiness. Indeed, if we took the
+  # latest release, then an update in the parser or analyser could result in new
+  # errors being found even if the code doesn't change. This would place the
+  # burden for fixing the code on the wrong dev (the devs who happen to open an
+  # MR coinciding with the semgrep update rather than the dev who wrote the
+  # infringing code in the first place).
+  # Update the hash in scripts/semgrep/README.md too when updating it here
+  # Last update: 20212-01-03
+  image: returntocorp/semgrep-agent:sha-c6cd7cf
+  stage: test
+  needs: []
+  script:
+    - echo "OCaml code linting. For information on how to reproduce locally, check out scripts/semgrep/README.md"
+    - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
+
+check_precommit_hook:
+  extends: .test_template
+  needs: []
+  script:
+    - ./scripts/pre_commit/pre_commit.py --test-itself
+    - poetry run pylint scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle scripts/pre_commit/pre_commit.py
+    - poetry run mypy scripts/pre_commit/pre_commit.py
+
+check_scripts_b58_prefix:
+  # Can be changed to a python image, but using the build docker image to keep
+  # in sync with the python version used for the tests
+  extends: .test_template
+  needs: []
+  script:
+    - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
+    - poetry run pytest scripts/b58_prefix/test_b58_prefix.py -v
+
+# TODO: https://gitlab.com/tezos/tezos/-/issues/2860
+# Disabled until compatible with ocaml 4.14
+
+# ometrics-code-quality-default:
+#   stage: test
+#   extends:
+#     - .template__code_quality
+#     # See https://gitlab.com/gitlab-org/gitlab/-/issues/215279
+#     # In short, GitLab requires a code quality report from the target branch.
+#     # As ometrics tries to find code quality issues against the target branch
+#     # (i.e. previously introduced issues will not be reported), we create a fake
+#     # empty report on the default branch which is supposed to be the target branch
+#     # in most cases.
+#     - .rules_template__tezos_default_branch_only
+#   script:
+#     - mkdir -p _reports/
+#     - echo "[]" > $CODE_QUALITY_REPORT
+#   artifacts:
+#     paths:
+#       - $CODE_QUALITY_REPORT
+
+# ometrics-code-quality:
+#   stage: test
+#   needs: []
+#   extends:
+#     - .default_settings_template
+#     - .image_template__runtime_build_test_dependencies_template
+#     - .template__code_quality
+#     - .rules_template__merge_request_only
+#   allow_failure: true
+#   script:
+#     - OMETRICS_GIT=$CI_MERGE_REQUEST_SOURCE_PROJECT_URL OMETRICS_BRANCH=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME make lint-ometrics-gitlab
+#   artifacts:
+#     expose_as: 'Code quality report'
+#     when: always
+#     reports:
+#       codequality: $CODE_QUALITY_REPORT
+#     paths:
+#       - _reports/
+#     expire_in: 15 days

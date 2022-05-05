@@ -101,7 +101,7 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
  (public_name tezos-protocol-000-Ps9mPmXa)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_000_Ps9mPmXa)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"
@@ -116,7 +116,7 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
  (public_name tezos-protocol-functor-000-Ps9mPmXa)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-000-Ps9mPmXa.raw)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"

@@ -1,11 +1,11 @@
-tezt/_regressions/encoding/alpha.vote.ballots.out
+encoding/alpha.vote.ballots.out
 
 ./tezos-codec encode alpha.vote.ballots from '{
-  "yay": 2147483647,
-  "nay": 0,
-  "pass": 455
+  "yay": "2147483647",
+  "nay": "0",
+  "pass": "455"
 }'
-7fffffff00000000000001c7
+000000007fffffff000000000000000000000000000001c7
 
-./tezos-codec decode alpha.vote.ballots from 7fffffff00000000000001c7
-{ "yay": 2147483647, "nay": 0, "pass": 455 }
+./tezos-codec decode alpha.vote.ballots from 000000007fffffff000000000000000000000000000001c7
+{ "yay": "2147483647", "nay": "0", "pass": "455" }

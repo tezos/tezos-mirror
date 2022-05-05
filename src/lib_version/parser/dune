@@ -1,0 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_version_parser)
+ (public_name tezos-version.parser)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_deriving.show))
+ (js_of_ocaml))
+
+(ocamllex tezos_version_parser)

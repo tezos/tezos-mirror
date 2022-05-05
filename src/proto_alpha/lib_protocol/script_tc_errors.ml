@@ -30,7 +30,7 @@ open Script
 
 type kind = Int_kind | String_kind | Bytes_kind | Prim_kind | Seq_kind
 
-type unparsed_stack_ty = (Script.expr * Script.annot) list
+type unparsed_stack_ty = Script.expr list
 
 type type_map = (Script.location * (unparsed_stack_ty * unparsed_stack_ty)) list
 
@@ -62,13 +62,19 @@ type error += Unexpected_operation of Script.location
 
 type error += Unexpected_contract of Script.location
 
-type error += No_such_entrypoint of string
+type error += No_such_entrypoint of Entrypoint.t
 
-type error += Duplicate_entrypoint of string
+type error += Duplicate_entrypoint of Entrypoint.t
 
 type error += Unreachable_entrypoint of prim list
 
-type error += Entrypoint_name_too_long of string
+(* Transaction rollup errors *)
+
+type error += Tx_rollup_bad_deposit_parameter of Script.location * Script.expr
+
+type error += Tx_rollup_invalid_ticket_amount of Z.t
+
+type error += Tx_rollup_addresses_disabled of Script.location
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
@@ -114,15 +120,6 @@ type error += Bad_stack_length
 
 type error += Bad_stack_item of int
 
-type error += Inconsistent_annotations of string * string
-
-type error +=
-  | Inconsistent_type_annotations :
-      Script.location * Script.expr * Script.expr
-      -> error
-
-type error += Inconsistent_field_annotations of string * string
-
 type error += Unexpected_annotation of Script.location
 
 type error += Ungrouped_annotations of Script.location
@@ -162,9 +159,7 @@ type error += Comparable_type_expected : Script.location * Script.expr -> error
 type error += Inconsistent_type_sizes : int * int -> error
 
 type error +=
-  | Inconsistent_types :
-      Script.location option * Script.expr * Script.expr
-      -> error
+  | Inconsistent_types : Script.location * Script.expr * Script.expr -> error
 
 type error +=
   | Inconsistent_memo_sizes : Sapling.Memo_size.t * Sapling.Memo_size.t -> error
@@ -200,5 +195,17 @@ type error += Unexpected_forged_value of Script.location
 
 type error += Non_dupable_type of Script.location * Script.expr
 
-(* Impossible errors *)
-type error += Unparsing_invariant_violated
+type error += Unexpected_ticket_owner of Destination.t
+
+(* Merge type errors *)
+
+type inconsistent_types_fast_error =
+  | Inconsistent_types_fast
+      (** This value is only used when the details of the error don't matter because
+the error will be ignored later. For example, when types are compared during
+the interpretation of the [CONTRACT] instruction any error will lead to
+returning [None] but the content of the error will be ignored. *)
+
+type (_, _) error_details =
+  | Informative : 'error_context -> ('error_context, error trace) error_details
+  | Fast : (_, inconsistent_types_fast_error) error_details

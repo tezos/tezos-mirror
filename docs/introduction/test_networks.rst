@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Hangzhou for hangzhounet), the protocol
+network is activated (such as Ithaca for ithacanet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -32,19 +32,18 @@ Faucets can be accessed from https://teztnets.xyz/. Each of the test
 network listed there, including the active test networks described
 below, have independent faucets.
 
-Hangzhounet
-===========
+Jakartanet
+==========
 
-- Built-in network alias: ``hangzhounet`` (see :ref:`builtin_networks`)
+- Built-in network alias: ``jakartanet`` (see :ref:`builtin_networks`)
 
-  * Available from version 11.0~rc2.
+  * Available from version 13.0.
 
-- Run Docker image: ``wget -O hangzhounet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+Jakartanet is a test network which runs the Jakarta 2 protocol.
+Jakartanet will run until Jakarta is refused through the amendment process
+or replaced by another protocol on Mainnet.
 
-Hangzhounet is a test network running the ``PtHangz2`` protocol.
-Hangzhounet will run until Hangzhou is replaced by another protocol on Mainnet.
-
-On Hangzhounet, some constants differ from Mainnet.
+On Jakartanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
@@ -57,11 +56,9 @@ Ithacanet
     to the second version of Ithacanet which runs ``Psithaca2`` instead
     of ``PsiThaCa``.
 
-- Run Docker image: ``wget -O ithacanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
 Ithacanet is a test network which ran the Ithaca protocol and which was reset
 to run on the Ithaca2 protocol.
-Ithacanet will run until Ithaca2 is rejected or replaced by another protocol on Mainnet.
+Ithacanet will run until Ithaca2 is replaced by another protocol on Mainnet.
 
 On Ithacanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
@@ -80,8 +77,17 @@ P is activated, the previous test network will end and P-net will continue on it
 Old Networks
 ============
 
+
+Hangzhounet
+-----------
+
+Hangzhounet was a test network running the Hangzhou protocol.
+Following the activation of the Ithaca protocol replacing Hangzhou on Mainnet,
+Hangzhounet stopped being maintained on April 6, 2022 (the bootstrap baker
+is no longer producing blocks).
+
 Granadanet
-==========
+----------
 
 Granadanet was a test network running the Granada protocol.
 Following the activation of the Hangzhou protocol replacing Granada on Mainnet,

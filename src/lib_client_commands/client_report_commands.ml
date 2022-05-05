@@ -36,6 +36,7 @@ let print_invalid_blocks ppf (b : Shell_services.Chain.invalid_block) =
     b.errors
 
 let commands () =
+  let open Lwt_result_syntax in
   let open Clic in
   let group =
     {name = "report"; title = "Commands to report the node's status"}
@@ -61,7 +62,7 @@ let commands () =
       (args1 output_arg)
       (fixed ["list"; "heads"])
       (fun ppf cctxt ->
-        Shell_services.Blocks.list cctxt () >>=? fun heads ->
+        let* heads = Shell_services.Blocks.list cctxt () in
         Format.fprintf
           ppf
           "@[<v>%a@]@."
@@ -74,11 +75,12 @@ let commands () =
       (args1 output_arg)
       (fixed ["list"; "rejected"; "blocks"])
       (fun ppf cctxt ->
-        Shell_services.Invalid_blocks.list cctxt () >>=? function
+        let* invalid = Shell_services.Invalid_blocks.list cctxt () in
+        match invalid with
         | [] ->
             Format.fprintf ppf "No invalid blocks.@." ;
             return_unit
-        | _ :: _ as invalid ->
+        | _ :: _ ->
             Format.fprintf
               ppf
               "@[<v>%a@]@."

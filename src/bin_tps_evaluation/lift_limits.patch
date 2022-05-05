@@ -1,0 +1,26 @@
+diff --git a/src/proto_alpha/lib_protocol/main.ml b/src/proto_alpha/lib_protocol/main.ml
+index b226dc5417..cef4feef6e 100644
+--- a/src/proto_alpha/lib_protocol/main.ml
++++ b/src/proto_alpha/lib_protocol/main.ml
+@@ -64,10 +64,9 @@ type operation = Alpha_context.packed_operation = {
+ 
+ let acceptable_passes = Alpha_context.Operation.acceptable_passes
+ 
+-let max_block_length = Alpha_context.Block_header.max_header_length
++let max_block_length = max_int
+ 
+-let max_operation_data_length =
+-  Alpha_context.Constants.max_operation_data_length
++let max_operation_data_length = max_int
+ 
+ let validation_passes =
+   let open Alpha_context.Constants in
+@@ -83,7 +82,7 @@ let validation_passes =
+         max_op = Some max_anon_ops_per_block;
+       };
+       (* 512kB *)
+-      {max_size = 512 * 1024; max_op = None};
++      {max_size = max_int; max_op = None};
+     ]
+ 
+ let rpc_services =

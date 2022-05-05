@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name bare_functor_outputs)
  (public_name tezos-lwt-result-stdlib.bare.functor-outputs)

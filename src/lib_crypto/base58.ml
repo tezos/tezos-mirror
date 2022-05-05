@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 let base = 58
 
@@ -158,8 +158,10 @@ type 'a encoding = {
 let prefix {prefix; _} = prefix
 
 let simple_decode ?alphabet {prefix; of_raw; _} s =
-  let ( >?? ) = Option.bind in
-  safe_decode ?alphabet s >?? TzString.remove_prefix ~prefix >?? of_raw
+  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+  let* s = safe_decode ?alphabet s in
+  let* s = TzString.remove_prefix ~prefix s in
+  of_raw s
 
 let simple_encode ?alphabet {prefix; to_raw; _} d =
   safe_encode ?alphabet (prefix ^ to_raw d)
@@ -293,7 +295,7 @@ struct
                     assert (String.sub prefix 0 ignored = encoding.prefix) ;
                     String.sub prefix ignored (len - ignored))
                 in
-                resolver context msg >|= fun msgs ->
+                let+ msgs = resolver context msg in
                 List.filter_map
                   (fun msg ->
                     let res = simple_encode encoding ?alphabet msg in
@@ -366,6 +368,8 @@ module Prefix = struct
 
   let p256_public_key_hash = "\006\161\164" (* tz3(36) *)
 
+  let bls12_381_public_key_hash = "\006\161\166" (* tz4(36) *)
+
   (* 16 *)
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
 
@@ -416,4 +420,14 @@ module Prefix = struct
 
   (* 43 *)
   let sapling_address = "\018\071\040\223" (* zet1(69) *)
+
+  (* 96 *)
+
+  let generic_aggregate_signature = "\002\075\234\101" (* asig(141) *)
+
+  let bls12_381_signature = "\040\171\064\207" (* BLsig(142) *)
+
+  let bls12_381_public_key = "\006\149\135\204" (* BLpk(76) *)
+
+  let bls12_381_secret_key = "\003\150\192\040" (* BLsk(54) *)
 end

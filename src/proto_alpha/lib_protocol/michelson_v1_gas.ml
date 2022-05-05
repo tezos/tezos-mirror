@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -28,6 +28,7 @@
 open Alpha_context
 open Gas
 module S = Saturation_repr
+module Size = Gas_input_size
 
 module Cost_of = struct
   module S_syntax = struct
@@ -54,24 +55,24 @@ module Cost_of = struct
 
     (* model N_IAbs_int *)
     (* Approximating 0.065045 x term *)
-    let cost_N_IAbs_int size = S.safe_int (25 + (size lsr 4))
+    let cost_N_IAbs_int size = S.safe_int (20 + (size lsr 4))
 
     (* model N_IAdd_bls12_381_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_IAdd_bls12_381_fr = S.safe_int 45
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_IAdd_bls12_381_fr = S.safe_int 30
 
     (* model N_IAdd_bls12_381_g1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_IAdd_bls12_381_g1 = S.safe_int 925
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_IAdd_bls12_381_g1 = S.safe_int 900
 
     (* model N_IAdd_bls12_381_g2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_IAdd_bls12_381_g2 = S.safe_int 2_520
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_IAdd_bls12_381_g2 = S.safe_int 2_470
 
     let cost_linear_op_int size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int (Compare.Int.max size1 size2) in
-      S.safe_int 55 + ((v0 lsr 4) + (v0 lsr 7))
+      S.safe_int 35 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_IAdd_int *)
     (* Approximating 0.078154 x term *)
@@ -96,17 +97,17 @@ module Cost_of = struct
     let cost_N_IAddress = S.safe_int 10
 
     (* model N_IAmount *)
-    let cost_N_IAmount = S.safe_int 15
+    let cost_N_IAmount = S.safe_int 10
 
     (* model N_IAnd *)
-    let cost_N_IAnd = S.safe_int 20
+    let cost_N_IAnd = S.safe_int 10
 
     (* model N_IAnd_int_nat *)
     (* Approximating 0.076804 x 2 x term *)
     let cost_N_IAnd_int_nat size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int (Compare.Int.min size1 size2) in
-      S.safe_int 50 + ((v0 lsr 3) + (v0 lsr 6))
+      S.safe_int 35 + ((v0 lsr 3) + (v0 lsr 6))
 
     (* model N_IAnd_nat *)
     (* Approximating 0.076804 x term *)
@@ -115,10 +116,10 @@ module Cost_of = struct
     let cost_N_IAnd_nat size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int (Compare.Int.min size1 size2) in
-      S.safe_int 50 + ((v0 lsr 4) + (v0 lsr 7))
+      S.safe_int 35 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_IApply *)
-    let cost_N_IApply = S.safe_int 160
+    let cost_N_IApply = S.safe_int 140
 
     (* model N_IBlake2b *)
     (* Approximating 1.120804 x term *)
@@ -128,7 +129,7 @@ module Cost_of = struct
       S.safe_int 430 + v0 + (v0 lsr 3)
 
     (* model N_IBytes_size *)
-    let cost_N_IBytes_size = S.safe_int 15
+    let cost_N_IBytes_size = S.safe_int 10
 
     (* model N_ICar *)
     let cost_N_ICar = S.safe_int 10
@@ -173,14 +174,14 @@ module Cost_of = struct
     let cost_N_IComb_get size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 30 + (v0 lsr 1) + (v0 lsr 4)
+      S.safe_int 20 + (v0 lsr 1) + (v0 lsr 4)
 
     (* model N_IComb_set *)
     (* Approximating 1.287531 x term *)
     let cost_N_IComb_set size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 40 + (v0 + (v0 lsr 2) + (v0 lsr 5))
+      S.safe_int 20 + (v0 + (v0 lsr 2) + (v0 lsr 5))
 
     (* Model N_ICompare *)
     (* Approximating 0.024413 x term *)
@@ -194,26 +195,26 @@ module Cost_of = struct
     let cost_N_IConcat_bytes_pair size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int size1 + S.safe_int size2 in
-      S.safe_int 65 + (v0 lsr 4)
+      S.safe_int 45 + (v0 lsr 4)
 
     (* model N_IConcat_string_pair *)
     (* Approximating 0.061402 x term *)
     let cost_N_IConcat_string_pair size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int size1 + S.safe_int size2 in
-      S.safe_int 65 + (v0 lsr 4)
+      S.safe_int 45 + (v0 lsr 4)
 
     (* model N_ICons_list *)
-    let cost_N_ICons_list = S.safe_int 15
+    let cost_N_ICons_list = S.safe_int 10
 
     (* model N_ICons_none *)
-    let cost_N_ICons_none = S.safe_int 15
+    let cost_N_ICons_none = S.safe_int 10
 
     (* model N_ICons_pair *)
-    let cost_N_ICons_pair = S.safe_int 15
+    let cost_N_ICons_pair = S.safe_int 10
 
     (* model N_ICons_some *)
-    let cost_N_ICons_some = S.safe_int 15
+    let cost_N_ICons_some = S.safe_int 10
 
     (* model N_IConst *)
     let cost_N_IConst = S.safe_int 10
@@ -233,17 +234,17 @@ module Cost_of = struct
     let cost_N_IDig size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 60 + ((S.safe_int 6 * v0) + (v0 lsr 1) + (v0 lsr 2))
+      S.safe_int 30 + ((S.safe_int 6 * v0) + (v0 lsr 1) + (v0 lsr 2))
 
     (* model N_IDip *)
-    let cost_N_IDip = S.safe_int 15
+    let cost_N_IDip = S.safe_int 10
 
     (* model N_IDipN *)
-    (* Approximating 1.708122 x term *)
+    (* Approximating 2.740571 x term *)
     let cost_N_IDipN size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 45 + (v0 + (v0 lsr 1) + (v0 lsr 3))
+      S.safe_int 30 + ((S.safe_int 2 * v0) + (v0 lsr 1) + (v0 lsr 3))
 
     (* model N_IView *)
     let cost_N_IView = S.safe_int 1460
@@ -256,14 +257,14 @@ module Cost_of = struct
     let cost_N_IDropN size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 60 + (S.safe_int 2 * v0) + (v0 lsr 1) + (v0 lsr 3)
+      S.safe_int 30 + (S.safe_int 2 * v0) + (v0 lsr 1) + (v0 lsr 3)
 
     (* model N_IDug *)
     (* Approximating 6.718396 x term *)
     let cost_N_IDug size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 60 + ((S.safe_int 6 * v0) + (v0 lsr 1) + (v0 lsr 2))
+      S.safe_int 35 + ((S.safe_int 6 * v0) + (v0 lsr 1) + (v0 lsr 2))
 
     (* model N_IDup *)
     let cost_N_IDup = S.safe_int 10
@@ -277,11 +278,11 @@ module Cost_of = struct
 
     let cost_div_int size1 size2 =
       let q = size1 - size2 in
-      if Compare.Int.(q < 0) then S.safe_int 140
+      if Compare.Int.(q < 0) then S.safe_int 105
       else
         let open S_syntax in
         let v0 = S.safe_int q * S.safe_int size2 in
-        S.safe_int 140 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13)
+        S.safe_int 105 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13)
 
     (* model N_IEdiv_int *)
     (* Approximating 0.001591 x term *)
@@ -292,13 +293,13 @@ module Cost_of = struct
     let cost_N_IEdiv_nat = cost_div_int
 
     (* model N_IEdiv_tez *)
-    let cost_N_IEdiv_tez = S.safe_int 140
+    let cost_N_IEdiv_tez = S.safe_int 80
 
     (* model N_IEdiv_teznat *)
-    let cost_N_IEdiv_teznat = S.safe_int 140
+    let cost_N_IEdiv_teznat = S.safe_int 70
 
     (* model N_IEmpty_big_map *)
-    let cost_N_IEmpty_big_map = S.safe_int 15
+    let cost_N_IEmpty_big_map = S.safe_int 10
 
     (* model N_IEmpty_map *)
     let cost_N_IEmpty_map = S.safe_int 220
@@ -307,25 +308,25 @@ module Cost_of = struct
     let cost_N_IEmpty_set = S.safe_int 220
 
     (* model N_IEq *)
-    let cost_N_IEq = S.safe_int 15
+    let cost_N_IEq = S.safe_int 10
 
     (* model N_IExec *)
-    let cost_N_IExec = S.safe_int 15
+    let cost_N_IExec = S.safe_int 10
 
     (* model N_IFailwith *)
     (* let cost_N_IFailwith = S.safe_int 105 *)
 
     (* model N_IGe *)
-    let cost_N_IGe = S.safe_int 15
+    let cost_N_IGe = S.safe_int 10
 
     (* model N_IGt *)
-    let cost_N_IGt = S.safe_int 15
+    let cost_N_IGt = S.safe_int 10
 
     (* model N_IHalt *)
-    let cost_N_IHalt = S.safe_int 15
+    let cost_N_IHalt = S.safe_int 10
 
     (* model N_IHash_key *)
-    let cost_N_IHash_key = S.safe_int 655
+    let cost_N_IHash_key = S.safe_int 605
 
     (* model N_IIf *)
     let cost_N_IIf = S.safe_int 10
@@ -340,20 +341,20 @@ module Cost_of = struct
     let cost_N_IIf_none = S.safe_int 10
 
     (* model N_IOpt_map *)
-    let cost_opt_map = S.safe_int 15
+    let cost_opt_map = S.safe_int 10
 
     (* model N_IImplicit_account *)
     let cost_N_IImplicit_account = S.safe_int 10
 
     (* model N_IInt_bls12_381_z_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_IInt_bls12_381_z_fr = S.safe_int 125
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_IInt_bls12_381_z_fr = S.safe_int 115
 
     (* model N_IInt_nat *)
-    let cost_N_IInt_nat = S.safe_int 15
+    let cost_N_IInt_nat = S.safe_int 10
 
     (* model N_IIs_nat *)
-    let cost_N_IIs_nat = S.safe_int 15
+    let cost_N_IIs_nat = S.safe_int 10
 
     (* model N_IKeccak *)
     (* Approximating 8.276352 x term *)
@@ -366,22 +367,22 @@ module Cost_of = struct
     let cost_N_ILambda = S.safe_int 10
 
     (* model N_ILe *)
-    let cost_N_ILe = S.safe_int 15
+    let cost_N_ILe = S.safe_int 10
 
     (* model N_ILeft *)
-    let cost_N_ILeft = S.safe_int 15
+    let cost_N_ILeft = S.safe_int 10
 
     (* model N_ILevel *)
-    let cost_N_ILevel = S.safe_int 15
+    let cost_N_ILevel = S.safe_int 10
 
     (* model N_IList_iter *)
-    let cost_N_IList_iter _ = S.safe_int 25
+    let cost_N_IList_iter _ = S.safe_int 20
 
     (* model N_IList_map *)
-    let cost_N_IList_map _ = S.safe_int 25
+    let cost_N_IList_map _ = S.safe_int 20
 
     (* model N_IList_size *)
-    let cost_N_IList_size = S.safe_int 15
+    let cost_N_IList_size = S.safe_int 10
 
     (* model N_ILoop *)
     let cost_N_ILoop = S.safe_int 10
@@ -394,96 +395,96 @@ module Cost_of = struct
     let cost_N_ILsl_nat size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 60 + ((v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6))
+      S.safe_int 40 + ((v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6))
 
     (* model N_ILsr_nat *)
     (* Approximating 0.115565 x term *)
     let cost_N_ILsr_nat size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 60 + ((v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6))
+      S.safe_int 45 + ((v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6))
 
     (* model N_ILt *)
-    let cost_N_ILt = S.safe_int 15
+    let cost_N_ILt = S.safe_int 10
 
     (* model N_IMap_get *)
     (* Approximating 0.048359 x term *)
     let cost_N_IMap_get size1 size2 =
       let open S_syntax in
       let v0 = size1 * log2 size2 in
-      S.safe_int 110 + (v0 lsr 5) + (v0 lsr 6)
+      S.safe_int 45 + (v0 lsr 5) + (v0 lsr 6)
 
     (* model N_IMap_get_and_update *)
     (* Approximating 0.145661 x term *)
     let cost_N_IMap_get_and_update size1 size2 =
       let open S_syntax in
       let v0 = size1 * log2 size2 in
-      S.safe_int 135 + (v0 lsr 3) + (v0 lsr 6)
+      S.safe_int 75 + (v0 lsr 3) + (v0 lsr 6)
 
     (* model N_IMap_iter *)
     (* Approximating 7.621331 x term *)
     let cost_N_IMap_iter size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 70 + (S.safe_int 7 * v0) + (v0 lsr 1) + (v0 lsr 3)
+      S.safe_int 50 + (S.safe_int 7 * v0) + (v0 lsr 1) + (v0 lsr 3)
 
     (* model N_IMap_map *)
     (* Approximating 7.46280485884 x term *)
     let cost_N_IMap_map size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 265 + ((S.safe_int 7 * v0) + (v0 lsr 1))
+      S.safe_int 50 + ((S.safe_int 7 * v0) + (v0 lsr 1))
 
     (* model N_IMap_mem *)
     (* Approximating 0.048446 x term *)
     let cost_N_IMap_mem size1 size2 =
       let open S_syntax in
       let v0 = size1 * log2 size2 in
-      S.safe_int 110 + (v0 lsr 5) + (v0 lsr 6)
+      S.safe_int 45 + (v0 lsr 5) + (v0 lsr 6)
 
     (* model N_IMap_size *)
-    let cost_N_IMap_size = S.safe_int 15
+    let cost_N_IMap_size = S.safe_int 10
 
     (* model N_IMap_update *)
     (* Approximating 0.097072 x term *)
     let cost_N_IMap_update size1 size2 =
       let open S_syntax in
       let v0 = size1 * log2 size2 in
-      S.safe_int 130 + (v0 lsr 4) + (v0 lsr 5)
+      S.safe_int 55 + (v0 lsr 4) + (v0 lsr 5)
 
     (* model N_IMul_bls12_381_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_IMul_bls12_381_fr = S.safe_int 65
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_IMul_bls12_381_fr = S.safe_int 45
 
     (* model N_IMul_bls12_381_fr_z *)
     (* Approximating 1.059386 x term *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_fr_z size1 =
       let open S_syntax in
       let v0 = S.safe_int size1 in
-      S.safe_int 330 + v0 + (v0 lsr 4)
+      S.safe_int 265 + v0 + (v0 lsr 4)
 
     (* model N_IMul_bls12_381_g1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_g1 = S.safe_int 103_000
 
     (* model N_IMul_bls12_381_g2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_g2 = S.safe_int 220_000
 
     (* model N_IMul_bls12_381_z_fr *)
     (* Approximating 1.068674 x term *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_z_fr size1 =
       let open S_syntax in
       let v0 = S.safe_int size1 in
-      S.safe_int 330 + v0 + (v0 lsr 4)
+      S.safe_int 265 + v0 + (v0 lsr 4)
 
     let cost_mul size1 size2 =
       let open S_syntax in
       let a = S.add (S.safe_int size1) (S.safe_int size2) in
       let v0 = a * log2 a in
-      S.safe_int 100 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4)
+      S.safe_int 55 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4)
 
     (* model N_IMul_int *)
     (* Approximating 0.857931 x term *)
@@ -500,28 +501,28 @@ module Cost_of = struct
     let cost_N_IMul_teznat = S.safe_int 50
 
     (* model N_INeg_bls12_381_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_INeg_bls12_381_fr = S.safe_int 45
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_INeg_bls12_381_fr = S.safe_int 25
 
     (* model N_INeg_bls12_381_g1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_INeg_bls12_381_g1 = S.safe_int 60
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_INeg_bls12_381_g1 = S.safe_int 50
 
     (* model N_INeg_bls12_381_g2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_N_INeg_bls12_381_g2 = S.safe_int 85
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_N_INeg_bls12_381_g2 = S.safe_int 70
 
     (* model N_INeg *)
     (* Approximating 0.066076 x term *)
     let cost_N_INeg size =
       let open S_syntax in
-      S.safe_int 40 + (S.safe_int size lsr 4)
+      S.safe_int 25 + (S.safe_int size lsr 4)
 
     (* model N_INeq *)
-    let cost_N_INeq = S.safe_int 15
+    let cost_N_INeq = S.safe_int 10
 
     (* model N_INil *)
-    let cost_N_INil = S.safe_int 15
+    let cost_N_INil = S.safe_int 10
 
     (* model N_INot *)
     let cost_N_INot = S.safe_int 10
@@ -531,10 +532,13 @@ module Cost_of = struct
     let cost_N_INot_int size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 50 + ((v0 lsr 4) + (v0 lsr 7))
+      S.safe_int 25 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_INow *)
-    let cost_N_INow = S.safe_int 15
+    let cost_N_INow = S.safe_int 10
+
+    (* model N_IMin_block_time *)
+    let cost_N_IMin_block_time = S.safe_int 20
 
     (* model N_IOpen_chest *)
     (* 612000 + chest * 19 + time * 19050 *)
@@ -545,56 +549,56 @@ module Cost_of = struct
       S.safe_int 612_000 + (S.safe_int 19 * v0) + (S.safe_int 19050 * v1)
 
     (* model N_IOr *)
-    let cost_N_IOr = S.safe_int 15
+    let cost_N_IOr = S.safe_int 10
 
     (* model N_IOr_nat *)
     (* Approximating 0.075758 x term *)
     let cost_N_IOr_nat = cost_linear_op_int
 
     (* model N_IPairing_check_bls12_381 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IPairing_check_bls12_381 size =
       S.add (S.safe_int 450_000) (S.mul (S.safe_int 342_500) (S.safe_int size))
 
     (* model N_IRead_ticket *)
-    let cost_N_IRead_ticket = S.safe_int 15
+    let cost_N_IRead_ticket = S.safe_int 10
 
     (* model N_IRight *)
-    let cost_N_IRight = S.safe_int 15
+    let cost_N_IRight = S.safe_int 10
 
     (* model N_ISapling_empty_state *)
-    let cost_N_ISapling_empty_state = S.safe_int 15
+    let cost_N_ISapling_empty_state = S.safe_int 10
 
     (* model N_ISapling_verify_update *)
-    (* Approximating 1.27167 x term *)
-    (* Approximating 38.72115 x term *)
-    let cost_N_ISapling_verify_update size1 size2 =
+    let cost_N_ISapling_verify_update size1 size2 bound_data =
       let open S_syntax in
       let v1 = S.safe_int size1 in
-      let v0 = S.safe_int size2 in
-      S.safe_int 84_050 + (v1 + (v1 lsr 2)) + (S.safe_int 39 * v0)
+      let v2 = S.safe_int size2 in
+      cost_N_IBlake2b bound_data + S.safe_int 310_000
+      + (S.safe_int 5_575_000 * v1)
+      + (S.safe_int 5_075_000 * v2)
 
     (* model N_ISelf_address *)
-    let cost_N_ISelf_address = S.safe_int 15
+    let cost_N_ISelf_address = S.safe_int 10
 
     (* model N_ISelf *)
-    let cost_N_ISelf = S.safe_int 15
+    let cost_N_ISelf = S.safe_int 10
 
     (* model N_ISender *)
-    let cost_N_ISender = S.safe_int 15
+    let cost_N_ISender = S.safe_int 10
 
     (* model N_ISet_delegate *)
-    let cost_N_ISet_delegate = S.safe_int 40
+    let cost_N_ISet_delegate = S.safe_int 30
 
     (* model N_ISet_iter *)
     (* Approximating 7.633555 x term *)
     let cost_N_ISet_iter size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 70 + (S.safe_int 7 * v0) + (v0 lsr 1) + (v0 lsr 3)
+      S.safe_int 50 + (S.safe_int 7 * v0) + (v0 lsr 1) + (v0 lsr 3)
 
     (* model N_ISet_size *)
-    let cost_N_ISet_size = S.safe_int 15
+    let cost_N_ISet_size = S.safe_int 10
 
     (* model N_ISha256 *)
     (* Approximating 4.763264 x term *)
@@ -618,23 +622,23 @@ module Cost_of = struct
     (* Approximating 0.065752 x term *)
     let cost_N_ISlice_bytes size =
       let open S_syntax in
-      S.safe_int 40 + (S.safe_int size lsr 4)
+      S.safe_int 25 + (S.safe_int size lsr 4)
 
     (* model N_ISlice_string *)
     (* Approximating 0.065688 x term *)
     let cost_N_ISlice_string size =
       let open S_syntax in
-      S.safe_int 40 + (S.safe_int size lsr 4)
+      S.safe_int 25 + (S.safe_int size lsr 4)
 
     (* model N_ISource *)
-    let cost_N_ISource = S.safe_int 15
+    let cost_N_ISource = S.safe_int 10
 
     (* model N_ISplit_ticket *)
     (* Approximating 0.132362 x term *)
     let cost_N_ISplit_ticket size1 size2 =
       let open S_syntax in
       let v1 = S.safe_int (Compare.Int.max size1 size2) in
-      S.safe_int 55 + (v1 lsr 3)
+      S.safe_int 40 + (v1 lsr 3)
 
     (* model N_IString_size *)
     let cost_N_IString_size = S.safe_int 15
@@ -644,7 +648,7 @@ module Cost_of = struct
     let cost_N_ISub_int = cost_linear_op_int
 
     (* model N_ISub_tez *)
-    let cost_N_ISub_tez = S.safe_int 20
+    let cost_N_ISub_tez = S.safe_int 15
 
     (* model N_ISub_tez_legacy *)
     let cost_N_ISub_tez_legacy = S.safe_int 20
@@ -657,7 +661,7 @@ module Cost_of = struct
     let cost_N_ISwap = S.safe_int 10
 
     (* model N_ITicket *)
-    let cost_N_ITicket = S.safe_int 15
+    let cost_N_ITicket = S.safe_int 10
 
     (* model N_ITotal_voting_power *)
     let cost_N_ITotal_voting_power = S.safe_int 370
@@ -679,17 +683,17 @@ module Cost_of = struct
     let cost_N_IVoting_power = S.safe_int 530
 
     (* model N_IXor *)
-    let cost_N_IXor = S.safe_int 20
+    let cost_N_IXor = S.safe_int 15
 
     (* model N_IXor_nat *)
     (* Approximating 0.075601 x term *)
     let cost_N_IXor_nat = cost_linear_op_int
 
     (* model N_KCons *)
-    let cost_N_KCons = S.safe_int 15
+    let cost_N_KCons = S.safe_int 10
 
     (* model N_KIter *)
-    let cost_N_KIter = S.safe_int 20
+    let cost_N_KIter = S.safe_int 10
 
     (* model N_KList_enter_body *)
     (* Approximating 1.672196 x term *)
@@ -698,49 +702,49 @@ module Cost_of = struct
       | [] ->
           let open S_syntax in
           let v0 = S.safe_int size_ys in
-          S.safe_int 40 + (v0 + (v0 lsr 1) + (v0 lsr 3))
-      | _ :: _ -> S.safe_int 70
+          S.safe_int 25 + (v0 + (v0 lsr 1) + (v0 lsr 3))
+      | _ :: _ -> S.safe_int 25
 
     (* model N_KList_exit_body *)
-    let cost_N_KList_exit_body = S.safe_int 30
+    let cost_N_KList_exit_body = S.safe_int 10
 
     (* model N_KLoop_in *)
-    let cost_N_KLoop_in = S.safe_int 15
+    let cost_N_KLoop_in = S.safe_int 10
 
     (* model N_KLoop_in_left *)
-    let cost_N_KLoop_in_left = S.safe_int 15
+    let cost_N_KLoop_in_left = S.safe_int 10
 
     (* model N_KMap_enter_body *)
-    let cost_N_KMap_enter_body = S.safe_int 165
+    let cost_N_KMap_enter_body = S.safe_int 80
 
     (* model N_KNil *)
-    let cost_N_KNil = S.safe_int 20
+    let cost_N_KNil = S.safe_int 10
 
     (* model N_KReturn *)
-    let cost_N_KReturn = S.safe_int 15
+    let cost_N_KReturn = S.safe_int 10
 
     (* model N_KView_exit *)
     let cost_N_KView_exit = S.safe_int 20
 
     (* model N_KMap_head *)
-    let const_N_KMap_head = S.safe_int 20
+    let cost_N_KMap_head = S.safe_int 20
 
     (* model N_KUndip *)
-    let cost_N_KUndip = S.safe_int 15
+    let cost_N_KUndip = S.safe_int 10
 
     (* model DECODING_BLS_FR *)
-    (* when benchmarking, compile bls12-381-unix without ADX, see
+    (* when benchmarking, compile bls12-381 without ADX, see
        https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
     *)
-    let cost_DECODING_BLS_FR = S.safe_int 150
+    let cost_DECODING_BLS_FR = S.safe_int 120
 
     (* model DECODING_BLS_G1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_DECODING_BLS_G1 = S.safe_int 65_300
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_DECODING_BLS_G1 = S.safe_int 54_600
 
     (* model DECODING_BLS_G2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
-    let cost_DECODING_BLS_G2 = S.safe_int 73_300
+    (* when benchmarking, compile bls12-381 without ADX *)
+    let cost_DECODING_BLS_G2 = S.safe_int 69_000
 
     (* model B58CHECK_DECODING_CHAIN_ID *)
     let cost_B58CHECK_DECODING_CHAIN_ID = S.safe_int 1_600
@@ -892,26 +896,27 @@ module Cost_of = struct
       S.safe_int 16630 + (v0 lsr 3)
 
     (* model TIMESTAMP_READABLE_DECODING *)
-    let cost_TIMESTAMP_READABLE_DECODING = S.safe_int 100
+    (* Approximating 0.354278 x term *)
+    let cost_TIMESTAMP_READABLE_DECODING ~bytes =
+      let open S_syntax in
+      let b = S.safe_int bytes in
+      let v0 = S.mul (S.sqrt b) b in
+      S.safe_int 800 + ((v0 lsr 2) + (v0 lsr 3))
 
     (* model TIMESTAMP_READABLE_ENCODING *)
-    let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 820
+    let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 100
 
     (* model CHECK_PRINTABLE *)
     let cost_CHECK_PRINTABLE size =
       let open S_syntax in
       S.safe_int 14 + (S.safe_int 10 * S.safe_int size)
 
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2264
-       Rerun benchmarks due to faster gas monad.
-       With the the redesign of the gas-monad this needs to be benchmarked again.
-    *)
-    (* model MERGE_TYPES
-       This is the estimated cost of one iteration of merge_types, extracted
-       and copied manually from the parameter fit for the MERGE_TYPES benchmark
+    (* model TY_EQ
+       This is the estimated cost of one iteration of ty_eq, extracted
+       and copied manually from the parameter fit for the TY_EQ benchmark
        (the model is parametric on the size of the type, which we don't have
        access to in O(1)). *)
-    let cost_MERGE_TYPES = S.safe_int 220
+    let cost_TY_EQ = S.safe_int 60
 
     (* model TYPECHECKING_CODE
        This is the cost of one iteration of parse_instr, extracted by hand from the
@@ -943,15 +948,14 @@ module Cost_of = struct
        parameter fit for the UNPARSE_TYPE benchmark. *)
     let cost_UNPARSE_TYPE type_size = S.mul (S.safe_int 20) type_size
 
-    (* TODO: Add benchmarked value from [Unparse_comparable_type_benchmark]. *)
-    let cost_UNPARSE_COMPARABLE_TYPE type_size = S.mul (S.safe_int 20) type_size
-
-    (* TODO: benchmark *)
-    let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2264
+       Benchmark.
+       Currently approximated by 2 comparisons of the longest entrypoint. *)
+    let cost_FIND_ENTRYPOINT = cost_N_ICompare 31 31
 
     (* model SAPLING_TRANSACTION_ENCODING *)
-    let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs =
-      S.safe_int (1500 + (inputs * 160) + (outputs * 320))
+    let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs ~bound_data =
+      S.safe_int (1500 + (inputs * 160) + (outputs * 320) + (bound_data lsr 3))
 
     (* model SAPLING_DIFF_ENCODING *)
     let cost_SAPLING_DIFF_ENCODING ~nfs ~cms =
@@ -1005,17 +1009,20 @@ module Cost_of = struct
 
     let empty_set = atomic_step_cost cost_N_IEmpty_set
 
-    let set_iter (type a) ((module Box) : a Script_typed_ir.set) =
+    let set_iter (type a) (set : a Script_typed_ir.set) =
+      let (module Box) = Script_set.get set in
       atomic_step_cost (cost_N_ISet_iter Box.size)
 
     let set_size = atomic_step_cost cost_N_ISet_size
 
     let empty_map = atomic_step_cost cost_N_IEmpty_map
 
-    let map_map (type k v) ((module Box) : (k, v) Script_typed_ir.map) =
+    let map_map (type k v) (map : (k, v) Script_typed_ir.map) =
+      let (module Box) = Script_map.get_module map in
       atomic_step_cost (cost_N_IMap_map Box.size)
 
-    let map_iter (type k v) ((module Box) : (k, v) Script_typed_ir.map) =
+    let map_iter (type k v) (map : (k, v) Script_typed_ir.map) =
+      let (module Box) = Script_map.get_module map in
       atomic_step_cost (cost_N_IMap_iter Box.size)
 
     let map_size = atomic_step_cost cost_N_IMap_size
@@ -1236,8 +1243,11 @@ module Cost_of = struct
 
     let dupn n = atomic_step_cost (cost_N_IDupN n)
 
-    let sapling_verify_update ~inputs ~outputs =
-      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs)
+    let sapling_verify_update ~inputs ~outputs ~bound_data =
+      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs bound_data)
+
+    let sapling_verify_update_deprecated ~inputs ~outputs =
+      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs 0)
 
     let sapling_empty_state = atomic_step_cost cost_N_ISapling_empty_state
 
@@ -1277,6 +1287,8 @@ module Cost_of = struct
 
     let now = atomic_step_cost cost_N_INow
 
+    let min_block_time = atomic_step_cost cost_N_IMin_block_time
+
     let source = atomic_step_cost cost_N_ISource
 
     let sender = atomic_step_cost cost_N_ISender
@@ -1300,7 +1312,9 @@ module Cost_of = struct
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
     let open_chest ~chest ~time =
-      let plaintext = Timelock.get_plaintext_size chest in
+      let plaintext =
+        Script_typed_ir.Script_timelock.get_plaintext_size chest
+      in
       let log_time = Z.log2 Z.(add one time) in
       atomic_step_cost (cost_N_IOpen_chest ~chest:plaintext ~time:log_time)
 
@@ -1353,6 +1367,10 @@ module Cost_of = struct
       let sz = Signature.Public_key_hash.size + entrypoint_size in
       atomic_step_cost (cost_N_ICompare sz sz)
 
+    (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
+        Refine the gas model *)
+    let compare_tx_rollup_l2_address = atomic_step_cost (cost_N_ICompare 48 48)
+
     let compare_chain_id = atomic_step_cost (S.safe_int 30)
 
     (* Defunctionalized CPS *)
@@ -1367,23 +1385,24 @@ module Cost_of = struct
           a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
        fun ty x y acc k ->
         match ty with
-        | Unit_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_unit) k
-        | Never_key _ -> ( match x with _ -> .)
-        | Bool_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_bool) k
-        | String_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
-        | Signature_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_signature) k
-        | Bytes_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
-        | Mutez_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
-        | Int_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
-        | Nat_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
-        | Key_hash_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
-        | Key_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_key) k
-        | Timestamp_key _ ->
+        | Unit_t -> (apply [@tailcall]) Gas.(acc +@ compare_unit) k
+        | Never_t -> ( match x with _ -> .)
+        | Bool_t -> (apply [@tailcall]) Gas.(acc +@ compare_bool) k
+        | String_t -> (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
+        | Signature_t -> (apply [@tailcall]) Gas.(acc +@ compare_signature) k
+        | Bytes_t -> (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
+        | Mutez_t -> (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
+        | Int_t -> (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
+        | Nat_t -> (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
+        | Key_hash_t -> (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
+        | Key_t -> (apply [@tailcall]) Gas.(acc +@ compare_key) k
+        | Timestamp_t ->
             (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
-        | Address_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
-        | Chain_id_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
-        | Pair_key ((tl, _), (tr, _), _) ->
+        | Address_t -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
+        | Tx_rollup_l2_address_t ->
+            (apply [@tailcall]) Gas.(acc +@ compare_tx_rollup_l2_address) k
+        | Chain_id_t -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
+        | Pair_t (tl, tr, _, YesYes) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
             let (xl, xr) = x in
             let (yl, yr) = y in
@@ -1393,7 +1412,7 @@ module Cost_of = struct
               yl
               Gas.(acc +@ compare_pair_tag)
               (Compare (tr, xr, yr, k))
-        | Union_key ((tl, _), (tr, _), _) -> (
+        | Union_t (tl, tr, _, YesYes) -> (
             match (x, y) with
             | (L x, L y) ->
                 (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
@@ -1401,7 +1420,7 @@ module Cost_of = struct
             | (R _, L _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
             | (R x, R y) ->
                 (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k)
-        | Option_key (t, _) -> (
+        | Option_t (t, _, Yes) -> (
             match (x, y) with
             | (None, None) ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
@@ -1419,58 +1438,38 @@ module Cost_of = struct
       compare ty x y Gas.free Return
      [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
-    let view_mem (elt : Script_string.t)
-        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
+    let set_mem (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
-      let per_elt_cost =
-        compare (Script_typed_ir.string_key ~annot:None) elt elt
-      in
-      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
-      let intercept = atomic_step_cost (S.safe_int 80) in
-      Gas.(intercept +@ (log2 size *@ per_elt_cost))
-
-    let view_get = view_mem
-
-    let view_update (elt : Script_string.t)
-        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
-      let open S_syntax in
-      let per_elt_cost =
-        compare (Script_typed_ir.string_key ~annot:None) elt elt
-      in
-      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
-      let intercept = atomic_step_cost (S.safe_int 80) in
-      Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
-
-    let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
-      let open S_syntax in
-      let per_elt_cost = compare Box.elt_ty elt elt in
+      let (module Box) = Script_set.get set in
+      let per_elt_cost = Box.OPS.elt_size elt |> Size.to_int |> S.safe_int in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 115) in
       Gas.(intercept +@ (log2 size *@ per_elt_cost))
 
-    let set_update (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
+    let set_update (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
-      let per_elt_cost = compare Box.elt_ty elt elt in
+      let (module Box) = Script_set.get set in
+      let per_elt_cost = Box.OPS.elt_size elt |> Size.to_int |> S.safe_int in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 130) in
       (* The 2 factor reflects the update vs mem overhead as benchmarked
          on non-structured data *)
       Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
 
-    let map_mem (type k v) (elt : k) ((module Box) : (k, v) Script_typed_ir.map)
-        =
+    let map_mem (type k v) (elt : k) (map : (k, v) Script_typed_ir.map) =
       let open S_syntax in
-      let per_elt_cost = compare Box.key_ty elt elt in
+      let (module Box) = Script_map.get_module map in
+      let per_elt_cost = Box.OPS.key_size elt |> Size.to_int |> S.safe_int in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 80) in
       Gas.(intercept +@ (log2 size *@ per_elt_cost))
 
     let map_get = map_mem
 
-    let map_update (type k v) (elt : k)
-        ((module Box) : (k, v) Script_typed_ir.map) =
+    let map_update (type k v) (elt : k) (map : (k, v) Script_typed_ir.map) =
       let open S_syntax in
-      let per_elt_cost = compare Box.key_ty elt elt in
+      let (module Box) = Script_map.get_module map in
+      let per_elt_cost = Box.OPS.key_size elt |> Size.to_int |> S.safe_int in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 80) in
       (* The 2 factor reflects the update vs mem overhead as benchmarked
@@ -1478,14 +1477,21 @@ module Cost_of = struct
       Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
 
     let map_get_and_update (type k v) (elt : k)
-        ((module Box) : (k, v) Script_typed_ir.map) =
+        (map : (k, v) Script_typed_ir.map) =
       let open S_syntax in
-      let per_elt_cost = compare Box.key_ty elt elt in
+      let (module Box) = Script_map.get_module map in
+      let per_elt_cost = Box.OPS.key_size elt |> Size.to_int |> S.safe_int in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 80) in
       (* The 3 factor reflects the update vs mem overhead as benchmarked
          on non-structured data *)
       Gas.(intercept +@ (S.safe_int 3 * log2 size *@ per_elt_cost))
+
+    let view_get (elt : Script_string.t) (m : Script_typed_ir.view_map) =
+      map_get elt m
+
+    let view_update (elt : Script_string.t) (m : Script_typed_ir.view_map) =
+      map_update elt m
 
     let join_tickets :
         'a Script_typed_ir.comparable_ty ->
@@ -1510,7 +1516,7 @@ module Cost_of = struct
 
       let view_exit = atomic_step_cost cost_N_KView_exit
 
-      let map_head = atomic_step_cost const_N_KMap_head
+      let map_head = atomic_step_cost cost_N_KMap_head
 
       let undip = atomic_step_cost cost_N_KUndip
 
@@ -1648,7 +1654,7 @@ module Cost_of = struct
     let contract_optimized = key_hash_optimized
 
     (* Reasonable approximation *)
-    let contract_readable = key_hash_readable
+    let contract_readable = Gas.(S.safe_int 2 *@ key_hash_readable)
 
     let bls12_381_g1 = atomic_step_cost cost_DECODING_BLS_G1
 
@@ -1659,7 +1665,7 @@ module Cost_of = struct
     let check_printable s =
       atomic_step_cost (cost_CHECK_PRINTABLE (String.length s))
 
-    let merge_cycle = atomic_step_cost cost_MERGE_TYPES
+    let merge_cycle = atomic_step_cost cost_TY_EQ
 
     let parse_type_cycle = atomic_step_cost cost_PARSE_TYPE
 
@@ -1667,20 +1673,23 @@ module Cost_of = struct
 
     let parse_data_cycle = atomic_step_cost cost_TYPECHECKING_DATA
 
-    let comparable_ty_of_ty_cycle = atomic_step_cost cost_COMPARABLE_TY_OF_TY
-
     (* Cost of a cycle of checking that a type is dupable *)
     (* TODO: bench *)
     let check_dupable_cycle = atomic_step_cost cost_TYPECHECKING_DATA
+
+    let find_entrypoint_cycle = atomic_step_cost cost_FIND_ENTRYPOINT
 
     let bool = free
 
     let unit = free
 
-    let timestamp_readable = atomic_step_cost cost_TIMESTAMP_READABLE_DECODING
+    let timestamp_readable s =
+      atomic_step_cost
+        (cost_TIMESTAMP_READABLE_DECODING ~bytes:(String.length s))
 
-    (* Reasonable estimate. *)
-    let contract = Gas.(S.safe_int 2 *@ public_key_readable)
+    (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
+        Refine the gas model *)
+    let tx_rollup_l2_address = bls12_381_g1
 
     (* Balance stored at /contracts/index/hash/balance, on 64 bits *)
     let contract_exists =
@@ -1778,27 +1787,31 @@ module Cost_of = struct
       atomic_step_cost
       @@ cost_UNPARSE_TYPE Script_typed_ir.(ty_size ty |> Type_size.to_int)
 
-    let unparse_comparable_type comp_ty =
-      atomic_step_cost
-      @@ cost_UNPARSE_COMPARABLE_TYPE
-           Script_typed_ir.(comparable_ty_size comp_ty |> Type_size.to_int)
-
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 
     let unparse_data_cycle = atomic_step_cost cost_UNPARSING_DATA
 
     let unit = Gas.free
 
-    (* Reasonable estimate. *)
-    let contract = Gas.(S.safe_int 2 *@ public_key_readable)
+    (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
+        Refine the gas model *)
+    let tx_rollup_l2_address = bls12_381_g1
 
     (* Reuse 006 costs. *)
     let operation bytes = Script.bytes_node_cost bytes
 
     let sapling_transaction (t : Sapling.transaction) =
+      let inputs = Size.sapling_transaction_inputs t in
+      let outputs = Size.sapling_transaction_outputs t in
+      let bound_data = Size.sapling_transaction_bound_data t in
+      atomic_step_cost
+        (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs ~bound_data)
+
+    let sapling_transaction_deprecated (t : Sapling.Legacy.transaction) =
       let inputs = List.length t.inputs in
       let outputs = List.length t.outputs in
-      atomic_step_cost (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs)
+      atomic_step_cost
+        (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs ~bound_data:0)
 
     let sapling_diff (d : Sapling.diff) =
       let nfs = List.length d.nullifiers in

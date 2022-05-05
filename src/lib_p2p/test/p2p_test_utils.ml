@@ -50,8 +50,9 @@ type 'a timeout_t = {time : float; msg : 'a -> string}
      [timeout] is exceed an error is raised. There is a Lwt cooperation
      point. *)
 let wait_pred ?timeout ~pred ~arg () =
+  let open Lwt_result_syntax in
   let rec inner_wait_pred () =
-    Lwt.pause () >>= fun () ->
+    let*! () = Lwt.pause () in
     if not (pred arg) then inner_wait_pred () else return_unit
   in
   match timeout with
@@ -59,15 +60,16 @@ let wait_pred ?timeout ~pred ~arg () =
   | Some timeout ->
       Lwt.pick
         [
-          ( Lwt_unix.sleep timeout.time >>= fun () ->
-            Error_monad.fail (Timeout_exceed (timeout.msg arg)) );
+          (let*! () = Lwt_unix.sleep timeout.time in
+           tzfail (Timeout_exceed (timeout.msg arg)));
           inner_wait_pred ();
         ]
 
 let wait_pred_s ?timeout ~pred ~arg () =
+  let open Lwt_result_syntax in
   let rec inner_wait_pred () =
-    Lwt.pause () >>= fun () ->
-    pred arg >>= fun cond ->
+    let*! () = Lwt.pause () in
+    let*! cond = pred arg in
     if not cond then inner_wait_pred () else return_unit
   in
   match timeout with
@@ -75,8 +77,8 @@ let wait_pred_s ?timeout ~pred ~arg () =
   | Some timeout ->
       Lwt.pick
         [
-          ( Lwt_unix.sleep timeout.time >>= fun () ->
-            Error_monad.fail (Timeout_exceed (timeout.msg arg)) );
+          (let*! () = Lwt_unix.sleep timeout.time in
+           tzfail (Timeout_exceed (timeout.msg arg)));
           inner_wait_pred ();
         ]
 
@@ -133,6 +135,7 @@ let conn_meta_config : unit P2p_params.conn_meta_config =
   }
 
 let rec listen ?port addr =
+  let open Lwt_syntax in
   let tentative_port =
     match port with None -> 49152 + Random.int 16384 | Some port -> port
   in
@@ -141,8 +144,7 @@ let rec listen ?port addr =
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
   Lwt.catch
     (fun () ->
-      Lwt_unix.bind main_socket (ADDR_INET (uaddr, tentative_port))
-      >>= fun () ->
+      let* () = Lwt_unix.bind main_socket (ADDR_INET (uaddr, tentative_port)) in
       Lwt_unix.listen main_socket 1 ;
       Lwt.return (main_socket, tentative_port))
     (function
@@ -152,39 +154,50 @@ let rec listen ?port addr =
       | exn -> Lwt.fail exn)
 
 let rec sync_nodes nodes =
-  List.iter_ep (fun p -> Process.receive p) nodes >>=? fun () ->
-  List.iter_ep (fun p -> Process.send p ()) nodes >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () = List.iter_ep (fun p -> Process.receive p) nodes in
+  let* () = List.iter_ep (fun p -> Process.send p ()) nodes in
   sync_nodes nodes
 
 let sync_nodes nodes =
-  sync_nodes nodes >>= function
+  let open Lwt_result_syntax in
+  let*! r = sync_nodes nodes in
+  match r with
   | Ok () | Error (Exn End_of_file :: _) -> return_unit
   | Error _ as err -> Lwt.return err
 
 let run_nodes client server =
-  listen !addr >>= fun (main_socket, port) ->
-  Process.detach ~prefix:"server: " (fun channel ->
-      let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      server channel sched main_socket >>=? fun () ->
-      P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
-  >>=? fun server_node ->
-  Process.detach ~prefix:"client: " (fun channel ->
-      (Lwt_utils_unix.safe_close main_socket >>= function
-       | Error trace ->
-           Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-           Lwt.return_unit
-       | Ok () -> Lwt.return_unit)
-      >>= fun () ->
-      let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      client channel sched !addr port >>=? fun () ->
-      P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
-  >>=? fun client_node ->
+  let open Lwt_result_syntax in
+  let*! (main_socket, port) = listen !addr in
+  let* server_node =
+    Process.detach ~prefix:"server: " (fun channel ->
+        let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
+        let* () = server channel sched main_socket in
+        let*! () = P2p_io_scheduler.shutdown sched in
+        return_unit)
+  in
+  let* client_node =
+    Process.detach ~prefix:"client: " (fun channel ->
+        let*! () =
+          let*! r = Lwt_utils_unix.safe_close main_socket in
+          match r with
+          | Error trace ->
+              Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
+              Lwt.return_unit
+          | Ok () -> Lwt.return_unit
+        in
+        let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
+        let* () = client channel sched !addr port in
+        let*! () = P2p_io_scheduler.shutdown sched in
+        return_unit)
+  in
   let nodes = [server_node; client_node] in
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
 
 let raw_accept sched main_socket =
-  P2p_fd.accept main_socket >>= fun (fd, sockaddr) ->
+  let open Lwt_syntax in
+  let* (fd, sockaddr) = P2p_fd.accept main_socket in
   let fd = P2p_io_scheduler.register sched fd in
   let point =
     match sockaddr with
@@ -199,8 +212,9 @@ let raw_accept sched main_socket =
    [proof_of_work_target].  *)
 let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
     main_socket =
-  raw_accept sched main_socket >>= fun (fd, point) ->
-  id >>= fun id1 ->
+  let open Lwt_syntax in
+  let* (fd, point) = raw_accept sched main_socket in
+  let* id1 = id in
   P2p_socket.authenticate
     ~canceler
     ~proof_of_work_target
@@ -212,9 +226,10 @@ let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
     conn_meta_config
 
 let raw_connect sched addr port =
-  P2p_fd.socket PF_INET6 SOCK_STREAM 0 >>= fun fd ->
+  let open Lwt_syntax in
+  let* fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-  P2p_fd.connect fd uaddr >>= fun () ->
+  let* () = P2p_fd.connect fd uaddr in
   let fd = P2p_io_scheduler.register sched fd in
   Lwt.return fd
 
@@ -222,7 +237,8 @@ let raw_connect sched addr port =
    and performs [P2p_socket.authenticate] with the given
    [proof_of_work_target]. *)
 let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
-  raw_connect sched addr port >>= fun fd ->
+  let open Lwt_syntax in
+  let* fd = raw_connect sched addr port in
   P2p_socket.authenticate
     ~canceler
     ~proof_of_work_target
@@ -234,5 +250,7 @@ let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
     conn_meta_config
 
 let sync ch =
-  Process.Channel.push ch () >>=? fun () ->
-  Process.Channel.pop ch >>=? fun () -> return_unit
+  let open Lwt_result_syntax in
+  let* () = Process.Channel.push ch () in
+  let* () = Process.Channel.pop ch in
+  return_unit

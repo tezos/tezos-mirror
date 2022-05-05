@@ -24,6 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let max_daysL =
+  (* [= 2932896L] which is less than [Stdlib.max_int] even on 32-bit
+     architecture. This ensures [Int64.to_int] is accurate no matter what. *)
+  let (max_days, _) = Ptime.(Span.to_d_ps (to_span max)) in
+  Int64.of_int max_days
+
+let min_daysL =
+  (* Same as [max_daysL] but min. *)
+  let (min_days, _) = Ptime.(Span.to_d_ps (to_span min)) in
+  Int64.of_int min_days
+
 module Protocol = struct
   type t = int64
 
@@ -41,17 +52,21 @@ module Protocol = struct
     Int64.add s_days (Int64.div ps 1_000_000_000_000L)
 
   let to_ptime t =
-    let days = Int64.to_int (Int64.div t 86_400L) in
+    let daysL = Int64.div t 86_400L in
     let ps = Int64.mul (Int64.rem t 86_400L) 1_000_000_000_000L in
-    let (days, ps) =
+    let (daysL, ps) =
       if ps < 0L then
         (* [Ptime.Span.of_d_ps] only accepts picoseconds in the range 0L-86_399_999_999_999_999L. Subtract a day and add a day's worth of picoseconds if need be. *)
-        (Int.pred days, Int64.(add ps (mul 86_400L 1_000_000_000_000L)))
-      else (days, ps)
+        (Int64.pred daysL, Int64.(add ps (mul 86_400L 1_000_000_000_000L)))
+      else (daysL, ps)
     in
-    match Option.bind (Ptime.Span.of_d_ps (days, ps)) Ptime.of_span with
-    | None -> invalid_arg "Time.Protocol.to_ptime"
-    | Some ptime -> ptime
+    if Compare.Int64.(daysL > max_daysL || daysL < min_daysL) then
+      invalid_arg "Time.Protocol.to_ptime" (* already out of range *)
+    else
+      let days = Int64.to_int daysL in
+      match Option.bind (Ptime.Span.of_d_ps (days, ps)) Ptime.of_span with
+      | None -> invalid_arg "Time.Protocol.to_ptime"
+      | Some ptime -> ptime
 
   let of_notation s =
     match Ptime.of_rfc3339 s with
@@ -140,6 +155,8 @@ module System = struct
 
   type t = Ptime.t
 
+  let now () = Ptime_clock.now ()
+
   include Compare.Make (Ptime)
 
   let epoch = Ptime.epoch
@@ -192,15 +209,19 @@ module System = struct
 
   let of_seconds_opt seconds =
     let x = Int64.abs seconds in
-    let days = Int64.to_int (Int64.div x 86_400L) in
-    let ps = Int64.mul (Int64.rem x 86_400L) 1_000_000_000_000L in
-    match Ptime.Span.of_d_ps (days, ps) with
-    | None -> None
-    | Some span ->
-        let span =
-          if Compare.Int64.(seconds < 0L) then Ptime.Span.neg span else span
-        in
-        Ptime.of_span span
+    let daysL = Int64.div x 86_400L in
+    if Compare.Int64.(daysL > max_daysL || daysL < min_daysL) then None
+      (* already out of range *)
+    else
+      let days = Int64.to_int daysL in
+      let ps = Int64.mul (Int64.rem x 86_400L) 1_000_000_000_000L in
+      match Ptime.Span.of_d_ps (days, ps) with
+      | None -> None
+      | Some span ->
+          let span =
+            if Compare.Int64.(seconds < 0L) then Ptime.Span.neg span else span
+          in
+          Ptime.of_span span
 
   let of_seconds_exn x =
     match of_seconds_opt x with

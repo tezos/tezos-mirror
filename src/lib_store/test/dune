@@ -1,19 +1,25 @@
-(executables
- (names test)
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test)
  (libraries
   tezos-base
   tezos-store
+  tezos-shell-services
   tezos-stdlib-unix
+  tezos-validation
   tezos-embedded-protocol-demo-noops
   tezos-embedded-protocol-genesis
   tezos-embedded-protocol-alpha
   tezos-protocol-alpha-parameters
   tezos-protocol-plugin-alpha
-  tezos-validation
-  alcotest-lwt)
+  alcotest-lwt
+  tezos-test-helpers
+  tezos-test-helpers-extra)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_store
    -open Tezos_shell_services
    -open Tezos_stdlib_unix
@@ -22,5 +28,10 @@
    -open Tezos_protocol_plugin_alpha)))
 
 (rule
- (alias runtest_store)
+ (alias runtest)
+ (package tezos-store)
  (action (setenv SLOW_TEST false (run %{exe:test.exe}))))
+
+(rule
+ (alias test_slow_manual)
+ (action (setenv SLOW_TEST true (run %{exe:test.exe}))))

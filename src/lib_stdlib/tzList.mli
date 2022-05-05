@@ -24,61 +24,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [is_empty l] returns [true] iff [l = []]. *)
-val is_empty : 'a list -> bool
+(** [repeat n x] is [List.of_array (Array.make n x)] but more efficient.
 
-(** [remove nb list] remove the first [nb] elements from the list [list]. *)
-val remove : int -> 'a list -> 'a list
-
-(** [repeat n x] is a list of [n] [x]'s *)
+    If [n < 0] it is the empty list [[]]. *)
 val repeat : int -> 'a -> 'a list
 
-(** [shift (hd :: tl)] computes [tl @ [hd]] *)
-val shift : 'a list -> 'a list
+(** [take_n n l] returns the [n] first elements of [l].
 
-(** [product a b] computes the Cartesian product of two lists [a] and [b]. *)
-val product : 'a list -> 'b list -> ('a * 'b) list
+    If [n < 0] it is the empty list [[]].
+    If [n > List.length l] it is the list [l] in its entirety. *)
+val take_n : int -> 'a list -> 'a list
 
-(** [take_n n l] returns the [n] first elements of [l]. When [compare]
-    is provided, it returns the [n] greatest element of [l]. *)
-val take_n : ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
+(** [rev_take_n n l] is [List.rev (take_n n l)] but more efficient. *)
+val rev_take_n : int -> 'a list -> 'a list
 
-(** [drop_n n l] returns the suffix of [l] after the first [n] elements,
-    or [] if [n > length l]. *)
+(** [drop_n n l] returns the suffix of [l] after the first [n] elements.
+
+    If [n < 0] it is the list [l] in its entirety.
+    If [n > List.length l] it is the empty list [[]]. *)
 val drop_n : int -> 'a list -> 'a list
 
-(** [split_n n l] is a pair of lists [(j, k)] where [j] contains the [n] first
-    elements of [l] and [k] the remainder elements. If [l] has less than or
-    exactly [n] elements, [j] is [l] and [k] is [[]]. *)
+(** [split_n n l] is [(take_n n l, drop_n n l)] but more efficient. *)
 val split_n : int -> 'a list -> 'a list * 'a list
 
-(** [select n l] is ([n]th element of [l], [l] without that element) *)
-val select : int -> 'a list -> 'a * 'a list
-
-(** [rev_sub l n] is [List.rev l] capped to max [n] elements *)
-val rev_sub : 'a list -> int -> 'a list
-
-(** [sub l n] is [l] capped to max [n] elements *)
-val sub : 'a list -> int -> 'a list
-
-(** [shuffle l] is a list that contains the same elements as [l] but in a random
-    order. *)
-val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list
-
-(** Get the index of an element in a list. *)
-val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
-
-(** [filter_some l] returns all [Some] elements of [l] *)
-val filter_some : 'a option list -> 'a list
-
-(** [find_map f l] applies [f] to the elements of [l] in order, and
-    returns the first result of the form [Some v], or [None] if none
-    exist.
-
-    Present in OCaml 4.10: this function can be removed once we catch
-    up. *)
-val find_map : ('a -> 'b option) -> 'a list -> 'b option
-
-(** [fold_left_i f init l] is equivalent to [fold_left] except that
-    the index of the element is passed as a first argument to [f]. *)
-val fold_left_i : (int -> 'b -> 'a -> 'b) -> 'b -> 'a list -> 'b
+(** [rev_split_n n l] is [(rev_take_n n l, drop_n n l)] but more efficient. *)
+val rev_split_n : int -> 'a list -> 'a list * 'a list

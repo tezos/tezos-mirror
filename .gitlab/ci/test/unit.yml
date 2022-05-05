@@ -1,0 +1,160 @@
+.unit_test_template:
+  extends: .test_template
+  variables:
+    ARCH: ""
+    MAKE_TARGETS: ""
+  script:
+    - make $MAKE_TARGETS
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
+    paths:
+      - test_results
+    reports:
+      junit: test_results/*.xml
+    expire_in: 1 day
+    when: always
+
+.unit_test_template_x86_64:
+  extends: .unit_test_template
+  needs: ["build_x86_64"]
+  variables:
+    ARCH: "x86_64"
+
+.unit_test_template_x86_64_coverage:
+  extends:
+    - .unit_test_template_x86_64
+    - .template__coverage_files
+  script:
+    - make $MAKE_TARGETS
+    - ./scripts/ci/merge_coverage.sh
+  artifacts:
+    when: always
+    paths:
+      - $BISECT_FILE
+      - test_results
+
+.unit_test_template_arm64:
+  extends: .unit_test_template
+  needs: ["build_arm64"]
+  variables:
+    ARCH: "arm64"
+  tags:
+    - arm64
+
+unit:012_Psithaca:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  # We use an extra level of indirection for TEST_TARGETS, to avoid
+  # overly long job names causing GitLab CI to silently fail.
+  variables:
+    # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
+    proto_012_Psithaca__lib_protocol__1: >
+        @@src/proto_012_Psithaca/lib_protocol/test/integration/runtest
+        @src/proto_012_Psithaca/lib_protocol/test/integration/consensus/runtest
+        @src/proto_012_Psithaca/lib_protocol/test/integration/gas/runtest
+    proto_012_Psithaca__lib_protocol__2: >
+        @src/proto_012_Psithaca/lib_protocol/test/integration/michelson/runtest
+        @src/proto_012_Psithaca/lib_protocol/test/integration/operations/runtest
+    proto_012_Psithaca__lib_protocol__3: >
+        @src/proto_012_Psithaca/lib_protocol/test/pbt/runtest
+        @src/proto_012_Psithaca/lib_protocol/test/unit/runtest
+    proto_012_Psithaca: >
+        @src/proto_012_Psithaca/lib_benchmark/runtest
+        @src/proto_012_Psithaca/lib_client/runtest
+        @src/proto_012_Psithaca/lib_plugin/runtest
+        @src/proto_012_Psithaca/lib_delegate/runtest
+  parallel:
+    matrix:
+      - TEST_TARGETS:
+          - proto_012_Psithaca__lib_protocol__1
+          - proto_012_Psithaca__lib_protocol__2
+          - proto_012_Psithaca__lib_protocol__3
+          - proto_012_Psithaca
+  script:
+    - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
+
+unit:013_PtJakart:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  # We use an extra level of indirection for TEST_TARGETS, to avoid
+  # overly long job names causing GitLab CI to silently fail.
+  variables:
+    # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
+    proto_013_PtJakart__lib_protocol__1: >
+        @@src/proto_013_PtJakart/lib_protocol/test/integration/runtest
+        @src/proto_013_PtJakart/lib_protocol/test/integration/consensus/runtest
+        @src/proto_013_PtJakart/lib_protocol/test/integration/gas/runtest
+    proto_013_PtJakart__lib_protocol__2: >
+        @src/proto_013_PtJakart/lib_protocol/test/integration/michelson/runtest
+        @src/proto_013_PtJakart/lib_protocol/test/integration/operations/runtest
+    proto_013_PtJakart__lib_protocol__3: >
+        @src/proto_013_PtJakart/lib_protocol/test/pbt/runtest
+        @src/proto_013_PtJakart/lib_protocol/test/unit/runtest
+    proto_013_PtJakart: >
+        @src/proto_013_PtJakart/lib_benchmark/runtest
+        @src/proto_013_PtJakart/lib_client/runtest
+        @src/proto_013_PtJakart/lib_plugin/runtest
+        @src/proto_013_PtJakart/lib_delegate/runtest
+  parallel:
+    matrix:
+      - TEST_TARGETS:
+          - proto_013_PtJakart__lib_protocol__1
+          - proto_013_PtJakart__lib_protocol__2
+          - proto_013_PtJakart__lib_protocol__3
+          - proto_013_PtJakart
+  script:
+    - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
+
+unit:alpha:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  # We use an extra level of indirection for TEST_TARGETS, to avoid
+  # overly long job names causing GitLab CI to silently fail.
+  variables:
+    # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
+    proto_alpha__lib_protocol__1: >
+        @@src/proto_alpha/lib_protocol/test/integration/runtest
+        @src/proto_alpha/lib_protocol/test/integration/consensus/runtest
+        @src/proto_alpha/lib_protocol/test/integration/gas/runtest
+    proto_alpha__lib_protocol__2: >
+        @src/proto_alpha/lib_protocol/test/integration/michelson/runtest
+        @src/proto_alpha/lib_protocol/test/integration/operations/runtest
+    proto_alpha__lib_protocol__3: >
+        @src/proto_alpha/lib_protocol/test/pbt/runtest
+        @src/proto_alpha/lib_protocol/test/unit/runtest
+    proto_alpha: >
+        @src/proto_alpha/lib_benchmark/runtest
+        @src/proto_alpha/lib_client/runtest
+        @src/proto_alpha/lib_plugin/runtest
+        @src/proto_alpha/lib_delegate/runtest
+  parallel:
+    matrix:
+      - TEST_TARGETS:
+          - proto_alpha__lib_protocol__1
+          - proto_alpha__lib_protocol__2
+          - proto_alpha__lib_protocol__3
+          - proto_alpha
+  script:
+    - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
+unit:non-proto-x86_64:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  variables:
+    MAKE_TARGETS: test-nonproto-unit
+
+unit:non-proto-arm64:
+  extends: .unit_test_template_arm64
+  variables:
+    MAKE_TARGETS: test-nonproto-unit
+
+unit:js_components:
+  extends: .unit_test_template_x86_64
+  script:
+    # install node
+    - . ./scripts/install_build_deps.js.sh
+    - make test-js
+
+unit:protocol_compiles:
+  extends: .unit_test_template_x86_64
+  script:
+    - dune build @runtest_compile_protocol

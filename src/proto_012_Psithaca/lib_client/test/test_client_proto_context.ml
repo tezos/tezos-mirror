@@ -32,39 +32,36 @@
 
 open Protocol
 open Alpha_context
-open Qcheck_helpers
+open Qcheck2_helpers
 
 let binary_roundtrip ?pp encoding t =
   let b = Data_encoding.Binary.to_bytes_exn encoding t in
   let actual = Data_encoding.Binary.of_bytes_exn encoding b in
   qcheck_eq' ?pp ~expected:t ~actual ()
 
-let arb_batch_transfer_operation_encoding :
-    Client_proto_context.batch_transfer_operation QCheck.arbitrary =
-  let open QCheck.Gen in
+let gen_batch_transfer_operation_encoding :
+    Client_proto_context.batch_transfer_operation QCheck2.Gen.t =
+  let open QCheck2.Gen in
   let gen_z = sized @@ fun n -> map Z.of_bits (string_size (return n)) in
   let gen_gas_arith_integral =
     map Gas.Arith.integral_of_int_exn (int_range 0 (Int.div Int.max_int 1000))
   in
-  let gen_batch_transfer_operation_encoding =
-    let* destination = string ?gen:None in
-    let* fee = opt string in
-    let* gas_limit = opt gen_gas_arith_integral in
-    let* storage_limit = opt gen_z in
-    let* amount = string ?gen:None in
-    let* arg = opt string in
-    let* entrypoint = opt string in
-    return
-      Client_proto_context.
-        {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint}
-  in
-  QCheck.make gen_batch_transfer_operation_encoding
+  let* destination = string in
+  let* fee = opt string in
+  let* gas_limit = opt gen_gas_arith_integral in
+  let* storage_limit = opt gen_z in
+  let* amount = string in
+  let* arg = opt string in
+  let* entrypoint = opt string in
+  return
+    Client_proto_context.
+      {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint}
 
 let tests =
   [
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"test_batch_transfer_operation_encoding_roundtrip"
-      arb_batch_transfer_operation_encoding
+      gen_batch_transfer_operation_encoding
       (binary_roundtrip Client_proto_context.batch_transfer_operation_encoding);
   ]
 

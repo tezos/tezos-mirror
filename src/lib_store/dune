@@ -1,26 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_store)
  (public_name tezos-store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
   tezos-shell-services
+  tezos-base
+  tezos-version
   index
   irmin-pack
-  tezos-stdlib-unix
   tezos-context
   tezos-validation
   tezos-protocol-updater
+  tezos-stdlib-unix
+  tezos-stdlib
   lwt-watcher
   ringo-lwt
   camlzip
   tar
-  tar-unix)
+  tar-unix
+  prometheus)
  (flags
   (:standard
    -open Tezos_shell_services
    -open Tezos_base
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_context
    -open Tezos_validation
    -open Tezos_protocol_updater

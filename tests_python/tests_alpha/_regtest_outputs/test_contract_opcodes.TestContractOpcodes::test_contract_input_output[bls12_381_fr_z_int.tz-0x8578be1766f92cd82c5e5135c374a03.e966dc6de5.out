@@ -7,17 +7,17 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039994.798 units remaining)
+  - location: 7 (remaining gas: 1039995.433 units remaining)
     [ (Pair 17180093072794558806177035834397932205917577288483739652510482486858834123369
-            0x8578be1766f92cd82c5e5135c374a03a8562e263ea953a3f9711b0153b7fcf2d)  	 ]
-  - location: 7 (remaining gas: 1039994.788 units remaining)
-    [ 17180093072794558806177035834397932205917577288483739652510482486858834123369  	@parameter
-      0x8578be1766f92cd82c5e5135c374a03a8562e263ea953a3f9711b0153b7fcf2d  	@storage ]
-  - location: 8 (remaining gas: 1039994.424 units remaining)
-    [ 0xfaa60dacea8e26112e524d379720fe4f95fbc5a26f1b1a67e229e26ddecbf221  	 ]
-  - location: 9 (remaining gas: 1039994.409 units remaining)
-    [ {}  	
-      0xfaa60dacea8e26112e524d379720fe4f95fbc5a26f1b1a67e229e26ddecbf221  	 ]
-  - location: 11 (remaining gas: 1039994.394 units remaining)
-    [ (Pair {} 0xfaa60dacea8e26112e524d379720fe4f95fbc5a26f1b1a67e229e26ddecbf221)  	 ]
+            0x8578be1766f92cd82c5e5135c374a03a8562e263ea953a3f9711b0153b7fcf2d) ]
+  - location: 7 (remaining gas: 1039995.423 units remaining)
+    [ 17180093072794558806177035834397932205917577288483739652510482486858834123369
+      0x8578be1766f92cd82c5e5135c374a03a8562e263ea953a3f9711b0153b7fcf2d ]
+  - location: 8 (remaining gas: 1039995.124 units remaining)
+    [ 0xfaa60dacea8e26112e524d379720fe4f95fbc5a26f1b1a67e229e26ddecbf221 ]
+  - location: 9 (remaining gas: 1039995.114 units remaining)
+    [ {}
+      0xfaa60dacea8e26112e524d379720fe4f95fbc5a26f1b1a67e229e26ddecbf221 ]
+  - location: 11 (remaining gas: 1039995.104 units remaining)
+    [ (Pair {} 0xfaa60dacea8e26112e524d379720fe4f95fbc5a26f1b1a67e229e26ddecbf221) ]
 

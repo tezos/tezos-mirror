@@ -73,9 +73,13 @@ type t = {
   allow_all_rpc : P2p_point.Id.addr_port_id list;
       (** a list of RPC listening addresses for which a full
           access should be granted *)
+  media_type : Media_type.Command_line.t;
+  metrics_addr : string list;
   operation_metadata_size_limit : int option option;
       (** maximum operation metadata size allowed to be stored on disk *)
 }
+
+val process_command : unit tzresult Lwt.t -> unit Cmdliner.Term.ret
 
 module Term : sig
   val args : t Cmdliner.Term.t

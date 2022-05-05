@@ -41,34 +41,39 @@ let base_dir_arg =
       ("data directory\n\
         The directory where the Tezos codec will output logs.\n\
         By default: '" ^ default_base_dir ^ "'.")
-    (parameter (fun _ctxt x -> return x))
+    (parameter (fun _ctxt x -> Lwt.return_ok x))
 
 let global_options = Clic.args1 base_dir_arg
 
 let parse_config_args argv =
+  let open Lwt_result_syntax in
   (* The context used during argument parsing. We switch to a real context
      that is created based on some of the parsed arguments. *)
   let ctxt = Client_context.null_printer in
-  Clic.parse_global_options global_options ctxt argv
-  >>=? fun (base_dir, argv) ->
-  (match base_dir with
-  | None ->
-      let base_dir = default_base_dir in
-      (if Sys.file_exists base_dir then Lwt.return_unit
-      else Lwt_utils_unix.create_dir base_dir)
-      >>= fun () -> return base_dir
-  | Some dir ->
-      if not (Sys.file_exists dir) then
-        failwith
-          "Specified -base-dir does not exist. Please create the directory and \
-           try again."
-      else if not (Sys.is_directory dir) then
-        failwith "Specified -base-dir must be a directory"
-      else return dir)
-  >>=? fun base_dir -> return (base_dir, argv)
+  let* (base_dir, argv) = Clic.parse_global_options global_options ctxt argv in
+  let* base_dir =
+    match base_dir with
+    | None ->
+        let base_dir = default_base_dir in
+        let*! () =
+          if Sys.file_exists base_dir then Lwt.return_unit
+          else Lwt_utils_unix.create_dir base_dir
+        in
+        return base_dir
+    | Some dir ->
+        if not (Sys.file_exists dir) then
+          failwith
+            "Specified -base-dir does not exist. Please create the directory \
+             and try again."
+        else if not (Sys.is_directory dir) then
+          failwith "Specified -base-dir must be a directory"
+        else return dir
+  in
+  return (base_dir, argv)
 
 (* Main (lwt) entry *)
 let main commands =
+  let open Lwt_result_syntax in
   let executable_name = Filename.basename Sys.executable_name in
   let run () =
     let (argv, autocomplete) =
@@ -97,8 +102,8 @@ let main commands =
           Format.err_formatter
           (if Unix.isatty Unix.stderr then Ansi else Plain)
           Short) ;
-    Internal_event_unix.init () >>= fun () ->
-    parse_config_args argv >>=? fun (base_dir, argv) ->
+    let*! () = Tezos_base_unix.Internal_event_unix.init () in
+    let* (base_dir, argv) = parse_config_args argv in
     let ctxt = new Client_context_unix.unix_logger ~base_dir in
     let commands =
       Clic.add_manual
@@ -110,25 +115,29 @@ let main commands =
     in
     match autocomplete with
     | Some (prev_arg, cur_arg, script) ->
-        Clic.autocompletion
-          ~script
-          ~cur_arg
-          ~prev_arg
-          ~args:argv
-          ~global_options
-          commands
-          ctxt
-        >>=? fun completions ->
+        let* completions =
+          Clic.autocompletion
+            ~script
+            ~cur_arg
+            ~prev_arg
+            ~args:argv
+            ~global_options
+            commands
+            ctxt
+        in
         List.iter print_endline completions ;
         return_unit
     | None -> Clic.dispatch commands ctxt argv
   in
   Stdlib.exit
     (Lwt_main.run
-       ( (Lwt.catch run (function
-              | Failure msg -> failwith "%s" msg
-              | exn -> failwith "%s" (Printexc.to_string exn))
-          >>= function
+       (let*! retcode =
+          let*! r =
+            Lwt.catch run (function
+                | Failure msg -> failwith "%s" msg
+                | exn -> failwith "%s" (Printexc.to_string exn))
+          in
+          match r with
           | Ok () -> Lwt.return 0
           | Error [Clic.Version] ->
               let version = Tezos_version.Bin_version.version_string in
@@ -148,10 +157,10 @@ let main commands =
                 ~global_options
                 ~default:Error_monad.pp
                 errs ;
-              Lwt.return 1)
-       >>= fun retcode ->
-         Format.pp_print_flush Format.err_formatter () ;
-         Format.pp_print_flush Format.std_formatter () ;
-         Lwt.return retcode ))
+              Lwt.return 1
+        in
+        Format.pp_print_flush Format.err_formatter () ;
+        Format.pp_print_flush Format.std_formatter () ;
+        Lwt.return retcode))
 
 let () = main commands

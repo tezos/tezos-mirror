@@ -1,7 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_validation)
  (public_name tezos-validation)
  (instrumentation (backend bisect_ppx))
+ (instrumentation (backend tezos-time-measurement))
  (libraries
   tezos-base
   tezos-context
@@ -11,8 +15,7 @@
   tezos-stdlib-unix)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
-   -open Tezos_stdlib_unix
+   -open Tezos_base.TzPervasives
    -open Tezos_context
    -open Tezos_shell_context
    -open Tezos_shell_services

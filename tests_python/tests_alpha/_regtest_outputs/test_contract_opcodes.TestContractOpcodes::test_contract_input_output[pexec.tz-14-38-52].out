@@ -7,41 +7,41 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039989.309 units remaining)
-    [ (Pair 38 14)  	 ]
-  - location: 7 (remaining gas: 1039989.299 units remaining)
-    [ { UNPAIR ; ADD }  	
-      (Pair 38 14)  	 ]
-  - location: 15 (remaining gas: 1039989.289 units remaining)
-    [ (Pair 38 14)  	
-      { UNPAIR ; ADD }  	 ]
-  - location: 16 (remaining gas: 1039989.279 units remaining)
-    [ 38  	@parameter
-      14  	@storage
-      { UNPAIR ; ADD }  	 ]
-  - location: 17 (remaining gas: 1039989.264 units remaining)
-    [ 14  	@storage
-      { UNPAIR ; ADD }  	 ]
-  - location: 19 (remaining gas: 1039989.039 units remaining)
-    [ { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } }  	 ]
-  - location: 17 (remaining gas: 1039989.009 units remaining)
-    [ 38  	@parameter
-      { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } }  	 ]
-  - location: 12 (remaining gas: 1039988.999 units remaining)
-    [ 14  	
-      38  	 ]
-  - location: 12 (remaining gas: 1039988.984 units remaining)
-    [ (Pair 14 38)  	@arg ]
-  - location: 13 (remaining gas: 1039988.974 units remaining)
-    [ 14  	
-      38  	 ]
-  - location: 14 (remaining gas: 1039988.919 units remaining)
-    [ 52  	 ]
-  - location: 20 (remaining gas: 1039988.889 units remaining)
-    [ 52  	 ]
-  - location: 21 (remaining gas: 1039988.874 units remaining)
-    [ {}  	
-      52  	 ]
-  - location: 23 (remaining gas: 1039988.859 units remaining)
-    [ (Pair {} 52)  	 ]
+  - location: 7 (remaining gas: 1039990.439 units remaining)
+    [ (Pair 38 14) ]
+  - location: 7 (remaining gas: 1039990.429 units remaining)
+    [ { UNPAIR ; ADD }
+      (Pair 38 14) ]
+  - location: 15 (remaining gas: 1039990.419 units remaining)
+    [ (Pair 38 14)
+      { UNPAIR ; ADD } ]
+  - location: 16 (remaining gas: 1039990.409 units remaining)
+    [ 38
+      14
+      { UNPAIR ; ADD } ]
+  - location: 17 (remaining gas: 1039990.399 units remaining)
+    [ 14
+      { UNPAIR ; ADD } ]
+  - location: 19 (remaining gas: 1039990.194 units remaining)
+    [ { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } } ]
+  - location: 17 (remaining gas: 1039990.174 units remaining)
+    [ 38
+      { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } } ]
+  - location: 12 (remaining gas: 1039990.164 units remaining)
+    [ 14
+      38 ]
+  - location: 12 (remaining gas: 1039990.154 units remaining)
+    [ (Pair 14 38) ]
+  - location: 13 (remaining gas: 1039990.144 units remaining)
+    [ 14
+      38 ]
+  - location: 14 (remaining gas: 1039990.109 units remaining)
+    [ 52 ]
+  - location: 20 (remaining gas: 1039990.089 units remaining)
+    [ 52 ]
+  - location: 21 (remaining gas: 1039990.079 units remaining)
+    [ {}
+      52 ]
+  - location: 23 (remaining gas: 1039990.069 units remaining)
+    [ (Pair {} 52) ]
 

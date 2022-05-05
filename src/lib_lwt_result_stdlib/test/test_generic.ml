@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
+module Assert = Lib_test.Assert
 
 module type GEN = sig
   type 'a t
@@ -58,16 +59,16 @@ end
 module Testing = struct
   exception Nope of int
 
-  module Prn = struct
-    let int = string_of_int
+  module Pp = struct
+    let int = Format.pp_print_int
 
-    let res f g = function
-      | Ok o -> "ok(" ^ f o ^ ")"
-      | Error e -> "error(" ^ g e ^ ")"
+    let res f g ppf = function
+      | Ok o -> Format.fprintf ppf "ok(%a)" f o
+      | Error e -> Format.fprintf ppf "error(%a)" g e
 
-    let unit _ = "()"
+    let unit ppf _ = Format.pp_print_string ppf "()"
 
-    let t _ _ = "T"
+    let t _ ppf _ = Format.pp_print_string ppf "T"
   end
 
   module Iter = struct
@@ -79,17 +80,23 @@ module Testing = struct
 
     let exn_now _ = raise (Nope 2048)
 
-    let prn = Prn.(res unit int)
+    let pp = Pp.(res unit int)
 
-    let eq a b = Assert.equal ~prn a b
+    let eq a b = Assert.equal ~pp a b
 
-    let eq_s a b = b >|= fun b -> Assert.equal ~prn a b
+    let eq_s a b =
+      let+ b = b in
+      Assert.equal ~pp a b
 
     let eq_s_catch a b =
-      Lwt.catch
-        (fun () -> b () >>= Lwt.return_ok)
-        (function Nope d -> Lwt.return_error d | exc -> raise exc)
-      >|= fun rb -> Assert.equal ~prn:Prn.(res prn int) a rb
+      let+ rb =
+        Lwt.catch
+          (fun () ->
+            let* x = b () in
+            Lwt.return_ok x)
+          (function Nope d -> Lwt.return_error d | exc -> raise exc)
+      in
+      Assert.equal ~pp:Pp.(res pp int) a rb
   end
 
   module Folder = struct
@@ -101,17 +108,23 @@ module Testing = struct
 
     let exn_now _ _ = raise (Nope 2048)
 
-    let prn = Prn.(res int int)
+    let pp = Pp.(res int int)
 
-    let eq a b = Assert.equal ~prn a b
+    let eq a b = Assert.equal ~pp a b
 
-    let eq_s a b = b >|= fun b -> Assert.equal ~prn a b
+    let eq_s a b =
+      let+ b = b in
+      eq a b
 
     let eq_s_catch a b =
-      Lwt.catch
-        (fun () -> b () >>= Lwt.return_ok)
-        (function Nope d -> Lwt.return_error d | exc -> raise exc)
-      >|= fun rb -> Assert.equal ~prn:Prn.(res prn int) a rb
+      let+ rb =
+        Lwt.catch
+          (fun () ->
+            let* x = b () in
+            Lwt.return_ok x)
+          (function Nope d -> Lwt.return_error d | exc -> raise exc)
+      in
+      Assert.equal ~pp:Pp.(res pp int) a rb
   end
 
   (* NOTE: the functor is necessary to avoid a type escaping its scope latter on *)
@@ -124,17 +137,24 @@ module Testing = struct
 
     let exn_now _ = raise (Nope 2048)
 
-    let prn : ('a G.t, int) result -> string = Prn.(res (t int) int)
+    let pp : Format.formatter -> ('a G.t, int) result -> unit =
+      Pp.(res (t int) int)
 
-    let eq a b = Assert.equal ~prn a b
+    let eq a b = Assert.equal ~pp a b
 
-    let eq_s a b = b >|= fun b -> Assert.equal ~prn a b
+    let eq_s a b =
+      let+ b = b in
+      Assert.equal ~pp a b
 
     let eq_s_catch a b =
-      Lwt.catch
-        (fun () -> b () >>= Lwt.return_ok)
-        (function Nope d -> Lwt.return_error d | exc -> raise exc)
-      >|= fun rb -> Assert.equal ~prn:Prn.(res prn int) a rb
+      let+ rb =
+        Lwt.catch
+          (fun () ->
+            let* x = b () in
+            Lwt.return_ok x)
+          (function Nope d -> Lwt.return_error d | exc -> raise exc)
+      in
+      Assert.equal ~pp:Pp.(res pp int) a rb
   end
 end
 
@@ -151,25 +171,22 @@ struct
     (* error with error *)
     eq (Error 3) @@ iter_e (e 3) (up 100) ;
     (* lwt with exception *)
-    (eq_s_catch (Error 4) @@ fun () -> iter_es (exn_es 4) (up 100))
-    >>= fun () ->
+    let* () = eq_s_catch (Error 4) @@ fun () -> iter_es (exn_es 4) (up 100) in
     (* lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> iter_es exn_now (up 100))
-    >>= fun () ->
+    let* () = eq_s_catch (Error 2048) @@ fun () -> iter_es exn_now (up 100) in
     (* error-lwt with exception *)
-    (eq_s_catch (Error 5) @@ fun () -> iter_es (exn_es 5) (up 100))
-    >>= fun () ->
+    let* () = eq_s_catch (Error 5) @@ fun () -> iter_es (exn_es 5) (up 100) in
     (* error-lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> iter_es exn_now (up 100))
-    >>= fun () ->
+    let* () = eq_s_catch (Error 2048) @@ fun () -> iter_es exn_now (up 100) in
     (* error-lwt with error *)
-    eq_s (Error 6) @@ iter_es (es 6) (up 100) >>= fun () -> Lwt.return_unit
+    let* () = eq_s (Error 6) @@ iter_es (es 6) (up 100) in
+    Lwt.return_unit
 
   let test_has_side_effects _ _ =
     let witness = ref 0 in
     (* vanilla, uninterrupted iter *)
     iter (fun _ -> incr witness) (up 10) ;
-    Assert.equal ~msg:"vanilla iter" ~prn:Testing.Prn.int 11 !witness ;
+    Assert.equal ~msg:"vanilla iter" ~pp:Testing.Pp.int 11 !witness ;
     (* error interrupted iter *)
     let ie =
       iter_e
@@ -182,25 +199,27 @@ struct
     | Error n ->
         Assert.equal
           ~msg:"unexpected error in result iter"
-          ~prn:Testing.Prn.int
+          ~pp:Testing.Pp.int
           10
           n ;
-        Assert.equal ~msg:"result iter" ~prn:Testing.Prn.int 22 !witness
+        Assert.equal ~msg:"result iter" ~pp:Testing.Pp.int 22 !witness
     | Ok () -> Assert.equal ~msg:"unexpected success in result iter" true false) ;
     (* lwt-error interrupted iter *)
-    iter_es
-      (fun m ->
-        incr witness ;
-        es 10 m)
-      (up 29)
-    >|= function
+    let+ r =
+      iter_es
+        (fun m ->
+          incr witness ;
+          es 10 m)
+        (up 29)
+    in
+    match r with
     | Error n ->
         Assert.equal
           ~msg:"unexpected error in lwt-result iter"
-          ~prn:Testing.Prn.int
+          ~pp:Testing.Pp.int
           10
           n ;
-        Assert.equal ~msg:"lwt-result iter" ~prn:Testing.Prn.int 33 !witness
+        Assert.equal ~msg:"lwt-result iter" ~pp:Testing.Pp.int 33 !witness
     | Ok () ->
         Assert.equal ~msg:"unexpected success in lwt-result iter" true false
 
@@ -229,19 +248,23 @@ struct
     (* error with error *)
     eq (Error 3) @@ fold_left_e (e 3) (-10) (up 100) ;
     (* lwt with exception *)
-    (eq_s_catch (Error 4) @@ fun () -> fold_left_es (exn_es 4) (-10) (up 100))
-    >>= fun () ->
+    let* () =
+      eq_s_catch (Error 4) @@ fun () -> fold_left_es (exn_es 4) (-10) (up 100)
+    in
     (* lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> fold_left_es exn_now (-10) (up 100))
-    >>= fun () ->
+    let* () =
+      eq_s_catch (Error 2048) @@ fun () -> fold_left_es exn_now (-10) (up 100)
+    in
     (* error-lwt with exception *)
-    (eq_s_catch (Error 5) @@ fun () -> fold_left_es (exn_es 5) (-10) (up 100))
-    >>= fun () ->
+    let* () =
+      eq_s_catch (Error 5) @@ fun () -> fold_left_es (exn_es 5) (-10) (up 100)
+    in
     (* error-lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> fold_left_es exn_now (-10) (up 100))
-    >>= fun () ->
+    let* () =
+      eq_s_catch (Error 2048) @@ fun () -> fold_left_es exn_now (-10) (up 100)
+    in
     (* error-lwt with error *)
-    eq_s (Error 6) @@ fold_left_es (es 6) (-10) (up 100) >>= fun () ->
+    let* () = eq_s (Error 6) @@ fold_left_es (es 6) (-10) (up 100) in
     Lwt.return_unit
 
   let tests = [Alcotest_lwt.test_case "fail-early" `Quick test_fail_early]
@@ -265,15 +288,16 @@ struct
     (* error with error *)
     eq (Error 3) @@ map_e (e 3) (up 100) ;
     (* lwt with exception *)
-    (eq_s_catch (Error 4) @@ fun () -> map_es (exn_es 4) (up 100)) >>= fun () ->
+    let* () = eq_s_catch (Error 4) @@ fun () -> map_es (exn_es 4) (up 100) in
     (* lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100)) >>= fun () ->
+    let* () = eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100) in
     (* error-lwt with exception *)
-    (eq_s_catch (Error 5) @@ fun () -> map_es (exn_es 5) (up 100)) >>= fun () ->
+    let* () = eq_s_catch (Error 5) @@ fun () -> map_es (exn_es 5) (up 100) in
     (* error-lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100)) >>= fun () ->
+    let* () = eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100) in
     (* error-lwt with error *)
-    eq_s (Error 6) @@ map_es (es 6) (up 100) >>= fun () -> Lwt.return_unit
+    let* () = eq_s (Error 6) @@ map_es (es 6) (up 100) in
+    Lwt.return_unit
 
   let tests = [Alcotest_lwt.test_case "fail-early" `Quick test_fail_early]
 end

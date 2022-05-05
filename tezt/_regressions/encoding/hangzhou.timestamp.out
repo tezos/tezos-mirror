@@ -1,7 +1,0 @@
-tezt/_regressions/encoding/hangzhou.timestamp.out
-
-./tezos-codec encode 011-PtHangz2.timestamp from '"2020-04-20T16:19:59Z"'
-000000005e9dcbaf
-
-./tezos-codec decode 011-PtHangz2.timestamp from 000000005e9dcbaf
-"2020-04-20T16:19:59Z"

@@ -1,19 +1,19 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/faucet.tz]
 
 Well typed
-Gas remaining: 1039986.830 units remaining
+Gas remaining: 1039988.070 units remaining
 { parameter key_hash ;
   storage timestamp ;
   code { UNPAIR
-         /* [ @parameter key_hash : @storage timestamp ] */ ;
+         /* [ key_hash : timestamp ] */ ;
          SWAP
-         /* [ @storage timestamp : @parameter key_hash ] */ ;
+         /* [ timestamp : key_hash ] */ ;
          PUSH int 300
-         /* [ int : @storage timestamp : @parameter key_hash ] */ ;
+         /* [ int : timestamp : key_hash ] */ ;
          ADD @FIVE_MINUTES_LATER
-         /* [ @FIVE_MINUTES_LATER timestamp : @parameter key_hash ] */ ;
+         /* [ timestamp : key_hash ] */ ;
          NOW
-         /* [ @now timestamp : @FIVE_MINUTES_LATER timestamp : @parameter key_hash ] */ ;
+         /* [ timestamp : timestamp : key_hash ] */ ;
          ASSERT_CMPGE ;
          IMPLICIT_ACCOUNT
          /* [ contract unit ] */ ;
@@ -29,7 +29,7 @@ Gas remaining: 1039986.830 units remaining
          /* [ operation : list operation ] */ ;
          CONS
          /* [ list operation ] */ ;
-         DIP { NOW /* [ @now timestamp ] */ }
-         /* [ list operation : @now timestamp ] */ ;
+         DIP { NOW /* [ timestamp ] */ }
+         /* [ list operation : timestamp ] */ ;
          PAIR
-         /* [ pair (list operation) (timestamp @now) ] */ } }
+         /* [ pair (list operation) timestamp ] */ } }

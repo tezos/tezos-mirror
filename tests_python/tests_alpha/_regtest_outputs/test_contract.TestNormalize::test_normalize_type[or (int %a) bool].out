@@ -1,0 +1,3 @@
+tests_alpha/test_contract.py::TestNormalize::test_normalize_type[or (int %a) bool]
+
+or int bool

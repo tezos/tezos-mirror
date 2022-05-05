@@ -54,6 +54,7 @@ struct
     \ - $TEZOS_SIGNER_HTTP_HOST and $TEZOS_SIGNER_HTTP_PORT (default: 6732),\n\
     \ - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
 
+  include Client_keys.Signature_type
   module Socket = Socket.Make (S)
   module Http = Http.Make (RPC_client) (S)
   module Https = Https.Make (RPC_client) (S)
@@ -87,33 +88,41 @@ struct
     | _ -> assert false
 
   let public_key pk_uri =
-    Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t))
-    >>?= Remote.public_key
+    let open Lwt_result_syntax in
+    let*? v = Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)) in
+    Remote.public_key v
 
   let public_key_hash pk_uri =
-    Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t))
-    >>?= Remote.public_key_hash
+    let open Lwt_result_syntax in
+    let*? v = Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)) in
+    Remote.public_key_hash v
 
   let import_secret_key ~io:_ = public_key_hash
 
   let neuterize sk_uri =
-    Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t) >>?= return
+    let open Lwt_result_syntax in
+    let*? v = Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t) in
+    return v
 
   let sign ?watermark sk_uri msg =
-    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) >>?= fun sk_uri ->
+    let open Lwt_result_syntax in
+    let*? sk_uri = Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) in
     Remote.sign ?watermark sk_uri msg
 
   let deterministic_nonce sk_uri msg =
-    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) >>?= fun sk_uri ->
+    let open Lwt_result_syntax in
+    let*? sk_uri = Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) in
     Remote.deterministic_nonce sk_uri msg
 
   let deterministic_nonce_hash sk_uri msg =
-    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) >>?= fun sk_uri ->
+    let open Lwt_result_syntax in
+    let*? sk_uri = Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) in
     Remote.deterministic_nonce_hash sk_uri msg
 
   let supports_deterministic_nonces sk_uri =
-    Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t))
-    >>?= Remote.supports_deterministic_nonces
+    let open Lwt_result_syntax in
+    let*? v = Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) in
+    Remote.supports_deterministic_nonces v
 end
 
 let make_sk sk =
@@ -125,6 +134,7 @@ let make_pk pk =
     (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
 
 let read_base_uri_from_env () =
+  let open Lwt_result_syntax in
   match
     ( Sys.getenv_opt "TEZOS_SIGNER_UNIX_PATH",
       Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST",

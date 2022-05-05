@@ -181,7 +181,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
       (* TODO-TB change this *)
       let head = match blocks with hd :: _ -> hd | _ -> assert false in
       let blocks =
-        List.remove (length - Int32.to_int (Raw_level.diff last first)) head
+        List.drop_n (length - Int32.to_int (Raw_level.diff last first)) head
       in
       if Int32.equal level (Raw_level.to_int32 last) then
         return (hash :: blocks)

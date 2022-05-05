@@ -1,0 +1,48 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (static (flags (:standard -ccopt -static))))
+
+(executable
+ (name main_sc_rollup_node_013_PtJakart)
+ (public_name tezos-sc-rollup-node-013-PtJakart)
+ (package tezos-sc-rollup-node-013-PtJakart)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-client-commands
+  tezos-stdlib-unix
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-client-013-PtJakart
+  tezos-context.encoding
+  tezos-context.helpers
+  tezos-protocol-013-PtJakart
+  tezos-protocol-plugin-013-PtJakart
+  tezos-protocol-013-PtJakart-parameters
+  tezos-rpc
+  tezos-rpc-http
+  tezos-rpc-http-server
+  tezos-shell-services
+  tezos-sc-rollup-013-PtJakart
+  data-encoding
+  irmin-pack
+  irmin-pack.unix
+  irmin
+  ringo
+  ringo-lwt)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_client_commands
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base
+   -open Tezos_client_base_unix
+   -open Tezos_client_013_PtJakart
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_protocol_plugin_013_PtJakart
+   -open Tezos_protocol_013_PtJakart_parameters
+   -open Tezos_rpc
+   -open Tezos_shell_services
+   -open Tezos_sc_rollup_013_PtJakart)))

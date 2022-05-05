@@ -192,23 +192,25 @@ module Info = struct
 
   module File = struct
     let load path peer_metadata_encoding =
+      let open Lwt_result_syntax in
       let enc = Data_encoding.list (encoding peer_metadata_encoding) in
       if path <> "/dev/null" && Sys.file_exists path then
-        Lwt_utils_unix.Json.read_file path >>=? fun json ->
+        let* json = Lwt_utils_unix.Json.read_file path in
         return (Data_encoding.Json.destruct enc json)
       else return_nil
 
     let save path peer_metadata_encoding peers =
+      let open Lwt_result_syntax in
       let open Data_encoding in
       (* [Lwt_unix.rename source target] function requires to have [source] and
          [target] in the same hard disk partition. To almost ensure that, the
          temporary file is created in the same directory as the final file. *)
       let tempfile = path ^ ".tmp" in
-      Lwt_utils_unix.Json.write_file tempfile
-      @@ Json.construct (list (encoding peer_metadata_encoding)) peers
-      >>=? fun () ->
-      protect (fun () ->
-          Lwt_unix.rename tempfile path >>= fun () -> return_unit)
+      let* () =
+        Lwt_utils_unix.Json.write_file tempfile
+        @@ Json.construct (list (encoding peer_metadata_encoding)) peers
+      in
+      protect (fun () -> Lwt_result.ok @@ Lwt_unix.rename tempfile path)
   end
 
   let watch {watchers; _} = Lwt_watcher.create_stream watchers
@@ -220,6 +222,12 @@ let get {Info.state; _} = state
 
 let is_disconnected {Info.state; _} =
   match state with Disconnected -> true | Accepted _ | Running _ -> false
+
+let is_accepted {Info.state; _} =
+  match state with Accepted _ -> true | Disconnected | Running _ -> false
+
+let is_running {Info.state; _} =
+  match state with Running _ -> true | Disconnected | Accepted _ -> false
 
 let set_accepted ~timestamp peer_info current_point cancel =
   assert (

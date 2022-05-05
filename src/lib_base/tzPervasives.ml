@@ -48,6 +48,9 @@ module String = struct
 
     let hash = Hashtbl.seeded_hash
   end)
+
+  module Map = Tezos_error_monad.TzLwtreslib.Map.Make (String)
+  module Set = Tezos_error_monad.TzLwtreslib.Set.Make (String)
 end
 
 module Time = Time
@@ -72,9 +75,18 @@ module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 include Utils.Infix
 include Error_monad
+
+module Option_syntax =
+  Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax
+
+module Lwt_option_syntax =
+  Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_option_syntax
+
 module Internal_event = Internal_event
 
 module Filename = struct
   include Stdlib.Filename
   include Tezos_stdlib.TzFilename
 end
+
+module Bounded = Bounded

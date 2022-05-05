@@ -135,7 +135,7 @@ module Axis : sig
 
   val return : 'a -> ('a, 'k) t
 
-  val ( >>= ) : ('a, 'k) t -> ('a -> ('b, 'k) t) -> ('b, 'k) t
+  val ( let* ) : ('a, 'k) t -> ('a -> ('b, 'k) t) -> ('b, 'k) t
 
   val run : ('a, 'k) t -> Pytypes.pyobject -> 'a
 
@@ -175,7 +175,7 @@ end = struct
 
   let return : 'a -> ('a, 'k) t = fun x ~ax -> ignore ax ; x
 
-  let ( >>= ) : 'k. ('a, 'k) t -> ('a -> ('b, 'k) t) -> ('b, 'k) t =
+  let ( let* ) : 'k. ('a, 'k) t -> ('a -> ('b, 'k) t) -> ('b, 'k) t =
     fun (type dim) (m : ('a, dim) t) (f : 'a -> ('b, dim) t) ->
      let res ~ax =
        let r = m ~ax in
@@ -367,7 +367,7 @@ type 'a t = matplotlib_state -> 'a
 
 let return : 'a -> 'a t = fun x _ -> x
 
-let ( >>= ) (m : 'a t) (f : 'a -> 'b t) : 'b t = fun state -> f (m state) state
+let ( let* ) (m : 'a t) (f : 'a -> 'b t) : 'b t = fun state -> f (m state) state
 
 let run ?figsize ~nrows ~ncols (plot : 'a t) =
   let (xfig, yfig) =
@@ -433,8 +433,8 @@ let rec perform_scatter_2d (data : (dim2 scatter_data * style) list) =
       match scatter_data with
       | Dim2Scatter {xs; ys} ->
           Axis.(
-            perform_scatter_2d more
-            >>= fun () -> scatter_2d ~xs ~ys ~color ~shape) )
+            let* () = perform_scatter_2d more in
+            scatter_2d ~xs ~ys ~color ~shape) )
 
 let rec perform_scatter_3d (data : (dim3 scatter_data * style) list) =
   match data with
@@ -445,8 +445,8 @@ let rec perform_scatter_3d (data : (dim3 scatter_data * style) list) =
       match scatter_data with
       | Dim3Scatter {xs; ys; zs} ->
           Axis.(
-            perform_scatter_3d more
-            >>= fun () -> scatter_3d ~xs ~ys ~zs ~color ~shape) )
+            let* () = perform_scatter_3d more in
+            scatter_3d ~xs ~ys ~zs ~color ~shape) )
 
 let scatter (type dim) (s : dim scatter) : (unit, dim) Axis.t =
   match s with
@@ -454,30 +454,26 @@ let scatter (type dim) (s : dim scatter) : (unit, dim) Axis.t =
     match axes with
     | Dim2Axes {xaxis; yaxis} ->
         Axis.(
-          set_xlabel xaxis
-          >>= fun () ->
-          set_ylabel yaxis
-          >>= fun () -> set_title title >>= fun () -> perform_scatter_2d data)
+          let* () = set_xlabel xaxis in
+          let* () = set_ylabel yaxis in
+          let* () = set_title title in
+          perform_scatter_2d data)
     | Dim3Axes {xaxis; yaxis; zaxis} ->
         Axis.(
-          set_xlabel xaxis
-          >>= fun () ->
-          set_ylabel yaxis
-          >>= fun () ->
-          set_zlabel zaxis
-          >>= fun () -> set_title title >>= fun () -> perform_scatter_3d data)
+          let* () = set_xlabel xaxis in
+          let* () = set_ylabel yaxis in
+          let* () = set_zlabel zaxis in
+          let* () = set_title title in
+          perform_scatter_3d data)
     )
 
 let histogram (h : histogram) : (unit, dim2) Axis.t =
   match h with
   | Histogram {data; options; axes = Dim2Axes {xaxis; yaxis}; title} -> (
       Axis.(
-        set_xlabel xaxis
-        >>= fun () ->
-        set_ylabel yaxis
-        >>= fun () ->
-        set_title title
-        >>= fun () ->
+        let* () = set_xlabel xaxis in
+        let* () = set_ylabel yaxis in
+        let* () = set_title title in
         match options with
         | None ->
             histogram_1d ~h:data ~opts:{bins = None; range = None}

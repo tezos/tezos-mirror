@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.vote.listings.out
+encoding/ithaca.vote.listings.out
 
 ./tezos-codec encode 012-Psithaca.vote.listings from '[
   {

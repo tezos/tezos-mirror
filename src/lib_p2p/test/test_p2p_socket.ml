@@ -39,26 +39,33 @@ include Internal_event.Legacy_logging.Make (struct
 end)
 
 let tzassert b pos =
+  let open Lwt_result_syntax in
   let p (file, lnum, cnum, _) = (file, lnum, cnum) in
-  if b then return_unit else fail (Exn (Assert_failure (p pos)))
+  if b then return_unit else fail_with_exn (Assert_failure (p pos))
 
 let high_pow_target = Crypto_box.make_pow_target 100.
 
 let sync ch =
-  Process.Channel.push ch () >>=? fun () ->
-  Process.Channel.pop ch >>=? fun () -> return_unit
+  let open Lwt_result_syntax in
+  let* () = Process.Channel.push ch () in
+  let* () = Process.Channel.pop ch in
+  return_unit
 
 (** [connect ?target_id ?proof_of_work_target sched addr port] connect
-   and performs [P2p_socket.authenticate] with the given
-   [proof_of_work_target] (also checking that the remote point is the
-   expected [target_id]). *)
+    and performs [P2p_socket.authenticate] with the given
+    [proof_of_work_target] (also checking that the remote point is the
+    expected [target_id]). *)
 let connect ?proof_of_work_target ?(target_id = id1) sched addr port id =
-  P2p_test_utils.connect ?proof_of_work_target sched addr port id
-  >>=? fun (info, auth_fd) ->
-  target_id >>= fun id1 ->
-  tzassert (not info.incoming) __POS__ >>=? fun () ->
-  tzassert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0) __POS__
-  >>=? fun () -> return auth_fd
+  let open Lwt_result_syntax in
+  let* (info, auth_fd) =
+    P2p_test_utils.connect ?proof_of_work_target sched addr port id
+  in
+  let*! id1 = target_id in
+  let* () = tzassert (not info.incoming) __POS__ in
+  let* () =
+    tzassert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0) __POS__
+  in
+  return auth_fd
 
 let is_connection_closed = function
   | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) -> true
@@ -100,11 +107,13 @@ module Crypto_test = struct
   let () = assert (tag_length >= header_length)
 
   let write_chunk fd cryptobox_data msg =
+    let open Lwt_result_syntax in
     let msg_length = Bytes.length msg in
-    fail_unless
-      (msg_length <= max_content_length)
-      Tezos_p2p_services.P2p_errors.Invalid_message_size
-    >>=? fun () ->
+    let* () =
+      fail_unless
+        (msg_length <= max_content_length)
+        Tezos_p2p_services.P2p_errors.Invalid_message_size
+    in
     let encrypted_length = tag_length + msg_length in
     let payload_length = header_length + encrypted_length in
     let tag = Bytes.make tag_length '\x00' in
@@ -116,35 +125,38 @@ module Crypto_test = struct
     TzEndian.set_int16 payload 0 encrypted_length ;
     Bytes.blit tag 0 payload header_length tag_length ;
     Bytes.blit cmsg 0 payload extrabytes msg_length ;
-    return (Unix.write fd payload 0 payload_length) >>=? fun i ->
+    let* i = return (Unix.write fd payload 0 payload_length) in
     tzassert (payload_length = i) __POS__
 
   let read_chunk fd cryptobox_data =
+    let open Lwt_result_syntax in
     let header_buf = Bytes.create header_length in
-    return (Unix.read fd header_buf 0 header_length) >>=? fun i ->
-    tzassert (header_length = i) __POS__ >>=? fun () ->
+    let* i = return (Unix.read fd header_buf 0 header_length) in
+    let* () = tzassert (header_length = i) __POS__ in
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
     assert (encrypted_length >= tag_length) ;
     let msg_length = encrypted_length - tag_length in
     let tag = Bytes.make tag_length '\x00' in
-    return (Unix.read fd tag 0 tag_length) >>=? fun i ->
-    tzassert (tag_length = i) __POS__ >>=? fun () ->
+    let* i = return (Unix.read fd tag 0 tag_length) in
+    let* () = tzassert (tag_length = i) __POS__ in
     let msg = Bytes.make msg_length '\x00' in
-    (if msg_length > 0 then return (Unix.read fd msg 0 msg_length)
-    else return 0)
-    >>=? fun i ->
-    tzassert (msg_length = i) __POS__ >>=? fun () ->
+    let* i =
+      if msg_length > 0 then return (Unix.read fd msg 0 msg_length)
+      else return 0
+    in
+    let* () = tzassert (msg_length = i) __POS__ in
     let remote_nonce = cryptobox_data.remote_nonce in
     cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
-    match
-      Crypto_box.fast_box_open_noalloc
-        cryptobox_data.channel_key
-        remote_nonce
-        tag
-        msg
-    with
-    | false -> fail Tezos_p2p_services.P2p_errors.Decipher_error
-    | true -> return msg
+    let*? () =
+      error_unless
+        (Crypto_box.fast_box_open_noalloc
+           cryptobox_data.channel_key
+           remote_nonce
+           tag
+           msg)
+        Tezos_p2p_services.P2p_errors.Decipher_error
+    in
+    return msg
 
   let (sk, pk, _pkh) = Crypto_box.random_keypair ()
 
@@ -157,20 +169,21 @@ module Crypto_test = struct
   let data = {channel_key; local_nonce = zero_nonce; remote_nonce = zero_nonce}
 
   let wrap () =
-    Alcotest.test_case "ACK" `Quick (fun () ->
-        Lwt_main.run
-          (let msg = Bytes.of_string "test" in
-           write_chunk out_fd data msg >>= fun _ ->
-           read_chunk in_fd data >>= function
-           | Ok res when Bytes.equal msg res -> Lwt.return_unit
-           | Ok res ->
-               Format.kasprintf
-                 Stdlib.failwith
-                 "Error : %s <> %s"
-                 (Bytes.to_string res)
-                 (Bytes.to_string msg)
-           | Error error ->
-               Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
+    Alcotest_lwt.test_case "ACK" `Quick (fun _ () ->
+        let open Lwt_syntax in
+        let msg = Bytes.of_string "test" in
+        let* _ = write_chunk out_fd data msg in
+        let* r = read_chunk in_fd data in
+        match r with
+        | Ok res when Bytes.equal msg res -> Lwt.return_unit
+        | Ok res ->
+            Format.kasprintf
+              Stdlib.failwith
+              "Error : %s <> %s"
+              (Bytes.to_string res)
+              (Bytes.to_string msg)
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 end
 
 (** Spawns a client and a server. The client connects to the server
@@ -183,12 +196,14 @@ module Pow_check = struct
     | _ -> false
 
   let server _ch sched socket =
-    accept ~proof_of_work_target:high_pow_target sched socket >>= fun res ->
+    let open Lwt_syntax in
+    let* res = accept ~proof_of_work_target:high_pow_target sched socket in
     tzassert (is_failing res) __POS__
 
   let client _ch sched addr port =
-    id2 >>= fun id ->
-    connect sched addr port id >>= fun conn ->
+    let open Lwt_syntax in
+    let* id = id2 in
+    let* conn = connect sched addr port id in
     tzassert (is_connection_closed conn) __POS__
 
   let run _dir = run_nodes client server
@@ -203,19 +218,24 @@ module Low_level = struct
   let simple_msg = Rand.generate (1 lsl 4)
 
   let client ch sched addr port =
+    let open Lwt_result_syntax in
     let msg = Bytes.create (Bytes.length simple_msg) in
-    raw_connect sched addr port >>= fun fd ->
-    P2p_buffer_reader.(
-      read_full (P2p_io_scheduler.to_readable fd) @@ mk_buffer_safe msg)
-    >>=? fun () ->
-    tzassert (Bytes.compare simple_msg msg = 0) __POS__ >>=? fun () ->
-    sync ch >>=? fun () -> P2p_io_scheduler.close fd
+    let*! fd = raw_connect sched addr port in
+    let* () =
+      P2p_buffer_reader.(
+        read_full (P2p_io_scheduler.to_readable fd) @@ mk_buffer_safe msg)
+    in
+    let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
+    let* () = sync ch in
+    P2p_io_scheduler.close fd
 
   let server ch sched socket =
-    raw_accept sched socket >>= fun (fd, _point) ->
-    P2p_io_scheduler.write fd simple_msg >>=? fun () ->
-    sync ch >>=? fun () ->
-    P2p_io_scheduler.close fd >>=? fun _ -> return_unit
+    let open Lwt_result_syntax in
+    let*! (fd, _point) = raw_accept sched socket in
+    let* () = P2p_io_scheduler.write fd simple_msg in
+    let* () = sync ch in
+    let* _ = P2p_io_scheduler.close fd in
+    return_unit
 
   let run _dir = run_nodes client server
 end
@@ -236,18 +256,23 @@ module Nack = struct
         false
 
   let server ch sched socket =
-    accept sched socket >>=? fun (info, auth_fd) ->
-    tzassert info.incoming __POS__ >>=? fun () ->
-    id2 >>= fun id2 ->
-    tzassert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __POS__
-    >>=? fun () ->
-    P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
+    let open Lwt_result_syntax in
+    let* (info, auth_fd) = accept sched socket in
+    let* () = tzassert info.incoming __POS__ in
+    let*! id2 = id2 in
+    let* () =
+      tzassert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __POS__
+    in
+    let*! () = P2p_socket.nack auth_fd P2p_rejection.No_motive [] in
+    sync ch
 
   let client ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept ~canceler auth_fd encoding >>= fun conn ->
-    tzassert (is_rejected conn) __POS__ >>=? fun () -> sync ch
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let*! conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = tzassert (is_rejected conn) __POS__ in
+    sync ch
 
   let run _dir = run_nodes client server
 end
@@ -260,14 +285,18 @@ module Nacked = struct
   let encoding = Data_encoding.bytes
 
   let server ch sched socket =
-    accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding >>= fun conn ->
-    tzassert (Nack.is_rejected conn) __POS__ >>=? fun () -> sync ch
+    let open Lwt_result_syntax in
+    let* (_info, auth_fd) = accept sched socket in
+    let*! conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = tzassert (Nack.is_rejected conn) __POS__ in
+    sync ch
 
   let client ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let*! () = P2p_socket.nack auth_fd P2p_rejection.No_motive [] in
+    sync ch
 
   let run _dir = run_nodes client server
 end
@@ -285,23 +314,27 @@ module Simple_message = struct
   let simple_msg2 = Rand.generate (1 lsl 4)
 
   let server ch sched socket =
-    accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    P2p_socket.write_sync conn simple_msg >>=? fun () ->
-    P2p_socket.read conn >>=? fun (_msg_size, msg) ->
-    tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ >>=? fun () ->
-    sync ch >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let* (_info, auth_fd) = accept sched socket in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = P2p_socket.write_sync conn simple_msg in
+    let* (_msg_size, msg) = P2p_socket.read conn in
+    let* () = tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ in
+    let* () = sync ch in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let client ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    P2p_socket.write_sync conn simple_msg2 >>=? fun () ->
-    P2p_socket.read conn >>=? fun (_msg_size, msg) ->
-    tzassert (Bytes.compare simple_msg msg = 0) __POS__ >>=? fun () ->
-    sync ch >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = P2p_socket.write_sync conn simple_msg2 in
+    let* (_msg_size, msg) = P2p_socket.read conn in
+    let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
+    let* () = sync ch in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let run _dir = run_nodes client server
 end
@@ -319,25 +352,31 @@ module Chunked_message = struct
   let simple_msg2 = Rand.generate (1 lsl 8)
 
   let server ch sched socket =
-    accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler ~binary_chunks_size:21 auth_fd encoding
-    >>=? fun conn ->
-    P2p_socket.write_sync conn simple_msg >>=? fun () ->
-    P2p_socket.read conn >>=? fun (_msg_size, msg) ->
-    tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ >>=? fun () ->
-    sync ch >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let* (_info, auth_fd) = accept sched socket in
+    let* conn =
+      P2p_socket.accept ~canceler ~binary_chunks_size:21 auth_fd encoding
+    in
+    let* () = P2p_socket.write_sync conn simple_msg in
+    let* (_msg_size, msg) = P2p_socket.read conn in
+    let* () = tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ in
+    let* () = sync ch in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let client ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept ~canceler ~binary_chunks_size:21 auth_fd encoding
-    >>=? fun conn ->
-    P2p_socket.write_sync conn simple_msg2 >>=? fun () ->
-    P2p_socket.read conn >>=? fun (_msg_size, msg) ->
-    tzassert (Bytes.compare simple_msg msg = 0) __POS__ >>=? fun () ->
-    sync ch >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let* conn =
+      P2p_socket.accept ~canceler ~binary_chunks_size:21 auth_fd encoding
+    in
+    let* () = P2p_socket.write_sync conn simple_msg2 in
+    let* (_msg_size, msg) = P2p_socket.read conn in
+    let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
+    let* () = sync ch in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let run _dir = run_nodes client server
 end
@@ -359,23 +398,27 @@ module Oversized_message = struct
   let simple_msg2 = rand_gen ()
 
   let server ch sched socket =
-    accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    P2p_socket.write_sync conn simple_msg >>=? fun () ->
-    P2p_socket.read conn >>=? fun (_msg_size, msg) ->
-    tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ >>=? fun () ->
-    sync ch >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let* (_info, auth_fd) = accept sched socket in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = P2p_socket.write_sync conn simple_msg in
+    let* (_msg_size, msg) = P2p_socket.read conn in
+    let* () = tzassert (Bytes.compare simple_msg2 msg = 0) __POS__ in
+    let* () = sync ch in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let client ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    P2p_socket.write_sync conn simple_msg2 >>=? fun () ->
-    P2p_socket.read conn >>=? fun (_msg_size, msg) ->
-    tzassert (Bytes.compare simple_msg msg = 0) __POS__ >>=? fun () ->
-    sync ch >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = P2p_socket.write_sync conn simple_msg2 in
+    let* (_msg_size, msg) = P2p_socket.read conn in
+    let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
+    let* () = sync ch in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let run _dir = run_nodes client server
 end
@@ -388,19 +431,23 @@ module Close_on_read = struct
   let encoding = Data_encoding.bytes
 
   let server ch sched socket =
-    accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    sync ch >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let* (_info, auth_fd) = accept sched socket in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = sync ch in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let client ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    sync ch >>=? fun () ->
-    P2p_socket.read conn >>= fun err ->
-    tzassert (is_connection_closed err) __POS__ >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = sync ch in
+    let*! err = P2p_socket.read conn in
+    let* () = tzassert (is_connection_closed err) __POS__ in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let run _dir = run_nodes client server
 end
@@ -415,20 +462,24 @@ module Close_on_write = struct
   let simple_msg = Rand.generate (1 lsl 4)
 
   let server ch sched socket =
-    accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    P2p_socket.close conn >>= fun _stat ->
-    sync ch >>=? fun () -> return_unit
+    let open Lwt_result_syntax in
+    let* (_info, auth_fd) = accept sched socket in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let*! _stat = P2p_socket.close conn in
+    let* () = sync ch in
+    return_unit
 
   let client ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    sync ch >>=? fun () ->
-    Lwt_unix.sleep 0.1 >>= fun () ->
-    P2p_socket.write_sync conn simple_msg >>= fun err ->
-    tzassert (is_connection_closed err) __POS__ >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = sync ch in
+    let*! () = Lwt_unix.sleep 0.1 in
+    let*! err = P2p_socket.write_sync conn simple_msg in
+    let* () = tzassert (is_connection_closed err) __POS__ in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let run _dir = run_nodes client server
 end
@@ -455,20 +506,24 @@ module Garbled_data = struct
     buf
 
   let server _ch sched socket =
-    accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    P2p_socket.raw_write_sync conn garbled_msg >>=? fun () ->
-    P2p_socket.read conn >>= fun err ->
-    tzassert (is_connection_closed err) __POS__ >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let* (_info, auth_fd) = accept sched socket in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let* () = P2p_socket.raw_write_sync conn garbled_msg in
+    let*! err = P2p_socket.read conn in
+    let* () = tzassert (is_connection_closed err) __POS__ in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let client _ch sched addr port =
-    id2 >>= fun id2 ->
-    connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
-    P2p_socket.read conn >>= fun err ->
-    tzassert (is_decoding_error err) __POS__ >>=? fun () ->
-    P2p_socket.close conn >>= fun _stat -> return_unit
+    let open Lwt_result_syntax in
+    let*! id2 = id2 in
+    let* auth_fd = connect sched addr port id2 in
+    let* conn = P2p_socket.accept ~canceler auth_fd encoding in
+    let*! err = P2p_socket.read conn in
+    let* () = tzassert (is_decoding_error err) __POS__ in
+    let*! _stat = P2p_socket.close conn in
+    return_unit
 
   let run _dir = run_nodes client server
 end
@@ -513,40 +568,43 @@ let spec =
         " Log up to debug msgs even in io_scheduler" );
     ]
 
-let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
+let init_logs =
+  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let wrap n f =
-  Alcotest.test_case n `Quick (fun () ->
-      Lwt_main.run
-        ( Lazy.force init_logs >>= fun () ->
-          f () >>= function
-          | Ok () -> Lwt.return_unit
-          | Error error ->
-              Format.kasprintf Stdlib.failwith "%a" pp_print_trace error ))
+  Alcotest_lwt.test_case n `Quick (fun _ () ->
+      let open Lwt_syntax in
+      let* () = Lazy.force init_logs in
+      let* r = f () in
+      match r with
+      | Ok () -> Lwt.return_unit
+      | Error error ->
+          Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
-  Alcotest.run
-    ~argv:[|""|]
-    "tezos-p2p"
-    [
-      ( "p2p-connection.",
-        [
-          wrap "low-level" Low_level.run;
-          wrap "pow" Pow_check.run;
-          wrap "nack" Nack.run;
-          wrap "nacked" Nacked.run;
-          wrap "simple-message" Simple_message.run;
-          wrap "chunked-message" Chunked_message.run;
-          wrap "oversized-message" Oversized_message.run;
-          wrap "close-on-read" Close_on_read.run;
-          wrap "close-on-write" Close_on_write.run;
-          wrap "garbled-data" Garbled_data.run;
-          Crypto_test.wrap ();
-        ] );
-    ]
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-p2p"
+       [
+         ( "p2p-connection.",
+           [
+             wrap "low-level" Low_level.run;
+             wrap "pow" Pow_check.run;
+             wrap "nack" Nack.run;
+             wrap "nacked" Nacked.run;
+             wrap "simple-message" Simple_message.run;
+             wrap "chunked-message" Chunked_message.run;
+             wrap "oversized-message" Oversized_message.run;
+             wrap "close-on-read" Close_on_read.run;
+             wrap "close-on-write" Close_on_write.run;
+             wrap "garbled-data" Garbled_data.run;
+             Crypto_test.wrap ();
+           ] );
+       ]
 
 let () =
   Sys.catch_break true ;

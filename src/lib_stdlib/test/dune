@@ -1,12 +1,15 @@
-(tests
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
  (names
   test_bits
   test_tzList
   test_bounded_heap
   test_tzString
   test_fallbackArray
-  test_functionalArray)
- (package tezos-stdlib)
+  test_functionalArray
+  test_hash_queue)
  (modes native js)
  (libraries
   tezos-stdlib
@@ -14,7 +17,44 @@
   bigstring
   tezos-test-helpers
   qcheck-alcotest)
- (flags (:standard -open Tezos_stdlib)))
+ (js_of_ocaml)
+ (flags (:standard
+         -open Tezos_stdlib)))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_bits.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_tzList.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_bounded_heap.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_tzString.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_fallbackArray.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_functionalArray.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_hash_queue.exe})))
 
 (rule
  (alias runtest_js)
@@ -45,3 +85,8 @@
  (alias runtest_js)
  (package tezos-stdlib)
  (action (run node %{dep:./test_functionalArray.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_hash_queue.bc.js})))

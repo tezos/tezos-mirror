@@ -92,7 +92,7 @@ module V0toV3
 
   let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
       ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
-    return (fun _ ->
+    Lwt.return_ok (fun _ ->
         Lwt.return
           (Error_monad.error_with
              "element_of_key called on environment protocol < V3"))
@@ -177,16 +177,18 @@ struct
   include P
 
   let init context header =
-    Context.Cache.set_cache_layout context [] >>= fun context ->
+    let open Lwt_syntax in
+    let* context = Context.Cache.set_cache_layout context [] in
     init context header
 
   let begin_partial_application ~chain_id ~ancestor_context
-      ~predecessor_timestamp ~predecessor_fitness raw_block =
+      ~(predecessor : Block_header.t) ~predecessor_hash:_ ~cache:_
+      (raw_block : block_header) =
     begin_partial_application
       ~chain_id
       ~ancestor_context
-      ~predecessor_timestamp
-      ~predecessor_fitness
+      ~predecessor_timestamp:predecessor.shell.timestamp
+      ~predecessor_fitness:predecessor.shell.fitness
       raw_block
 
   let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp

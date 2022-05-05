@@ -1,29 +1,29 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "tezos-tooling" { with-test }
   "dune" { >= "2.9" }
+  "tezos-stdlib"
   "tezos-base"
-  "tezos-benchmark"
-  "tezos-protocol-environment"
-  "tezos-protocol-012-Psithaca"
-  "tezos-012-Psithaca-test-helpers"
-  "tezos-protocol-012-Psithaca-parameters"
+  "tezos-error-monad"
+  "tezos-micheline"
   "tezos-micheline-rewriting"
+  "tezos-benchmark"
   "tezos-benchmark-type-inference-012-Psithaca"
+  "tezos-protocol-012-Psithaca"
+  "tezos-crypto"
+  "tezos-protocol-012-Psithaca-parameters"
   "hashcons"
   "benchmark-utils"
   "tezos-012-Psithaca-test-helpers"
-  "prbnmcn-stats" { = "0.0.2" }
-  "tezos-micheline" { with-test }
-  "tezos-error-monad" { with-test }
-  "alcotest-lwt" { with-test }
-
+  "prbnmcn-stats" { = "0.0.4" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

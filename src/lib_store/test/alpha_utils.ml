@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Assert = Lib_test.Assert
 open Tezos_protocol_alpha.Protocol
 open Alpha_context
 open Tezos_context
@@ -89,12 +90,10 @@ module Account = struct
   let activator_account = new_account ()
 
   let find pkh =
-    try
-      return
-        (Signature.Public_key_hash.Table.find known_accounts pkh
-        |> WithExceptions.Option.to_exn ~none:Not_found)
-    with Not_found ->
-      failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
+    let open Lwt_result_syntax in
+    match Signature.Public_key_hash.Table.find known_accounts pkh with
+    | Some v -> return v
+    | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
   let find_alternate pkh =
     let exception Found of t in
@@ -119,22 +118,64 @@ module Account = struct
     |> WithExceptions.Option.get ~loc:__LOC__
 
   let new_commitment ?seed () =
+    let open Lwt_result_syntax in
     let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
     let unactivated_account = {pkh; pk; sk} in
     let open Commitment in
     let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
     let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
-    (Lwt.return @@ Environment.wrap_tzresult @@ Tez.(one *? 4_000L))
-    >>=? fun amount ->
+    let*? amount = Environment.wrap_tzresult @@ Tez.(one *? 4_000L) in
     return @@ (unactivated_account, {blinded_public_key_hash = bpkh; amount})
 end
 
-let make_rpc_context ctxt =
+let make_rpc_context ~chain_id ctxt block =
+  let open Lwt_result_syntax in
+  let header = Store.Block.shell_header block in
+  let ({
+         timestamp = predecessor_timestamp;
+         level = predecessor_level;
+         fitness = predecessor_fitness;
+         _;
+       }
+        : Block_header.shell_header) =
+    header
+  in
+  let timestamp = Time.System.to_protocol (Tezos_base.Time.System.now ()) in
+  (* We need to forge a predecessor hash to pass it to [value_of_key].
+     This initial context is used for RPC, hence this piece of
+     information is not important and does not have to be meaningful
+  *)
+  let predecessor =
+    Tezos_base.Block_header.hash
+      {shell = header; protocol_data = Store.Block.protocol_data block}
+  in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  (* Wrap mark the cache as non-initialised, we need to initialize
-     again. *)
-  Main.init_cache ctxt >>= fun ctxt ->
-  Lwt.return
+  let*! value_of_key =
+    Main.value_of_key
+      ~chain_id
+      ~predecessor_context:ctxt
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+  in
+  let*? value_of_key =
+    Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult value_of_key
+  in
+  let* ctxt =
+    Tezos_protocol_environment.Context.load_cache
+      (Store.Block.hash block)
+      ctxt
+      `Lazy
+      (fun key ->
+        let*! value = value_of_key key in
+        let*? value =
+          Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult value
+        in
+        return value)
+  in
+  return
   @@ new Environment.proto_rpc_context_of_directory
        (fun block ->
          {
@@ -156,8 +197,10 @@ type baker_policy =
   | Excluding of public_key_hash list
 
 let get_next_baker_by_round rpc_ctxt round block =
-  Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~max_round:(round + 1) block
-  >>=? fun bakers ->
+  let open Lwt_result_syntax in
+  let* bakers =
+    Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~max_round:(round + 1) block
+  in
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
     List.find (fun {Plugin.RPC.Baking_rights.round = p; _} -> p = round) bakers
     |> WithExceptions.Option.get ~loc:__LOC__
@@ -165,15 +208,18 @@ let get_next_baker_by_round rpc_ctxt round block =
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_by_account rpc_ctxt pkh block =
-  Plugin.RPC.Baking_rights.get rpc_ctxt ~delegates:[pkh] ~max_round:256 block
-  >>=? fun bakers ->
+  let open Lwt_result_syntax in
+  let* bakers =
+    Plugin.RPC.Baking_rights.get rpc_ctxt ~delegates:[pkh] ~max_round:256 block
+  in
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
     List.hd bakers |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_excluding rpc_ctxt excludes block =
-  Plugin.RPC.Baking_rights.get rpc_ctxt ~max_round:256 block >>=? fun bakers ->
+  let open Lwt_result_syntax in
+  let* bakers = Plugin.RPC.Baking_rights.get rpc_ctxt ~max_round:256 block in
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
     List.find
       (fun {Plugin.RPC.Baking_rights.delegate; _} ->
@@ -206,14 +252,15 @@ module Forge = struct
 
   let make_contents ~payload_hash ~payload_round
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?(liquidity_baking_escape_vote = false) ~seed_nonce_hash () =
+      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
+      ~seed_nonce_hash () =
     Block_header.
       {
         payload_hash;
         payload_round;
         proof_of_work_nonce;
         seed_nonce_hash;
-        liquidity_baking_escape_vote;
+        liquidity_baking_toggle_vote;
       }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash
@@ -236,7 +283,8 @@ module Forge = struct
   let set_baker baker header = {header with baker}
 
   let sign_header ~chain_id {baker; shell; contents} =
-    Account.find baker >>=? fun delegate ->
+    let open Lwt_result_syntax in
+    let* delegate = Account.find baker in
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -251,27 +299,32 @@ module Forge = struct
     Block_header.{shell; protocol_data = {contents; signature}} |> return
 
   let forge_header rpc_ctxt ?(policy = By_round 0) ?timestamp ~operations pred =
+    let open Lwt_result_syntax in
     let predecessor_round =
       match Fitness.from_raw (Store.Block.fitness pred) with
       | Ok pred_fitness -> Fitness.round pred_fitness
       | _ -> Round.zero
     in
     let proto_level = Store.Block.proto_level pred in
-    dispatch_policy rpc_ctxt policy pred
-    >>=? fun (pkh, round, expected_timestamp) ->
+    let* (pkh, round, expected_timestamp) =
+      dispatch_policy rpc_ctxt policy pred
+    in
     let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ (Store.Block.level pred) in
-    Raw_level.of_int32 level |> Environment.wrap_tzresult >>?= fun raw_level ->
+    let*? raw_level = Raw_level.of_int32 level |> Environment.wrap_tzresult in
     let locked_round = None in
-    Environment.wrap_tzresult (Round.of_int round) >>?= fun round ->
-    Fitness.create ~level:raw_level ~locked_round ~predecessor_round ~round
-    |> Environment.wrap_tzresult
-    >>?= fun fitness ->
+    let*? round = Environment.wrap_tzresult (Round.of_int round) in
+    let*? fitness =
+      Fitness.create ~level:raw_level ~locked_round ~predecessor_round ~round
+      |> Environment.wrap_tzresult
+    in
     let fitness = Fitness.to_raw fitness in
-    (Plugin.RPC.current_level ~offset:1l rpc_ctxt pred >|=? function
-     | {expected_commitment = true; _} -> Some (fst (Proto_nonce.generate ()))
-     | {expected_commitment = false; _} -> None)
-    >>=? fun seed_nonce_hash ->
+    let* seed_nonce_hash =
+      let+ l = Plugin.RPC.current_level ~offset:1l rpc_ctxt pred in
+      match l with
+      | {expected_commitment = true; _} -> Some (fst (Proto_nonce.generate ()))
+      | {expected_commitment = false; _} -> None
+    in
     let operations_hash =
       Operation_list_list_hash.compute
         (List.map
@@ -303,20 +356,26 @@ end
 let protocol_param_key = ["protocol_parameters"]
 
 let check_constants_consistency constants =
-  let open Constants_repr in
+  let open Lwt_result_syntax in
+  let open Constants_parametric_repr in
   let {blocks_per_cycle; blocks_per_commitment; blocks_per_stake_snapshot; _} =
     constants
   in
-  Error_monad.unless (blocks_per_commitment <= blocks_per_cycle) (fun () ->
-      failwith
-        "Inconsistent constants : blocks per commitment must be less than \
-         blocks per cycle")
-  >>=? fun () ->
-  Error_monad.unless (blocks_per_cycle >= blocks_per_stake_snapshot) (fun () ->
-      failwith
-        "Inconsistent constants : blocks per cycle must be superior than \
-         blocks per roll snapshot")
-  >>=? return
+  let* () =
+    Error_monad.unless (blocks_per_commitment <= blocks_per_cycle) (fun () ->
+        failwith
+          "Inconsistent constants : blocks per commitment must be less than \
+           blocks per cycle")
+  in
+  let* () =
+    Error_monad.unless
+      (blocks_per_cycle >= blocks_per_stake_snapshot)
+      (fun () ->
+        failwith
+          "Inconsistent constants : blocks per cycle must be superior than \
+           blocks per stake snapshot")
+  in
+  return_unit
 
 let default_accounts =
   let initial_accounts =
@@ -363,6 +422,7 @@ let default_genesis_parameters =
   }
 
 let patch_context ctxt ~json =
+  let open Lwt_syntax in
   let shell =
     {
       Tezos_base.Block_header.level = 0l;
@@ -378,12 +438,13 @@ let patch_context ctxt ~json =
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  Context.add ctxt ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
-  Context.add ctxt protocol_param_key proto_params >>= fun ctxt ->
+  let* ctxt = Context.add ctxt ["version"] (Bytes.of_string "genesis") in
+  let* ctxt = Context.add ctxt protocol_param_key proto_params in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  Main.init ctxt shell >|= Environment.wrap_tzresult >>= function
-  | Error _ -> assert false
-  | Ok {context; _} -> return (Shell_context.unwrap_disk_context context)
+  let* r = Main.init ctxt shell in
+  match r with
+  | Error e -> failwith "%a" Environment.Error_monad.pp_trace e
+  | Ok {context; _} -> return_ok (Shell_context.unwrap_disk_context context)
 
 let default_patch_context ctxt =
   patch_context
@@ -394,75 +455,90 @@ let default_patch_context ctxt =
 
 let nb_validation_passes = List.length Main.validation_passes
 
-let list_init_exn n f =
-  List.init ~when_negative_length:(Failure "list init exn") n f |> function
-  | Ok x -> x
-  | _ -> assert false
-
-let empty_operations = list_init_exn nb_validation_passes (fun _ -> [])
+let empty_operations =
+  WithExceptions.List.init ~loc:__LOC__ nb_validation_passes (fun _ -> [])
 
 let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
-  make_rpc_context ctxt >>= fun rpc_ctxt ->
+  let open Lwt_result_syntax in
+  let* rpc_ctxt = make_rpc_context ~chain_id ctxt pred in
   let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
       ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
-    Main.value_of_key
+    let*! f =
+      Main.value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+    in
+    let*? f = Environment.wrap_tzresult f in
+    return (fun x ->
+        let*! r = f x in
+        let*? r = Environment.wrap_tzresult r in
+        return r)
+  in
+  let* {shell; contents; baker} =
+    Forge.forge_header rpc_ctxt ?policy ~operations pred
+  in
+  let protocol_data = {Block_header.contents; signature = Signature.zero} in
+  let*! context =
+    match Store.Block.block_metadata_hash pred with
+    | None -> Lwt.return ctxt
+    | Some hash -> Context.add_predecessor_block_metadata_hash ctxt hash
+  in
+  let*! ctxt =
+    match Store.Block.all_operations_metadata_hash pred with
+    | None -> Lwt.return context
+    | Some hash -> Context.add_predecessor_ops_metadata_hash context hash
+  in
+  let predecessor_context = Shell_context.wrap_disk_context ctxt in
+  let* element_of_key =
+    element_of_key
       ~chain_id
       ~predecessor_context
-      ~predecessor_timestamp
-      ~predecessor_level
-      ~predecessor_fitness
-      ~predecessor
-      ~timestamp
-    >|= Environment.wrap_tzresult
-    >>=? fun f -> return (fun x -> f x >|= Environment.wrap_tzresult)
+      ~predecessor_timestamp:(Store.Block.timestamp pred)
+      ~predecessor_level:(Store.Block.level pred)
+      ~predecessor_fitness:(Store.Block.fitness pred)
+      ~predecessor:(Store.Block.hash pred)
+      ~timestamp:shell.timestamp
   in
-  Forge.forge_header rpc_ctxt ?policy ~operations pred
-  >>=? fun {shell; contents; baker} ->
-  let protocol_data = {Block_header.contents; signature = Signature.zero} in
-  (match Store.Block.block_metadata_hash pred with
-  | None -> Lwt.return ctxt
-  | Some hash -> Context.add_predecessor_block_metadata_hash ctxt hash)
-  >>= fun context ->
-  (match Store.Block.all_operations_metadata_hash pred with
-  | None -> Lwt.return context
-  | Some hash -> Context.add_predecessor_ops_metadata_hash context hash)
-  >>= fun ctxt ->
-  let predecessor_context = Shell_context.wrap_disk_context ctxt in
-  element_of_key
-    ~chain_id
-    ~predecessor_context
-    ~predecessor_timestamp:(Store.Block.timestamp pred)
-    ~predecessor_level:(Store.Block.level pred)
-    ~predecessor_fitness:(Store.Block.fitness pred)
-    ~predecessor:(Store.Block.hash pred)
-    ~timestamp:shell.timestamp
-  >>=? fun element_of_key ->
-  Environment_context.Context.load_cache
-    (Store.Block.hash pred)
-    predecessor_context
-    `Lazy
-    element_of_key
-  >>=? fun predecessor_context ->
-  (let open Environment.Error_monad in
-  Main.begin_construction
-    ~chain_id
-    ~predecessor_context
-    ~predecessor_timestamp:(Store.Block.timestamp pred)
-    ~predecessor_level:(Store.Block.level pred)
-    ~predecessor_fitness:(Store.Block.fitness pred)
-    ~predecessor:(Store.Block.hash pred)
-    ~timestamp:shell.timestamp
-    ~protocol_data
-    ()
-  >>=? fun vstate ->
-  List.fold_left_es
-    (fun vstate op ->
-      apply_operation vstate op >>=? fun (state, _result) -> return state)
-    vstate
-    (List.concat operations)
-  >>=? fun vstate -> Main.finalize_block vstate (Some shell))
-  >|= Environment.wrap_tzresult
-  >>=? fun (validation, block_header_metadata) ->
+  let* predecessor_context =
+    Environment_context.Context.load_cache
+      (Store.Block.hash pred)
+      predecessor_context
+      `Lazy
+      element_of_key
+  in
+  let* (validation, block_header_metadata) =
+    let*! r =
+      let open Environment.Error_monad in
+      let* vstate =
+        Main.begin_construction
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp:(Store.Block.timestamp pred)
+          ~predecessor_level:(Store.Block.level pred)
+          ~predecessor_fitness:(Store.Block.fitness pred)
+          ~predecessor:(Store.Block.hash pred)
+          ~timestamp:shell.timestamp
+          ~protocol_data
+          ()
+      in
+      let* vstate =
+        List.fold_left_es
+          (List.fold_left_es (fun vstate op ->
+               let* (state, _result) = apply_operation vstate op in
+               return state))
+          vstate
+          operations
+      in
+      Main.finalize_block vstate (Some shell)
+    in
+    let*? r = Environment.wrap_tzresult r in
+    return r
+  in
   let max_operations_ttl =
     max
       0
@@ -472,8 +548,9 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   in
   let validation = {validation with max_operations_ttl} in
   let context = Shell_context.unwrap_disk_context validation.context in
-  Context.commit ~time:shell.timestamp ?message:validation.message context
-  >>= fun context_hash ->
+  let*! context_hash =
+    Context.commit ~time:shell.timestamp ?message:validation.message context
+  in
   let block_header_metadata =
     Data_encoding.Binary.to_bytes_exn
       Main.block_header_metadata_encoding
@@ -490,7 +567,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   in
   let contents = {contents with payload_hash} in
   let shell = {shell with context = context_hash} in
-  Forge.sign_header ~chain_id {baker; shell; contents} >>=? fun header ->
+  let* header = Forge.sign_header ~chain_id {baker; shell; contents} in
   let protocol_data =
     Data_encoding.Binary.to_bytes_exn
       Main.block_header_data_encoding
@@ -506,7 +583,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
     Some
       (List.map
          (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
-         (list_init_exn 4 (fun _ -> [])))
+         (WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])))
   in
   return
     ( block_header,
@@ -517,14 +594,16 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
 
 let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     ?(operations = empty_operations) pred =
-  Store.Block.context chain_store pred >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ctxt = Store.Block.context chain_store pred in
   let chain_id = Store.Chain.chain_id chain_store in
-  apply ctxt chain_id ~policy ~operations pred
-  >>=? fun ( block_header,
-             block_header_metadata,
-             block_metadata_hash,
-             ops_metadata_hashes,
-             validation ) ->
+  let* ( block_header,
+         block_header_metadata,
+         block_metadata_hash,
+         ops_metadata_hashes,
+         validation ) =
+    apply ctxt chain_id ~policy ~operations pred
+  in
   let context_hash = block_header.shell.context in
   let ops_metadata =
     let operations_metadata =
@@ -563,23 +642,27 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
            Data_encoding.Binary.of_bytes_exn Tezos_base.Operation.encoding op))
       operations
   in
-  Store.Block.store_block
-    chain_store
-    ~block_header
-    ~operations
-    validation_result
-  >>=? function
+  let* o =
+    Store.Block.store_block
+      chain_store
+      ~block_header
+      ~operations
+      validation_result
+  in
+  match o with
   | Some b ->
       if synchronous_merge then (
         let block_store = Store.Unsafe.get_block_store chain_store in
-        Block_store.await_merging block_store >>= fun () ->
-        Store.Chain.set_head chain_store b >>=? fun _ ->
-        Block_store.await_merging block_store >>= fun () ->
+        let*! () = Block_store.await_merging block_store in
+        let* _ = Store.Chain.set_head chain_store b in
+        let*! () = Block_store.await_merging block_store in
         (match Block_store.get_merge_status block_store with
         | Merge_failed err -> Assert.fail_msg "%a" pp_print_trace err
         | Running | Not_running -> ()) ;
         return b)
-      else Store.Chain.set_head chain_store b >>=? fun _ -> return b
+      else
+        let* _ = Store.Chain.set_head chain_store b in
+        return b
   | None ->
       let h = Tezos_base.Block_header.hash block_header in
       Format.eprintf "block %a already stored@." Block_hash.pp h ;
@@ -601,37 +684,52 @@ let bake chain_store ?synchronous_merge ?policy ?operation ?operations pred =
 let get_constants rpc_ctxt b = Alpha_services.Constants.all rpc_ctxt b
 
 let bake_n chain_store ?synchronous_merge ?policy n b =
-  List.fold_left_es
-    (fun (bl, last) _ ->
-      bake ?synchronous_merge chain_store ?policy last >>=? fun b ->
-      return (b :: bl, b))
-    ([], b)
-    (1 -- n)
-  >>=? fun (bl, last) -> return (List.rev bl, last)
+  let open Lwt_result_syntax in
+  let* (bl, last) =
+    List.fold_left_es
+      (fun (bl, last) _ ->
+        let* b = bake ?synchronous_merge chain_store ?policy last in
+        return (b :: bl, b))
+      ([], b)
+      (1 -- n)
+  in
+  return (List.rev bl, last)
 
 let bake_until_cycle_end chain_store ?synchronous_merge ?policy b =
-  Store.Block.context chain_store b >>=? fun ctxt ->
-  make_rpc_context ctxt >>= fun rpc_ctxt ->
-  get_constants rpc_ctxt b
-  >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  let open Lwt_result_syntax in
+  let* ctxt = Store.Block.context chain_store b in
+  let* rpc_ctxt =
+    make_rpc_context ~chain_id:(Store.Chain.chain_id chain_store) ctxt b
+  in
+  let* Constants.{parametric = {blocks_per_cycle; _}; _} =
+    get_constants rpc_ctxt b
+  in
   let current_level = Store.Block.level b in
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
   bake_n ?synchronous_merge chain_store ?policy (Int32.to_int delta) b
 
 let bake_until_n_cycle_end chain_store ?synchronous_merge ?policy n b =
-  List.fold_left_es
-    (fun (bll, last) _ ->
-      bake_until_cycle_end chain_store ?synchronous_merge ?policy last
-      >>=? fun (bl, last) -> return (bl :: bll, last))
-    ([], b)
-    (1 -- n)
-  >>=? fun (bll, last) -> return (List.concat (List.rev bll), last)
+  let open Lwt_result_syntax in
+  let* (bll, last) =
+    List.fold_left_es
+      (fun (bll, last) _ ->
+        let* (bl, last) =
+          bake_until_cycle_end chain_store ?synchronous_merge ?policy last
+        in
+        return (bl :: bll, last))
+      ([], b)
+      (1 -- n)
+  in
+  return (List.concat (List.rev bll), last)
 
 let bake_until_cycle chain_store ?synchronous_merge ?policy cycle b =
-  Store.Block.context chain_store b >>=? fun ctxt ->
-  make_rpc_context ctxt >>= fun rpc_ctxt ->
-  get_constants rpc_ctxt b >>=? fun constants ->
+  let open Lwt_result_syntax in
+  let* ctxt = Store.Block.context chain_store b in
+  let* rpc_ctxt =
+    make_rpc_context ~chain_id:(Store.Chain.chain_id chain_store) ctxt b
+  in
+  let* constants = get_constants rpc_ctxt b in
   let Constants.{parametric = {blocks_per_cycle; _}; _} = constants in
   let rec loop (bl, b) =
     let current_cycle =
@@ -641,11 +739,17 @@ let bake_until_cycle chain_store ?synchronous_merge ?policy cycle b =
     in
     if Int32.equal (Cycle.to_int32 cycle) current_cycle then return (bl, b)
     else
-      bake_until_cycle_end chain_store ?synchronous_merge ?policy b
-      >>=? fun (bl', b') -> loop (bl @ bl', b')
+      let* (bl', b') =
+        bake_until_cycle_end chain_store ?synchronous_merge ?policy b
+      in
+      loop (bl @ bl', b')
   in
   loop ([b], b)
 
 let get_constants chain_store b =
-  Store.Block.context chain_store b >>=? fun ctxt ->
-  make_rpc_context ctxt >>= fun rpc_ctxt -> get_constants rpc_ctxt b
+  let open Lwt_result_syntax in
+  let* ctxt = Store.Block.context chain_store b in
+  let* rpc_ctxt =
+    make_rpc_context ~chain_id:(Store.Chain.chain_id chain_store) ctxt b
+  in
+  get_constants rpc_ctxt b

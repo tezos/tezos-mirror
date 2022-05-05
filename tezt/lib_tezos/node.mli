@@ -46,15 +46,17 @@
 
 (** History modes for the node. *)
 
-(** The parameter for [Full] And [Rolling] mode is called
-   [additional_cycles].
+(** The parameter for [Full] And [Rolling] mode is called [additional_cycles].
 
     For the [Full] (resp. [Rolling]) mode it controls the number of
-   contexts (resp. blocks) we preserved behind the [checkpoint] (aka
-   the no fork point]). Default in sandbox mode is [2] and [5] for
-   mainnet parameters (see [preserved_cycles] in the protocol
-   parameters). *)
+    contexts (resp. blocks) we preserved behind the [checkpoint] (aka
+    the no fork point). Default in sandbox mode is [2] and [5] for
+    mainnet parameters (see [preserved_cycles] in the protocol
+    parameters). *)
 type history_mode = Archive | Full of int option | Rolling of int option
+
+(** Values that can be passed to the node's [--media-type] argument *)
+type media_type = Json | Binary | Any
 
 (** Tezos node command-line arguments.
 
@@ -74,7 +76,9 @@ type argument =
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
   | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
+  | Media_type of media_type  (** [--media-type] *)
   | Metadata_size_limit of int option  (** --metadata-size-limit *)
+  | Metrics_addr of string  (** [--metrics-addr] *)
 
 (** Tezos node states. *)
 type t
@@ -159,7 +163,7 @@ val add_peer_with_id : t -> t -> unit Lwt.t
     In other words it is the address where [from] can contact [node]. *)
 val point_and_id : ?from:t -> t -> string Lwt.t
 
-(** Get the name of a node. *)
+(** See [Daemon.Make.name] *)
 val name : t -> string
 
 (** Get the network port given as [--net-addr] to a node. *)
@@ -192,19 +196,11 @@ val runner : t -> Runner.t option
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** Get a fresh, unused port.
-
-    Warning: this function does not guarantee that the given port is
-    not already in use by another process. It only guarantees that
-    it is not already in use by another node, and only if you let
-    the [Node] module choose all ports for you. *)
-val fresh_port : unit -> int
-
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Send SIGTERM (or SIGKILL) to a node and wait for it to terminate. *)
+(** See [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
@@ -242,6 +238,11 @@ module Config_file : sig
       activated upgrades. *)
   val set_sandbox_network_with_user_activated_upgrades :
     (int * Protocol.t) list -> JSON.t -> JSON.t
+
+  (** Set the network config to a sandbox with the given user
+      activated protocol overrides. *)
+  val set_sandbox_network_with_user_activated_overrides :
+    (string * string) list -> JSON.t -> JSON.t
 
   (** Set the prevalidator configuration in the given configuration. *)
   val set_prevalidator :
@@ -305,12 +306,6 @@ val replay :
 
 (** {2 Events} *)
 
-(** Exception raised by [wait_for] functions if the node terminates before the event.
-
-    You may catch or let it propagate to cause the test to fail.
-    [daemon] is the name of the node.
-    [event] is the name of the event.
-    [where] is an additional optional constraint, such as ["level >= 10"]. *)
 exception
   Terminated_before_event of {
     daemon : string;
@@ -351,63 +346,26 @@ val wait_for_identity : t -> string Lwt.t
 val wait_for_request :
   request:[< `Flush | `Inject | `Notify | `Arrived] -> t -> unit Lwt.t
 
-(** Wait for a custom event to occur.
-
-    Usage: [wait_for_full node name filter]
-
-    If an event named [name] occurs, apply [filter] to its
-    whole json, which is of the form:
-    {[{
-      "fd-sink-item.v0": {
-        "hostname": "...",
-        "time_stamp": ...,
-        "section": [ ... ],
-        "event": { <name>: ... }
-      }
-    }]}
-    If [filter] returns [None], continue waiting.
-    If [filter] returns [Some x], return [x].
-
-    [where] is used as the [where] field of the [Terminated_before_event] exception
-    if the node terminates. It should describe the constraint that [filter] applies,
-    such as ["field level exists"].
-
-    It is advised to register such event handlers before starting the node,
-    as if they occur before being registered, they will not trigger your handler.
-    For instance, you can define a promise with
-    [let x_event = wait_for node "x" (fun x -> Some x)]
-    and bind it later with [let* x = x_event]. *)
+(** See [Daemon.Make.wait_for_full]. *)
 val wait_for_full :
   ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** Same as [wait_for_full] but ignore metadata from the file descriptor sink.
-
-    More precisely, [filter] is applied to the value of field
-    ["fd-sink-item.v0"."event".<name>].
-
-    If the node receives a JSON value that does not match the right
-    JSON structure, it is not given to [filter] and the event is
-    ignored. See [wait_for_full] to know what the JSON value must
-    look like. *)
+(** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t}
 
-(** Add a callback to be called whenever the node emits an event.
-
-    Contrary to [wait_for] functions, this callback is never removed.
-
-    Listening to events with [on_event] will not prevent [wait_for] promises
-    to be fulfilled. You can also have multiple [on_event] handlers, although
-    the order in which they trigger is unspecified. *)
+(** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
 
-(** Register an event handler that logs all events.
-
-    Use this when you need to debug or reverse engineer incoming events.
-    Usually you do not want to keep that in the final versions of your tests. *)
+(** See [Daemon.Make.log_events]. *)
 val log_events : t -> unit
+
+type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
+
+(** See [Daemon.Make.memory_consumption]. *)
+val memory_consumption : t -> observe_memory_consumption Lwt.t
 
 (** {2 High-Level Functions} *)
 
@@ -435,16 +393,6 @@ val init :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   argument list ->
   t Lwt.t
-
-(** Restart a node.
-
-    This {!terminate}s a node, then {!run}s it again and waits for it to be ready.
-
-    If you passed arguments such as [Expected_pow] or [Singleprocess]
-    to {!run} they are not automatically passed again.
-    You can pass them to [restart], or you can pass other values if you want
-    to restart with other parameters. *)
-val restart : t -> argument list -> unit Lwt.t
 
 (** [send_raw_data node ~data] writes [~data] using an IP socket on the net
     port of [node]. *)

@@ -400,6 +400,49 @@ val args18 :
     'ctx )
   options
 
+(** Include 19 optional parameters *)
+val args19 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
+  ('m, 'ctx) arg ->
+  ('n, 'ctx) arg ->
+  ('o, 'ctx) arg ->
+  ('p, 'ctx) arg ->
+  ('q, 'ctx) arg ->
+  ('r, 'ctx) arg ->
+  ('s, 'ctx) arg ->
+  ( 'a
+    * 'b
+    * 'c
+    * 'd
+    * 'e
+    * 'f
+    * 'g
+    * 'h
+    * 'i
+    * 'j
+    * 'k
+    * 'l
+    * 'm
+    * 'n
+    * 'o
+    * 'p
+    * 'q
+    * 'r
+    * 's,
+    'ctx )
+  options
+
 (** {2 Parameter based command lines} *)
 
 (** Type of parameters for a command *)
@@ -534,7 +577,7 @@ type error += Help : _ command option -> error
 type error += Version : error
 
 (** Find and call the applicable command on the series of arguments.
-    @raise [Failure] if the command list would be ambiguous. *)
+    @raise Failure if the command list would be ambiguous. *)
 val dispatch : 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
 
 (** Parse the global options, and return their value, with the rest of

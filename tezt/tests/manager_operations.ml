@@ -168,6 +168,8 @@ module Operation = struct
 
   let inject_origination = inject_origination ~async:true ~force:true
 
+  let inject_transfer_ticket = inject_transfer_ticket ~async:true ~force:true
+
   let forge_and_inject_operation ?protocol ?branch ~batch ~signer
       ?patch_unsigned client =
     let* branch = get_injection_branch ?branch client in
@@ -211,9 +213,14 @@ module Helpers = struct
     `File (Format.sprintf "./tezt/tests/contracts/proto_alpha/%s" alias)
 
   (** Initialize a network with two nodes *)
-  let init ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
-    let node1 = Node.create [Synchronisation_threshold 0; Connections 1] in
-    let node2 = Node.create [Synchronisation_threshold 0; Connections 1] in
+  let init ?(disable_operation_precheck = false)
+      ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
+    let args =
+      [Node.Synchronisation_threshold 0; Connections 1]
+      @ if disable_operation_precheck then [Disable_operations_precheck] else []
+    in
+    let node1 = Node.create args in
+    let node2 = Node.create args in
     let* client1 = Client.init ~endpoint:(Node node1) ()
     and* client2 = Client.init ~endpoint:(Node node2) () in
     let nodes =
@@ -279,6 +286,21 @@ module Helpers = struct
     let* () = bake_and_wait_block nodes.main in
     Log.info "  - Contract address is %s." contract ;
     return contract
+
+  type hard_gas_limits = {
+    hard_gas_limit_per_operation : int;
+    hard_gas_limit_per_block : int;
+  }
+
+  let gas_limits client =
+    let* constants = RPC.get_constants client in
+    let hard_gas_limit_per_operation =
+      JSON.(constants |-> "hard_gas_limit_per_operation" |> as_int)
+    in
+    let hard_gas_limit_per_block =
+      JSON.(constants |-> "hard_gas_limit_per_block" |> as_int)
+    in
+    return {hard_gas_limit_per_operation; hard_gas_limit_per_block}
 end
 
 (** This module provides helper functions and wrappers to check the
@@ -289,7 +311,7 @@ module Memchecks = struct
     | `Applied -> "applied"
     | `Refused -> "refused"
     | `Branch_refused -> "branch_refused"
-    | `Branch_delayed -> "b ranch_delayed"
+    | `Branch_delayed -> "branch_delayed"
     | `Outdated -> "outdated"
     | `Unprocessed -> "unprocessed"
 
@@ -542,7 +564,7 @@ module Memchecks = struct
     let wait_observer = Events.wait_for_notify nodes.observer.node in
     Log.info "- Injecting operation." ;
     let* (`OpHash oph) = inject () in
-    let* mempool_after_injection = RPC.get_mempool client in
+    let* mempool_after_injection = Mempool.get_mempool client in
     check_operation_is_in_mempool
       `Applied
       ~__LOC__
@@ -557,7 +579,7 @@ module Memchecks = struct
       Log.ok "  - %s was propagated to observer node as valid." oph
     else if List.mem oph pending then
       Test.fail ~__LOC__ "%s was propagated to observer node as pending" oph ;
-    let* mempool_observer = RPC.get_mempool nodes.observer.client in
+    let* mempool_observer = Mempool.get_mempool nodes.observer.client in
     let check_observer_mempool =
       match observer_classification with
       | ( `Applied | `Refused | `Branch_refused | `Branch_delayed | `Outdated
@@ -578,7 +600,7 @@ module Memchecks = struct
           ~who:"main"
           client
       in
-      let* mempool_after_baking = RPC.get_mempool client in
+      let* mempool_after_baking = Mempool.get_mempool client in
       check_operation_not_in_mempool
         ~__LOC__
         ~classification:`Applied
@@ -601,7 +623,7 @@ module Memchecks = struct
     in
     Log.info "- Injecting operation." ;
     let* (`OpHash oph) = inject () in
-    let* mempool_after_injection = RPC.get_mempool client in
+    let* mempool_after_injection = Mempool.get_mempool client in
     check_operation_classification
       classification
       ~__LOC__
@@ -618,7 +640,7 @@ module Memchecks = struct
       Log.info "- Waiting for observer to see operation or block." ;
       let* observer_result = wait_observer in
       Log.info "- Checking mempool of main node." ;
-      let* mempool_after_baking = RPC.get_mempool client in
+      let* mempool_after_baking = Mempool.get_mempool client in
       check_operation_classification
         classification_after_flush
         ~__LOC__
@@ -657,7 +679,7 @@ module Memchecks = struct
     with_checks ~classification:`Absent ~should_propagate:false
 
   let check_balance ~__LOC__ {client; _} key amount =
-    let* bal =
+    let*! bal =
       RPC.Contracts.get_balance ~contract_id:key.Account.public_key_hash client
     in
     let bal = JSON.as_int bal in
@@ -670,7 +692,7 @@ module Memchecks = struct
     unit
 
   let check_revealed ~__LOC__ {client; _} key ~revealed =
-    let* res =
+    let*! res =
       RPC.Contracts.get_manager_key
         ~contract_id:key.Account.public_key_hash
         client
@@ -803,9 +825,260 @@ module Illtyped_originations = struct
     unit
 
   let register ~protocols =
-    contract_body_illtyped_1 ~protocols ;
-    contract_body_illtyped_2 ~protocols ;
-    initial_storage_illtyped ~protocols
+    contract_body_illtyped_1 protocols ;
+    contract_body_illtyped_2 protocols ;
+    initial_storage_illtyped protocols
+end
+
+module Deserialisation = struct
+  let milligas_per_byte = 20 (* As per the protocol *)
+
+  (** Returns the gas needed for the deserialization of an argument of
+      size [size_kB] in kilobytes. *)
+  let deserialization_gas ~size_kB = size_kB * milligas_per_byte
+
+  (** Returns an hexadecimal representation of a zero byte sequence of
+     size [size_kB]. *)
+  let make_zero_hex ~size_kB =
+    (* A hex representation for a byte sequence of n bytes is 2n long,
+       so for n kB it is 2000n long *)
+    String.make (size_kB * 2000) '0'
+
+  (* Originate a contract that takes a byte sequence as argument and does nothing *)
+  let originate_noop_contract nc =
+    let* contract =
+      Client.originate_contract
+        ~wait:"none"
+        ~init:"Unit"
+        ~alias:"deserialization_gas"
+        ~amount:Tez.zero
+        ~burn_cap:Tez.one
+        ~src:Constant.bootstrap1.alias
+        ~prg:"parameter bytes; storage unit; code {CDR; NIL operation; PAIR}"
+        nc.client
+    in
+    let* () = Helpers.bake_and_wait_block nc in
+    return contract
+
+  (* Gas to execute call to noop contract without deserialization *)
+  let gas_to_execute_rest_noop = function
+    | Protocol.Ithaca -> 2049
+    | Jakarta | Alpha -> 2109
+
+  let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
+      ~size_kB ~gas_limit client =
+    let* op =
+      Operation.mk_call
+        ~entrypoint:"default"
+        ~arg:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
+        ~gas_limit
+        ~dest:contract
+        ~source
+        client
+    in
+    Operation.forge_and_inject_operation
+      ?protocol
+      ~batch:[op]
+      ~signer:source
+      client
+
+  let test_deserialization_gas_canary =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        "Smart contract call that should succeeds with the provided gas limit"
+      ~tags:["precheck"; "gas"; "deserialization"; "canary"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract = originate_noop_contract nodes.main in
+    let size_kB = 20 in
+    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let gas_for_the_rest = gas_to_execute_rest_noop protocol in
+    (* This is specific to this contract, obtained empirically *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["applied"]
+      @@ fun () ->
+      inject_call_with_bytes
+        ~protocol
+        ~contract
+        ~size_kB:20
+        ~gas_limit:(min_deserialization_gas + gas_for_the_rest)
+        (* Enough gas to deserialize and do the application *)
+        nodes.main.client
+    in
+    unit
+
+  let test_not_enough_gas_deserialization =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Contract call with not enough gas to deserialize argument"
+      ~tags:["precheck"; "gas"; "deserialization"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract = originate_noop_contract nodes.main in
+    let size_kB = 20 in
+    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let* _ =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      inject_call_with_bytes
+        ~protocol
+        ~contract
+        ~size_kB
+        ~gas_limit:(min_deserialization_gas - 1)
+        nodes.main.client
+    in
+    unit
+
+  let test_deserialization_gas_accounting =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        "Smart contract call that would succeed if we did not account \
+         deserialization gas correctly"
+      ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract = originate_noop_contract nodes.main in
+    let size_kB = 20 in
+    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let gas_for_the_rest = gas_to_execute_rest_noop protocol in
+    (* This is specific to this contract, obtained empirically *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["gas_exhausted.operation"]]
+      @@ fun () ->
+      inject_call_with_bytes
+        ~protocol
+        ~contract
+        ~size_kB:20
+        ~gas_limit:(min_deserialization_gas + gas_for_the_rest - 1)
+        (* Enough gas to deserialize or to do the rest, but not to do both *)
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    test_deserialization_gas_canary protocols ;
+    test_not_enough_gas_deserialization protocols ;
+    test_deserialization_gas_accounting [Ithaca; Alpha]
+end
+
+module Gas_limits = struct
+  (** Build a batch of transfers with the same given gas limit for every one of
+      them.  *)
+  let mk_batch ?(source = Constant.bootstrap2) ?(dest = Constant.bootstrap3) ~nb
+      ~gas_limit client =
+    let rec loop n counter acc =
+      if n <= 0 then Lwt.return (List.rev acc)
+      else
+        let counter = counter + 1 in
+        let* op =
+          Operation.mk_transfer
+            ~source
+            ~fee:1_000_000
+            ~gas_limit
+            ~dest
+            ~counter
+            client
+        in
+        loop (n - 1) counter (op :: acc)
+    in
+    let* counter = Operation.get_counter client ~source:Constant.bootstrap1 in
+    loop nb counter []
+
+  let block_below_ops_below =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Batch below block limit with each operation below limit"
+      ~tags:["precheck"; "batch"; "gas"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* limits = Helpers.gas_limits nodes.main.client in
+    (* Gas limit per op is ok *)
+    let* batch =
+      mk_batch
+        ~nb:2
+        ~gas_limit:limits.hard_gas_limit_per_operation
+        nodes.main.client
+    in
+    let* _oph =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["applied"; "applied"]
+      @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let block_below_ops_over =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Batch below block limit with operations over limit"
+      ~tags:["precheck"; "batch"; "gas"; "op_gas"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* limits = Helpers.gas_limits nodes.main.client in
+    let* batch =
+      mk_batch
+        ~nb:2
+        ~gas_limit:(limits.hard_gas_limit_per_operation + 1)
+        nodes.main.client
+    in
+    let* _oph =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      (* Gas limit per op is too high *)
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let block_over_ops_below =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Batch over block limit with operations below limit"
+      ~tags:["precheck"; "batch"; "gas"; "block_gas"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* limits = Helpers.gas_limits nodes.main.client in
+    (* Gas limit per block is too high *)
+    let too_many_ops =
+      (limits.hard_gas_limit_per_block / limits.hard_gas_limit_per_operation)
+      + 1
+    in
+    let* batch =
+      mk_batch
+        ~nb:too_many_ops
+        ~gas_limit:limits.hard_gas_limit_per_operation
+        nodes.main.client
+    in
+    let* _oph =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    block_below_ops_below protocols ;
+    block_below_ops_over protocols ;
+    block_over_ops_below [Ithaca; Alpha]
 end
 
 module Reveal = struct
@@ -924,11 +1197,596 @@ module Reveal = struct
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
 
   let register ~protocols =
-    simple_reveal_bad_pk ~protocols ;
-    simple_reveal_not_a_pk ~protocols ;
-    revealed_twice_in_batch ~protocols ;
-    revealed_twice_in_batch_bad_first_key ~protocols ;
-    revealed_twice_in_batch_bad_second_key ~protocols
+    simple_reveal_bad_pk protocols ;
+    simple_reveal_not_a_pk protocols ;
+    revealed_twice_in_batch protocols ;
+    revealed_twice_in_batch_bad_first_key protocols ;
+    revealed_twice_in_batch_bad_second_key protocols
+end
+
+module Simple_transfers = struct
+  let test_simple_transfer_applied =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer applied"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
+    Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  let test_simple_transfer_low_balance_to_pay_fees =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer not enough balance to pay fees"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let*! bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+    in
+    let bal = JSON.as_int bal in
+    let* _ =
+      Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:((2 * bal) + 1) (* Too high fee *)
+        ~amount:1
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_low_balance_to_make_transfer =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer not enough balance to make transfer"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let*! bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+    in
+    let bal = JSON.as_int bal in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["balance_too_low"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:(bal - 1) (* fee and amount too large: cannot pay [fee + amount] *)
+        ~amount:(bal / 2)
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 1
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_counter_in_the_past =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer counter in the past"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let*! bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+    in
+    let bal = JSON.as_int bal in
+    let* _ =
+      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:(fee + 1)
+        ~amount:(bal - fee)
+        ~counter (* Specifying existing counter: wrong *)
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_counter_in_the_future =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer counter in the future"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let*! bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+    in
+    let bal = JSON.as_int bal in
+    let* _ =
+      Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:(fee + 1)
+        ~amount:(bal - fee)
+        ~counter:
+          (counter + 5) (* Counter too large (aka "in the future"): wrong *)
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_wrong_signature =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer with wrong signature"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let*! bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+    in
+    let bal = JSON.as_int bal in
+    let* _ =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~signer:Constant.bootstrap3 (* signer is different from source *)
+        ~amount
+        ~fee
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_not_enough_gas =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer with not enough gas"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["gas_exhausted.operation"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee
+        ~amount
+        nodes.main.client
+        ~gas_limit:1
+      (* Gas too small *)
+    in
+    unit
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2077
+     Once this issue is fixed change the test to check that the operation is refused
+     and not propagated.
+
+     Note: At the moment, the pre-filter (hence pre-check) of the mempool is not
+     called for operations injected to the node directly (but rather for the
+     ones that are received from another node) otherwise these would have been
+     classified as "rejected".
+  *)
+  let test_simple_transfer_not_enough_fees_for_gas =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer with not enough fees to cover gas"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~observer_classification:`Refused
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:150
+        ~amount
+        nodes.main.client
+    in
+    unit
+
+  let test_simple_transfer_low_balance_to_pay_allocation_1 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test simple transfer with low balance to pay allocation (1)"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key1 =
+      Helpers.init_fresh_account ~protocol ~reveal:true nodes ~amount ~fee
+    in
+    let* key2 = Client.gen_and_show_keys nodes.main.client in
+    let balance = amount - fee in
+    (* subtract fees payed for revelation *)
+    let to_transfer = balance - fee - 1 in
+    (* In theory, if the operation succeeds, there will remain 1 mutez on the account *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["backtracked"]
+        ~expected_errors:[["contract.cannot_pay_storage_fee"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:key1
+        ~dest:key2
+        ~gas_limit:1500
+        ~fee
+        ~amount:to_transfer
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main key1 (balance - fee)
+    in
+    let* () =
+      Memchecks.check_revealed ~__LOC__ nodes.main key1 ~revealed:true
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key2 0 in
+    Memchecks.check_revealed ~__LOC__ nodes.main key2 ~revealed:false
+
+  let test_simple_transfer_low_balance_to_pay_allocation_2 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test simple transfer with low balance to pay allocation (2)"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key1 =
+      Helpers.init_fresh_account ~protocol ~reveal:true nodes ~amount ~fee
+    in
+    let* key2 = Client.gen_and_show_keys nodes.main.client in
+    let balance = amount - fee in
+    (* subtract revelation fees *)
+    let to_transfer = balance - fee in
+    (* In theory, if the operation succeeds, there will remain 0 mutez on the account *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["backtracked"]
+        ~expected_errors:[["contract.cannot_pay_storage_fee"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:key1
+        ~dest:key2
+        ~gas_limit:1900
+        ~fee
+        ~amount:to_transfer
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main key1 (balance - fee)
+    in
+    let* () =
+      Memchecks.check_revealed ~__LOC__ nodes.main key1 ~revealed:true
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key2 0 in
+    Memchecks.check_revealed ~__LOC__ nodes.main key2 ~revealed:false
+
+  let test_simple_transfer_of_the_whole_balance =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test simple transfer of the whole balance"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key1 =
+      Helpers.init_fresh_account ~protocol ~reveal:true nodes ~amount ~fee
+    in
+    let balance = amount - fee in
+    (* subtract revelation fees *)
+    let to_transfer = balance - fee in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["applied"]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:key1
+        ~dest:Constant.bootstrap2
+        ~gas_limit:1900
+        ~fee
+        ~amount:to_transfer
+        nodes.main.client
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key1 0 in
+    let* () =
+      Memchecks.check_revealed ~__LOC__ nodes.main key1 ~revealed:false
+    in
+    unit
+
+  let test_simple_transfers_successive_wrong_counters =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test succesive injections with same manager"
+      ~tags:["transaction"; "transfer"; "counters"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1) (* Reuse counter: wrong *)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_delayed_checks
+        ~__LOC__
+        nodes
+        ~classification_after_flush:`Branch_refused
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        ~amount:2
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_delayed_checks
+        ~__LOC__
+        nodes
+        ~classification_after_flush:`Absent
+        ~should_include:true
+      (* applied after flush *)
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 3)
+        ~amount:2
+        nodes.main.client
+    in
+    unit
+
+  let test_simple_transfers_successive_wrong_counters_no_op_pre =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        "Test successive injections with same manager (no operation precheck)"
+      ~tags:["transaction"; "transfer"; "counters"; "no_operation_precheck"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~disable_operation_precheck:true ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2) (* Reuse counter: wrong *)
+        ~amount:2
+        nodes.main.client
+    in
+    unit
+
+  let test_batch_simple_transfers_wrong_counters =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test batch with wrong counters (+1, +2, +2)"
+      ~tags:["transaction"; "transfer"; "counters"; "batch"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* op1 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        nodes.main.client
+    in
+    let* op2 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        nodes.main.client
+    in
+    let* op3 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch:[op1; op2; op3]
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let test_batch_simple_transfers_wrong_counters_2 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test batch with wrong counters (+1, +2, +4)"
+      ~tags:["transaction"; "transfer"; "counters"; "batch"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* op1 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        nodes.main.client
+    in
+    let* op2 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        nodes.main.client
+    in
+    let* op3 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 4)
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch:[op1; op2; op3]
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    test_simple_transfer_applied protocols ;
+    test_simple_transfer_low_balance_to_pay_fees protocols ;
+    test_simple_transfer_low_balance_to_make_transfer protocols ;
+    test_simple_transfer_counter_in_the_past protocols ;
+    test_simple_transfer_counter_in_the_future protocols ;
+    test_simple_transfer_wrong_signature protocols ;
+    test_simple_transfer_not_enough_gas protocols ;
+    test_simple_transfer_not_enough_fees_for_gas protocols ;
+    test_simple_transfer_low_balance_to_pay_allocation_1 protocols ;
+    test_simple_transfer_low_balance_to_pay_allocation_2 protocols ;
+    test_simple_transfer_of_the_whole_balance protocols ;
+    test_simple_transfers_successive_wrong_counters [Ithaca; Alpha] ;
+    test_simple_transfers_successive_wrong_counters_no_op_pre protocols ;
+    test_batch_simple_transfers_wrong_counters [Alpha] ;
+    test_batch_simple_transfers_wrong_counters_2 [Alpha]
 end
 
 module Simple_contract_calls = struct
@@ -1041,13 +1899,105 @@ module Simple_contract_calls = struct
     unit
 
   let register ~protocols =
-    sucessful_smart_contract_call ~protocols ;
-    call_with_illtyped_argument ~protocols ;
-    test_contract_call_with_failwith ~protocols ;
-    test_contract_call_with_loop_gas_exhaution ~protocols
+    sucessful_smart_contract_call protocols ;
+    call_with_illtyped_argument protocols ;
+    test_contract_call_with_failwith protocols ;
+    test_contract_call_with_loop_gas_exhaution protocols
+end
+
+module Tx_rollup = struct
+  open Deserialisation (* for the constants *)
+
+  (* In this test, we ensure that we can build a [transfer ticket] operation
+     which passes the precheck. Note that we do not build a transfer ticket
+     operation which succeeds because this requires a lot more work to build a
+     context where it is valid. This tests serves as a "canary" to ensure that
+     the next one still remain meaningful even after changes in the protocol. *)
+  let transfer_ticket_deserialization_canary =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Deserialization of transfer ticket"
+      ~tags:
+        [
+          "precheck";
+          "deserialization";
+          "gas";
+          "transfer_ticket";
+          "tx_rollup";
+          "canary";
+        ]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let size_kB = 20 in
+    let min_deserialization_gas =
+      (* contents *) deserialization_gas ~size_kB + (* ty *) 1
+    in
+    let* _oph =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["cannot_transfer_ticket_to_implicit"]]
+      (* Does not fail in precheck, so is applied (as failed) *)
+      @@ fun () ->
+      Operation.inject_transfer_ticket
+        ~protocol
+        ~source:Constant.bootstrap1
+        ~gas_limit:
+          (min_deserialization_gas + 1000)
+          (* we add 1000 (the gas for manager operation) to avoid failing with
+             gas_exhausted right after precheck *)
+        ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
+        ~ty:(`Json (`O [("prim", `String "bytes")]))
+        ~ticketer:Constant.bootstrap2.public_key_hash
+        ~amount:1
+        ~destination:Constant.bootstrap1.public_key_hash
+        ~entrypoint:"default"
+        nodes.main.client
+    in
+    unit
+
+  (* This test makes sure that the deserialization is performed in the
+     precheck. The operation should be refused because there isn't enough gas to
+     deserialize the micheline parameters. *)
+  let transfer_ticket_deserialization_too_large =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Deserialization of transfer ticket too large"
+      ~tags:
+        ["precheck"; "deserialization"; "gas"; "transfer_ticket"; "tx_rollup"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let size_kB = 20 in
+    let min_deserialization_gas =
+      (* contents *) deserialization_gas ~size_kB + (* ty *) 1
+    in
+    let* _oph =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer_ticket
+        ~protocol
+        ~source:Constant.bootstrap1
+        ~gas_limit:(min_deserialization_gas - 1)
+        ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
+        ~ty:(`Json (`O [("prim", `String "bytes")]))
+        ~ticketer:Constant.bootstrap2.public_key_hash
+        ~amount:1
+        ~destination:Constant.bootstrap1.public_key_hash
+        ~entrypoint:"default"
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    transfer_ticket_deserialization_canary protocols ;
+    transfer_ticket_deserialization_too_large protocols
 end
 
 let register ~protocols =
   Illtyped_originations.register ~protocols ;
+  Deserialisation.register ~protocols ;
+  Gas_limits.register ~protocols ;
   Reveal.register ~protocols ;
-  Simple_contract_calls.register ~protocols
+  Simple_transfers.register ~protocols ;
+  Simple_contract_calls.register ~protocols ;
+  Tx_rollup.register ~protocols:[Alpha]

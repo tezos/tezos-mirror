@@ -23,18 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Assert_lib = Lib_test_extra.Assert_lib
 open Test_utils
 
 let assert_presence_in_cemented_store ?(with_metadata = true) cemented_store
     blocks =
+  let open Lwt_result_syntax in
   List.iter_es
     (fun b ->
       let hash = Block_repr.hash b in
-      Cemented_block_store.get_cemented_block_by_hash
-        ~read_metadata:with_metadata
-        cemented_store
-        hash
-      >>=? function
+      let* o =
+        Cemented_block_store.get_cemented_block_by_hash
+          ~read_metadata:with_metadata
+          cemented_store
+          hash
+      in
+      match o with
       | None ->
           Alcotest.failf
             "assert_presence_in_cemented_store: cannot find block %a"
@@ -45,7 +49,7 @@ let assert_presence_in_cemented_store ?(with_metadata = true) cemented_store
             Assert.equal ~msg:"block equality with metadata" b b' ;
             return_unit)
           else (
-            Assert.equal_block
+            Assert_lib.Crypto.equal_block
               ~msg:"block equality without metadata"
               (Block_repr.header b)
               (Block_repr.header b') ;
@@ -53,42 +57,64 @@ let assert_presence_in_cemented_store ?(with_metadata = true) cemented_store
     blocks
 
 let test_cement_pruned_blocks cemented_store =
-  make_raw_block_list ~kind:`Pruned (genesis_hash, -1l) 4095
-  >>= fun (blocks, _head) ->
-  Cemented_block_store.cement_blocks cemented_store ~write_metadata:false blocks
-  >>=? fun () ->
+  let open Lwt_result_syntax in
+  let*! (blocks, _head) =
+    make_raw_block_list ~kind:`Pruned (genesis_hash, -1l) 4095
+  in
+  let* () =
+    Cemented_block_store.cement_blocks
+      cemented_store
+      ~write_metadata:false
+      blocks
+  in
   assert_presence_in_cemented_store ~with_metadata:true cemented_store blocks
 
 let test_cement_full_blocks cemented_store =
-  make_raw_block_list ~kind:`Full (genesis_hash, -1l) 4095
-  >>= fun (blocks, _head) ->
-  Cemented_block_store.cement_blocks cemented_store ~write_metadata:false blocks
-  >>=? fun () ->
+  let open Lwt_result_syntax in
+  let*! (blocks, _head) =
+    make_raw_block_list ~kind:`Full (genesis_hash, -1l) 4095
+  in
+  let* () =
+    Cemented_block_store.cement_blocks
+      cemented_store
+      ~write_metadata:false
+      blocks
+  in
   assert_presence_in_cemented_store ~with_metadata:false cemented_store blocks
 
 let test_metadata_retrieval cemented_store =
-  make_raw_block_list ~kind:`Full (genesis_hash, -1l) 100
-  >>= fun (blocks, _head) ->
-  Cemented_block_store.cement_blocks cemented_store ~write_metadata:true blocks
-  >>=? fun () ->
+  let open Lwt_result_syntax in
+  let*! (blocks, _head) =
+    make_raw_block_list ~kind:`Full (genesis_hash, -1l) 100
+  in
+  let* () =
+    Cemented_block_store.cement_blocks
+      cemented_store
+      ~write_metadata:true
+      blocks
+  in
   assert_presence_in_cemented_store ~with_metadata:true cemented_store blocks
 
 let wrap_cemented_store_test (name, f) =
+  let open Lwt_result_syntax in
   let cemented_store_init f _ () =
     let prefix_dir = "tezos_indexed_store_test_" in
     Lwt_utils_unix.with_tempdir prefix_dir (fun base_dir ->
         let run f = f base_dir in
-        run (fun base_dir ->
-            let store_dir = Naming.store_dir ~dir_path:base_dir in
-            let chain_dir = Naming.chain_dir store_dir Chain_id.zero in
-            Lwt_unix.mkdir (Naming.dir_path chain_dir) 0o700 >>= fun () ->
-            Cemented_block_store.init ~readonly:false chain_dir
-            >>=? fun cemented_store ->
-            Error_monad.protect (fun () ->
-                f cemented_store >>=? fun () ->
-                Cemented_block_store.close cemented_store ;
-                return_unit))
-        >>= function
+        let*! r =
+          run (fun base_dir ->
+              let store_dir = Naming.store_dir ~dir_path:base_dir in
+              let chain_dir = Naming.chain_dir store_dir Chain_id.zero in
+              let*! () = Lwt_unix.mkdir (Naming.dir_path chain_dir) 0o700 in
+              let* cemented_store =
+                Cemented_block_store.init ~readonly:false chain_dir
+              in
+              Error_monad.protect (fun () ->
+                  let* () = f cemented_store in
+                  Cemented_block_store.close cemented_store ;
+                  return_unit))
+        in
+        match r with
         | Error err ->
             Format.printf
               "@\nTest failed:@\n%a@."

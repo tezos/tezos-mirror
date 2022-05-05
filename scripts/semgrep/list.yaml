@@ -1,0 +1,72 @@
+rules:
+- id: ocamllint-length-list-compare-length
+  pattern-either:
+  - pattern: compare (List.length $X) (List.length $Y)
+  - pattern: List.length $X = List.length $Y
+  - pattern: List.length $X <= List.length $Y
+  - pattern: List.length $X >= List.length $Y
+  - pattern: List.length $X < List.length $Y
+  - pattern: List.length $X > List.length $Y
+  - pattern: List.length $X <> List.length $Y
+  message: You probably want to use Compare.List_lengths or List.compare_lengths, which are faster. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-lengths-comparison for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: ocamllint-length-list-compare
+  pattern-either:
+  - pattern: compare (List.length $X) $Y
+  - pattern: List.length $X = $Y
+  - pattern: List.length $X <= $Y
+  - pattern: List.length $X >= $Y
+  - pattern: List.length $X < $Y
+  - pattern: List.length $X > $Y
+  - pattern: List.length $X <> $Y
+  message: You probably want to use Compare.List_length_with or List.compare_length_with, which are faster. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-length-comparison for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: ocamllint-length-list-compare
+  pattern-either:
+  - pattern: compare $Y (List.length $X)
+  - pattern: $X = List.length $Y
+  - pattern: $X <= List.length $Y
+  - pattern: $X >= List.length $Y
+  - pattern: $X < List.length $Y
+  - pattern: $X > List.length $Y
+  - pattern: $X <> List.length $Y
+  message: You probably want to use Compare.List_length_with or List.compare_length_with, which are faster. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-length-comparison for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: ocamllint-concat-map
+  pattern-either:
+  - pattern: let $Z = List.map $X $Y in List.concat $Z
+  - pattern: List.concat (List.map $X $Y)
+  - pattern: List.map $X $Y |> List.concat
+  - pattern: let+ $Z = List.map_e $X $Y in List.concat $Z
+  - pattern: let* $Z = List.map_e $X $Y in List.concat $Z
+  - pattern: let*? $Z = List.map_e $X $Y in List.concat $Z
+  - pattern: List.map_e $X $Y >|? fun $Z -> List.concat $Z
+  - pattern: let+ $Z = List.map_s $X $Y in List.concat $Z
+  - pattern: let* $Z = List.map_s $X $Y in List.concat $Z
+  - pattern: let*! $Z = List.map_s $X $Y in List.concat $Z
+  - pattern: List.map_s $X $Y >|= fun $Z -> List.concat $Z
+  - pattern: let+ $Z = List.map_es $X $Y in List.concat $Z
+  - pattern: let* $Z = List.map_es $X $Y in List.concat $Z
+  - pattern: List.map_es $X $Y >|=? fun $Z -> List.concat $Z
+  message: You probably want to use List.concat_map $X $Y, which is faster and tail-recursive. See https://tezos.gitlab.io/developer/guidelines.html#chaining_concat_map for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml

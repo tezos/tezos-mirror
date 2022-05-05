@@ -1,3 +1,4 @@
 (lang dune 2.9)
 (formatting (enabled_for ocaml))
-(name tezos-client-005-PsBabyM1)
+; This file was automatically generated, do not edit.
+; Edit file manifest/manifest.ml instead.

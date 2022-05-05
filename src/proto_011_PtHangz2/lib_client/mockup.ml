@@ -820,9 +820,7 @@ let initial_context chain_id (header : Block_header.shell_header)
         : Block_header.shell_header) =
     header
   in
-  let timestamp =
-    Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ())
-  in
+  let timestamp = Time.System.to_protocol (Tezos_base.Time.System.now ()) in
   (*
 
      We need to forge a predecessor hash to pass it to [value_of_key].

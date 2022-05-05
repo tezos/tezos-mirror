@@ -48,7 +48,7 @@ let sign_hash ?pp ?buf h i hash =
 
 let sign_txn ?pp ?buf h i txn =
   let msg = "Zil.sign_txn" in
-  let txnlen = Cstruct.len txn in
+  let txnlen = Cstruct.length txn in
   let data = Cstruct.create (12 + txnlen) in
   Cstruct.LE.set_uint32 data 0 i ;
   Cstruct.LE.set_uint32 data 4 0l ;

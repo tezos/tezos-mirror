@@ -1,24 +1,30 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_base_unix)
  (public_name tezos-client-base-unix)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-base.unix
+  tezos-rpc-http
+  tezos-rpc-http-client-unix
+  tezos-shell-services
+  tezos-stdlib-unix
   tezos-client-base
   tezos-client-commands
-  tezos-stdlib-unix
-  tezos-rpc-http-client-unix
   tezos-mockup
   tezos-mockup-registration
   tezos-mockup-commands
   tezos-proxy
+  tezos-proxy.rpc
   tezos-signer-backends.unix
-  tezos-shell-services
   lwt-exit)
+ (library_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_rpc_http
    -open Tezos_rpc_http_client_unix
    -open Tezos_shell_services

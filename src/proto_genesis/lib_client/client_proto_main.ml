@@ -30,7 +30,7 @@ let bake cctxt ?timestamp block command sk =
   let timestamp =
     match timestamp with
     | Some t -> t
-    | None -> Time.System.(to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+    | None -> Time.System.(to_protocol (Tezos_base.Time.System.now ()))
   in
   let protocol_data = {command; signature = Signature.zero} in
   Genesis_block_services.Helpers.Preapply.block
@@ -73,8 +73,7 @@ let timestamp_arg =
     (Clic.parameter (fun _ t ->
          match Time.System.of_notation_opt t with
          | None ->
-             Error_monad.failwith
-               "Could not parse value provided to -timestamp option"
+             failwith "Could not parse value provided to -timestamp option"
          | Some t -> return t))
 
 let test_delay_arg =
@@ -85,9 +84,7 @@ let test_delay_arg =
     ~default:(Int64.to_string (Int64.mul 24L 3600L))
     (Clic.parameter (fun _ t ->
          match Int64.of_string_opt t with
-         | None ->
-             Error_monad.failwith
-               "Could not parse value provided to -delay option"
+         | None -> failwith "Could not parse value provided to -delay option"
          | Some t -> return t))
 
 let proto_param ~name ~desc t =
@@ -108,8 +105,7 @@ let commands () =
          (parameter (fun _ t ->
               match Time.Protocol.of_notation t with
               | None ->
-                  Error_monad.failwith
-                    "Could not parse value provided to -timestamp option"
+                  failwith "Could not parse value provided to -timestamp option"
               | Some t -> return t)))
   in
   [

@@ -34,46 +34,90 @@ type ('a, 'trace) t =
 
 type ('a, 'trace) gas_monad = ('a, 'trace) t
 
-let of_result x gas = Some (x, gas)
+let of_result x gas = Some (x, gas) [@@ocaml.inline always]
 
-let return x = of_result (ok x)
+let return x = of_result (ok x) [@@ocaml.inline always]
+
+let return_unit = return ()
 
 (* Inlined [Option.bind] for performance. *)
 let ( >>?? ) m f =
   match m with None -> None | Some x -> f x
   [@@ocaml.inline always]
 
-let ( >>$ ) m f gas =
+let bind m f gas =
   m gas >>?? fun (res, gas) ->
   match res with Ok y -> f y gas | Error _ as err -> of_result err gas
+  [@@ocaml.inline always]
 
-let ( >|$ ) m f gas = m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
+let map f m gas =
+  m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
+  [@@ocaml.inline always]
 
-let ( >?$ ) m f = m >>$ fun x -> of_result (f x)
+let bind_result m f = bind (of_result m) f [@@ocaml.inline always]
 
-let ( >??$ ) m f gas = m gas >>?? fun (x, gas) -> f x gas
+let bind_recover m f gas =
+  m gas >>?? fun (x, gas) -> f x gas
+  [@@ocaml.inline always]
 
 let consume_gas cost gas =
-  match Local_gas_counter.update_and_check gas cost with
+  match Local_gas_counter.consume_opt gas cost with
   | None -> None
   | Some gas -> Some (ok (), gas)
 
 let run ctxt m =
+  let open Local_gas_counter in
   match Gas.level ctxt with
   | Gas.Unaccounted -> (
-      match m (Saturation_repr.saturated :> int) with
+      match m (Local_gas_counter (Saturation_repr.saturated :> int)) with
       | Some (res, _new_gas_counter) -> ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
-  | Limited {remaining} -> (
-      match m (remaining :> int) with
+  | Limited {remaining = _} -> (
+      let (gas_counter, outdated_ctxt) =
+        local_gas_counter_and_outdated_context ctxt
+      in
+      match m gas_counter with
       | Some (res, new_gas_counter) ->
-          let ctxt =
-            Local_gas_counter.update_context
-              new_gas_counter
-              (Local_gas_counter.outdated ctxt)
-          in
+          let ctxt = update_context new_gas_counter outdated_ctxt in
           ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
 
-let record_trace_eval f m gas =
-  m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas
+let record_trace_eval :
+    type error_trace error_context.
+    error_details:(error_context, error_trace) Script_tc_errors.error_details ->
+    (error_context -> error) ->
+    ('a, error_trace) t ->
+    ('a, error_trace) t =
+ fun ~error_details ->
+  match error_details with
+  | Fast -> fun _f m -> m
+  | Informative err_ctxt ->
+      fun f m gas ->
+        m gas >>?? fun (x, gas) ->
+        of_result (record_trace_eval (fun () -> f err_ctxt) x) gas
+
+let fail e = of_result (Error e) [@@ocaml.inline always]
+
+module Syntax = struct
+  let return = return
+
+  let return_unit = return_unit
+
+  let return_none = return None
+
+  let return_some x = return (Some x)
+
+  let return_nil = return []
+
+  let return_true = return true
+
+  let return_false = return false
+
+  let fail = fail
+
+  let ( let* ) = bind
+
+  let ( let+ ) m f = map f m
+
+  let ( let*? ) = bind_result
+end

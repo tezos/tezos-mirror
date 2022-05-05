@@ -25,6 +25,13 @@
 
 type history_mode = Archive | Full of int option | Rolling of int option
 
+type media_type = Json | Binary | Any
+
+let string_of_media_type = function
+  | Any -> "any"
+  | Binary -> "binary"
+  | Json -> "json"
+
 type argument =
   | Network of string
   | History_mode of history_mode
@@ -37,7 +44,9 @@ type argument =
   | Peer of string
   | No_bootstrap_peers
   | Disable_operations_precheck
+  | Media_type of media_type
   | Metadata_size_limit of int option
+  | Metrics_addr of string
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -58,8 +67,10 @@ let make_argument = function
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
   | Disable_operations_precheck -> ["--disable-mempool-precheck"]
+  | Media_type media_type -> ["--media-type"; string_of_media_type media_type]
   | Metadata_size_limit None -> ["--metadata-size-limit"; "unlimited"]
   | Metadata_size_limit (Some i) -> ["--metadata-size-limit"; string_of_int i]
+  | Metrics_addr metrics_addr -> ["--metrics-addr"; metrics_addr]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -122,17 +133,6 @@ let data_dir node = node.persistent_state.data_dir
 
 let runner node = node.persistent_state.runner
 
-let next_port = ref Cli.options.starting_port
-
-let fresh_port () =
-  let port = !next_port in
-  incr next_port ;
-  port
-
-let () =
-  Test.declare_reset_function @@ fun () ->
-  next_port := Cli.options.starting_port
-
 let spawn_command node =
   Process.spawn
     ?runner:node.persistent_state.runner
@@ -190,9 +190,7 @@ module Config_file = struct
 
   let read node = JSON.parse_file (filename node)
 
-  let write node config =
-    with_open_out (filename node) @@ fun chan ->
-    output_string chan (JSON.encode config)
+  let write node config = JSON.encode_to_file (filename node) config
 
   let update node update = read node |> update |> write node
 
@@ -227,49 +225,67 @@ module Config_file = struct
     in
     JSON.put ("shell", peer_validator) old_config
 
+  let sandbox_network_config =
+    `O
+      [
+        ( "genesis",
+          `O
+            [
+              ("timestamp", `String "2018-06-30T16:07:32Z");
+              ( "block",
+                `String "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" );
+              ("protocol", `String Protocol.genesis_hash);
+            ] );
+        ( "genesis_parameters",
+          `O
+            [
+              ( "values",
+                `O [("genesis_pubkey", `String Constant.activator.public_key)]
+              );
+            ] );
+        ("chain_name", `String "TEZOS");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
   let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
       =
     let network =
-      `O
-        [
-          ( "genesis",
-            `O
-              [
-                ("timestamp", `String "2018-06-30T16:07:32Z");
-                ( "block",
-                  `String "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
-                );
-                ( "protocol",
-                  `String "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-                );
-              ] );
-          ( "genesis_parameters",
-            `O
-              [
-                ( "values",
-                  `O
-                    [
-                      ( "genesis_pubkey",
-                        `String
-                          "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
-                      );
-                    ] );
-              ] );
-          ("chain_name", `String "TEZOS");
-          ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
-          ( "user_activated_upgrades",
-            `A
-              (List.map
-                 (fun (level, protocol) ->
-                   `O
-                     [
-                       ("level", `Float (float level));
-                       ("replacement_protocol", `String (Protocol.hash protocol));
-                     ])
-                 upgrade_points) );
-        ]
+      sandbox_network_config
       |> JSON.annotate
            ~origin:"set_sandbox_network_with_user_activated_upgrades"
+      |> JSON.put
+           ( "user_activated_upgrades",
+             JSON.annotate ~origin:"user_activated_upgrades"
+             @@ `A
+                  (List.map
+                     (fun (level, protocol) ->
+                       `O
+                         [
+                           ("level", `Float (float level));
+                           ( "replacement_protocol",
+                             `String (Protocol.hash protocol) );
+                         ])
+                     upgrade_points) )
+    in
+    JSON.put ("network", network) old_config
+
+  let set_sandbox_network_with_user_activated_overrides overrides old_config =
+    let network =
+      sandbox_network_config
+      |> JSON.annotate
+           ~origin:"set_sandbox_network_with_user_activated_overrides"
+      |> JSON.put
+           ( "user_activated_protocol_overrides",
+             JSON.annotate ~origin:"user_activated_overrides"
+             @@ `A
+                  (List.map
+                     (fun (replaced_protocol, replacement_protocol) ->
+                       `O
+                         [
+                           ("replaced_protocol", `String replaced_protocol);
+                           ("replacement_protocol", `String replacement_protocol);
+                         ])
+                     overrides) )
     in
     JSON.put ("network", network) old_config
 end
@@ -414,10 +430,10 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
   let net_port =
-    match net_port with None -> fresh_port () | Some port -> port
+    match net_port with None -> Port.fresh () | Some port -> port
   in
   let rpc_port =
-    match rpc_port with None -> fresh_port () | Some port -> port
+    match rpc_port with None -> Port.fresh () | Some port -> port
   in
   let arguments =
     (* Give a default value of 0 to --expected-pow. *)
@@ -585,11 +601,6 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
   let* () = run ?event_level ?event_sections_levels node [] in
   let* () = wait_for_ready node in
   return node
-
-let restart node arguments =
-  let* () = terminate node in
-  let* () = run node arguments in
-  wait_for_ready node
 
 let send_raw_data node ~data =
   (* Extracted from Lwt_utils_unix. *)

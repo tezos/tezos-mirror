@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili tech, Inc. <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,25 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** State of the validation.
+
+    Two parts:
+
+    1. Context.t: what is stored between blocks, this includes an
+    Irmin tree typically stored on disk and the cache (stored in
+    RAM).
+
+    2. Additional information needed during the validation of a
+    block but not persisted across blocks, always stored in
+    RAM. The gas counter is here.
+
+    [Alpha_context.t] is actually implemented as [Raw_context.t].
+    The difference is that Alpha_context.mli does not expose this
+    so functions manipulating an Alpha_context.t are guaranteed
+    to only access the context through the storage modules
+    exposed in Alpha_context.mli. These modules are in charge of
+    maintaining invariants over the structure of the context. *)
 
 (** {1 Errors} *)
 
@@ -63,7 +83,7 @@ val prepare :
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Ithaca_012
+type previous_protocol = Genesis of Parameters_repr.t | Jakarta_013
 
 val prepare_first_block :
   level:int32 ->
@@ -83,10 +103,10 @@ val predecessor_timestamp : t -> Time.t
 
 val current_timestamp : t -> Time.t
 
-val constants : t -> Constants_repr.parametric
+val constants : t -> Constants_parametric_repr.t
 
 val patch_constants :
-  t -> (Constants_repr.parametric -> Constants_repr.parametric) -> t Lwt.t
+  t -> (Constants_parametric_repr.t -> Constants_parametric_repr.t) -> t Lwt.t
 
 val round_durations : t -> Round_repr.Durations.t
 
@@ -197,25 +217,35 @@ val record_non_consensus_operation_hash : t -> Operation_hash.t -> t
 
 val non_consensus_operations : t -> Operation_hash.t list
 
-(** [set_sampler_for_cycle ctxt cycle sampler] evaluates to
-    [Ok c] with [c] verifying [sampler_for_cycle c cycle = sampler]
-    if no sampler was set for the same [cycle] beforehand.
-    In the other case, it returns [Error `Sampler_already_set]. *)
-val set_sampler_for_cycle :
+(** [init_sampler_for_cycle ctxt cycle seed state] caches the seeded stake
+    sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access. *)
+val init_sampler_for_cycle :
   t ->
   Cycle_repr.t ->
-  Seed_repr.seed * (Signature.public_key * Signature.public_key_hash) Sampler.t ->
-  (t, [`Sampler_already_set]) result
+  Seed_repr.seed ->
+  (Signature.public_key * Signature.public_key_hash) Sampler.t ->
+  t tzresult
 
-(** [sampler_for_cycle ctxt cycle] evaluates to [Ok sampler] if a sampler was
-    set for [cycle] using [set_sampler_for_cycle].
-    Otherwise, it returns [Error `Sampler_not_set]. *)
+(** [sampler_for_cycle ~read ctxt cycle] returns the seeded stake
+    sampler for [cycle]. The sampler is read in memory if
+    [init_sampler_for_cycle] or [sampler_for_cycle] was previously
+    called for the same [cycle]. Otherwise, it is read "on-disk" with
+    the [read] function and then cached in [ctxt] like
+    [init_sampler_for_cycle]. *)
 val sampler_for_cycle :
+  read:
+    (t ->
+    (Seed_repr.seed
+    * (Signature.public_key * Signature.public_key_hash) Sampler.t)
+    tzresult
+    Lwt.t) ->
   t ->
   Cycle_repr.t ->
-  ( Seed_repr.seed * (Signature.public_key * Signature.public_key_hash) Sampler.t,
-    [`Sampler_not_set] )
-  result
+  (t
+  * Seed_repr.seed
+  * (Signature.public_key * Signature.public_key_hash) Sampler.t)
+  tzresult
+  Lwt.t
 
 (* The stake distribution is stored both in [t] and in the cache. It
    may be sufficient to only store it in the cache. *)
@@ -224,6 +254,10 @@ val stake_distribution_for_current_cycle :
 
 val init_stake_distribution_for_current_cycle :
   t -> Tez_repr.t Signature.Public_key_hash.Map.t -> t
+
+module Internal_for_tests : sig
+  val add_level : t -> int -> t
+end
 
 module type CONSENSUS = sig
   type t
@@ -322,3 +356,17 @@ module Consensus :
      and type 'a slot_map := 'a Slot_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
+
+module Tx_rollup : sig
+  val add_message :
+    t ->
+    Tx_rollup_repr.t ->
+    Tx_rollup_message_hash_repr.t ->
+    t * Tx_rollup_inbox_repr.Merkle.root
+end
+
+module Sc_rollup_in_memory_inbox : sig
+  val current_messages : t -> Sc_rollup_repr.t -> (Context.tree * t) tzresult
+
+  val set_current_messages : t -> Sc_rollup_repr.t -> Context.tree -> t tzresult
+end

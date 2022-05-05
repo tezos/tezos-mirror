@@ -53,6 +53,7 @@ let () =
     (fun addrlist -> Proxy_server_RPC_Port_already_in_use addrlist)
 
 let launch_rpc_server dir {address; port; tls_cert_and_key} =
+  let open Lwt_result_syntax in
   let host = Ipaddr.V6.to_string address in
   let mode =
     match tls_cert_and_key with
@@ -62,39 +63,43 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
   in
   Lwt.catch
     (fun () ->
-      Tezos_rpc_http_server.RPC_server.launch
-        ~host
-        mode
-        dir
-        ~media_types:Tezos_rpc_http.Media_type.all_media_types
-      >>= return)
+      Lwt_result.ok
+      @@ Tezos_rpc_http_server.RPC_server.launch
+           ~host
+           mode
+           dir
+           ~media_types:Tezos_rpc_http.Media_type.all_media_types)
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-          fail (Proxy_server_RPC_Port_already_in_use [(address, port)])
+          tzfail (Proxy_server_RPC_Port_already_in_use [(address, port)])
       | exn -> fail_with_exn exn)
 
 let run dir ({address; port; _} as args) =
+  let open Lwt_result_syntax in
   let log_cfg = Lwt_log_sink_unix.create_cfg () in
-  Internal_event_unix.init ~lwt_log_sink:log_cfg () >>= fun () ->
+  let*! () =
+    Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink:log_cfg ()
+  in
   let node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Events.(emit shutting_down_proxy_server) ())
   in
-  launch_rpc_server dir args >>=? fun rpc ->
+  let* rpc = launch_rpc_server dir args in
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[node_downer]
       (fun _ ->
-        Events.(emit shutting_down_rpc_server) () >>= fun () ->
+        let*! () = Events.(emit shutting_down_rpc_server) () in
         Tezos_rpc_http_server.RPC_server.shutdown rpc)
   in
-  Events.(emit starting_rpc_server) (P2p_addr.to_string address, port)
-  >>= fun () ->
+  let*! () =
+    Events.(emit starting_rpc_server) (P2p_addr.to_string address, port)
+  in
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[rpc_downer]
-      (fun _exit_status -> Internal_event_unix.close ())
+      (fun _exit_status -> Tezos_base_unix.Internal_event_unix.close ())
   in
   Lwt_utils.never_ending ()

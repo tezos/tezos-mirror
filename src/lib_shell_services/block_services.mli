@@ -74,7 +74,7 @@ type operation_list_quota = {max_size : int; max_op : int option}
 (** The low-level storage exposed as a tree *)
 type raw_context =
   | Key of Bytes.t  (** A leaf, containing a value *)
-  | Dir of raw_context TzString.Map.t
+  | Dir of raw_context String.Map.t
       (** A directory, mapping keys to nested [raw_context]s *)
   | Cut
       (** An omitted piece, because it is too deep compared to the maximum
@@ -106,7 +106,7 @@ type merkle_node =
   | Continue of merkle_tree  (** An edge to a more nested tree *)
 
 (** The type of Merkle tree used by the light mode *)
-and merkle_tree = merkle_node TzString.Map.t
+and merkle_tree = merkle_node String.Map.t
 
 (** [merkle_tree_eq mtree1 mtree2] tests whether [mtree1] and [mtree2] are equal,
  *  that is, have the same constructors; and the constructor's content
@@ -212,7 +212,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   open RPC_context
 
   val info :
-    #simple -> ?chain:chain -> ?block:block -> unit -> block_info tzresult Lwt.t
+    #simple ->
+    ?force_metadata:bool ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    block_info tzresult Lwt.t
 
   val hash :
     #simple ->
@@ -267,6 +272,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   module Operations : sig
     val operations :
       #simple ->
+      ?force_metadata:bool ->
       ?chain:chain ->
       ?block:block ->
       unit ->
@@ -274,6 +280,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     val operations_in_pass :
       #simple ->
+      ?force_metadata:bool ->
       ?chain:chain ->
       ?block:block ->
       int ->
@@ -281,6 +288,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     val operation :
       #simple ->
+      ?force_metadata:bool ->
       ?chain:chain ->
       ?block:block ->
       int ->
@@ -415,9 +423,25 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val pending_operations_version_dispatcher :
       version:int -> t -> t_with_version RPC_answer.t Lwt.t
 
-    (** Call RPC GET /chains/[chain]/mempool/pending_operations *)
+    (** Call RPC GET /chains/[chain]/mempool/pending_operations
+
+    - Default [version] is [0].
+    - Default [applied] is [true].
+    - Default [branch_delayed] is [true].
+    - Default [branch_refused] is [true].
+    - Default [refused] is [true].
+    - Default [outdated] is [true]. *)
     val pending_operations :
-      #simple -> ?chain:chain -> ?version:int -> unit -> t tzresult Lwt.t
+      #simple ->
+      ?chain:chain ->
+      ?version:int ->
+      ?applied:bool ->
+      ?branch_delayed:bool ->
+      ?branch_refused:bool ->
+      ?refused:bool ->
+      ?outdated:bool ->
+      unit ->
+      t tzresult Lwt.t
 
     (** Call RPC POST /chains/[chain]/mempool/ban_operation *)
     val ban_operation :
@@ -475,7 +499,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   module S : sig
     val hash : ([`GET], prefix, prefix, unit, unit, Block_hash.t) RPC_service.t
 
-    val info : ([`GET], prefix, prefix, unit, unit, block_info) RPC_service.t
+    val info :
+      ( [`GET],
+        prefix,
+        prefix,
+        < force_metadata : bool >,
+        unit,
+        block_info )
+      RPC_service.t
 
     val header :
       ([`GET], prefix, prefix, unit, unit, block_header) RPC_service.t
@@ -516,16 +547,28 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     module Operations : sig
       val operations :
-        ([`GET], prefix, prefix, unit, unit, operation list list) RPC_service.t
+        ( [`GET],
+          prefix,
+          prefix,
+          < force_metadata : bool >,
+          unit,
+          operation list list )
+        RPC_service.t
 
       val operations_in_pass :
-        ([`GET], prefix, prefix * int, unit, unit, operation list) RPC_service.t
+        ( [`GET],
+          prefix,
+          prefix * int,
+          < force_metadata : bool >,
+          unit,
+          operation list )
+        RPC_service.t
 
       val operation :
         ( [`GET],
           prefix,
           (prefix * int) * int,
-          unit,
+          < force_metadata : bool >,
           unit,
           operation )
         RPC_service.t
@@ -668,7 +711,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           'a,
           'b,
-          < version : int >,
+          < version : int
+          ; applied : bool
+          ; branch_delayed : bool
+          ; branch_refused : bool
+          ; refused : bool
+          ; outdated : bool >,
           unit,
           Mempool.t_with_version )
         RPC_service.t

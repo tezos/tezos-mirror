@@ -358,7 +358,7 @@ module Mempool = struct
     match !removed_oph_source with
     | None ->
         (* Not present anywhere in the filter state, because of invariants.
-           @see {!state} *)
+           See {!state} *)
         filter_state
     | Some source ->
         let prechecked_operations_count =
@@ -586,7 +586,7 @@ module Mempool = struct
   (** Returns the weight and resources consumption of an operation. The weight
       corresponds to the one implemented by the baker, to decide which operations
       to put in a block first (the code is largely duplicated).
-      @see {!Tezos_baking_alpha.Operation_selection.weight_manager} *)
+      See {!Tezos_baking_alpha.Operation_selection.weight_manager} *)
   let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas
       op =
     let hard_gas_limit_per_block =
@@ -780,7 +780,7 @@ module Mempool = struct
       (function Consensus_operation_in_far_future -> Some () | _ -> None)
       (fun () -> Consensus_operation_in_far_future)
 
-  (** {2} consensus operation filtering.
+  (** {2 consensus operation filtering}
 
      In Tenderbake, we increased a lot the number of consensus
       operations, therefore it seems necessary to be able to filter consensus
@@ -936,7 +936,9 @@ module Mempool = struct
             (let proposal_timestamp =
                Alpha_context.Timestamp.predecessor ctxt
              in
-             let now_timestamp = Systime_os.now () |> Time.System.to_protocol in
+             let now_timestamp =
+               Time.System.now () |> Time.System.to_protocol
+             in
              let Level.{level; _} = Alpha_context.Level.current ctxt in
              let proposal_level =
                match Raw_level.pred level with
@@ -3250,9 +3252,9 @@ module RPC = struct
         *)
         List.sort_uniq
           Level.compare
-          (List.concat
-             (List.map (Level.from_raw ctxt) levels
-              :: List.map (Level.levels_in_cycle ctxt) cycles))
+          (List.rev_append
+             (List.rev_map (Level.from_raw ctxt) levels)
+             (List.concat_map (Level.levels_in_cycle ctxt) cycles))
 
   module Baking_rights = struct
     type t = {
@@ -3391,10 +3393,9 @@ module RPC = struct
           List.map_es (baking_rights_at_level ctxt max_round) levels
           >|=? fun rights ->
           let rights =
-            if q.all then rights
-            else List.map remove_duplicated_delegates rights
+            if q.all then List.concat rights
+            else List.concat_map remove_duplicated_delegates rights
           in
-          let rights = List.concat rights in
           match q.delegates with
           | [] -> rights
           | _ :: _ as delegates ->
@@ -3596,18 +3597,13 @@ module RPC = struct
       let validators =
         RPC_service.get_service
           ~description:
-            "Retrieves the delegates allowed to endorse a block.\n\
-             By default, it gives the endorsing slots for delegates that have \
-             at least one in the next block.\n\
+            "Retrieves the level, the endorsement slots and the public key \
+             hash of each delegate allowed to endorse a block.\n\
+             By default, it provides this information for the next level.\n\
              Parameter `level` can be used to specify the (valid) level(s) in \
              the past or future at which the endorsement rights have to be \
              returned. Parameter `delegate` can be used to restrict the \
-             results to the given delegates.\n\
-             Returns the list of endorsing slots. Also returns the minimal \
-             timestamps that correspond to these slots. The timestamps are \
-             omitted for levels in the past, and are only estimates for levels \
-             later that the next block, based on the hypothesis that all \
-             predecessor blocks were baked at the first round."
+             results to the given delegates.\n"
           ~query:validators_query
           ~output:(list encoding)
           path
@@ -3630,8 +3626,8 @@ module RPC = struct
               []
               q.levels
           in
-          List.map_es (endorsing_slots_at_level ctxt) levels >|=? fun rights ->
-          let rights = List.concat rights in
+          List.concat_map_es (endorsing_slots_at_level ctxt) levels
+          >|=? fun rights ->
           match q.delegates with
           | [] -> rights
           | _ :: _ as delegates ->

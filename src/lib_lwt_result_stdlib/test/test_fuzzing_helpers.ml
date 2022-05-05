@@ -57,8 +57,11 @@ module Fn = struct
 
   let arith =
     let open QCheck in
-    let module O = Observable in
-    fun2 O.int O.int int
+    fun2 Observable.int Observable.int int
+
+  let predarith =
+    let open QCheck in
+    fun2 Observable.int Observable.int (option int)
 
   (* combinators *)
   let e (cond, QCheck.Fun (_, ok), QCheck.Fun (_, error)) x y =
@@ -116,6 +119,7 @@ end
 
 module Map2Of = Apply
 module CondOf = Apply
+module CondMapOf = Apply
 module Cond2Of = Apply
 
 module FilterMapOf = struct
@@ -198,6 +202,12 @@ module Map2EOf = struct
 end
 
 module CondEOf = struct
+  let fn fn const elt = Ok (fn const elt)
+
+  let fn_e fn const elt = fn const elt
+end
+
+module CondMapEOf = struct
   let fn fn const elt = Ok (fn const elt)
 
   let fn_e fn const elt = fn const elt
@@ -300,6 +310,12 @@ module Map2SOf = struct
 end
 
 module CondSOf = struct
+  let fn fn const elt = Lwt.return (fn const elt)
+
+  let fn_s fn const elt = fn const elt
+end
+
+module CondMapSOf = struct
   let fn fn const elt = Lwt.return (fn const elt)
 
   let fn_s fn const elt = fn const elt
@@ -491,6 +507,12 @@ module CondESOf = struct
   let fn_es fn const elt = fn const elt
 end
 
+module CondMapESOf = struct
+  let fn fn const elt = Lwt_result_syntax.return (fn const elt)
+
+  let fn_es fn const elt = fn const elt
+end
+
 module Cond2ESOf = struct
   let fn fn x y = Lwt_result_syntax.return (fn x y)
 
@@ -556,13 +578,17 @@ let eq_s ?pp a b =
    example:
    {[
    eq_s
-     (let acc = ref init in
-     M.iter_s (IterSOf.fn_s acc fn) input >|= fun () -> !acc)
+     Lwt_syntax.(
+      let acc = ref init in
+      let+ () = M.iter_s (IterSOf.fn_s acc fn) input in
+      !acc)
      (M.fold_left_s (FoldSOf.fn_s fn) init input)
 
    eq_es
-     (let acc = ref init in
-     M.iter_es (IterESOf.fn acc fn) (M.of_list input) >|=? fun () -> !acc)
+     Lwt_result_syntax.(
+      let acc = ref init in
+      let+ () = M.iter_es (IterESOf.fn acc fn) (M.of_list input) in
+      !acc)
      (Lwt.return_ok @@ with_stdlib_iter (fn, init, input))
    ]}
 *)

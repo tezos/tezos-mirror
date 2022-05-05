@@ -41,6 +41,7 @@ val keyed_daemons :
      t
   -> client:Tezos_client.t
   -> key:string
+  -> lb_vote:(string -> string option)
   -> node:Tezos_node.t
   -> Tezos_daemon.t list
 (** Prepare the baker and endorse daemons to secure the hard-fork. *)

@@ -1,25 +1,25 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/max_in_list.tz]
 
 Well typed
-Gas remaining: 1039985.981 units remaining
+Gas remaining: 1039987.861 units remaining
 { parameter (list int) ;
   storage (option int) ;
   code { CAR
-         /* [ @parameter list int ] */ ;
+         /* [ list int ] */ ;
          DIP { NONE int /* [ option int ] */ }
-         /* [ @parameter list int : option int ] */ ;
+         /* [ list int : option int ] */ ;
          ITER { SWAP
-                /* [ option int : @parameter.elt int ] */ ;
+                /* [ option int : int ] */ ;
                 IF_NONE
                   { SOME /* [ option int ] */ }
-                  { DIP { DUP /* [ @parameter.elt int : @parameter.elt int ] */ }
-                    /* [ @some int : @parameter.elt int : @parameter.elt int ] */ ;
+                  { DIP { DUP /* [ int : int ] */ }
+                    /* [ int : int : int ] */ ;
                     DUP
-                    /* [ @some int : @some int : @parameter.elt int : @parameter.elt int ] */ ;
-                    DIP { SWAP /* [ @parameter.elt int : @some int : @parameter.elt int ] */ }
-                    /* [ @some int : @parameter.elt int : @some int : @parameter.elt int ] */ ;
+                    /* [ int : int : int : int ] */ ;
+                    DIP { SWAP /* [ int : int : int ] */ }
+                    /* [ int : int : int : int ] */ ;
                     CMPLE ;
-                    IF { DROP /* [ @parameter.elt int ] */ } { DIP { DROP /* [] */ } /* [ @some int ] */ } ;
+                    IF { DROP /* [ int ] */ } { DIP { DROP /* [] */ } /* [ int ] */ } ;
                     SOME
                     /* [ option int ] */ } }
          /* [ option int ] */ ;

@@ -1,0 +1,20 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/big_map_write.tz]
+
+Well typed
+Gas remaining: 1039994.982 units remaining
+{ storage unit ;
+  parameter (big_map nat nat) ;
+  code { UNPAIR
+         /* [ big_map nat nat : unit ] */ ;
+         PUSH (option nat) (Some 1)
+         /* [ option nat : big_map nat nat : unit ] */ ;
+         PUSH nat 1
+         /* [ nat : option nat : big_map nat nat : unit ] */ ;
+         UPDATE
+         /* [ big_map nat nat : unit ] */ ;
+         DROP
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

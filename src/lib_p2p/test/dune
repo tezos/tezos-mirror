@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executables
  (names
   test_p2p_socket
@@ -7,25 +10,24 @@
   test_p2p_buffer_reader
   test_p2p_banned_peers
   test_p2p_node
-  ; Deactivated because it fails on CI (but not locally)
-  ; See https://gitlab.com/tezos/tezos/-/issues/1184
-  ; test_p2p_logging
   test_p2p_connect_handler)
  (libraries
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
+  tezos-stdlib
   tezos-p2p
-  tezos-p2p-services
   tezos-test-helpers
   tezos-base-test-helpers
   tezos-event-logging-test-helpers
+  tezos-p2p-services
   alcotest-lwt
   astring)
+ (preprocess (pps bisect_ppx --bisect-sigterm))
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib_unix
    -open Tezos_stdlib
    -open Tezos_p2p
@@ -103,8 +105,6 @@
   (alias runtest_p2p_peerset)
   (alias runtest_p2p_buffer_reader)
   (alias runtest_p2p_banned_peers)
-  ; Deactivated because it fails the coverage
-  ; See https://gitlab.com/tezos/tezos/-/issues/1946
-  ; (alias runtest_p2p_node)
+  (alias runtest_p2p_node)
   (alias runtest_p2p_connect_handler))
  (action (progn)))

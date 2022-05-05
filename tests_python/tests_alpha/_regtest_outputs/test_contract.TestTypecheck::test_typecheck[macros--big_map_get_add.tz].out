@@ -1,32 +1,19 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/big_map_get_add.tz]
 
 Well typed
-Gas remaining: 1039968.666 units remaining
+Gas remaining: 1039971.186 units remaining
 { parameter (pair (pair %set_pair int (option int)) (pair %check_pair int (option int))) ;
   storage (pair (big_map int int) unit) ;
   code { DUP
-         /* [ pair (pair @parameter
-                    (pair %set_pair int (option int))
-                    (pair %check_pair int (option int)))
-                 (pair @storage (big_map int int) unit)
-            : pair (pair @parameter
-                    (pair %set_pair int (option int))
-                    (pair %check_pair int (option int)))
-                 (pair @storage (big_map int int) unit) ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : pair (pair (pair int (option int)) int (option int)) (big_map int int) unit ] */ ;
          DIP { CDAR }
-         /* [ pair (pair @parameter
-                    (pair %set_pair int (option int))
-                    (pair %check_pair int (option int)))
-                 (pair @storage (big_map int int) unit) : big_map int int ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int ] */ ;
          DUP
-         /* [ pair (pair @parameter
-                    (pair %set_pair int (option int))
-                    (pair %check_pair int (option int)))
-                 (pair @storage (big_map int int) unit)
-            : pair (pair @parameter
-                    (pair %set_pair int (option int))
-                    (pair %check_pair int (option int)))
-                 (pair @storage (big_map int int) unit) : big_map int int ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int ] */ ;
          DIP { CADR ;
                DUP
                /* [ pair int (option int) : pair int (option int) : big_map int int ] */ ;
@@ -38,11 +25,8 @@ Gas remaining: 1039968.666 units remaining
                /* [ big_map int int ] */ ;
                DUP
                /* [ big_map int int : big_map int int ] */ }
-         /* [ pair (pair @parameter
-                    (pair %set_pair int (option int))
-                    (pair %check_pair int (option int)))
-                 (pair @storage (big_map int int) unit) : big_map int int
-            : big_map int int ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int : big_map int int ] */ ;
          CADR ;
          DUP
          /* [ pair int (option int) : pair int (option int) : big_map int int
@@ -56,7 +40,7 @@ Gas remaining: 1039968.666 units remaining
          /* [ option int : option int : big_map int int ] */ ;
          IF_SOME
            { SWAP
-             /* [ option int : @some int : big_map int int ] */ ;
+             /* [ option int : int : big_map int int ] */ ;
              IF_SOME { ASSERT_CMPEQ } { FAIL } }
            { ASSERT_NONE } ;
          UNIT

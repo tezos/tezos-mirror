@@ -31,8 +31,8 @@ let name = "tezos-proxy-server"
 let config : string option Term.t =
   let doc =
     "The configuration file. Fields (see corresponding options): endpoint \
-     (string), rpc_addr (string), rpc_tls (string), and sym_block_caching_time \
-     (int)."
+     (string), rpc_addr (string), rpc_tls (string), sym_block_caching_time \
+     (int), and data_dir (string)."
   in
   let docv = "CONFIG" in
   Arg.(value & opt (some string) None & info ["c"; "config"] ~docv ~doc)
@@ -61,6 +61,15 @@ let rpc_tls : string option Term.t =
   let docv = "RPC_TLS" in
   Arg.(value & opt (some string) None & info ["rpc-tls"] ~docv ~doc)
 
+let data_dir : string option Term.t =
+  let doc =
+    "Path to the data-dir of a running tezos-node, for reading the `context` \
+     subdirectory to obtain data instead of using the ../raw/bytes RPC (hereby \
+     reducing the node's IO)."
+  in
+  let docv = "DATA_DIR" in
+  Arg.(value & opt (some string) None & info ["d"; "data-dir"] ~docv ~doc)
+
 let sym_block_caching_time : int option Term.t =
   let doc =
     "The duration (in seconds) during which data for a symbolic block \
@@ -73,7 +82,8 @@ let sym_block_caching_time : int option Term.t =
   Arg.(value & opt (some int) None & info ["sym-block-caching-time"] ~docv ~doc)
 
 let load_config_from_file (config_file : string) =
-  Lwt_utils_unix.Json.read_file config_file >>=? fun json ->
+  let open Lwt_result_syntax in
+  let* json = Lwt_utils_unix.Json.read_file config_file in
   let open Proxy_server_config in
   match destruct_config json with
   | CannotDeserialize ->
@@ -89,6 +99,7 @@ let load_config_from_file (config_file : string) =
     and the command line, and translates the result to
     a value of type [Proxy_server_config.runtime]. *)
 let get_runtime config_from_file config_args =
+  let open Lwt_result_syntax in
   let open Proxy_server_config in
   let config =
     match config_from_file with
@@ -106,19 +117,21 @@ let get_runtime config_from_file config_args =
 let main_promise (config_file : string option)
     (config_args : Proxy_server_config.t) (log_requests : bool) :
     int tzresult Lwt.t =
-  (match config_file with
-  | None -> return_none
-  | Some config_file -> load_config_from_file config_file >>=? return_some)
-  >>=? fun (config_from_file : Proxy_server_config.t option) ->
+  let open Lwt_result_syntax in
+  let* (config_from_file : Proxy_server_config.t option) =
+    Option.map_es load_config_from_file config_file
+  in
   let open Proxy_server_config in
-  get_runtime config_from_file config_args
-  >>=? fun {
-             endpoint;
-             rpc_server_address;
-             rpc_server_port;
-             rpc_server_tls;
-             sym_block_caching_time;
-           } ->
+  let* {
+         endpoint;
+         rpc_server_address;
+         rpc_server_port;
+         rpc_server_tls;
+         sym_block_caching_time;
+         data_dir = data_dir_opt;
+       } =
+    get_runtime config_from_file config_args
+  in
   let open Tezos_rpc_http in
   let open Tezos_rpc_http_client_unix in
   let logger =
@@ -126,30 +139,80 @@ let main_promise (config_file : string option)
     else RPC_client_unix.null_logger
   in
   let rpc_config : RPC_client_unix.config =
-    {media_type = Media_type.all_media_types; endpoint; logger}
+    {media_type = Media_type.Command_line.Any; endpoint; logger}
   in
   let printer =
     let logger channel msg : unit Lwt.t =
       if channel = "stderr" then
-        Lwt_io.eprintf "%s" msg >>= fun () -> Lwt_io.(flush stderr)
-      else Lwt_io.printf "%s" msg >>= fun () -> Lwt_io.(flush stdout)
+        let*! () = Lwt_io.eprintf "%s" msg in
+        Lwt_io.(flush stderr)
+      else
+        let*! () = Lwt_io.printf "%s" msg in
+        Lwt_io.(flush stdout)
     in
     new Tezos_client_base.Client_context.simple_printer logger
   in
   let http_ctxt =
     new RPC_client_unix.http_ctxt rpc_config Media_type.all_media_types
   in
-  Tezos_proxy.Registration.get_registered_proxy
-    printer
-    http_ctxt
-    `Mode_proxy
-    None
-  >>=? fun proxy_env ->
+  let* proxy_env =
+    Tezos_proxy.Registration.get_registered_proxy
+      printer
+      http_ctxt
+      `Mode_proxy
+      None
+  in
+  (* This should probably be extracted into Lwt_result or similar. *)
+  let lift_lwt (a : 'a Lwt.t) : 'a tzresult Lwt.t =
+    let*! r = a in
+    return r
+  in
+  (* The context index, which we try to read if and only if the --data-dir *)
+  (* argument has been passed. *)
+  let* (context_index : Tezos_context.Context.index option) =
+    Option.map_es
+      (fun data_dir ->
+        let context_path = Filename.concat data_dir "context" in
+        Lwt.catch
+          (fun () ->
+            lift_lwt
+              (Tezos_shell_context.Proxy_delegate_maker.make_index
+                 ~context_path))
+          (function
+            | Index_unix__Raw.Not_written ->
+                failwith
+                  "error reading data-dir: %s is not a valid context directory"
+                  context_path
+            | Unix.Unix_error (Unix.EBADF, _, _) ->
+                failwith
+                  "error reading data-dir: %s does not exist"
+                  context_path
+            | e ->
+                failwith
+                  "unexpected error %s while reading context directory %s"
+                  (Printexc.to_string e)
+                  context_path))
+      data_dir_opt
+  in
+  (* Now we build the function that the proxy server can use to build a proxy
+     delegate later, using [Tezos_shell_context.Proxy_delegate_maker.*] functions.
+     This lets it not depend directly on [Tezos_shell_context]: if it did, it
+     would break compilation of tezos-client to JavaScript. *)
+  let on_disk_proxy_builder =
+    Option.map
+      (fun index ctx_hash ->
+        (* Sync first so we don't observe a stale state. *)
+        let*! () = Tezos_context.Context.sync index in
+        Tezos_shell_context.Proxy_delegate_maker.of_index ~index ctx_hash)
+      context_index
+  in
   let dir =
+    let sleep = Lwt_unix.sleep in
     Tezos_proxy.Proxy_services.build_directory
       printer
       http_ctxt
-      (Tezos_proxy.Proxy_services.Proxy_server sym_block_caching_time)
+      (Tezos_proxy.Proxy_services.Proxy_server
+         {sleep; sym_block_caching_time; on_disk_proxy_builder})
       proxy_env
   in
   let server_args : Proxy_server_main_run.args =
@@ -163,30 +226,37 @@ let main_promise (config_file : string option)
 
 let main (config_file : string option) (log_requests : bool)
     (endpoint : string option) (rpc_addr : string option)
-    (rpc_tls : string option) (sym_block_caching_time : int option) =
+    (rpc_tls : string option) (sym_block_caching_time : int option)
+    (data_dir : string option) =
   let config_args =
     Proxy_server_config.make
       ~endpoint:(Option.map Uri.of_string endpoint)
       ~rpc_addr:(Option.map Uri.of_string rpc_addr)
       ~rpc_tls
       ~sym_block_caching_time
+      ~data_dir
   in
   Lwt_main.run
-    (Lwt_exit.wrap_and_error
-     @@ main_promise config_file config_args log_requests
-     >>= function
-     | Ok (Ok _) -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
-     | Ok (Error err) ->
-         Lwt_exit.exit_and_wait 2 >|= fun _ ->
-         `Error (false, Format.asprintf "%a" pp_print_trace err)
-     | Error exit_status ->
-         Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
+    (let open Lwt_syntax in
+    let* r =
+      Lwt_exit.wrap_and_error
+      @@ main_promise config_file config_args log_requests
+    in
+    match r with
+    | Ok (Ok _) ->
+        let+ _ = Lwt_exit.exit_and_wait 0 in
+        `Ok ()
+    | Ok (Error err) ->
+        let+ _ = Lwt_exit.exit_and_wait 2 in
+        `Error (false, Format.asprintf "%a" pp_print_trace err)
+    | Error exit_status ->
+        Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
 
 let term : unit Term.t =
   Term.(
     ret
       (const main $ config $ log_requests $ endpoint $ rpc_addr $ rpc_tls
-     $ sym_block_caching_time))
+     $ sym_block_caching_time $ data_dir))
 
 let info =
   let doc = "Launches a server that is a readonly frontend to a Tezos node" in
@@ -197,6 +267,6 @@ let info =
     ]
   in
   let version = Tezos_version.Bin_version.version_string in
-  Term.info name ~version ~doc ~exits:Term.default_exits ~man
+  Cmd.info name ~version ~doc ~exits:Cmd.Exit.defaults ~man
 
-let () = Term.exit @@ Term.eval (term, info)
+let () = exit (Cmd.eval (Cmd.v info term))

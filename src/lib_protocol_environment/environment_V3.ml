@@ -85,7 +85,7 @@ module type V3 = sig
        and type Timelock.chest = Timelock.chest
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result
-       and module Sapling = Tezos_sapling.Core.Validator
+       and module Sapling = Tezos_sapling.Core.Validator_legacy
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -168,15 +168,38 @@ struct
 
   module Compare = Compare
   module Seq = Tezos_error_monad.TzLwtreslib.Seq
-  module List = Tezos_error_monad.TzLwtreslib.List
+
+  module List = struct
+    include Tezos_error_monad.TzLwtreslib.List
+
+    include Tezos_protocol_environment_structs.V3.M.Lwtreslib_list_combine
+  end
+
   module Char = Char
   module Bytes = Bytes
   module Hex = Hex
   module String = String
   module Bits = Bits
   module TzEndian = TzEndian
-  module Set = Tezos_error_monad.TzLwtreslib.Set
-  module Map = Tezos_error_monad.TzLwtreslib.Map
+
+  module Set = struct
+    module type S =
+      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Set.S
+        with type 'a error_monad_trace := 'a Error_monad.trace
+
+    module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t =
+      Tezos_error_monad.TzLwtreslib.Set.Make (Ord)
+  end
+
+  module Map = struct
+    module type S =
+      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Map.S
+        with type 'a error_monad_trace := 'a Error_monad.trace
+
+    module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t =
+      Tezos_error_monad.TzLwtreslib.Map.Make (Ord)
+  end
+
   module Int32 = Int32
   module Int64 = Int64
   module Buffer = Buffer
@@ -637,14 +660,20 @@ struct
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
     include
-      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
+      Tezos_error_monad.Monad_maker.Make (Error_core) (TzTrace)
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
+    include Tezos_protocol_environment_structs.V3.M.Error_monad_infix_globals
+
     include
       Tezos_protocol_environment_structs.V3.M.Error_monad_preallocated_values
 
     include Tezos_protocol_environment_structs.V3.M.Error_monad_trace_eval
+
+    let fail e = Lwt.return_error (TzTrace.make e)
+
+    let error e = Error (TzTrace.make e)
 
     let dont_wait ex er f = dont_wait f er ex
 
@@ -684,17 +713,18 @@ struct
       |> Result.map_error (fun e -> trace_of_error (h e))
 
     let catch_s ?catch_only f =
-      Result.catch_s ?catch_only f
-      >|= Result.map_error (fun e -> error_of_exn e)
+      let open Lwt_syntax in
+      let+ r = Result.catch_s ?catch_only f in
+      Result.map_error (fun e -> error_of_exn e) r
 
     (* Shouldn't be used, only to keep the same environment interface *)
     let classify_error error = (find_info_of_error error).category
 
-    let both_e = Tzresult_syntax.both
+    let both_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.both
 
-    let join_e = Tzresult_syntax.join
+    let join_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.join
 
-    let all_e = Tzresult_syntax.all
+    let all_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.all
   end
 
   let () =
@@ -761,8 +791,10 @@ struct
     include RPC_directory
 
     let gen_register dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= function
+          let* r = handler p q i in
+          match r with
           | `Ok o -> RPC_answer.return o
           | `OkChunk o -> RPC_answer.return_chunked o
           | `OkStream s -> RPC_answer.return_stream s
@@ -785,23 +817,28 @@ struct
               Lwt.return (`Error e))
 
     let register ~chunked dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= function
+          let* r = handler p q i in
+          match r with
           | Ok o when chunked -> RPC_answer.return_chunked o
           | Ok o (* otherwise *) -> RPC_answer.return o
           | Error e -> RPC_answer.fail e)
 
     let opt_register ~chunked dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= function
+          let* r = handler p q i in
+          match r with
           | Ok (Some o) when chunked -> RPC_answer.return_chunked o
           | Ok (Some o) (* otherwise *) -> RPC_answer.return o
           | Ok None -> RPC_answer.not_found
           | Error e -> RPC_answer.fail e)
 
     let lwt_register ~chunked dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= fun o ->
+          let* o = handler p q i in
           if chunked then RPC_answer.return_chunked o else RPC_answer.return o)
 
     open Curry
@@ -945,31 +982,39 @@ struct
     let make_call3 = (make_call3 : _ -> _ simple -> _ :> _ -> _ #simple -> _)
 
     let make_opt_call0 s ctxt block q i =
-      make_call0 s ctxt block q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call0 s ctxt block q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call1 s ctxt block a1 q i =
-      make_call1 s ctxt block a1 q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call1 s ctxt block a1 q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call2 s ctxt block a1 a2 q i =
-      make_call2 s ctxt block a1 a2 q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call2 s ctxt block a1 a2 q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call3 s ctxt block a1 a2 a3 q i =
-      make_call3 s ctxt block a1 a2 a3 q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call3 s ctxt block a1 a2 a3 q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
   end
 
-  module Sapling = Tezos_sapling.Core.Validator
+  module Sapling = Tezos_sapling.Core.Validator_legacy
 
   module Micheline = struct
     include Micheline
@@ -1033,48 +1078,7 @@ struct
 
   module Context = struct
     include Context
-
-    type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
-
-    module type VIEW = sig
-      include Environment_context.VIEW
-
-      val fold :
-        ?depth:depth ->
-        t ->
-        key ->
-        init:'a ->
-        f:(key -> tree -> 'a -> 'a Lwt.t) ->
-        'a Lwt.t
-    end
-
-    module Kind = struct
-      type t = [`Value | `Tree]
-    end
-
-    module type TREE = sig
-      type t
-
-      type tree
-
-      include VIEW with type t := tree and type tree := tree
-
-      val empty : t -> tree
-
-      val is_empty : tree -> bool
-
-      val kind : tree -> Kind.t
-
-      val to_value : tree -> value option Lwt.t
-
-      val of_value : t -> value -> tree Lwt.t
-
-      val hash : tree -> Context_hash.t
-
-      val equal : tree -> tree -> bool
-
-      val clear : ?depth:int -> tree -> unit
-    end
+    include Environment_context.V3
 
     let fold ?depth ctxt k ~init ~f =
       Context.fold ?depth ctxt k ~order:`Sorted ~init ~f
@@ -1100,16 +1104,21 @@ struct
 
     let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
-      value_of_key
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level
-        ~predecessor_fitness
-        ~predecessor
-        ~timestamp
-      >|= wrap_tzresult
-      >>=? fun f -> return (fun x -> f x >|= wrap_tzresult)
+      let open Lwt_result_syntax in
+      let*! r =
+        value_of_key
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_level
+          ~predecessor_fitness
+          ~predecessor
+          ~timestamp
+      in
+      let*? f = wrap_tzresult r in
+      return (fun x ->
+          let*! r = f x in
+          Lwt.return (wrap_tzresult r))
 
     (*
        [load_predecessor_cache] ensures that the cache is correctly
@@ -1118,89 +1127,111 @@ struct
     let load_predecessor_cache ~chain_id ~predecessor_context
         ~predecessor_timestamp ~predecessor_level ~predecessor_fitness
         ~predecessor ~timestamp ~cache =
-      value_of_key
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level
-        ~predecessor_fitness
-        ~predecessor
-        ~timestamp
-      >>=? fun value_of_key ->
+      let open Lwt_result_syntax in
+      let* value_of_key =
+        value_of_key
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_level
+          ~predecessor_fitness
+          ~predecessor
+          ~timestamp
+      in
       Context.load_cache predecessor predecessor_context cache value_of_key
 
     let begin_partial_application ~chain_id ~ancestor_context
         ~(predecessor : Block_header.t) ~predecessor_hash ~cache
         (raw_block : block_header) =
-      load_predecessor_cache
-        ~chain_id
-        ~predecessor_context:ancestor_context
-        ~predecessor_timestamp:predecessor.shell.timestamp
-        ~predecessor_level:predecessor.shell.level
-        ~predecessor_fitness:predecessor.shell.fitness
-        ~predecessor:predecessor_hash
-        ~timestamp:raw_block.shell.timestamp
-        ~cache
-      >>=? fun ancestor_context ->
-      begin_partial_application
-        ~chain_id
-        ~ancestor_context
-        ~predecessor_timestamp:predecessor.shell.timestamp
-        ~predecessor_fitness:predecessor.shell.fitness
-        raw_block
-      >|= wrap_tzresult
+      let open Lwt_result_syntax in
+      let* ancestor_context =
+        load_predecessor_cache
+          ~chain_id
+          ~predecessor_context:ancestor_context
+          ~predecessor_timestamp:predecessor.shell.timestamp
+          ~predecessor_level:predecessor.shell.level
+          ~predecessor_fitness:predecessor.shell.fitness
+          ~predecessor:predecessor_hash
+          ~timestamp:raw_block.shell.timestamp
+          ~cache
+      in
+      let*! r =
+        begin_partial_application
+          ~chain_id
+          ~ancestor_context
+          ~predecessor_timestamp:predecessor.shell.timestamp
+          ~predecessor_fitness:predecessor.shell.fitness
+          raw_block
+      in
+      Lwt.return (wrap_tzresult r)
 
     let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_fitness ~cache (raw_block : block_header) =
-      load_predecessor_cache
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level:(Int32.pred raw_block.shell.level)
-        ~predecessor_fitness
-        ~predecessor:raw_block.shell.predecessor
-        ~timestamp:raw_block.shell.timestamp
-        ~cache
-      >>=? fun predecessor_context ->
-      begin_application
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_fitness
-        raw_block
-      >|= wrap_tzresult
+      let open Lwt_result_syntax in
+      let* predecessor_context =
+        load_predecessor_cache
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_level:(Int32.pred raw_block.shell.level)
+          ~predecessor_fitness
+          ~predecessor:raw_block.shell.predecessor
+          ~timestamp:raw_block.shell.timestamp
+          ~cache
+      in
+      let*! r =
+        begin_application
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_fitness
+          raw_block
+      in
+      Lwt.return (wrap_tzresult r)
 
     let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
         ?protocol_data ~cache () =
-      load_predecessor_cache
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level
-        ~predecessor_fitness
-        ~predecessor
-        ~timestamp
-        ~cache
-      >>=? fun predecessor_context ->
-      begin_construction
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level
-        ~predecessor_fitness
-        ~predecessor
-        ~timestamp
-        ?protocol_data
-        ()
-      >|= wrap_tzresult
+      let open Lwt_result_syntax in
+      let* predecessor_context =
+        load_predecessor_cache
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_level
+          ~predecessor_fitness
+          ~predecessor
+          ~timestamp
+          ~cache
+      in
+      let*! r =
+        begin_construction
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_level
+          ~predecessor_fitness
+          ~predecessor
+          ~timestamp
+          ?protocol_data
+          ()
+      in
+      Lwt.return (wrap_tzresult r)
 
-    let apply_operation c o = apply_operation c o >|= wrap_tzresult
+    let apply_operation c o =
+      let open Lwt_syntax in
+      let+ r = apply_operation c o in
+      wrap_tzresult r
 
     let finalize_block c shell_header =
-      finalize_block c shell_header >|= wrap_tzresult
+      let open Lwt_syntax in
+      let+ r = finalize_block c shell_header in
+      wrap_tzresult r
 
-    let init c bh = init c bh >|= wrap_tzresult
+    let init c bh =
+      let open Lwt_syntax in
+      let+ r = init c bh in
+      wrap_tzresult r
 
     let set_log_message_consumer f = Logging.logging_function := Some f
   end

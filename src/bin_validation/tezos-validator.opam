@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -11,10 +13,11 @@ depends: [
   "tezos-context"
   "tezos-stdlib-unix"
   "tezos-protocol-environment"
-  "tezos-protocol-updater"
   "tezos-shell"
-  "tezos-shell-context"
+  "tezos-shell-services"
   "tezos-validation"
+  "tezos-protocol-updater"
+  "tezos-shell-context"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

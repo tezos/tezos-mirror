@@ -1,23 +1,22 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/concat.tz]
 
 Well typed
-Gas remaining: 1039992.618 units remaining
+Gas remaining: 1039993.578 units remaining
 { parameter string ;
   storage string ;
   code { DUP
-         /* [ pair (string @parameter) (string @storage)
-            : pair (string @parameter) (string @storage) ] */ ;
+         /* [ pair string string : pair string string ] */ ;
          DIP { CDR
-               /* [ @storage string ] */ ;
+               /* [ string ] */ ;
                NIL string
-               /* [ list string : @storage string ] */ ;
+               /* [ list string : string ] */ ;
                SWAP
-               /* [ @storage string : list string ] */ ;
+               /* [ string : list string ] */ ;
                CONS
                /* [ list string ] */ }
-         /* [ pair (string @parameter) (string @storage) : list string ] */ ;
+         /* [ pair string string : list string ] */ ;
          CAR
-         /* [ @parameter string : list string ] */ ;
+         /* [ string : list string ] */ ;
          CONS
          /* [ list string ] */ ;
          CONCAT

@@ -1,11 +1,11 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/pexec_2.tz]
 
 Well typed
-Gas remaining: 1039986.241 units remaining
+Gas remaining: 1039988.161 units remaining
 { parameter int ;
   storage (list int) ;
   code { UNPAIR @p @s
-         /* [ @p int : @s list int ] */ ;
+         /* [ int : list int ] */ ;
          LAMBDA
            (pair int (pair int int))
            int
@@ -17,19 +17,19 @@ Gas remaining: 1039986.241 units remaining
              /* [ int : int ] */ ;
              MUL
              /* [ int ] */ }
-         /* [ lambda (pair int int int) int : @p int : @s list int ] */ ;
+         /* [ lambda (pair int int int) int : int : list int ] */ ;
          SWAP
-         /* [ @p int : lambda (pair int int int) int : @s list int ] */ ;
+         /* [ int : lambda (pair int int int) int : list int ] */ ;
          APPLY
-         /* [ lambda (pair int int) int : @s list int ] */ ;
+         /* [ lambda (pair int int) int : list int ] */ ;
          PUSH int 3
-         /* [ int : lambda (pair int int) int : @s list int ] */ ;
+         /* [ int : lambda (pair int int) int : list int ] */ ;
          APPLY
-         /* [ lambda int int : @s list int ] */ ;
+         /* [ lambda int int : list int ] */ ;
          SWAP
-         /* [ @s list int : lambda int int ] */ ;
+         /* [ list int : lambda int int ] */ ;
          MAP { DIP { DUP /* [ lambda int int : lambda int int ] */ }
-               /* [ @s.elt int : lambda int int : lambda int int ] */ ;
+               /* [ int : lambda int int : lambda int int ] */ ;
                EXEC
                /* [ int : lambda int int ] */ }
          /* [ list int : lambda int int ] */ ;

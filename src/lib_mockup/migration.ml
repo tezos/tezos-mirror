@@ -27,41 +27,50 @@ open Persistence
 
 let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~protocol_hash ~next_protocol_hash =
+  let open Lwt_result_syntax in
   let base_dir = cctxt#get_base_dir in
   let explain_will_not_work explain =
-    cctxt#error
-      "@[<hv>Base directory %s %a@ This command will not work.@ Please specify \
-       a correct mockup base directory.@]"
-      base_dir
-      explain
-      ()
-    >>= fun () -> return_unit
+    let*! () =
+      cctxt#error
+        "@[<hv>Base directory %s %a@ This command will not work.@ Please \
+         specify a correct mockup base directory.@]"
+        base_dir
+        explain
+        ()
+    in
+    return_unit
   in
-  classify_base_dir base_dir >>=? fun base_dir_class ->
-  (match base_dir_class with
-  | Base_dir_does_not_exist ->
-      explain_will_not_work (fun fmtr () ->
-          Format.fprintf fmtr "does not exist.")
-  | Base_dir_is_empty ->
-      explain_will_not_work (fun fmtr () -> Format.fprintf fmtr "is empty.")
-  | Base_dir_is_file ->
-      explain_will_not_work (fun fmtr () -> Format.fprintf fmtr "is a file.")
-  | Base_dir_is_nonempty ->
-      explain_will_not_work (fun fmtr () ->
-          Format.fprintf fmtr "is not a mockup base directory.")
-  | Base_dir_is_mockup -> return_unit)
-  >>=? fun () ->
-  get_mockup_context_from_disk ~base_dir ~protocol_hash cctxt
-  >>=? fun ((module Current_mockup_env), registration_data) ->
-  get_registered_mockup (Some next_protocol_hash) cctxt
-  >>=? fun (module Next_mockup_env) ->
-  Next_mockup_env.migrate registration_data
-  >>=? fun {chain = chain_id; rpc_context; protocol_data} ->
-  overwrite_mockup
-    ~protocol_hash:next_protocol_hash
-    ~chain_id
-    ~rpc_context
-    ~protocol_data
-    ~base_dir
-  >>=? fun () ->
-  cctxt#message "Migration successful." >>= fun () -> return_unit
+  let* base_dir_class = classify_base_dir base_dir in
+  let* () =
+    match base_dir_class with
+    | Base_dir_does_not_exist ->
+        explain_will_not_work (fun fmtr () ->
+            Format.fprintf fmtr "does not exist.")
+    | Base_dir_is_empty ->
+        explain_will_not_work (fun fmtr () -> Format.fprintf fmtr "is empty.")
+    | Base_dir_is_file ->
+        explain_will_not_work (fun fmtr () -> Format.fprintf fmtr "is a file.")
+    | Base_dir_is_nonempty ->
+        explain_will_not_work (fun fmtr () ->
+            Format.fprintf fmtr "is not a mockup base directory.")
+    | Base_dir_is_mockup -> return_unit
+  in
+  let* ((module Current_mockup_env), registration_data) =
+    get_mockup_context_from_disk ~base_dir ~protocol_hash cctxt
+  in
+  let* (module Next_mockup_env) =
+    get_registered_mockup (Some next_protocol_hash) cctxt
+  in
+  let* {chain = chain_id; rpc_context; protocol_data} =
+    Next_mockup_env.migrate registration_data
+  in
+  let* () =
+    overwrite_mockup
+      ~protocol_hash:next_protocol_hash
+      ~chain_id
+      ~rpc_context
+      ~protocol_data
+      ~base_dir
+  in
+  let*! () = cctxt#message "Migration successful." in
+  return_unit

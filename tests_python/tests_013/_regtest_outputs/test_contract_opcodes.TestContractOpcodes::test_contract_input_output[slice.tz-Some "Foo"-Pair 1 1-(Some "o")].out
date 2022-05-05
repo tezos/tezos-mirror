@@ -1,0 +1,37 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[slice.tz-Some "Foo"-Pair 1 1-(Some "o")]
+
+storage
+  (Some "o")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (remaining gas: 1039990.163 units remaining)
+    [ (Pair (Pair 1 1) (Some "Foo")) ]
+  - location: 10 (remaining gas: 1039990.153 units remaining)
+    [ (Pair 1 1)
+      (Some "Foo") ]
+  - location: 11 (remaining gas: 1039990.143 units remaining)
+    [ (Some "Foo")
+      (Pair 1 1) ]
+  - location: 13 (remaining gas: 1039990.133 units remaining)
+    [ "Foo"
+      (Pair 1 1) ]
+  - location: 19 (remaining gas: 1039990.123 units remaining)
+    [ (Pair 1 1)
+      "Foo" ]
+  - location: 20 (remaining gas: 1039990.113 units remaining)
+    [ 1
+      1
+      "Foo" ]
+  - location: 21 (remaining gas: 1039990.088 units remaining)
+    [ (Some "o") ]
+  - location: 13 (remaining gas: 1039990.078 units remaining)
+    [ (Some "o") ]
+  - location: 22 (remaining gas: 1039990.068 units remaining)
+    [ {}
+      (Some "o") ]
+  - location: 24 (remaining gas: 1039990.058 units remaining)
+    [ (Pair {} (Some "o")) ]
+

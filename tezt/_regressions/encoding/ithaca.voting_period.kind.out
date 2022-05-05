@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.voting_period.kind.out
+encoding/ithaca.voting_period.kind.out
 
 ./tezos-codec encode 012-Psithaca.voting_period.kind from '"promotion"'
 03

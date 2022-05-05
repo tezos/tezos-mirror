@@ -1,3 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env
+ (_
+  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))
+  (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+
 (library
  (name tezos_base)
  (public_name tezos-base)
@@ -7,14 +15,16 @@
   tezos-crypto
   data-encoding
   tezos-error-monad
-  tezos-event-logging
   tezos-rpc
   tezos-clic
   tezos-micheline
+  tezos-event-logging
   ptime
+  ptime.clock.os
   ezjsonm
   lwt
   ipaddr)
+ (js_of_ocaml (javascript_files ptime.js))
  (flags
   (:standard
    -open Tezos_stdlib
@@ -28,3 +38,7 @@
    -open Tezos_event_logging)))
 
 (ocamllex point_parser)
+
+(rule
+ (targets ptime.js)
+ (action (copy %{lib:ptime.clock.os:runtime.js} ptime.js)))

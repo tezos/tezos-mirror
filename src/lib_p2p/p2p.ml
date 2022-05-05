@@ -193,11 +193,12 @@ module Real = struct
   }
 
   let create ~config ~limits meta_cfg msg_cfg conn_meta_cfg =
+    let open Lwt_result_syntax in
     let io_sched = create_scheduler limits in
     let watcher = Lwt_watcher.create_input () in
     let log event = Lwt_watcher.notify watcher event in
     let triggers = P2p_trigger.create () in
-    create_connection_pool config limits meta_cfg log triggers >>= fun pool ->
+    let*! pool = create_connection_pool config limits meta_cfg log triggers in
     (* There is a mutual recursion between an answerer and connect_handler,
        for the default answerer. Because of the swap request mechanism, the
        default answerer needs to initiate new connections using the
@@ -237,7 +238,8 @@ module Real = struct
     let maintenance =
       create_maintenance_worker limits pool connect_handler config triggers log
     in
-    may_create_welcome_worker config limits connect_handler >>=? fun welcome ->
+    let* welcome = may_create_welcome_worker config limits connect_handler in
+    P2p_metrics.collect pool ;
     return
       {
         config;
@@ -266,15 +268,16 @@ module Real = struct
   (* returns when all workers have shut down in the opposite
      creation order. *)
   let shutdown net () =
-    Events.(emit shutdown_welcome_worker) () >>= fun () ->
-    Option.iter_s P2p_welcome.shutdown net.welcome >>= fun () ->
-    Events.(emit shutdown_maintenance_worker) () >>= fun () ->
-    P2p_maintenance.shutdown net.maintenance >>= fun () ->
-    Events.(emit shutdown_connection_pool) () >>= fun () ->
-    P2p_pool.destroy net.pool >>= fun () ->
-    Events.(emit shutdown_connection_handler) () >>= fun () ->
-    P2p_connect_handler.destroy net.connect_handler >>= fun () ->
-    Events.(emit shutdown_scheduler) () >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Events.(emit shutdown_welcome_worker) () in
+    let* () = Option.iter_s P2p_welcome.shutdown net.welcome in
+    let* () = Events.(emit shutdown_maintenance_worker) () in
+    let* () = P2p_maintenance.shutdown net.maintenance in
+    let* () = Events.(emit shutdown_connection_pool) () in
+    let* () = P2p_pool.destroy net.pool in
+    let* () = Events.(emit shutdown_connection_handler) () in
+    let* () = P2p_connect_handler.destroy net.connect_handler in
+    let* () = Events.(emit shutdown_scheduler) () in
     P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
   let connections {pool; _} () =
@@ -309,42 +312,52 @@ module Real = struct
     P2p_connect_handler.connect ?timeout net.connect_handler point
 
   let recv _net conn =
-    P2p_conn.read conn >>=? fun msg ->
-    Events.(emit message_read) (P2p_conn.info conn).peer_id >>= fun () ->
+    let open Lwt_result_syntax in
+    let* msg = P2p_conn.read conn in
+    let*! () = Events.(emit message_read) (P2p_conn.info conn).peer_id in
     return msg
 
   let rec recv_any net () =
+    let open Lwt_syntax in
     let pipes =
       P2p_pool.Connection.fold net.pool ~init:[] ~f:(fun _peer_id conn acc ->
-          (P2p_conn.is_readable conn >>= function
+          (let* r = P2p_conn.is_readable conn in
+           match r with
            | Ok () -> Lwt.return_some conn
            | Error _ -> Lwt_utils.never_ending ())
           :: acc)
     in
-    Lwt.pick
-      (( P2p_trigger.wait_new_connection net.triggers >>= fun () ->
-         Lwt.return_none )
-       :: pipes)
-    >>= function
+    let new_connection =
+      let* () = P2p_trigger.wait_new_connection net.triggers in
+      Lwt.return_none
+    in
+    let* o = Lwt.pick (new_connection :: pipes) in
+    match o with
     | None -> recv_any net ()
     | Some conn -> (
-        P2p_conn.read conn >>= function
+        let* r = P2p_conn.read conn in
+        match r with
         | Ok msg ->
-            Events.(emit message_read) (P2p_conn.info conn).peer_id
-            >>= fun () -> Lwt.return (conn, msg)
+            let* () = Events.(emit message_read) (P2p_conn.info conn).peer_id in
+            Lwt.return (conn, msg)
         | Error _ ->
-            Events.(emit message_read_error) (P2p_conn.info conn).peer_id
-            >>= fun () ->
-            Lwt.pause () >>= fun () -> recv_any net ())
+            let* () =
+              Events.(emit message_read_error) (P2p_conn.info conn).peer_id
+            in
+            let* () = Lwt.pause () in
+            recv_any net ())
 
   let send _net conn m =
-    P2p_conn.write conn m >>= function
-    | Ok () ->
-        Events.(emit message_sent) (P2p_conn.info conn).peer_id >>= fun () ->
-        return_unit
-    | Error err ->
-        Events.(emit sending_message_error) ((P2p_conn.info conn).peer_id, err)
-        >>= fun () -> Lwt.return_error err
+    let open Lwt_result_syntax in
+    let*! r = P2p_conn.write conn m in
+    let*! () =
+      match r with
+      | Ok () -> Events.(emit message_sent) (P2p_conn.info conn).peer_id
+      | Error trace ->
+          Events.(emit sending_message_error)
+            ((P2p_conn.info conn).peer_id, trace)
+    in
+    Lwt.return r
 
   let try_send _net conn v =
     match P2p_conn.write_now conn v with
@@ -467,33 +480,37 @@ let pool net = net.pool
 let connect_handler net = net.connect_handler
 
 let check_limits =
+  let open Result_syntax in
   let fail_1 v orig =
     if not (Ptime.Span.compare v Ptime.Span.zero <= 0) then return_unit
     else
-      Error_monad.failwith
+      Error_monad.error_with
         "value of option %S cannot be negative or null@."
         orig
   in
   let fail_2 v orig =
     if not (v < 0) then return_unit
-    else Error_monad.failwith "value of option %S cannot be negative@." orig
+    else Error_monad.error_with "value of option %S cannot be negative@." orig
   in
   fun c ->
-    fail_1 c.authentication_timeout "authentication-timeout" >>=? fun () ->
-    fail_2 c.min_connections "min-connections" >>=? fun () ->
-    fail_2 c.expected_connections "expected-connections" >>=? fun () ->
-    fail_2 c.max_connections "max-connections" >>=? fun () ->
-    fail_2 c.max_incoming_connections "max-incoming-connections" >>=? fun () ->
-    fail_2 c.read_buffer_size "read-buffer-size" >>=? fun () ->
-    fail_1 c.swap_linger "swap-linger" >>=? fun () ->
-    (match c.binary_chunks_size with
-    | None -> return_unit
-    | Some size -> P2p_socket.check_binary_chunks_size size)
-    >>=? fun () -> return_unit
+    let* () = fail_1 c.authentication_timeout "authentication-timeout" in
+    let* () = fail_2 c.min_connections "min-connections" in
+    let* () = fail_2 c.expected_connections "expected-connections" in
+    let* () = fail_2 c.max_connections "max-connections" in
+    let* () = fail_2 c.max_incoming_connections "max-incoming-connections" in
+    let* () = fail_2 c.read_buffer_size "read-buffer-size" in
+    let* () = fail_1 c.swap_linger "swap-linger" in
+    let* () =
+      match c.binary_chunks_size with
+      | None -> return_unit
+      | Some size -> P2p_socket.check_binary_chunks_size size
+    in
+    return_unit
 
 let create ~config ~limits peer_cfg conn_cfg msg_cfg =
-  check_limits limits >>=? fun () ->
-  Real.create ~config ~limits peer_cfg msg_cfg conn_cfg >>=? fun net ->
+  let open Lwt_result_syntax in
+  let*? () = check_limits limits in
+  let* net = Real.create ~config ~limits peer_cfg msg_cfg conn_cfg in
   return
     {
       announced_version =
@@ -562,10 +579,12 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     global_stat = (fun () -> Fake.empty_stat);
     get_peer_metadata = (fun _ -> peer_cfg.P2p_params.peer_meta_initial ());
     set_peer_metadata = (fun _ _ -> ());
-    connect = (fun ?timeout:_ _ -> fail P2p_errors.Connection_refused);
+    connect =
+      (fun ?timeout:_ _ ->
+        Lwt_result_syntax.tzfail P2p_errors.Connection_refused);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
-    send = (fun _ _ -> fail P2p_errors.Connection_closed);
+    send = (fun _ _ -> Lwt_result_syntax.tzfail P2p_errors.Connection_closed);
     try_send = (fun _ _ -> false);
     fold_connections = (fun ~init ~f:_ -> init);
     iter_connections = (fun _f -> ());

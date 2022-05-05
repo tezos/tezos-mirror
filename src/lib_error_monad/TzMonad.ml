@@ -24,7 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error = TzCore.error = ..
-
-include TzLwtreslib.Monad
-include Monad_extension_maker.Make (TzCore) (TzTrace) (TzLwtreslib.Monad)
+module Option_syntax = TzLwtreslib.Monad.Option_syntax
+module Lwt_option_syntax = TzLwtreslib.Monad.Option_syntax
+include Monad_maker.Make (TzCore) (TzTrace) (TzLwtreslib.Monad)

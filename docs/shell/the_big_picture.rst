@@ -178,7 +178,7 @@ economic protocol, as a form of static sandboxing. It also generates a
 functorized version of the protocol, to make the execution of the
 protocol in an alternative environment possible.
 
-  - :package:`tezos-protocol-environment-sigs` contains the modules
+  - :package:`tezos-protocol-environment` contains the modules
     that are available to the economic protocol. A review of this
     sandbox is available :doc:`here <../developer/protocol_environment>`. These
     modules include a stripped-down standard library, and interfaces
@@ -210,6 +210,8 @@ protocol in an alternative environment possible.
     implementation, these are the ones that are linked into the
     node. It also contains a module that registers the protocol in the
     node's protocol table.
+
+.. _embedded_protocols:
 
 The Embedded Economic Protocols
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+module Smart_contracts = Client_proto_stresstest_contracts
 
 type transfer_strategy =
   | Fixed_amount of {mutez : Tez.t}  (** Amount to transfer *)
@@ -32,14 +33,20 @@ type transfer_strategy =
       (** Maximum fraction of current wealth to transfer.
           Minimum amount is 1 mutez regardless of total wealth. *)
 
+type limit =
+  | Abs of int  (** Absolute level at which we should stop  *)
+  | Rel of int  (** Relative number of levels before stopping *)
+
 type parameters = {
   seed : int;
   fresh_probability : float;
       (** Per-transfer probability that the destination will be fresh *)
   tps : float;  (** Transaction per seconds target *)
   strategy : transfer_strategy;
-  fee_mutez : Tez.t;  (** fees for each transfer, in mutez *)
-  gas_limit : Gas.Arith.integral;  (** gas limit per operation *)
+  regular_transfer_fee : Tez.t;
+      (** fees for each transfer (except for transfers to smart contracts), in mutez *)
+  regular_transfer_gas_limit : Gas.Arith.integral;
+      (** gas limit per operation (except for transfers to smart contracts) *)
   storage_limit : Z.t;  (** storage limit per operation *)
   account_creation_storage : Z.t;
       (** upper bound on bytes consumed when creating a tz1 account *)
@@ -49,6 +56,11 @@ type parameters = {
       (** if true, a single operation will be injected by pkh by block to
           improve the chance for the injected operations to be included in the
           next block *)
+  level_limit : limit option;
+      (** total number of levels during which the stresstest is run; unbounded if None *)
+  smart_contracts : Smart_contracts.t;
+      (** An opaque type that stores all the information that is necessary for
+    efficient sampling of smart contract calls. *)
 }
 
 type origin = Explicit | Wallet_pkh | Wallet_alias of string
@@ -66,16 +78,24 @@ type input_source =
 
 type source_origin = {source : source; origin : origin}
 
+(** Destination of a call: either an implicit contract or an originated one
+   with all the necessary data (entrypoint and the argument). *)
+type destination =
+  | Implicit of Signature.Public_key_hash.t
+  | Originated of Smart_contracts.invocation_parameters
+
 type transfer = {
   src : source;
-  dst : public_key_hash;
+  dst : destination;
   fee : Tez.t;
+  gas_limit : Gas.Arith.integral;
   amount : Tez.t;
   counter : Z.t option;
   fresh_dst : bool;
 }
 
 type state = {
+  rng_state : Random.State.t;
   current_head_on_start : Block_hash.t;
   counters : (Block_hash.t * Z.t) Signature.Public_key_hash.Table.t;
   mutable pool : source_origin list;
@@ -84,17 +104,31 @@ type state = {
   mutable shuffled_pool : source list option;
   mutable revealed : Signature.Public_key_hash.Set.t;
   mutable last_block : Block_hash.t;
+  mutable last_level : int;
   mutable target_block : Block_hash.t;
       (** The block on top of which we are injecting transactions (HEAD~2). *)
   new_block_condition : unit Lwt_condition.t;
   injected_operations : Operation_hash.t list Block_hash.Table.t;
 }
 
-let verbose = ref false
+(** Cost estimations for every kind of transaction used in the stress test.
+   *)
+type transaction_costs = {
+  regular : Gas.Arith.integral;  (** Cost of a regular transaction. *)
+  smart_contracts : (string * Gas.Arith.integral) list;
+      (** Cost of a smart contract call (per contract alias). *)
+}
 
-let debug = ref false
+type verbosity = Notice | Info | Debug
 
-let debug_msg msg = if !debug then msg () else Lwt.return_unit
+let verbosity = ref Notice
+
+let log level msg =
+  match (level, !verbosity) with
+  | (Notice, _) | (Info, Info) | (Info, Debug) | (Debug, Debug) -> msg ()
+  | _ -> Lwt.return_unit
+
+let pp_sep ppf () = Format.fprintf ppf ",@ "
 
 let default_parameters =
   {
@@ -102,8 +136,8 @@ let default_parameters =
     fresh_probability = 0.001;
     tps = 5.0;
     strategy = Fixed_amount {mutez = Tez.one};
-    fee_mutez = Tez.of_mutez_exn 2_000L;
-    gas_limit = Gas.Arith.integral_of_int_exn 1_600;
+    regular_transfer_fee = Tez.of_mutez_exn 2_000L;
+    regular_transfer_gas_limit = Gas.Arith.integral_of_int_exn 1_600;
     (* [gas_limit] corresponds to a slight overapproximation of the
        gas needed to inject an operation. It was obtained by simulating
        the operation using the client. *)
@@ -114,6 +148,8 @@ let default_parameters =
        It was obtained by simulating the operation using the client. *)
     total_transfers = None;
     single_op_per_pkh_per_block = false;
+    level_limit = None;
+    smart_contracts = Smart_contracts.no_contracts;
   }
 
 let input_source_encoding =
@@ -151,6 +187,20 @@ let injected_operations_encoding =
     (obj2
        (req "block_hash_when_injected" Block_hash.encoding)
        (req "operation_hashes" (list Operation_hash.encoding)))
+
+let transaction_costs_encoding =
+  let open Data_encoding in
+  conv
+    (fun {regular; smart_contracts} -> (regular, smart_contracts))
+    (fun (regular, smart_contracts) -> {regular; smart_contracts})
+    (obj2
+       (req "regular" Gas.Arith.n_integral_encoding)
+       (req "smart_contracts" (assoc Gas.Arith.n_integral_encoding)))
+
+let destination_to_contract dst =
+  match dst with
+  | Implicit x -> Contract.implicit_contract x
+  | Originated x -> x.destination
 
 let parse_strategy s =
   match String.split ~limit:1 ':' s with
@@ -262,8 +312,8 @@ let unnormalize_source src_org =
 (** Samples from [state.pool]. Used to generate the destination of a
     transfer, and its source only when [state.shuffled_pool] is [None]
     meaning that [--single-op-per-pkh-per-block] is not set. *)
-let sample_any_source_from_pool state rng_state =
-  let idx = Random.State.int rng_state state.pool_size in
+let sample_any_source_from_pool state =
+  let idx = Random.State.int state.rng_state state.pool_size in
   match List.nth state.pool idx with
   | None -> assert false
   | Some src_org -> Lwt.return src_org.source
@@ -271,13 +321,12 @@ let sample_any_source_from_pool state rng_state =
 (** Generates the source of a transfer. If [state.shuffled_pool] has a
     value (meaning that [--single-op-per-pkh-per-block] is active) then
     it is sampled from there, otherwise from [state.pool]. *)
-let rec sample_source_from_pool state rng_state
-    (cctxt : Protocol_client_context.full) =
+let rec sample_source_from_pool state (cctxt : Protocol_client_context.full) =
   match state.shuffled_pool with
-  | None -> sample_any_source_from_pool state rng_state
+  | None -> sample_any_source_from_pool state
   | Some (source :: l) ->
       state.shuffled_pool <- Some l ;
-      debug_msg (fun () ->
+      log Debug (fun () ->
           cctxt#message
             "sample_transfer: %d unused sources for the block next to %a"
             (List.length l)
@@ -291,54 +340,124 @@ let rec sample_source_from_pool state rng_state
         state.last_block
       >>= fun () ->
       Lwt_condition.wait state.new_block_condition >>= fun () ->
-      sample_source_from_pool state rng_state cctxt
+      sample_source_from_pool state cctxt
 
-let random_seed rng_state =
-  Bytes.init 32 (fun _ -> Char.chr (Random.State.int rng_state 256))
+let random_seed rng =
+  Bytes.init 32 (fun _ -> Char.chr (Random.State.int rng 256))
 
-let generate_fresh_source pool rng_state =
-  let seed = random_seed rng_state in
+let generate_fresh_source state =
+  let seed = random_seed state.rng_state in
   let (pkh, pk, sk) = Signature.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
-  pool.pool <- fresh :: pool.pool ;
-  pool.pool_size <- pool.pool_size + 1 ;
+  state.pool <- fresh :: state.pool ;
+  state.pool_size <- state.pool_size + 1 ;
   fresh.source
 
-(* [on_new_head cctxt f] calls [f head] each time there is a new head
-   received by the streamed RPC /monitor/heads/main *)
-let on_new_head (cctxt : Protocol_client_context.full) f =
-  Shell_services.Monitor.heads cctxt `Main >>=? fun (heads_stream, stopper) ->
-  Lwt_stream.iter_s f heads_stream >>= fun () ->
-  stopper () ;
-  return_unit
+(* [heads_iter cctxt f] calls [f head] each time there is a new head received
+   by the streamed RPC /monitor/heads/main and returns [promise, stopper].
+   [promise] resolved when the stream is closed. [stopper ()] closes the
+   stream. *)
+let heads_iter (cctxt : Protocol_client_context.full)
+    (f : Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t) :
+    (unit tzresult Lwt.t * RPC_context.stopper) tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* (heads_stream, stopper) = Shell_services.Monitor.heads cctxt `Main in
+  let rec loop () : unit tzresult Lwt.t =
+    let*! block_hash_and_header = Lwt_stream.get heads_stream in
+    match block_hash_and_header with
+    | None -> Error_monad.failwith "unexpected end of block stream@."
+    | Some ((new_block_hash, _block_header) as block_hash_and_header) ->
+        Lwt.catch
+          (fun () ->
+            let*! () =
+              log Debug (fun () ->
+                  cctxt#message
+                    "heads_iter: new block received %a@."
+                    Block_hash.pp
+                    new_block_hash)
+            in
+            let* protocols =
+              Shell_services.Blocks.protocols
+                cctxt
+                ~block:(`Hash (new_block_hash, 0))
+                ()
+            in
+            if Protocol_hash.(protocols.current_protocol = Protocol.hash) then
+              let* () = f block_hash_and_header in
+              loop ()
+            else
+              let*! () =
+                log Debug (fun () ->
+                    cctxt#message
+                      "heads_iter: new block on protocol %a. Stopping \
+                       iteration.@."
+                      Protocol_hash.pp
+                      protocols.current_protocol)
+              in
+              return_unit)
+          (fun exn ->
+            Error_monad.failwith
+              "An exception occured on a function bound on new heads : %s@."
+              (Printexc.to_string exn))
+  in
+  let promise = loop () in
+  let*! () =
+    log Debug (fun () ->
+        cctxt#message
+          "head iteration for proto %a stopped@."
+          Protocol_hash.pp
+          Protocol.hash)
+  in
+  return (promise, stopper)
+
+let sample_smart_contracts smart_contracts rng_state =
+  let smart_contract =
+    Smart_contracts.select smart_contracts (Random.State.float rng_state 1.0)
+  in
+  Option.map
+    (fun invocation_parameters ->
+      ( Originated invocation_parameters,
+        invocation_parameters.fee,
+        invocation_parameters.gas_limit ))
+    smart_contract
 
 (* We perform rejection sampling of valid sources.
    We could maintain a local cache of existing contracts with sufficient balance. *)
 let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
-    (parameters : parameters) (state : state) rng_state =
-  sample_source_from_pool state rng_state cctxt >>= fun src ->
+    (parameters : parameters) (state : state) =
+  sample_source_from_pool state cctxt >>= fun src ->
   Alpha_services.Contract.balance
     cctxt
     (chain, block)
     (Contract.implicit_contract src.pkh)
   >>=? fun tez ->
   if Tez.(tez = zero) then
-    debug_msg (fun () ->
+    log Debug (fun () ->
         cctxt#message
           "sample_transfer: invalid balance %a"
           Signature.Public_key_hash.pp
           src.pkh)
     >>= fun () ->
     (* Sampled source has zero balance: the transfer that created that
-             address was not included yet. Retry *)
-    sample_transfer cctxt chain block parameters state rng_state
+       address was not included yet. Retry *)
+    sample_transfer cctxt chain block parameters state
   else
     let fresh =
-      Random.State.float rng_state 1.0 < parameters.fresh_probability
+      Random.State.float state.rng_state 1.0 < parameters.fresh_probability
     in
-    (if fresh then Lwt.return (generate_fresh_source state rng_state)
-    else sample_any_source_from_pool state rng_state)
-    >>= fun dest ->
+    (match
+       sample_smart_contracts parameters.smart_contracts state.rng_state
+     with
+    | None ->
+        (if fresh then Lwt.return (generate_fresh_source state)
+        else sample_any_source_from_pool state)
+        >|= fun dest ->
+        Ok
+          ( Implicit dest.pkh,
+            parameters.regular_transfer_fee,
+            parameters.regular_transfer_gas_limit )
+    | Some v -> return v)
+    >>=? fun (dst, fee, gas_limit) ->
     let amount =
       match parameters.strategy with
       | Fixed_amount {mutez} -> mutez
@@ -347,15 +466,13 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
           let max_fraction = Int64.of_float (mutez *. fraction) in
           let amount =
             if max_fraction = 0L then 1L
-            else max 1L (Random.State.int64 rng_state max_fraction)
+            else max 1L (Random.State.int64 state.rng_state max_fraction)
           in
           Tez.of_mutez_exn amount
     in
-    let fee = parameters.fee_mutez in
-    return {src; dst = dest.pkh; fee; amount; counter = None; fresh_dst = fresh}
+    return {src; dst; fee; gas_limit; amount; counter = None; fresh_dst = fresh}
 
-let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
-    contents =
+let inject_contents (cctxt : Protocol_client_context.full) branch sk contents =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
@@ -370,13 +487,12 @@ let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
   let bytes =
     Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
-  Shell_services.Injection.operation cctxt ~chain bytes
+  Shell_services.Injection.operation cctxt bytes
 
 (* counter _must_ be set before calling this function *)
 let manager_op_of_transfer parameters
-    {src; dst; fee; amount; counter; fresh_dst} =
+    {src; dst; fee; gas_limit; amount; counter; fresh_dst} =
   let source = src.pkh in
-  let gas_limit = parameters.gas_limit in
   let storage_limit =
     if fresh_dst then
       Z.add parameters.account_creation_storage parameters.storage_limit
@@ -386,11 +502,18 @@ let manager_op_of_transfer parameters
     let parameters =
       let open Tezos_micheline in
       Script.lazy_expr
-      @@ Micheline.strip_locations
-           (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
+        (match dst with
+        | Implicit _ ->
+            Micheline.strip_locations
+              (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
+        | Originated x -> x.arg)
     in
-    let entrypoint = "default" in
-    let destination = Contract.implicit_contract dst in
+    let entrypoint =
+      match dst with
+      | Implicit _ -> Entrypoint.default
+      | Originated x -> x.entrypoint
+    in
+    let destination = Destination.Contract (destination_to_contract dst) in
     Transaction {amount; parameters; entrypoint; destination}
   in
   match counter with
@@ -402,152 +525,129 @@ let manager_op_of_transfer parameters
 let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 1_000
 
 let inject_transfer (cctxt : Protocol_client_context.full) parameters state
-    rng_state chain block transfer =
-  Alpha_services.Contract.counter cctxt (chain, block) transfer.src.pkh
+    transfer =
+  Shell_services.Blocks.hash cctxt () >>=? fun branch ->
+  Alpha_services.Contract.counter cctxt (`Main, `Head 0) transfer.src.pkh
   >>=? fun pcounter ->
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun branch ->
-  (* If there is a new block refresh the fresh_pool *)
-  if not (Block_hash.equal branch state.last_block) then (
-    state.last_block <- branch ;
-    (* Because of how Tenderbake works the target block should stay 2
-       blocks in the past because this guarantees that we are targeting a
-       block that is decided. *)
-    Shell_services.Blocks.hash cctxt ~chain ~block:(`Head 2) ()
-    >>=? fun target_block ->
-    state.target_block <- target_block ;
-    if Option.is_some state.shuffled_pool then
-      state.shuffled_pool <-
-        Some
-          (List.shuffle
-             ~rng_state
-             (List.map (fun src_org -> src_org.source) state.pool)) ;
-    return ())
-  else
-    return () >>=? fun () ->
-    let freshest_counter =
-      match
-        Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
-      with
-      | None ->
-          (* This is the first operation we inject for this pkh: the counter given
-             by the RPC _must_ be the freshest one. *)
+  let freshest_counter =
+    match
+      Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
+    with
+    | None ->
+        (* This is the first operation we inject for this pkh: the counter given
+           by the RPC _must_ be the freshest one. *)
+        pcounter
+    | Some (previous_branch, previous_counter) ->
+        if Block_hash.equal branch previous_branch then
+          (* We already injected an operation on top of this block: the one stored
+             locally is the freshest one. *)
+          previous_counter
+        else
+          (* It seems the block changed since we last injected an operation:
+             this invalidates the previously stored counter. We return the counter
+             given by the RPC. *)
           pcounter
-      | Some (previous_branch, previous_counter) ->
-          if Block_hash.equal branch previous_branch then
-            (* We already injected an operation on top of this block: the one stored
-               locally is the freshest one. *)
-            previous_counter
-          else
-            (* It seems the block changed since we last injected an operation:
-               this invalidates the previously stored counter. We return the counter
-               given by the RPC. *)
-            pcounter
-    in
-    (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
-     return true
-    else (
-      (* Either the [manager_key] RPC tells us the key is already
-         revealed, or we immediately inject a reveal operation: in any
-         case the key is revealed in the end. *)
-      state.revealed <-
-        Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
-      Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
-      >>=? fun pk_opt -> return (Option.is_some pk_opt)))
-    >>=? fun already_revealed ->
-    (if not already_revealed then (
-     let reveal_counter = Z.succ freshest_counter in
-     let transf_counter = Z.succ reveal_counter in
-     let reveal =
-       Manager_operation
-         {
-           source = transfer.src.pkh;
-           fee = Tez.zero;
-           counter = reveal_counter;
-           gas_limit = cost_of_manager_operation;
-           storage_limit = Z.zero;
-           operation = Reveal transfer.src.pk;
-         }
-     in
-     let manager_op =
-       manager_op_of_transfer
-         parameters
-         {transfer with counter = Some transf_counter}
-     in
-     let list = Cons (reveal, Single manager_op) in
-     Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-     Signature.Public_key_hash.Table.add
-       state.counters
-       transfer.src.pkh
-       (branch, transf_counter) ;
-     (if !verbose then
-      cctxt#message
-        "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-        Signature.Public_key_hash.pp
-        transfer.src.pkh
-        Z.pp_print
-        reveal_counter
-        Z.pp_print
-        transf_counter
-        Signature.Public_key_hash.pp
-        transfer.dst
-     else Lwt.return_unit)
-     >>= fun () ->
-     (* NB: regardless of our best efforts to keep track of counters, injection can fail with
-        "counter in the future" if a block switch happens in between the moment we
-        get the branch and the moment we inject, and the new block does not include
-        all the operations we injected. *)
-     inject_contents cctxt chain state.target_block transfer.src.sk list)
-    else
-      let transf_counter = Z.succ freshest_counter in
-      let manager_op =
-        manager_op_of_transfer
-          parameters
-          {transfer with counter = Some transf_counter}
-      in
-      let list = Single manager_op in
-      Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-      Signature.Public_key_hash.Table.add
-        state.counters
-        transfer.src.pkh
-        (branch, transf_counter) ;
-      (if !verbose then
+  in
+  (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
+   return true
+  else (
+    (* Either the [manager_key] RPC tells us the key is already
+       revealed, or we immediately inject a reveal operation: in any
+       case the key is revealed in the end. *)
+    state.revealed <-
+      Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
+    Alpha_services.Contract.manager_key cctxt (`Main, `Head 0) transfer.src.pkh
+    >>=? fun pk_opt -> return (Option.is_some pk_opt)))
+  >>=? fun already_revealed ->
+  (if not already_revealed then (
+   let reveal_counter = Z.succ freshest_counter in
+   let transf_counter = Z.succ reveal_counter in
+   let reveal =
+     Manager_operation
+       {
+         source = transfer.src.pkh;
+         fee = Tez.zero;
+         counter = reveal_counter;
+         gas_limit = cost_of_manager_operation;
+         storage_limit = Z.zero;
+         operation = Reveal transfer.src.pk;
+       }
+   in
+   let manager_op =
+     manager_op_of_transfer
+       parameters
+       {transfer with counter = Some transf_counter}
+   in
+   let list = Cons (reveal, Single manager_op) in
+   Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+   Signature.Public_key_hash.Table.add
+     state.counters
+     transfer.src.pkh
+     (branch, transf_counter) ;
+   log Info (fun () ->
        cctxt#message
-         "injecting transfer from %a (counter=%a) to %a"
+         "injecting reveal+transfer from %a (counters=%a,%a) to %a"
          Signature.Public_key_hash.pp
          transfer.src.pkh
          Z.pp_print
+         reveal_counter
+         Z.pp_print
          transf_counter
-         Signature.Public_key_hash.pp
-         transfer.dst
-      else Lwt.return_unit)
+         Contract.pp
+         (destination_to_contract transfer.dst))
+   >>= fun () ->
+   (* NB: regardless of our best efforts to keep track of counters, injection can fail with
+      "counter in the future" if a block switch happens in between the moment we
+      get the branch and the moment we inject, and the new block does not include
+      all the operations we injected. *)
+   inject_contents cctxt state.target_block transfer.src.sk list)
+  else
+    let transf_counter = Z.succ freshest_counter in
+    let manager_op =
+      manager_op_of_transfer
+        parameters
+        {transfer with counter = Some transf_counter}
+    in
+    let list = Single manager_op in
+    Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+    Signature.Public_key_hash.Table.add
+      state.counters
+      transfer.src.pkh
+      (branch, transf_counter) ;
+    log Info (fun () ->
+        cctxt#message
+          "injecting transfer from %a (counter=%a) to %a"
+          Signature.Public_key_hash.pp
+          transfer.src.pkh
+          Z.pp_print
+          transf_counter
+          Contract.pp
+          (destination_to_contract transfer.dst))
+    >>= fun () ->
+    (* See comment above. *)
+    inject_contents cctxt state.target_block transfer.src.sk list)
+  >>= function
+  | Ok op_hash ->
+      log Debug (fun () ->
+          cctxt#message
+            "inject_transfer: op injected %a"
+            Operation_hash.pp
+            op_hash)
       >>= fun () ->
-      (* See comment above. *)
-      inject_contents cctxt chain state.target_block transfer.src.sk list)
-    >>= function
-    | Ok op_hash ->
-        debug_msg (fun () ->
-            cctxt#message
-              "inject_transfer: op injected %a"
-              Operation_hash.pp
-              op_hash)
-        >>= fun () ->
-        let ops =
-          Option.value
-            ~default:[]
-            (Block_hash.Table.find state.injected_operations branch)
-        in
-        Block_hash.Table.replace
-          state.injected_operations
-          branch
-          (op_hash :: ops) ;
-        return_unit
-    | Error e ->
-        debug_msg (fun () ->
-            cctxt#message
-              "inject_transfer: error, op not injected: %a"
-              Error_monad.pp_print_trace
-              e)
-        >>= fun () -> return_unit
+      let ops =
+        Option.value
+          ~default:[]
+          (Block_hash.Table.find state.injected_operations branch)
+      in
+      Block_hash.Table.replace state.injected_operations branch (op_hash :: ops) ;
+      return_unit
+  | Error e ->
+      log Debug (fun () ->
+          cctxt#message
+            "inject_transfer: error, op not injected: %a"
+            Error_monad.pp_print_trace
+            e)
+      >>= fun () -> return_unit
 
 let save_injected_operations (cctxt : Protocol_client_context.full) state =
   let json =
@@ -615,12 +715,12 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
     in
     get_included_ops state.current_head_on_start >>=? fun included_ops ->
     let included_ops_count = inter_cardinal injected_ops included_ops in
-    debug_msg (fun () ->
+    log Debug (fun () ->
         cctxt#message
-          "injected : %a\nincluded: %a"
-          (Format.pp_print_list Operation_hash.pp)
+          "injected : [%a]@.included: [%a]"
+          (Format.pp_print_list ~pp_sep Operation_hash.pp)
           injected_ops
-          (Format.pp_print_list Operation_hash.pp)
+          (Format.pp_print_list ~pp_sep Operation_hash.pp)
           included_ops)
     >>= fun () ->
     let injected_ops_count = List.length injected_ops in
@@ -637,36 +737,55 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
   ratio_injected_included_op ()
 
 let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
-    state rng_state save_pool_callback =
+    state save_pool_callback =
   let injected = ref 0 in
+  let target_level =
+    match parameters.level_limit with
+    | None -> None
+    | Some (Abs target) -> Some target
+    | Some (Rel offset) -> Some (state.last_level + offset)
+  in
   let dt = 1. /. parameters.tps in
   let terminated () =
-    match parameters.total_transfers with
-    | None -> false
-    | Some bound -> bound <= !injected
+    if
+      match parameters.total_transfers with
+      | None -> false
+      | Some bound -> bound <= !injected
+    then
+      cctxt#message
+        "Stopping after %d injections (target %a)."
+        !injected
+        Format.(pp_print_option pp_print_int)
+        parameters.total_transfers
+      >>= fun () -> Lwt.return_true
+    else
+      match target_level with
+      | None -> Lwt.return_false
+      | Some target ->
+          if target <= state.last_level then
+            cctxt#message
+              "Stopping at level %d (target level: %d)."
+              state.last_level
+              target
+            >>= fun () -> Lwt.return_true
+          else Lwt.return_false
   in
+
   let rec loop () =
-    if terminated () then
+    terminated () >>= fun terminated ->
+    if terminated then
       save_pool_callback () >>= fun () ->
       save_injected_operations cctxt state >>= fun () ->
       stat_on_exit cctxt state
     else
       let start = Mtime_clock.elapsed () in
-      debug_msg (fun () -> cctxt#message "launch.loop: invoke sample_transfer")
+      log Debug (fun () -> cctxt#message "launch.loop: invoke sample_transfer")
       >>= fun () ->
-      sample_transfer cctxt cctxt#chain cctxt#block parameters state rng_state
+      sample_transfer cctxt cctxt#chain cctxt#block parameters state
       >>=? fun transfer ->
-      debug_msg (fun () -> cctxt#message "launch.loop: invoke inject_transfer")
+      log Debug (fun () -> cctxt#message "launch.loop: invoke inject_transfer")
       >>= fun () ->
-      inject_transfer
-        cctxt
-        parameters
-        state
-        rng_state
-        cctxt#chain
-        cctxt#block
-        transfer
-      >>=? fun () ->
+      inject_transfer cctxt parameters state transfer >>=? fun () ->
       incr injected ;
       let stop = Mtime_clock.elapsed () in
       let elapsed = Mtime.Span.(to_s stop -. to_s start) in
@@ -678,32 +797,41 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       else Lwt_unix.sleep remaining)
       >>= loop
   in
-  (* True, if and only if [single_op_per_pkh_per_block] is true. *)
-  if Option.is_some state.shuffled_pool then
-    dont_wait
-      (fun () ->
-        on_new_head cctxt (fun (block, _) ->
-            if not (Block_hash.equal block state.last_block) then (
-              state.last_block <- block ;
-              state.shuffled_pool <-
-                Some
-                  (List.shuffle
-                     ~rng_state
-                     (List.map (fun src_org -> src_org.source) state.pool))) ;
-            Lwt_condition.broadcast state.new_block_condition () ;
-            Lwt.return_unit))
-      (fun trace ->
-        ignore
-          (cctxt#error
-             "an error while getting the new head has been returned: %a"
-             Error_monad.pp_print_trace
-             trace))
-      (fun exn ->
-        ignore
-          (cctxt#error
-             "an exception while getting the new head has been raised: %s"
-             (Printexc.to_string exn))) ;
-  loop ()
+  let on_new_head :
+      Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t =
+    (* Because of how Tenderbake works the target block should stay 2
+       blocks in the past because this guarantees that we are targeting a
+       block that is decided. *)
+    let update_target_block () =
+      Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
+      >>=? fun target_block ->
+      state.target_block <- target_block ;
+      return_unit
+    in
+    match state.shuffled_pool with
+    (* Some _ if and only if [single_op_per_pkh_per_block] is true. *)
+    | Some _ ->
+        fun (new_block_hash, new_block_header) ->
+          update_target_block () >>=? fun () ->
+          if not (Block_hash.equal new_block_hash state.last_block) then (
+            state.last_block <- new_block_hash ;
+            state.last_level <- Int32.to_int new_block_header.shell.level ;
+            state.shuffled_pool <-
+              Some
+                (List.shuffle
+                   ~rng:state.rng_state
+                   (List.map (fun src_org -> src_org.source) state.pool))) ;
+          Lwt_condition.broadcast state.new_block_condition () ;
+          return_unit
+    | None ->
+        (* only wait for the end of the head stream; don't act on heads *)
+        fun _ -> update_target_block ()
+  in
+  heads_iter cctxt on_new_head >>=? fun (heads_iteration, stopper) ->
+  (* The head iteration stops at protocol change. *)
+  Lwt.pick [loop (); heads_iteration] >>=? fun () ->
+  (match Lwt.state heads_iteration with Lwt.Return _ -> () | _ -> stopper ()) ;
+  return_unit
 
 let group =
   Clic.{name = "stresstest"; title = "Commands for stress-testing the network"}
@@ -783,6 +911,28 @@ let fresh_probability_arg =
              cctxt#error "While parsing --fresh-probability: invalid argument"
          | f -> return f))
 
+let smart_contract_parameters_arg =
+  let open Clic in
+  arg
+    ~long:"smart-contract-parameters"
+    ~placeholder:"JSON file with smart contract parameters"
+    ~doc:
+      (Format.sprintf
+         "A JSON object that maps smart contract aliases to objects with three \
+          fields: probability in [0;1], invocation_fee, and \
+          invocation_gas_limit.")
+    (parameter (fun (cctxt : Protocol_client_context.full) s ->
+         match Data_encoding.Json.from_string s with
+         | Ok json ->
+             return
+               (Data_encoding.Json.destruct
+                  Smart_contracts.contract_parameters_collection_encoding
+                  json)
+         | Error _ ->
+             cctxt#error
+               "While parsing --smart-contract-parameters: invalid JSON %s"
+               s))
+
 let strategy_arg =
   let open Clic in
   arg
@@ -812,7 +962,7 @@ let gas_limit_arg =
          "Set the gas limit of the transaction instead of using the default \
           value of %a"
          Gas.Arith.pp_integral
-         default_parameters.gas_limit)
+         default_parameters.regular_transfer_gas_limit)
     gas_limit_kind
 
 let storage_limit_arg =
@@ -860,13 +1010,31 @@ let single_op_per_pkh_per_block_arg =
        to 1 operation per public_key_hash per block."
     ()
 
+let level_limit_arg =
+  let open Clic in
+  arg
+    ~long:"level-limit"
+    ~placeholder:"integer | +integer"
+    ~doc:
+      "Level at which the stresstest will stop (if prefixed by '+', the level \
+       is relative to the current head)"
+    (parameter (fun (cctxt : Protocol_client_context.full) s ->
+         match int_of_string s with
+         | exception _ ->
+             cctxt#error "While parsing --levels: invalid integer literal"
+         | i when i <= 0 ->
+             cctxt#error "While parsing --levels: negative integer or zero"
+         | i -> if String.get s 0 = '+' then return (Rel i) else return (Abs i)))
+
 let verbose_arg =
   Clic.switch
     ~long:"verbose"
+    ~short:'v'
     ~doc:"Display detailed logs of the injected operations"
     ()
 
-let debug_arg = Clic.switch ~long:"debug" ~doc:"Display debug logs" ()
+let debug_arg =
+  Clic.switch ~long:"debug" ~short:'V' ~doc:"Display debug logs" ()
 
 let set_option opt f x = Option.fold ~none:x ~some:(f x) opt
 
@@ -903,16 +1071,18 @@ let generate_random_transactions =
   command
     ~group
     ~desc:"Generate random transactions"
-    (args11
+    (args13
        seed_arg
        tps_arg
        fresh_probability_arg
+       smart_contract_parameters_arg
        strategy_arg
        Client_proto_args.fee_arg
        gas_limit_arg
        storage_limit_arg
        transfers_arg
        single_op_per_pkh_per_block_arg
+       level_limit_arg
        verbose_arg
        debug_arg)
     (prefixes ["stresstest"; "transfer"; "using"]
@@ -925,35 +1095,47 @@ let generate_random_transactions =
     (fun ( seed,
            tps,
            freshp,
+           smart_contract_parameters,
            strat,
            fee,
            gas_limit,
            storage_limit,
            transfers,
            single_op_per_pkh_per_block,
+           level_limit,
            verbose_flag,
            debug_flag )
          sources_json
          (cctxt : Protocol_client_context.full) ->
-      verbose := verbose_flag ;
-      debug := debug_flag ;
+      (verbosity :=
+         match (debug_flag, verbose_flag) with
+         | (true, _) -> Debug
+         | (false, true) -> Info
+         | (false, false) -> Notice) ;
+      Smart_contracts.init
+        cctxt
+        (Option.value ~default:[] smart_contract_parameters)
+      >>=? fun smart_contracts ->
       let parameters =
-        default_parameters
+        {default_parameters with smart_contracts}
         |> set_option seed (fun parameter seed -> {parameter with seed})
         |> set_option tps (fun parameter tps -> {parameter with tps})
         |> set_option freshp (fun parameter fresh_probability ->
                {parameter with fresh_probability})
         |> set_option strat (fun parameter strategy ->
                {parameter with strategy})
-        |> set_option fee (fun parameter fee_mutez ->
-               {parameter with fee_mutez})
-        |> set_option gas_limit (fun parameter gas_limit ->
-               {parameter with gas_limit})
+        |> set_option fee (fun parameter regular_transfer_fee ->
+               {parameter with regular_transfer_fee})
+        |> set_option gas_limit (fun parameter regular_transfer_gas_limit ->
+               {parameter with regular_transfer_gas_limit})
         |> set_option storage_limit (fun parameter storage_limit ->
                {parameter with storage_limit})
         |> set_option transfers (fun parameter transfers ->
                {parameter with total_transfers = Some transfers})
-        |> fun parameter -> {parameter with single_op_per_pkh_per_block}
+        |> fun parameter ->
+        {parameter with single_op_per_pkh_per_block}
+        |> set_option level_limit (fun parameter level_limit ->
+               {parameter with level_limit = Some level_limit})
       in
       match
         Data_encoding.Json.destruct
@@ -963,14 +1145,36 @@ let generate_random_transactions =
       | exception _ -> cctxt#error "Could not decode list of sources"
       | [] -> cctxt#error "It is required to provide sources"
       | sources ->
-          List.filter_map_p (normalize_source cctxt) sources >>= fun sources ->
+          log Info (fun () -> cctxt#message "starting to normalize sources")
+          >>= fun () ->
+          List.filter_map_s (normalize_source cctxt) sources >>= fun sources ->
+          log Info (fun () -> cctxt#message "all sources have been normalized")
+          >>= fun () ->
+          let sources =
+            List.sort_uniq
+              (fun src1 src2 ->
+                Signature.Secret_key.compare src1.source.sk src2.source.sk)
+              sources
+          in
           let counters = Signature.Public_key_hash.Table.create 1023 in
           let rng_state = Random.State.make [|parameters.seed|] in
           Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
+          Shell_services.Blocks.Header.shell_header cctxt ()
+          >>=? fun header_on_start ->
+          (if header_on_start.level <= 2l then
+           cctxt#error
+             "The level of the head (%a) needs to be greater than 2 and is \
+              actually %ld."
+             Block_hash.pp
+             current_head_on_start
+             header_on_start.level
+          else return_unit)
+          >>=? fun () ->
           Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
           >>=? fun current_target_block ->
           let state =
             {
+              rng_state;
               current_head_on_start;
               counters;
               pool = sources;
@@ -979,11 +1183,12 @@ let generate_random_transactions =
                 (if parameters.single_op_per_pkh_per_block then
                  Some
                    (List.shuffle
-                      ~rng_state
+                      ~rng:rng_state
                       (List.map (fun src_org -> src_org.source) sources))
                 else None);
               revealed = Signature.Public_key_hash.Set.empty;
               last_block = current_head_on_start;
+              last_level = Int32.to_int header_on_start.level;
               target_block = current_target_block;
               new_block_condition = Lwt_condition.create ();
               injected_operations = Block_hash.Table.create 1023;
@@ -1013,9 +1218,105 @@ let generate_random_transactions =
                ~loc:__LOC__
                ~after:[exit_callback_id]
                (fun _retcode -> save_injected_operations ())) ;
-          launch cctxt parameters state rng_state save_pool)
+          launch cctxt parameters state save_pool)
+
+let estimate_transaction_cost ?smart_contracts
+    (cctxt : Protocol_client_context.full) : Gas.Arith.integral tzresult Lwt.t =
+  normalize_source cctxt (Wallet_alias "bootstrap1") >>= fun src ->
+  normalize_source cctxt (Wallet_alias "bootstrap2") >>= fun dst ->
+  let rng_state = Random.State.make [|default_parameters.seed|] in
+  (match (src, dst) with
+  | (Some src, Some dst) -> return (src, dst)
+  | _ ->
+      cctxt#error "Cannot find bootstrap1 or bootstrap2 accounts in the wallet.")
+  >>=? fun (src, dst) ->
+  let chain = cctxt#chain in
+  let block = cctxt#block in
+  let selected_smart_constract =
+    Option.bind smart_contracts (fun smart_contracts ->
+        sample_smart_contracts smart_contracts rng_state)
+  in
+  let (dst, fee, gas_limit) =
+    Option.value
+      selected_smart_constract
+      ~default:
+        ( Implicit dst.source.pkh,
+          default_parameters.regular_transfer_fee,
+          default_parameters.regular_transfer_gas_limit )
+  in
+  Alpha_services.Contract.counter cctxt (chain, block) src.source.pkh
+  >>=? fun current_counter ->
+  let transf_counter = Z.succ current_counter in
+  let transfer =
+    {
+      src = src.source;
+      dst;
+      fee;
+      gas_limit;
+      amount = Tez.of_mutez_exn (Int64.of_int 1);
+      counter = Some transf_counter;
+      fresh_dst = false;
+    }
+  in
+  let manager_op =
+    manager_op_of_transfer
+      {
+        default_parameters with
+        regular_transfer_gas_limit =
+          Default_parameters.constants_mainnet.hard_gas_limit_per_operation;
+      }
+      transfer
+  in
+  Injection.simulate cctxt ~chain ~block (Single manager_op)
+  >>=? fun (_oph, op, result) ->
+  match result.contents with
+  | Single_result (Manager_operation_result {operation_result; _}) -> (
+      match operation_result with
+      | Applied
+          (Transaction_result
+            (Transaction_to_contract_result {consumed_gas; _})) ->
+          return (Gas.Arith.ceil consumed_gas)
+      | _ ->
+          (match operation_result with
+          | Failed (_, errors) ->
+              Error_monad.pp_print_trace
+                Format.err_formatter
+                (Environment.wrap_tztrace errors)
+          | _ -> assert false) ;
+          cctxt#error
+            "@[<v 2>Simulation result:@,%a@]"
+            Operation_result.pp_operation_result
+            (op.protocol_data.contents, result.contents))
+
+let estimate_transaction_costs : Protocol_client_context.full Clic.command =
+  let open Clic in
+  command
+    ~group
+    ~desc:"Output gas estimations for transactions that stresstest uses"
+    no_options
+    (prefixes ["stresstest"; "estimate"; "gas"] @@ stop)
+    (fun () cctxt ->
+      estimate_transaction_cost cctxt >>=? fun regular ->
+      Smart_contracts.with_every_known_smart_contract
+        cctxt
+        (fun smart_contracts ->
+          estimate_transaction_cost ~smart_contracts cctxt)
+      >>=? fun smart_contracts ->
+      let transaction_costs : transaction_costs = {regular; smart_contracts} in
+      let json =
+        Data_encoding.Json.construct
+          transaction_costs_encoding
+          transaction_costs
+      in
+      Format.printf "%a" Data_encoding.Json.pp json ;
+      return_unit)
 
 let commands network () =
   match network with
   | Some `Mainnet -> []
-  | Some `Testnet | None -> [generate_random_transactions]
+  | Some `Testnet | None ->
+      [
+        generate_random_transactions;
+        estimate_transaction_costs;
+        Smart_contracts.originate_command;
+      ]

@@ -26,82 +26,74 @@
 
 open Filename.Infix
 
+let get_config data_dir config_file expected_pow =
+  let open Lwt_result_syntax in
+  let* cfg =
+    match (data_dir, config_file) with
+    | (None, None) ->
+        let default_config =
+          Node_config_file.default_data_dir
+          // Node_data_version.default_config_file_name
+        in
+        let*! config_file_exists = Lwt_unix.file_exists default_config in
+        if config_file_exists then Node_config_file.read default_config
+        else return Node_config_file.default_config
+    | (None, Some config_file) -> Node_config_file.read config_file
+    | (Some data_dir, None) ->
+        let* cfg =
+          Node_config_file.read
+            (data_dir // Node_data_version.default_config_file_name)
+        in
+        return {cfg with data_dir}
+    | (Some data_dir, Some config_file) ->
+        let* cfg = Node_config_file.read config_file in
+        return {cfg with data_dir}
+  in
+  Node_config_file.update ?expected_pow cfg
+
 (** Commands *)
 
 let identity_file data_dir =
   data_dir // Node_data_version.default_identity_file_name
 
-let show {Node_config_file.data_dir; _} =
-  Node_identity_file.read (identity_file data_dir) >>=? fun id ->
-  Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
-  return_unit
+let show data_dir config_file expected_pow =
+  Node_shared_arg.process_command
+    (let open Lwt_result_syntax in
+    let* {Node_config_file.data_dir; _} =
+      get_config data_dir config_file expected_pow
+    in
+    let* id = Node_identity_file.read (identity_file data_dir) in
+    Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
+    return_unit)
 
-let check {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
-  Node_identity_file.read ~expected_pow (identity_file data_dir) >>=? fun id ->
-  Format.printf
-    "Peer_id: %a. Proof of work is higher than %.2f.@."
-    P2p_peer.Id.pp
-    id.peer_id
-    expected_pow ;
-  return_unit
+let check data_dir config_file expected_pow =
+  Node_shared_arg.process_command
+    (let open Lwt_result_syntax in
+    let* {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
+      get_config data_dir config_file expected_pow
+    in
+    let* id = Node_identity_file.read ~expected_pow (identity_file data_dir) in
+    Format.printf
+      "Peer_id: %a. Proof of work is higher than %.2f.@."
+      P2p_peer.Id.pp
+      id.peer_id
+      expected_pow ;
+    return_unit)
 
-let generate {Node_config_file.data_dir; p2p; _} =
-  Node_identity_file.generate (identity_file data_dir) p2p.expected_pow
-  >>=? fun _id -> return_unit
+let generate data_dir config_file expected_pow =
+  Node_shared_arg.process_command
+    (let open Lwt_result_syntax in
+    let* {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
+      get_config data_dir config_file expected_pow
+    in
+    let* _id =
+      Node_identity_file.generate (identity_file data_dir) expected_pow
+    in
+    return_unit)
 
 (** Main *)
 
 module Term = struct
-  type subcommand = Show | Generate | Check
-
-  let process subcommand data_dir config_file expected_pow =
-    let res =
-      (match (data_dir, config_file) with
-      | (None, None) ->
-          let default_config =
-            Node_config_file.default_data_dir
-            // Node_data_version.default_config_file_name
-          in
-          if Sys.file_exists default_config then
-            Node_config_file.read default_config
-          else return Node_config_file.default_config
-      | (None, Some config_file) -> Node_config_file.read config_file
-      | (Some data_dir, None) ->
-          Node_config_file.read
-            (data_dir // Node_data_version.default_config_file_name)
-          >>=? fun cfg -> return {cfg with data_dir}
-      | (Some data_dir, Some config_file) ->
-          Node_config_file.read config_file >>=? fun cfg ->
-          return {cfg with data_dir})
-      >>=? fun cfg ->
-      Node_config_file.update ?expected_pow cfg >>=? fun cfg ->
-      match subcommand with
-      | Show -> show cfg
-      | Generate -> generate cfg
-      | Check -> check cfg
-    in
-    match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
-    | Ok () -> `Ok ()
-    | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
-
-  let subcommand_arg =
-    let parser = function
-      | "show" -> `Ok Show
-      | "generate" -> `Ok Generate
-      | "check" -> `Ok Check
-      | s -> `Error ("invalid argument: " ^ s)
-    and printer fmt = function
-      | Show -> Format.fprintf fmt "show"
-      | Generate -> Format.fprintf fmt "generate"
-      | Check -> Format.fprintf fmt "check"
-    in
-    let doc =
-      "Operation to perform. Possible values: $(b,show), $(b,generate), \
-       $(b,check)."
-    in
-    let open Cmdliner.Arg in
-    value & pos 0 (parser, printer) Show & info [] ~docv:"OPERATION" ~doc
-
   let expected_pow =
     let open Cmdliner in
     let doc =
@@ -109,13 +101,47 @@ module Term = struct
        parameter should be a float between 0 and 256, where\n\
       \       0 disables the proof-of-work mechanism."
     in
-    Arg.(value & pos 1 (some float) None & info [] ~docv:"DIFFICULTY" ~doc)
+    Arg.(value & pos 0 (some float) None & info [] ~docv:"DIFFICULTY" ~doc)
 
-  let term =
-    Cmdliner.Term.(
-      ret
-        (const process $ subcommand_arg $ Node_shared_arg.Term.data_dir
-       $ Node_shared_arg.Term.config_file $ expected_pow))
+  let cmds =
+    [
+      Cmdliner.Cmd.v
+        (Cmdliner.Cmd.info
+           ~doc:
+             "reads, parses and displays the current identity of the node. Use \
+              this command to see what identity will be used by Tezos. This is \
+              the default operation"
+           "show")
+        Cmdliner.Term.(
+          ret
+            (const show $ Node_shared_arg.Term.data_dir
+           $ Node_shared_arg.Term.config_file $ expected_pow));
+      Cmdliner.Cmd.v
+        (Cmdliner.Cmd.info
+           ~doc:
+             "generates an identity whose proof of work stamp difficulty is at \
+              least equal to $(i,difficulty). The value provided must be a \
+              floating point number between 0 and 256. It roughly reflects the \
+              numbers of expected leading zeroes in the hash of the identity \
+              data-structure. Therefore, a value of 0 means no proof-of-work, \
+              and the difficulty doubles for each increment of 1 in the \
+              difficulty value"
+           "generate")
+        Cmdliner.Term.(
+          ret
+            (const generate $ Node_shared_arg.Term.data_dir
+           $ Node_shared_arg.Term.config_file $ expected_pow));
+      Cmdliner.Cmd.v
+        (Cmdliner.Cmd.info
+           ~doc:
+             "checks that an identity is valid and that its proof of work \
+              stamp difficulty is at least equal to $(i,difficulty)"
+           "check")
+        Cmdliner.Term.(
+          ret
+            (const check $ Node_shared_arg.Term.data_dir
+           $ Node_shared_arg.Term.config_file $ expected_pow));
+    ]
 end
 
 module Manpage = struct
@@ -128,33 +154,11 @@ module Manpage = struct
      is required to participate in the Tezos network, therefore this command \
      is necessary to launch Tezos the first time."
 
-  let description =
-    [
-      `S "DESCRIPTION";
-      `P (command_description ^ " Several options are possible:");
-      `P
-        "$(b,show) reads, parses and displays the current identity of the \
-         node. Use this command to see what identity will be used by Tezos. \
-         This is the default operation.";
-      `P
-        "$(b,generate [difficulty]) generates an identity whose proof of work \
-         stamp difficulty is at least equal to $(i,difficulty). The value \
-         provided must be a floating point number between 0 and 256. It \
-         roughly reflects the numbers of expected leading zeroes in the hash \
-         of the identity data-structure. Therefore, a value of 0 means no \
-         proof-of-work, and the difficulty doubles for each increment of 1 in \
-         the difficulty value.";
-      `P
-        "$(b,check [difficulty]) checks that an identity is valid and that its \
-         proof of work stamp difficulty is at least equal to $(i,difficulty).";
-    ]
-
   let man =
-    description
-    @ (* [ `S misc_docs ] @ *)
+    (* [ `S misc_docs ] @ *)
     Node_shared_arg.Manpage.bugs
 
-  let info = Cmdliner.Term.info ~doc:"Manage node identities" ~man "identity"
+  let info = Cmdliner.Cmd.info ~doc:"Manage node identities" ~man "identity"
 end
 
-let cmd = (Term.term, Manpage.info)
+let cmd = Cmdliner.Cmd.group Manpage.info Term.cmds

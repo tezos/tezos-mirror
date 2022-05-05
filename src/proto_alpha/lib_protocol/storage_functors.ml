@@ -112,7 +112,16 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
   let fold ?depth t k ~order ~init ~f =
     C.fold ?depth t (to_key k) ~order ~init ~f
 
+  let config t = C.config t
+
   module Tree = C.Tree
+  module Proof = C.Proof
+
+  let verify_tree_proof = C.verify_tree_proof
+
+  let verify_stream_proof = C.verify_stream_proof
+
+  let equal_config = C.equal_config
 
   let project = C.project
 
@@ -131,6 +140,8 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
       if R.ghost then Storage_description.create () else C.description
     in
     Storage_description.register_named_subcontext description N.name
+
+  let length = C.length
 end
 
 module Make_single_data_storage
@@ -368,9 +379,8 @@ module Make_indexed_carbonated_data_storage_INTERNAL
   let len_key i = I.to_path i [len_name]
 
   let consume_mem_gas c key =
-    C.consume_gas
-      c
-      (Storage_costs.read_access ~path_length:(List.length key) ~read_bytes:0)
+    let path_length = List.length @@ C.absolute_key c key in
+    C.consume_gas c (Storage_costs.read_access ~path_length ~read_bytes:0)
 
   let existing_size c i =
     C.find c (len_key i) >|= function
@@ -380,13 +390,10 @@ module Make_indexed_carbonated_data_storage_INTERNAL
   let consume_read_gas get c i =
     let len_key = len_key i in
     get c len_key >>=? fun len ->
+    let path_length = List.length @@ C.absolute_key c len_key in
     Lwt.return
       ( decode_len_value len_key len >>? fun read_bytes ->
-        let cost =
-          Storage_costs.read_access
-            ~path_length:(List.length len_key)
-            ~read_bytes
-        in
+        let cost = Storage_costs.read_access ~path_length ~read_bytes in
         C.consume_gas c cost )
 
   (* For the future: here, we bill a generic cost for encoding the value
@@ -499,7 +506,13 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     (C.project s, List.rev rev_values)
 
   let fold_keys_unaccounted s ~order ~init ~f =
-    C.fold ~depth:(`Eq I.path_length) s [] ~order ~init ~f:(fun file tree acc ->
+    C.fold
+      ~depth:(`Eq (1 + I.path_length))
+      s
+      []
+      ~order
+      ~init
+      ~f:(fun file tree acc ->
         match C.Tree.kind tree with
         | `Value -> (
             match List.rev file with
@@ -561,6 +574,8 @@ module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
   let mem = M.mem
 
   let init s i = M.init s i ()
+
+  let add s i = M.add s i ()
 
   let remove s i = M.remove s i
 
@@ -768,6 +783,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let (t, i) = unpack c in
       C.fold ?depth t (to_key i k) ~order ~init ~f
 
+    let config c =
+      let (t, _) = unpack c in
+      C.config t
+
     module Tree = struct
       include C.Tree
 
@@ -775,6 +794,14 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
         let (t, _) = unpack c in
         C.Tree.empty t
     end
+
+    module Proof = C.Proof
+
+    let verify_tree_proof = C.verify_tree_proof
+
+    let verify_stream_proof = C.verify_stream_proof
+
+    let equal_config = C.equal_config
 
     let project c =
       let (t, _) = unpack c in
@@ -797,6 +824,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       C.check_enough_gas t g
 
     let description = description
+
+    let length c =
+      let (t, _i) = unpack c in
+      C.length t
   end
 
   module Make_set (R : REGISTER) (N : NAME) :
@@ -963,9 +994,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     let data_name = data_name :: N.name
 
-    let path_length = List.length N.name + 1
-
     let consume_mem_gas c =
+      let path_length = List.length (Raw_context.absolute_key c N.name) + 1 in
       Raw_context.consume_gas
         c
         (Storage_costs.read_access ~path_length ~read_bytes:0)
@@ -976,6 +1006,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       | Some len -> decode_len_value len_name len >|? fun len -> (len, true)
 
     let consume_read_gas get c =
+      let path_length = List.length (Raw_context.absolute_key c N.name) + 1 in
       get c len_name >>=? fun len ->
       Lwt.return
         ( decode_len_value len_name len >>? fun read_bytes ->

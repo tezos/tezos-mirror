@@ -34,7 +34,7 @@
    `circular_buffer` behaves similarly than a reference implementation
    of the same interface. *)
 
-open Lwt.Infix
+open Lwt.Syntax
 open Lib_test.Qcheck_helpers
 
 module type S = sig
@@ -70,7 +70,7 @@ module Reference : S = struct
 
   let write ~maxlen ~fill_using () =
     let bytes = Bytes.create maxlen in
-    fill_using bytes 0 maxlen >>= fun written_bytes ->
+    let* written_bytes = fill_using bytes 0 maxlen in
     Lwt.return (Bytes.sub bytes 0 written_bytes)
 
   let read data ?(len = Bytes.length data) () ~into ~offset =
@@ -126,13 +126,13 @@ let rec ops_gen acc i =
     let open QCheck in
     let open Gen in
     ops_gen
-      ( acc >>= fun (nb_writes, ops) ->
-        let gen = if nb_writes > 0 then op else write_op in
-        map
-          (fun op ->
-            let delta = match op with Write _ -> 1 | Read _ -> -1 in
-            (nb_writes + delta, op :: ops))
-          gen )
+      (let* (nb_writes, ops) = acc in
+       let gen = if nb_writes > 0 then op else write_op in
+       map
+         (fun op ->
+           let delta = match op with Write _ -> 1 | Read _ -> -1 in
+           (nb_writes + delta, op :: ops))
+         gen)
       (i - 1)
 
 (* Scenarios start with a write operation. *)
@@ -147,7 +147,9 @@ let values =
      - quick execution
   *)
   let size_gen = Gen.int_range 0 1000 in
-  Gen.(size_gen >>= ops_gen)
+  Gen.(
+    let* size = size_gen in
+    ops_gen size)
 
 let values = QCheck.make ~print:(Format.asprintf "%a" pp) values
 
@@ -197,11 +199,12 @@ let () =
   in
   let write_data write_len maxlen bytes_to_write (E state) =
     let (module M) = state.implementation in
-    M.write
-      ~maxlen
-      ~fill_using:(fill_using write_len bytes_to_write)
-      state.internal_state
-    >>= fun data ->
+    let* data =
+      M.write
+        ~maxlen
+        ~fill_using:(fill_using write_len bytes_to_write)
+        state.internal_state
+    in
     Queue.add data state.data_to_be_read ;
     Lwt.return_unit
   in
@@ -234,8 +237,8 @@ let () =
     | Write (write_len, maxlen) ->
         let len = min write_len maxlen in
         let bytes_to_write = random_bytes len in
-        write_data write_len maxlen bytes_to_write left_state >>= fun () ->
-        write_data write_len maxlen bytes_to_write right_state >>= fun () ->
+        let* () = write_data write_len maxlen bytes_to_write left_state in
+        let* () = write_data write_len maxlen bytes_to_write right_state in
         Lwt.return_false
     | Read read_len -> (
         try
@@ -286,12 +289,14 @@ let () =
         Lwt_main.run
           (Lwt_list.iter_s
              (fun value ->
-               update_state
-                 ~without_invalid_argument:true
-                 left_state
-                 right_state
-                 value
-               >>= fun _ -> Lwt.return_unit)
+               let* _ =
+                 update_state
+                   ~without_invalid_argument:true
+                   left_state
+                   right_state
+                   value
+               in
+               Lwt.return_unit)
              ops) ;
         true)
   in
@@ -328,7 +333,7 @@ let () =
                (fun raised value ->
                  if raised then Lwt.return raised
                  else
-                   update_state left_state right_state value >>= fun raised' ->
+                   let* raised' = update_state left_state right_state value in
                    Lwt.return (raised || raised'))
                false
                ops)

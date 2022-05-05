@@ -78,7 +78,7 @@ let check_refused ~__LOC__ nodes inject =
 let op_is_applied ~__LOC__ nodes opH =
   Lwt_list.iter_s
     (fun client ->
-      let* mempool = RPC.get_mempool client in
+      let* mempool = Mempool.get_mempool client in
       Memchecks.check_operation_is_in_mempool ~__LOC__ `Applied mempool opH ;
       unit)
     [nodes.main.client; nodes.observer.client]
@@ -86,7 +86,7 @@ let op_is_applied ~__LOC__ nodes opH =
 let op_is_outdated ~__LOC__ nodes opH =
   Lwt_list.iter_s
     (fun client ->
-      let* mempool = RPC.get_mempool client in
+      let* mempool = Mempool.get_mempool client in
       Memchecks.check_operation_is_in_mempool ~__LOC__ `Outdated mempool opH ;
       unit)
     [nodes.main.client; nodes.observer.client]
@@ -138,7 +138,7 @@ let replacement_op = {default_op with fee = replacement_fee}
 
 (* Auxiliary function to get the current counter *)
 let get_counter ?(contract = default_source) client =
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:contract.Account.public_key_hash
       client
@@ -509,21 +509,21 @@ let sum_fees_overflow =
     ()
 
 let register ~protocols =
-  identical_operations ~protocols ;
-  same_gas_and_fees_but_different_ops ~protocols ;
-  replacement_fees_below_threshold ~protocols ;
-  replacement_fees_equal_to_threshold ~protocols ;
-  replacement_fees_above_threshold ~protocols ;
-  third_operation_fees_below_replacement_threshold ~protocols ;
-  third_operation_fees_equal_to_replacement_threshold ~protocols ;
-  replacement_fees_equal_to_threshold_but_gas_increased ~protocols ;
-  replacement_fees_below_threshold_even_if_gas_is_decreased ~protocols ;
-  fees_of_second_op_below_fees_of_first_one ~protocols ;
-  cannot_replace_with_an_op_having_diffrent_counter ~protocols ;
-  cannot_replace_a_non_applied_operation ~protocols ;
-  replace_simple_op_with_a_batched_low_fees ~protocols ;
-  replace_simple_op_with_a_batched ~protocols ;
-  replace_batched_op_with_simple_one_low_fees ~protocols ;
-  replace_batched_op_with_simple_one ~protocols ;
-  low_balance_to_pay_fees ~protocols ;
-  sum_fees_overflow ~protocols
+  identical_operations protocols ;
+  same_gas_and_fees_but_different_ops protocols ;
+  replacement_fees_below_threshold protocols ;
+  replacement_fees_equal_to_threshold protocols ;
+  replacement_fees_above_threshold protocols ;
+  third_operation_fees_below_replacement_threshold protocols ;
+  third_operation_fees_equal_to_replacement_threshold protocols ;
+  replacement_fees_equal_to_threshold_but_gas_increased protocols ;
+  replacement_fees_below_threshold_even_if_gas_is_decreased protocols ;
+  fees_of_second_op_below_fees_of_first_one protocols ;
+  cannot_replace_with_an_op_having_diffrent_counter protocols ;
+  cannot_replace_a_non_applied_operation protocols ;
+  replace_simple_op_with_a_batched_low_fees protocols ;
+  replace_simple_op_with_a_batched protocols ;
+  replace_batched_op_with_simple_one_low_fees protocols ;
+  replace_batched_op_with_simple_one protocols ;
+  low_balance_to_pay_fees protocols ;
+  sum_fees_overflow protocols

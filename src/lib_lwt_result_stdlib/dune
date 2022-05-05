@@ -1,3 +1,8 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (_ (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
+
 (library
  (name tezos_lwt_result_stdlib)
  (public_name tezos-lwt-result-stdlib)
@@ -9,3 +14,5 @@
   tezos-lwt-result-stdlib.traced.sigs
   tezos-lwt-result-stdlib.traced.structs)
  (js_of_ocaml))
+
+(documentation)

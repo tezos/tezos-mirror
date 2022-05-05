@@ -26,7 +26,7 @@ let max_timestamp_drift : Ptime.span = Ptime.Span.of_int_s 5
 
 let soon : unit -> Time.Protocol.t =
  fun () ->
-  let now = Systime_os.now () in
+  let now = Time.System.now () in
   match Ptime.add_span now max_timestamp_drift with
   | Some s -> Time.System.to_protocol s
   | None -> invalid_arg "Clock_drift.is_not_too_far_in_the_future: end of time"

@@ -1,6 +1,8 @@
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
 active_protocol_versions := $(shell cat active_protocol_versions)
+tx_rollup_protocol_versions := $(shell cat tx_rollup_protocol_versions)
+sc_rollup_protocol_versions := $(shell cat sc_rollup_protocol_versions)
 
 define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
@@ -22,6 +24,7 @@ DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
+CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
@@ -30,7 +33,12 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
     $(foreach p, $(active_protocol_versions), tezos-accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
-		             echo tezos-endorser-$(p); fi))
+		             echo tezos-endorser-$(p); fi)) \
+
+UNRELEASED_TEZOS_BIN=$(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
+   $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
+   $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
+   $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
@@ -58,6 +66,11 @@ build-parameters:
 $(TEZOS_BIN): generate_dune
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
+
+.PHONY: $(UNRELEASED_TEZOS_BIN)
+$(UNRELEASED_TEZOS_BIN): generate_dune
+	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
+	@cp -f _build/install/default/bin/$@ ./
 
 build: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
@@ -115,38 +128,33 @@ enable-time-measurement:
 
 .PHONY: build-sandbox
 build-sandbox:
-	@dune build --profile=$(PROFILE) src/bin_sandbox/main.exe
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) src/bin_sandbox/main.exe
 	@cp -f _build/default/src/bin_sandbox/main.exe tezos-sandbox
-
-.PHONY: build-test
-build-test: build-sandbox
-	@dune build --profile=$(PROFILE) @buildtest
 
 .PHONY: test-protocol-compile
 test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_compile_protocol
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
-PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d -exec test -f \{\}/dune \; -print 2>/dev/null | LC_COLLATE=C sort)
-PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
-PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
-
-$(PROTO_TARGETS): %.test_proto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*)) --profile=$(PROFILE) $(COVERAGE_OPTIONS)
+PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
-test-proto-unit: $(PROTO_TARGETS)
+test-proto-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-proto-unit \
+		$(addprefix @, $(addsuffix /runtest,$(PROTO_LIBS)))
+
 
 # We do not run vendor tests because they are a no-op from dune
 NONPROTO_LIBS := $(shell find src/ -path src/proto_\* -prune -o -name test -type d -exec test -f \{\}/dune \; -print | LC_COLLATE=C sort)
-NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
-NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
-
-$(NONPROTO_TARGETS): %.test_nonproto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*))) --profile=$(PROFILE) $(COVERAGE_OPTIONS)
 
 .PHONY: test-nonproto-unit
-test-nonproto-unit: $(NONPROTO_TARGETS)
+test-nonproto-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-nonproto-unit \
+		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_LIBS)))
 
 .PHONY: test-unit
 test-unit: test-nonproto-unit test-proto-unit
@@ -175,6 +183,10 @@ test-flextesa:
 test-js:
 	@dune build @runtest_js
 	@dune exec ./src/tooling/run_js_inline_tests.exe
+
+.PHONY: build-tezt
+build-tezt:
+	@dune build tezt
 
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
@@ -222,6 +234,38 @@ lint-tests-pkg:
 	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
 
 
+
+NONPROTO_LIBS_DIR := $(addsuffix /,${NONPROTO_LIBS})
+EXCLUDE_NONPROTO_LIBS_DIR := $(addprefix --exclude-file ,${NONPROTO_LIBS_DIR})
+PROTO_LIBS_DIR = $(addsuffix /,${PROTO_LIBS})
+EXCLUDE_PROTO_LIBS_DIR := $(addprefix --exclude-file ,${PROTO_LIBS_DIR})
+
+.PHONY: lint-ometrics
+lint-ometrics:
+	@echo "Running ometrics analysis in your changes."
+	@ometrics check ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
+        --exclude-file "tezt/tests/" \
+        --exclude-entry-re "pp\|pp_.+" \
+        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
+        --exclude-entry-re "compare\|compare_.+\|.+_compare"
+
+.PHONY: lint-ometric-gitlab
+lint-ometrics-gitlab:
+	@echo "Running ometrics analysis in your changes."
+	@mkdir -p _reports
+	@ometrics check-clone ${OMETRICS_GIT} --branch ${OMETRICS_BRANCH} \
+        ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
+        --exclude-file "tezt/tests/" \
+        --exclude-entry-re "pp\|pp_.+" \
+        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
+        --exclude-entry-re "compare\|compare_.+\|.+_compare" \
+        --gitlab --output ${CODE_QUALITY_REPORT}
+	@echo "Report should be available in file://$(shell pwd)/${CODE_QUALITY_REPORT}"
+
 .PHONY: test
 test: lint-opam-dune test-code
 
@@ -235,6 +279,9 @@ check-linting:
 check-python-linting:
 	@$(MAKE) -C tests_python lint
 	@$(MAKE) -C docs lint
+
+check-ocaml-linting:
+	@./scripts/semgrep/lint-all-ocaml-sources.sh
 
 .PHONY: fmt fmt-ocaml fmt-python
 fmt: fmt-ocaml fmt-python
@@ -253,14 +300,25 @@ build-deps:
 build-dev-deps:
 	@./scripts/install_build_deps.sh --dev
 
+.PHONY: lift-protocol-limits-patch
+lift-protocol-limits-patch:
+	@git apply -R ./src/bin_tps_evaluation/lift_limits.patch || true
+	@git apply ./src/bin_tps_evaluation/lift_limits.patch
+
 .PHONY: build-tps-deps
 build-tps-deps:
 	@./scripts/install_build_deps.sh --tps
 
 .PHONY: build-tps
-build-tps:
+build-tps: lift-protocol-limits-patch build build-tezt
 	@dune build ./src/bin_tps_evaluation
 	@cp -f ./_build/install/default/bin/tezos-tps-evaluation .
+	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-benchmark-tps .
+	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-estimate-average-block .
+	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-gas-tps .
+
+.PHONY: build-unreleased
+build-unreleased: build $(UNRELEASED_TEZOS_BIN)
 
 .PHONY: docker-image-build
 docker-image-build:
@@ -324,7 +382,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f ${TEZOS_BIN} tezos-sandbox
+	@-rm -f ${TEZOS_BIN} ${UNRELEASED_TEZOS_BIN} tezos-sandbox
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html

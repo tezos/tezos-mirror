@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/generic_multisig.tz]
 
 Well typed
-Gas remaining: 1039928.421 units remaining
+Gas remaining: 1039939.911 units remaining
 { parameter
     (or (unit %default)
         (pair %main
@@ -13,426 +13,233 @@ Gas remaining: 1039928.421 units remaining
            (list %sigs (option signature)))) ;
   storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys key))) ;
   code { UNPAIR
-         /* [ @parameter or (unit %default)
-               (pair %main
-                  (pair :payload
-                     (nat %counter)
-                     (or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))))
-                  (list %sigs (option signature)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+         /* [ or unit
+               (pair (pair nat (or (lambda unit (list operation)) (pair nat (list key))))
+                     (list (option signature))) : pair nat nat (list key) ] */ ;
          IF_LEFT
            { DROP
-             /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+             /* [ pair nat nat (list key) ] */ ;
              NIL operation
-             /* [ list operation
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+             /* [ list operation : pair nat nat (list key) ] */ ;
              PAIR
-             /* [ pair (list operation)
-                     (pair @storage (nat %stored_counter) (nat %threshold) (list %keys key)) ] */ }
+             /* [ pair (list operation) nat nat (list key) ] */ }
            { PUSH mutez
                   0
              /* [ mutez
-                : @parameter.main pair (pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key))))
-                     (list %sigs (option signature))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                : pair (pair nat (or (lambda unit (list operation)) (pair nat (list key))))
+                     (list (option signature)) : pair nat nat (list key) ] */ ;
              AMOUNT
-             /* [ @amount mutez : mutez
-                : @parameter.main pair (pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key))))
-                     (list %sigs (option signature))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+             /* [ mutez : mutez
+                : pair (pair nat (or (lambda unit (list operation)) (pair nat (list key))))
+                     (list (option signature)) : pair nat nat (list key) ] */ ;
              ASSERT_CMPEQ ;
              SWAP
-             /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-                : @parameter.main pair (pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key))))
-                     (list %sigs (option signature)) ] */ ;
+             /* [ pair nat nat (list key)
+                : pair (pair nat (or (lambda unit (list operation)) (pair nat (list key))))
+                     (list (option signature)) ] */ ;
              DUP
-             /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-                : @parameter.main pair (pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key))))
-                     (list %sigs (option signature)) ] */ ;
+             /* [ pair nat nat (list key) : pair nat nat (list key)
+                : pair (pair nat (or (lambda unit (list operation)) (pair nat (list key))))
+                     (list (option signature)) ] */ ;
              DIP { SWAP
-                   /* [ @parameter.main pair (pair :payload
-                              (nat %counter)
-                              (or :action
-                                 (lambda %operation unit (list operation))
-                                 (pair %change_keys (nat %threshold) (list %keys key))))
-                           (list %sigs (option signature))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-             /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-                : @parameter.main pair (pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key))))
-                     (list %sigs (option signature))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ pair (pair nat (or (lambda unit (list operation)) (pair nat (list key))))
+                           (list (option signature)) : pair nat nat (list key) ] */ }
+             /* [ pair nat nat (list key)
+                : pair (pair nat (or (lambda unit (list operation)) (pair nat (list key))))
+                     (list (option signature)) : pair nat nat (list key) ] */ ;
              DIP { UNPAIR
-                   /* [ pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    DUP
-                   /* [ pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    SELF
-                   /* [ @self contract unit
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ contract unit
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    ADDRESS
-                   /* [ @self.address address
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ address
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    CHAIN_ID
-                   /* [ chain_id : @self.address address
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ chain_id : address
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    PAIR
-                   /* [ pair chain_id (address @self.address)
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ pair chain_id address
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    PAIR
-                   /* [ pair (pair chain_id (address @self.address))
-                           (pair :payload
-                              (nat %counter)
-                              (or :action
-                                 (lambda %operation unit (list operation))
-                                 (pair %change_keys (nat %threshold) (list %keys key))))
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ pair (pair chain_id address) nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    PACK
-                   /* [ @packed bytes
-                      : pair :payload
-                        (nat %counter)
-                        (or :action
-                           (lambda %operation unit (list operation))
-                           (pair %change_keys (nat %threshold) (list %keys key)))
-                      : list (option signature)
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ bytes : pair nat (or (lambda unit (list operation)) (pair nat (list key)))
+                      : list (option signature) : pair nat nat (list key) ] */ ;
                    DIP { UNPAIR @counter
-                         /* [ @counter nat
-                            : or :action
-                              (lambda %operation unit (list operation))
-                              (pair %change_keys (nat %threshold) (list %keys key))
-                            : list (option signature)
-                            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                         /* [ nat : or (lambda unit (list operation)) (pair nat (list key))
+                            : list (option signature) : pair nat nat (list key) ] */ ;
                          DIP { SWAP
                                /* [ list (option signature)
-                                  : or :action
-                                    (lambda %operation unit (list operation))
-                                    (pair %change_keys (nat %threshold) (list %keys key))
-                                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                         /* [ @counter nat : list (option signature)
-                            : or :action
-                              (lambda %operation unit (list operation))
-                              (pair %change_keys (nat %threshold) (list %keys key))
-                            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                   /* [ @packed bytes : @counter nat : list (option signature)
-                      : or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                  : or (lambda unit (list operation)) (pair nat (list key))
+                                  : pair nat nat (list key) ] */ }
+                         /* [ nat : list (option signature)
+                            : or (lambda unit (list operation)) (pair nat (list key))
+                            : pair nat nat (list key) ] */ }
+                   /* [ bytes : nat : list (option signature)
+                      : or (lambda unit (list operation)) (pair nat (list key))
+                      : pair nat nat (list key) ] */ ;
                    SWAP
-                   /* [ @counter nat : @packed bytes : list (option signature)
-                      : or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-             /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-                : @counter nat : @packed bytes : list (option signature)
-                : or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ nat : bytes : list (option signature)
+                      : or (lambda unit (list operation)) (pair nat (list key))
+                      : pair nat nat (list key) ] */ }
+             /* [ pair nat nat (list key) : nat : bytes : list (option signature)
+                : or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              UNPAIR @stored_counter
-             /* [ @stored_counter nat : pair (nat %threshold) (list %keys key) : @counter nat
-                : @packed bytes : list (option signature)
-                : or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+             /* [ nat : pair nat (list key) : nat : bytes : list (option signature)
+                : or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              DIP { SWAP
-                   /* [ @counter nat : pair (nat %threshold) (list %keys key) : @packed bytes
-                      : list (option signature)
-                      : or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-             /* [ @stored_counter nat : @counter nat : pair (nat %threshold) (list %keys key)
-                : @packed bytes : list (option signature)
-                : or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ nat : pair nat (list key) : bytes : list (option signature)
+                      : or (lambda unit (list operation)) (pair nat (list key))
+                      : pair nat nat (list key) ] */ }
+             /* [ nat : nat : pair nat (list key) : bytes : list (option signature)
+                : or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              ASSERT_CMPEQ ;
              DIP { SWAP
-                   /* [ list (option signature) : @packed bytes
-                      : or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-             /* [ pair (nat %threshold) (list %keys key) : list (option signature)
-                : @packed bytes
-                : or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ list (option signature) : bytes
+                      : or (lambda unit (list operation)) (pair nat (list key))
+                      : pair nat nat (list key) ] */ }
+             /* [ pair nat (list key) : list (option signature) : bytes
+                : or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              UNPAIR @threshold @keys
-             /* [ @threshold nat : @keys list key : list (option signature) : @packed bytes
-                : or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+             /* [ nat : list key : list (option signature) : bytes
+                : or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              DIP { PUSH @valid
                      nat
                      0
-                   /* [ @valid nat : @keys list key : list (option signature) : @packed bytes
-                      : or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ nat : list key : list (option signature) : bytes
+                      : or (lambda unit (list operation)) (pair nat (list key))
+                      : pair nat nat (list key) ] */ ;
                    SWAP
-                   /* [ @keys list key : @valid nat : list (option signature) : @packed bytes
-                      : or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ list key : nat : list (option signature) : bytes
+                      : or (lambda unit (list operation)) (pair nat (list key))
+                      : pair nat nat (list key) ] */ ;
                    ITER { DIP { SWAP
-                                /* [ list (option signature) : @valid nat : @packed bytes
-                                   : or :action
-                                     (lambda %operation unit (list operation))
-                                     (pair %change_keys (nat %threshold) (list %keys key))
-                                   : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                          /* [ @keys.elt key : list (option signature) : @valid nat : @packed bytes
-                             : or :action
-                               (lambda %operation unit (list operation))
-                               (pair %change_keys (nat %threshold) (list %keys key))
-                             : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                /* [ list (option signature) : nat : bytes
+                                   : or (lambda unit (list operation)) (pair nat (list key))
+                                   : pair nat nat (list key) ] */ }
+                          /* [ key : list (option signature) : nat : bytes
+                             : or (lambda unit (list operation)) (pair nat (list key))
+                             : pair nat nat (list key) ] */ ;
                           SWAP
-                          /* [ list (option signature) : @keys.elt key : @valid nat : @packed bytes
-                             : or :action
-                               (lambda %operation unit (list operation))
-                               (pair %change_keys (nat %threshold) (list %keys key))
-                             : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                          /* [ list (option signature) : key : nat : bytes
+                             : or (lambda unit (list operation)) (pair nat (list key))
+                             : pair nat nat (list key) ] */ ;
                           IF_CONS
                             { IF_SOME
                                 { SWAP
-                                  /* [ @tl list (option signature) : @hd.some signature : @keys.elt key
-                                     : @valid nat : @packed bytes
-                                     : or :action
-                                       (lambda %operation unit (list operation))
-                                       (pair %change_keys (nat %threshold) (list %keys key))
-                                     : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                  /* [ list (option signature) : signature : key : nat : bytes
+                                     : or (lambda unit (list operation)) (pair nat (list key))
+                                     : pair nat nat (list key) ] */ ;
                                   DIP { SWAP
-                                        /* [ @keys.elt key : @hd.some signature : @valid nat : @packed bytes
-                                           : or :action
-                                             (lambda %operation unit (list operation))
-                                             (pair %change_keys (nat %threshold) (list %keys key))
-                                           : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                        /* [ key : signature : nat : bytes
+                                           : or (lambda unit (list operation)) (pair nat (list key))
+                                           : pair nat nat (list key) ] */ ;
                                         DIIP { DUUP
-                                               /* [ bytes : @valid nat : @packed bytes
-                                                  : or :action
-                                                    (lambda %operation unit (list operation))
-                                                    (pair %change_keys (nat %threshold) (list %keys key))
-                                                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                                        /* [ @keys.elt key : @hd.some signature : bytes : @valid nat : @packed bytes
-                                           : or :action
-                                             (lambda %operation unit (list operation))
-                                             (pair %change_keys (nat %threshold) (list %keys key))
-                                           : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                               /* [ bytes : nat : bytes
+                                                  : or (lambda unit (list operation)) (pair nat (list key))
+                                                  : pair nat nat (list key) ] */ }
+                                        /* [ key : signature : bytes : nat : bytes
+                                           : or (lambda unit (list operation)) (pair nat (list key))
+                                           : pair nat nat (list key) ] */ ;
                                         { DUUUP
-                                          /* [ bytes : @keys.elt key : @hd.some signature : bytes : @valid nat
-                                             : @packed bytes
-                                             : or :action
-                                               (lambda %operation unit (list operation))
-                                               (pair %change_keys (nat %threshold) (list %keys key))
-                                             : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                          /* [ bytes : key : signature : bytes : nat : bytes
+                                             : or (lambda unit (list operation)) (pair nat (list key))
+                                             : pair nat nat (list key) ] */ ;
                                           DIP { CHECK_SIGNATURE
-                                                /* [ bool : @valid nat : @packed bytes
-                                                   : or :action
-                                                     (lambda %operation unit (list operation))
-                                                     (pair %change_keys (nat %threshold) (list %keys key))
-                                                   : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                                          /* [ bytes : bool : @valid nat : @packed bytes
-                                             : or :action
-                                               (lambda %operation unit (list operation))
-                                               (pair %change_keys (nat %threshold) (list %keys key))
-                                             : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                                /* [ bool : nat : bytes
+                                                   : or (lambda unit (list operation)) (pair nat (list key))
+                                                   : pair nat nat (list key) ] */ }
+                                          /* [ bytes : bool : nat : bytes
+                                             : or (lambda unit (list operation)) (pair nat (list key))
+                                             : pair nat nat (list key) ] */ ;
                                           SWAP
-                                          /* [ bool : bytes : @valid nat : @packed bytes
-                                             : or :action
-                                               (lambda %operation unit (list operation))
-                                               (pair %change_keys (nat %threshold) (list %keys key))
-                                             : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                          /* [ bool : bytes : nat : bytes
+                                             : or (lambda unit (list operation)) (pair nat (list key))
+                                             : pair nat nat (list key) ] */ ;
                                           IF { DROP
-                                               /* [ @valid nat : @packed bytes
-                                                  : or :action
-                                                    (lambda %operation unit (list operation))
-                                                    (pair %change_keys (nat %threshold) (list %keys key))
-                                                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                               /* [ nat : bytes : or (lambda unit (list operation)) (pair nat (list key))
+                                                  : pair nat nat (list key) ] */ }
                                              { FAILWITH /* [] */ } } ;
                                         PUSH nat
                                              1
-                                        /* [ nat : @valid nat : @packed bytes
-                                           : or :action
-                                             (lambda %operation unit (list operation))
-                                             (pair %change_keys (nat %threshold) (list %keys key))
-                                           : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                        /* [ nat : nat : bytes : or (lambda unit (list operation)) (pair nat (list key))
+                                           : pair nat nat (list key) ] */ ;
                                         ADD @valid
-                                        /* [ @valid nat : @packed bytes
-                                           : or :action
-                                             (lambda %operation unit (list operation))
-                                             (pair %change_keys (nat %threshold) (list %keys key))
-                                           : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                                  /* [ @tl list (option signature) : @valid nat : @packed bytes
-                                     : or :action
-                                       (lambda %operation unit (list operation))
-                                       (pair %change_keys (nat %threshold) (list %keys key))
-                                     : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                        /* [ nat : bytes : or (lambda unit (list operation)) (pair nat (list key))
+                                           : pair nat nat (list key) ] */ }
+                                  /* [ list (option signature) : nat : bytes
+                                     : or (lambda unit (list operation)) (pair nat (list key))
+                                     : pair nat nat (list key) ] */ }
                                 { SWAP
-                                  /* [ @keys.elt key : @tl list (option signature) : @valid nat : @packed bytes
-                                     : or :action
-                                       (lambda %operation unit (list operation))
-                                       (pair %change_keys (nat %threshold) (list %keys key))
-                                     : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                  /* [ key : list (option signature) : nat : bytes
+                                     : or (lambda unit (list operation)) (pair nat (list key))
+                                     : pair nat nat (list key) ] */ ;
                                   DROP
-                                  /* [ @tl list (option signature) : @valid nat : @packed bytes
-                                     : or :action
-                                       (lambda %operation unit (list operation))
-                                       (pair %change_keys (nat %threshold) (list %keys key))
-                                     : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ } }
+                                  /* [ list (option signature) : nat : bytes
+                                     : or (lambda unit (list operation)) (pair nat (list key))
+                                     : pair nat nat (list key) ] */ } }
                             { FAIL } ;
                           SWAP
-                          /* [ @valid nat : @tl list (option signature) : @packed bytes
-                             : or :action
-                               (lambda %operation unit (list operation))
-                               (pair %change_keys (nat %threshold) (list %keys key))
-                             : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                   /* [ @valid nat : list (option signature) : @packed bytes
-                      : or :action
-                        (lambda %operation unit (list operation))
-                        (pair %change_keys (nat %threshold) (list %keys key))
-                      : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-             /* [ @threshold nat : @valid nat : list (option signature) : @packed bytes
-                : or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                          /* [ nat : list (option signature) : bytes
+                             : or (lambda unit (list operation)) (pair nat (list key))
+                             : pair nat nat (list key) ] */ }
+                   /* [ nat : list (option signature) : bytes
+                      : or (lambda unit (list operation)) (pair nat (list key))
+                      : pair nat nat (list key) ] */ }
+             /* [ nat : nat : list (option signature) : bytes
+                : or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              ASSERT_CMPLE ;
              IF_CONS
                { FAIL }
-               { /* [ @packed bytes
-                    : or :action
-                      (lambda %operation unit (list operation))
-                      (pair %change_keys (nat %threshold) (list %keys key))
-                    : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ } ;
+               { /* [ bytes : or (lambda unit (list operation)) (pair nat (list key))
+                    : pair nat nat (list key) ] */ } ;
              DROP
-             /* [ or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+             /* [ or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              DIP { UNPAIR
-                   /* [ nat : pair (nat %threshold) (list %keys key) ] */ ;
+                   /* [ nat : pair nat (list key) ] */ ;
                    PUSH nat 1
-                   /* [ nat : nat : pair (nat %threshold) (list %keys key) ] */ ;
+                   /* [ nat : nat : pair nat (list key) ] */ ;
                    ADD @new_counter
-                   /* [ @new_counter nat : pair (nat %threshold) (list %keys key) ] */ ;
+                   /* [ nat : pair nat (list key) ] */ ;
                    PAIR
-                   /* [ pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ }
-             /* [ or :action
-                  (lambda %operation unit (list operation))
-                  (pair %change_keys (nat %threshold) (list %keys key))
-                : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+                   /* [ pair nat nat (list key) ] */ }
+             /* [ or (lambda unit (list operation)) (pair nat (list key))
+                : pair nat nat (list key) ] */ ;
              IF_LEFT
                { UNIT
-                 /* [ unit : @operation lambda unit (list operation)
-                    : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+                 /* [ unit : lambda unit (list operation) : pair nat nat (list key) ] */ ;
                  EXEC
-                 /* [ list operation
-                    : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ }
-               { DIP { CAR /* [ @new_counter nat ] */ }
-                 /* [ @change_keys pair (nat %threshold) (list %keys key) : @new_counter nat ] */ ;
+                 /* [ list operation : pair nat nat (list key) ] */ }
+               { DIP { CAR /* [ nat ] */ }
+                 /* [ pair nat (list key) : nat ] */ ;
                  SWAP
-                 /* [ @new_counter nat : @change_keys pair (nat %threshold) (list %keys key) ] */ ;
+                 /* [ nat : pair nat (list key) ] */ ;
                  PAIR
-                 /* [ pair (nat @new_counter) (pair @change_keys (nat %threshold) (list %keys key)) ] */ ;
+                 /* [ pair nat nat (list key) ] */ ;
                  NIL operation
-                 /* [ list operation
-                    : pair (nat @new_counter) (pair @change_keys (nat %threshold) (list %keys key)) ] */ } ;
+                 /* [ list operation : pair nat nat (list key) ] */ } ;
              PAIR
-             /* [ pair (list operation) (nat @new_counter) (nat %threshold) (list %keys key) ] */ } } }
+             /* [ pair (list operation) nat nat (list key) ] */ } } }

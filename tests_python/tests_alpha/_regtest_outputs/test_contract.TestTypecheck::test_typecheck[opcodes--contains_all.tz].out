@@ -1,16 +1,15 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/contains_all.tz]
 
 Well typed
-Gas remaining: 1039972.367 units remaining
+Gas remaining: 1039974.767 units remaining
 { parameter (pair (list string) (list string)) ;
   storage (option bool) ;
   code { CAR
-         /* [ @parameter pair (list string) (list string) ] */ ;
+         /* [ pair (list string) (list string) ] */ ;
          DUP
-         /* [ @parameter pair (list string) (list string)
-            : @parameter pair (list string) (list string) ] */ ;
+         /* [ pair (list string) (list string) : pair (list string) (list string) ] */ ;
          CAR
-         /* [ list string : @parameter pair (list string) (list string) ] */ ;
+         /* [ list string : pair (list string) (list string) ] */ ;
          DIP { CDR /* [ list string ] */ }
          /* [ list string : list string ] */ ;
          EMPTY_SET string
@@ -18,18 +17,17 @@ Gas remaining: 1039972.367 units remaining
          SWAP
          /* [ list string : set string : list string ] */ ;
          ITER { PAIR
-                /* [ pair (string @elt) (set string) : list string ] */ ;
+                /* [ pair string (set string) : list string ] */ ;
                 DUP
-                /* [ pair (string @elt) (set string) : pair (string @elt) (set string)
-                   : list string ] */ ;
+                /* [ pair string (set string) : pair string (set string) : list string ] */ ;
                 CAR
-                /* [ @elt string : pair (string @elt) (set string) : list string ] */ ;
+                /* [ string : pair string (set string) : list string ] */ ;
                 DIP { CDR /* [ set string : list string ] */ }
-                /* [ @elt string : set string : list string ] */ ;
+                /* [ string : set string : list string ] */ ;
                 PUSH bool True
-                /* [ bool : @elt string : set string : list string ] */ ;
+                /* [ bool : string : set string : list string ] */ ;
                 SWAP
-                /* [ @elt string : bool : set string : list string ] */ ;
+                /* [ string : bool : set string : list string ] */ ;
                 UPDATE
                 /* [ set string : list string ] */ }
          /* [ set string : list string ] */ ;
@@ -42,22 +40,20 @@ Gas remaining: 1039972.367 units remaining
          SWAP
          /* [ list string : pair (set string) bool ] */ ;
          ITER { PAIR
-                /* [ pair (string @elt) (set string) bool ] */ ;
+                /* [ pair string (set string) bool ] */ ;
                 DUP
-                /* [ pair (string @elt) (set string) bool
-                   : pair (string @elt) (set string) bool ] */ ;
+                /* [ pair string (set string) bool : pair string (set string) bool ] */ ;
                 DUP
-                /* [ pair (string @elt) (set string) bool : pair (string @elt) (set string) bool
-                   : pair (string @elt) (set string) bool ] */ ;
+                /* [ pair string (set string) bool : pair string (set string) bool
+                   : pair string (set string) bool ] */ ;
                 CAR
-                /* [ @elt string : pair (string @elt) (set string) bool
-                   : pair (string @elt) (set string) bool ] */ ;
+                /* [ string : pair string (set string) bool : pair string (set string) bool ] */ ;
                 DIP { CDAR ;
                       DIP { CDDR }
                       /* [ set string : bool ] */ ;
                       DUP
                       /* [ set string : set string : bool ] */ }
-                /* [ @elt string : set string : set string : bool ] */ ;
+                /* [ string : set string : set string : bool ] */ ;
                 MEM
                 /* [ bool : set string : bool ] */ ;
                 DIP { SWAP /* [ bool : set string ] */ }

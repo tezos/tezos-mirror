@@ -23,29 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A value of type [key_hash] is a hashed combination of:
-  - Ticketer
-  - Content type
-  - Content
-  - Owner
-*)
-type key_hash
-
-(** [script_expr_hash_of_key_hash key_hash] returns a [Script_expr_hash.t] value
-    representation of the given [key_hash]. This is useful for comparing and
-    pretty-printing key-hash values. *)
-val script_expr_hash_of_key_hash : key_hash -> Script_expr_hash.t
-
-(** [make_key_hash ctxt ~ticketer ~typ ~contents ~owner] creates a hashed
-    representation of the given [ticketer], [typ], [contents] and [owner].
-*)
-val make_key_hash :
-  Raw_context.t ->
-  ticketer:Script_repr.node ->
-  typ:Script_repr.node ->
-  contents:Script_repr.node ->
-  owner:Script_repr.node ->
-  (key_hash * Raw_context.t) tzresult
+type error +=
+  | Negative_ticket_balance of {key : Ticket_hash_repr.t; balance : Z.t}
+  | Used_storage_space_underflow
 
 (** [get_balance ctxt key] receives the ticket balance for the given
     [key] in the context [ctxt]. The [key] represents a ticket content and a
@@ -53,7 +33,9 @@ val make_key_hash :
     [None] is returned.
     *)
 val get_balance :
-  Raw_context.t -> key_hash -> (Z.t option * Raw_context.t) tzresult Lwt.t
+  Raw_context.t ->
+  Ticket_hash_repr.t ->
+  (Z.t option * Raw_context.t) tzresult Lwt.t
 
 (** [adjust_balance ctxt key ~delta] adjusts the balance of the
     given key (representing a ticket content, creator and owner pair)
@@ -68,4 +50,26 @@ val get_balance :
     in case the resulting balance is negative.
  *)
 val adjust_balance :
-  Raw_context.t -> key_hash -> delta:Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t
+  Raw_context.t ->
+  Ticket_hash_repr.t ->
+  delta:Z.t ->
+  (Z.t * Raw_context.t) tzresult Lwt.t
+
+(** [adjust_storage_space ctxt ~storage_diff] updates the used storage space
+    for the ticket-table according to [storage_diff]. The additional positive
+    amount of unpaid storage is returned. If no unpaid storage is consumed,
+    this amount is 0.
+
+    Note that when storage space for the ticket table is released we may later
+    use that space for free. For this reason, the amount returned may be less
+    than the given (positive) [storage_diff]. *)
+val adjust_storage_space :
+  Raw_context.t -> storage_diff:Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** [used_storage_space ctxt] returns the used ticket storage space. *)
+  val used_storage_space : Raw_context.t -> (Z.t, error trace) result Lwt.t
+
+  (** [paid_storage_space ctxt] returns the paid ticket storage space. *)
+  val paid_storage_space : Raw_context.t -> (Z.t, error trace) result Lwt.t
+end

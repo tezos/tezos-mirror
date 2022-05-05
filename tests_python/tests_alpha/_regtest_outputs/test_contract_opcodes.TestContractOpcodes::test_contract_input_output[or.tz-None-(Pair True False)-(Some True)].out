@@ -7,29 +7,29 @@ emitted operations
 big_map diff
   
 trace
-  - location: 10 (remaining gas: 1039990.715 units remaining)
-    [ (Pair (Pair True False) None)  	 ]
-  - location: 10 (remaining gas: 1039990.705 units remaining)
-    [ (Pair True False)  	@parameter ]
-  - location: 11 (remaining gas: 1039990.695 units remaining)
-    [ (Pair True False)  	@parameter
-      (Pair True False)  	@parameter ]
-  - location: 12 (remaining gas: 1039990.685 units remaining)
-    [ True  	
-      (Pair True False)  	@parameter ]
-  - location: 13 (remaining gas: 1039990.675 units remaining)
-    [ (Pair True False)  	@parameter
-      True  	 ]
-  - location: 14 (remaining gas: 1039990.665 units remaining)
-    [ False  	
-      True  	 ]
-  - location: 15 (remaining gas: 1039990.650 units remaining)
-    [ True  	 ]
-  - location: 16 (remaining gas: 1039990.635 units remaining)
-    [ (Some True)  	 ]
-  - location: 17 (remaining gas: 1039990.620 units remaining)
-    [ {}  	
-      (Some True)  	 ]
-  - location: 19 (remaining gas: 1039990.605 units remaining)
-    [ (Pair {} (Some True))  	 ]
+  - location: 10 (remaining gas: 1039991.480 units remaining)
+    [ (Pair (Pair True False) None) ]
+  - location: 10 (remaining gas: 1039991.470 units remaining)
+    [ (Pair True False) ]
+  - location: 11 (remaining gas: 1039991.460 units remaining)
+    [ (Pair True False)
+      (Pair True False) ]
+  - location: 12 (remaining gas: 1039991.450 units remaining)
+    [ True
+      (Pair True False) ]
+  - location: 13 (remaining gas: 1039991.440 units remaining)
+    [ (Pair True False)
+      True ]
+  - location: 14 (remaining gas: 1039991.430 units remaining)
+    [ False
+      True ]
+  - location: 15 (remaining gas: 1039991.420 units remaining)
+    [ True ]
+  - location: 16 (remaining gas: 1039991.410 units remaining)
+    [ (Some True) ]
+  - location: 17 (remaining gas: 1039991.400 units remaining)
+    [ {}
+      (Some True) ]
+  - location: 19 (remaining gas: 1039991.390 units remaining)
+    [ (Pair {} (Some True)) ]
 

@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 ## How to use:
 ## eval $(scripts/env.sh)

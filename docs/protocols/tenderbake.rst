@@ -21,11 +21,20 @@ Rolls still play the following roles:
 
 - A delegate's voting power in the governance process is still in terms of rolls, as in Hangzhou.
 
+Baking and endorsing rights are no longer independent of each other:
+delegates that participate in consensus at a given level are called
+:ref:`validators<tb_validator>` in Tenderbake and validator rights in
+Tenderbake are similar to endorsing rights in Emmy*. Baking rights are
+deduced from endorsing rights: the baker at round ``r`` is the
+validator that owns the endorsing slot ``r``.
 
 Operations
 ~~~~~~~~~~
 
 The layout of the endorsement operations has changed. It consists of a level, a round, a slot, and a payload hash.
+A validator emits at most one endorsement per round, but can emit more
+endorsements per level; therefore, the current high-water mark
+mechanism used by the signer has been adapted (see :ref:`Signer<signer_chgs>`).
 
 There is a new consensus operation, `preendorsement`, with the same layout as an endorsement.
 
@@ -44,6 +53,33 @@ because it will not be anchored on a block belonging to the
 chain. (The blocks at the current and previous levels are not
 necessary final.)
 
+Block headers
+~~~~~~~~~~~~~
+
+The block fitness (included in the shell part of the block header)
+changes, mainly to allow block
+:ref:`candidates<candidate_block>` to be accepted by nodes.
+
+The protocol part of the block header changes as follows:
+
+- it no longer contains the priority entry.
+- it contains two additional fields:
+
+ - ``payload_hash`` is the hash of the sequence of the block's
+   non-consensus operations
+ - ``payload_round`` is the round at which the block's payload has
+   been first proposed (at the current level); it is equal to the
+   block's round in case of a fresh
+   :ref:`proposal<candidate_block>` and it is strictly smaller
+   in case of a reproposal.
+
+As in Emmy*, a block includes a set of endorsements for the
+predecessor block. These endorsements constitute a
+:ref:`quorum<quorum>` and serve as a justification that the previous
+block has been agreed upon. In case of a reproposal, a block also
+includes a quorum of preendorsements for the same round to justify
+that the payload is indeed a reproposal.
+
 Parameters
 ~~~~~~~~~~
 
@@ -60,7 +96,7 @@ The following protocol parameters have been removed:
 The following protocol parameters have been introduced:
 
 * ``baking_reward_fixed_portion`` = 10 tez
-* ``baking_reward_bonus_per_slot`` = 0.004285 tez
+* ``baking_reward_bonus_per_slot`` = 0.004286 tez
 * ``endorsing_reward_per_slot`` = 0.002857 tez
 * ``delay_increment_per_round`` = 15
 * ``minimal_participation_ratio`` = 2/3
@@ -109,7 +145,7 @@ The balance updates have been updated as follows:
   - block fees, with the kind ``accumulator`` and category ``block fees``;
   - storage fees, with the kind ``burned`` and category ``storage fees``;
   - double signing punishments, with the kind ``burned`` and category ``punishments``;
-  - lost endorsing rewards, with the kind ``burned``, category ``lost endorsing rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean with value ``true`` if and only if the reward was lost because of unsufficient participation), and 5th field ``revelation`` (a boolean with value ``true`` if and only if the reward was lost because of unrevealed nonces);
+  - lost endorsing rewards, with the kind ``burned``, category ``lost endorsing rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean with value ``true`` if and only if the reward was lost because of insufficient participation), and 5th field ``revelation`` (a boolean with value ``true`` if and only if the reward was lost because of unrevealed nonces);
   - liquidity baking subsidies, with the kind ``minted`` and category ``subsidy``;
   - commitments, with the kind ``commitment`` and category ``commitment``;
   - invoices, with the kind ``minted`` and category ``invoice``;
@@ -138,6 +174,8 @@ The receipt for (pre)endorsement operations contains three fields:
 The receipt for double preendorsement evidence operations has the same format as for double endorsement evidence operations.
 
 The receipt for set deposits limit operations has one field: the ``consumed_gas``.
+
+A more detailed documentation of balance updates is available :doc:`here<../alpha/token_management>`.
 
 RPCs
 ----
@@ -208,13 +246,15 @@ The following RPCs are new:
     the rewards are zero.
 
 
+.. _signer_chgs:
+
 Signer
 ------
 
 The signer's messages were of the form
 ``<magic_byte><chain_id><block|endorsement>`` and are now of the form
 ``<magic_byte><chain_id><block|preendorsement|endorsement>``, where
-the magic byte has changes from ``0x01`` for blocks and ``0x02`` for
+the magic byte has changed from ``0x01`` for blocks and ``0x02`` for
 endorsements, to ``0x11`` for blocks, ``0x12`` for preendorsements,
 ``0x13`` for endorsements.
 

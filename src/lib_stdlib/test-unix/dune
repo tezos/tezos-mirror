@@ -1,6 +1,12 @@
-(tests
- (names test_lwt_pipe test_circular_buffer test_circular_buffer_fuzzy)
- (package tezos-stdlib)
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names
+  test_lwt_pipe
+  test_circular_buffer
+  test_circular_buffer_fuzzy
+  test_hash_queue_lwt)
  (libraries
   tezos-stdlib
   alcotest
@@ -10,4 +16,25 @@
   lwt.unix
   tezos-test-helpers
   qcheck-alcotest)
- (flags (:standard -open Tezos_stdlib)))
+ (flags (:standard
+         -open Tezos_stdlib)))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_lwt_pipe.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_circular_buffer.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_circular_buffer_fuzzy.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_hash_queue_lwt.exe})))

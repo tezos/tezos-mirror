@@ -2226,9 +2226,9 @@ module RPC = struct
         let levels =
           List.sort_uniq
             Level.compare
-            (List.concat
-               (List.map (Level.from_raw ctxt) levels
-                :: List.map (Level.levels_in_cycle ctxt) cycles))
+            (List.rev_append
+               (List.rev_map (Level.from_raw ctxt) levels)
+               (Stdlib.List.concat_map (Level.levels_in_cycle ctxt) cycles))
         in
         List.map_e
           (fun level ->
@@ -2398,11 +2398,8 @@ module RPC = struct
           | [] ->
               List.map_es (baking_priorities ctxt max_priority) levels
               >|=? fun rights ->
-              let rights =
-                if q.all then rights
-                else List.map remove_duplicated_delegates rights
-              in
-              List.concat rights
+              if q.all then List.concat rights
+              else Stdlib.List.concat_map remove_duplicated_delegates rights
           | _ :: _ as delegates ->
               List.filter_map_s
                 (fun delegate ->

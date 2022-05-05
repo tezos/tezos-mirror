@@ -26,32 +26,6 @@
 open Client_keys
 open Tezos_sapling.Core.Client
 
-module Mnemonic = struct
-  let new_random = Bip39.of_entropy (Hacl.Rand.gen 32)
-
-  let to_sapling_key mnemonic =
-    (* Z-cash needs 32 bytes and BIP-39 gives 64 bytes of entropy.
-       We xor the two halves in case the entropy is not well distributed. *)
-    let seed_64_to_seed_32 (seed_64 : bytes) : bytes =
-      assert (Bytes.length seed_64 = 64) ;
-      let first_32 = Bytes.sub seed_64 0 32 in
-      let second_32 = Bytes.sub seed_64 32 32 in
-      let seed_32 = Bytes.create 32 in
-      for i = 0 to 31 do
-        Bytes.set
-          seed_32
-          i
-          (Char.chr
-             (Char.code (Bytes.get first_32 i)
-             lxor Char.code (Bytes.get second_32 i)))
-      done ;
-      seed_32
-    in
-    Spending_key.of_seed (seed_64_to_seed_32 (Bip39.to_seed mnemonic))
-
-  let words_pp = Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string)
-end
-
 (* Transform a spending key to an uri, encrypted or not. *)
 let to_uri unencrypted cctxt sapling_key =
   if unencrypted then
@@ -65,7 +39,7 @@ let from_uri (cctxt : #Client_context.full) uri =
 
 let register (cctxt : #Client_context.full) ?(force = false)
     ?(unencrypted = false) mnemonic name =
-  let sk = Mnemonic.to_sapling_key mnemonic in
+  let sk = Spending_key.of_seed @@ Mnemonic.to_32_bytes mnemonic in
   to_uri unencrypted cctxt sk >>=? fun sk_uri ->
   let key =
     {

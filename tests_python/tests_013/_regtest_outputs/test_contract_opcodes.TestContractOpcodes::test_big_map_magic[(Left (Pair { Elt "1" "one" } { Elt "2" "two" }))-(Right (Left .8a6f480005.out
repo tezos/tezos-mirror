@@ -1,0 +1,35 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_big_map_magic[(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))-(Right (Left (Right Unit)))-(Right Unit)-big_map_diff2]
+
+storage
+  (Right Unit)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 43 (remaining gas: 1039933.366 units remaining)
+    [ (Pair (Right (Left (Right Unit))) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
+  - location: 43 (remaining gas: 1039933.356 units remaining)
+    [ (Right (Left (Right Unit)))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 44 (remaining gas: 1039933.346 units remaining)
+    [ (Left (Right Unit))
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 60 (remaining gas: 1039933.336 units remaining)
+    [ (Right Unit)
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" })) ]
+  - location: 62 (remaining gas: 1039933.326 units remaining)
+    [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))
+      (Right Unit) ]
+  - location: 63 (remaining gas: 1039933.316 units remaining)
+    [ (Right Unit) ]
+  - location: 60 (remaining gas: 1039933.306 units remaining)
+    [ (Right Unit) ]
+  - location: 44 (remaining gas: 1039933.296 units remaining)
+    [ (Right Unit) ]
+  - location: 151 (remaining gas: 1039933.286 units remaining)
+    [ {}
+      (Right Unit) ]
+  - location: 153 (remaining gas: 1039933.276 units remaining)
+    [ (Pair {} (Right Unit)) ]
+

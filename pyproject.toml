@@ -19,25 +19,25 @@ keywords = ["tezos"]
 [tool.poetry.dependencies]
 python = "~3.9"
 
-base58check = "1.0.2"
-ed25519 = "1.4"
-# Set to 0.790 because the tests replication give duplicated modules errors with
-# mypy >= 0.8.
-# Replace with `mypy = "*"` when the tests have been refactorized.
-mypy = "0.790"
+# developer tools
+mypy = "0.942"
 mypy-extensions = "0.4.3"
-pyblake2 = "1.1.2"
-pycryptodome = "3.9.7"
 pycodestyle = "2.7.0"
-py_ecc = "2.0.0"
 pylint = "2.11.1"
+black = "22.3.0"
+
+# tests_python/ python testing and execution framework dependencies
 pytest = "6.2.5"
 pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", branch="fc5bd9b2" }
 pytest-timeout = "1.4.2"
 requests = "2.26.0"
-black = "^20.8b1"
+types-requests = "^2.27.16"
 # Used to validate the OpenAPI spec.
 openapi-spec-validator = "0.2.9"
+# tests_python/tools/bls12_381.py dependencies
+py_ecc = "2.0.0"
+# tests_python/tests_*/test_crypto.py dependencies
+pycryptodome = "3.9.7"
 
 # docs/ dependencies
 recommonmark = "0.7.1"
@@ -47,6 +47,8 @@ sphinx-rtd-theme = "0.5.2"
 # scripts/b58_prefix dependencies
 base58 = "2.1.0"
 fire = "0.4.0"
+
+# scripts/ci/coverage.py dependencies
 python-gitlab = "2.10.1"
 
 [tool.black]

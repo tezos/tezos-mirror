@@ -129,7 +129,7 @@ end
 
 let resolve_domain_name =
   let resolver =
-    TzString.Map.of_seq
+    String.Map.of_seq
     @@ List.to_seq
          [
            ( "localhost",
@@ -137,7 +137,7 @@ let resolve_domain_name =
            ("127.0.0.1", List.map Ipaddr.V6.of_int64 [(0L, 281472812449793L)]);
          ]
   in
-  fun addr -> TzString.Map.find_opt addr resolver |> Option.value ~default:[]
+  fun addr -> String.Map.find_opt addr resolver |> Option.value ~default:[]
 
 let resolve_domain_names_in_policy =
   RPC_server.Acl.Internal_for_test.resolve_domain_names (fun {addr; port; _} ->
@@ -349,16 +349,47 @@ let test_matching_with_name_resolving =
     `Quick
     (fun () ->
       Lwt_main.run
-        ( resolve_domain_names_in_policy example_policy >>= fun policy ->
-          List.iter
-            (fun (ip_addr, port, expected) ->
-              check_acl_search
-                "a domain name should match an appropriate IP address"
-                policy
-                expected
-                (ip_addr, port))
-            to_test ;
-          Lwt.return () ))
+        (let open Lwt_syntax in
+        let* policy = resolve_domain_names_in_policy example_policy in
+        List.iter
+          (fun (ip_addr, port, expected) ->
+            check_acl_search
+              "a domain name should match an appropriate IP address"
+              policy
+              expected
+              (ip_addr, port))
+          to_test ;
+        return_unit))
+
+let test_media_type_pp_parse =
+  let open Tezos_rpc_http.Media_type.Command_line in
+  let inputs = [Any; Json; Binary] in
+  let to_string = function
+    | Any -> "Any"
+    | Json -> "Json"
+    | Binary -> "Binary"
+  in
+  Alcotest.test_case "Media_type.Command_line.pp/parse" `Quick (fun () ->
+      List.iter
+        (fun m ->
+          let s = Format.asprintf "%a" pp_parameter m in
+          let mm = parse_cli_parameter s in
+          match mm with
+          | None ->
+              Format.kasprintf
+                Stdlib.failwith
+                "No parsing back for %s (%s)"
+                (to_string m)
+                s
+          | Some mm when m <> mm ->
+              Format.kasprintf
+                Stdlib.failwith
+                "No round trip for %s (%s) (%s)"
+                (to_string m)
+                s
+                (to_string mm)
+          | Some mm -> assert (m = mm))
+        inputs)
 
 let () =
   let open Qcheck_helpers in
@@ -372,4 +403,5 @@ let () =
       ("find_policy_matching_rules", [test_finding_policy]);
       ("ensure_unsafe_rpcs_blocked", [ensure_unsafe_rpcs_blocked]);
       ("test_matching_with_name_resolving", [test_matching_with_name_resolving]);
+      ("test_media_type_pp_parse", [test_media_type_pp_parse]);
     ]

@@ -1,16 +1,14 @@
-tezt/_regressions/rpc/alpha.light.others.out
+rpc/alpha.light.others.out
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/context/constants
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
   "max_micheline_bytes_limit": 50000,
-  "max_allowed_global_constants_depth": 10000,
-  "cache_layout": [ "100000000", "8", "8" ],
+  "max_allowed_global_constants_depth": 10000, "cache_layout_size": 3,
   "michelson_maximum_type_size": 2001, "preserved_cycles": 2,
   "blocks_per_cycle": 8, "blocks_per_commitment": 4,
-  "blocks_per_stake_snapshot": 4, "blocks_per_voting_period": 64,
+  "blocks_per_stake_snapshot": 4, "cycles_per_voting_period": 8,
   "hard_gas_limit_per_operation": "1040000",
   "hard_gas_limit_per_block": "5200000", "proof_of_work_threshold": "-1",
   "tokens_per_roll": "6000000000", "seed_nonce_revelation_tip": "125000",
@@ -21,7 +19,7 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
   "quorum_max": 7000, "min_proposal_quorum": 500,
   "liquidity_baking_subsidy": "2500000",
   "liquidity_baking_sunset_level": 128,
-  "liquidity_baking_escape_ema_threshold": 666667,
+  "liquidity_baking_toggle_ema_threshold": 1000000000,
   "max_operations_time_to_live": 120, "minimal_block_delay": "1",
   "delay_increment_per_round": "1", "consensus_committee_size": 256,
   "consensus_threshold": 0,
@@ -29,11 +27,31 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
   "max_slashing_period": 2, "frozen_deposits_percentage": 5,
   "double_baking_punishment": "640000000",
   "ratio_of_frozen_deposits_slashed_per_double_endorsement":
-    { "numerator": 1, "denominator": 2 }, "tx_rollup_enable": false,
-  "tx_rollup_origination_size": 60000 }
+    { "numerator": 1, "denominator": 2 }, "cache_script_size": 100000000,
+  "cache_stake_distribution_cycles": 8, "cache_sampler_state_cycles": 8,
+  "tx_rollup_enable": true, "tx_rollup_origination_size": 4000,
+  "tx_rollup_hard_size_limit_per_inbox": 500000,
+  "tx_rollup_hard_size_limit_per_message": 5000,
+  "tx_rollup_max_withdrawals_per_batch": 15,
+  "tx_rollup_commitment_bond": "10000000000",
+  "tx_rollup_finality_period": 40000, "tx_rollup_withdraw_period": 40000,
+  "tx_rollup_max_inboxes_count": 40100,
+  "tx_rollup_max_messages_per_inbox": 1010,
+  "tx_rollup_max_commitments_count": 80100,
+  "tx_rollup_cost_per_byte_ema_factor": 120,
+  "tx_rollup_max_ticket_payload_size": 2048,
+  "tx_rollup_rejection_max_proof_size": 30000,
+  "tx_rollup_sunset_level": 3473409, "sc_rollup_enable": false,
+  "sc_rollup_origination_size": 6314,
+  "sc_rollup_challenge_window_in_blocks": 20160,
+  "sc_rollup_max_available_messages": 1000000,
+  "sc_rollup_stake_amount_in_mutez": 32000000,
+  "sc_rollup_commitment_frequency_in_blocks": 20,
+  "sc_rollup_commitment_storage_size_in_bytes": 84,
+  "sc_rollup_max_lookahead_in_blocks": 30000 }
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "round": 0, "estimated_time": "[TIMESTAMP]" },
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
@@ -44,14 +62,14 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
     "round": 3, "estimated_time": "[TIMESTAMP]" },
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "round": 10, "estimated_time": "[TIMESTAMP]" } ]
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
   "expected_commitment": false }
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/endorsing_rights
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ { "level": 1,
     "delegates":
       [ { "delegate": "[PUBLIC_KEY_HASH]",
@@ -64,7 +82,8 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
           "first_slot": 1, "endorsing_power": 55 },
         { "delegate": "[PUBLIC_KEY_HASH]",
           "first_slot": 0, "endorsing_power": 58 } ] } ]
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "first": 1, "last": 8 }
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

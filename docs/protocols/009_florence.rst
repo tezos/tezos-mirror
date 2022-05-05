@@ -1,5 +1,5 @@
-Protocol 009_PsFLoren Florence
-==============================
+Protocol Florence
+=================
 
 This page contains all the relevant information for protocol 009 Florence.
 

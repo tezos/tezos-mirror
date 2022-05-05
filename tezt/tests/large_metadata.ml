@@ -30,12 +30,16 @@
    Subject: Test that large operations metadata are not stored.
 *)
 
-let metadata_is_stored client exponent =
+let metadata_is_available ?(force_metadata = false) client exponent =
+  let rpc_args = ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"] in
   let* first_manager_operation =
-    Client.rpc
-      Client.GET
-      ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"]
-      client
+    if force_metadata then
+      Client.rpc
+        ~query_string:[("force_metadata", "")]
+        Client.GET
+        rpc_args
+        client
+    else Client.rpc Client.GET rpc_args client
   in
   let first_operation_result =
     JSON.(
@@ -51,7 +55,12 @@ let metadata_is_stored client exponent =
   assert (length_of_first_error_message = 1 lsl exponent) ;
   unit
 
-let large_metadata_is_not_stored client =
+let get_endorsement client =
+  let rpc_args = ["chains"; "main"; "blocks"; "head"; "operations"; "0"; "0"] in
+  let* _ = Client.rpc Client.GET rpc_args client in
+  unit
+
+let metadata_is_not_available client =
   let* first_manager_operation =
     Client.rpc
       Client.GET
@@ -120,7 +129,7 @@ let check_default_limit_metadata =
   in
   let* () = Client.bake_for client in
   (* All protocols should store the metadata. *)
-  let* () = metadata_is_stored client small_exponent in
+  let* () = metadata_is_available client small_exponent in
   (* We now call the contract with a bigger exponent to exceed the
      10_000_000 limit: 2^24=16_777_216. The contract should be
      sucessfully injected. *)
@@ -140,7 +149,7 @@ let check_default_limit_metadata =
   in
   let* () = Client.bake_for client in
   (* All protocols should not store the metadata. *)
-  let* () = large_metadata_is_not_stored client in
+  let* () = metadata_is_not_available client in
   unit
 
 let check_limit_metadata =
@@ -172,7 +181,7 @@ let check_limit_metadata =
   in
   let* () = Client.bake_for client in
   (* The metadata should be present. *)
-  let* () = metadata_is_stored client small_exponent in
+  let* () = metadata_is_available client small_exponent in
   (* We now call the contract with a bigger exponent to exceed the
      10_000 limit: 2^14=16_384. *)
   let big_exponent = 14 in
@@ -191,7 +200,7 @@ let check_limit_metadata =
   in
   let* () = Client.bake_for client in
   (* The metadata shouldn't be present. *)
-  let* () = large_metadata_is_not_stored client in
+  let* () = metadata_is_not_available client in
   unit
 
 let check_unlimited_metadata =
@@ -221,10 +230,67 @@ let check_unlimited_metadata =
   in
   let* () = Client.bake_for client in
   (* The metadata should be present. *)
-  let* () = metadata_is_stored client big_exponent in
+  let* () = metadata_is_available client big_exponent in
+  unit
+
+let check_metadata_force_recompute =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Force recompute large metadata"
+    ~tags:["large_metadata"; "force"; "recompute"]
+  @@ fun protocol ->
+  let* (contract_id, client, _node) =
+    setup_node ~limit:(Some (Node.Metadata_size_limit (Some 10_000))) protocol
+  in
+  let small_exponent = 13 in
+  (* Call the contract with a small exponent to make sure that the
+     metadata is allowed. As the metadata cap is set to 10_000 bytes
+     and as 2^13=8_192 does not exceed this limit, the metadata should
+     be stored. *)
+  let* () =
+    Client.transfer
+      ~gas_limit:100_000
+      ~fee:Tez.one
+      ~amount:Tez.zero
+      ~burn_cap:Tez.zero
+      ~storage_limit:10000
+      ~giver:"bootstrap1"
+      ~receiver:contract_id
+      ~arg:(string_of_int small_exponent)
+      ~force:true
+      client
+  in
+  let* () = Client.bake_for client in
+  (* The metadata should be present. *)
+  let* () = metadata_is_available client small_exponent in
+  (* We now call the contract with a bigger exponent to exceed the
+     10_000 limit: 2^14=16_384. *)
+  let big_exponent = 14 in
+  let* () =
+    Client.transfer
+      ~gas_limit:100_000
+      ~fee:Tez.one
+      ~amount:Tez.zero
+      ~burn_cap:Tez.zero
+      ~storage_limit:10000
+      ~giver:"bootstrap1"
+      ~receiver:contract_id
+      ~arg:(string_of_int big_exponent)
+      ~force:true
+      client
+  in
+  let* () = Client.bake_for client in
+  (* The metadata shouldn't be present. *)
+  let* () = metadata_is_not_available client in
+  (* The metadata should be available as we force the node to
+     recompute it. *)
+  let* () = metadata_is_available ~force_metadata:true client 14 in
+  (* Check that endorsements can still be queried. *)
+  let* () = get_endorsement client in
   unit
 
 let register ~protocols =
-  check_default_limit_metadata ~protocols ;
-  check_limit_metadata ~protocols ;
-  check_unlimited_metadata ~protocols
+  check_default_limit_metadata protocols ;
+  check_limit_metadata protocols ;
+  check_unlimited_metadata protocols ;
+  check_metadata_force_recompute protocols

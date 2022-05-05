@@ -1,7 +1,10 @@
-(tests
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
  (names test_mockup_args test_fuzzing_mockup_args test_persistence)
- (package tezos-mockup)
  (libraries
+  tezos-base
   tezos-base-test-helpers
   tezos-mockup
   tezos-mockup-registration
@@ -9,4 +12,21 @@
   qcheck-alcotest
   alcotest-lwt)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_base_test_helpers)))
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base_test_helpers)))
+
+(rule
+ (alias runtest)
+ (package tezos-mockup)
+ (action (run %{dep:./test_mockup_args.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-mockup)
+ (action (run %{dep:./test_fuzzing_mockup_args.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-mockup)
+ (action (run %{dep:./test_persistence.exe})))

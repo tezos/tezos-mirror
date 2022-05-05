@@ -182,6 +182,44 @@ val init :
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 
+(** [init1] : returns an initial block with 1 initialized bootstrap account
+    and the associated implicit contract *)
+val init1 :
+  ?rng_state:Random.State.t ->
+  ?commitments:Commitment.t list ->
+  ?initial_balances:int64 list ->
+  ?consensus_threshold:int ->
+  ?min_proposal_quorum:int32 ->
+  ?level:int32 ->
+  ?cost_per_byte:Tez.t ->
+  ?liquidity_baking_subsidy:Tez.t ->
+  ?endorsing_reward_per_slot:Tez.t ->
+  ?baking_reward_bonus_per_slot:Tez.t ->
+  ?baking_reward_fixed_portion:Tez.t ->
+  ?origination_size:int ->
+  ?blocks_per_cycle:int32 ->
+  unit ->
+  (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+
+(** [init2] : returns an initial block with 2 initialized bootstrap accounts
+    and the associated implicit contracts *)
+val init2 :
+  ?rng_state:Random.State.t ->
+  ?commitments:Commitment.t list ->
+  ?initial_balances:int64 list ->
+  ?consensus_threshold:int ->
+  ?min_proposal_quorum:int32 ->
+  ?level:int32 ->
+  ?cost_per_byte:Tez.t ->
+  ?liquidity_baking_subsidy:Tez.t ->
+  ?endorsing_reward_per_slot:Tez.t ->
+  ?baking_reward_bonus_per_slot:Tez.t ->
+  ?baking_reward_fixed_portion:Tez.t ->
+  ?origination_size:int ->
+  ?blocks_per_cycle:int32 ->
+  unit ->
+  (Block.t * Alpha_context.Contract.t * Alpha_context.Contract.t) tzresult Lwt.t
+
 val init_with_constants :
   Constants.parametric ->
   int ->

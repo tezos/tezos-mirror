@@ -77,6 +77,17 @@ let encode_u = Ezjsonm.value_to_string ~minify:false
 
 let encode {node; _} = Ezjsonm.value_to_string ~minify:false node
 
+let encode_to_file_u filename json =
+  let ch = open_out filename in
+  try
+    Ezjsonm.value_to_channel ~minify:false ch json ;
+    close_out ch
+  with exn ->
+    close_out ch ;
+    raise exn
+
+let encode_to_file filename json = encode_to_file_u filename json.node
+
 let annotate ~origin node = {origin = Origin {name = origin; json = node}; node}
 
 let unannotate {node; _} = node

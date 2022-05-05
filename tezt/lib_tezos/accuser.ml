@@ -123,6 +123,7 @@ let init ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
     create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node
   in
   let* () = run accuser in
+  let* () = wait_for_ready accuser in
   return accuser
 
 let restart accuser =

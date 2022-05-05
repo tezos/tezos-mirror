@@ -51,15 +51,29 @@
         | Error _ -> (ctxt, []))
 *)
 
+(*
+  To patch code of legacy contracts you can add a helper function here and call
+  it at the end of prepare_first_block.
+
+  See !3730 for an example.
+*)
+
 let prepare_first_block ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
+  let parametric = Raw_context.constants ctxt in
+  ( Raw_context.Cache.set_cache_layout
+      ctxt
+      (Constants_repr.cache_layout parametric)
+  >|= fun ctxt -> Raw_context.Cache.clear ctxt )
+  >>= fun ctxt ->
   (match previous_protocol with
   | Genesis param ->
       (* This is the genesis protocol: initialise the state *)
+      Raw_level_repr.of_int32 level >>?= fun level ->
+      Storage.Tenderbake.First_level_of_protocol.init ctxt level
+      >>=? fun ctxt ->
       Storage.Block_round.init ctxt Round_repr.zero >>=? fun ctxt ->
-      Raw_level_repr.of_int32 level >>?= fun first_level ->
-      Storage.Tenderbake.First_level.init ctxt first_level >>=? fun ctxt ->
       let init_commitment (ctxt, balance_updates)
           Commitment_repr.{blinded_public_key_hash; amount} =
         Token.transfer
@@ -83,8 +97,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
         param.bootstrap_accounts
         param.bootstrap_contracts
       >>=? fun (ctxt, bootstrap_balance_updates) ->
-      Stake_storage.init_first_cycles ctxt Delegate_storage.pubkey
-      >>=? fun ctxt ->
+      Delegate_storage.init_first_cycles ctxt >>=? fun ctxt ->
       let cycle = (Raw_context.current_level ctxt).cycle in
       Delegate_storage.freeze_deposits_do_not_call_except_for_migration
         ~new_cycle:cycle
@@ -105,11 +118,12 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
           @ deposits_balance_updates )
-  | Ithaca_012 ->
-      (* TODO (#2233): fix endorsement of migration block in Ithaca baker *)
-      Raw_level_repr.of_int32 level >>?= fun first_level ->
-      Storage.Tenderbake.First_level.update ctxt first_level >>=? fun ctxt ->
-      return (ctxt, []))
+  | Jakarta_013 ->
+      (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
+         if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
+      Raw_level_repr.of_int32 level >>?= fun level ->
+      Storage.Tenderbake.First_level_of_protocol.update ctxt level
+      >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates

@@ -2,7 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module provides functions to extract the value of protocol parameters
+    from the context.
+    See {!Constant_repr.parametric} for more details about these values. *)
+
 val preserved_cycles : Raw_context.t -> int
 
 val blocks_per_cycle : Raw_context.t -> int32
@@ -32,7 +37,7 @@ val blocks_per_commitment : Raw_context.t -> int32
 
 val blocks_per_stake_snapshot : Raw_context.t -> int32
 
-val blocks_per_voting_period : Raw_context.t -> int32
+val cycles_per_voting_period : Raw_context.t -> int32
 
 val hard_gas_limit_per_operation :
   Raw_context.t -> Gas_limit_repr.Arith.integral
@@ -67,15 +72,15 @@ val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
 
 val liquidity_baking_sunset_level : Raw_context.t -> int32
 
-val liquidity_baking_escape_ema_threshold : Raw_context.t -> int32
+val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 
-val parametric : Raw_context.t -> Constants_repr.parametric
+val parametric : Raw_context.t -> Constants_parametric_repr.t
 
 val consensus_committee_size : Raw_context.t -> int
 
 val consensus_threshold : Raw_context.t -> int
 
-val minimal_participation_ratio : Raw_context.t -> Constants_repr.ratio
+val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 
 val max_slashing_period : Raw_context.t -> int
 
@@ -87,9 +92,51 @@ val tx_rollup_enable : Raw_context.t -> bool
 
 val tx_rollup_origination_size : Raw_context.t -> int
 
+val tx_rollup_hard_size_limit_per_inbox : Raw_context.t -> int
+
+val tx_rollup_hard_size_limit_per_message : Raw_context.t -> int
+
+val tx_rollup_max_withdrawals_per_batch : Raw_context.t -> int
+
+val tx_rollup_commitment_bond : Raw_context.t -> Tez_repr.t
+
+val tx_rollup_finality_period : Raw_context.t -> int
+
+val tx_rollup_withdraw_period : Raw_context.t -> int
+
+val tx_rollup_max_inboxes_count : Raw_context.t -> int
+
+val tx_rollup_max_messages_per_inbox : Raw_context.t -> int
+
+val tx_rollup_max_commitments_count : Raw_context.t -> int
+
+val tx_rollup_cost_per_byte_ema_factor : Raw_context.t -> int
+
+val tx_rollup_max_ticket_payload_size : Raw_context.t -> int
+
+val tx_rollup_rejection_max_proof_size : Raw_context.t -> int
+
+val tx_rollup_sunset_level : Raw_context.t -> int32
+
 val ratio_of_frozen_deposits_slashed_per_double_endorsement :
-  Raw_context.t -> Constants_repr.ratio
+  Raw_context.t -> Ratio_repr.t
 
 val minimal_block_delay : Raw_context.t -> Period_repr.t
 
 val delay_increment_per_round : Raw_context.t -> Period_repr.t
+
+val sc_rollup_enable : Raw_context.t -> bool
+
+val sc_rollup_origination_size : Raw_context.t -> int
+
+val sc_rollup_challenge_window_in_blocks : Raw_context.t -> int
+
+val sc_rollup_max_available_messages : Raw_context.t -> int
+
+val sc_rollup_stake_amount_in_mutez : Raw_context.t -> int
+
+val sc_rollup_commitment_frequency_in_blocks : Raw_context.t -> int
+
+val sc_rollup_commitment_storage_size_in_bytes : Raw_context.t -> int
+
+val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32

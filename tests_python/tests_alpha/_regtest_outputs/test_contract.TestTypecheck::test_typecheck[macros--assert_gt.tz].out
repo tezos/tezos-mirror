@@ -1,15 +1,15 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/assert_gt.tz]
 
 Well typed
-Gas remaining: 1039990.923 units remaining
+Gas remaining: 1039991.843 units remaining
 { parameter (pair int int) ;
   storage unit ;
   code { CAR
-         /* [ @parameter pair int int ] */ ;
+         /* [ pair int int ] */ ;
          DUP
-         /* [ @parameter pair int int : @parameter pair int int ] */ ;
+         /* [ pair int int : pair int int ] */ ;
          CAR
-         /* [ int : @parameter pair int int ] */ ;
+         /* [ int : pair int int ] */ ;
          DIP { CDR /* [ int ] */ }
          /* [ int : int ] */ ;
          COMPARE

@@ -52,7 +52,7 @@ let get_fs ?runner () =
 
 let next_name = ref 0
 
-let base_main_dir = "tezt-" ^ string_of_int (Unix.getpid ())
+let base_main_dir () = "tezt-" ^ string_of_int (Unix.getpid ())
 
 (* [add_file], [add_dir] and [add_parent] select the file system to use.*)
 let add_file ?runner file =
@@ -76,7 +76,7 @@ let add_parent ?runner parent =
 let fresh_main_dir () =
   let index = !next_name in
   incr next_name ;
-  Filename.get_temp_dir_name () // base_main_dir // string_of_int index
+  Filename.get_temp_dir_name () // base_main_dir () // string_of_int index
 
 let main_dir_ref = ref @@ fresh_main_dir ()
 

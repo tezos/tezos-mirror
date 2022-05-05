@@ -37,20 +37,14 @@ end
 
 module Conf : Irmin_pack.Conf.S
 
-module Contents : Irmin.Contents.S with type t = bytes
+module Schema :
+  Irmin.Schema.Extended
+    with type Contents.t = bytes
+     and type Metadata.t = unit
+     and type Path.t = string list
+     and type Path.step = string
+     and type Branch.t = string
+     and module Info = Irmin.Info.Default
+     and type Hash.t = Hash.t
 
-module Metadata : Irmin.Metadata.S with type t = unit
-
-module Path : Irmin.Path.S with type step = string and type t = string list
-
-module Branch : Irmin.Branch.S with type t = string
-
-(* Note: [Irmin.Private] contains backend-specific modules and module types.
-   These are intended to be consumed by [lib_context] but not to appear in its
-   main public API. *)
-
-module Node : Irmin.Private.Node.Maker
-
-module Commit : Irmin.Private.Commit.Maker
-
-module Info = Irmin.Info
+module type Conf = Irmin_pack.Conf.S

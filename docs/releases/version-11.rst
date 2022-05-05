@@ -1,4 +1,4 @@
-Version 11.0
+Version 11.1
 ============
 
 Version 11.0 contains a new version (V3) of the protocol
@@ -15,40 +15,30 @@ Hangzhou to Hangzhou2 on Mainnet. This means that nodes using version
 instead of Hangzhou if Hangzhou was
 to be activated by the on-chain governance process.
 
+Version 11.1 fixes some storage issues, as well as some build issues.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v11.0
+  git checkout v11.1
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v11.0`` Docker images of Tezos.
+If you are using Docker instead, use the ``v11.1`` Docker images of Tezos.
 
 If you are installing Octez using Opam, note that the required
 OCaml version is now 4.12.1. This means that you need to create a
 new switch with ``opam switch create 4.12.1`` before you run ``opam install tezos``.
 
-Known Issues
-------------
-
-Users with older CPUs may encounter a "core dumped: illegal instruction" error
-when using pre-built executables (Docker images or static binaries).
-Such users can fix this issue by:
-
-- using Docker images tagged ``v11.0_no_adx`` (see on `Docker Hub <https://hub.docker.com/layers/tezos/tezos/v11.0_no_adx/images/sha256-b0532eb8cc4201983e24034cf5252992db5c99bb0f7cb10afd1bf4675153ea4a>`_);
-- using the no-ADX static binaries
-  (`AMD64 <https://gitlab.com/tezos/tezos/-/jobs/1805009867/artifacts/browse/tezos-binaries/>`_ or
-  `ARM64 <https://gitlab.com/tezos/tezos/-/jobs/1805009868/artifacts/browse/tezos-binaries/>`_);
-- or compiling from source or with Opam (see :doc:`../introduction/howtoget`).
-
 Changelog
 ---------
 
+- `Version 11.1 <../CHANGES.html#version-11-1>`_
 - `Version 11.0 <../CHANGES.html#version-11-0>`_
 - `Version 11.0~rc2 <../CHANGES.html#version-11-0-rc2>`_
 - `Version 11.0~rc1 <../CHANGES.html#version-11-0-rc1>`_

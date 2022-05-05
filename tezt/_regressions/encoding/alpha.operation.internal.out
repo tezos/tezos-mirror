@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.operation.internal.out
+encoding/alpha.operation.internal.out
 
 ./tezos-codec encode alpha.operation.internal from '{
   "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -102,19 +102,6 @@ tezt/_regressions/encoding/alpha.operation.internal.out
                   { "prim": "NIL", "args": [ { "prim": "operation" } ] },
                   { "prim": "PAIR" } ] ] } ],
       "storage": [ { "string": "test" } ] } }
-
-./tezos-codec encode alpha.operation.internal from '{
-  "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-  "nonce": 0,
-  "kind": "reveal",
-  "public_key": "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-}'
-000002298c03ed7d454a101eb7022bc95f7e5f41ac78000000004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
-
-./tezos-codec decode alpha.operation.internal from 000002298c03ed7d454a101eb7022bc95f7e5f41ac78000000004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
-{ "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "nonce": 0,
-  "kind": "reveal",
-  "public_key": "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" }
 
 ./tezos-codec encode alpha.operation.internal from '{
   "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",

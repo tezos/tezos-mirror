@@ -1,0 +1,82 @@
+# We use the --job option to split tests into jobs of roughly the same
+# duration. This is based on a file that contains timings of test results,
+# generated with --record. To rebalance jobs, update this record with:
+#
+#   make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
+
+.tezt_template:
+  artifacts:
+    reports:
+      junit: tezt-junit.xml
+    paths:
+      - tezt.log
+      - tezt-results-$CI_NODE_INDEX.json
+      - $BISECT_FILE
+    expire_in: 1 day
+    # certain tests can be blacklisted by adding it to this variable
+    when: always
+  variables:
+    TESTS: "/protocol_override"
+  script:
+    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --on-unknown-regression-files fail --junit tezt-junit.xml --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
+    - ./scripts/ci/merge_coverage.sh
+
+tezt:
+  extends:
+    - .integration_template
+    - .template__coverage_files
+    - .tezt_template
+  parallel: 9
+
+# these are tezt tests as above, but run using the static binaries
+tezt:static-binaries:
+  extends:
+    - .integration_template
+    - .tezt_template
+  dependencies:
+    - build:static-x86_64-linux-binaries
+  needs:
+    - build:static-x86_64-linux-binaries
+  parallel: 2
+  variables:
+    TESTS: "cli"
+
+# Long Tezt tests are not ran in the CI, but we want them to type-check so that
+# they can be built in the performance regression test framework executors.
+tezt:build-long:
+  extends:
+    - .build_template
+    - .rules_template__development
+  stage: test
+  script:
+    - dune build @tezt/long_tests/check
+
+# Tests tezt itself
+tezt:self_tests:
+  extends:
+    - .build_template
+    - .rules_template__development
+  stage: test
+  script:
+    - dune runtest tezt/self_tests/
+
+# Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
+#
+#tezt:manual:migration:
+#  extends:
+#    - .test_template
+#    - .rules_template__extended_test_pipeline
+#  before_script:
+#    - export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
+#    - curl -s https://api.github.com/repos/Phlogi/tezos-snapshots/releases/latest | jq -r ".assets[] | select(.name) | .browser_download_url" | grep roll | xargs wget -q
+#    - block_hash=$(echo mainnet.roll.* | sed -r 's/mainnet\.roll\.[0-9_-]+\.(.*)\.[0-9]+\.chain\.xz/\1/g')
+#    - cat mainnet.roll.* | xz -d -v -T0 > mainnet.rolling
+#    - scripts/prepare_migration_test.sh auto mainnet.rolling "$block_hash"
+#  script:
+#    - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
+#    - dune exec ./tezt/manual_tests/main.exe -- migration --color --log-buffer-size 5000 --log-file tezt-migration.log
+#  artifacts:
+#    when: always
+#    paths:
+#      - tezt-migration.log
+#    expire_in: 30 days

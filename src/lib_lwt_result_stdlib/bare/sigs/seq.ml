@@ -87,12 +87,6 @@ module type S = sig
       with type 'a t = 'a Stdlib.Seq.t
        and type 'a node = 'a Stdlib.Seq.node
 
-  (** {3 Some values that made it to Stdlib's Seq since} *)
-
-  val cons : 'a -> 'a t -> 'a t
-
-  val append : 'a t -> 'a t -> 'a t
-
   (** {3 Lwtreslib-specific extensions} *)
 
   (** [first s] is [None] if [s] is empty, it is [Some x] where [x] is the
@@ -160,5 +154,14 @@ module type S = sig
       them is. *)
   val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
-  val unfold : ('b -> ('a * 'b) option) -> 'b -> 'a t
+  (** {3 Values which have made it to the Stdlib since then}
+
+      This section is for forward compatibility: bringing you the features of
+      more recent OCaml Stdlib than we compile against. *)
+
+  (** [concat s] is a sequence containing the elements of the elements of [s]. *)
+  val concat : 'a t t -> 'a t
+
+  (** [concat_map] is an alias for {!flat_map} *)
+  val concat_map : ('a -> 'b t) -> 'a t -> 'b t
 end

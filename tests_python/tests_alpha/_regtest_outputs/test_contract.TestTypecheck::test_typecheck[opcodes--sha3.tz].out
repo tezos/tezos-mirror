@@ -1,11 +1,11 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/sha3.tz]
 
 Well typed
-Gas remaining: 1039996.037 units remaining
+Gas remaining: 1039996.837 units remaining
 { storage (option bytes) ;
   parameter bytes ;
   code { CAR
-         /* [ @parameter bytes ] */ ;
+         /* [ bytes ] */ ;
          SHA3
          /* [ bytes ] */ ;
          SOME

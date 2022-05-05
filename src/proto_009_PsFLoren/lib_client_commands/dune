@@ -1,57 +1,69 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_009_PsFLoren_commands)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-009-PsFLoren-commands)
- (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-protocol-009-PsFLoren
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-mockup
-            tezos-mockup-registration
-            tezos-mockup-commands
-            tezos-client-base-unix
-            tezos-client-009-PsFLoren
-            tezos-client-commands
-            tezos-rpc
-            tezos-protocol-plugin-009-PsFLoren)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-009-PsFLoren
+  tezos-stdlib-unix
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-mockup
+  tezos-mockup-registration
+  tezos-mockup-commands
+  tezos-client-base
+  tezos-client-009-PsFLoren
+  tezos-client-commands
+  tezos-rpc
+  tezos-client-base-unix
+  tezos-protocol-plugin-009-PsFLoren)
  (library_flags (:standard -linkall))
- (modules (:standard \ alpha_commands_registration))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_009_PsFLoren
-                   -open Tezos_stdlib_unix
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_009_PsFLoren
-                   -open Tezos_client_commands
-                   -open Tezos_rpc
-                   -open Tezos_client_base_unix
-                   -open Tezos_protocol_plugin_009_PsFLoren)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_009_PsFLoren
+   -open Tezos_stdlib_unix
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_009_PsFLoren
+   -open Tezos_client_commands
+   -open Tezos_rpc
+   -open Tezos_client_base_unix
+   -open Tezos_protocol_plugin_009_PsFLoren))
+ (modules (:standard \ alpha_commands_registration)))
 
 (library
  (name tezos_client_009_PsFLoren_commands_registration)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-009-PsFLoren-commands-registration)
- (libraries tezos-base
-            tezos-protocol-009-PsFLoren
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-009-PsFLoren
-            tezos-client-commands
-            tezos-client-009-PsFLoren-commands
-            tezos-client-sapling-009-PsFLoren
-            tezos-rpc
-            tezos-protocol-plugin-009-PsFLoren)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-009-PsFLoren
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-009-PsFLoren
+  tezos-client-commands
+  tezos-client-009-PsFLoren-commands
+  tezos-client-sapling-009-PsFLoren
+  tezos-rpc
+  tezos-protocol-plugin-009-PsFLoren)
  (library_flags (:standard -linkall))
- (modules alpha_commands_registration)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_009_PsFLoren
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_009_PsFLoren
-                   -open Tezos_client_commands
-                   -open Tezos_client_009_PsFLoren_commands
-                   -open Tezos_client_sapling_009_PsFLoren
-                   -open Tezos_rpc
-                   -open Tezos_protocol_plugin_009_PsFLoren)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_009_PsFLoren
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_009_PsFLoren
+   -open Tezos_client_commands
+   -open Tezos_client_009_PsFLoren_commands
+   -open Tezos_client_sapling_009_PsFLoren
+   -open Tezos_rpc
+   -open Tezos_protocol_plugin_009_PsFLoren))
+ (modules alpha_commands_registration))

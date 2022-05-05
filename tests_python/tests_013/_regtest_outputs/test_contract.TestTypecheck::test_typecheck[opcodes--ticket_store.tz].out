@@ -1,0 +1,14 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/ticket_store.tz]
+
+Well typed
+Gas remaining: 1039997.074 units remaining
+{ parameter (ticket nat) ;
+  storage (option (ticket nat)) ;
+  code { CAR
+         /* [ ticket nat ] */ ;
+         SOME
+         /* [ option (ticket nat) ] */ ;
+         NIL operation
+         /* [ list operation : option (ticket nat) ] */ ;
+         PAIR
+         /* [ pair (list operation) (option (ticket nat)) ] */ } }

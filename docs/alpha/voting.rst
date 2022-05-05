@@ -15,9 +15,9 @@ The rest of this page gives more details about the amendment and voting process.
 Periods
 -------
 
-The amendment process consists of five *periods*. Each period lasts for 40960
-blocks (5 cycles) (or approximately two weeks). The periods (listed below)
-typically succeed one another for a total duration of approximately 2 months and
+The amendment process consists of five *periods*. Each period lasts for 5 cycles
+(or approximately two weeks). The periods (listed below)
+typically succeed one to another for a total duration of approximately 2 months and
 a half, after which the whole amendment process starts again.
 
 The five periods are as follows:
@@ -25,20 +25,22 @@ The five periods are as follows:
 - *Proposal period*: During this period, delegates can
 
   - submit *protocol amendment proposals* (or, simply, *proposals*) using the
-    ``Proposals`` operation (see below),
-  - support a proposal using the ``Ballot`` operation (see below).
+    ``Proposals`` operation (see below);
+  - upvote one or several proposals, using the same ``Proposals`` operation.
 
   Each delegate can submit a maximum of 20 proposals. Duplicates count towards
   this total.
 
-  At the end of a **proposal period**, the proposal with most support is
+  At the end of a **proposal period**, if participation reaches a
+  :ref:`proposal quorum <proposal_quorum>`, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the cumulated number of :ref:`rolls <Roll>` that delegates supporting the
-  proposal have. E.g., a proposal supported by a single delegate with 100 rolls
-  has more support than a proposal supported by two delegates with 20 rolls
-  each.
+  measured in the cumulated staking power (expressed in mutez) that delegates supporting the
+  proposal have. E.g., a proposal supported by a single delegate with 600,000 tz of staking power
+  has more support than a proposal supported by two delegates with 100,000 tz
+  each of staking power.
 
-  If there are no proposals, or a tie between two or more proposals, the process
+  If there are no proposals, or a tie between two or more proposals,
+  or if participation did not reach the proposal quorum, the process
   moves back to a new **proposal period**.
 
 - *Exploration period*: During this period delegates can cast one
@@ -101,7 +103,7 @@ Voting Power
 
 When supporting a proposal or casting a Yay, Nay, or Pass ballot, each delegate
 has voting power equal to its *stake*. The stake is always measured in
-**number of rolls**.
+**mutez**.
 
 Note that the stake of each delegate is computed at the beginning of each
 period.
@@ -110,7 +112,7 @@ period.
 Super-majority and Quorum
 -------------------------
 
-As mentioned above, during either of the **proposal** or **promotion** periods,
+As mentioned above, during either of the **exploration** or **promotion** periods,
 delegates can cast ballots using the ``Ballot`` operation (see below).
 In both cases, delegates can cast a single Yay, Nay, or Pass ballot. A ballot
 has a weight equal to the delegate's stake as detailed above.
@@ -122,13 +124,18 @@ Yay.
 The *vote participation* is the ratio of all the cumulated stake of cast ballots
 (including Pass ballots) to the total stake.
 
-For the first voting period, the *quorum* started at 80% of stake. The quorum is
+For the first vote, the *quorum* started at 80% of stake. The quorum is
 adjusted after each vote as detailed below. This adjustment is necessary to
 ensure that the amendment process can continue even if some delegates stop
 participating. After each vote the new quorum is updated based on the old quorum
 and the **vote participation** with the following coefficients::
 
   new-quorum = 0.8 × old-quorum + 0.2 × participation
+
+However, in order to avoid establishing quorums close to 100% that would be
+very difficult to attain, or, conversely, low quorums close to 0% making
+little participation chronicle, the quorums are lower- and upper-bounded by
+:ref:`quorum_caps`.
 
 The *super-majority* is reached if the cumulated stake of Yay ballots is
 greater than 8/10 of the cumulated stake of Yay and Nay ballots.
@@ -215,8 +222,8 @@ and the delegate submits another *proposals* operation for protocols B
 and C.
 The list of submissions that will be tallied is [A,B,C].
 
-A *ballot* operation can only be submitted during one of the voting
-periods, and only once per period.
+A *ballot* operation can only be submitted during periods where a vote happens
+(e.g. exploration, promotion), and only once per period.
 
 ::
 
@@ -257,26 +264,29 @@ in the following samples::
   Current period: "proposal"
   Blocks remaining until end of period: 59
   Current proposals:
-  PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp 400
+  PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp 2,400,000 ꜩ
 
   $ tezos-client show voting period
   Current period: "exploration"
   Blocks remaining until end of period: 63
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
-  Ballots: { "yay": 400, "nay": 0, "pass": 0 }
+  Ballots:
+    Yay: 2,400,000 ꜩ
+    Nay: 0 ꜩ
+    Pass: 0 ꜩ
   Current participation 20.00%, necessary quorum 80.00%
-  Current in favor 400, needed supermajority 320
+  Current in favor 2,400,000 ꜩ, needed supermajority 1,920,000 ꜩ
 
   $ tezos-client show voting period
   Current period: "cooldown"
   Blocks remaining until end of period: 64
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
 
-It should be noted that the ballot number 400 above is the stake counted in
-number of rolls.
-The proposal has a total stake of 400 rolls, which may come from a single ballot
-from a delegate having 400 rolls, or it may come from multiple ballots from
-delegates with a combined stake of 400 rolls.
+It should be noted that the ballot number 2,400,000 ꜩ above is the stake counted in
+mutez (displayed in tez).
+The proposal has a total stake of 2,400,000 ꜩ, which may come from a single ballot
+from a delegate having a staking balance of 2,400,000 ꜩ or it may come from multiple ballots from
+delegates with a combined stake of 2,400,000 ꜩ.
 
 
 Submit proposals
@@ -293,7 +303,7 @@ following two conditions:
 
 - the protocol hash was already proposed on the network. In this case
   we can submit an additional proposal that "upvotes" an existing one
-  and our rolls are added to the ones already supporting the proposal.
+  and our staking power are added to the ones already supporting the proposal.
 - the protocol is known by the node. In particular the first proposer
   of a protocol should be able to successfully inject the protocol in
   its node which performs some checks, compiles and loads the

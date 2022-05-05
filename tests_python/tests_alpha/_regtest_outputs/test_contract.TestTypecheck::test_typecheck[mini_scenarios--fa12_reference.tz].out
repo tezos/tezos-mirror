@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/fa12_reference.tz]
 
 Well typed
-Gas remaining: 1039229.258 units remaining
+Gas remaining: 1039349.178 units remaining
 { parameter
     (or (or (or (pair %transfer (address :from) (pair (address :to) (nat :value)))
                 (pair %approve (address :spender) (nat :value)))
@@ -136,7 +136,7 @@ Gas remaining: 1039229.258 units remaining
                           /* [ address : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SENDER
-                          /* [ @sender address : address : pair address address nat
+                          /* [ address : address : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           COMPARE
                           /* [ int : pair address address nat
@@ -163,15 +163,15 @@ Gas remaining: 1039229.258 units remaining
                                               : pair (big_map address (pair nat (map address nat))) address bool nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            SENDER
-                                           /* [ @sender address : address
+                                           /* [ address : address
                                               : pair (big_map address (pair nat (map address nat))) address bool nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            PAIR
-                                           /* [ pair (address @sender) address
+                                           /* [ pair address address
                                               : pair (big_map address (pair nat (map address nat))) address bool nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            DUP
-                                           /* [ pair (address @sender) address : pair (address @sender) address
+                                           /* [ pair address address : pair address address
                                               : pair (big_map address (pair nat (map address nat))) address bool nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            DIP { CDR
@@ -195,10 +195,10 @@ Gas remaining: 1039229.258 units remaining
                                                    { CDR
                                                      /* [ map address nat
                                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } }
-                                           /* [ pair (address @sender) address : map address nat
+                                           /* [ pair address address : map address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            CAR
-                                           /* [ @sender address : map address nat
+                                           /* [ address : map address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            GET
                                            /* [ option nat
@@ -208,7 +208,7 @@ Gas remaining: 1039229.258 units remaining
                                                     0
                                                /* [ nat
                                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                             { /* [ @some nat
+                                             { /* [ nat
                                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } }
                                      /* [ pair address address nat : nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
@@ -219,7 +219,7 @@ Gas remaining: 1039229.258 units remaining
                                      /* [ address : pair address address nat : nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DIP { SENDER
-                                           /* [ @sender address : pair address address nat : nat
+                                           /* [ address : pair address address nat : nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            DIP { DUP
                                                  /* [ pair address address nat : pair address address nat : nat
@@ -284,207 +284,195 @@ Gas remaining: 1039229.258 units remaining
                                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                                      FAILWITH
                                                      /* [] */ }
-                                                   { /* [ @some nat : pair address address nat : nat
+                                                   { /* [ nat : pair address address nat : nat
                                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } }
-                                           /* [ @sender address : @some nat : pair address address nat : nat
+                                           /* [ address : nat : pair address address nat : nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            PAIR
-                                           /* [ pair (address @sender) (nat @some) : pair address address nat : nat
+                                           /* [ pair address nat : pair address address nat : nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                     /* [ address : pair (address @sender) (nat @some) : pair address address nat
-                                        : nat
+                                     /* [ address : pair address nat : pair address address nat : nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      PAIR
-                                     /* [ pair address (address @sender) (nat @some) : pair address address nat : nat
+                                     /* [ pair address address nat : pair address address nat : nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DIP { DROP
                                            /* [ nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            DROP
                                            /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                     /* [ pair address (address @sender) (nat @some)
+                                     /* [ pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DIP { DUP
                                            /* [ pair (big_map address (pair nat (map address nat))) address bool nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                     /* [ pair address (address @sender) (nat @some)
+                                     /* [ pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      SWAP
                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
-                                        : pair address (address @sender) (nat @some)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DIP { DUP
-                                           /* [ pair address (address @sender) (nat @some)
-                                              : pair address (address @sender) (nat @some)
+                                           /* [ pair address address nat : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            CAR
-                                           /* [ address : pair address (address @sender) (nat @some)
+                                           /* [ address : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
-                                        : address : pair address (address @sender) (nat @some)
+                                        : address : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      SWAP
                                      /* [ address
                                         : pair (big_map address (pair nat (map address nat))) address bool nat
-                                        : pair address (address @sender) (nat @some)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DIP { CAR
-                                           /* [ big_map address (pair nat (map address nat))
-                                              : pair address (address @sender) (nat @some)
+                                           /* [ big_map address (pair nat (map address nat)) : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                      /* [ address : big_map address (pair nat (map address nat))
-                                        : pair address (address @sender) (nat @some)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      GET
-                                     /* [ option (pair nat (map address nat))
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ option (pair nat (map address nat)) : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      IF_NONE
                                        { PUSH nat
                                               0
-                                         /* [ nat : pair address (address @sender) (nat @some)
+                                         /* [ nat : pair address address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                          DIP { EMPTY_MAP
                                                  address
                                                  nat
-                                               /* [ map address nat : pair address (address @sender) (nat @some)
+                                               /* [ map address nat : pair address address nat
                                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                         /* [ nat : map address nat : pair address (address @sender) (nat @some)
+                                         /* [ nat : map address nat : pair address address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                          PAIR
-                                         /* [ pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                         /* [ pair nat (map address nat) : pair address address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                          EMPTY_MAP
                                            address
                                            nat
-                                         /* [ map address nat : pair nat (map address nat)
-                                            : pair address (address @sender) (nat @some)
+                                         /* [ map address nat : pair nat (map address nat) : pair address address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                        { DUP
-                                         /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
-                                            : pair address (address @sender) (nat @some)
+                                         /* [ pair nat (map address nat) : pair nat (map address nat)
+                                            : pair address address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                          CDR
-                                         /* [ map address nat : @some pair nat (map address nat)
-                                            : pair address (address @sender) (nat @some)
+                                         /* [ map address nat : pair nat (map address nat) : pair address address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                      DIP { DIP { DUP
-                                                 /* [ pair address (address @sender) (nat @some)
-                                                    : pair address (address @sender) (nat @some)
+                                                 /* [ pair address address nat : pair address address nat
                                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                           /* [ pair nat (map address nat) : pair address (address @sender) (nat @some)
-                                              : pair address (address @sender) (nat @some)
+                                           /* [ pair nat (map address nat) : pair address address nat
+                                              : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            SWAP
-                                           /* [ pair address (address @sender) (nat @some) : pair nat (map address nat)
-                                              : pair address (address @sender) (nat @some)
+                                           /* [ pair address address nat : pair nat (map address nat)
+                                              : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                     /* [ map address nat : pair address (address @sender) (nat @some)
-                                        : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                     /* [ map address nat : pair address address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      SWAP
-                                     /* [ pair address (address @sender) (nat @some) : map address nat
-                                        : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                     /* [ pair address address nat : map address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      CDR
-                                     /* [ pair (address @sender) (nat @some) : map address nat
-                                        : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                     /* [ pair address nat : map address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      CDR
-                                     /* [ @some nat : map address nat : pair nat (map address nat)
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ nat : map address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DUP
-                                     /* [ @some nat : @some nat : map address nat : pair nat (map address nat)
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ nat : nat : map address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      INT
-                                     /* [ int : @some nat : map address nat : pair nat (map address nat)
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ int : nat : map address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      EQ
-                                     /* [ bool : @some nat : map address nat : pair nat (map address nat)
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ bool : nat : map address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      IF { DROP
-                                          /* [ map address nat : pair nat (map address nat)
-                                             : pair address (address @sender) (nat @some)
+                                          /* [ map address nat : pair nat (map address nat) : pair address address nat
                                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                           NONE nat
                                           /* [ option nat : map address nat : pair nat (map address nat)
-                                             : pair address (address @sender) (nat @some)
+                                             : pair address address nat
                                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                         { SOME
                                           /* [ option nat : map address nat : pair nat (map address nat)
-                                             : pair address (address @sender) (nat @some)
+                                             : pair address address nat
                                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                      DIP { DIP { DIP { DUP
-                                                       /* [ pair address (address @sender) (nat @some)
-                                                          : pair address (address @sender) (nat @some)
+                                                       /* [ pair address address nat : pair address address nat
                                                           : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                                 /* [ pair nat (map address nat) : pair address (address @sender) (nat @some)
-                                                    : pair address (address @sender) (nat @some)
+                                                 /* [ pair nat (map address nat) : pair address address nat
+                                                    : pair address address nat
                                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                                  SWAP
-                                                 /* [ pair address (address @sender) (nat @some) : pair nat (map address nat)
-                                                    : pair address (address @sender) (nat @some)
+                                                 /* [ pair address address nat : pair nat (map address nat)
+                                                    : pair address address nat
                                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                           /* [ map address nat : pair address (address @sender) (nat @some)
-                                              : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                           /* [ map address nat : pair address address nat : pair nat (map address nat)
+                                              : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            SWAP
-                                           /* [ pair address (address @sender) (nat @some) : map address nat
-                                              : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                           /* [ pair address address nat : map address nat : pair nat (map address nat)
+                                              : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                     /* [ option nat : pair address (address @sender) (nat @some) : map address nat
-                                        : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                     /* [ option nat : pair address address nat : map address nat
+                                        : pair nat (map address nat) : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      SWAP
-                                     /* [ pair address (address @sender) (nat @some) : option nat : map address nat
-                                        : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                     /* [ pair address address nat : option nat : map address nat
+                                        : pair nat (map address nat) : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      CDR
-                                     /* [ pair (address @sender) (nat @some) : option nat : map address nat
-                                        : pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                     /* [ pair address nat : option nat : map address nat
+                                        : pair nat (map address nat) : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      CAR
-                                     /* [ @sender address : option nat : map address nat : pair nat (map address nat)
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ address : option nat : map address nat : pair nat (map address nat)
+                                        : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      UPDATE
-                                     /* [ map address nat : pair nat (map address nat)
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ map address nat : pair nat (map address nat) : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DIP { DUP
                                            /* [ pair nat (map address nat) : pair nat (map address nat)
-                                              : pair address (address @sender) (nat @some)
+                                              : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            DIP { CAR
-                                                 /* [ nat : pair address (address @sender) (nat @some)
+                                                 /* [ nat : pair address address nat
                                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                           /* [ pair nat (map address nat) : nat
-                                              : pair address (address @sender) (nat @some)
+                                           /* [ pair nat (map address nat) : nat : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                            CDR
-                                           /* [ map address nat : nat : pair address (address @sender) (nat @some)
+                                           /* [ map address nat : nat : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                     /* [ map address nat : map address nat : nat
-                                        : pair address (address @sender) (nat @some)
+                                     /* [ map address nat : map address nat : nat : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      DIP { DROP
-                                           /* [ nat : pair address (address @sender) (nat @some)
+                                           /* [ nat : pair address address nat
                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                     /* [ map address nat : nat : pair address (address @sender) (nat @some)
+                                     /* [ map address nat : nat : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      SWAP
-                                     /* [ nat : map address nat : pair address (address @sender) (nat @some)
+                                     /* [ nat : map address nat : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      PAIR
-                                     /* [ pair nat (map address nat) : pair address (address @sender) (nat @some)
+                                     /* [ pair nat (map address nat) : pair address address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      SWAP
-                                     /* [ pair address (address @sender) (nat @some) : pair nat (map address nat)
+                                     /* [ pair address address nat : pair nat (map address nat)
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      CAR
                                      /* [ address : pair nat (map address nat)
@@ -609,41 +597,39 @@ Gas remaining: 1039229.258 units remaining
                             { DIP { DUP
                                     /* [ pair address address nat : pair address address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                              /* [ @some pair nat (map address nat) : pair address address nat
+                              /* [ pair nat (map address nat) : pair address address nat
                                  : pair address address nat
                                  : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               SWAP
-                              /* [ pair address address nat : @some pair nat (map address nat)
+                              /* [ pair address address nat : pair nat (map address nat)
                                  : pair address address nat
                                  : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               CDR
-                              /* [ pair address nat : @some pair nat (map address nat)
-                                 : pair address address nat
+                              /* [ pair address nat : pair nat (map address nat) : pair address address nat
                                  : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               CDR
-                              /* [ nat : @some pair nat (map address nat) : pair address address nat
+                              /* [ nat : pair nat (map address nat) : pair address address nat
                                  : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               DIP { DUP
-                                    /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
+                                    /* [ pair nat (map address nat) : pair nat (map address nat)
                                        : pair address address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     CAR
-                                    /* [ nat : @some pair nat (map address nat) : pair address address nat
+                                    /* [ nat : pair nat (map address nat) : pair address address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                              /* [ nat : nat : @some pair nat (map address nat) : pair address address nat
+                              /* [ nat : nat : pair nat (map address nat) : pair address address nat
                                  : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               ADD
-                              /* [ nat : @some pair nat (map address nat) : pair address address nat
+                              /* [ nat : pair nat (map address nat) : pair address address nat
                                  : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               DIP { DUP
-                                    /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
+                                    /* [ pair nat (map address nat) : pair nat (map address nat)
                                        : pair address address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     DIP { CDR
                                           /* [ map address nat : pair address address nat
                                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                    /* [ @some pair nat (map address nat) : map address nat
-                                       : pair address address nat
+                                    /* [ pair nat (map address nat) : map address nat : pair address address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     CAR
                                     /* [ nat : map address nat : pair address address nat
@@ -744,7 +730,7 @@ Gas remaining: 1039229.258 units remaining
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     FAILWITH
                                     /* [] */ }
-                                  { /* [ @some nat
+                                  { /* [ nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                 DIP { DUP
                                       /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -752,7 +738,7 @@ Gas remaining: 1039229.258 units remaining
                                       CDR
                                       /* [ pair address bool nat
                                          : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                /* [ @some nat : pair address bool nat
+                                /* [ nat : pair address bool nat
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
                                       /* [ pair address bool nat : pair address bool nat
@@ -765,7 +751,7 @@ Gas remaining: 1039229.258 units remaining
                                       CDR
                                       /* [ pair bool nat : address
                                          : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                /* [ @some nat : pair bool nat : address
+                                /* [ nat : pair bool nat : address
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
                                       /* [ pair bool nat : pair bool nat : address
@@ -778,24 +764,24 @@ Gas remaining: 1039229.258 units remaining
                                       CDR
                                       /* [ nat : bool : address
                                          : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                /* [ @some nat : nat : bool : address
+                                /* [ nat : nat : bool : address
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DROP
                                       /* [ bool : address
                                          : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                /* [ @some nat : bool : address
+                                /* [ nat : bool : address
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 SWAP
-                                /* [ bool : @some nat : address
+                                /* [ bool : nat : address
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 PAIR
-                                /* [ pair bool (nat @some) : address
+                                /* [ pair bool nat : address
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 SWAP
-                                /* [ address : pair bool (nat @some)
+                                /* [ address : pair bool nat
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 PAIR
-                                /* [ pair address bool (nat @some)
+                                /* [ pair address bool nat
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
                                       /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -805,393 +791,383 @@ Gas remaining: 1039229.258 units remaining
                                          : big_map address (pair nat (map address nat)) ] */ ;
                                       CDR
                                       /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ }
-                                /* [ pair address bool (nat @some) : pair address bool nat
+                                /* [ pair address bool nat : pair address bool nat
                                    : big_map address (pair nat (map address nat)) ] */ ;
                                 DIP { DROP /* [ big_map address (pair nat (map address nat)) ] */ }
-                                /* [ pair address bool (nat @some)
-                                   : big_map address (pair nat (map address nat)) ] */ ;
+                                /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ ;
                                 SWAP
-                                /* [ big_map address (pair nat (map address nat))
-                                   : pair address bool (nat @some) ] */ ;
+                                /* [ big_map address (pair nat (map address nat)) : pair address bool nat ] */ ;
                                 PAIR
-                                /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                           /* [ pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { DUP
-                                /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                /* [ pair (big_map address (pair nat (map address nat))) address bool nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                           /* [ pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SWAP
-                          /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
+                          /* [ pair (big_map address (pair nat (map address nat))) address bool nat
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { DUP
                                 /* [ pair address address nat : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                          /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                          /* [ pair (big_map address (pair nat (map address nat))) address bool nat
                              : pair address address nat : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SWAP
                           /* [ pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some)
+                             : pair (big_map address (pair nat (map address nat))) address bool nat
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           CAR
                           /* [ address
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some)
+                             : pair (big_map address (pair nat (map address nat))) address bool nat
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { CAR
                                 /* [ big_map address (pair nat (map address nat)) : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                           /* [ address : big_map address (pair nat (map address nat))
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           GET
                           /* [ option (pair nat (map address nat)) : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           IF_NONE
                             { CDR
                               /* [ pair address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               CDR
                               /* [ nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               PUSH nat
                                    0
                               /* [ nat : nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               SWAP
                               /* [ nat : nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               PAIR
                               /* [ pair nat nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               PUSH string
                                    "NotEnoughBalance"
                               /* [ string : pair nat nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               PAIR
                               /* [ pair string nat nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               FAILWITH
                               /* [] */ }
-                            { /* [ @some pair nat (map address nat) : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ } ;
+                            { /* [ pair nat (map address nat) : pair address address nat
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                           DUP
-                          /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
+                          /* [ pair nat (map address nat) : pair nat (map address nat)
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           CAR
-                          /* [ nat : @some pair nat (map address nat) : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                          /* [ nat : pair nat (map address nat) : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { DIP { DUP
                                       /* [ pair address address nat : pair address address nat
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                /* [ @some pair nat (map address nat) : pair address address nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                /* [ pair nat (map address nat) : pair address address nat
                                    : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 SWAP
-                                /* [ pair address address nat : @some pair nat (map address nat)
+                                /* [ pair address address nat : pair nat (map address nat)
                                    : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                          /* [ nat : pair address address nat : @some pair nat (map address nat)
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                          /* [ nat : pair address address nat : pair nat (map address nat)
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SWAP
-                          /* [ pair address address nat : nat : @some pair nat (map address nat)
+                          /* [ pair address address nat : nat : pair nat (map address nat)
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           CDR
-                          /* [ pair address nat : nat : @some pair nat (map address nat)
+                          /* [ pair address nat : nat : pair nat (map address nat)
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           CDR
-                          /* [ nat : nat : @some pair nat (map address nat) : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                          /* [ nat : nat : pair nat (map address nat) : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SWAP
-                          /* [ nat : nat : @some pair nat (map address nat) : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                          /* [ nat : nat : pair nat (map address nat) : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SUB
-                          /* [ int : @some pair nat (map address nat) : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                          /* [ int : pair nat (map address nat) : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           ISNAT
-                          /* [ option nat : @some pair nat (map address nat) : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                          /* [ option nat : pair nat (map address nat) : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           IF_NONE
                             { CAR
                               /* [ nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               DIP { DUP
                                     /* [ pair address address nat : pair address address nat
-                                       : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                               /* [ nat : pair address address nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               SWAP
                               /* [ pair address address nat : nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               CDR
                               /* [ pair address nat : nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               CDR
                               /* [ nat : nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               PAIR
                               /* [ pair nat nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               PUSH string
                                    "NotEnoughBalance"
                               /* [ string : pair nat nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               PAIR
                               /* [ pair string nat nat : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                               FAILWITH
                               /* [] */ }
-                            { /* [ @some nat : @some pair nat (map address nat) : pair address address nat
-                                 : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ } ;
+                            { /* [ nat : pair nat (map address nat) : pair address address nat
+                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                           DIP { DUP
-                                /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
+                                /* [ pair nat (map address nat) : pair nat (map address nat)
                                    : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { CDR
                                       /* [ map address nat : pair address address nat
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                /* [ @some pair nat (map address nat) : map address nat
-                                   : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                /* [ pair nat (map address nat) : map address nat : pair address address nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 CAR
                                 /* [ nat : map address nat : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                          /* [ @some nat : nat : map address nat : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                          /* [ nat : nat : map address nat : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { DROP
                                 /* [ map address nat : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                          /* [ @some nat : map address nat : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                          /* [ nat : map address nat : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           PAIR
-                          /* [ pair (nat @some) (map address nat) : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                          /* [ pair nat (map address nat) : pair address address nat
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { DUP
                                 /* [ pair address address nat : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                          /* [ pair (nat @some) (map address nat) : pair address address nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                          /* [ pair nat (map address nat) : pair address address nat
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SWAP
-                          /* [ pair address address nat : pair (nat @some) (map address nat)
+                          /* [ pair address address nat : pair nat (map address nat)
                              : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { DUP
-                                /* [ pair (nat @some) (map address nat) : pair (nat @some) (map address nat)
+                                /* [ pair nat (map address nat) : pair nat (map address nat)
                                    : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 CAR
-                                /* [ @some nat : pair (nat @some) (map address nat) : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                /* [ nat : pair nat (map address nat) : pair address address nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 INT
-                                /* [ int : pair (nat @some) (map address nat) : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                /* [ int : pair nat (map address nat) : pair address address nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 EQ
-                                /* [ bool : pair (nat @some) (map address nat) : pair address address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                /* [ bool : pair nat (map address nat) : pair address address nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 IF { DUP
-                                     /* [ pair (nat @some) (map address nat) : pair (nat @some) (map address nat)
+                                     /* [ pair nat (map address nat) : pair nat (map address nat)
                                         : pair address address nat
-                                        : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      CDR
-                                     /* [ map address nat : pair (nat @some) (map address nat)
-                                        : pair address address nat
-                                        : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                     /* [ map address nat : pair nat (map address nat) : pair address address nat
+                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      SIZE
-                                     /* [ nat : pair (nat @some) (map address nat) : pair address address nat
-                                        : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                     /* [ nat : pair nat (map address nat) : pair address address nat
+                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      INT
-                                     /* [ int : pair (nat @some) (map address nat) : pair address address nat
-                                        : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                     /* [ int : pair nat (map address nat) : pair address address nat
+                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      EQ
-                                     /* [ bool : pair (nat @some) (map address nat) : pair address address nat
-                                        : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                     /* [ bool : pair nat (map address nat) : pair address address nat
+                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                      IF { DROP
                                           /* [ pair address address nat
-                                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                           NONE (pair nat (map address nat))
                                           /* [ option (pair nat (map address nat)) : pair address address nat
-                                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                         { SOME
-                                          /* [ option (pair (nat @some) (map address nat)) : pair address address nat
-                                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ } }
+                                          /* [ option (pair nat (map address nat)) : pair address address nat
+                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } }
                                    { SOME
-                                     /* [ option (pair (nat @some) (map address nat)) : pair address address nat
-                                        : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ } ;
+                                     /* [ option (pair nat (map address nat)) : pair address address nat
+                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                 SWAP
                                 /* [ pair address address nat : option (pair nat (map address nat))
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 CAR
                                 /* [ address : option (pair nat (map address nat))
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DIP { DUP
-                                            /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                                               : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                            /* [ pair (big_map address (pair nat (map address nat))) address bool nat
+                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                             CAR
                                             /* [ big_map address (pair nat (map address nat))
-                                               : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                       /* [ option (pair nat (map address nat))
                                          : big_map address (pair nat (map address nat))
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                 /* [ address : option (pair nat (map address nat))
                                    : big_map address (pair nat (map address nat))
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 UPDATE
                                 /* [ big_map address (pair nat (map address nat))
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
-                                      /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
-                                      DIP { CDR /* [ pair address bool (nat @some) ] */ }
-                                      /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                                         : pair address bool (nat @some) ] */ ;
+                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
+                                      DIP { CDR /* [ pair address bool nat ] */ }
+                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
+                                         : pair address bool nat ] */ ;
                                       CAR
-                                      /* [ big_map address (pair nat (map address nat))
-                                         : pair address bool (nat @some) ] */ }
+                                      /* [ big_map address (pair nat (map address nat)) : pair address bool nat ] */ }
                                 /* [ big_map address (pair nat (map address nat))
-                                   : big_map address (pair nat (map address nat))
-                                   : pair address bool (nat @some) ] */ ;
-                                DIP { DROP /* [ pair address bool (nat @some) ] */ }
-                                /* [ big_map address (pair nat (map address nat))
-                                   : pair address bool (nat @some) ] */ ;
+                                   : big_map address (pair nat (map address nat)) : pair address bool nat ] */ ;
+                                DIP { DROP /* [ pair address bool nat ] */ }
+                                /* [ big_map address (pair nat (map address nat)) : pair address bool nat ] */ ;
                                 PAIR
-                                /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                           /* [ pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DUP
                           /* [ pair address address nat : pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DIP { CDR
                                 /* [ pair address nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 CDR
                                 /* [ nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 NEG
                                 /* [ int
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
-                                      /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       CDR
-                                      /* [ pair address bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair address bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       CDR
-                                      /* [ pair bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       CDR
-                                      /* [ @some nat
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                /* [ int : @some nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                /* [ int : nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 ADD
                                 /* [ int
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 ISNAT
                                 /* [ option nat
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 IF_NONE
                                   { PUSH string
                                          "Internal: Negative total supply"
                                     /* [ string
-                                       : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     FAILWITH
                                     /* [] */ }
-                                  { /* [ @some nat
-                                       : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ } ;
+                                  { /* [ nat
+                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                 DIP { DUP
-                                      /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       CDR
-                                      /* [ pair address bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                /* [ @some nat : pair address bool (nat @some)
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair address bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                /* [ nat : pair address bool nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
-                                      /* [ pair address bool (nat @some) : pair address bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair address bool nat : pair address bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       DIP { CAR
                                             /* [ address
-                                               : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                      /* [ pair address bool (nat @some) : address
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                      /* [ pair address bool nat : address
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       CDR
-                                      /* [ pair bool (nat @some) : address
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                /* [ @some nat : pair bool (nat @some) : address
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair bool nat : address
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                /* [ nat : pair bool nat : address
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
-                                      /* [ pair bool (nat @some) : pair bool (nat @some) : address
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair bool nat : pair bool nat : address
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       DIP { CAR
                                             /* [ bool : address
-                                               : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                      /* [ pair bool (nat @some) : bool : address
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                      /* [ pair bool nat : bool : address
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       CDR
-                                      /* [ @some nat : bool : address
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                /* [ @some nat : @some nat : bool : address
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ nat : bool : address
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                /* [ nat : nat : bool : address
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DROP
                                       /* [ bool : address
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
-                                /* [ @some nat : bool : address
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
+                                /* [ nat : bool : address
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 SWAP
-                                /* [ bool : @some nat : address
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                /* [ bool : nat : address
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 PAIR
-                                /* [ pair bool (nat @some) : address
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                /* [ pair bool nat : address
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 SWAP
-                                /* [ address : pair bool (nat @some)
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                /* [ address : pair bool nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 PAIR
-                                /* [ pair address bool (nat @some)
-                                   : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                /* [ pair address bool nat
+                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                 DIP { DUP
-                                      /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
-                                         : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
+                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                       DIP { CAR /* [ big_map address (pair nat (map address nat)) ] */ }
-                                      /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some)
+                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
                                          : big_map address (pair nat (map address nat)) ] */ ;
                                       CDR
-                                      /* [ pair address bool (nat @some)
-                                         : big_map address (pair nat (map address nat)) ] */ }
-                                /* [ pair address bool (nat @some) : pair address bool (nat @some)
+                                      /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ }
+                                /* [ pair address bool nat : pair address bool nat
                                    : big_map address (pair nat (map address nat)) ] */ ;
                                 DIP { DROP /* [ big_map address (pair nat (map address nat)) ] */ }
-                                /* [ pair address bool (nat @some)
-                                   : big_map address (pair nat (map address nat)) ] */ ;
+                                /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ ;
                                 SWAP
-                                /* [ big_map address (pair nat (map address nat))
-                                   : pair address bool (nat @some) ] */ ;
+                                /* [ big_map address (pair nat (map address nat)) : pair address bool nat ] */ ;
                                 PAIR
-                                /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                                /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                           /* [ pair address address nat
-                             : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           DROP
-                          /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ } ;
+                          /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                      NIL operation
                      /* [ list operation
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      PAIR
                      /* [ pair (list operation) (big_map address (pair nat (map address nat))) address bool nat ] */ }
                    { SENDER
-                     /* [ @sender address : pair address nat
+                     /* [ address : pair address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      PAIR
-                     /* [ pair (address @sender) address nat
+                     /* [ pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { DUP
                            /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -1218,307 +1194,297 @@ Gas remaining: 1039229.258 units remaining
                                 FAILWITH
                                 /* [] */ }
                               { /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ } }
-                     /* [ pair (address @sender) address nat
+                     /* [ pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { DUP
                            /* [ pair (big_map address (pair nat (map address nat))) address bool nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ pair (address @sender) address nat
+                     /* [ pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { DUP
-                           /* [ pair (address @sender) address nat : pair (address @sender) address nat
+                           /* [ pair address address nat : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
-                        : pair (address @sender) address nat : pair (address @sender) address nat
+                        : pair address address nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
-                     /* [ pair (address @sender) address nat
+                     /* [ pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DUP
-                     /* [ pair (address @sender) address nat : pair (address @sender) address nat
+                     /* [ pair address address nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { CAR
-                           /* [ @sender address
+                           /* [ address
                               : pair (big_map address (pair nat (map address nat))) address bool nat
-                              : pair (address @sender) address nat
+                              : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            DIP { CAR
-                                 /* [ big_map address (pair nat (map address nat))
-                                    : pair (address @sender) address nat
+                                 /* [ big_map address (pair nat (map address nat)) : pair address address nat
                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                           /* [ @sender address : big_map address (pair nat (map address nat))
-                              : pair (address @sender) address nat
+                           /* [ address : big_map address (pair nat (map address nat))
+                              : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            GET
-                           /* [ option (pair nat (map address nat)) : pair (address @sender) address nat
+                           /* [ option (pair nat (map address nat)) : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            IF_NONE
                              { EMPTY_MAP
                                  address
                                  nat
-                               /* [ map address nat : pair (address @sender) address nat
+                               /* [ map address nat : pair address address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                              { CDR
-                               /* [ map address nat : pair (address @sender) address nat
+                               /* [ map address nat : pair address address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } }
-                     /* [ pair (address @sender) address nat : map address nat
-                        : pair (address @sender) address nat
+                     /* [ pair address address nat : map address nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      CDR
-                     /* [ pair address nat : map address nat : pair (address @sender) address nat
+                     /* [ pair address nat : map address nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      CAR
-                     /* [ address : map address nat : pair (address @sender) address nat
+                     /* [ address : map address nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      GET
-                     /* [ option nat : pair (address @sender) address nat
+                     /* [ option nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      IF_NONE
                        { PUSH nat
                               0
-                         /* [ nat : pair (address @sender) address nat
+                         /* [ nat : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                       { /* [ @some nat : pair (address @sender) address nat
+                       { /* [ nat : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                      DUP
-                     /* [ nat : nat : pair (address @sender) address nat
+                     /* [ nat : nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      INT
-                     /* [ int : nat : pair (address @sender) address nat
+                     /* [ int : nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      EQ
-                     /* [ bool : nat : pair (address @sender) address nat
+                     /* [ bool : nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      IF { DROP
-                          /* [ pair (address @sender) address nat
+                          /* [ pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                         { DIP { DUP
-                                /* [ pair (address @sender) address nat : pair (address @sender) address nat
+                                /* [ pair address address nat : pair address address nat
                                    : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                          /* [ nat : pair (address @sender) address nat
-                             : pair (address @sender) address nat
+                          /* [ nat : pair address address nat : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           SWAP
-                          /* [ pair (address @sender) address nat : nat
-                             : pair (address @sender) address nat
+                          /* [ pair address address nat : nat : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           CDR
-                          /* [ pair address nat : nat : pair (address @sender) address nat
+                          /* [ pair address nat : nat : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           CDR
-                          /* [ nat : nat : pair (address @sender) address nat
+                          /* [ nat : nat : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           INT
-                          /* [ int : nat : pair (address @sender) address nat
+                          /* [ int : nat : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           EQ
-                          /* [ bool : nat : pair (address @sender) address nat
+                          /* [ bool : nat : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           IF { DROP
-                               /* [ pair (address @sender) address nat
+                               /* [ pair address address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                              { PUSH string
                                     "UnsafeAllowanceChange"
-                               /* [ string : nat : pair (address @sender) address nat
+                               /* [ string : nat : pair address address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                PAIR
-                               /* [ pair string nat : pair (address @sender) address nat
+                               /* [ pair string nat : pair address address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                FAILWITH
                                /* [] */ } } ;
                      DIP { DUP
                            /* [ pair (big_map address (pair nat (map address nat))) address bool nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ pair (address @sender) address nat
+                     /* [ pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { DUP
-                           /* [ pair (address @sender) address nat : pair (address @sender) address nat
+                           /* [ pair address address nat : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            CAR
-                           /* [ @sender address : pair (address @sender) address nat
+                           /* [ address : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
-                        : @sender address : pair (address @sender) address nat
+                        : address : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
-                     /* [ @sender address
+                     /* [ address
                         : pair (big_map address (pair nat (map address nat))) address bool nat
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { CAR
-                           /* [ big_map address (pair nat (map address nat))
-                              : pair (address @sender) address nat
+                           /* [ big_map address (pair nat (map address nat)) : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ @sender address : big_map address (pair nat (map address nat))
-                        : pair (address @sender) address nat
+                     /* [ address : big_map address (pair nat (map address nat))
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      GET
-                     /* [ option (pair nat (map address nat)) : pair (address @sender) address nat
+                     /* [ option (pair nat (map address nat)) : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      IF_NONE
                        { PUSH nat
                               0
-                         /* [ nat : pair (address @sender) address nat
+                         /* [ nat : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DIP { EMPTY_MAP
                                  address
                                  nat
-                               /* [ map address nat : pair (address @sender) address nat
+                               /* [ map address nat : pair address address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                         /* [ nat : map address nat : pair (address @sender) address nat
+                         /* [ nat : map address nat : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          PAIR
-                         /* [ pair nat (map address nat) : pair (address @sender) address nat
+                         /* [ pair nat (map address nat) : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          EMPTY_MAP
                            address
                            nat
-                         /* [ map address nat : pair nat (map address nat)
-                            : pair (address @sender) address nat
+                         /* [ map address nat : pair nat (map address nat) : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                        { DUP
-                         /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
-                            : pair (address @sender) address nat
+                         /* [ pair nat (map address nat) : pair nat (map address nat)
+                            : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          CDR
-                         /* [ map address nat : @some pair nat (map address nat)
-                            : pair (address @sender) address nat
+                         /* [ map address nat : pair nat (map address nat) : pair address address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                      DIP { DIP { DUP
-                                 /* [ pair (address @sender) address nat : pair (address @sender) address nat
+                                 /* [ pair address address nat : pair address address nat
                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                           /* [ pair nat (map address nat) : pair (address @sender) address nat
-                              : pair (address @sender) address nat
+                           /* [ pair nat (map address nat) : pair address address nat
+                              : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            SWAP
-                           /* [ pair (address @sender) address nat : pair nat (map address nat)
-                              : pair (address @sender) address nat
+                           /* [ pair address address nat : pair nat (map address nat)
+                              : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ map address nat : pair (address @sender) address nat
-                        : pair nat (map address nat) : pair (address @sender) address nat
+                     /* [ map address nat : pair address address nat : pair nat (map address nat)
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
-                     /* [ pair (address @sender) address nat : map address nat
-                        : pair nat (map address nat) : pair (address @sender) address nat
+                     /* [ pair address address nat : map address nat : pair nat (map address nat)
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      CDR
                      /* [ pair address nat : map address nat : pair nat (map address nat)
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      CDR
                      /* [ nat : map address nat : pair nat (map address nat)
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DUP
                      /* [ nat : nat : map address nat : pair nat (map address nat)
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      INT
                      /* [ int : nat : map address nat : pair nat (map address nat)
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      EQ
                      /* [ bool : nat : map address nat : pair nat (map address nat)
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      IF { DROP
-                          /* [ map address nat : pair nat (map address nat)
-                             : pair (address @sender) address nat
+                          /* [ map address nat : pair nat (map address nat) : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                           NONE nat
                           /* [ option nat : map address nat : pair nat (map address nat)
-                             : pair (address @sender) address nat
+                             : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                         { SOME
                           /* [ option nat : map address nat : pair nat (map address nat)
-                             : pair (address @sender) address nat
+                             : pair address address nat
                              : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                      DIP { DIP { DIP { DUP
-                                       /* [ pair (address @sender) address nat : pair (address @sender) address nat
+                                       /* [ pair address address nat : pair address address nat
                                           : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                 /* [ pair nat (map address nat) : pair (address @sender) address nat
-                                    : pair (address @sender) address nat
+                                 /* [ pair nat (map address nat) : pair address address nat
+                                    : pair address address nat
                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                  SWAP
-                                 /* [ pair (address @sender) address nat : pair nat (map address nat)
-                                    : pair (address @sender) address nat
+                                 /* [ pair address address nat : pair nat (map address nat)
+                                    : pair address address nat
                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                           /* [ map address nat : pair (address @sender) address nat
-                              : pair nat (map address nat) : pair (address @sender) address nat
+                           /* [ map address nat : pair address address nat : pair nat (map address nat)
+                              : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            SWAP
-                           /* [ pair (address @sender) address nat : map address nat
-                              : pair nat (map address nat) : pair (address @sender) address nat
+                           /* [ pair address address nat : map address nat : pair nat (map address nat)
+                              : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ option nat : pair (address @sender) address nat : map address nat
-                        : pair nat (map address nat) : pair (address @sender) address nat
+                     /* [ option nat : pair address address nat : map address nat
+                        : pair nat (map address nat) : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
-                     /* [ pair (address @sender) address nat : option nat : map address nat
-                        : pair nat (map address nat) : pair (address @sender) address nat
+                     /* [ pair address address nat : option nat : map address nat
+                        : pair nat (map address nat) : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      CDR
                      /* [ pair address nat : option nat : map address nat
-                        : pair nat (map address nat) : pair (address @sender) address nat
+                        : pair nat (map address nat) : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      CAR
                      /* [ address : option nat : map address nat : pair nat (map address nat)
-                        : pair (address @sender) address nat
+                        : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      UPDATE
-                     /* [ map address nat : pair nat (map address nat)
-                        : pair (address @sender) address nat
+                     /* [ map address nat : pair nat (map address nat) : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { DUP
                            /* [ pair nat (map address nat) : pair nat (map address nat)
-                              : pair (address @sender) address nat
+                              : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            DIP { CAR
-                                 /* [ nat : pair (address @sender) address nat
+                                 /* [ nat : pair address address nat
                                     : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                           /* [ pair nat (map address nat) : nat : pair (address @sender) address nat
+                           /* [ pair nat (map address nat) : nat : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            CDR
-                           /* [ map address nat : nat : pair (address @sender) address nat
+                           /* [ map address nat : nat : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ map address nat : map address nat : nat
-                        : pair (address @sender) address nat
+                     /* [ map address nat : map address nat : nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { DROP
-                           /* [ nat : pair (address @sender) address nat
+                           /* [ nat : pair address address nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ map address nat : nat : pair (address @sender) address nat
+                     /* [ map address nat : nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
-                     /* [ nat : map address nat : pair (address @sender) address nat
+                     /* [ nat : map address nat : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      PAIR
-                     /* [ pair nat (map address nat) : pair (address @sender) address nat
+                     /* [ pair nat (map address nat) : pair address address nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      SWAP
-                     /* [ pair (address @sender) address nat : pair nat (map address nat)
+                     /* [ pair address address nat : pair nat (map address nat)
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      CAR
-                     /* [ @sender address : pair nat (map address nat)
+                     /* [ address : pair nat (map address nat)
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { SOME
                            /* [ option (pair nat (map address nat))
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ @sender address : option (pair nat (map address nat))
+                     /* [ address : option (pair nat (map address nat))
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { DIP { DUP
                                  /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -1529,7 +1495,7 @@ Gas remaining: 1039229.258 units remaining
                            /* [ option (pair nat (map address nat))
                               : big_map address (pair nat (map address nat))
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ @sender address : option (pair nat (map address nat))
+                     /* [ address : option (pair nat (map address nat))
                         : big_map address (pair nat (map address nat))
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      UPDATE
@@ -1656,12 +1622,12 @@ Gas remaining: 1039229.258 units remaining
                               0
                          /* [ nat : contract nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                       { /* [ @some nat : contract nat
+                       { /* [ nat : contract nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                      DIP { AMOUNT
-                           /* [ @amount mutez : contract nat
+                           /* [ mutez : contract nat
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ nat : @amount mutez : contract nat
+                     /* [ nat : mutez : contract nat
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      TRANSFER_TOKENS
                      /* [ operation
@@ -1742,9 +1708,9 @@ Gas remaining: 1039229.258 units remaining
                              /* [ nat : contract nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                          DIP { AMOUNT
-                               /* [ @amount mutez : contract nat
+                               /* [ mutez : contract nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                         /* [ nat : @amount mutez : contract nat
+                         /* [ nat : mutez : contract nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          TRANSFER_TOKENS
                          /* [ operation
@@ -1802,9 +1768,9 @@ Gas remaining: 1039229.258 units remaining
                          /* [ nat : contract nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DIP { AMOUNT
-                               /* [ @amount mutez : contract nat
+                               /* [ mutez : contract nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                         /* [ nat : @amount mutez : contract nat
+                         /* [ nat : mutez : contract nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          TRANSFER_TOKENS
                          /* [ operation
@@ -1832,7 +1798,7 @@ Gas remaining: 1039229.258 units remaining
                            /* [ address
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            SENDER
-                           /* [ @sender address : address
+                           /* [ address : address
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            COMPARE
                            /* [ int
@@ -1934,7 +1900,7 @@ Gas remaining: 1039229.258 units remaining
                            /* [ address
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            SENDER
-                           /* [ @sender address : address
+                           /* [ address : address
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                            COMPARE
                            /* [ int
@@ -2047,9 +2013,9 @@ Gas remaining: 1039229.258 units remaining
                      /* [ address : contract address
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      DIP { AMOUNT
-                           /* [ @amount mutez : contract address
+                           /* [ mutez : contract address
                               : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                     /* [ address : @amount mutez : contract address
+                     /* [ address : mutez : contract address
                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                      TRANSFER_TOKENS
                      /* [ operation
@@ -2076,7 +2042,7 @@ Gas remaining: 1039229.258 units remaining
                                /* [ address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                SENDER
-                               /* [ @sender address : address
+                               /* [ address : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                COMPARE
                                /* [ int
@@ -2171,34 +2137,32 @@ Gas remaining: 1039229.258 units remaining
                            { DIP { DUP
                                    /* [ pair address nat : pair address nat
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                             /* [ @some pair nat (map address nat) : pair address nat : pair address nat
+                             /* [ pair nat (map address nat) : pair address nat : pair address nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                              SWAP
-                             /* [ pair address nat : @some pair nat (map address nat) : pair address nat
+                             /* [ pair address nat : pair nat (map address nat) : pair address nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                              CDR
-                             /* [ nat : @some pair nat (map address nat) : pair address nat
+                             /* [ nat : pair nat (map address nat) : pair address nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                              DIP { DUP
-                                   /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
-                                      : pair address nat
+                                   /* [ pair nat (map address nat) : pair nat (map address nat) : pair address nat
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                    CAR
-                                   /* [ nat : @some pair nat (map address nat) : pair address nat
+                                   /* [ nat : pair nat (map address nat) : pair address nat
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                             /* [ nat : nat : @some pair nat (map address nat) : pair address nat
+                             /* [ nat : nat : pair nat (map address nat) : pair address nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                              ADD
-                             /* [ nat : @some pair nat (map address nat) : pair address nat
+                             /* [ nat : pair nat (map address nat) : pair address nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                              DIP { DUP
-                                   /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
-                                      : pair address nat
+                                   /* [ pair nat (map address nat) : pair nat (map address nat) : pair address nat
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                    DIP { CDR
                                          /* [ map address nat : pair address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                                   /* [ @some pair nat (map address nat) : map address nat : pair address nat
+                                   /* [ pair nat (map address nat) : map address nat : pair address nat
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                    CAR
                                    /* [ nat : map address nat : pair address nat
@@ -2292,7 +2256,7 @@ Gas remaining: 1039229.258 units remaining
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                    FAILWITH
                                    /* [] */ }
-                                 { /* [ @some nat
+                                 { /* [ nat
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                DIP { DUP
                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -2300,7 +2264,7 @@ Gas remaining: 1039229.258 units remaining
                                      CDR
                                      /* [ pair address bool nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : pair address bool nat
+                               /* [ nat : pair address bool nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DUP
                                      /* [ pair address bool nat : pair address bool nat
@@ -2313,7 +2277,7 @@ Gas remaining: 1039229.258 units remaining
                                      CDR
                                      /* [ pair bool nat : address
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : pair bool nat : address
+                               /* [ nat : pair bool nat : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DUP
                                      /* [ pair bool nat : pair bool nat : address
@@ -2326,24 +2290,24 @@ Gas remaining: 1039229.258 units remaining
                                      CDR
                                      /* [ nat : bool : address
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : nat : bool : address
+                               /* [ nat : nat : bool : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DROP
                                      /* [ bool : address
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : bool : address
+                               /* [ nat : bool : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                SWAP
-                               /* [ bool : @some nat : address
+                               /* [ bool : nat : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                PAIR
-                               /* [ pair bool (nat @some) : address
+                               /* [ pair bool nat : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                SWAP
-                               /* [ address : pair bool (nat @some)
+                               /* [ address : pair bool nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                PAIR
-                               /* [ pair address bool (nat @some)
+                               /* [ pair address bool nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DUP
                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -2353,29 +2317,23 @@ Gas remaining: 1039229.258 units remaining
                                         : big_map address (pair nat (map address nat)) ] */ ;
                                      CDR
                                      /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ }
-                               /* [ pair address bool (nat @some) : pair address bool nat
+                               /* [ pair address bool nat : pair address bool nat
                                   : big_map address (pair nat (map address nat)) ] */ ;
                                DIP { DROP /* [ big_map address (pair nat (map address nat)) ] */ }
-                               /* [ pair address bool (nat @some)
-                                  : big_map address (pair nat (map address nat)) ] */ ;
+                               /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ ;
                                SWAP
-                               /* [ big_map address (pair nat (map address nat))
-                                  : pair address bool (nat @some) ] */ ;
+                               /* [ big_map address (pair nat (map address nat)) : pair address bool nat ] */ ;
                                PAIR
-                               /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                               /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                          /* [ pair address nat
-                            : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                            : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DROP
-                         /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                         /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          NIL operation
                          /* [ list operation
-                            : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                            : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          PAIR
-                         /* [ pair (list operation)
-                                 (big_map address (pair nat (map address nat)))
-                                 address
-                                 bool
-                                 (nat @some) ] */ }
+                         /* [ pair (list operation) (big_map address (pair nat (map address nat))) address bool nat ] */ }
                        { DIP { DUP
                                /* [ pair (big_map address (pair nat (map address nat))) address bool nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
@@ -2386,7 +2344,7 @@ Gas remaining: 1039229.258 units remaining
                                /* [ address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                SENDER
-                               /* [ @sender address : address
+                               /* [ address : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                COMPARE
                                /* [ int
@@ -2466,41 +2424,38 @@ Gas remaining: 1039229.258 units remaining
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                              FAILWITH
                              /* [] */ }
-                           { /* [ @some pair nat (map address nat) : pair address nat
+                           { /* [ pair nat (map address nat) : pair address nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                          DUP
-                         /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
-                            : pair address nat
+                         /* [ pair nat (map address nat) : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          CAR
-                         /* [ nat : @some pair nat (map address nat) : pair address nat
+                         /* [ nat : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DIP { DIP { DUP
                                      /* [ pair address nat : pair address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some pair nat (map address nat) : pair address nat : pair address nat
+                               /* [ pair nat (map address nat) : pair address nat : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                SWAP
-                               /* [ pair address nat : @some pair nat (map address nat) : pair address nat
+                               /* [ pair address nat : pair nat (map address nat) : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                         /* [ nat : pair address nat : @some pair nat (map address nat)
-                            : pair address nat
+                         /* [ nat : pair address nat : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          SWAP
-                         /* [ pair address nat : nat : @some pair nat (map address nat)
-                            : pair address nat
+                         /* [ pair address nat : nat : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          CDR
-                         /* [ nat : nat : @some pair nat (map address nat) : pair address nat
+                         /* [ nat : nat : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          SWAP
-                         /* [ nat : nat : @some pair nat (map address nat) : pair address nat
+                         /* [ nat : nat : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          SUB
-                         /* [ int : @some pair nat (map address nat) : pair address nat
+                         /* [ int : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          ISNAT
-                         /* [ option nat : @some pair nat (map address nat) : pair address nat
+                         /* [ option nat : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          IF_NONE
                            { CAR
@@ -2529,66 +2484,63 @@ Gas remaining: 1039229.258 units remaining
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                              FAILWITH
                              /* [] */ }
-                           { /* [ @some nat : @some pair nat (map address nat) : pair address nat
+                           { /* [ nat : pair nat (map address nat) : pair address nat
                                 : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                          DIP { DUP
-                               /* [ @some pair nat (map address nat) : @some pair nat (map address nat)
-                                  : pair address nat
+                               /* [ pair nat (map address nat) : pair nat (map address nat) : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { CDR
                                      /* [ map address nat : pair address nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some pair nat (map address nat) : map address nat : pair address nat
+                               /* [ pair nat (map address nat) : map address nat : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                CAR
                                /* [ nat : map address nat : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                         /* [ @some nat : nat : map address nat : pair address nat
+                         /* [ nat : nat : map address nat : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DIP { DROP
                                /* [ map address nat : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                         /* [ @some nat : map address nat : pair address nat
+                         /* [ nat : map address nat : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          PAIR
-                         /* [ pair (nat @some) (map address nat) : pair address nat
+                         /* [ pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DIP { DUP
                                /* [ pair address nat : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                         /* [ pair (nat @some) (map address nat) : pair address nat : pair address nat
+                         /* [ pair nat (map address nat) : pair address nat : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          SWAP
-                         /* [ pair address nat : pair (nat @some) (map address nat) : pair address nat
+                         /* [ pair address nat : pair nat (map address nat) : pair address nat
                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DIP { DUP
-                               /* [ pair (nat @some) (map address nat) : pair (nat @some) (map address nat)
-                                  : pair address nat
+                               /* [ pair nat (map address nat) : pair nat (map address nat) : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                CAR
-                               /* [ @some nat : pair (nat @some) (map address nat) : pair address nat
+                               /* [ nat : pair nat (map address nat) : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                INT
-                               /* [ int : pair (nat @some) (map address nat) : pair address nat
+                               /* [ int : pair nat (map address nat) : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                EQ
-                               /* [ bool : pair (nat @some) (map address nat) : pair address nat
+                               /* [ bool : pair nat (map address nat) : pair address nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                IF { DUP
-                                    /* [ pair (nat @some) (map address nat) : pair (nat @some) (map address nat)
-                                       : pair address nat
+                                    /* [ pair nat (map address nat) : pair nat (map address nat) : pair address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     CDR
-                                    /* [ map address nat : pair (nat @some) (map address nat) : pair address nat
+                                    /* [ map address nat : pair nat (map address nat) : pair address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     SIZE
-                                    /* [ nat : pair (nat @some) (map address nat) : pair address nat
+                                    /* [ nat : pair nat (map address nat) : pair address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     INT
-                                    /* [ int : pair (nat @some) (map address nat) : pair address nat
+                                    /* [ int : pair nat (map address nat) : pair address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     EQ
-                                    /* [ bool : pair (nat @some) (map address nat) : pair address nat
+                                    /* [ bool : pair nat (map address nat) : pair address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                     IF { DROP
                                          /* [ pair address nat
@@ -2597,10 +2549,10 @@ Gas remaining: 1039229.258 units remaining
                                          /* [ option (pair nat (map address nat)) : pair address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                                        { SOME
-                                         /* [ option (pair (nat @some) (map address nat)) : pair address nat
+                                         /* [ option (pair nat (map address nat)) : pair address nat
                                             : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } }
                                   { SOME
-                                    /* [ option (pair (nat @some) (map address nat)) : pair address nat
+                                    /* [ option (pair nat (map address nat)) : pair address nat
                                        : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                SWAP
                                /* [ pair address nat : option (pair nat (map address nat))
@@ -2675,7 +2627,7 @@ Gas remaining: 1039229.258 units remaining
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                    FAILWITH
                                    /* [] */ }
-                                 { /* [ @some nat
+                                 { /* [ nat
                                       : pair (big_map address (pair nat (map address nat))) address bool nat ] */ } ;
                                DIP { DUP
                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -2683,7 +2635,7 @@ Gas remaining: 1039229.258 units remaining
                                      CDR
                                      /* [ pair address bool nat
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : pair address bool nat
+                               /* [ nat : pair address bool nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DUP
                                      /* [ pair address bool nat : pair address bool nat
@@ -2696,7 +2648,7 @@ Gas remaining: 1039229.258 units remaining
                                      CDR
                                      /* [ pair bool nat : address
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : pair bool nat : address
+                               /* [ nat : pair bool nat : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DUP
                                      /* [ pair bool nat : pair bool nat : address
@@ -2709,24 +2661,24 @@ Gas remaining: 1039229.258 units remaining
                                      CDR
                                      /* [ nat : bool : address
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : nat : bool : address
+                               /* [ nat : nat : bool : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DROP
                                      /* [ bool : address
                                         : pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
-                               /* [ @some nat : bool : address
+                               /* [ nat : bool : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                SWAP
-                               /* [ bool : @some nat : address
+                               /* [ bool : nat : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                PAIR
-                               /* [ pair bool (nat @some) : address
+                               /* [ pair bool nat : address
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                SWAP
-                               /* [ address : pair bool (nat @some)
+                               /* [ address : pair bool nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                PAIR
-                               /* [ pair address bool (nat @some)
+                               /* [ pair address bool nat
                                   : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                                DIP { DUP
                                      /* [ pair (big_map address (pair nat (map address nat))) address bool nat
@@ -2736,26 +2688,20 @@ Gas remaining: 1039229.258 units remaining
                                         : big_map address (pair nat (map address nat)) ] */ ;
                                      CDR
                                      /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ }
-                               /* [ pair address bool (nat @some) : pair address bool nat
+                               /* [ pair address bool nat : pair address bool nat
                                   : big_map address (pair nat (map address nat)) ] */ ;
                                DIP { DROP /* [ big_map address (pair nat (map address nat)) ] */ }
-                               /* [ pair address bool (nat @some)
-                                  : big_map address (pair nat (map address nat)) ] */ ;
+                               /* [ pair address bool nat : big_map address (pair nat (map address nat)) ] */ ;
                                SWAP
-                               /* [ big_map address (pair nat (map address nat))
-                                  : pair address bool (nat @some) ] */ ;
+                               /* [ big_map address (pair nat (map address nat)) : pair address bool nat ] */ ;
                                PAIR
-                               /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ }
+                               /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ }
                          /* [ pair address nat
-                            : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                            : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          DROP
-                         /* [ pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                         /* [ pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          NIL operation
                          /* [ list operation
-                            : pair (big_map address (pair nat (map address nat))) address bool (nat @some) ] */ ;
+                            : pair (big_map address (pair nat (map address nat))) address bool nat ] */ ;
                          PAIR
-                         /* [ pair (list operation)
-                                 (big_map address (pair nat (map address nat)))
-                                 address
-                                 bool
-                                 (nat @some) ] */ } } } } } }
+                         /* [ pair (list operation) (big_map address (pair nat (map address nat))) address bool nat ] */ } } } } } }

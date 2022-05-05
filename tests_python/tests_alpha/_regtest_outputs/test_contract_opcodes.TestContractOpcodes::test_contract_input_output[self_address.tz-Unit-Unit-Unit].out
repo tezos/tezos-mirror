@@ -7,40 +7,40 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039984.339 units remaining)
-    [ (Pair Unit Unit)  	 ]
-  - location: 7 (remaining gas: 1039984.329 units remaining)
+  - location: 7 (remaining gas: 1039985.599 units remaining)
+    [ (Pair Unit Unit) ]
+  - location: 7 (remaining gas: 1039985.589 units remaining)
     [  ]
-  - location: 8 (remaining gas: 1039984.319 units remaining)
-    [ { DROP ; SELF_ADDRESS }  	 ]
-  - location: 14 (remaining gas: 1039984.309 units remaining)
-    [ Unit  	
-      { DROP ; SELF_ADDRESS }  	 ]
-  - location: 12 (remaining gas: 1039984.299 units remaining)
+  - location: 8 (remaining gas: 1039985.579 units remaining)
+    [ { DROP ; SELF_ADDRESS } ]
+  - location: 14 (remaining gas: 1039985.569 units remaining)
+    [ Unit
+      { DROP ; SELF_ADDRESS } ]
+  - location: 12 (remaining gas: 1039985.559 units remaining)
     [  ]
-  - location: 13 (remaining gas: 1039984.284 units remaining)
-    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
-  - location: 15 (remaining gas: 1039984.254 units remaining)
-    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
-  - location: 16 (remaining gas: 1039984.239 units remaining)
-    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self
-      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
-  - location: 17 (remaining gas: 1039984.229 units remaining)
-    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self.address
-      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
-  - location: 20 (remaining gas: 1039984.193 units remaining)
-    [ 0  	 ]
-  - location: 21 (remaining gas: 1039984.178 units remaining)
-    [ True  	 ]
-  - location: 22 (remaining gas: 1039984.168 units remaining)
+  - location: 13 (remaining gas: 1039985.549 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 15 (remaining gas: 1039985.529 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 16 (remaining gas: 1039985.519 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 17 (remaining gas: 1039985.509 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 20 (remaining gas: 1039985.473 units remaining)
+    [ 0 ]
+  - location: 21 (remaining gas: 1039985.463 units remaining)
+    [ True ]
+  - location: 22 (remaining gas: 1039985.453 units remaining)
     [  ]
-  - location: 22 (remaining gas: 1039984.153 units remaining)
+  - location: 22 (remaining gas: 1039985.443 units remaining)
     [  ]
-  - location: 28 (remaining gas: 1039984.143 units remaining)
-    [ Unit  	 ]
-  - location: 29 (remaining gas: 1039984.128 units remaining)
-    [ {}  	
-      Unit  	 ]
-  - location: 31 (remaining gas: 1039984.113 units remaining)
-    [ (Pair {} Unit)  	 ]
+  - location: 28 (remaining gas: 1039985.433 units remaining)
+    [ Unit ]
+  - location: 29 (remaining gas: 1039985.423 units remaining)
+    [ {}
+      Unit ]
+  - location: 31 (remaining gas: 1039985.413 units remaining)
+    [ (Pair {} Unit) ]
 

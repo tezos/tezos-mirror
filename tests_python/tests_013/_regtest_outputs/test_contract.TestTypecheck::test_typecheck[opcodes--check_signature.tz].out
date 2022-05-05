@@ -1,0 +1,34 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/check_signature.tz]
+
+Well typed
+Gas remaining: 1039988.984 units remaining
+{ parameter key ;
+  storage (pair signature string) ;
+  code { DUP
+         /* [ pair key signature string : pair key signature string ] */ ;
+         DUP
+         /* [ pair key signature string : pair key signature string
+            : pair key signature string ] */ ;
+         DIP { CDR
+               /* [ pair signature string : pair key signature string ] */ ;
+               DUP
+               /* [ pair signature string : pair signature string : pair key signature string ] */ ;
+               CAR
+               /* [ signature : pair signature string : pair key signature string ] */ ;
+               DIP { CDR
+                     /* [ string : pair key signature string ] */ ;
+                     PACK
+                     /* [ bytes : pair key signature string ] */ }
+               /* [ signature : bytes : pair key signature string ] */ }
+         /* [ pair key signature string : signature : bytes : pair key signature string ] */ ;
+         CAR
+         /* [ key : signature : bytes : pair key signature string ] */ ;
+         CHECK_SIGNATURE
+         /* [ bool : pair key signature string ] */ ;
+         IF { /* [ pair key signature string ] */ } { FAIL } ;
+         CDR
+         /* [ pair signature string ] */ ;
+         NIL operation
+         /* [ list operation : pair signature string ] */ ;
+         PAIR
+         /* [ pair (list operation) signature string ] */ } }

@@ -1,0 +1,46 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test_consensus_filter test_filter_state test_plugin)
+ (libraries
+  tezos-base
+  tezos-base-test-helpers
+  tezos-base.unix
+  alcotest-lwt
+  tezos-test-helpers
+  qcheck-alcotest
+  tezos-stdlib-unix
+  tezos-micheline
+  tezos-protocol-plugin-013-PtJakart
+  tezos-protocol-013-PtJakart.environment
+  tezos-protocol-013-PtJakart
+  tezos-protocol-013-PtJakart-parameters
+  tezos-013-PtJakart-test-helpers)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_base_test_helpers
+   -open Tezos_micheline
+   -open Tezos_protocol_plugin_013_PtJakart
+   -open Tezos_protocol_environment_013_PtJakart
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_protocol_013_PtJakart.Protocol
+   -open Tezos_protocol_013_PtJakart_parameters
+   -open Tezos_013_PtJakart_test_helpers)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-013-PtJakart-tests)
+ (action (run %{dep:./test_consensus_filter.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-013-PtJakart-tests)
+ (action (run %{dep:./test_filter_state.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-013-PtJakart-tests)
+ (action (run %{dep:./test_plugin.exe})))

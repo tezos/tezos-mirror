@@ -71,7 +71,7 @@ let () =
         "Round cannot be built out of integer greater than maximum int32 value \
          (%Ld)"
         i)
-    (obj1 (req "Negative_round" int64))
+    (obj1 (req "Round_overflow" int64))
     (function Round_overflow i -> Some (Int64.of_int i) | _ -> None)
     (fun i -> Round_overflow (Int64.to_int i))
 
@@ -98,9 +98,9 @@ let to_int i32 =
 let to_int32 t = t [@@inline]
 
 let to_slot round ~committee_size =
-  to_int round >|? fun r ->
+  to_int round >>? fun r ->
   let slot = r mod committee_size in
-  Slot_repr.of_int_exn slot
+  Slot_repr.of_int slot
 
 let encoding =
   Data_encoding.conv_with_guard
@@ -221,20 +221,21 @@ let () =
    The level offset of round r is the sum of the durations of the rounds up
    until round r - 1. In other words, when r > 0
 
-     level_offset_of_round(0)   = 0
-     level_offset_of_round(r+1) = level_offset_of_round(r) + round_duration(r)
+     raw_level_offset_of_round(0)   = 0
+     raw_level_offset_of_round(r+1) =
+       raw_level_offset_of_round(r) + round_duration(r)
 
 Hence
 
-     level_offset_of_round(r) = Σ_{k=0}^{r-1} (round_duration(k))
+     raw_level_offset_of_round(r) = Σ_{k=0}^{r-1} (round_duration(k))
 
    After unfolding the series, the same function can be finally explicited into
 
-     level_offset_of_round(0) = 0
-     level_offset_of_round(r) = r * first_round_duration
+     raw_level_offset_of_round(0) = 0
+     raw_level_offset_of_round(r) = r * first_round_duration
                                 + 1/2 * r * (r - 1) * delay_increment_per_round
 *)
-let level_offset_of_round round_durations ~round =
+let raw_level_offset_of_round round_durations ~round =
   if Compare.Int32.(round = zero) then ok Int64.zero
   else
     let sum_durations =
@@ -277,47 +278,102 @@ let () =
 
 type round_and_offset = {round : int32; offset : Period_repr.t}
 
-(** Complexity: O(log max_int). *)
+(** Complexity: O(log level_offset). *)
 let round_and_offset round_durations ~level_offset =
   let level_offset_in_seconds = Period_repr.to_seconds level_offset in
-  (* We have the invariant [round <= level_offset] so there is no need to search
-     beyond [level_offset]. We set [right_bound] to [level_offset + 1] to avoid
-     triggering the error level_offset too high when the round equals
-     [level_offset]. *)
-  let right_bound =
-    if Compare.Int64.(level_offset_in_seconds < Int64.of_int32 Int32.max_int)
-    then Int32.of_int (Int64.to_int level_offset_in_seconds + 1)
-    else Int32.max_int
-  in
-  let rec bin_search min_r max_r =
-    if Compare.Int32.(min_r >= right_bound) then
-      error (Level_offset_too_high level_offset)
+  (* We set the bound as 2^53 to prevent overflows when computing the
+     variable [discr] for reasonable values of [first_round_duration] and
+     [delay_increment_per_round]. This bound is derived by a rough approximation
+     from the inequation [discr] < Int64.max_int. *)
+  let overflow_bound = Int64.shift_right Int64.max_int 10 in
+  if Compare.Int64.(overflow_bound < level_offset_in_seconds) then
+    error (Level_offset_too_high level_offset)
+  else
+    let Durations.{first_round_duration; delay_increment_per_round} =
+      round_durations
+    in
+    let first_round_duration = Period_repr.to_seconds first_round_duration in
+    let delay_increment_per_round =
+      Period_repr.to_seconds delay_increment_per_round
+    in
+    (* If [level_offset] is lower than the first round duration, then
+       the solution straightforward. *)
+    if Compare.Int64.(level_offset_in_seconds < first_round_duration) then
+      ok {round = 0l; offset = level_offset}
     else
-      let round = Int32.(add min_r (div (sub max_r min_r) 2l)) in
-      level_offset_of_round round_durations ~round:(Int32.succ round)
-      >>? fun next_level_offset ->
-      if
-        Compare.Int64.(Period_repr.to_seconds level_offset >= next_level_offset)
-      then bin_search (Int32.succ round) max_r
-      else
-        level_offset_of_round round_durations ~round
-        >>? fun current_level_offset ->
-        if
-          Compare.Int64.(
-            Period_repr.to_seconds level_offset < current_level_offset)
-        then bin_search min_r round
+      let round =
+        if Compare.Int64.(delay_increment_per_round = Int64.zero) then
+          (* Case when delay_increment_per_round is zero and a simple
+             linear solution exists. *)
+          Int64.div level_offset_in_seconds first_round_duration
         else
-          ok
-            {
-              round;
-              offset =
-                Period_repr.of_seconds_exn
-                  (Int64.sub
-                     (Period_repr.to_seconds level_offset)
-                     current_level_offset);
-            }
-  in
-  bin_search 0l right_bound
+          (* Case when the increment is non-negative and we look for the
+             quadratic solution. *)
+          let pow_2 n = Int64.mul n n in
+          let double n = Int64.shift_left n 1 in
+          let times_8 n = Int64.shift_left n 3 in
+          let half n = Int64.shift_right n 1 in
+          (* The integer square root is implemented using the Newton-Raphson
+             method. For any integer N, the convergence within the
+             neighborhood of √N is ensured within log2 (N) steps. *)
+          let sqrt (n : int64) =
+            let x0 = ref (half n) in
+            if Compare.Int64.(!x0 > 1L) then (
+              let x1 = ref (half (Int64.add !x0 (Int64.div n !x0))) in
+              while Compare.Int64.(!x1 < !x0) do
+                x0 := !x1 ;
+                x1 := half (Int64.add !x0 (Int64.div n !x0))
+              done ;
+              !x0)
+            else n
+          in
+          (* The idea is to solve the following equation in [round] and
+             use its integer value:
+
+             Σ_{k=0}^{round-1} round_duration(k) = level_offset
+
+             After unfolding the sum and expanding terms, we obtain a
+             quadratic equation:
+
+             delay_increment_per_round × round²
+               + (2 first_round_duration - delay_increment_per_round) × round
+               - 2 level_offset
+                 = 0
+
+             From there, we compute the discriminant and the solution of
+             the equation.
+
+             Refer to https://gitlab.com/tezos/tezos/-/merge_requests/4009
+             for more explanations.
+          *)
+          let discr =
+            Int64.add
+              (pow_2
+                 (Int64.sub
+                    (double first_round_duration)
+                    delay_increment_per_round))
+              (times_8
+                 (Int64.mul delay_increment_per_round level_offset_in_seconds))
+          in
+          Int64.div
+            (Int64.add
+               (Int64.sub
+                  delay_increment_per_round
+                  (double first_round_duration))
+               (sqrt discr))
+            (double delay_increment_per_round)
+      in
+      raw_level_offset_of_round round_durations ~round:(Int64.to_int32 round)
+      >>? fun current_level_offset ->
+      ok
+        {
+          round = Int64.to_int32 round;
+          offset =
+            Period_repr.of_seconds_exn
+              (Int64.sub
+                 (Period_repr.to_seconds level_offset)
+                 current_level_offset);
+        }
 
 (** Complexity: O(|round_durations|). *)
 let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
@@ -333,7 +389,7 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
   >>? fun start_of_current_level ->
   (* Finally, we sum the durations of the rounds at the current level l until
      reaching current [round]. *)
-  level_offset_of_round round_durations ~round >>? fun level_offset ->
+  raw_level_offset_of_round round_durations ~round >>? fun level_offset ->
   let level_offset = Period_repr.of_seconds_exn level_offset in
   Time_repr.(start_of_current_level +? level_offset)
 
@@ -348,9 +404,9 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     Complexity: O(|round_durations|). *)
 let timestamp_of_another_round_same_level round_durations ~current_timestamp
     ~current_round ~considered_round =
-  level_offset_of_round round_durations ~round:considered_round
+  raw_level_offset_of_round round_durations ~round:considered_round
   >>? fun target_offset ->
-  level_offset_of_round round_durations ~round:current_round
+  raw_level_offset_of_round round_durations ~round:current_round
   >>? fun current_offset ->
   ok
   @@ Time_repr.of_seconds
@@ -417,7 +473,7 @@ let round_of_timestamp round_durations ~predecessor_timestamp ~predecessor_round
   >>? fun round_and_offset -> ok round_and_offset.round
 
 let level_offset_of_round round_durations ~round =
-  level_offset_of_round round_durations ~round >>? fun offset ->
+  raw_level_offset_of_round round_durations ~round >>? fun offset ->
   ok (Period_repr.of_seconds_exn offset)
 
 module Internals_for_test = struct

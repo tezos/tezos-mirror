@@ -52,9 +52,10 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Internal_event_unix.Configuration.t;
+  internal_events : Internal_event_config.t;
   shell : shell;
   blockchain_network : blockchain_network;
+  metrics_addr : string list;
 }
 
 and p2p = {
@@ -76,6 +77,7 @@ and rpc = {
   cors_headers : string list;
   tls : tls option;
   acl : RPC_server.Acl.policy;
+  media_type : Media_type.Command_line.t;
 }
 
 and tls = {cert : string; key : string}
@@ -121,6 +123,8 @@ val update :
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
+  ?media_type:Media_type.Command_line.t ->
+  ?metrics_addr:string list ->
   ?operation_metadata_size_limit:int option ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
@@ -165,6 +169,12 @@ val resolve_discovery_addrs : string -> (Ipaddr.V4.t * int) list tzresult Lwt.t
    returns a list of [points]. The default port is
    [default_rpc_port]. Fails if the address could not be parsed. *)
 val resolve_rpc_listening_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
+
+(** [resolve_metrics_addrs metrics_addr] parses [metrics_addr] and returns a list of
+    returns a list of [points]).
+    The default host is "localhost" and the default port is [default_metrics_port].
+    Fails if the address could not be parsed.*)
+val resolve_metrics_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
 
 (** [resolve_boostrap_addrs bs_addrs] parses [bs_addrs] and returns
    for each [addr] a list of [points]. The default port is

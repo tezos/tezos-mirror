@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 let build_rpc_directory validator mainchain_validator =
+  let open Lwt_syntax in
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
@@ -43,18 +44,19 @@ let build_rpc_directory validator mainchain_validator =
         if !first_run then (
           first_run := false ;
           let chain_store = Chain_validator.chain_store mainchain_validator in
-          Store.Chain.current_head chain_store >>= fun head ->
+          let* head = Store.Chain.current_head chain_store in
           let head_hash = Store.Block.hash head in
           let head_header = Store.Block.header head in
           Lwt.return_some (head_hash, head_header.shell.timestamp))
         else
           Lwt.pick
             [
-              Lwt_stream.get block_stream
-              >|= Option.map (fun b ->
-                      (Store.Block.hash b, Store.Block.timestamp b));
-              ( Chain_validator.bootstrapped mainchain_validator >|= fun () ->
-                None );
+              (let+ o = Lwt_stream.get block_stream in
+               Option.map
+                 (fun b -> (Store.Block.hash b, Store.Block.timestamp b))
+                 o);
+              (let+ () = Chain_validator.bootstrapped mainchain_validator in
+               None);
             ]
       in
       let shutdown () = Lwt_watcher.shutdown stopper in
@@ -69,7 +71,8 @@ let build_rpc_directory validator mainchain_validator =
             let that_chain_id = Store.Chain.chain_id chain_store in
             List.exists_p
               (fun chain ->
-                Chain_directory.get_chain_id_opt store chain >|= function
+                let+ o = Chain_directory.get_chain_id_opt store chain in
+                match o with
                 | None -> false
                 | Some this_chain_id ->
                     Chain_id.equal this_chain_id that_chain_id)
@@ -79,11 +82,12 @@ let build_rpc_directory validator mainchain_validator =
         match q#protocols with
         | [] -> Lwt.return_true
         | protocols -> (
-            Store.Block.read_predecessor_opt chain_store block >>= function
+            let* o = Store.Block.read_predecessor_opt chain_store block in
+            match o with
             | None -> Lwt.return_false (* won't happen *)
             | Some pred ->
-                Store.Block.context_exn chain_store pred >>= fun context ->
-                Context.get_protocol context >>= fun protocol ->
+                let* context = Store.Block.context_exn chain_store pred in
+                let* protocol = Context.get_protocol context in
                 Lwt.return
                   (List.exists (Protocol_hash.equal protocol) protocols))
       in
@@ -91,17 +95,17 @@ let build_rpc_directory validator mainchain_validator =
         match q#next_protocols with
         | [] -> Lwt.return_true
         | protocols ->
-            Store.Block.context_exn chain_store block >>= fun context ->
-            Context.get_protocol context >>= fun next_protocol ->
+            let* context = Store.Block.context_exn chain_store block in
+            let* next_protocol = Context.get_protocol context in
             Lwt.return
               (List.exists (Protocol_hash.equal next_protocol) protocols)
       in
       let stream =
         Lwt_stream.filter_map_s
           (fun ((chain_store, block) as elt) ->
-            in_chains elt >>= fun in_chains ->
-            in_next_protocols elt >>= fun in_next_protocols ->
-            in_protocols elt >>= fun in_protocols ->
+            let* in_chains = in_chains elt in
+            let* in_next_protocols = in_next_protocols elt in
+            let* in_protocols = in_protocols elt in
             if in_chains && in_protocols && in_next_protocols then
               let chain_id = Store.Chain.chain_id chain_store in
               Lwt.return_some
@@ -114,35 +118,35 @@ let build_rpc_directory validator mainchain_validator =
   gen_register1 Monitor_services.S.heads (fun chain q () ->
       (* TODO: when `chain = `Test`, should we reset then stream when
          the `testnet` change, or dias we currently do ?? *)
-      Chain_directory.get_chain_store_exn store chain >>= fun chain_store ->
+      let* chain_store = Chain_directory.get_chain_store_exn store chain in
       match Validator.get validator (Store.Chain.chain_id chain_store) with
       | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
           let (block_stream, stopper) =
             Chain_validator.new_head_watcher chain_validator
           in
-          Store.Chain.current_head chain_store >>= fun head ->
+          let* head = Store.Chain.current_head chain_store in
           let shutdown () = Lwt_watcher.shutdown stopper in
           let in_next_protocols block =
             match q#next_protocols with
             | [] -> Lwt.return_true
             | protocols ->
-                Store.Block.context_exn chain_store block >>= fun context ->
-                Context.get_protocol context >>= fun next_protocol ->
+                let* context = Store.Block.context_exn chain_store block in
+                let* next_protocol = Context.get_protocol context in
                 Lwt.return
                   (List.exists (Protocol_hash.equal next_protocol) protocols)
           in
           let stream =
             Lwt_stream.filter_map_s
               (fun block ->
-                in_next_protocols block >>= fun in_next_protocols ->
+                let* in_next_protocols = in_next_protocols block in
                 if in_next_protocols then
                   Lwt.return_some
                     (Store.Block.hash block, Store.Block.header block)
                 else Lwt.return_none)
               block_stream
           in
-          in_next_protocols head >>= fun first_block_is_among_next_protocols ->
+          let* first_block_is_among_next_protocols = in_next_protocols head in
           let first_call =
             (* Skip the first block if this is false *)
             ref first_block_is_among_next_protocols
@@ -177,7 +181,8 @@ let build_rpc_directory validator mainchain_validator =
               chain_id
           then Lwt.return (Monitor_services.Active_main chain_id)
           else
-            Store.get_chain_store_opt store chain_id >>= function
+            let* o = Store.get_chain_store_opt store chain_id in
+            match o with
             | None -> Lwt.fail Not_found
             | Some chain_store ->
                 let {Genesis.protocol; _} = Store.Chain.genesis chain_store in
@@ -198,14 +203,19 @@ let build_rpc_directory validator mainchain_validator =
         in
         if !first_call then (
           first_call := false ;
-          List.map_p
-            (fun c -> convert (c, true))
-            (Validator.get_active_chains validator)
-          >>= fun l -> Lwt.return_some l)
+          let* l =
+            List.map_p
+              (fun c -> convert (c, true))
+              (Validator.get_active_chains validator)
+          in
+          Lwt.return_some l)
         else
-          Lwt_stream.get stream >>= function
+          let* o = Lwt_stream.get stream in
+          match o with
           | None -> Lwt.return_none
-          | Some c -> convert c >>= fun status -> Lwt.return_some [status]
+          | Some c ->
+              let* status = convert c in
+              Lwt.return_some [status]
       in
       RPC_answer.return_stream {next; shutdown}) ;
   !dir

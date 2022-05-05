@@ -29,6 +29,8 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
+.. _address_prefixes_alpha:
+
 Semantics of smart contracts and transactions
 ---------------------------------------------
 
@@ -47,6 +49,9 @@ tokens (and be the destinations of transactions).
 From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
 always succeed to receive tokens, and does nothing else.
+
+Another kind of addresses, prefixed by ``txr1`` and ``tz4``, are
+related to :doc:`transaction rollups <./transaction_rollups>`.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1743,6 +1748,8 @@ Domain specific data types
 -  ``chest_key``: used to open a chest, also contains a proof
    to check the correctness of the opening. see :doc:`Timelock <timelock>` .
 
+- ``tx_rollup_l2_address``: An address used to identify an account in a transaction rollup ledger. It is the hash of a BLS public key, used to authenticate layer-2 operations to transfer tickets from this account.
+
 
 Domain specific operations
 --------------------------
@@ -1986,9 +1993,14 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 
     :: key_hash : 'S   ->   contract unit : 'S
 
--  ``VOTING_POWER``: Return the voting power of a given contract. This voting power
-   coincides with the weight of the contract in the voting listings (i.e., the rolls
-   count) which is calculated at the beginning of every voting period.
+- ``VOTING_POWER``: Return the voting power of a given contract. This
+   voting power coincides with the weight of the contract in the
+   voting listings, which is calculated at the beginning of every
+   voting period. Currently the voting power is proportional to the
+   full staking balance of the contract, but this might change in
+   future version of the protocol and developers should not rely on
+   this. Hence, the value returned by ``VOTING_POWER`` should only be
+   considered relative to the one returned by ``TOTAL_VOTING_POWER``.
 
 ::
 
@@ -2033,8 +2045,15 @@ Special operations
     :: 'S   ->   nat : 'S
 
 -  ``TOTAL_VOTING_POWER``: Return the total voting power of all contracts. The total
-   voting power coincides with the sum of the rolls count of every contract in the voting
-   listings. The voting listings is calculated at the beginning of every voting period.
+   voting power coincides with the sum of the voting power of every contract in
+   the voting listings (as returned by ``VOTING_POWER``). The voting listings is calculated at the beginning of every
+   voting period.
+
+::
+
+    :: 'S   ->   nat : 'S
+
+- ``MIN_BLOCK_TIME``: Push the current minimal block time in seconds.
 
 ::
 
@@ -2231,11 +2250,11 @@ comprehensive description of the Sapling protocol.
 
 ::
 
-    :: sapling_transaction ms : sapling_state ms : 'S   ->   option (pair int (sapling_state ms)): 'S
+    :: sapling_transaction ms : sapling_state ms : 'S   ->   option (pair bytes (pair int (sapling_state ms))): 'S
 
-    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair b s') : S
+    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair bound_data (Pair balance s')) : S
         iff the transaction t successfully applied on state s resulting
-        in balance b and an updated state s'
+        in the bound_data and the balance of the transaction and an updated state s'
     > SAPLING_VERIFY_UPDATE / t : s : S  =>  None : S
         iff the transaction t is invalid with respect to the state
 
@@ -2248,7 +2267,6 @@ comprehensive description of the Sapling protocol.
     > SAPLING_EMPTY_STATE ms /  S  =>  sapling_state ms : S
         with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
         with memo_size `ms`
-
 
 .. _MichelsonTickets_alpha:
 
@@ -3336,7 +3354,7 @@ name the root of the type. The conventional name for that is ``root``.
 
 Let us recapitulate this by tweaking the names of the previous example.
 
-``parameter %root (or (or (nat %A) (bool %B)) (or (unit %default) string))``
+``parameter (or %root (or (nat %A) (bool %B)) (or (unit %default) string))``
 
 The input values will be wrapped as in the following examples.
 
@@ -3767,6 +3785,7 @@ Full grammar
       | signature
       | timestamp
       | address
+      | tx_rollup_l2_address
       | option <comparable type>
       | or <comparable type> <comparable type>
       | pair <comparable type> <comparable type> ...

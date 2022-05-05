@@ -1,18 +1,31 @@
-(tests
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
  (names test_requester test_fuzzing_requester)
- (package tezos-requester)
  (libraries
   tezos-base
   tezos-base.unix
   tezos-test-helpers
   tezos-base-test-helpers
+  tezos-stdlib
   tezos-stdlib-unix
   tezos-requester
   alcotest-lwt
   qcheck-alcotest)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base_test_helpers
    -open Tezos_stdlib
    -open Tezos_requester)))
+
+(rule
+ (alias runtest)
+ (package tezos-requester)
+ (action (run %{dep:./test_requester.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-requester)
+ (action (run %{dep:./test_fuzzing_requester.exe})))

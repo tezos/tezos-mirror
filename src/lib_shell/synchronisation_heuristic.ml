@@ -133,7 +133,7 @@ module Core = struct
     if state.threshold < 0 then Not_synchronised
     else if state.threshold = 0 then Synchronised {is_chain_stuck = false}
     else
-      let now = Time.System.to_protocol @@ Systime_os.now () in
+      let now = Time.System.to_protocol @@ Time.System.now () in
       match
         ( state.candidates.(state.index_of_youngest_candidate),
           state.candidates.(state.index_of_oldest_candidate) )
@@ -255,21 +255,24 @@ module Bootstrapping = struct
     }
 
   let activate state =
+    let open Lwt_syntax in
     let is_synchronised =
       match state.heuristic.current_status with
       | Synchronised _ -> true
       | _ -> false
     in
-    set_bootstrapped ~initialisation:true state is_synchronised >>= fun () ->
+    let* () = set_bootstrapped ~initialisation:true state is_synchronised in
     state.when_status_changes (Core.get_status state.heuristic)
 
   let update state candidate =
+    let open Lwt_syntax in
     let old_status = Core.get_status state.heuristic in
     Core.update state.heuristic candidate ;
     let new_status = Core.get_status state.heuristic in
-    (if old_status <> new_status then state.when_status_changes new_status
-    else Lwt.return_unit)
-    >>= fun () ->
+    let* () =
+      if old_status <> new_status then state.when_status_changes new_status
+      else Lwt.return_unit
+    in
     match new_status with
     | Synchronised _ when state.bootstrapped = false ->
         set_bootstrapped state true

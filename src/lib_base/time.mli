@@ -163,6 +163,9 @@ module System : sig
 
   type t = Ptime.t
 
+  (** The current time according to the system clock *)
+  val now : unit -> Ptime.t
+
   (** Unix epoch is 1970-01-01 00:00:00.000000000000 UTC *)
   val epoch : t
 

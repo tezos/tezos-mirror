@@ -1,57 +1,69 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_011_PtHangz2_commands)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-011-PtHangz2-commands)
- (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-protocol-011-PtHangz2
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-mockup
-            tezos-mockup-registration
-            tezos-mockup-commands
-            tezos-client-base-unix
-            tezos-client-011-PtHangz2
-            tezos-client-commands
-            tezos-rpc
-            tezos-protocol-plugin-011-PtHangz2)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-011-PtHangz2
+  tezos-stdlib-unix
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-mockup
+  tezos-mockup-registration
+  tezos-mockup-commands
+  tezos-client-base
+  tezos-client-011-PtHangz2
+  tezos-client-commands
+  tezos-rpc
+  tezos-client-base-unix
+  tezos-protocol-plugin-011-PtHangz2)
  (library_flags (:standard -linkall))
- (modules (:standard \ alpha_commands_registration))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_stdlib_unix
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_client_commands
-                   -open Tezos_rpc
-                   -open Tezos_client_base_unix
-                   -open Tezos_protocol_plugin_011_PtHangz2)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_stdlib_unix
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_011_PtHangz2
+   -open Tezos_client_commands
+   -open Tezos_rpc
+   -open Tezos_client_base_unix
+   -open Tezos_protocol_plugin_011_PtHangz2))
+ (modules (:standard \ alpha_commands_registration)))
 
 (library
  (name tezos_client_011_PtHangz2_commands_registration)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-011-PtHangz2-commands-registration)
- (libraries tezos-base
-            tezos-protocol-011-PtHangz2
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-011-PtHangz2
-            tezos-client-commands
-            tezos-client-011-PtHangz2-commands
-            tezos-client-sapling-011-PtHangz2
-            tezos-rpc
-            tezos-protocol-plugin-011-PtHangz2)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-011-PtHangz2
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-011-PtHangz2
+  tezos-client-commands
+  tezos-client-011-PtHangz2-commands
+  tezos-client-sapling-011-PtHangz2
+  tezos-rpc
+  tezos-protocol-plugin-011-PtHangz2)
  (library_flags (:standard -linkall))
- (modules alpha_commands_registration)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_client_commands
-                   -open Tezos_client_011_PtHangz2_commands
-                   -open Tezos_client_sapling_011_PtHangz2
-                   -open Tezos_rpc
-                   -open Tezos_protocol_plugin_011_PtHangz2)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_011_PtHangz2
+   -open Tezos_client_commands
+   -open Tezos_client_011_PtHangz2_commands
+   -open Tezos_client_sapling_011_PtHangz2
+   -open Tezos_rpc
+   -open Tezos_protocol_plugin_011_PtHangz2))
+ (modules alpha_commands_registration))

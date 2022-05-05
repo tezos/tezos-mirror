@@ -1,3 +1,8 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (_ (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
+
 (library
  (name lib_test)
  (public_name tezos-test-helpers)
@@ -8,10 +13,31 @@
   qcheck-alcotest
   alcotest
   lwt
-  pure-splitmix)
+  pure-splitmix
+  data-encoding)
  (js_of_ocaml)
- (flags (:standard -linkall)))
+ (library_flags (:standard -linkall))
+ (modules
+  assert
+  lwt_assert
+  qcheck2_helpers
+  qcheck_extra
+  qcheck_helpers
+  random_pure
+  roundtrip
+  testable))
 
-;; This rule is necessary for `make lint-tests-pkg`, without it dune
-;; complains that the alias is empty
 (rule (alias runtest_js) (action progn))
+
+(library
+ (name lib_test_extra)
+ (public_name tezos-test-helpers-extra)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-crypto
+  tezos-test-helpers
+  tezos-shell-services)
+ (modules assert_lib))
+
+(rule (alias runtest_js_base) (action progn))

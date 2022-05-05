@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines RPC services to access the information associated to
+    contracts (balance, delegate, script, etc.).
+*)
+
 open Alpha_context
 
 val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
@@ -38,9 +42,19 @@ type info = {
 val info_encoding : info Data_encoding.t
 
 val info :
-  'a #RPC_context.simple -> 'a -> Contract.t -> info shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  normalize_types:bool ->
+  info shell_tzresult Lwt.t
 
 val balance :
+  'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
+
+val frozen_bonds :
+  'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
+
+val balance_and_frozen_bonds :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
 val manager_key :
@@ -83,13 +97,15 @@ val entrypoint_type :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  string ->
+  Entrypoint.t ->
+  normalize_types:bool ->
   Script.expr shell_tzresult Lwt.t
 
 val list_entrypoints :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
+  normalize_types:bool ->
   (Michelson_v1_primitives.prim list list * (string * Script.expr) list)
   shell_tzresult
   Lwt.t

@@ -1,41 +1,46 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executables
- (names test_sampling_data test_sampling_code test_autocompletion test_distribution)
- (libraries tezos-micheline
-            tezos-micheline-rewriting
-            tezos-benchmark-type-inference-012-Psithaca
-            tezos-benchmark
-            tezos-benchmark-012-Psithaca
-            tezos-protocol-012-Psithaca
-            tezos-012-Psithaca-test-helpers
-            tezos-error-monad
-            alcotest-lwt
-            prbnmcn-stats)
-;; uncomment to enable gprof profiling
-;; (ocamlopt_flags (:standard -p -ccopt -no-pie))
- (flags (:standard
-         -open Tezos_micheline
-         -open Tezos_protocol_012_Psithaca
-         -open Tezos_benchmark
-         -open Tezos_benchmark_type_inference_012_Psithaca
-         -open Tezos_benchmark_012_Psithaca
-         -open Tezos_012_Psithaca_test_helpers)))
-
-(alias
-  (name buildtest)
-  (deps test_sampling_data.exe test_sampling_code.exe))
+ (names
+  test_sampling_data
+  test_sampling_code
+  test_autocompletion
+  test_distribution)
+ (libraries
+  tezos-base
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-protocol-012-Psithaca
+  tezos-benchmark
+  tezos-benchmark-type-inference-012-Psithaca
+  tezos-benchmark-012-Psithaca
+  tezos-012-Psithaca-test-helpers
+  tezos-error-monad
+  alcotest-lwt
+  prbnmcn-stats)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_micheline
+   -open Tezos_protocol_012_Psithaca
+   -open Tezos_benchmark
+   -open Tezos_benchmark_type_inference_012_Psithaca
+   -open Tezos_benchmark_012_Psithaca
+   -open Tezos_012_Psithaca_test_helpers)))
 
 (rule
+ (alias runtest_micheline_rewriting_data)
+ (action (run %{exe:test_sampling_data.exe} 1234)))
+
+(rule
+ (alias runtest_micheline_rewriting_code)
+ (action (run %{exe:test_sampling_code.exe} 1234)))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-012-Psithaca)
+ (deps
   (alias runtest_micheline_rewriting_data)
-  (action (run %{exe:test_sampling_data.exe} 1234)))
-
-(rule
-  (alias runtest_micheline_rewriting_code)
-  (action (run %{exe:test_sampling_code.exe} 1234)))
-
-
-(alias
-  (name runtest)
-  (package tezos-benchmark-012-Psithaca)
-  (deps (alias runtest_micheline_rewriting_data)
-        (alias runtest_micheline_rewriting_code)
-  ))
+  (alias runtest_micheline_rewriting_code))
+ (action (progn)))

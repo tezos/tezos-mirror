@@ -1,37 +1,36 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/tez_add_sub.tz]
 
 Well typed
-Gas remaining: 1039986.225 units remaining
+Gas remaining: 1039987.345 units remaining
 { parameter (pair mutez mutez) ;
   storage (option (pair mutez mutez)) ;
   code { CAR
-         /* [ @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez ] */ ;
          DUP
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez ] */ ;
          DUP
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez ] */ ;
          CAR
-         /* [ mutez : @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
-         DIP { CDR /* [ mutez : @parameter pair mutez mutez ] */ }
-         /* [ mutez : mutez : @parameter pair mutez mutez ] */ ;
+         /* [ mutez : pair mutez mutez : pair mutez mutez ] */ ;
+         DIP { CDR /* [ mutez : pair mutez mutez ] */ }
+         /* [ mutez : mutez : pair mutez mutez ] */ ;
          ADD
-         /* [ mutez : @parameter pair mutez mutez ] */ ;
+         /* [ mutez : pair mutez mutez ] */ ;
          DIP { DUP
-               /* [ @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
+               /* [ pair mutez mutez : pair mutez mutez ] */ ;
                CAR
-               /* [ mutez : @parameter pair mutez mutez ] */ ;
+               /* [ mutez : pair mutez mutez ] */ ;
                DIP { CDR /* [ mutez ] */ }
                /* [ mutez : mutez ] */ ;
                SUB_MUTEZ
                /* [ option mutez ] */ ;
                ASSERT_SOME }
-         /* [ mutez : @some mutez ] */ ;
+         /* [ mutez : mutez ] */ ;
          PAIR
-         /* [ pair mutez (mutez @some) ] */ ;
+         /* [ pair mutez mutez ] */ ;
          SOME
-         /* [ option (pair mutez (mutez @some)) ] */ ;
+         /* [ option (pair mutez mutez) ] */ ;
          NIL operation
-         /* [ list operation : option (pair mutez (mutez @some)) ] */ ;
+         /* [ list operation : option (pair mutez mutez) ] */ ;
          PAIR
-         /* [ pair (list operation) (option (pair mutez (mutez @some))) ] */ } }
+         /* [ pair (list operation) (option (pair mutez mutez)) ] */ } }

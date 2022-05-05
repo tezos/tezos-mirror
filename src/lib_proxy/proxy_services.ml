@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Rpc_dir_creation_failure of tztrace
+
 module Directory = Resto_directory.Make (RPC_encoding)
 
 module Events = struct
@@ -74,7 +76,7 @@ module BlockToHashClient (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
   let hash_of_block (rpc_context : #RPC_context.simple)
       (chain : Tezos_shell_services.Shell_services.chain)
       (block : Tezos_shell_services.Block_services.block) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match raw_hash_of_block block with
     | Some h ->
         (* Block is defined by its hash *)
@@ -114,14 +116,21 @@ end
 type mode =
   | Light_client of Light.sources
   | Proxy_client
-  | Proxy_server of int option
+  | Proxy_server of {
+      sleep : float -> unit Lwt.t;
+      sym_block_caching_time : int option;
+      on_disk_proxy_builder :
+        (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option;
+    }
 
 let to_client_server_mode = function
   | Light_client _ | Proxy_client -> Proxy.Client
   | Proxy_server _ -> Proxy.Server
 
 module BlockToHashServer : BLOCK_TO_HASH = struct
-  let hash_of_block __ _ = function
+  let hash_of_block __ _ =
+    let open Lwt_result_syntax in
+    function
     | `Hash (h, 0) -> return_some h
     | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) ->
         return_none
@@ -161,7 +170,7 @@ module Env_cache =
 module Env_cache_lwt = Ringo_lwt.Functors.Make_result (Env_cache)
 
 let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.json)
+    (rpc_context : RPC_context.generic)
     (proxy_env : Registration.proxy_environment) (mode : mode) envs_cache key
     chain block =
   let open Lwt_syntax in
@@ -174,13 +183,13 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
            Remember that contexts are kept in an LRU cache though, so clearing
            will eventually happen; but we don't schedule it. *)
       Lwt.return_unit
-  | (Proxy_server sym_block_caching_time_opt, _) ->
+  | (Proxy_server {sleep; sym_block_caching_time; _}, _) ->
       let (chain_string, block_string) =
         Tezos_shell_services.Block_services.
           (chain_to_string chain, to_string block)
       in
       let* time_between_blocks =
-        match sym_block_caching_time_opt with
+        match sym_block_caching_time with
         | Some sym_block_caching_time ->
             Lwt.return @@ Int.to_float sym_block_caching_time
         | None -> (
@@ -207,7 +216,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
             | Ok (Some x) -> Lwt.return (Int64.to_float x))
       in
       let schedule () : _ Lwt.t =
-        let* () = Lwt_unix.sleep time_between_blocks in
+        let* () = sleep time_between_blocks in
         Env_cache_lwt.remove envs_cache key ;
         Events.(emit clearing_data (chain_string, block_string))
       in
@@ -248,7 +257,7 @@ let protocols protocol_hash =
           }))
 
 let build_directory (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.json) (mode : mode)
+    (rpc_context : RPC_context.generic) (mode : mode)
     (proxy_env : Registration.proxy_environment) : unit RPC_directory.t =
   let (module Proxy_environment) = proxy_env in
   let b2h : (module BLOCK_TO_HASH) =
@@ -258,25 +267,32 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
         (module BlockToHashClient (Proxy_environment))
   in
   let module B2H = (val b2h : BLOCK_TO_HASH) in
-  let make chain block (module P_RPC : Proxy_proto.PROTO_RPC) =
-    let open Lwt_syntax in
+  let make chain block =
     match mode with
     | Light_client sources ->
-        let (module C) =
-          Light_core.get_core (module Proxy_environment) printer sources
-        in
-        let (chain_string, block_string) =
-          Tezos_shell_services.Block_services.
-            (chain_to_string chain, to_string block)
-        in
-        let* () =
-          Light_logger.Logger.(emit core_created (chain_string, block_string))
-        in
-        let module M = Proxy_getter.Make (C) (P_RPC) in
-        Lwt.return (module M : Proxy_getter.M)
-    | Proxy_client | Proxy_server _ ->
-        let module M = Proxy_getter.MakeProxy (P_RPC) in
-        Lwt.return (module M : Proxy_getter.M)
+        Proxy_getter.Of_rpc
+          (fun (module P_RPC : Proxy_proto.PROTO_RPC) ->
+            let open Lwt_syntax in
+            let (module C) =
+              Light_core.get_core (module Proxy_environment) printer sources
+            in
+            let (chain_string, block_string) =
+              Tezos_shell_services.Block_services.
+                (chain_to_string chain, to_string block)
+            in
+            let* () =
+              Light_logger.Logger.(
+                emit core_created (chain_string, block_string))
+            in
+            let module M = Proxy_getter.Make (C) (P_RPC) in
+            Lwt.return (module M : Proxy_getter.M))
+    | Proxy_client | Proxy_server {on_disk_proxy_builder = None; _} ->
+        Proxy_getter.Of_rpc
+          (fun (module P_RPC : Proxy_proto.PROTO_RPC) ->
+            let module M = Proxy_getter.MakeProxy (P_RPC) in
+            Lwt.return (module M : Proxy_getter.M))
+    | Proxy_server {on_disk_proxy_builder = Some f; _} ->
+        Proxy_getter.Of_data_dir f
   in
   (* proxy_server case: given that a new block arrives every minute,
      make the cache keep blocks from approximately the last hour.
@@ -291,7 +307,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
       | Proxy_client | Light_client _ -> 16)
   in
   let get_env_rpc_context chain block =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* block_hash_opt = B2H.hash_of_block rpc_context chain block in
     let (block_key, (fill_b2h : Block_hash.t -> unit)) =
       match block_hash_opt with
@@ -300,15 +316,17 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     in
     let key = (chain, block_key) in
     let compute_value (chain, block_key) =
-      let* initial_context =
-        Proxy_environment.init_env_rpc_context
-          printer
-          (make chain block_key)
-          rpc_context
-          (to_client_server_mode mode)
-          chain
-          block_key
+      let ctx : Proxy_getter.rpc_context_args =
+        {
+          printer = Some printer;
+          proxy_builder = make chain block_key;
+          rpc_context;
+          mode = to_client_server_mode mode;
+          chain;
+          block;
+        }
       in
+      let* initial_context = Proxy_environment.init_env_rpc_context ctx in
       fill_b2h @@ initial_context.block_hash ;
       let*! () =
         schedule_clearing
@@ -335,7 +353,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
            throwing an exception. It's handled in
            [Tezos_mockup_proxy.RPC_client]. This is not ideal, but
            it's better than asserting false. *)
-        raise (Tezos_mockup_proxy.RPC_client.Rpc_dir_creation_failure trace)
+        raise (Rpc_dir_creation_failure trace)
     | Ok res -> Lwt.return res
   in
   let proto_directory =

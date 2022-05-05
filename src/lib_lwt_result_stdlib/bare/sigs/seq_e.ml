@@ -120,20 +120,30 @@ module type S = sig
       returns an [Error _] or if the sequence is interrupted. Otherwise it
       returns [Ok _].
 
-      It is the responsibility of the caller to differentiate
-      between errors from the function and errors from the sequence. The
-      function {!map_error} may come in handy. E.g.,
+      This function does not discriminate between interruption and traversal
+      errors. The {!fold_left_e_discriminated} provide such a distinction. *)
+  val fold_left_e :
+    ('a -> 'b -> ('a, 'e) result) -> 'a -> ('b, 'e) t -> ('a, 'e) result
+
+  (** [fold_left_e_discriminated f init seq] is the same as {!fold_left_e} but
+      errors from [f] are wrapped in [Right] whilst interruptions in [seq] are
+      wrapped in [Left].
+
+      [fold_left_e_discriminated f init seq] is equivalent to
 
 {[
 fold_left_e
   (fun acc item ->
-    f acc item |> Result.map_error (fun e -> `Traverse e))
+    f acc item |> Result.map_error (fun e -> Either.Right e))
   init
-  (s |> map_error (fun e -> `Interrupt e))
+  (s |> map_error (fun e -> Either.Left e))
 ]}
-*)
-  val fold_left_e :
-    ('a -> 'b -> ('a, 'e) result) -> 'a -> ('b, 'e) t -> ('a, 'e) result
+  *)
+  val fold_left_e_discriminated :
+    ('a -> 'b -> ('a, 'f) result) ->
+    'a ->
+    ('b, 'e) t ->
+    ('a, ('e, 'f) Either.t) result
 
   (** [fold_left_s f init seq] is a promise that resolves to
 
@@ -160,15 +170,33 @@ fold_left_e
 
       The elements are traversed sequentially. Specifically, a node's suspension
       is called only when the [f]-promise of the previous node has resolved.
-      Thus, there might be yielding in between suspensions being called.
-
-      See {!fold_left_e} for a warning about traversal and interruption errors
-      being indistinguishable. *)
+      Thus, there might be yielding in between suspensions being called. *)
   val fold_left_es :
     ('a -> 'b -> ('a, 'e) result Lwt.t) ->
     'a ->
     ('b, 'e) t ->
     ('a, 'e) result Lwt.t
+
+  (** [fold_left_es_discriminated f init seq] is the same as {!fold_left_es} but
+      errors from [f] are wrapped in [Right] whilst interruptions in [seq] are
+      wrapped in [Left].
+
+      [fold_left_es_discriminated f init seq] is equivalent to
+
+{[
+fold_left_es
+  (fun acc item ->
+    let+ r = f acc item in
+    Result.map_error Either.right r)
+  init
+  (s |> map_error Either.left)
+]}
+  *)
+  val fold_left_es_discriminated :
+    ('a -> 'b -> ('a, 'f) result Lwt.t) ->
+    'a ->
+    ('b, 'e) t ->
+    ('a, ('e, 'f) Either.t) result Lwt.t
 
   (** [iter f seq] is [fold_left (fun () x -> f x) () seq] *)
   val iter : ('a -> unit) -> ('a, 'e) t -> (unit, 'e) result
@@ -176,12 +204,24 @@ fold_left_e
   (** [iter_e f seq] is [fold_left_e (fun () x -> f x) () seq] *)
   val iter_e : ('a -> (unit, 'e) result) -> ('a, 'e) t -> (unit, 'e) result
 
+  (** [iter_e_discriminated f seq] is like {!iter_e} but the errors from [f]
+      and [seq] are kept separate. *)
+  val iter_e_discriminated :
+    ('a -> (unit, 'f) result) -> ('a, 'e) t -> (unit, ('e, 'f) Either.t) result
+
   (** [iter_s f seq] is [fold_left_s (fun () x -> f x) () seq] *)
   val iter_s : ('a -> unit Lwt.t) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
 
   (** [iter_es f seq] is [fold_left_es (fun () x -> f x) () seq] *)
   val iter_es :
     ('a -> (unit, 'e) result Lwt.t) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
+
+  (** [iter_es_discriminated f seq] is like {!iter_es} but the errors from [f]
+      and [seq] are kept separate. *)
+  val iter_es_discriminated :
+    ('a -> (unit, 'f) result Lwt.t) ->
+    ('a, 'e) t ->
+    (unit, ('e, 'f) Either.t) result Lwt.t
 
   (** [iter_p f seq] is a promise [p].
 
@@ -230,6 +270,16 @@ fold_left_e
         (whichever comes first). *)
   val map_e : ('a -> ('b, 'e) result) -> ('a, 'e) t -> ('b, 'e) t
 
+  (** There is no [map_e_discriminated] because the result of a [map*] is a
+      sequence ([t]) and so any error (even from [f]) is, in essence, an
+      interruption of the resulting sequence.
+
+      If you need to apply such a distinction and you are ready to deal with the
+      resulting [Either.t]-interruptible sequence, you can arrange this manually
+      using {!map_error} and [Result.map_error].
+
+      A similar remark applies to the other combinators below. *)
+
   (** [filter f s] is a sequence of the same kind as [s] with only the elements
       for which [f] returns [true]. *)
   val filter : ('a -> bool) -> ('a, 'e) t -> ('a, 'e) t
@@ -260,9 +310,3 @@ fold_left_e
 
   val of_seq_e : ('a, 'e) result Stdlib.Seq.t -> ('a, 'e) t
 end
-
-(* Developer notes:
-
-   We could use [Either.t] to distinguish between interruption and traversal
-   failure. [Either] is introduced only in more recent versions of OCaml that we
-   use here. We'll update to use [Either.t] later. *)

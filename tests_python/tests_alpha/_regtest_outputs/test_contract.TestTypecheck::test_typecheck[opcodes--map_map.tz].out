@@ -1,20 +1,20 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/map_map.tz]
 
 Well typed
-Gas remaining: 1039992.454 units remaining
+Gas remaining: 1039993.574 units remaining
 { parameter nat ;
   storage (map string nat) ;
   code { UNPAIR
-         /* [ @parameter nat : @storage map string nat ] */ ;
+         /* [ nat : map string nat ] */ ;
          SWAP
-         /* [ @storage map string nat : @parameter nat ] */ ;
+         /* [ map string nat : nat ] */ ;
          MAP { CDR
-               /* [ @elt nat : @parameter nat ] */ ;
-               DIP { DUP /* [ @parameter nat : @parameter nat ] */ }
-               /* [ @elt nat : @parameter nat : @parameter nat ] */ ;
+               /* [ nat : nat ] */ ;
+               DIP { DUP /* [ nat : nat ] */ }
+               /* [ nat : nat : nat ] */ ;
                ADD
-               /* [ nat : @parameter nat ] */ }
-         /* [ map string nat : @parameter nat ] */ ;
+               /* [ nat : nat ] */ }
+         /* [ map string nat : nat ] */ ;
          DIP { DROP /* [] */ }
          /* [ map string nat ] */ ;
          NIL operation

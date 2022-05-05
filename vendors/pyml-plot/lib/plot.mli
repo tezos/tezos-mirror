@@ -96,7 +96,7 @@ module Axis : sig
 
   val return : 'a -> ('a, 'k) t
 
-  val ( >>= ) : ('a, 'k) t -> ('a -> ('b, 'k) t) -> ('b, 'k) t
+  val ( let* ) : ('a, 'k) t -> ('a -> ('b, 'k) t) -> ('b, 'k) t
 
   val run : ('a, 'k) t -> Pytypes.pyobject -> 'a
 
@@ -158,7 +158,7 @@ type 'a t
 
 val return : 'a -> 'a t
 
-val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
 
 (** Performs a layout in a matrix of [nrows]x[ncols] subplots. *)
 val run : ?figsize:float * float -> nrows:int -> ncols:int -> 'a t -> 'a

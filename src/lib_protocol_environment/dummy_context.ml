@@ -67,10 +67,15 @@ module M = struct
 
     let list _ ?offset:_ ?length:_ _ = assert false
 
+    let length _ _ = assert false
+
     let fold ?depth:_ _ _ ~order:_ ~init:_ ~f:_ = assert false
+
+    let config _ = assert false
   end
 
   include Tree
+  module Proof = Memory_context.M.Proof
 
   let set_protocol _ _ = assert false
 
@@ -81,6 +86,14 @@ module M = struct
   let set_hash_version _ _ = assert false
 
   let get_hash_version _ = assert false
+
+  let verify_tree_proof _ _ = assert false
+
+  let verify_stream_proof _ _ = assert false
+
+  let equal_config _ _ = assert false
+
+  let config _ = assert false
 end
 
 open Tezos_protocol_environment

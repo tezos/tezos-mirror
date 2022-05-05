@@ -18,14 +18,14 @@ export NODE_VERSION="${NODE_VERSION:-${recommended_node_version}}"
 
 export NVM_NODEJS_ORG_MIRROR=https://unofficial-builds.nodejs.org/download/release
 export NVM_DIR="$HOME/.nvm"
-#shellcheck disable=SC1090
+#shellcheck disable=SC1091
 . "$HOME/.nvm/nvm.sh"
 
 # shellcheck disable=SC2039
 # override nvm_get_arch, as suggested in https://github.com/nvm-sh/nvm/issues/1102
 nvm_get_arch() {
-  local HOST_ARCH
-  local NVM_OS
+  HOST_ARCH
+  NVM_OS
 
   NVM_OS="$(nvm_get_os)"
   # If the OS is SunOS, first try to use pkgsrc to guess
@@ -44,7 +44,7 @@ nvm_get_arch() {
     HOST_ARCH="$(command uname -m)"
   fi
 
-  local NVM_ARCH
+  NVM_ARCH
   case "${HOST_ARCH}" in
     x86_64 | amd64) NVM_ARCH="x64" ;;
     i*86) NVM_ARCH="x86" ;;
@@ -63,4 +63,6 @@ nvm use --delete-prefix "$NODE_VERSION"
 
 echo "Check versions"
 node --version
+
+npm install
 

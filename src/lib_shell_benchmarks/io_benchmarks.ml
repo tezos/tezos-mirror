@@ -55,18 +55,24 @@ module Helpers = struct
      given [key_set]. *)
   let random_contents rng_state base_dir index context key_set commit_batch_size
       =
-    Key_map.fold_lwt
-      (fun path size (index, context, current_commit_batch_size) ->
-        Io_helpers.initialize_key rng_state context path size >>= fun context ->
-        if current_commit_batch_size < commit_batch_size then
-          Lwt.return (index, context, current_commit_batch_size + 1)
-        else
-          (* save and proceed with fresh diff *)
-          Io_helpers.commit_and_reload base_dir index context
-          >>= fun (context, index) -> Lwt.return (index, context, 0))
-      key_set
-      (index, context, 0)
-    >>= fun (index, context, _) ->
+    let open Lwt_syntax in
+    let* (index, context, _) =
+      Key_map.fold_lwt
+        (fun path size (index, context, current_commit_batch_size) ->
+          let* context =
+            Io_helpers.initialize_key rng_state context path size
+          in
+          if current_commit_batch_size < commit_batch_size then
+            Lwt.return (index, context, current_commit_batch_size + 1)
+          else
+            (* save and proceed with fresh diff *)
+            let* (context, index) =
+              Io_helpers.commit_and_reload base_dir index context
+            in
+            Lwt.return (index, context, 0))
+        key_set
+        (index, context, 0)
+    in
     Io_helpers.commit_and_reload base_dir index context
 
   let random_key_set rng_state ~depth ~key_card ~insertions =
@@ -97,9 +103,11 @@ module Helpers = struct
       Io_helpers.load_context_from_disk base_dir context_hash
     in
     Lwt_main.run
-      ( random_contents rng_state base_dir index context keys commit_batch_size
-      >>= fun (context, index) ->
-        Io_helpers.commit_and_reload base_dir index context )
+      (let open Lwt_syntax in
+      let* (context, index) =
+        random_contents rng_state base_dir index context keys commit_batch_size
+      in
+      Io_helpers.commit_and_reload base_dir index context)
 end
 
 module Context_size_dependent_shared = struct
@@ -293,8 +301,9 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index >>= fun () ->
-            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          (let open Lwt_syntax in
+          let* () = Tezos_context.Context.close index in
+          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -344,7 +353,10 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
     let (random_key, value_size) = sample_accessed_key rng_state cfg keys in
     Format.eprintf "preparing bench: insertions = %d@." insertions ;
     let closure context =
-      Lwt_main.run (Io_helpers.commit context >>= fun _ -> Lwt.return_unit)
+      Lwt_main.run
+        (let open Lwt_syntax in
+        let* _ = Io_helpers.commit context in
+        Lwt.return_unit)
     in
     let workload =
       Random_context_random_access
@@ -371,8 +383,9 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index >>= fun () ->
-            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          (let open Lwt_syntax in
+          let* () = Tezos_context.Context.close index in
+          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -632,8 +645,9 @@ module Irmin_pack_read_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index >>= fun () ->
-            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          (let open Lwt_syntax in
+          let* () = Tezos_context.Context.close index in
+          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -804,8 +818,9 @@ module Irmin_pack_write_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index >>= fun () ->
-            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          (let open Lwt_syntax in
+          let* () = Tezos_context.Context.close index in
+          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir)
       in
       let result =
         try f context
@@ -817,7 +832,10 @@ module Irmin_pack_write_bench : Benchmark.S = struct
       result
     in
     let closure context =
-      Lwt_main.run (Io_helpers.commit context >>= fun _ -> Lwt.return_unit)
+      Lwt_main.run
+        (let open Lwt_syntax in
+        let* _ = Io_helpers.commit context in
+        Lwt.return_unit)
     in
     let workload =
       Irmin_pack_write
@@ -1089,8 +1107,9 @@ module Write_random_keys_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index >>= fun () ->
-            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir target_base_dir )
+          (let open Lwt_syntax in
+          let* () = Tezos_context.Context.close index in
+          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir target_base_dir)
       in
       let result =
         try f context
@@ -1103,7 +1122,9 @@ module Write_random_keys_bench : Benchmark.S = struct
     in
     let closure context =
       Lwt_main.run
-        (Io_helpers.commit context >>= fun _context_hash -> Lwt.return_unit)
+        (let open Lwt_syntax in
+        let* _context_hash = Io_helpers.commit context in
+        Lwt.return_unit)
     in
     let workload =
       Write_random_keys

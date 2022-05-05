@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_micheline_rewriting)
  (public_name tezos-micheline-rewriting)
@@ -9,4 +12,7 @@
   tezos-error-monad
   tezos-micheline)
  (flags
-  (:standard -open Tezos_stdlib -open Tezos_error_monad -open Tezos_micheline)))
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_error_monad
+   -open Tezos_micheline)))

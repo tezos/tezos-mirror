@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.vote.ballot.out
+encoding/ithaca.vote.ballot.out
 
 ./tezos-codec encode 012-Psithaca.vote.ballot from '"nay"'
 01

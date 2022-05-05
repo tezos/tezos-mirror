@@ -1,13 +1,13 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/hash_string.tz]
 
 Well typed
-Gas remaining: 1039996.340 units remaining
+Gas remaining: 1039996.980 units remaining
 { parameter string ;
   storage bytes ;
   code { CAR
-         /* [ @parameter string ] */ ;
+         /* [ string ] */ ;
          PACK
-         /* [ @parameter.packed bytes ] */ ;
+         /* [ bytes ] */ ;
          BLAKE2B
          /* [ bytes ] */ ;
          NIL operation

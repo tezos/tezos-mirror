@@ -57,27 +57,23 @@ let test_gas_storage_limits =
   in
   let* giver_balance = Client.get_balance_for ~account:giver client in
   let* receiver_balance = Client.get_balance_for ~account:receiver client in
-  let expected_receiver_balance =
-    initial_receiver_balance +. Tez.to_float amount
-  in
-  let expected_giver_balance =
-    initial_giver_balance -. Tez.(to_float (fee + amount))
-  in
+  let expected_receiver_balance = Tez.(initial_receiver_balance + amount) in
+  let expected_giver_balance = Tez.(initial_giver_balance - (fee + amount)) in
   let* () =
     if receiver_balance <> expected_receiver_balance then
       Test.fail
-        "test_gas_storage_limits: unexpected balance for receiver (got %f, \
-         expected %f)"
-        receiver_balance
-        expected_receiver_balance
+        "test_gas_storage_limits: unexpected balance for receiver (got %s, \
+         expected %s)"
+        (Tez.to_string receiver_balance)
+        (Tez.to_string expected_receiver_balance)
     else return ()
   in
   if giver_balance <> expected_giver_balance then
     Test.fail
-      "test_gas_storage_limits: unexpected balance for giver (got %f, expected \
-       %f)"
-      giver_balance
-      expected_giver_balance
+      "test_gas_storage_limits: unexpected balance for giver (got %s, expected \
+       %s)"
+      (Tez.to_string giver_balance)
+      (Tez.to_string expected_giver_balance)
   else return ()
 
-let register ~protocols = test_gas_storage_limits ~protocols
+let register ~protocols = test_gas_storage_limits protocols

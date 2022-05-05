@@ -1,0 +1,96 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[concat_list.tz-""-{ "a" ; "b" ; "c" }-"abc"]
+
+storage
+  "abc"
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039988.551 units remaining)
+    [ (Pair { "a" ; "b" ; "c" } "") ]
+  - location: 8 (remaining gas: 1039988.541 units remaining)
+    [ { "a" ; "b" ; "c" } ]
+  - location: 9 (remaining gas: 1039988.531 units remaining)
+    [ ""
+      { "a" ; "b" ; "c" } ]
+  - location: 12 (remaining gas: 1039988.521 units remaining)
+    [ { "a" ; "b" ; "c" }
+      "" ]
+  - location: 13 (remaining gas: 1039988.521 units remaining)
+    [ "a"
+      "" ]
+  - location: 15 (remaining gas: 1039988.511 units remaining)
+    [ ""
+      "a" ]
+  - location: 16 (remaining gas: 1039988.501 units remaining)
+    [ "a" ]
+  - location: 18 (remaining gas: 1039988.491 units remaining)
+    [ {}
+      "a" ]
+  - location: 20 (remaining gas: 1039988.481 units remaining)
+    [ "a"
+      {} ]
+  - location: 21 (remaining gas: 1039988.471 units remaining)
+    [ { "a" } ]
+  - location: 16 (remaining gas: 1039988.451 units remaining)
+    [ ""
+      { "a" } ]
+  - location: 22 (remaining gas: 1039988.441 units remaining)
+    [ { "" ; "a" } ]
+  - location: 23 (remaining gas: 1039988.321 units remaining)
+    [ "a" ]
+  - location: 13 (remaining gas: 1039988.311 units remaining)
+    [ "b"
+      "a" ]
+  - location: 15 (remaining gas: 1039988.301 units remaining)
+    [ "a"
+      "b" ]
+  - location: 16 (remaining gas: 1039988.291 units remaining)
+    [ "b" ]
+  - location: 18 (remaining gas: 1039988.281 units remaining)
+    [ {}
+      "b" ]
+  - location: 20 (remaining gas: 1039988.271 units remaining)
+    [ "b"
+      {} ]
+  - location: 21 (remaining gas: 1039988.261 units remaining)
+    [ { "b" } ]
+  - location: 16 (remaining gas: 1039988.241 units remaining)
+    [ "a"
+      { "b" } ]
+  - location: 22 (remaining gas: 1039988.231 units remaining)
+    [ { "a" ; "b" } ]
+  - location: 23 (remaining gas: 1039988.111 units remaining)
+    [ "ab" ]
+  - location: 13 (remaining gas: 1039988.101 units remaining)
+    [ "c"
+      "ab" ]
+  - location: 15 (remaining gas: 1039988.091 units remaining)
+    [ "ab"
+      "c" ]
+  - location: 16 (remaining gas: 1039988.081 units remaining)
+    [ "c" ]
+  - location: 18 (remaining gas: 1039988.071 units remaining)
+    [ {}
+      "c" ]
+  - location: 20 (remaining gas: 1039988.061 units remaining)
+    [ "c"
+      {} ]
+  - location: 21 (remaining gas: 1039988.051 units remaining)
+    [ { "c" } ]
+  - location: 16 (remaining gas: 1039988.031 units remaining)
+    [ "ab"
+      { "c" } ]
+  - location: 22 (remaining gas: 1039988.021 units remaining)
+    [ { "ab" ; "c" } ]
+  - location: 23 (remaining gas: 1039987.901 units remaining)
+    [ "abc" ]
+  - location: 13 (remaining gas: 1039987.891 units remaining)
+    [ "abc" ]
+  - location: 24 (remaining gas: 1039987.881 units remaining)
+    [ {}
+      "abc" ]
+  - location: 26 (remaining gas: 1039987.871 units remaining)
+    [ (Pair {} "abc") ]
+

@@ -175,7 +175,7 @@ let activate
               P2p.send p2p conn (Get_current_branch chain_id) :: acc)
         in
         Error_monad.dont_wait
-          (fun () -> Error_monad.Lwt_tzresult_syntax.join sends)
+          (fun () -> Error_monad.Lwt_result_syntax.tzjoin sends)
           (fun trace ->
             Format.eprintf
               "Uncaught error: %a\n%!"
@@ -189,6 +189,7 @@ let activate
   {global_db; reader_chain_db}
 
 let deactivate chain_db =
+  let open Lwt_syntax in
   let {active_chains; p2p; _} = chain_db.global_db in
   let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
   Chain_id.Table.remove active_chains chain_id ;
@@ -208,9 +209,10 @@ let deactivate chain_db =
       Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_trace trace)
     (fun exc ->
       Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
-  Distributed_db_requester.Raw_operation.shutdown
-    chain_db.reader_chain_db.operation_db
-  >>= fun () ->
+  let* () =
+    Distributed_db_requester.Raw_operation.shutdown
+      chain_db.reader_chain_db.operation_db
+  in
   Distributed_db_requester.Raw_block_header.shutdown
     chain_db.reader_chain_db.block_header_db
 
@@ -227,15 +229,18 @@ let disconnect {global_db = {p2p; _}; _} peer_id =
   | Some conn -> P2p.disconnect p2p conn
 
 let shutdown {p2p_readers; active_chains; _} =
-  P2p_peer.Table.iter_p
-    (fun _peer_id reader -> P2p_reader.shutdown reader)
-    p2p_readers
-  >>= fun () ->
+  let open Lwt_syntax in
+  let* () =
+    P2p_peer.Table.iter_p
+      (fun _peer_id reader -> P2p_reader.shutdown reader)
+      p2p_readers
+  in
   Chain_id.Table.iter_p
     (fun _ reader_chain_db ->
-      Distributed_db_requester.Raw_operation.shutdown
-        reader_chain_db.P2p_reader.operation_db
-      >>= fun () ->
+      let* () =
+        Distributed_db_requester.Raw_operation.shutdown
+          reader_chain_db.P2p_reader.operation_db
+      in
       Distributed_db_requester.Raw_block_header.shutdown
         reader_chain_db.P2p_reader.block_header_db)
     active_chains
@@ -250,26 +255,30 @@ let clear_block chain_db hash n =
     hash
 
 let commit_block chain_db hash block_header operations result =
+  let open Lwt_result_syntax in
   assert (Block_hash.equal hash (Block_header.hash block_header)) ;
   assert (
     Compare.List_length_with.(operations = block_header.shell.validation_passes)) ;
-  Store.Block.store_block
-    chain_db.reader_chain_db.chain_store
-    ~block_header
-    ~operations
-    result
-  >>=? fun res ->
+  let* res =
+    Store.Block.store_block
+      chain_db.reader_chain_db.chain_store
+      ~block_header
+      ~operations
+      result
+  in
   clear_block chain_db hash block_header.shell.validation_passes ;
   return res
 
 let commit_invalid_block chain_db hash header errors =
+  let open Lwt_result_syntax in
   assert (Block_hash.equal hash (Block_header.hash header)) ;
-  Store.Block.mark_invalid
-    chain_db.reader_chain_db.chain_store
-    hash
-    ~level:header.shell.level
-    errors
-  >>=? fun () ->
+  let* () =
+    Store.Block.mark_invalid
+      chain_db.reader_chain_db.chain_store
+      hash
+      ~level:header.shell.level
+      errors
+  in
   clear_block chain_db hash header.shell.validation_passes ;
   return_unit
 
@@ -288,9 +297,10 @@ let inject_prechecked_block chain_db hash block_header operations =
     ~operations
 
 let commit_protocol db h p =
-  Store.Protocol.store db.disk h p >>= fun res ->
+  let open Lwt_syntax in
+  let* res = Store.Protocol.store db.disk h p in
   Distributed_db_requester.Raw_protocol.clear_or_cancel db.protocol_db h ;
-  return (res <> None)
+  return_ok (res <> None)
 
 (** This functor is used to export [Requester.REQUESTER] modules outside of this
     module. Thanks to the [Kind] module, requesters are accessed using
@@ -320,6 +330,8 @@ struct
   let read t k = Table.read (Kind.proj t) k
 
   let read_opt t k = Table.read_opt (Kind.proj t) k
+
+  let inject t k v = Table.inject (Kind.proj t) k v
 
   let fetch t ?peer ?timeout k p = Table.fetch (Kind.proj t) ?peer ?timeout k p
 
@@ -470,15 +482,17 @@ module Advertise = struct
       chain_db.reader_chain_db.active_connections
 
   let current_branch chain_db =
+    let open Lwt_syntax in
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let chain_store = chain_store chain_db in
     let sender_id = my_peer_id chain_db in
-    Store.Chain.current_head chain_store >>= fun current_head ->
+    let* current_head = Store.Chain.current_head chain_store in
     P2p_peer.Table.iter_p
       (fun receiver_id conn ->
         let seed = {Block_locator.receiver_id; sender_id} in
-        Store.Chain.compute_locator chain_store current_head seed
-        >>= fun locator ->
+        let* locator =
+          Store.Chain.compute_locator chain_store current_head seed
+        in
         let msg = Message.Current_branch (chain_id, locator) in
         ignore (P2p.try_send chain_db.global_db.p2p conn msg) ;
         Lwt.return_unit)

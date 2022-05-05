@@ -1,15 +1,15 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/fail_amount.tz]
 
 Well typed
-Gas remaining: 1039992.147 units remaining
+Gas remaining: 1039993.067 units remaining
 { parameter unit ;
   storage unit ;
   code { DROP
          /* [] */ ;
          AMOUNT
-         /* [ @amount mutez ] */ ;
+         /* [ mutez ] */ ;
          PUSH mutez 10000000
-         /* [ mutez : @amount mutez ] */ ;
+         /* [ mutez : mutez ] */ ;
          CMPGT ;
          IF { FAIL } { /* [] */ } ;
          UNIT

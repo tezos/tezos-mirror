@@ -115,8 +115,10 @@ let wrap f _switch () =
 
 (** Start tests *)
 
-let ( >>=?? ) m f =
-  m >>= function
+let ( let*?? ) m f =
+  let open Lwt_syntax in
+  let* r = m in
+  match r with
   | Ok v -> f v
   | Error error ->
       Format.printf "Error:\n   %a\n" pp_print_trace error ;
@@ -126,23 +128,24 @@ let ( >>=?? ) m f =
 (** Node creation in sandbox. Expects one event with status
     [p2p_layer_disabled]. *)
 let node_sandbox_initialization_events sandbox_parameters config _switch () =
-  Node.create
-    ~sandboxed:true
-    ~sandbox_parameters
-    ~singleprocess:true
-    (* Tezos_shell.Node.config *)
-    config
-    (* Tezos_shell.Node.peer_validator_limits *)
-    Node.default_peer_validator_limits
-    (* Tezos_shell.Node.block_validator_limits *)
-    Node.default_block_validator_limits
-    (* Tezos_shell.Node.prevalidator_limits *)
-    Node.default_prevalidator_limits
-    (* Tezos_shell.Node.chain_validator_limits *)
-    Node.default_chain_validator_limits
-    (* Tezos_shell_services.History_mode.t option *)
-    None
-  >>=?? fun n ->
+  let*?? n =
+    Node.create
+      ~sandboxed:true
+      ~sandbox_parameters
+      ~singleprocess:true
+      (* Tezos_shell.Node.config *)
+      config
+      (* Tezos_shell.Node.peer_validator_limits *)
+      Node.default_peer_validator_limits
+      (* Tezos_shell.Node.block_validator_limits *)
+      Node.default_block_validator_limits
+      (* Tezos_shell.Node.prevalidator_limits *)
+      Node.default_prevalidator_limits
+      (* Tezos_shell.Node.chain_validator_limits *)
+      Node.default_chain_validator_limits
+      (* Tezos_shell_services.History_mode.t option *)
+      None
+  in
   (* Start tests *)
   let evs = Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have one event" 1 (List.length evs) ;
@@ -160,22 +163,23 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
 (** Node creation. Expects two events with statuses
     [bootstrapping] and [p2p_maintain_started]. *)
 let node_initialization_events _sandbox_parameters config _switch () =
-  Node.create
-    ~sandboxed:false
-    ~singleprocess:true
-    (* Tezos_shell.Node.config *)
-    {config with p2p = default_p2p}
-    (* Tezos_shell.Node.peer_validator_limits *)
-    Node.default_peer_validator_limits
-    (* Tezos_shell.Node.block_validator_limits *)
-    Node.default_block_validator_limits
-    (* Tezos_shell.Node.prevalidator_limits *)
-    Node.default_prevalidator_limits
-    (* Tezos_shell.Node.chain_validator_limits *)
-    Node.default_chain_validator_limits
-    (* Tezos_shell_services.History_mode.t option *)
-    None
-  >>=?? fun n ->
+  let*?? n =
+    Node.create
+      ~sandboxed:false
+      ~singleprocess:true
+      (* Tezos_shell.Node.config *)
+      {config with p2p = default_p2p}
+      (* Tezos_shell.Node.peer_validator_limits *)
+      Node.default_peer_validator_limits
+      (* Tezos_shell.Node.block_validator_limits *)
+      Node.default_block_validator_limits
+      (* Tezos_shell.Node.prevalidator_limits *)
+      Node.default_prevalidator_limits
+      (* Tezos_shell.Node.chain_validator_limits *)
+      Node.default_chain_validator_limits
+      (* Tezos_shell_services.History_mode.t option *)
+      None
+  in
   (* Start tests *)
   let evs = Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have two events" 2 (List.length evs) ;
@@ -199,22 +203,23 @@ let node_initialization_events _sandbox_parameters config _switch () =
   Node.shutdown n
 
 let node_store_known_protocol_events _sandbox_parameters config _switch () =
-  Node.create
-    ~sandboxed:false
-    ~singleprocess:true
-    (* Tezos_shell.Node.config *)
-    {config with p2p = default_p2p}
-    (* Tezos_shell.Node.peer_validator_limits *)
-    Node.default_peer_validator_limits
-    (* Tezos_shell.Node.block_validator_limits *)
-    Node.default_block_validator_limits
-    (* Tezos_shell.Node.prevalidator_limits *)
-    Node.default_prevalidator_limits
-    (* Tezos_shell.Node.chain_validator_limits *)
-    Node.default_chain_validator_limits
-    (* Tezos_shell_services.History_mode.t option *)
-    None
-  >>=?? fun n ->
+  let*?? n =
+    Node.create
+      ~sandboxed:false
+      ~singleprocess:true
+      (* Tezos_shell.Node.config *)
+      {config with p2p = default_p2p}
+      (* Tezos_shell.Node.peer_validator_limits *)
+      Node.default_peer_validator_limits
+      (* Tezos_shell.Node.block_validator_limits *)
+      Node.default_block_validator_limits
+      (* Tezos_shell.Node.prevalidator_limits *)
+      Node.default_prevalidator_limits
+      (* Tezos_shell.Node.chain_validator_limits *)
+      Node.default_chain_validator_limits
+      (* Tezos_shell_services.History_mode.t option *)
+      None
+  in
   (* Start tests *)
   Mock_sink.(
     assert_has_event

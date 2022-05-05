@@ -1,21 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env
+ (_
+  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))
+  (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+
 (library
  (name tezos_crypto)
  (public_name tezos-crypto)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-stdlib
   data-encoding
   tezos-lwt-result-stdlib
   lwt
-  ; NOTE: tezos_*_glue are virtual packages;
-  ; either the unix or js implementation must be installed
-  tezos-hacl-glue
+  tezos-hacl
   secp256k1-internal
   tezos-error-monad
   tezos-rpc
-  tezos-stdlib
   ringo
   zarith
-  zarith_stubs_js)
+  zarith_stubs_js
+  bls12-381)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib

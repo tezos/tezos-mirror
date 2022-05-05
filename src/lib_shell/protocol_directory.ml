@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 let build_rpc_directory block_validator store =
+  let open Lwt_result_syntax in
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
   let gen_register0 s f =
     dir := RPC_directory.gen_register !dir s (fun () p q -> f p q)
@@ -42,17 +43,19 @@ let build_rpc_directory block_validator store =
       match Registered_protocol.get_embedded_sources hash with
       | Some p -> return p
       | None -> (
-          Store.Protocol.read store hash >>= function
-          | None -> fail_with_exn Not_found
-          | Some p -> return p)) ;
+          let*! o = Store.Protocol.read store hash in
+          match o with None -> fail_with_exn Not_found | Some p -> return p)) ;
   register1 Protocol_services.S.environment (fun hash () () ->
       match Registered_protocol.get_embedded_sources hash with
       | Some p -> return p.expected_env
       | None -> (
-          Store.Protocol.read store hash >>= function
+          let*! o = Store.Protocol.read store hash in
+          match o with
           | None -> fail_with_exn Not_found
           | Some p -> return p.expected_env)) ;
   register1 Protocol_services.S.fetch (fun hash () () ->
-      Block_validator.fetch_and_compile_protocol block_validator hash
-      >>=? fun _proto -> return_unit) ;
+      let* _proto =
+        Block_validator.fetch_and_compile_protocol block_validator hash
+      in
+      return_unit) ;
   !dir

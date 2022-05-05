@@ -23,22 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 open Plugin.Mempool
 open Alpha_context
-
-let config drift_opt =
-  {
-    default_config with
-    clock_drift =
-      Option.map
-        (fun drift -> Period.of_seconds_exn (Int64.of_int drift))
-        drift_opt;
-  }
+open Test_utils
 
 type Environment.Error_monad.error += Generation_failure
 
-(** Conversion helpers  *)
+(** {2. Conversion helpers} *)
 
 let int32_of_timestamp ts =
   let i64 = Timestamp.to_seconds ts in
@@ -55,79 +47,67 @@ let timestamp_of_int32 ts = Timestamp.of_seconds (Int64.of_int32 ts)
 
 (** Data Generators *)
 module Generator = struct
-  open QCheck
+  open QCheck2.Gen
 
-  let decorate ?(prefix = "") ?(suffix = "") printer gen =
-    set_print (fun d -> prefix ^ printer d ^ suffix) gen
+  let decorate ?(prefix = "") ?(suffix = "") printer d =
+    prefix ^ printer d ^ suffix
 
   let config =
+    let+ x = opt small_nat in
+    config x
+
+  let print_config =
     decorate ~prefix:"clock_drift " (fun config ->
         Option.fold
           ~none:"round_0 duration"
           ~some:(fun drift -> Int64.to_string @@ Period.to_seconds drift)
           config.clock_drift)
-    @@ map
-         ~rev:(fun {clock_drift; _} ->
-           Option.map
-             (fun drift -> Int64.to_int @@ Period.to_seconds drift)
-             clock_drift)
-         config
-         (option small_nat)
 
-  let of_error_arb gen =
-    of_option_arb
-    @@ map
-         ~rev:(function
-           | Some x -> Ok x
-           | None -> Environment.Error_monad.error Generation_failure)
-         (function Ok x -> Some x | Error _err -> None)
-         gen
+  let of_result = Result.value_f ~default:(fun _ -> assert false)
 
-  let small_nat_32 ?prefix ?suffix () =
-    decorate ?prefix ?suffix Int32.to_string
-    @@ map ~rev:Int32.to_int Int32.of_int small_nat
+  let print_int32 ?prefix ?suffix () = decorate ?prefix ?suffix Int32.to_string
 
-  let small_signed_32 ?prefix ?suffix () =
-    decorate ?prefix ?suffix Int32.to_string
-    @@ map ~rev:Int32.to_int Int32.of_int small_signed_int
+  let small_nat_32 =
+    let+ small_nat = small_nat in
+    Int32.of_int small_nat
 
-  let decorated_small_nat ?prefix ?suffix () =
-    decorate ?prefix ?suffix string_of_int small_nat
+  let small_signed_32 =
+    let+ small_signed_int = small_signed_int in
+    Int32.of_int small_signed_int
 
-  let dup gen = map ~rev:fst (fun x -> (x, x)) gen
+  let print_small_nat ?prefix ?suffix () =
+    decorate ?prefix ?suffix string_of_int
+
+  let dup gen =
+    let+ x = gen in
+    (x, x)
 
   let round =
-    of_error_arb
-    @@ map
-         ~rev:(function Ok l -> Round.to_int32 l | Error _ -> -1l)
-         (fun i32 -> Round.of_int32 i32)
-         (small_nat_32 ~prefix:"rnd " ())
+    let+ x = map (fun i32 -> Round.of_int32 i32) small_nat_32 in
+    of_result x
+
+  let print_round = Format.asprintf "%a" Round.pp
 
   let same_rounds = dup round
 
   let level =
-    of_error_arb
-    @@ map
-         ~rev:(function Ok l -> Raw_level.to_int32 l | Error _ -> -1l)
-         Raw_level.of_int32
-         (small_nat_32 ~prefix:"lev " ())
+    let+ x = map Raw_level.of_int32 small_nat_32 in
+    of_result x
+
+  let print_level = Format.asprintf "%a" Raw_level.pp
 
   let same_levels = dup level
 
   let timestamp =
-    set_print Timestamp.to_notation
-    @@ map ~rev:int32_of_timestamp_exn (fun f -> timestamp_of_int32 f) int32
+    let+ i32 = int32 in
+    timestamp_of_int32 i32
+
+  let print_timestamp = Timestamp.to_notation
 
   let near_timestamps =
-    map
-      ~rev:(fun (ts1, ts2) ->
-        let its1 = int32_of_timestamp_exn ts1 in
-        let its2 = int32_of_timestamp_exn ts2 in
-        Int32.(its1, sub its2 its1))
-      (fun (i, diff) ->
-        timestamp_of_int32 i |> fun ts1 ->
-        timestamp_of_int32 Int32.(add i diff) |> fun ts2 -> (ts1, ts2))
-      (pair int32 (small_signed_32 ~prefix:"+" ~suffix:"sec." ()))
+    let+ (i, diff) = pair int32 small_signed_32 in
+    timestamp_of_int32 i |> fun ts1 ->
+    timestamp_of_int32 Int32.(add i diff) |> fun ts2 -> (ts1, ts2)
 
   let dummy_timestamp =
     match Timestamp.of_seconds_string "0" with
@@ -142,19 +122,23 @@ module Generator = struct
     | Error _ -> assert false
 
   let successive_timestamp =
-    of_error_arb
-    @@ map
-         ~rev:(function
-           | Ok (ts1, ts2) -> (ts1, unsafe_sub ts2 ts1)
-           | Error _ -> (dummy_timestamp, -1))
-         (fun (ts, (diff : int)) ->
-           Period.of_seconds (Int64.of_int diff) >>? fun diff ->
-           Timestamp.(ts +? diff) >>? fun ts2 -> Ok (ts, ts2))
-         (pair timestamp (decorated_small_nat ~prefix:"+" ~suffix:"sec." ()))
+    let+ (ts, (diff : int)) = pair timestamp small_nat in
+    let x =
+      Period.of_seconds (Int64.of_int diff) >>? fun diff ->
+      Timestamp.(ts +? diff) >>? fun ts2 -> Ok (ts, ts2)
+    in
+    of_result x
 
   let param_acceptable ?(rounds = pair round round) ?(levels = pair level level)
       ?(timestamps = near_timestamps) () =
     pair config (pair (pair rounds levels) timestamps)
+
+  let print_param_acceptable =
+    let open QCheck2.Print in
+    let print_levels = pair print_level print_level in
+    let print_timestamps = pair print_timestamp print_timestamp in
+    let print_rounds = pair print_round print_round in
+    pair print_config (pair (pair print_rounds print_levels) print_timestamps)
 end
 
 let assert_no_error d = match d with Error _ -> assert false | Ok d -> d
@@ -225,8 +209,6 @@ let drift_of =
 let max_ts clock_drift prop_ts now =
   Timestamp.(max prop_ts now +? drift_of clock_drift)
 
-let count = None
-
 let predecessor_start proposal_timestamp proposal_round grandparent_round =
   assert_no_error
   @@ ( Round.level_offset_of_round
@@ -239,14 +221,16 @@ let predecessor_start proposal_timestamp proposal_round grandparent_round =
        >>? fun proposal_offset ->
        Ok Timestamp.(proposal_timestamp - proposal_offset) )
 
-(** TESTS   *)
+(** {2. Tests} *)
 
 (** Test past operations that are accepted whatever the current timestamp is:
    strictly before the predecessor level or at the current level and with a
    strictly lower round than the head. *)
 
 let test_acceptable_past_level =
-  QCheck.Test.make
+  let open QCheck2 in
+  Test.make
+    ~print:Generator.print_param_acceptable
     ~name:"acceptable past op "
     (Generator.param_acceptable ())
     (fun
@@ -254,33 +238,32 @@ let test_acceptable_past_level =
         ( ((proposal_round, op_round), (proposal_level, op_level)),
           (proposal_timestamp, now_timestamp) ) )
     ->
-      QCheck.(
-        Raw_level.(
-          proposal_level > succ op_level
-          || (proposal_level = op_level && Round.(proposal_round > op_round)))
-        ==> no_error
-            @@ acceptable_op
-                 ~config
-                 ~round_durations
-                 ~round_zero_duration
-                 ~proposal_level
-                 ~proposal_round
-                 ~proposal_timestamp
-                 ~proposal_predecessor_level_start:
-                   (predecessor_start
-                      proposal_timestamp
-                      proposal_round
-                      Round.zero)
-                 ~op_level
-                 ~op_round
-                 ~now_timestamp))
+      Raw_level.(
+        proposal_level > succ op_level
+        || (proposal_level = op_level && Round.(proposal_round > op_round)))
+      ==> no_error
+          @@ acceptable_op
+               ~config
+               ~round_durations
+               ~round_zero_duration
+               ~proposal_level
+               ~proposal_round
+               ~proposal_timestamp
+               ~proposal_predecessor_level_start:
+                 (predecessor_start
+                    proposal_timestamp
+                    proposal_round
+                    Round.zero)
+               ~op_level
+               ~op_round
+               ~now_timestamp)
 
 (** Test acceptable operations at current level, current round, i.e. on the
    currently considered proposal *)
 let test_acceptable_current_level_current_round =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
-    ?count
+    ~print:Generator.print_param_acceptable
     ~name:"same round, same level "
     Generator.(param_acceptable ~rounds:same_rounds ~levels:same_levels ())
     (fun ( config,
@@ -305,9 +288,9 @@ let test_acceptable_current_level_current_round =
 (** Test operations at same level, different round, with an acceptable expected
     timestamp for the operation.   *)
 let test_acceptable_current_level =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
-    ?count
+    ~print:Generator.print_param_acceptable
     ~name:"same level, different round, acceptable op"
     Generator.(param_acceptable ~levels:same_levels ())
     (fun ( config,
@@ -344,9 +327,9 @@ let test_acceptable_current_level =
 (** Test operations at same level, different round, with a too high expected
     timestamp for the operation,  and not at current round (which is always accepted). *)
 let test_not_acceptable_current_level =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
-    ?count
+    ~print:Generator.print_param_acceptable
     ~name:"same level, different round, too far"
     Generator.(param_acceptable ~levels:same_levels ())
     (fun ( config,
@@ -387,9 +370,9 @@ let test_not_acceptable_current_level =
 (** Test operations at next level, different round, with an acceptable timestamp for
     the operation. *)
 let test_acceptable_next_level =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
-    ?count
+    ~print:Generator.print_param_acceptable
     ~name:"next level, acceptable op"
     Generator.(param_acceptable ~levels:same_levels ())
     (fun ( config,
@@ -432,9 +415,9 @@ let test_acceptable_next_level =
 (** Test operations at next level, different round, with a too high timestamp
    for the operation. *)
 let test_not_acceptable_next_level =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
-    ?count
+    ~print:Generator.print_param_acceptable
     ~name:"next level, too far"
     Generator.(
       param_acceptable ~levels:same_levels ~timestamps:successive_timestamp ())

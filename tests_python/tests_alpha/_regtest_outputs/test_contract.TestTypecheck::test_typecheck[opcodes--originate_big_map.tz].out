@@ -1,12 +1,12 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/originate_big_map.tz]
 
 Well typed
-Gas remaining: 1039996.374 units remaining
+Gas remaining: 1039997.334 units remaining
 { parameter (big_map int int) ;
   storage (big_map int int) ;
   code { CAR
-         /* [ @parameter big_map int int ] */ ;
+         /* [ big_map int int ] */ ;
          NIL operation
-         /* [ list operation : @parameter big_map int int ] */ ;
+         /* [ list operation : big_map int int ] */ ;
          PAIR
-         /* [ pair (list operation) (big_map @parameter int int) ] */ } }
+         /* [ pair (list operation) (big_map int int) ] */ } }

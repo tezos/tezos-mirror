@@ -1,0 +1,14 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/concat_hello.tz]
+
+Well typed
+Gas remaining: 1039995.899 units remaining
+{ parameter (list string) ;
+  storage (list string) ;
+  code { CAR
+         /* [ list string ] */ ;
+         MAP { PUSH @hello string "Hello " /* [ string : string ] */ ; CONCAT /* [ string ] */ }
+         /* [ list string ] */ ;
+         NIL operation
+         /* [ list operation : list string ] */ ;
+         PAIR
+         /* [ pair (list operation) (list string) ] */ } }

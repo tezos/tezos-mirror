@@ -347,7 +347,7 @@ def test_config_init_mockup_fail(mockup_client: Client):
 
 
 def _try_json_loads(flag: str, string: str) -> Any:
-    """ Converts the given string to a json object """
+    """Converts the given string to a json object"""
     try:
         return json.loads(string)
     except json.JSONDecodeError:
@@ -601,6 +601,8 @@ def _test_create_mockup_init_show_roundtrip(
 @pytest.mark.parametrize(
     'initial_bootstrap_accounts', [None, json.dumps(_create_accounts_list())]
 )
+# The following values should be different from the default ones in
+# order to check loading of the parameters.
 @pytest.mark.parametrize(
     'protocol_constants',
     [
@@ -635,12 +637,12 @@ def _test_create_mockup_init_show_roundtrip(
                 'minimal_block_delay': '1',
                 'delay_increment_per_round': '1',
                 'max_slashing_period': 12,
-                "blocks_per_voting_period": 65,
+                "cycles_per_voting_period": 7,
                 "blocks_per_stake_snapshot": 5,
                 "blocks_per_commitment": 5,
                 "blocks_per_cycle": 9,
                 "preserved_cycles": 3,
-                "liquidity_baking_escape_ema_threshold": 1000000,
+                "liquidity_baking_toggle_ema_threshold": 1000000000,
                 "liquidity_baking_subsidy": "2500000",
                 "liquidity_baking_sunset_level": 1024,
                 "max_operations_time_to_live": 120,
@@ -650,9 +652,32 @@ def _test_create_mockup_init_show_roundtrip(
                     'denominator': 2,
                 },
                 "double_baking_punishment": "640000001",
+                "cache_script_size": 100000001,
+                "cache_stake_distribution_cycles": 10,
+                "cache_sampler_state_cycles": 10,
                 "tx_rollup_enable": False,
-                # TODO: https://gitlab.com/tezos/tezos/-/issues/2152
-                "tx_rollup_origination_size": 60_000,
+                "tx_rollup_origination_size": 30_000,
+                "tx_rollup_hard_size_limit_per_inbox": 100_000,
+                "tx_rollup_hard_size_limit_per_message": 5_000,
+                "tx_rollup_commitment_bond": "10000000000",
+                "tx_rollup_finality_period": 2000,
+                "tx_rollup_withdraw_period": 123456,
+                "tx_rollup_max_inboxes_count": 2218,
+                "tx_rollup_max_messages_per_inbox": 1010,
+                'tx_rollup_max_withdrawals_per_batch': 255,
+                "tx_rollup_max_commitments_count": 666,
+                "tx_rollup_cost_per_byte_ema_factor": 321,
+                "tx_rollup_max_ticket_payload_size": 10_240,
+                "tx_rollup_rejection_max_proof_size": 30_000,
+                "tx_rollup_sunset_level": 3_473_409,
+                "sc_rollup_enable": False,
+                "sc_rollup_origination_size": 6_314,
+                "sc_rollup_challenge_window_in_blocks": 20_160,
+                "sc_rollup_max_available_messages": 1_000_000,
+                "sc_rollup_stake_amount_in_mutez": 42_000_000,
+                "sc_rollup_commitment_frequency_in_blocks": 40,
+                "sc_rollup_commitment_storage_size_in_bytes": 84,
+                "sc_rollup_max_lookahead_in_blocks": 10_000,
             }
         ),
     ],

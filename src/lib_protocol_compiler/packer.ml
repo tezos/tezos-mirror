@@ -91,7 +91,7 @@ let include_ml oc file =
               other)
       unit
   in
-  Printf.fprintf oc "module %s " unit ;
+  Printf.fprintf oc "open struct module %s (_ : sig end)" unit ;
   let mli = file ^ "i" in
   if Sys.file_exists mli then (
     check_syntax `Interface mli ;
@@ -103,7 +103,8 @@ let include_ml oc file =
   Printf.fprintf oc "# 1 %S\n" file ;
   check_syntax `Implementation file ;
   dump_file oc file ;
-  Printf.fprintf oc "end\n%!"
+  Printf.fprintf oc "end end\n" ;
+  Printf.fprintf oc "module %s = %s ()\n" unit unit
 
 let opened_modules = ["Tezos_protocol_environment"; "Pervasives"; "Error_monad"]
 

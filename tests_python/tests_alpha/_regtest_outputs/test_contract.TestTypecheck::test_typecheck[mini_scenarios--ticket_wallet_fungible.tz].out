@@ -1,224 +1,170 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/ticket_wallet_fungible.tz]
 
 Well typed
-Gas remaining: 1039935.806 units remaining
+Gas remaining: 1039943.146 units remaining
 { parameter
     (or (ticket %receive unit)
         (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer))) ;
   storage (pair (address %manager) (big_map %tickets address (ticket unit))) ;
   code { AMOUNT
-         /* [ @amount mutez
-            : pair (or @parameter
-                    (ticket %receive unit)
-                    (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer)))
-                 (pair @storage (address %manager) (big_map %tickets address (ticket unit))) ] */ ;
+         /* [ mutez
+            : pair (or (ticket unit) (pair (contract (ticket unit)) nat address))
+                 address
+                 (big_map address (ticket unit)) ] */ ;
          PUSH mutez
               0
-         /* [ mutez : @amount mutez
-            : pair (or @parameter
-                    (ticket %receive unit)
-                    (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer)))
-                 (pair @storage (address %manager) (big_map %tickets address (ticket unit))) ] */ ;
+         /* [ mutez : mutez
+            : pair (or (ticket unit) (pair (contract (ticket unit)) nat address))
+                 address
+                 (big_map address (ticket unit)) ] */ ;
          ASSERT_CMPEQ ;
          UNPAIR
            3
-         /* [ or (ticket %receive unit)
-               (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer))
-            : @manager address : @tickets big_map address (ticket unit) ] */ ;
+         /* [ or (ticket unit) (pair (contract (ticket unit)) nat address) : address
+            : big_map address (ticket unit) ] */ ;
          IF_LEFT
            { READ_TICKET
-             /* [ pair address unit nat : @receive ticket unit : @manager address
-                : @tickets big_map address (ticket unit) ] */ ;
+             /* [ pair address unit nat : ticket unit : address
+                : big_map address (ticket unit) ] */ ;
              CAR @ticketer
-             /* [ @ticketer address : @receive ticket unit : @manager address
-                : @tickets big_map address (ticket unit) ] */ ;
+             /* [ address : ticket unit : address : big_map address (ticket unit) ] */ ;
              DUP
-             /* [ @ticketer address : @ticketer address : @receive ticket unit
-                : @manager address : @tickets big_map address (ticket unit) ] */ ;
+             /* [ address : address : ticket unit : address : big_map address (ticket unit) ] */ ;
              DIG 4
-             /* [ @tickets big_map address (ticket unit) : @ticketer address
-                : @ticketer address : @receive ticket unit : @manager address ] */ ;
+             /* [ big_map address (ticket unit) : address : address : ticket unit : address ] */ ;
              NONE (ticket unit)
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @ticketer address : @ticketer address : @receive ticket unit
-                : @manager address ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit) : address : address
+                : ticket unit : address ] */ ;
              DIG 2
-             /* [ @ticketer address : option (ticket unit)
-                : @tickets big_map address (ticket unit) : @ticketer address
-                : @receive ticket unit : @manager address ] */ ;
+             /* [ address : option (ticket unit) : big_map address (ticket unit) : address
+                : ticket unit : address ] */ ;
              GET_AND_UPDATE
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @ticketer address : @receive ticket unit : @manager address ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit) : address
+                : ticket unit : address ] */ ;
              IF_SOME
                { DIG 3
-                 /* [ @receive ticket unit : @some ticket unit
-                    : @tickets big_map address (ticket unit) : @ticketer address
-                    : @manager address ] */ ;
+                 /* [ ticket unit : ticket unit : big_map address (ticket unit) : address
+                    : address ] */ ;
                  PAIR
-                 /* [ pair (ticket @receive unit) (ticket @some unit)
-                    : @tickets big_map address (ticket unit) : @ticketer address
-                    : @manager address ] */ ;
+                 /* [ pair (ticket unit) (ticket unit) : big_map address (ticket unit) : address
+                    : address ] */ ;
                  JOIN_TICKETS
-                 /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                    : @ticketer address : @manager address ] */ ;
+                 /* [ option (ticket unit) : big_map address (ticket unit) : address : address ] */ ;
                  ASSERT_SOME }
                { DIG 2
-                 /* [ @receive ticket unit : @tickets big_map address (ticket unit)
-                    : @ticketer address : @manager address ] */ } ;
+                 /* [ ticket unit : big_map address (ticket unit) : address : address ] */ } ;
              SOME
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @ticketer address : @manager address ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit) : address : address ] */ ;
              DIG 2
-             /* [ @ticketer address : option (ticket unit)
-                : @tickets big_map address (ticket unit) : @manager address ] */ ;
+             /* [ address : option (ticket unit) : big_map address (ticket unit) : address ] */ ;
              GET_AND_UPDATE
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @manager address ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit) : address ] */ ;
              ASSERT_NONE ;
              SWAP
-             /* [ @manager address : @tickets big_map address (ticket unit) ] */ ;
+             /* [ address : big_map address (ticket unit) ] */ ;
              PAIR
-             /* [ pair (address @manager) (big_map @tickets address (ticket unit)) ] */ ;
+             /* [ pair address (big_map address (ticket unit)) ] */ ;
              NIL operation
-             /* [ list operation
-                : pair (address @manager) (big_map @tickets address (ticket unit)) ] */ }
+             /* [ list operation : pair address (big_map address (ticket unit)) ] */ }
            { DUP @manager
                2
-             /* [ @manager address
-                : @send pair (contract %destination (ticket unit)) (nat %amount) (address %ticketer)
-                : @manager address : @tickets big_map address (ticket unit) ] */ ;
+             /* [ address : pair (contract (ticket unit)) nat address : address
+                : big_map address (ticket unit) ] */ ;
              SENDER
-             /* [ @sender address : @manager address
-                : @send pair (contract %destination (ticket unit)) (nat %amount) (address %ticketer)
-                : @manager address : @tickets big_map address (ticket unit) ] */ ;
+             /* [ address : address : pair (contract (ticket unit)) nat address : address
+                : big_map address (ticket unit) ] */ ;
              ASSERT_CMPEQ ;
              UNPAIR
                3
-             /* [ @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address : @tickets big_map address (ticket unit) ] */ ;
+             /* [ contract (ticket unit) : nat : address : address
+                : big_map address (ticket unit) ] */ ;
              DIG 4
-             /* [ @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ big_map address (ticket unit) : contract (ticket unit) : nat : address
+                : address ] */ ;
              NONE (ticket unit)
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit)
+                : contract (ticket unit) : nat : address : address ] */ ;
              DUP @ticketer
                5
-             /* [ @ticketer address : option (ticket unit)
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ address : option (ticket unit) : big_map address (ticket unit)
+                : contract (ticket unit) : nat : address : address ] */ ;
              GET_AND_UPDATE
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit)
+                : contract (ticket unit) : nat : address : address ] */ ;
              ASSERT_SOME ;
              READ_TICKET
-             /* [ pair address unit nat : @some ticket unit
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ pair address unit nat : ticket unit : big_map address (ticket unit)
+                : contract (ticket unit) : nat : address : address ] */ ;
              GET @total_amount
                4
-             /* [ @total_amount nat : @some ticket unit
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ nat : ticket unit : big_map address (ticket unit) : contract (ticket unit)
+                : nat : address : address ] */ ;
              DUP @amount
                5
-             /* [ @amount nat : @total_amount nat : @some ticket unit
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ nat : nat : ticket unit : big_map address (ticket unit)
+                : contract (ticket unit) : nat : address : address ] */ ;
              SWAP
-             /* [ @total_amount nat : @amount nat : @some ticket unit
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ nat : nat : ticket unit : big_map address (ticket unit)
+                : contract (ticket unit) : nat : address : address ] */ ;
              SUB
-             /* [ int : @some ticket unit : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ int : ticket unit : big_map address (ticket unit) : contract (ticket unit)
+                : nat : address : address ] */ ;
              ISNAT
-             /* [ option nat : @some ticket unit : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @amount nat : @ticketer address
-                : @manager address ] */ ;
+             /* [ option nat : ticket unit : big_map address (ticket unit)
+                : contract (ticket unit) : nat : address : address ] */ ;
              ASSERT_SOME @remaining_amount ;
              DIG 4
-             /* [ @amount nat : @remaining_amount nat : @some ticket unit
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @ticketer address
-                : @manager address ] */ ;
+             /* [ nat : nat : ticket unit : big_map address (ticket unit)
+                : contract (ticket unit) : address : address ] */ ;
              PAIR
-             /* [ pair (nat @amount) (nat @remaining_amount) : @some ticket unit
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @ticketer address
-                : @manager address ] */ ;
+             /* [ pair nat nat : ticket unit : big_map address (ticket unit)
+                : contract (ticket unit) : address : address ] */ ;
              SWAP
-             /* [ @some ticket unit : pair (nat @amount) (nat @remaining_amount)
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @ticketer address
-                : @manager address ] */ ;
+             /* [ ticket unit : pair nat nat : big_map address (ticket unit)
+                : contract (ticket unit) : address : address ] */ ;
              SPLIT_TICKET
-             /* [ option (pair (ticket @amount unit) (ticket @remaining_amount unit))
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @ticketer address
-                : @manager address ] */ ;
+             /* [ option (pair (ticket unit) (ticket unit)) : big_map address (ticket unit)
+                : contract (ticket unit) : address : address ] */ ;
              ASSERT_SOME ;
              UNPAIR @to_send @to_keep
-             /* [ @to_send ticket unit : @to_keep ticket unit
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @ticketer address
-                : @manager address ] */ ;
+             /* [ ticket unit : ticket unit : big_map address (ticket unit)
+                : contract (ticket unit) : address : address ] */ ;
              DUG 5
-             /* [ @to_keep ticket unit : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @ticketer address : @manager address
-                : @to_send ticket unit ] */ ;
+             /* [ ticket unit : big_map address (ticket unit) : contract (ticket unit)
+                : address : address : ticket unit ] */ ;
              SOME
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @ticketer address : @manager address
-                : @to_send ticket unit ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit)
+                : contract (ticket unit) : address : address : ticket unit ] */ ;
              DIG 3
-             /* [ @ticketer address : option (ticket unit)
-                : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @manager address
-                : @to_send ticket unit ] */ ;
+             /* [ address : option (ticket unit) : big_map address (ticket unit)
+                : contract (ticket unit) : address : ticket unit ] */ ;
              GET_AND_UPDATE
-             /* [ option (ticket unit) : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @manager address
-                : @to_send ticket unit ] */ ;
+             /* [ option (ticket unit) : big_map address (ticket unit)
+                : contract (ticket unit) : address : ticket unit ] */ ;
              ASSERT_NONE ;
              DIG 2
-             /* [ @manager address : @tickets big_map address (ticket unit)
-                : @destination contract (ticket unit) : @to_send ticket unit ] */ ;
+             /* [ address : big_map address (ticket unit) : contract (ticket unit)
+                : ticket unit ] */ ;
              PAIR
-             /* [ pair (address @manager) (big_map @tickets address (ticket unit))
-                : @destination contract (ticket unit) : @to_send ticket unit ] */ ;
+             /* [ pair address (big_map address (ticket unit)) : contract (ticket unit)
+                : ticket unit ] */ ;
              SWAP
-             /* [ @destination contract (ticket unit)
-                : pair (address @manager) (big_map @tickets address (ticket unit))
-                : @to_send ticket unit ] */ ;
+             /* [ contract (ticket unit) : pair address (big_map address (ticket unit))
+                : ticket unit ] */ ;
              PUSH mutez
                   0
-             /* [ mutez : @destination contract (ticket unit)
-                : pair (address @manager) (big_map @tickets address (ticket unit))
-                : @to_send ticket unit ] */ ;
+             /* [ mutez : contract (ticket unit)
+                : pair address (big_map address (ticket unit)) : ticket unit ] */ ;
              DIG 3
-             /* [ @to_send ticket unit : mutez : @destination contract (ticket unit)
-                : pair (address @manager) (big_map @tickets address (ticket unit)) ] */ ;
+             /* [ ticket unit : mutez : contract (ticket unit)
+                : pair address (big_map address (ticket unit)) ] */ ;
              TRANSFER_TOKENS
-             /* [ operation
-                : pair (address @manager) (big_map @tickets address (ticket unit)) ] */ ;
+             /* [ operation : pair address (big_map address (ticket unit)) ] */ ;
              NIL operation
-             /* [ list operation : operation
-                : pair (address @manager) (big_map @tickets address (ticket unit)) ] */ ;
+             /* [ list operation : operation : pair address (big_map address (ticket unit)) ] */ ;
              SWAP
-             /* [ operation : list operation
-                : pair (address @manager) (big_map @tickets address (ticket unit)) ] */ ;
+             /* [ operation : list operation : pair address (big_map address (ticket unit)) ] */ ;
              CONS
-             /* [ list operation
-                : pair (address @manager) (big_map @tickets address (ticket unit)) ] */ } ;
+             /* [ list operation : pair address (big_map address (ticket unit)) ] */ } ;
          PAIR
-         /* [ pair (list operation) (address @manager) (big_map @tickets address (ticket unit)) ] */ } }
+         /* [ pair (list operation) address (big_map address (ticket unit)) ] */ } }

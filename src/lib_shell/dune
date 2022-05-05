@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_shell)
  (public_name tezos-shell)
@@ -5,8 +8,9 @@
  (libraries
   lwt-watcher
   lwt-canceler
+  prometheus
   tezos-base
-  tezos-version
+  tezos-base.unix
   tezos-context
   tezos-store
   tezos-shell-context
@@ -18,11 +22,13 @@
   tezos-requester
   tezos-workers
   tezos-validation
+  tezos-version
   lwt-exit)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base
+   -open Tezos_base_unix
    -open Tezos_context
    -open Tezos_store
    -open Tezos_shell_context
@@ -35,3 +41,5 @@
    -open Tezos_workers
    -open Tezos_validation
    -open Tezos_version)))
+
+(documentation)

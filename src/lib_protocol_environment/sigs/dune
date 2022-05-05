@@ -1,9 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_protocol_environment_sigs)
- (public_name tezos-protocol-environment-sigs)
+ (public_name tezos-protocol-environment.sigs)
  (instrumentation (backend bisect_ppx))
- (flags (:standard -nopervasives))
- (modules V0 V1 V2 V3 V4))
+ (libraries
+  tezos-protocol-environment.sigs.stdlib-compat)
+ (flags (:standard
+         -nostdlib
+         -nopervasives))
+ (modules V0 V1 V2 V3 V4 V5))
 
 (include v0.dune.inc)
 
@@ -14,3 +21,5 @@
 (include v3.dune.inc)
 
 (include v4.dune.inc)
+
+(include v5.dune.inc)

@@ -110,6 +110,34 @@ transparent token.
 It suffices to add more values in the outputs than in the inputs
 to mint and to have more in inputs than outputs to burn.
 
+Preventing Malleability
+~~~~~~~~~~~~~~~~~~~~~~~
+
+A Sapling transaction contains a `bound_data` field with arbitrary
+bytes that gets signed by the user's Sapling key.
+This field can be used to bind the transaction to another
+application's logic.
+For example during an unshield operation it is important to include in
+the `bound_data` the Tezos account that will receive the unshielded
+tokens.
+Without any `bound_data`, a Sapling unshield operation authorizes any
+party that submits it to claim the unshielded tokens. An adversary can
+intercept the Tezos operation containing the unshield and resubmit it
+using its own Tezos account.
+This malleability attack is prevented by including the recipient Tezos
+account in the `bound_data`, which is signed by the owner of the
+Sapling keys, and that can be used by the Smart Contract to transfer
+the tokens.
+
+**All Smart Contracts managing a Sapling shielded pool must include a
+`bound_data` field in their unshield operations.**
+
+Note that the `bound_data` field is not encrypted and could leak
+information about a transaction, therefore for a transfer (e.g. an
+operation with balance 0) it should be left empty.
+This is not a concern for shielding and unshielding which are already
+linking a shielded and a transparent address.
+
 Privacy guarantees
 ~~~~~~~~~~~~~~~~~~
 
@@ -181,11 +209,12 @@ We introduce two new Michelson types `sapling_state` and
 (see the :doc:`Michelson reference<michelson>`
 for more details).
 `SAPLING_EMPTY_STATE` pushes an empty `sapling_state` on the stack.
-`SAPLING_VERIFY_UPDATE` takes a transaction and a state and returns an
-option type which is Some (updated
-state and a balance) if the transaction is correct, None otherwise.
-A transaction has a list of inputs, outputs, a signature, a balance,
-and the root of the Merkle tree containing its inputs.
+`SAPLING_VERIFY_UPDATE` takes a transaction and a state and
+returns an
+option type which is Some (bound_data, balance and updated
+state) if the transaction is correct, None otherwise.
+A transaction has a list of inputs, outputs, a balance,
+the root of the Merkle tree containing its inputs, some bound data and a signature.
 The verification part checks the zero-knowledge proofs of all inputs
 and outputs of the transaction, which guarantee several properties of
 correctness.
@@ -211,8 +240,8 @@ referring to an old root, as long as the inputs used were present in
 the Merkle tree with that root and were not spent after.
 In particular the protocol keeps 120 previous roots and guarantees
 that roots are updated only once per block.
-Considering 1 block per minute and that each block contains at least
-one call to the same contract, a client has 2 hours to have its
+Considering 2 blocks per minute and that each block contains at least
+one call to the same contract, a client has 1 hour to have its
 transaction accepted before it is considered invalid.
 
 The nullifiers are stored in a set. The ciphertexts and other relevant
@@ -220,8 +249,16 @@ information linked to the commitment of the Merkle tree are
 stored in a map indexed by the position of the commitment in the
 Merkle tree.
 
-Lastly the instruction pushes the updated state and the balance as an option
-on the stack.
+Lastly the instruction pushes on the stack an option with the bound
+data, the balance and the updated state.
+
+A smart contract typically shields or unshields tokens if the balance
+is positive or negative, and simply updates the state if the balance
+is zero.
+Additionally in case of an unshield, it must use the bound data to
+authorize the transfer of unshielded tokens.
+For example it could convert the bound_data to a public_key_hash and
+use it as recipient address of Tezos transfer.
 
 Example contracts
 ~~~~~~~~~~~~~~~~~
@@ -230,7 +267,8 @@ Shielded tez
 ^^^^^^^^^^^^
 
 An example contract to have a shielded tez with a 1 to 1 conversion to
-tez is available in the tests of `lib_sapling`.
+mutez is available in the tests of the protocol at
+``src/proto_alpha/lib_protocol/test/integration/michelson/contracts/sapling_contract.tz``.
 
 Simple Vote Contract
 ^^^^^^^^^^^^^^^^^^^^
@@ -386,8 +424,8 @@ Tezos node. These changes are part of version V1 of the environment
 while protocols 000 to 006 depends on version V0.
 
 There are two main changes to Tezos' economic protocol, the storage
-for Sapling and the addition of `SAPLING_VERIFY_UPDATE` to the Michelson
-interpreter.
+for Sapling and the addition of `SAPLING_VERIFY_UPDATE` to the
+Michelson interpreter.
 
 Given that the storage of a Sapling contract can be substantially
 large, it is important to provide an efficient implementation.
@@ -453,7 +491,7 @@ unshielding.
    # bake a block to include it.
    # { } represents an empty Sapling state.
    tezos-client originate contract shielded-tez transferring 0 from bootstrap1 \
-   running src/proto_alpha/lib_protocol/test/contracts/sapling_contract.tz \
+   running src/proto_alpha/lib_protocol/test/integration/michelson/contracts/sapling_contract.tz \
    --init '{ }' --burn-cap 3 &
    tezos-client bake for bootstrap1
 

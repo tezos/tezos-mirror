@@ -1,0 +1,51 @@
+tests_alpha/test_contract.py::TestCreateRemoveTickets::test_add_clear_tickets_origination
+
+Node is bootstrapped.
+Estimated gas: 1427.302 units (will add 100 for safety)
+Estimated storage: 372 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.000498
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 1528
+    Storage limit: 392 bytes
+    Balance updates:
+      [CONTRACT_HASH] ... -ꜩ0.000498
+      payload fees(the block proposer) ....... +ꜩ0.000498
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ200
+      Script:
+        { parameter (or (pair %add nat string) (unit %clear)) ;
+          storage (list (ticket string)) ;
+          code { UNPAIR ;
+                 IF_LEFT
+                   { UNPAIR ; DIG 2 ; SWAP ; DIG 2 ; TICKET ; CONS ; NIL operation ; PAIR }
+                   { DROP 2 ; NIL (ticket string) ; NIL operation ; PAIR } } }
+        Initial storage: {}
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 115 bytes
+        Paid storage size diff: 115 bytes
+        Consumed gas: 1427.302
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.02875
+          storage fees ........................... +ꜩ0.02875
+          [CONTRACT_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
+          [CONTRACT_HASH] ... -ꜩ200
+          [CONTRACT_HASH] ... +ꜩ200
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as add_clear_tickets.
+Injected block at minimal timestamp
+[ [], [], [], [ "[BLOCK_HASH]" ] ]

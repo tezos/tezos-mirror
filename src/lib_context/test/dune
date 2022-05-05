@@ -1,15 +1,46 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name test)
- (package tezos-context)
  (libraries
   tezos-base
   tezos-base.unix
   tezos-context
   tezos-stdlib-unix
-  alcotest-lwt
-  vector)
+  tezos-test-helpers
+  tezos-test-helpers-extra
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_context
+   -open Tezos_stdlib_unix))
+ (modules test_context test))
+
+(rule
+ (alias runtest)
+ (package tezos-context)
+ (action (run %{dep:./test.exe})))
+
+(executable
+ (name test_merkle_proof)
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-context
+  tezos-context.encoding
+  tezos-stdlib-unix
+  qcheck-alcotest
+  tezos-test-helpers)
  (flags
   (:standard
    -open Tezos_base__TzPervasives
    -open Tezos_context
-   -open Tezos_stdlib_unix)))
+   -open Tezos_stdlib_unix))
+ (modules test_merkle_proof))
+
+(rule
+ (alias runtest)
+ (package tezos-context)
+ (action (run %{dep:./test_merkle_proof.exe})))

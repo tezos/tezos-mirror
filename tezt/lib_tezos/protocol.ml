@@ -25,22 +25,33 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Hangzhou | Ithaca | Alpha
+type t = Ithaca | Jakarta | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
 let name = function
   | Alpha -> "Alpha"
-  | Hangzhou -> "Hangzhou"
   | Ithaca -> "Ithaca"
+  | Jakarta -> "Jakarta"
+
+let number = function Ithaca -> 012 | Jakarta -> 013 | Alpha -> 014
+
+let directory = function
+  | Alpha -> "proto_alpha"
+  | Ithaca -> "proto_012_Psithaca"
+  | Jakarta -> "proto_013_PtJakart"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Hangzhou -> "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
   | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+  | Jakarta -> "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
+
+let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+
+let demo_counter_hash = "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT"
 
 let default_constants = Constants_sandbox
 
@@ -51,18 +62,12 @@ let parameter_file ?(constants = default_constants) protocol =
     | Constants_mainnet -> "mainnet"
     | Constants_test -> "test"
   in
-  let directory =
-    match protocol with
-    | Alpha -> "proto_alpha"
-    | Hangzhou -> "proto_011_PtHangz2"
-    | Ithaca -> "proto_012_Psithaca"
-  in
-  sf "src/%s/parameters/%s-parameters.json" directory name
+  sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
 let daemon_name = function
   | Alpha -> "alpha"
-  | Hangzhou -> "011-PtHangz2"
   | Ithaca -> "012-Psithaca"
+  | Jakarta -> "013-PtJakart"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -110,10 +115,7 @@ let write_parameter_file :
               `String account.public_key_hash;
               `String
                 (string_of_int
-                   (Option.fold
-                      ~none:4000000000000
-                      ~some:Fun.id
-                      default_balance));
+                   (Option.value ~default:4000000000000 default_balance));
             ])
         additional_bootstrap_accounts
     in
@@ -122,46 +124,78 @@ let write_parameter_file :
       bootstrap_accounts
       (Some (`A (existing_accounts @ additional_bootstrap_accounts)))
   in
-  let* overriden_parameters_out =
-    Lwt_io.open_file ~mode:Output overriden_parameters
-  in
-  let* () = Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters in
+  JSON.encode_to_file_u overriden_parameters parameters ;
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Hangzhou -> Some Ithaca
-  | Ithaca -> None
+  | Ithaca -> Some Jakarta
+  | Jakarta -> None
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Hangzhou
-  | Ithaca -> Some Hangzhou
-  | Hangzhou -> None
+  | Alpha -> Some Jakarta
+  | Jakarta -> Some Ithaca
+  | Ithaca -> None
 
-let all = [Alpha; Hangzhou; Ithaca]
+let all = [Alpha; Ithaca; Jakarta]
+
+type supported_protocols =
+  | Any_protocol
+  | From_protocol of int
+  | Until_protocol of int
+  | Between_protocols of int * int
+
+let is_supported supported_protocols protocol =
+  match supported_protocols with
+  | Any_protocol -> true
+  | From_protocol n -> number protocol >= n
+  | Until_protocol n -> number protocol <= n
+  | Between_protocols (a, b) ->
+      let n = number protocol in
+      a <= n && n <= b
+
+let show_supported_protocols = function
+  | Any_protocol -> "Any_protocol"
+  | From_protocol n -> sf "From_protocol %d" n
+  | Until_protocol n -> sf "Until_protocol %d" n
+  | Between_protocols (a, b) -> sf "Between_protocol (%d, %d)" a b
+
+let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
+  match List.filter (is_supported supports) protocols with
+  | [] ->
+      failwith
+        (sf
+           "test %s was registered with ~protocols:[%s] %s, which results in \
+            an empty list of protocols"
+           title
+           (String.concat ", " (List.map name protocols))
+           (show_supported_protocols supports))
+  | supported_protocols -> List.iter f supported_protocols
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
 let add_to_test_parameters protocol title tags =
   (name protocol ^ ": " ^ title, tag protocol :: tags)
 
-let register_test ~__FILE__ ~title ~tags body ~protocols =
-  let register_with_protocol protocol =
-    let (title, tags) = add_to_test_parameters protocol title tags in
-    Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
-  in
-  List.iter register_with_protocol protocols
+let register_test ~__FILE__ ~title ~tags ?supports body protocols =
+  iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
+  let (title, tags) = add_to_test_parameters protocol title tags in
+  Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
 
-let register_regression_test ~__FILE__ ~title ~tags ~output_file
-    ?regression_output_path body ~protocols =
-  let register_with_protocol protocol =
-    let (title, tags) = add_to_test_parameters protocol title tags in
-    Regression.register
-      ~__FILE__
-      ~title
-      ~tags
-      ~output_file
-      ?regression_output_path
-      (fun () -> body protocol)
-  in
-  List.iter register_with_protocol protocols
+let register_long_test ~__FILE__ ~title ~tags ?supports ?team ~executors
+    ~timeout body protocols =
+  iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
+  let (title, tags) = add_to_test_parameters protocol title tags in
+  Long_test.register ~__FILE__ ~title ~tags ?team ~executors ~timeout (fun () ->
+      body protocol)
+
+let register_regression_test ~__FILE__ ~title ~tags ?supports ~output_file body
+    protocols =
+  iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
+  let (title, tags) = add_to_test_parameters protocol title tags in
+  Regression.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~output_file:(output_file protocol)
+    (fun () -> body protocol)

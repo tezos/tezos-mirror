@@ -1,24 +1,20 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/merge_comparable_pairs.tz]
 
 Well typed
-Gas remaining: 1039990.293 units remaining
+Gas remaining: 1039992.173 units remaining
 { parameter (set (pair (nat %n) (pair %p (string %s) (int %i)))) ;
   storage nat ;
   code { UNPAIR
-         /* [ @parameter set (pair (nat %n) (pair %p (string %s) (int %i)))
-            : @storage nat ] */ ;
+         /* [ set (pair nat string int) : nat ] */ ;
          SWAP
-         /* [ @storage nat
-            : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
-         PUSH nat
-              3
-         /* [ nat : @storage nat
-            : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
+         /* [ nat : set (pair nat string int) ] */ ;
+         PUSH nat 3
+         /* [ nat : nat : set (pair nat string int) ] */ ;
          COMPARE
-         /* [ int : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
+         /* [ int : set (pair nat string int) ] */ ;
          GT
-         /* [ bool : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
-         IF { /* [ @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ }
+         /* [ bool : set (pair nat string int) ] */ ;
+         IF { /* [ set (pair nat string int) ] */ }
             { DROP
               /* [] */ ;
               EMPTY_SET (pair nat (pair string int))

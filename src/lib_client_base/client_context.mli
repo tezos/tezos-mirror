@@ -103,6 +103,11 @@ class type wallet =
     method write :
       string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 
+    (** [last_modification_time alias] returns the last modification
+        time of the file corresponding to the [alias], if the file exists;
+        otherwise [None]. *)
+    method last_modification_time : string -> float option tzresult Lwt.t
+
     (** Current base directory. Stores the information of keys (public
         key hashes, public keys, secret keys) and watermarks. *)
     method get_base_dir : string
@@ -145,7 +150,7 @@ class type io_rpcs =
 
     inherit prompter
 
-    inherit RPC_context.json
+    inherit RPC_context.generic
   end
 
 (** User interface related operations. *)
@@ -158,6 +163,12 @@ class type ui =
     method now : unit -> Ptime.t
   end
 
+(** User experience options. *)
+class type ux_options =
+  object
+    method verbose_rpc_error_diagnostics : bool
+  end
+
 (** A comprehensive class type gathering the above class types, that
     is used for #Protocol_client_context.full. *)
 class type full =
@@ -168,13 +179,15 @@ class type full =
 
     inherit wallet
 
-    inherit RPC_context.json
+    inherit RPC_context.generic
 
     inherit chain
 
     inherit block
 
     inherit ui
+
+    inherit ux_options
   end
 
 (** A simple printer can be used to implement a printer as it is done

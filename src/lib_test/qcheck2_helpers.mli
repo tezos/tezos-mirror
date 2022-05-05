@@ -72,6 +72,17 @@ val qcheck_eq' :
   unit ->
   bool
 
+(** [qcheck_cond pp cond a] evaluate [cond a], if this condition is false,
+    raises a failure and prints an error message.
+
+    If [pp] is provided, use this to print [a] if [cond a] is false. *)
+val qcheck_cond :
+  ?pp:(Format.formatter -> 'a -> unit) ->
+  cond:('a -> bool) ->
+  'a ->
+  unit ->
+  bool
+
 (** [int64_range_gen a b] generates an [int64] between [a] inclusive
     and [b] inclusive.
 
@@ -111,6 +122,9 @@ val string_fixed : int -> string QCheck2.Gen.t
 (** [bytes_gen] is a [QCheck2.Gen.t] for [bytes]. *)
 val bytes_gen : bytes QCheck2.Gen.t
 
+(** [bytes_fixed_gen n] is a [QCheck2.Gen.t] for [bytes] of length [n]. *)
+val bytes_fixed_gen : int -> bytes QCheck2.Gen.t
+
 (** [endpoint_gen] is a [QCheck2.Gen.t] for endpoints (such as
     [tezos-client]'s [--endpoint] flag). It returns URLs of the form:
     [(http|https)://(string\.)+(:port)?]. It is by no means the most
@@ -129,7 +143,13 @@ val sublist : 'a list -> 'a list QCheck2.Gen.t
 val holey : 'a list -> 'a list QCheck2.Gen.t
 
 (** Map-related generators. *)
-module MakeMapGen (Map : Stdlib.Map.S) : sig
+module MakeMapGen (Map : sig
+  type 'a t
+
+  type key
+
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end) : sig
   (** [gen_of_size size_gen key_gen val_gen] is a generator of Map where the keys
       are generated with [key_gen] and the values with [val_gen].
       The number of entries in the map is decided by [size_gen]. *)

@@ -1,11 +1,11 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_size.tz]
 
 Well typed
-Gas remaining: 1039996.720 units remaining
+Gas remaining: 1039997.360 units remaining
 { parameter (set int) ;
   storage nat ;
   code { CAR
-         /* [ @parameter set int ] */ ;
+         /* [ set int ] */ ;
          SIZE
          /* [ nat ] */ ;
          NIL operation

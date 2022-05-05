@@ -1,0 +1,14 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/sapling_empty_state.tz]
+
+Well typed
+Gas remaining: 1039997.397 units remaining
+{ parameter unit ;
+  storage (sapling_state 8) ;
+  code { DROP
+         /* [] */ ;
+         SAPLING_EMPTY_STATE 8
+         /* [ sapling_state 8 ] */ ;
+         NIL operation
+         /* [ list operation : sapling_state 8 ] */ ;
+         PAIR
+         /* [ pair (list operation) (sapling_state 8) ] */ } }

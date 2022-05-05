@@ -644,8 +644,7 @@ let action_to_expr_generic ~loc = function
                ~parameter
                ~amount
           >|? left ~loc)
-  | Lambda code ->
-      Error_monad.ok Tezos_micheline.Micheline.(left ~loc (root code))
+  | Lambda code -> ok Tezos_micheline.Micheline.(left ~loc (root code))
   | Change_delegate delegate ->
       lambda_from_string
       @@ Managed_contract.build_lambda_for_set_delegate ~delegate
@@ -653,37 +652,36 @@ let action_to_expr_generic ~loc = function
   | Change_keys (threshold, keys) ->
       let optimized_keys = seq ~loc (List.map (optimized_key ~loc) keys) in
       let expr = right ~loc (pair ~loc (int ~loc threshold) optimized_keys) in
-      Error_monad.ok expr
+      ok expr
 
 let action_to_expr_legacy ~loc = function
   | Transfer {amount; destination; entrypoint; parameter_type; parameter} ->
       if parameter <> Tezos_micheline.Micheline.strip_locations (unit ~loc:0)
-      then Error_monad.error @@ Unsupported_feature_generic_call parameter
+      then error @@ Unsupported_feature_generic_call parameter
       else if
         parameter_type
         <> Tezos_micheline.Micheline.strip_locations (unit_t ~loc:0)
-      then
-        Error_monad.error @@ Unsupported_feature_generic_call_ty parameter_type
+      then error @@ Unsupported_feature_generic_call_ty parameter_type
       else
-        Error_monad.ok
+        ok
         @@ left
              ~loc
              (pair
                 ~loc
                 (mutez ~loc amount)
                 (optimized_address ~loc ~address:destination ~entrypoint))
-  | Lambda _ -> Error_monad.error @@ Unsupported_feature_lambda ""
+  | Lambda _ -> error @@ Unsupported_feature_lambda ""
   | Change_delegate delegate ->
       let delegate_opt =
         match delegate with
         | None -> none ~loc ()
         | Some delegate -> some ~loc (optimized_key_hash ~loc delegate)
       in
-      Error_monad.ok @@ right ~loc (left ~loc delegate_opt)
+      ok @@ right ~loc (left ~loc delegate_opt)
   | Change_keys (threshold, keys) ->
       let optimized_keys = seq ~loc (List.map (optimized_key ~loc) keys) in
       let expr = right ~loc (pair ~loc (int ~loc threshold) optimized_keys) in
-      Error_monad.ok (right ~loc expr)
+      ok (right ~loc expr)
 
 let action_to_expr ~loc ~generic action =
   if generic then action_to_expr_generic ~loc action
@@ -691,7 +689,7 @@ let action_to_expr ~loc ~generic action =
 
 let action_of_expr_generic e =
   let fail () =
-    Error_monad.fail
+    fail
       (Action_deserialisation_error
          (Tezos_micheline.Micheline.strip_locations e))
   in
@@ -726,7 +724,7 @@ let action_of_expr_generic e =
 
 let action_of_expr_not_generic e =
   let fail () =
-    Error_monad.fail
+    fail
       (Action_deserialisation_error
          (Tezos_micheline.Micheline.strip_locations e))
   in

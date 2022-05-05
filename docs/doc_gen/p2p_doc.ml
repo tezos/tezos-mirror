@@ -26,7 +26,7 @@
 let protocols =
   [("Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")]
 
-let main _node =
+let main () =
   (* Style : hack *)
   Format.printf "%a@." Rst.pp_raw_html Rst.style ;
   (* Script : hack *)
@@ -75,6 +75,6 @@ let main _node =
         Data_encoding.Binary_schema.pp
         (Data_encoding.Binary.describe Proto.operation_data_encoding))
     protocols ;
-  return ()
+  ()
 
-let () = Lwt_main.run (Node_helpers.with_node main)
+let () = main ()

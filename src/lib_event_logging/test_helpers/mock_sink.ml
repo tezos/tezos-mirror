@@ -105,11 +105,11 @@ let uri_scheme = "mock-log"
 
 let configure _ =
   activated := true ;
-  return ()
+  Lwt_result_syntax.return_unit
 
 let is_activated () = !activated
 
-let close (_ : t) : unit tzresult Lwt.t = return ()
+let close (_ : t) : unit tzresult Lwt.t = Lwt_result_syntax.return_unit
 
 let handle (type a) (_ : t) m ?section (f : unit -> a) =
   let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
@@ -124,7 +124,7 @@ let handle (type a) (_ : t) m ?section (f : unit -> a) =
     }
   in
   recorded_events := !recorded_events @ [event] ;
-  return ()
+  Lwt_result_syntax.return_unit
 
 (** testing stuff *)
 
@@ -201,13 +201,13 @@ let assert_has_events msg ?filter ?(strict = true) (pats : Pattern.t list) =
   if strict then
     match List.combine_with_leftovers pats events with
     | (pes, None) -> List.iter (fun (p, e) -> Pattern.assert_event p e) pes
-    | (_, Some (`Left pats)) ->
+    | (_, Some (Either.Left pats)) ->
         Alcotest.fail
           (Format.asprintf
              "Missing events in sink: %a"
              (Format.pp_print_list Pattern.pp)
              pats)
-    | (_, Some (`Right events)) ->
+    | (_, Some (Either.Right events)) ->
         Alcotest.fail
           (Format.asprintf
              "Excess events in sink: %a"

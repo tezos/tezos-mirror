@@ -347,7 +347,7 @@ def test_config_init_mockup_fail(mockup_client: Client):
 
 
 def _try_json_loads(flag: str, string: str) -> Any:
-    """ Converts the given string to a json object """
+    """Converts the given string to a json object"""
     try:
         return json.loads(string)
     except json.JSONDecodeError:
@@ -717,11 +717,7 @@ def test_transfer_rpc(mockup_client: Client):
 
 @pytest.mark.parametrize(
     'protos',
-    [
-        (proto1, proto2)
-        for proto1 in [protocol.HASH, protocol.PREV_HASH]
-        for proto2 in [protocol.HASH, protocol.PREV_HASH, ""]
-    ],
+    [(protocol.HASH, protocol.HASH), (protocol.HASH, "")],
 )
 @pytest.mark.parametrize(
     'command',

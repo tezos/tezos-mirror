@@ -156,11 +156,19 @@ val register_peer :
   (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t
 
 module Connection : sig
+  (** [fold pool ~init ~f] computes [(f iN cN ... (f i1 c1 init)...)]
+      where [id1 ... idN] are the ids of every connected peers and [c1 ... cN] the associated peers info. *)
   val fold :
     ('msg, 'peer, 'conn) t ->
     init:'a ->
     f:(P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> 'a -> 'a) ->
     'a
+
+  (** [iter f pool] applies [f] to all connected peers of [pool]. *)
+  val iter :
+    (P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> unit) ->
+    ('msg, 'peer, 'conn) t ->
+    unit
 
   val list :
     ('msg, 'peer, 'conn) t ->
@@ -212,12 +220,22 @@ module Peers : sig
 
   val get_score : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> float
 
+  (** [fold_known pool ~init ~f] computes [(f iN pN ... (f i1 p1 init)...)]
+      where [id1 ... idN] are the ids of every known peers and [p1 ... pN] the associated peers info. *)
   val fold_known :
     ('msg, 'peer, 'conn) t ->
     init:'a ->
     f:(P2p_peer.Id.t -> ('msg, 'peer, 'conn) info -> 'a -> 'a) ->
     'a
 
+  (** [iter_known f pool] applies [f] to all known peers of [pool]. *)
+  val iter_known :
+    (P2p_peer.Id.t -> ('msg, 'peer, 'conn) info -> unit) ->
+    ('msg, 'peer, 'conn) t ->
+    unit
+
+  (** [fold_connected pool ~init ~f] computes [(f iN pN ... (f i1 p1 init)...)]
+      where [id1 ... idN] are the ids of every connected peers and [p1 ... pN] the associated peers info. *)
   val fold_connected :
     ('msg, 'peer, 'conn) t ->
     init:'a ->
@@ -268,6 +286,8 @@ module Points : sig
   val info :
     ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> ('msg, 'peer, 'conn) info option
 
+  (** [fold_known pool ~init ~f] computes [(f iN pN ... (f i1 p1 init)...)]
+      where [id1 ... idN] are the ids of every known points and [p1 ... pN] the associated points info. *)
   val fold_known :
     ('msg, 'peer, 'conn) t ->
     init:'a ->
@@ -278,6 +298,16 @@ module Points : sig
       'a) ->
     'a
 
+  (** [iter_known f pool] applies [f] to all known points of [pool]. *)
+  val iter_known :
+    (P2p_point.Id.t ->
+    ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t ->
+    unit) ->
+    ('msg, 'peer, 'conn) t ->
+    unit
+
+  (** [fold_known pool ~init ~f] computes [(f iN pN ... (f i1 p1 init)...)]
+      where [id1 ... idN] are the ids of every connected points and [p1 ... pN] the associated points info. *)
   val fold_connected :
     ('msg, 'peer, 'conn) t ->
     init:'a ->
@@ -361,7 +391,7 @@ val acl_clear : ('msg, 'peer, 'conn) t -> unit
     It returns at most [size] point ids (default is 50) based on a
     heuristic that selects a mix of 3/5 "good" and 2/5 random points.
 
-    @raise [Invalid_argument] if [size < 0] *)
+    @raise Invalid_argument if [size < 0] *)
 val list_known_points :
   ignore_private:bool ->
   ?size:int ->

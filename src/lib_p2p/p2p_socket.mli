@@ -145,7 +145,7 @@ val accept :
   ('msg, 'meta) t tzresult Lwt.t
 
 (** Check for the [?binary_chunks_size] parameter of [accept]. *)
-val check_binary_chunks_size : int -> unit tzresult Lwt.t
+val check_binary_chunks_size : int -> unit tzresult
 
 (** {1 IO functions on connections} *)
 

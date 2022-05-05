@@ -30,10 +30,11 @@ let mockup_subdirectory = "mockup"
 let get_mockup_directory ~dirname = Filename.concat dirname mockup_subdirectory
 
 let exists_mockup_directory ~dirname =
+  let open Lwt_syntax in
   let filename = get_mockup_directory ~dirname in
-  Lwt_unix.file_exists filename >>= fun b ->
+  let* b = Lwt_unix.file_exists filename in
   if b then
-    Lwt_unix.stat filename >>= fun stat ->
+    let* stat = Lwt_unix.stat filename in
     Lwt.return (stat.st_kind = Lwt_unix.S_DIR)
   else Lwt.return_false
 

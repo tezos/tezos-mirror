@@ -69,7 +69,7 @@ struct
   let of_hex s =
     match of_hex_opt s with
     | None -> error_with "of_hex (%s)" H.name
-    | Some pk -> ok pk
+    | Some pk -> Ok pk
 end
 
 module MakeB58 (H : sig

@@ -121,6 +121,7 @@ type t = {
   arguments : string list;
   color : Log.Color.t;
   lwt_process : Lwt_process.process_full;
+  mutable handle : unit Lwt.t;
   log_status_on_exit : bool;
   stdout : echo;
   stderr : echo;
@@ -139,6 +140,16 @@ type failed_info = {
 
 exception Failed of failed_info
 
+(** Converts the given [status] into a string explaining
+    why the corresponding process has stopped.
+
+    The resulting string is a subject-less sentence that
+    assumes that the subject will be prepended. *)
+let status_to_reason = function
+  | Unix.WEXITED code -> Format.sprintf "exited with code %d" code
+  | Unix.WSIGNALED code -> Format.sprintf "was killed by signal %d" code
+  | Unix.WSTOPPED code -> Format.sprintf "was stopped by signal %d" code
+
 let () =
   Printexc.register_printer @@ function
   | Failed {name; command; arguments; status; expect_failure; reason} ->
@@ -146,11 +157,7 @@ let () =
         Option.value
           ~default:
             (match status with
-            | Some (WEXITED code) -> Printf.sprintf "exited with code %d" code
-            | Some (WSIGNALED code) ->
-                Printf.sprintf "was killed by signal %d" code
-            | Some (WSTOPPED code) ->
-                Printf.sprintf "was killed by signal %d" code
+            | Some st -> status_to_reason st
             | None -> Printf.sprintf "exited")
           reason
       in
@@ -215,7 +222,7 @@ let show_signal code =
   else string_of_int code
 
 let wait process =
-  let* status = process.lwt_process#status in
+  let* status = process.lwt_process#status and* () = process.handle in
   (* If we already removed [process] from [!live_processes], we already logged
      the exit status. *)
   if ID_map.mem process.id !live_processes then (
@@ -238,28 +245,48 @@ let wait process =
 (* Read process outputs and log them.
    Also take care of removing the process from [live_processes] on termination. *)
 let handle_process ~log_output process =
-  let rec handle_output name (ch : Lwt_io.input_channel) echo =
+  let rec handle_output name ch echo lines =
     let* line = Lwt_io.read_line_opt ch in
     match line with
     | None ->
         close_echo echo ;
-        Lwt_io.close ch
+        let* () = Lwt_io.close ch in
+        return (List.rev lines)
     | Some line ->
-        if log_output then (
-          Log.debug ~prefix:name ~color:process.color "%s" line ;
-          Option.iter (fun hooks -> hooks.on_log line) process.hooks) ;
+        if log_output then Log.debug ~prefix:name ~color:process.color "%s" line ;
+        let lines =
+          match process.hooks with None -> lines | Some _ -> line :: lines
+        in
         push_to_echo echo line ;
         (* TODO: here we assume that all lines end with "\n",
              but it may not always be the case:
            - there may be lines ending with "\r\n";
            - the last line may not end with "\n" before the EOF. *)
         push_to_echo echo "\n" ;
-        handle_output name ch echo
+        handle_output name ch echo lines
   in
-  let* () = handle_output process.name process.lwt_process#stdout process.stdout
-  and* () = handle_output process.name process.lwt_process#stderr process.stderr
-  and* _ = wait process in
-  unit
+  let promise =
+    let* stdout_lines =
+      handle_output process.name process.lwt_process#stdout process.stdout []
+    and* stderr_lines =
+      handle_output process.name process.lwt_process#stderr process.stderr []
+    and* _ = wait process in
+    match process.hooks with
+    | None -> unit
+    | Some hooks ->
+        List.iter hooks.on_log stdout_lines ;
+        List.iter hooks.on_log stderr_lines ;
+        unit
+  in
+  (* As long as the process is running, we don't want to stop reading its output.
+     So we return a non-cancelable promise.
+     This also makes sure that if [wait] is called twice, and one of the two
+     instances is canceled, the other instance will not also be canceled.
+     Indeed, canceling one instance of [wait] would cancel [process.handle],
+     which is also used by the other instance of [wait].
+     This can happen in particular if a test is [wait]ing for a process and
+     the user presses Ctrl+C, which triggers [clean_up], which calls [wait]. *)
+  Lwt.no_cancel promise
 
 (** [parse_current_environment ()], given that the current environment
     is "K1=V2; K2=V2" (see `export` in a terminal)
@@ -285,12 +312,13 @@ let to_key_equal_value (kv_map : string String_map.t) : string array =
   |> Seq.map (fun (name, value) -> name ^ "=" ^ value)
   |> Array.of_seq
 
-let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
-    ?name ?(color = Log.Color.FG.cyan) ?(env = String_map.empty) ?hooks command
-    arguments =
+let spawn_with_stdin ?runner ?(log_command = true) ?(log_status_on_exit = true)
+    ?(log_output = true) ?name ?(color = Log.Color.FG.cyan)
+    ?(env = String_map.empty) ?hooks command arguments =
   let name = Option.value ~default:(get_unique_name command) name in
   Option.iter (fun hooks -> hooks.on_spawn command arguments) hooks ;
-  Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
+  if log_command then
+    Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
   let lwt_command =
     match runner with
     | None -> (command, Array.of_list (command :: arguments))
@@ -346,6 +374,7 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
       arguments;
       color;
       lwt_process;
+      handle = Lwt.return_unit;
       log_status_on_exit;
       stdout = create_echo ();
       stderr = create_echo ();
@@ -354,14 +383,15 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
     }
   in
   live_processes := ID_map.add process.id process !live_processes ;
-  Background.register (handle_process ~log_output process) ;
+  process.handle <- handle_process ~log_output process ;
   (process, process.lwt_process#stdin)
 
-let spawn ?runner ?log_status_on_exit ?log_output ?name ?color ?env ?hooks
-    command arguments =
+let spawn ?runner ?log_command ?log_status_on_exit ?log_output ?name ?color ?env
+    ?hooks command arguments =
   let (process, stdin) =
     spawn_with_stdin
       ?runner
+      ?log_command
       ?log_status_on_exit
       ?log_output
       ?name
@@ -404,13 +434,20 @@ let kill (process : t) =
   kill_remote_if_needed process ;
   process.lwt_process#terminate
 
+let pid (process : t) = process.lwt_process#pid
+
+let validate_status ?(expect_failure = false) status =
+  match status with
+  | Unix.WEXITED n
+    when (n = 0 && not expect_failure) || (n <> 0 && expect_failure) ->
+      Ok ()
+  | _ -> Error (`Invalid_status (status_to_reason status))
+
 let check ?(expect_failure = false) process =
   let* status = wait process in
-  match status with
-  | WEXITED n when (n = 0 && not expect_failure) || (n <> 0 && expect_failure)
-    ->
-      unit
-  | _ ->
+  match validate_status ~expect_failure status with
+  | Ok () -> unit
+  | Error (`Invalid_status reason) ->
       raise
         (Failed
            {
@@ -419,12 +456,12 @@ let check ?(expect_failure = false) process =
              arguments = process.arguments;
              status = Some status;
              expect_failure;
-             reason = None;
+             reason = Some reason;
            })
 
-let run ?log_status_on_exit ?name ?color ?env ?expect_failure command arguments
-    =
-  spawn ?log_status_on_exit ?name ?color ?env command arguments
+let run ?log_status_on_exit ?name ?color ?env ?hooks ?expect_failure command
+    arguments =
+  spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
   |> check ?expect_failure
 
 let clean_up () =
@@ -457,14 +494,18 @@ let check_and_read_stdout = check_and_read ~channel_getter:stdout
 
 let check_and_read_stderr = check_and_read ~channel_getter:stderr
 
-let run_and_read_stdout ?log_status_on_exit ?name ?color ?env ?expect_failure
-    command arguments =
-  let process = spawn ?log_status_on_exit ?name ?color ?env command arguments in
+let run_and_read_stdout ?log_status_on_exit ?name ?color ?env ?hooks
+    ?expect_failure command arguments =
+  let process =
+    spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
+  in
   check_and_read_stdout ?expect_failure process
 
-let run_and_read_stderr ?log_status_on_exit ?name ?color ?env ?expect_failure
-    command arguments =
-  let process = spawn ?log_status_on_exit ?name ?color ?env command arguments in
+let run_and_read_stderr ?log_status_on_exit ?name ?color ?env ?hooks
+    ?expect_failure command arguments =
+  let process =
+    spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
+  in
   check_and_read_stdout ?expect_failure process
 
 let check_error ?exit_code ?msg process =
@@ -481,30 +522,32 @@ let check_error ?exit_code ?msg process =
     }
   in
   match status with
-  | WEXITED n ->
-      if not (Option.fold ~none:(n <> 0) ~some:(( = ) n) exit_code) then
-        raise
-          (Failed
-             {
-               error with
-               reason =
-                 Some
-                   (Option.fold
-                      ~none:" with any non-zero code"
-                      ~some:(fun exit_code ->
-                        sf " with code %d but failed with code %d" exit_code n)
-                      exit_code);
-             }) ;
-      Option.iter
-        (fun msg ->
-          if err_msg =~! msg then
-            raise
-              (Failed
-                 {
-                   error with
-                   reason =
-                     Some (sf " but failed with stderr =~! %s" (show_rex msg));
-                 }))
-        msg ;
-      unit
+  | WEXITED n -> (
+      match exit_code with
+      | None when n = 0 ->
+          raise (Failed {error with reason = Some " with any non-zero code"})
+      | Some exit_code when n <> exit_code ->
+          let reason = sf " with code %d but failed with code %d" exit_code n in
+          raise (Failed {error with reason = Some reason})
+      | _ ->
+          Option.iter
+            (fun msg ->
+              if err_msg =~! msg then
+                raise
+                  (Failed
+                     {
+                       error with
+                       reason =
+                         Some
+                           (sf " but failed with stderr =~! %s" (show_rex msg));
+                     }))
+            msg ;
+          unit)
   | _ -> raise (Failed error)
+
+let program_path program =
+  Lwt.catch
+    (fun () ->
+      let* path = run_and_read_stdout "sh" ["-c"; "command -v " ^ program] in
+      return (Some (String.trim path)))
+    (fun _ -> return None)

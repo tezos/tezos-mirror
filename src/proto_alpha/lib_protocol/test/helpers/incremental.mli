@@ -51,6 +51,7 @@ val begin_construction :
 val add_operation :
   ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
+  ?check_size:bool ->
   incremental ->
   Operation.packed ->
   incremental tzresult Lwt.t
@@ -60,3 +61,5 @@ val finalize_block : incremental -> Block.t tzresult Lwt.t
 val rpc_ctxt : incremental Environment.RPC_context.simple
 
 val alpha_ctxt : incremental -> Alpha_context.context
+
+val set_alpha_ctxt : incremental -> Alpha_context.context -> incremental

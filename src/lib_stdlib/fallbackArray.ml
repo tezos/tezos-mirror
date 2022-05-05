@@ -28,3 +28,11 @@ include ReadOnlyArray
 let set array idx v =
   let len = length array in
   if idx >= 0 && idx < len then Array.unsafe_set array idx v else ()
+
+let of_list ~fallback ~proj l =
+  let length = List.length l in
+  let arr = make length fallback in
+  (* the initial construction of the array guarantees that we can always use
+     unsafe_set since the condition check in set is always true. *)
+  List.iteri (fun i e -> Array.unsafe_set arr i (proj e)) l ;
+  arr

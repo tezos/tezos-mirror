@@ -26,26 +26,55 @@
 
 open Tezos_context_encoding.Context
 
-module type DB =
-  Irmin.S
-    with type key = Path.t
-     and type contents = Contents.t
-     and type branch = Branch.t
-     and type hash = Hash.t
-     and type step = Path.step
-     and type metadata = Metadata.t
-     and type Key.step = Path.step
+module type DB = Irmin.Generic_key.S with module Schema = Schema
 
-module Make_tree (Store : DB) = struct
+module Kinded_hash = struct
+  let of_context_hash = function
+    | `Value h -> `Contents (Hash.of_context_hash h, ())
+    | `Node h -> `Node (Hash.of_context_hash h)
+
+  let to_context_hash = function
+    | `Contents (h, ()) -> `Value (Hash.to_context_hash h)
+    | `Node h -> `Node (Hash.to_context_hash h)
+end
+
+type proof_version_expanded = {is_stream : bool; is_binary : bool}
+
+let stream_mask = 0b1
+
+let binary_mask = 0b10
+
+let decode_proof_version v =
+  let extract_bit v mask = (v land mask <> 0, v land lnot mask) in
+  let (is_stream, v) = extract_bit v stream_mask in
+  let (is_binary, v) = extract_bit v binary_mask in
+  if v <> 0 then Error `Invalid_proof_version else Ok {is_stream; is_binary}
+
+let encode_proof_version ~is_stream ~is_binary =
+  (if is_stream then stream_mask else 0)
+  lor if is_binary then binary_mask else 0
+
+module Make_config (Conf : Conf) = struct
+  let equal_config = Tezos_context_sigs.Config.equal
+
+  let config _ =
+    Tezos_context_sigs.Config.v
+      ~entries:Conf.entries
+      ~stable_hash:Conf.stable_hash
+      ~inode_child_order:Conf.inode_child_order
+end
+
+module Make_tree (Conf : Conf) (Store : DB) = struct
   include Store.Tree
+  include Make_config (Conf)
 
   let pp = Irmin.Type.pp Store.tree_t
 
-  let empty _ = Store.Tree.empty
+  let empty _ = Store.Tree.empty ()
 
   let equal = Irmin.Type.(unstage (equal Store.tree_t))
 
-  let is_empty t = equal Store.Tree.empty t
+  let is_empty t = equal (Store.Tree.empty ()) t
 
   let hash t = Hash.to_context_hash (Store.Tree.hash t)
 
@@ -55,14 +84,19 @@ module Make_tree (Store : DB) = struct
     match Store.Tree.destruct t with `Contents _ -> `Value | `Node _ -> `Tree
 
   let to_value t =
+    let open Lwt_syntax in
     match Store.Tree.destruct t with
-    | `Contents (c, _) -> Store.Tree.Contents.force_exn c >|= Option.some
+    | `Contents (c, _) ->
+        let+ v = Store.Tree.Contents.force_exn c in
+        Some v
     | `Node _ -> Lwt.return_none
 
-  let of_value _ v = Store.Tree.add Store.Tree.empty [] v
+  let of_value _ v = Store.Tree.add (Store.Tree.empty ()) [] v
 
   let fold ?depth t k ~(order : [`Sorted | `Undefined]) ~init ~f =
-    find_tree t k >>= function
+    let open Lwt_syntax in
+    let* o = find_tree t k in
+    match o with
     | None -> Lwt.return init
     | Some t ->
         let order =
@@ -81,13 +115,13 @@ module Make_tree (Store : DB) = struct
           t
           init
 
-  type raw = [`Value of bytes | `Tree of raw TzString.Map.t]
+  type raw = [`Value of bytes | `Tree of raw String.Map.t]
 
   type concrete = Store.Tree.concrete
 
   let rec raw_of_concrete : type a. (raw -> a) -> concrete -> a =
    fun k -> function
-    | `Tree l -> raw_of_node (fun l -> k (`Tree (TzString.Map.of_seq l))) l
+    | `Tree l -> raw_of_node (fun l -> k (`Tree (String.Map.of_seq l))) l
     | `Contents (v, _) -> k (`Value v)
 
   and raw_of_node :
@@ -99,11 +133,14 @@ module Make_tree (Store : DB) = struct
           (fun v -> raw_of_node (fun t -> k (fun () -> Seq.Cons ((n, v), t))) t)
           v
 
-  let to_raw t = Store.Tree.to_concrete t >|= raw_of_concrete (fun t -> t)
+  let to_raw t =
+    let open Lwt_syntax in
+    let+ c = Store.Tree.to_concrete t in
+    raw_of_concrete (fun t -> t) c
 
   let rec concrete_of_raw : type a. (concrete -> a) -> raw -> a =
    fun k -> function
-    | `Tree l -> concrete_of_node (fun l -> k (`Tree l)) (TzString.Map.to_seq l)
+    | `Tree l -> concrete_of_node (fun l -> k (`Tree l)) (String.Map.to_seq l)
     | `Value v -> k (`Contents (v, ()))
 
   and concrete_of_node :
@@ -123,8 +160,8 @@ module Make_tree (Store : DB) = struct
     mu "Tree.raw" (fun encoding ->
         let map_encoding =
           conv
-            TzString.Map.bindings
-            (fun bindings -> TzString.Map.of_seq (List.to_seq bindings))
+            String.Map.bindings
+            (fun bindings -> String.Map.of_seq (List.to_seq bindings))
             (list (tup2 string encoding))
         in
         union
@@ -157,14 +194,25 @@ module Make_tree (Store : DB) = struct
     fun () -> Store.Repo.v @@ Irmin_pack.config @@ random_store_name ()
 
   let shallow repo kinded_hash =
-    Store.Tree.shallow
-      repo
-      (match kinded_hash with
-      | `Node hash -> `Node (Hash.of_context_hash hash)
-      | `Contents hash -> `Contents (Hash.of_context_hash hash, ()))
+    let kinded_hash =
+      match kinded_hash with `Node n -> `Node n | `Value v -> `Contents (v, ())
+    in
+    Store.Tree.shallow repo kinded_hash
+
+  let kinded_key t =
+    match Store.Tree.key t with
+    | (None | Some (`Node _)) as r -> r
+    | Some (`Contents (v, ())) -> Some (`Value v)
+
+  let is_shallow tree =
+    match Store.Tree.inspect tree with
+    | `Node `Key -> true
+    | `Node (`Map | `Value | `Portable_dirty | `Pruned) | `Contents -> false
 
   let list tree ?offset ?length key =
     Store.Tree.list ~cache:true tree ?offset ?length key
+
+  let length tree key = Store.Tree.length ~cache:true tree key
 
   exception Context_dangling_hash of string
 
@@ -172,7 +220,8 @@ module Make_tree (Store : DB) = struct
     Lwt.catch
       (fun () -> Store.Tree.find_tree tree key)
       (function
-        | Dangling_hash {context; hash} ->
+        | Store.Backend.Node.Val.Dangling_hash {context; hash}
+        | Store.Tree.Dangling_hash {context; hash} ->
             let str =
               Fmt.str
                 "%s encountered dangling hash %a"
@@ -187,7 +236,8 @@ module Make_tree (Store : DB) = struct
     Lwt.catch
       (fun () -> Store.Tree.add_tree tree key value)
       (function
-        | Dangling_hash {context; hash} ->
+        | Store.Backend.Node.Val.Dangling_hash {context; hash}
+        | Store.Tree.Dangling_hash {context; hash} ->
             let str =
               Fmt.str
                 "%s encountered dangling hash %a"
@@ -197,6 +247,139 @@ module Make_tree (Store : DB) = struct
             in
             raise (Context_dangling_hash str)
         | exn -> raise exn)
+end
+
+module Proof_encoding = Merkle_proof_encoding
+
+module Make_proof
+    (Store : DB)
+    (Store_conf : Tezos_context_encoding.Context.Conf) =
+struct
+  module DB_proof = Store.Tree.Proof
+
+  module Proof = struct
+    include Tezos_context_sigs.Context.Proof_types
+
+    module State = struct
+      let rec to_inode : type a b. (a -> b) -> a DB_proof.inode -> b inode =
+       fun f {length; proofs} ->
+        {length; proofs = List.map (fun (k, v) -> (k, f v)) proofs}
+
+      and to_tree : DB_proof.tree -> tree = function
+        | Contents (c, ()) -> Value c
+        | Blinded_contents (h, ()) -> Blinded_value (Hash.to_context_hash h)
+        | Node l -> Node (List.map (fun (k, v) -> (k, to_tree v)) l)
+        | Blinded_node h -> Blinded_node (Hash.to_context_hash h)
+        | Inode i -> Inode (to_inode to_inode_tree i)
+        | Extender e -> Extender (to_inode_extender to_inode_tree e)
+
+      and to_inode_extender :
+          type a b. (a -> b) -> a DB_proof.inode_extender -> b inode_extender =
+       fun f {length; segments = segment; proof} ->
+        {length; segment; proof = f proof}
+
+      and to_inode_tree : DB_proof.inode_tree -> inode_tree = function
+        | Blinded_inode h -> Blinded_inode (Hash.to_context_hash h)
+        | Inode_values l ->
+            Inode_values (List.map (fun (k, v) -> (k, to_tree v)) l)
+        | Inode_tree i -> Inode_tree (to_inode to_inode_tree i)
+        | Inode_extender e -> Inode_extender (to_inode_extender to_inode_tree e)
+
+      let rec of_inode : type a b. (a -> b) -> a inode -> b DB_proof.inode =
+       fun f {length; proofs} ->
+        {length; proofs = List.map (fun (k, v) -> (k, f v)) proofs}
+
+      and of_tree : tree -> DB_proof.tree = function
+        | Value c -> Contents (c, ())
+        | Blinded_value h -> Blinded_contents (Hash.of_context_hash h, ())
+        | Node l -> Node (List.map (fun (k, v) -> (k, of_tree v)) l)
+        | Blinded_node h -> Blinded_node (Hash.of_context_hash h)
+        | Inode i -> Inode (of_inode of_inode_tree i)
+        | Extender e -> Extender (of_inode_extender of_inode_tree e)
+
+      and of_inode_extender :
+          type a b. (a -> b) -> a inode_extender -> b DB_proof.inode_extender =
+       fun f {length; segment = segments; proof} ->
+        {length; segments; proof = f proof}
+
+      and of_inode_tree : inode_tree -> DB_proof.inode_tree = function
+        | Blinded_inode h -> Blinded_inode (Hash.of_context_hash h)
+        | Inode_values l ->
+            Inode_values (List.map (fun (k, v) -> (k, of_tree v)) l)
+        | Inode_tree i -> Inode_tree (of_inode of_inode_tree i)
+        | Inode_extender e -> Inode_extender (of_inode_extender of_inode_tree e)
+
+      let of_stream_elt : Stream.elt -> DB_proof.elt = function
+        | Value c -> Contents c
+        | Node l ->
+            Node (List.map (fun (k, v) -> (k, Kinded_hash.of_context_hash v)) l)
+        | Inode i -> Inode (of_inode Hash.of_context_hash i)
+        | Inode_extender e ->
+            Inode_extender (of_inode_extender Hash.of_context_hash e)
+
+      let of_stream : stream -> DB_proof.stream = Seq.map of_stream_elt
+
+      let to_stream_elt : DB_proof.elt -> Stream.elt = function
+        | Contents c -> Value c
+        | Node l ->
+            Node (List.map (fun (k, v) -> (k, Kinded_hash.to_context_hash v)) l)
+        | Inode i -> Inode (to_inode Hash.to_context_hash i)
+        | Inode_extender e ->
+            Inode_extender (to_inode_extender Hash.to_context_hash e)
+
+      let to_stream : DB_proof.stream -> stream = Seq.map to_stream_elt
+    end
+
+    let is_binary =
+      if Store_conf.entries = 2 then true
+      else if Store_conf.entries = 32 then false
+      else assert false
+
+    let of_proof ~is_stream f p =
+      let before = Kinded_hash.to_context_hash (DB_proof.before p) in
+      let after = Kinded_hash.to_context_hash (DB_proof.after p) in
+      let state = f (DB_proof.state p) in
+      let version = encode_proof_version ~is_stream ~is_binary in
+      {version; before; after; state}
+
+    let to_proof f p =
+      let before = Kinded_hash.of_context_hash p.before in
+      let after = Kinded_hash.of_context_hash p.after in
+      let state = f p.state in
+      DB_proof.v ~before ~after state
+
+    let to_tree = of_proof ~is_stream:false State.to_tree
+
+    let of_tree = to_proof State.of_tree
+
+    let to_stream = of_proof ~is_stream:true State.to_stream
+
+    let of_stream = to_proof State.of_stream
+  end
+
+  let produce_tree_proof repo key f =
+    let open Lwt_syntax in
+    let key =
+      match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
+    in
+    let+ (p, r) = Store.Tree.produce_proof repo key f in
+    (Proof.to_tree p, r)
+
+  let verify_tree_proof proof f =
+    let proof = Proof.of_tree proof in
+    Store.Tree.verify_proof proof f
+
+  let produce_stream_proof repo key f =
+    let open Lwt_syntax in
+    let key =
+      match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
+    in
+    let+ (p, r) = Store.Tree.produce_stream repo key f in
+    (Proof.to_stream p, r)
+
+  let verify_stream_proof proof f =
+    let proof = Proof.of_stream proof in
+    Store.Tree.verify_stream proof f
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,7 +47,8 @@ let get_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
 
 let get_block_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "hash"] in
-  Client.rpc ?endpoint ?hooks GET path client
+  let* json = Client.rpc ?endpoint ?hooks GET path client in
+  return (JSON.as_string json)
 
 let get_block_metadata ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     client =
@@ -64,7 +66,15 @@ let is_bootstrapped ?endpoint ?hooks ?(chain = "main") client =
   Client.rpc ?endpoint ?hooks GET path client
 
 let get_checkpoint ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "checkpoint"] in
+  let path = ["chains"; chain; "levels"; "checkpoint"] in
+  Client.rpc ?endpoint ?hooks GET path client
+
+let get_savepoint ?endpoint ?hooks ?(chain = "main") client =
+  let path = ["chains"; chain; "levels"; "savepoint"] in
+  Client.rpc ?endpoint ?hooks GET path client
+
+let get_caboose ?endpoint ?hooks ?(chain = "main") client =
+  let path = ["chains"; chain; "levels"; "caboose"] in
   Client.rpc ?endpoint ?hooks GET path client
 
 let raw_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
@@ -92,33 +102,23 @@ let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   Client.rpc ?endpoint ?hooks GET path client
 
 let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
-    client =
+    ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
-  Client.rpc
-    ?endpoint
-    ?hooks
-    ~query_string:(match version with None -> [] | Some v -> [("version", v)])
-    GET
-    path
-    client
-
-let get_mempool ?endpoint ?hooks ?chain client =
-  let* pending_ops =
-    get_mempool_pending_operations ?endpoint ?hooks ?chain ~version:"1" client
+  let query_parameter param param_s =
+    match param with
+    | None -> []
+    | Some true -> [(param_s, "true")]
+    | Some false -> [(param_s, "false")]
   in
-  let get_hash op = JSON.(op |-> "hash" |> as_string) in
-  let get_hashes classification =
-    List.map get_hash JSON.(pending_ops |-> classification |> as_list)
+  let query_string =
+    (match version with None -> [] | Some v -> [("version", v)])
+    @ query_parameter applied "applied"
+    @ query_parameter refused "refused"
+    @ query_parameter outdated "outdated"
+    @ query_parameter branch_delayed "branch_delayed"
+    @ query_parameter branch_refused "branch_refused"
   in
-  let applied = get_hashes "applied" in
-  let branch_delayed = get_hashes "branch_delayed" in
-  let branch_refused = get_hashes "branch_refused" in
-  let refused = get_hashes "refused" in
-  let outdated = get_hashes "outdated" in
-  let unprocessed = get_hashes "unprocessed" in
-  return
-    Mempool.
-      {applied; branch_delayed; branch_refused; refused; outdated; unprocessed}
+  Client.rpc ?endpoint ?hooks ~query_string GET path client
 
 let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
   let path = ["chains"; chain; "mempool"; "request_operations"] in
@@ -169,23 +169,12 @@ let inject_block ?endpoint ?hooks ~data client =
 let inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["injection"; "operation"] in
   let query_string = if async then [("async", "")] else [] in
-  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let spawn_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
-  let path = ["injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
+  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let private_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["private"; "injection"; "operation"] in
   let query_string = if async then [("async", "")] else [] in
-  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let spawn_private_inject_operation ?endpoint ?hooks ?(async = false) ~data
-    client =
-  let path = ["private"; "injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
+  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
@@ -259,6 +248,21 @@ let post_run_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
   in
   Client.rpc ?endpoint ?hooks ~data POST path client
 
+let post_simulate_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+    ~data client =
+  let path =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "scripts";
+      "simulate_operation";
+    ]
+  in
+  Client.rpc ?endpoint ?hooks ~data POST path client
+
 module Big_maps = struct
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash
       client =
@@ -266,20 +270,6 @@ module Big_maps = struct
       ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
     in
     Client.rpc ?endpoint ?hooks GET path client
-
-  let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~big_map_id ?offset ?length client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
-    in
-    let query_string =
-      [
-        Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-        Option.map (fun length -> ("length", Int.to_string length)) length;
-      ]
-      |> List.filter_map Fun.id
-    in
-    Client.spawn_rpc ?endpoint ?hooks ~query_string GET path client
 
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
       ?offset ?length client =
@@ -293,7 +283,7 @@ module Big_maps = struct
       ]
       |> List.filter_map Fun.id
     in
-    Client.rpc ?endpoint ?hooks ~query_string GET path client
+    Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
 end
 
 let get_ddb ?endpoint ?hooks ?(chain = "main") client =
@@ -301,15 +291,9 @@ let get_ddb ?endpoint ?hooks ?(chain = "main") client =
   Client.rpc ?endpoint ?hooks GET path client
 
 module Contracts = struct
-  let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
-      =
-    let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
     let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    let* contracts = Client.rpc ?endpoint ?hooks GET path client in
-    return (JSON.as_list contracts |> List.map JSON.as_string)
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_all_delegates ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       client =
@@ -317,19 +301,12 @@ module Contracts = struct
     let* contracts = Client.rpc ?endpoint ?hooks GET path client in
     return (JSON.as_list contracts |> List.map JSON.as_string)
 
-  let spawn_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "contracts"; contract_id]
-    in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~contract_id
       client =
     let path =
       ["chains"; chain; "blocks"; block; "context"; "contracts"; contract_id]
     in
-    Client.rpc ?endpoint ?hooks GET path client
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let sub_path ~chain ~block ~contract_id field =
     [
@@ -343,89 +320,53 @@ module Contracts = struct
       field;
     ]
 
-  let spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
-    let path = sub_path ~chain ~block ~contract_id field in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
   let get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
     let path = sub_path ~chain ~block ~contract_id field in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let spawn_get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
 
-  let spawn_big_map_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id ~data client =
-    let path = sub_path ~chain ~block ~contract_id "big_map_get" in
-    Client.spawn_rpc ?endpoint ?hooks ~data POST path client
+  let get_frozen_bonds ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~contract_id client =
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "frozen_bonds" client
+
+  let get_balance_and_frozen_bonds ?endpoint ?hooks ?(chain = "main")
+      ?(block = "head") ~contract_id client =
+    get_sub
+      ?endpoint
+      ?hooks
+      ~chain
+      ~block
+      ~contract_id
+      "balance_and_frozen_bonds"
+      client
 
   let big_map_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id ~data client =
     let path = sub_path ~chain ~block ~contract_id "big_map_get" in
-    Client.rpc ?endpoint ?hooks ~data POST path client
-
-  let spawn_get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
+    Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
 
   let get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
 
-  let spawn_get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
-
   let get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
-
-  let spawn_get_entrypoints ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub
-      ?endpoint
-      ?hooks
-      ~chain
-      ~block
-      ~contract_id
-      "entrypoints"
-      client
 
   let get_entrypoints ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "entrypoints" client
 
-  let spawn_get_manager_key ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub
-      ?endpoint
-      ?hooks
-      ~chain
-      ~block
-      ~contract_id
-      "manager_key"
-      client
-
   let get_manager_key ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "manager_key" client
 
-  let spawn_get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
-
   let get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
-
-  let spawn_get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
 
   let get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
@@ -618,21 +559,255 @@ module Votes = struct
     Client.rpc ?endpoint ?hooks GET path client
 end
 
-module Tx_rollup = struct
-  let sub_path ~chain ~block ~tx_rollup_hash sub =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "tx_rollup";
-      tx_rollup_hash;
-      sub;
-    ]
-
-  let get_state ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~tx_rollup_hash client =
-    let path = sub_path ~chain ~block ~tx_rollup_hash "state" in
+module Script_cache = struct
+  let get_cached_contracts ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      client =
+    let path =
+      ["chains"; chain; "blocks"; block; "context"; "cache"; "contracts"; "all"]
+    in
     Client.rpc ?endpoint ?hooks GET path client
+end
+
+module Tx_rollup = struct
+  let sub_path ?(chain = "main") ?(block = "head") ~rollup sub =
+    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; rollup] @ sub
+
+  let get_state ?endpoint ?hooks ?chain ?block ~rollup client =
+    let path = sub_path ?chain ?block ~rollup ["state"] in
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
+
+  let get_inbox ?endpoint ?hooks ?chain ?block ~rollup ~level client =
+    let path =
+      sub_path ?chain ?block ~rollup ["inbox"; Format.sprintf "%d" level]
+    in
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
+
+  let get_commitment ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~rollup ~level client =
+    let path =
+      sub_path ~chain ~block ~rollup ["commitment"; Format.sprintf "%d" level]
+    in
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
+
+  let get_pending_bonded_commitments ?endpoint ?hooks ?(chain = "main")
+      ?(block = "head") ~rollup ~pkh client =
+    let path =
+      sub_path ~chain ~block ~rollup ["pending_bonded_commitments"; pkh]
+    in
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
+
+  module Forge = struct
+    module Inbox = struct
+      let message_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "inbox";
+            "message_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "inbox";
+            "merkle_tree_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "inbox";
+            "merkle_tree_path";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+    end
+
+    module Commitment = struct
+      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "merkle_tree_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "merkle_tree_path";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let message_result_hash ?endpoint ?hooks ?(chain = "main")
+          ?(block = "head") ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "message_result_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+    end
+
+    module Withdraw = struct
+      let withdraw_list_hash ?endpoint ?hooks ?(chain = "main")
+          ?(block = "head") ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "withdraw";
+            "withdraw_list_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+    end
+  end
+end
+
+module Sc_rollup = struct
+  let root_path ~chain ~block =
+    ["chains"; chain; "blocks"; block; "context"; "sc_rollup"]
+
+  let list ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
+    let path = root_path ~chain ~block in
+    Client.rpc ?endpoint ?hooks GET path client
+
+  let path ~chain ~block ~sc_rollup_address =
+    root_path ~chain ~block @ [sc_rollup_address]
+
+  let get_inbox ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~sc_rollup_address client =
+    let path = path ~chain ~block ~sc_rollup_address @ ["inbox"] in
+    Client.rpc ?endpoint ?hooks GET path client
+
+  let get_initial_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~sc_rollup_address client =
+    let path = path ~chain ~block ~sc_rollup_address @ ["initial_level"] in
+    Client.rpc ?endpoint ?hooks GET path client
+end
+
+let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
+    client =
+  let path =
+    ["chains"; chain; "blocks"; block; "context"; "raw"; "bytes"] @ path
+  in
+  Client.rpc ?endpoint ?hooks GET path client
+
+module Curl = struct
+  let curl_path_cache = ref None
+
+  let get () =
+    Process.(
+      try
+        let* curl_path =
+          match !curl_path_cache with
+          | Some curl_path -> return curl_path
+          | None ->
+              let* curl_path =
+                run_and_read_stdout "sh" ["-c"; "command -v curl"]
+              in
+              let curl_path = String.trim curl_path in
+              curl_path_cache := Some curl_path ;
+              return curl_path
+        in
+        return
+        @@ Some
+             (fun ~url ->
+               let* output = run_and_read_stdout curl_path ["-s"; url] in
+               return (JSON.parse ~origin:url output))
+      with _ -> return @@ None)
+
+  let post () =
+    Process.(
+      try
+        let* curl_path =
+          match !curl_path_cache with
+          | Some curl_path -> return curl_path
+          | None ->
+              let* curl_path =
+                run_and_read_stdout "sh" ["-c"; "command -v curl"]
+              in
+              let curl_path = String.trim curl_path in
+              curl_path_cache := Some curl_path ;
+              return curl_path
+        in
+        return
+        @@ Some
+             (fun ~url data ->
+               let* output =
+                 run_and_read_stdout
+                   curl_path
+                   [
+                     "-X";
+                     "POST";
+                     "-H";
+                     "Content-Type: application/json";
+                     "-s";
+                     url;
+                     "-d";
+                     JSON.encode data;
+                   ]
+               in
+               return (JSON.parse ~origin:url output))
+      with _ -> return @@ None)
 end

@@ -64,16 +64,22 @@ val encode : t -> string
 (** Encode a JSON unannotated AST into a string. *)
 val encode_u : u -> string
 
+(** Encode a JSON annotated AST into a file. *)
+val encode_to_file : string -> t -> unit
+
+(** Encode a JSON unannotated AST into a file. *)
+val encode_to_file_u : string -> u -> unit
+
 (** {2 Decoding} *)
 
 (** Parse a JSON file.
 
-    @raise [Error] if the input is invalid JSON. *)
+    @raise Error if the input is invalid JSON. *)
 val parse_file : string -> t
 
 (** Parse a JSON string.
 
-    @raise [Error] if the input is invalid JSON. *)
+    @raise Error if the input is invalid JSON. *)
 val parse : origin:string -> string -> t
 
 (** Same as [parse], but return [None] instead of raising [Error]. *)
@@ -114,7 +120,7 @@ val ( |=> ) : t -> int -> t
     already exists, it is overwritten. Otherwise a new key is added at the end
     of the object.
 
-    @raise [Error] if [obj] is not a JSON object. *)
+    @raise Error if [obj] is not a JSON object. *)
 val put : string * t -> t -> t
 
 (** Alters the value of a specific key in a JSON object by applying its value to a
@@ -123,7 +129,7 @@ val put : string * t -> t -> t
     [update key f obj] is equivalent to [put (key, f (get key obj)) obj].
 
     Note: if [key] is not present in [obj], [`Null] is passed to [f] instead.
-    @raise [Error] if [obj] is not an object. *)
+    @raise Error if [obj] is not an object. *)
 val update : string -> (t -> t) -> t -> t
 
 (** Test whether a JSON value is [`Null]. *)
@@ -136,7 +142,7 @@ val as_opt : t -> t option
 
 (** Get the value from a [`Bool] node.
 
-    @raise [Error] if the input is not a [`Bool]. *)
+    @raise Error if the input is not a [`Bool]. *)
 val as_bool : t -> bool
 
 (** Same as [as_bool], but return [None] instead of raising [Error]. *)
@@ -147,7 +153,7 @@ val is_bool : t -> bool
 
 (** Get the integer value from a [`Float] or [`String] node.
 
-    @raise [Error] if:
+    @raise Error if:
     - the input is not a [`Float] nor a [`String];
     - the input is a [`Float] but is not an integer;
     - the input is a [`String] but does not denote a valid decimal integer. *)
@@ -161,7 +167,7 @@ val is_int : t -> bool
 
 (** Get the integer value from a [`Float] or [`String] node (64-bit version).
 
-    @raise [Error] if:
+    @raise Error if:
     - the input is not a [`Float] nor a [`String];
     - the input is a [`Float] but is not an integer;
     - the input is a [`String] but does not denote a valid decimal integer. *)
@@ -175,7 +181,7 @@ val is_int64 : t -> bool
 
 (** Get the float value from a [`Float] or [`String] node.
 
-    @raise [Error] if:
+    @raise Error if:
     - the input is not a [`Float] nor a [`String];
     - the input is a [`String] but does not denote a valid decimal float. *)
 val as_float : t -> float
@@ -188,7 +194,7 @@ val is_float : t -> bool
 
 (** Get the value from a [`String] node.
 
-    @raise [Error] if the input is not a [`String]. *)
+    @raise Error if the input is not a [`String]. *)
 val as_string : t -> string
 
 (** Same as [as_string], but return [None] instead of raising [Error]. *)
@@ -199,7 +205,7 @@ val is_string : t -> bool
 
 (** Get the list of items from an [`Array] node.
 
-    @raise [Error] if the input is not an [`Array] nor [`Null].
+    @raise Error if the input is not an [`Array] nor [`Null].
     Return the empty list if the input is [`Null]. *)
 val as_list : t -> t list
 
@@ -211,7 +217,7 @@ val is_list : t -> bool
 
 (** Get the list of fields from an [`Object] node.
 
-    @raise [Error] if the input is not an [`Object] nor [`Null].
+    @raise Error if the input is not an [`Object] nor [`Null].
     Return the empty list if the input is [`Null]. *)
 val as_object : t -> (string * t) list
 

@@ -1,0 +1,61 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_member.tz-(Pair { "Hello" ; "World" } None)-""-(Pair { "Hello" ; "World" } (Some False))]
+
+storage
+  (Pair { "Hello" ; "World" } (Some False))
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (remaining gas: 1039984.878 units remaining)
+    [ (Pair "" { "Hello" ; "World" } None) ]
+  - location: 11 (remaining gas: 1039984.868 units remaining)
+    [ (Pair "" { "Hello" ; "World" } None)
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 12 (remaining gas: 1039984.858 units remaining)
+    [ (Pair "" { "Hello" ; "World" } None)
+      (Pair "" { "Hello" ; "World" } None)
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 13 (remaining gas: 1039984.848 units remaining)
+    [ ""
+      (Pair "" { "Hello" ; "World" } None)
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 14 (remaining gas: 1039984.838 units remaining)
+    [ (Pair "" { "Hello" ; "World" } None)
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 17 (remaining gas: 1039984.828 units remaining)
+    [ (Pair { "Hello" ; "World" } None)
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 18 (remaining gas: 1039984.818 units remaining)
+    [ { "Hello" ; "World" }
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 14 (remaining gas: 1039984.798 units remaining)
+    [ ""
+      { "Hello" ; "World" }
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 19 (remaining gas: 1039984.683 units remaining)
+    [ False
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 20 (remaining gas: 1039984.673 units remaining)
+    [ (Some False)
+      (Pair "" { "Hello" ; "World" } None) ]
+  - location: 21 (remaining gas: 1039984.663 units remaining)
+    [ (Pair "" { "Hello" ; "World" } None) ]
+  - location: 24 (remaining gas: 1039984.653 units remaining)
+    [ (Pair { "Hello" ; "World" } None) ]
+  - location: 25 (remaining gas: 1039984.643 units remaining)
+    [ { "Hello" ; "World" } ]
+  - location: 21 (remaining gas: 1039984.623 units remaining)
+    [ (Some False)
+      { "Hello" ; "World" } ]
+  - location: 26 (remaining gas: 1039984.613 units remaining)
+    [ { "Hello" ; "World" }
+      (Some False) ]
+  - location: 27 (remaining gas: 1039984.603 units remaining)
+    [ (Pair { "Hello" ; "World" } (Some False)) ]
+  - location: 28 (remaining gas: 1039984.593 units remaining)
+    [ {}
+      (Pair { "Hello" ; "World" } (Some False)) ]
+  - location: 30 (remaining gas: 1039984.583 units remaining)
+    [ (Pair {} { "Hello" ; "World" } (Some False)) ]
+

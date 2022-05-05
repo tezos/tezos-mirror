@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Dailambda, Inc. <contact@dailambda.jp>                 *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -50,5 +51,3 @@ let tests : unit Alcotest.test list =
           test_version_of_int_validation );
       ] );
   ]
-
-let tests_lwt = []

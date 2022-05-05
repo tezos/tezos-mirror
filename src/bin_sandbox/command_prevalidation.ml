@@ -3,8 +3,9 @@ open Internal_pervasives
 open Console
 
 let run state node_exec client_exec () =
-  Test_scenario.network_with_protocol ~size:2 state ~node_exec ~client_exec
-  >>= fun (nodes, _protocol) ->
+  let* (nodes, _protocol) =
+    Test_scenario.network_with_protocol ~size:2 state ~node_exec ~client_exec
+  in
   match nodes with
   | [] | [_] | _ :: _ :: _ :: _ -> assert false
   | [n1; n2] ->
@@ -20,7 +21,7 @@ let run state node_exec client_exec () =
       Stdlib.ignore c1 ;
       Stdlib.ignore c2 ;
       let commands = Interactive_test.Commands.all_defaults state ~nodes in
-      Prompt.command state ~commands >>= fun () ->
+      let* () = Prompt.command state ~commands in
       Running_processes.wait_all state
 
 let cmd () =
@@ -33,12 +34,15 @@ let cmd () =
       ~command_name:"prevalidation"
       ()
   in
-  ( const (fun bnod bcli state ->
+  let term =
+    const (fun bnod bcli state ->
         Test_command_line.Run_command.or_hard_fail
           state
           ~pp_error
           (run state bnod bcli))
     $ Tezos_executable.cli_term base_state `Node "tezos"
     $ Tezos_executable.cli_term base_state `Client "tezos"
-    $ Test_command_line.cli_state ~name:"prevalidation" (),
-    info ~doc:"Work-in-progress." "prevalidation" )
+    $ Test_command_line.cli_state ~name:"prevalidation" ()
+  in
+  let info = Cmd.info ~doc:"Work-in-progress." "prevalidation" in
+  Cmd.v info term

@@ -90,6 +90,17 @@ let qcheck_eq_tests ~eq ~gen ~eq_name =
 let qcheck_eq' ?pp ?cmp ?eq ~expected ~actual () =
   qcheck_eq ?pp ?cmp ?eq expected actual
 
+let qcheck_cond ?pp ~cond e () =
+  if cond e then true
+  else
+    match pp with
+    | None ->
+        QCheck.Test.fail_reportf
+          "@[<h 0>The condition check failed, but no pretty printer was \
+           provided.@]"
+    | Some pp ->
+        QCheck.Test.fail_reportf "@[<v 2>The condition check failed!@,%a@]" pp e
+
 let int64_range_gen a b =
   let gen a b st =
     let range = Int64.sub b a in
@@ -117,6 +128,8 @@ let string_fixed n = QCheck2.Gen.(string_size (pure n))
 
 let bytes_gen = QCheck2.Gen.(map Bytes.of_string string)
 
+let bytes_fixed_gen size = QCheck2.Gen.map Bytes.of_string (string_fixed size)
+
 let sublist : 'a list -> 'a list QCheck2.Gen.t =
   (* [take_n n l] returns the first [n] elements of [l].
      We do not reuse the implementation from [Stdlib.TzList] to avoid a
@@ -137,7 +150,7 @@ let sublist : 'a list -> 'a list QCheck2.Gen.t =
 let holey (l : 'a list) : 'a list QCheck2.Gen.t =
   let open QCheck2.Gen in
   (* Generate as many Booleans as there are elements in [l] *)
-  let+ bools = list_size (return (List.length l)) bool in
+  let+ bools = list_repeat (List.length l) bool in
   let rev_result =
     List.fold_left
       (fun acc (elem, pick) -> if pick then elem :: acc else acc)
@@ -152,18 +165,32 @@ let endpoint_gen =
   let protocol_gen = oneofl ["http"; "https"] in
   let path_gen =
     (* Specify the characters to use, to have valid URLs *)
-    list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
-    >|= String.concat "."
+    let+ path_chunks =
+      list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
+    in
+    String.concat "." path_chunks
   in
-  let port_gen = 1 -- 32768 >|= fun port -> ":" ^ Int.to_string port in
+  let port_gen =
+    let+ port = 1 -- 32768 in
+    ":" ^ Int.to_string port
+  in
   let url_string_gen =
-    triple protocol_gen path_gen (opt port_gen)
-    >|= fun (protocol, path, opt_part) ->
+    let+ (protocol, path, opt_part) =
+      triple protocol_gen path_gen (opt port_gen)
+    in
     String.concat "" [protocol; "://"; path; Option.value ~default:"" opt_part]
   in
-  url_string_gen >|= Uri.of_string
+  let+ s = url_string_gen in
+  Uri.of_string s
 
-module MakeMapGen (Map : Stdlib.Map.S) = struct
+module MakeMapGen (Map : sig
+  type 'a t
+
+  type key
+
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end) =
+struct
   open QCheck2
 
   let gen_of_size (size_gen : int Gen.t) (key_gen : Map.key Gen.t)

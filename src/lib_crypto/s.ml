@@ -337,7 +337,7 @@ module type MERKLE_TREE = sig
   val check_path : path -> elt -> t * int
 end
 
-module type SIGNATURE = sig
+module type COMMON_SIGNATURE = sig
   module Public_key_hash : sig
     type t
 
@@ -403,13 +403,22 @@ module type SIGNATURE = sig
   include B58_DATA with type t := t
 
   include ENCODER with type t := t
+end
+
+module type SIGNATURE = sig
+  include COMMON_SIGNATURE
 
   val zero : t
 
   type watermark
 
+  (** [sign ?watermark sk message] produce the signature of [message] (with
+      possibly [watermark]) using [sk].*)
   val sign : ?watermark:watermark -> Secret_key.t -> Bytes.t -> t
 
+  (** [check pk ?watermark signature message] check that [signature] is the
+      signature produced by signing [message] (with possibly [watermark]) with
+      the secret key of [pk]. *)
   val check : ?watermark:watermark -> Public_key.t -> t -> Bytes.t -> bool
 
   val generate_key :
@@ -426,6 +435,34 @@ module type SIGNATURE = sig
      deterministic_nonce_hash sk msg]
    *)
   val deterministic_nonce_hash : Secret_key.t -> Bytes.t -> Bytes.t
+end
+
+module type AGGREGATE_SIGNATURE = sig
+  include COMMON_SIGNATURE
+
+  (** [sign sk message] produces the signature of [message] using [sk]. The
+      signature produced by this function can be aggregated to other signatures
+      with [agregate_signature_opt].*)
+  val sign : Secret_key.t -> Bytes.t -> t
+
+  (** [check pk signature message] checks that [signature] is the signature
+      produced by signing [message] with the secret key of [pk]. See
+      [aggregate_check] if you want to check an aggregated signature.*)
+  val check : Public_key.t -> t -> Bytes.t -> bool
+
+  (** [agregate_check pk_msg_list signature] checks that the list of public key
+      and message [pk_msg_list] produced a signature equal to [signature]. *)
+  val aggregate_check : (Public_key.t * bytes) list -> t -> bool
+
+  (** [generate_key ?seed ()] creates a new pair of secret key and public key
+      using the seed or with a random generated one. It also returns the hash of
+      the public key. *)
+  val generate_key :
+    ?seed:Bytes.t -> unit -> Public_key_hash.t * Public_key.t * Secret_key.t
+
+  (** [agregate_signature_opt sig_list] creates an aggregated signature using
+      the list of signatures [sig_list]. *)
+  val aggregate_signature_opt : t list -> t option
 end
 
 module type FIELD = sig

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,44 +25,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
 open Script_typed_ir
 
-let key_ty : type a b. (a, b) map -> a comparable_ty =
- fun (module Box) -> Box.key_ty
+let make x = Map_tag x
+
+let get_module (Map_tag x) = x
+
+let empty_from : type a b c. (a, b) map -> (a, c) map =
+ fun (Map_tag (module Box)) ->
+  Map_tag
+    (module struct
+      type key = a
+
+      type value = c
+
+      module OPS = Box.OPS
+
+      let boxed = OPS.empty
+
+      let size = 0
+    end)
 
 let empty : type a b. a comparable_ty -> (a, b) map =
  fun ty ->
-  let module OPS = Map.Make (struct
-    type t = a
+  let module OPS = struct
+    let key_size = Gas_comparable_input_size.size_of_comparable_value ty
 
-    let compare = Script_comparable.compare_comparable ty
-  end) in
-  (module struct
-    type key = a
+    include Map.Make (struct
+      type t = a
 
-    type value = b
+      let compare = Script_comparable.compare_comparable ty
+    end)
+  end in
+  Map_tag
+    (module struct
+      type key = a
 
-    let key_ty = ty
-
-    module OPS = struct
       type value = b
 
-      include OPS
+      module OPS = OPS
 
-      type nonrec t = value t
-    end
+      let boxed = OPS.empty
 
-    let boxed = OPS.empty
-
-    let size = 0
-  end)
+      let size = 0
+    end)
 
 let get : type key value. key -> (key, value) map -> value option =
- fun k (module Box) -> Box.OPS.find k Box.boxed
+ fun k (Map_tag (module Box)) -> Box.OPS.find k Box.boxed
 
 let update : type a b. a -> b option -> (a, b) map -> (a, b) map =
- fun k v (module Box) ->
+ fun k v (Map_tag (module Box)) ->
   let (boxed, size) =
     let contains =
       match Box.OPS.find k Box.boxed with None -> false | _ -> true
@@ -70,28 +83,63 @@ let update : type a b. a -> b option -> (a, b) map -> (a, b) map =
     | Some v -> (Box.OPS.add k v Box.boxed, Box.size + if contains then 0 else 1)
     | None -> (Box.OPS.remove k Box.boxed, Box.size - if contains then 1 else 0)
   in
-  (module struct
-    type key = a
+  Map_tag
+    (module struct
+      type key = a
 
-    type value = b
+      type value = b
 
-    let key_ty = Box.key_ty
+      module OPS = Box.OPS
 
-    module OPS = Box.OPS
+      let boxed = boxed
 
-    let boxed = boxed
-
-    let size = size
-  end)
+      let size = size
+    end)
 
 let mem : type key value. key -> (key, value) map -> bool =
- fun k (module Box) ->
+ fun k (Map_tag (module Box)) ->
   match Box.OPS.find k Box.boxed with None -> false | _ -> true
 
 let fold :
     type key value acc.
     (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f Box.boxed
+ fun f (Map_tag (module Box)) -> Box.OPS.fold f Box.boxed
+
+let fold_es :
+    type key value acc.
+    (key -> value -> acc -> acc tzresult Lwt.t) ->
+    (key, value) map ->
+    acc ->
+    acc tzresult Lwt.t =
+ fun f (Map_tag (module Box)) -> Box.OPS.fold_es f Box.boxed
 
 let size : type key value. (key, value) map -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int Box.size))
+ fun (Map_tag (module Box)) -> Script_int.(abs (of_int Box.size))
+
+let map_es_in_context :
+    type context key value value'.
+    (context -> key -> value -> (value' * context) tzresult Lwt.t) ->
+    context ->
+    (key, value) map ->
+    ((key, value') map * context) tzresult Lwt.t =
+ fun f ctxt (Map_tag (module Box)) ->
+  Box.OPS.fold_es
+    (fun key value (map, ctxt) ->
+      f ctxt key value >|=? fun (value, ctxt) ->
+      (Box.OPS.add key value map, ctxt))
+    Box.boxed
+    (Box.OPS.empty, ctxt)
+  >|=? fun (map, ctxt) ->
+  ( Map_tag
+      (module struct
+        type key = Box.key
+
+        type value = value'
+
+        module OPS = Box.OPS
+
+        let boxed = map
+
+        let size = Box.size
+      end),
+    ctxt )

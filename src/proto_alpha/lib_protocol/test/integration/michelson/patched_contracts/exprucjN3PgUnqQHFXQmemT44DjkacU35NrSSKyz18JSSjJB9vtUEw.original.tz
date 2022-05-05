@@ -1,0 +1,232 @@
+{ parameter
+    (or (pair %Action
+           (or %action_input
+              (or (pair %Transfer (contract %dest unit) (mutez %transfer_amount))
+                  (option %Set_pour (pair (contract %pour_dest unit) (key %pour_authorizer))))
+              (or (pair %Set_keys
+                     (list %key_groups (pair (list %signatories key) (nat %group_threshold)))
+                     (nat %overall_threshold))
+                  (option %Set_delegate (key_hash %new_delegate))))
+           (list %signatures (list (option signature))))
+        (option (pair %Pour (signature %pour_auth) (mutez %pour_amount)))) ;
+  storage
+    (pair (pair (nat %replay_counter)
+                (pair %key_info
+                   (list %key_groups (pair (list %signatories key) (nat %group_threshold)))
+                   (nat %overall_threshold)))
+          (pair (pair %vesting
+                   (pair %vesting_quantities (mutez %vested_balance) (mutez %vesting_increment))
+                   (pair %vesting_schedule (timestamp %next_payout) (int %payout_interval)))
+                (option %pour_info (pair (contract %pour_dest unit) (key %pour_authorizer))))) ;
+  code { DUP ;
+         CAR ;
+         IF_LEFT
+           { DIP { CDR ; DUP ; NIL @operations operation ; SWAP } ;
+             SWAP ;
+             CAR ;
+             DUP ;
+             CDR %key_info @% ;
+             DIP { CAR %replay_counter @% ;
+                   DIP { DUP ; CDR %signatures @% } ;
+                   SWAP ;
+                   DIP { DIP { CAR %action_input @% ; DUP } ;
+                         SELF ;
+                         ADDRESS ;
+                         PAIR ;
+                         SWAP ;
+                         PAIR ;
+                         PACK @packed } } ;
+             SWAP ;
+             DIP { DUP ;
+                   CAR %key_groups @% ;
+                   DIP { CDR %overall_threshold @% ; INT @overall_counter ; SWAP } } ;
+             ITER { DIP { IF_CONS
+                            { DIP { SWAP } ;
+                              DUP ;
+                              CAR @%% ;
+                              DIP { CDR @%% ; INT @group_counter ; SWAP } }
+                            { { UNIT ; FAILWITH } } } ;
+                    ITER { DIP { IF_CONS {} { { UNIT ; FAILWITH } } } ;
+                           IF_NONE
+                             { DROP }
+                             { SWAP ;
+                               DIP { DIP { SWAP ; DIP { DIP { PUSH int -1 ; ADD @group_counter } } ; DUP } } ;
+                               CHECK_SIGNATURE @sig_ok ;
+                               { IF {} { { UNIT ; FAILWITH } } } ;
+                               SWAP } } ;
+                    { DIP { DIP { PUSH int 0 ;
+                                  { COMPARE ; GE @group_threshold_met } ;
+                                  IF { DIP { PUSH int -1 ; ADD @overall_counter } } {} } } } ;
+                    IF_CONS { { UNIT ; FAILWITH } } {} ;
+                    SWAP } ;
+             IF_CONS { { UNIT ; FAILWITH } } {} ;
+             DROP ;
+             PUSH int 0 ;
+             { COMPARE ; GE @overall_threshold_met } ;
+             { IF {} { { UNIT ; FAILWITH } } } ;
+             { DIP { DIP { DUP ;
+                           CAR ;
+                           DUP ;
+                           CAR %replay_counter @% ;
+                           PUSH nat 1 ;
+                           ADD @replay_counter ;
+                           DIP { CDR %key_info @% } ;
+                           PAIR %@ %@ ;
+                           DIP { CDR } ;
+                           PAIR } } } ;
+             IF_LEFT
+               { IF_LEFT
+                   { DUP ;
+                     DIP { CDR %transfer_amount @% ;
+                           DUP ;
+                           BALANCE @balance ;
+                           { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
+                           SWAP ;
+                           DIP { DIP { DUP ;
+                                       CDR ;
+                                       DUP ;
+                                       CAR ;
+                                       CAR %vesting_quantities @% ;
+                                       DUP ;
+                                       CAR %vested_balance @% ;
+                                       DUP } ;
+                                 DUP ;
+                                 DIP { { { COMPARE ; LE } ; IF {} { { UNIT ; FAILWITH } } } } ;
+                                 SWAP ;
+                                 SUB @vested_balance ;
+                                 DIP { CDR %vesting_increment @% } ;
+                                 PAIR @vesting_quantities %@ %@ ;
+                                 DIP { DUP ; CAR ; CDR %vesting_schedule @% ; DIP { CDR %pour_info @% } } ;
+                                 PAIR @vesting %@ %@ ;
+                                 PAIR %@ %@ ;
+                                 SWAP ;
+                                 CAR ;
+                                 PAIR } } ;
+                     DUP ;
+                     CDR %transfer_amount @% ;
+                     DIP { CAR %dest @% } ;
+                     UNIT ;
+                     TRANSFER_TOKENS @transfer_op ;
+                     CONS @operations }
+                   { SWAP ;
+                     DIP { SWAP ;
+                           DUP ;
+                           CAR ;
+                           DIP { CDR ; CAR %vesting @% ; PAIR %vesting %pour_info } ;
+                           PAIR @storage } } }
+               { IF_LEFT
+                   { DUP ;
+                     DUP ;
+                     CAR %key_groups @% ;
+                     DIP { CDR %overall_threshold @new_threshold ;
+                           DUP ;
+                           PUSH nat 0 ;
+                           { { COMPARE ; LT } ; IF {} { { UNIT ; FAILWITH } } } ;
+                           PUSH @counter nat 0 } ;
+                     ITER { DUP ;
+                            CAR %signatories @%% ;
+                            DIP { CDR %group_threshold @%% ;
+                                  DUP ;
+                                  PUSH nat 0 ;
+                                  { { COMPARE ; LT } ; IF {} { { UNIT ; FAILWITH } } } } ;
+                            SIZE @num_keys ;
+                            { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
+                            PUSH nat 1 ;
+                            ADD @counter } ;
+                     { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
+                     SWAP ;
+                     DIP { DIP { DUP ; CAR ; CAR %replay_counter } ;
+                           SWAP ;
+                           PAIR %@ %key_info ;
+                           DIP { CDR } ;
+                           PAIR @storage } }
+                   { SET_DELEGATE @set_delegate_op ; CONS } } ;
+             PAIR }
+           { IF_NONE
+               { CDR ;
+                 DUP ;
+                 CDR ;
+                 DUP ;
+                 DIP { CDR %pour_info @% } ;
+                 CAR %vesting @% ;
+                 DUP ;
+                 CDR %vesting_schedule @% ;
+                 DUP ;
+                 CAR %next_payout @% ;
+                 DUP ;
+                 NOW ;
+                 { COMPARE ; GT } ;
+                 { IF {} { { UNIT ; FAILWITH } } } ;
+                 DIP { CDR %payout_interval @% ; DUP } ;
+                 ADD @new_next_payout ;
+                 PAIR %next_payout %@ @new_vesting_schedule ;
+                 SWAP ;
+                 CAR %vesting_quantities @% ;
+                 DUP ;
+                 CAR %vested_balance @% ;
+                 DIP { CDR %vesting_increment @% ; DUP } ;
+                 ADD @new_balance ;
+                 PAIR %vested_balance %@ ;
+                 PAIR %vesting_quantities %vesting_schedule ;
+                 PAIR %vesting %@ ;
+                 SWAP ;
+                 CAR ;
+                 PAIR @storage ;
+                 NIL operation }
+               { DIP { CDR ;
+                       DUP ;
+                       CDR ;
+                       DUP ;
+                       CAR %vesting @% ;
+                       DUP ;
+                       CAR %vesting_quantities @% ;
+                       DUP ;
+                       CAR %vested_balance @% ;
+                       DUP } ;
+                 DUP ;
+                 DIP { CDR %pour_amount @%% ;
+                       DUP ;
+                       DIP { { { COMPARE ; LE } ; IF {} { { UNIT ; FAILWITH } } } } ;
+                       DUP ;
+                       BALANCE @balance ;
+                       { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
+                       SWAP ;
+                       SUB @new_cur_balance ;
+                       DIP { CDR %vesting_increment @% } ;
+                       PAIR %vested_balance %@ @vesting_quantities ;
+                       DIP { CDR %vesting_schedule @% } ;
+                       PAIR %@ %@ @vesting ;
+                       DIP { CDR %pour_info @% ; DUP ; IF_NONE { { UNIT ; FAILWITH } } {} } ;
+                       SWAP ;
+                       DIP { PAIR %@ %@ ;
+                             SWAP ;
+                             CAR ;
+                             DUP ;
+                             CAR %replay_counter @% ;
+                             DUP ;
+                             PUSH nat 1 ;
+                             ADD @replay_counter ;
+                             SWAP ;
+                             SELF ;
+                             ADDRESS ;
+                             PAIR ;
+                             DIP { DIP { CDR %key_info @% } ; PAIR %@ %@ ; PAIR @storage } } } ;
+                 DUP ;
+                 DIP { SWAP ;
+                       DUP ;
+                       CAR %pour_dest @% ;
+                       DIP { DUP ;
+                             CDR %pour_authorizer @% ;
+                             DIP { CAR %pour_dest @% ;
+                                   SWAP ;
+                                   DUP ;
+                                   CAR %pour_auth @% ;
+                                   DIP { CDR %pour_amount @% ; SWAP ; PAIR ; PAIR ; PACK @packed } } ;
+                             CHECK_SIGNATURE @pour_auth_ok ;
+                             { IF {} { { UNIT ; FAILWITH } } } ;
+                             NIL operation } } ;
+                 CDR %pour_amount @% ;
+                 UNIT ;
+                 TRANSFER_TOKENS @pour_op ;
+                 CONS } ;
+             PAIR } } }

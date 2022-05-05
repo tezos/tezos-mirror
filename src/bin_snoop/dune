@@ -1,5 +1,7 @@
-(env
- (static (flags (:standard -ccopt -static))))
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (static (flags (:standard -ccopt -static))))
 
 (executable
  (name main_snoop)
@@ -20,9 +22,9 @@
   pyml
   pyml-plot
   prbnmcn-stats)
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib_unix
    -open Tezos_benchmark)))

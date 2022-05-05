@@ -492,7 +492,7 @@ let action_to_expr ~loc = function
 
 let action_of_expr e =
   let fail () =
-    Error_monad.fail
+    fail
       (Action_deserialisation_error
          (Tezos_micheline.Micheline.strip_locations e))
   in

@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 let never_ending () = fst (Lwt.wait ())
 
@@ -39,25 +39,11 @@ let worker name ~on_event ~run ~cancel =
           (`Failed (Printf.sprintf "Exception: %s" (Printexc.to_string e))))
       cancel
   in
-  on_event name `Started >>= fun () ->
+  let* () = on_event name `Started in
   let p = Lwt.catch run fail in
   Lwt.on_termination p (Lwt.wakeup stopper) ;
-  stop >>= fun () ->
+  let* () = stop in
   Lwt.catch (fun () -> on_event name `Ended) (fun _ -> Lwt.return_unit)
 
 let worker name ~on_event ~run ~cancel =
   Lwt.no_cancel (worker name ~on_event ~run ~cancel)
-
-let rec fold_left_s_n ~n f acc l =
-  if n = 0 then Lwt.return (acc, l)
-  else
-    match l with
-    | [] -> Lwt.return (acc, [])
-    | x :: l ->
-        f acc x >>= fun acc ->
-        (fold_left_s_n [@ocaml.tailcall]) f ~n:(n - 1) acc l
-
-let rec find_map_s f = function
-  | [] -> Lwt.return_none
-  | x :: l ->
-      Lwt.bind (f x) (function None -> find_map_s f l | r -> Lwt.return r)

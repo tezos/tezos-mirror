@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
@@ -15,7 +15,7 @@ else
 fi
 
 
-export OPAMYES=${OPAMYES:=true}
+export OPAMYES="${OPAMYES:=true}"
 
 ## In another ideal world, this list should be extracted from the pinned
 ## packages and filter only conf-* packages
@@ -25,7 +25,7 @@ export OPAMYES=${OPAMYES:=true}
 # Note that install_build_deps.sh calls install_build_deps.rust.sh
 # which checks whether Rust is installed with the right version and explains how
 # to install it if needed, so using opam depext is redundant anyway.
-conf_packages="conf-gmp conf-libev conf-pkg-config conf-hidapi conf-autoconf conf-libffi conf-zlib" #conf-rust
+conf_packages="conf-gmp conf-libev conf-pkg-config conf-hidapi conf-autoconf conf-zlib" #conf-rust
 
 # Opam < 2.1 uses opam-depext as a plugin, later versions provide the option
 # `--depext-only`:

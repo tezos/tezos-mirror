@@ -1,5 +1,5 @@
-Tezt: Long Tests
-================
+Tezt: Long Tests and Performance Regression Test Framework
+============================================================
 
 :doc:`Tezt <tezt>` can also be used for long tests.
 Here are the differences with regular Tezt tests:
@@ -11,13 +11,16 @@ Here are the differences with regular Tezt tests:
   :src:`tezt/tests/main.ml`;
 - long tests are registered with ``Long_test.register`` instead
   of ``Test.register``;
-- long tests have easy access to an InfluxDB database to send data
-  points such as how long it takes to do something;
-- long tests have easy access to a Grafana instance that they can
-  update to create graphs displaying the data points sent to InfluxDB;
-- long tests have easy access to a Slack webhook that can be used to
-  send alerts when measurements differ significantly from previous
-  tests.
+- long tests have easy access to a Performance Regression Test framework
+  which provides these features:
+
+  - Persist measurement samples (in an `InfluxDB <https://github.com/influxdata/influxdb>`_ database) such as how long it takes
+    to do something. These samples will be used to prevent regressions of
+    performance.
+  - Provide easy access to a `Grafana <https://github.com/grafana/grafana>`_ instance that can be updated to
+    create graphs displaying the samples sent to InfluxDB;
+  - Call Slack webhooks to send alerts when a performance regression has
+    been detected.
 
 Adding a Long Test
 ------------------
@@ -31,7 +34,7 @@ in :src:`tezt/long_tests/main.ml` instead of
 ``Test.register``. The main difference is that you have to declare a
 timeout (that should be significantly overestimated, see the
 documentation of the ``timeout`` type in
-:src:`tezt/long_tests/long_test.mli`) and that ``Long_test.register``
+:src:`tezt/lib_performance_regression/long_test.mli`) and that ``Long_test.register``
 will handle InfluxDB, Grafana and Slack alerts.  Just like regular
 Tezt tests, your test should be implemented in the same file with other
 thematically-related tests, with only a single line in
@@ -45,11 +48,13 @@ however ask that a new dedicated machine is created to run your test.
 Please ask on the ``#tests`` Slack channel of ``tezos-dev`` before
 merging.
 
-Time Series, Alerts and Graphs
-------------------------------
+.. _performance_regression_test_fw:
+
+Performance Regression Test framework: Time Series, Alerts and Graphs
+---------------------------------------------------------------------
 
 Long tests can use functions from the ``Long_test`` module
-(:src:`tezt/long_tests/long_test.mli`) to send data points to InfluxDB,
+(:src:`tezt/lib_performance_regression/long_test.mli`) to send data points to InfluxDB,
 which is a time-series database. A time-series database stores values
 annotated with a timestamp. In the particular case of InfluxDB,
 data points are composed of:
@@ -138,68 +143,92 @@ tests will find it under ``/s3data/myfolder/myfile``.
 Testing Your Benchmarks Locally
 -------------------------------
 
-When developing a benchmark depending on the long test framework, it can
-be useful to test it using a development database so that your tests does
-not impact the production database.
+When developing a benchmark depending on the Performance Regression Test
+framework, it can be useful to test it using development backends so that
+your tests does not impact production ones.
 
-This section describes how to easily set up an InfluxDB database so that the
-framework can operate with it.
+The Performance Regression Test framework now contains a setup that can
+automatically provision and configure InfuxDB and Grafana instances using
+Docker Compose.
 
-The following steps assume that you already installed Docker and correctly
-configured it. For more information on this subject, please refer to:
-https://docs.docker.com/engine/install/#desktop
+Provisioning InfluxDB and Grafana
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We will first install and bootstrap an InfluxDB database. This can be done
-using the official Docker image: https://hub.docker.com/_/influxdb
+The following steps assume that you already installed ``Docker`` as well
+as ``docker-compose`` and correctly configured it. For more information
+on this subject, please refer to:
 
-From a terminal, run the following commands::
+- https://docs.docker.com/engine/install/#desktop
+- https://docs.docker.com/compose/
 
-    mkdir $HOME/influxdb
+From the root folder of ``tezos`` run the following commands from a terminal
+to start the Docker containers in background::
 
-    docker run -d -p 8086:8086 \
-      -v $HOME/influxdb/data:/var/lib/influxdb2 \
-      -v $HOME/influxdb/config:/etc/influxdb2 \
-      -e DOCKER_INFLUXDB_INIT_MODE=setup \
-      -e DOCKER_INFLUXDB_INIT_USERNAME=<user> \
-      -e DOCKER_INFLUXDB_INIT_PASSWORD=<password> \
-      -e DOCKER_INFLUXDB_INIT_ORG=my-org \
-      -e DOCKER_INFLUXDB_INIT_BUCKET=my-bucket \
-      influxdb:1.8
+    docker-compose -f tezt/lib_performance_regression/local-sandbox/docker-compose.yml up -d
 
-This will download an image of the version 1.8 of InfluxDB and start a
-container with it. Version 1.8 is mandatory as the framework does not
-support newer versions for now.
+After containers have been started, you can test that InfluxDB is properly started and
+that the ``performance_regression`` database has been automatically created::
 
-Of course, ``<user>`` and ``<password>`` should be replaced by values of your choice.
+    curl --get http://localhost:8086/query\?pretty\=true --data-urlencode "q=show databases"
 
-When the container is bootstrapped, you need to create the database
-that will be used by the framework.
-
-Run the following command to connect to the InfluxDB server and create
-a database named ``prt``::
-
-    curl -X POST http://localhost:8086/query\?pretty\=true \
-    --user "<user>:<password>" \
-    --data-urlencode "q=create database prt"
-
-After the database is created, you can use the following JSON
-configuration to set up the framework with your local database:
-
-``tezt_config.json``:
-
-.. code-block:: json
+The command should display the following::
 
     {
-      "influxdb": {
-        "url": "http://localhost:8086",
-        "database": "prt",
-        "username": "<user>",
-        "password": "<password>"
-      }
+        "results": [
+            {
+                "statement_id": 0,
+                "series": [
+                    {
+                        "name": "databases",
+                        "columns": [
+                            "name"
+                        ],
+                        "values": [
+                            [
+                                "performance_regression"
+                            ],
+                            [
+                                "_internal"
+                            ]
+                        ]
+                    }
+                ]
+            }
+        ]
     }
 
-For more information about the configuration file, please refer
-to the `Long test module API <https://gitlab.com/tezos/tezos/-/blob/master/tezt/long_tests/long_test.mli>`__.
+Also, you should be able to connect to the Grafana web UI by connecting to
+``http://localhost:3000`` on your browser. By going to the ``Datasources`` menu in the
+webapp configuration, you can see that an InfluxDB datasource has been pre-configured
+and is connected to the ``performance_regression``.
 
+Note that as security does not really matter for tests, it has been disable for ease.
+This is why you can connect to the Graphana web app with full privileges or send requests
+to InfluxDB without having to authenticate.
 
+To stop the container, simply run::
 
+    docker-compose -f tezt/lib_performance_regression/local-sandbox/docker-compose.yml down
+
+The created containers use persistent Docker volumes, so that data stored in the database
+and created dashboards will be preserved between container runs. To permanently remove these
+docker volumes, run the command `docker volume rm local-sandbox_influxdb local-sandbox_grafana`.
+
+Configuring and Running Tezt Long Tests
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For more information about how to use the configuration file, please refer
+to the `Long test module API <https://tezos.gitlab.io/api/odoc/_html/tezt-performance-regression/Tezt_performance_regression/>`__.
+
+A predefined configuration has already been shiped in :src:`tezt/lib_performance_regression/local-sandbox/tezt_config.json`.
+It allows to use the InfluxDB and Grafana instances set up by the
+Docker compose file presented in the previous section.
+
+All content related to Grafana and InfluxDB has already been set and can be used as is.
+
+Other aspects of the configuration (for example the ``test_data_path``) should be updated to match the needs
+of your local machine.
+
+To run Tezt long tests, run the following command::
+
+    TEZT_CONFIG=tezt/lib_performance_regression/local-sandbox/tezt_config.json dune exec tezt/long_tests/main.exe

@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The current time according to the system clock *)
-val now : unit -> Ptime.t
-
 (** [sleep t] is an Lwt promise that resolves after [t] time has elapsed.
     If [t] is negative, [sleep t] is already resolved. *)
 val sleep : Ptime.Span.t -> unit Lwt.t

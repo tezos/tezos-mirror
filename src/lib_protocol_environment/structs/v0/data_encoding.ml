@@ -25,6 +25,16 @@
 
 include Data_encoding
 
+module Json = struct
+  include Data_encoding.Json
+
+  (* Suppress some optional parameters *)
+
+  let construct encoding v = construct encoding v
+
+  let destruct encoding j = destruct encoding j
+end
+
 module Binary = struct
   include Binary
 

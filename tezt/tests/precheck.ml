@@ -120,7 +120,7 @@ let precheck_block =
     Test.fail "prechecking of block did not executed as expected"
   else return ()
 
-let forge_block ~protocol ?client node ~key =
+let forge_block ?client node ~key ~with_op =
   Log.info "Creating another node to forge a block" ;
   let* client =
     match client with
@@ -128,7 +128,7 @@ let forge_block ~protocol ?client node ~key =
     | Some c -> return c
   in
   let* node_level = Client.level client in
-  let* node2 = Node.init [] in
+  let* node2 = Node.init [Synchronisation_threshold 0] in
   let* client2 = Client.(init ~endpoint:(Node node2) ()) in
   let* () =
     Client.Admin.trust_address ~endpoint:(Node node) ~peer:node2 client
@@ -138,12 +138,20 @@ let forge_block ~protocol ?client node ~key =
   let* node2_id = Node.wait_for_identity node2 in
   let* () = Client.Admin.kick_peer ~peer:node2_id client in
   let* () =
-    let open Protocol in
-    if protocol = Hangzhou then Client.bake_for ~keys:[key] client2
-    else
-      (* We want an empty block, in tenderbake, we can simply propose
-         so that there is no endorsement operations. *)
-      Client.propose_for ~key:[key] ~force:true client2
+    if with_op then
+      let* _ =
+        Operation.inject_transfer
+          ~source:Constant.bootstrap1
+          ~dest:Constant.bootstrap2
+          client2
+      in
+      unit
+    else unit
+  in
+  let* () =
+    (* We want an empty block, in tenderbake, we can simply propose
+       so that there is no endorsement operations. *)
+    Client.propose_for ~key:[key] ~force:true client2
   in
   let* shell =
     Client.shell_header client2 >>= fun shell ->
@@ -204,7 +212,7 @@ let propagate_precheckable_bad_block =
            let* () = Client.bake_for ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
-  let* block_header = forge_block ~protocol ~client n1 ~key:bootstrap1 in
+  let* block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:false in
   (* Put a bad context *)
   Log.info "Crafting a block header with a bad context hash" ;
   let dummy_context_hash =
@@ -254,7 +262,9 @@ let propagate_precheckable_bad_block =
                 |> as_opt)
             with
             | None -> None
-            | Some _ -> if !got_prechecked then Some () else assert false))
+            | Some _ ->
+                if !got_prechecked then Some ()
+                else Test.fail "The block was not expected to be prechecked"))
   in
   (* Wait all nodes to precheck the block but fail on validation *)
   let precheck_waiter =
@@ -263,7 +273,7 @@ let propagate_precheckable_bad_block =
   let p =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
   in
-  let* () = Process.check_error p in
+  let* () = Process.check_error ~msg:(rex "Inconsistent hash") p in
   let* () =
     Lwt.pick
       [
@@ -275,14 +285,142 @@ let propagate_precheckable_bad_block =
   (* Also check that re-injecting the bad block fails *)
   let* () =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
-    |> Process.check_error
+    |> Process.check_error ~msg:(rex "Inconsistent hash")
   in
-  Log.info "Bake a valid block and check the cluster receives it" ;
+  Log.info
+    "Bake a valid block and check the cluster receives it (ensuring the \
+     cluster is still connected)." ;
+  (* One final bake to ensure everyone is at the same level *)
+  let* () = Client.bake_for ~keys:[bootstrap1] client in
+  (* activation block + four blocks + the final bake *)
+  wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
+
+let propagate_precheckable_bad_block_signature =
+  let blocks_to_bake = 4 in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"forge block with wrong signature"
+    ~tags:["precheck"; "fake_block"; "propagation"; "signature"]
+  @@ fun protocol ->
+  (* Expected topology is :
+               N3
+              /  \
+      N1 -- N2    N5
+              \  /
+               N4
+  *)
+  Log.info "Setting up the node topology" ;
+  let n1 = Node.create [] in
+  let ring =
+    Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
+  in
+  let n2 = List.hd ring in
+  Cluster.ring ring ;
+  Cluster.connect [n1] [n2] ;
+  let cluster = n1 :: ring in
+  Log.info "Starting up cluster" ;
+  let* () =
+    Cluster.start
+      ~wait_connections:true
+      ~event_sections_levels:[("validator.block", `Debug)]
+      cluster
+  in
+  Log.info "Cluster initialized" ;
+  let* client = Client.(init ~endpoint:(Node n1) ()) in
+  let* () = Client.activate_protocol ~protocol client in
+  let bootstrap1 = Constant.bootstrap1.alias in
+  let* () =
+    List.init blocks_to_bake Fun.id
+    |> List.map succ
+    |> Lwt_list.iter_s (fun i ->
+           let* () = Client.bake_for ~keys:[bootstrap1] client in
+           wait_for_cluster_at_level cluster i)
+  in
+  let* op_block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:true in
+  let* block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:false in
+  (* Put a bad context *)
+  Log.info "Crafting a block header with a bad context hash" ;
+  let bad_block_header =
+    JSON.update
+      "protocol_data"
+      (fun _ ->
+        JSON.annotate
+          ~origin:"bad context hash"
+          (`String JSON.(op_block_header |-> "protocol_data" |> as_string)))
+      block_header
+  in
+  let* bad_block_header_hex =
+    Codec.encode ~name:"block_header" (JSON.unannotate bad_block_header)
+    >>= fun hex -> String.trim hex |> return
+  in
+  (* Remove the signature *)
+  let unsigned_bad_block_header_hex =
+    String.sub bad_block_header_hex 0 (String.length bad_block_header_hex - 128)
+  in
+  let* bad_signature =
+    Client.sign_block client unsigned_bad_block_header_hex ~delegate:bootstrap1
+    >>= fun s -> String.trim s |> return
+  in
+  let signed_bad_block_header_hex =
+    String.concat "" [unsigned_bad_block_header_hex; bad_signature]
+  in
+  let injection_json =
+    `O
+      [
+        ("data", `String signed_bad_block_header_hex);
+        ("operations", `A (List.init 4 (fun _ -> `A [])));
+      ]
+  in
+  let wait_precheck_but_validation_fail node =
+    let got_prechecked = ref false in
+    Node.wait_for node "node_block_validator.v0" (fun value ->
+        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
+        | Some "prechecked" ->
+            got_prechecked := true ;
+            None
+        | Some _ -> None
+        | None -> (
+            match
+              JSON.(
+                value |=> 1 |-> "event" |-> "failed_validation_after_precheck"
+                |> as_opt)
+            with
+            | None -> None
+            | Some _ ->
+                if !got_prechecked then Some ()
+                else Test.fail "The block was not expected to be prechecked"))
+  in
+  (* Wait all nodes to precheck the block but fail on validation *)
+  let precheck_waiter =
+    Lwt_list.iter_p wait_precheck_but_validation_fail cluster
+  in
+  let p =
+    Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
+  in
+  let* () = Process.check_error ~msg:(rex "Invalid payload hash") p in
+  let* () =
+    Lwt.pick
+      [
+        ( Lwt_unix.sleep 30. >>= fun () ->
+          Test.fail "timeout while waiting for precheck" );
+        precheck_waiter;
+      ]
+  in
+  (* Also check that re-injecting the bad block fails *)
+  let* () =
+    Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
+    |> Process.check_error ~msg:(rex "Invalid payload hash")
+  in
+  let* _ = RPC.get_block client in
+  Log.info
+    "Bake a valid block and check the cluster receives it (ensuring the \
+     cluster is still connected)." ;
   (* One final bake to ensure everyone is at the same level *)
   let* () = Client.bake_for ~keys:[bootstrap1] client in
   (* activation block + four blocks + the final bake *)
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 
 let register ~protocols =
-  precheck_block ~protocols ;
-  propagate_precheckable_bad_block ~protocols
+  precheck_block protocols ;
+  propagate_precheckable_bad_block protocols ;
+  propagate_precheckable_bad_block_signature protocols

@@ -1,17 +1,5 @@
 ---
 
-.build_template:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
-    - .template__coverage
-  stage: build
-  before_script:
-    - . ./scripts/version.sh
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . $HOME/.venv/bin/activate
-
 .build:
   extends: .build_template
   needs: []
@@ -29,11 +17,13 @@
       fi
     - diff poetry.lock /home/tezos/poetry.lock
     - diff pyproject.toml /home/tezos/pyproject.toml
-    - dune build @runtest_dune_template
+    # We add $COVERAGE_OPTIONS to all dune build commands to enable reuse of
+    # build artifacts.
+    - dune build $COVERAGE_OPTIONS @runtest_dune_template
     # 2. Actually build
-    - make all build-test
+    - make all build-sandbox build-unreleased
     # 3. Also build the tps evaluation tool which is not part of the default build.
-    - dune build src/bin_tps_evaluation
+    - dune build $COVERAGE_OPTIONS src/bin_tps_evaluation
     # 4. clean-up caches before uploading the cache
     - opam clean
   cache:
@@ -56,6 +46,8 @@ build_arm64:
     - .rules_template__development_arm64
   variables:
     ARCH: "arm64"
+    # Disable coverage for arm64
+    COVERAGE_OPTIONS: ""
   tags:
     - arm64
 
@@ -65,7 +57,6 @@ build_x86_64:
     - .rules_template__development
   variables:
     ARCH: "x86_64"
-    COVERAGE_OPTIONS: --instrument-with bisect_ppx
 
 # similar to the build template above, this template
 # compiles all binaries using the static profile.
@@ -73,7 +64,11 @@ build_x86_64:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies_template
+  variables:
+    ARCH: ""
   before_script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
     # dune build @install make ocamlopt stack overflow when compiling
     # protocol functor with static linking (because of
@@ -83,12 +78,12 @@ build_x86_64:
       @src/lib_protocol_compiler/install
       $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done)
       --profile static
-    - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
+    - mkdir -p "tezos-binaries/$ARCH" && install -t "tezos-binaries/$ARCH" _build/install/default/bin/*
     # Strip debug symbols in binaries
-    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+    - find "tezos-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
   artifacts:
     paths:
-      - tezos-binaries/*
+      - "tezos-binaries/$ARCH/*"
 
 # Static binaries for x86_64 are necessary for development branches, as we want to make
 # sure the build does not break. We also need it for release tags, to as its artifacts
@@ -96,19 +91,27 @@ build_x86_64:
 
 # arm64 static binaries are built in the stage `build_release` and only for master and releases.
 build:static-x86_64-linux-binaries:
-  extends: .build_static_binaries_template
+  extends:
+    - .build_static_binaries_template
+    - .rules_template__not_on_latest_release
   script:
     - sudo apk --no-cache --virtual add upx
     # Compress resulting binaries
-    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+    - find tezos-binaries/x86_64 -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+  variables:
+    ARCH: "x86_64"
   stage: build
+  needs: []
 
 build:static-arm64-linux-binaries:
   extends:
       - .build_static_binaries_template
       - .rules_template__master_and_releases
-  stage: build_release
+  variables:
+    ARCH: "arm64"
+  stage: build
   script:
     - echo "No compression for now"
   tags:
     - arm64
+  needs: []

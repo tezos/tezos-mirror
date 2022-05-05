@@ -23,27 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let commands =
-  [
-    Benchmark_tps_command.cmd;
-    Estimate_average_block_command.cmd;
-    Gas_tps_command.cmd;
-  ]
-
-let term =
-  let open Cmdliner.Term in
-  ret (const (`Help (`Pager, None)))
-
-let info =
-  let version = Tezos_version.Bin_version.version_string in
-  Cmdliner.Term.info
-    ~doc:"The Tezos TPS evaluation tool"
-    ~version
-    "tezos-tps-evaluation"
-
 let () =
-  match Cmdliner.Term.eval_choice (term, info) commands with
-  | `Error _ -> exit 1
-  | `Help -> exit 0
-  | `Version -> exit 0
-  | `Ok () -> exit 0
+  Long_test.init () ;
+  Dashboard.update_grafana_dashboard () ;
+  Benchmark_tps_command.register () ;
+  Estimate_average_block_command.register () ;
+  Gas_tps_command.register () ;
+  Test.run ()

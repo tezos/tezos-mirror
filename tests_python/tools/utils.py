@@ -3,7 +3,6 @@ Assertions are retried to avoid using arbitrary time constants in test.
 """
 import datetime
 from typing import Any, List, Tuple, Pattern, Callable
-import hashlib
 import contextlib
 import json
 import os
@@ -12,9 +11,6 @@ import subprocess
 import time
 
 import urllib.error
-import base58check
-import ed25519
-import pyblake2
 import requests
 from client.client import Client
 from client.client_output import (
@@ -328,86 +324,6 @@ def rpc(
     return res
 
 
-def sign(data: bytes, secret_key: bytes) -> str:
-    """Sign digest of data with secret key
-
-    Uses blake2b hash function (32 bytes digest)
-    Ed25519 signing scheme
-
-    Parameters:
-        data (bytes): data to be signed
-        secret_key (bytes): secret key
-
-    Returns:
-        str: signature of digest of data (hex string)
-    """
-    blake_hash = pyblake2.blake2b(digest_size=32)
-    blake_hash.update(data)
-    digest = blake_hash.digest()
-    res = ed25519.SigningKey(secret_key)
-    return res.sign(digest).hex()
-
-
-def b58_key_to_hex(b58_key: str) -> str:
-    """Translate a tezos b58check key encoding to a hex string.
-
-    Params:
-        b58_sig (str): tezos b58check encoding of a key
-
-    Returns:
-        str: hex string of key
-    """
-    # we get rid of prefix and final checksum
-    return base58check.b58decode(b58_key).hex()[8:-8]
-
-
-def b58_sig_to_hex(b58_sig: str) -> str:
-    """Translate a tezos b58check signature encoding to a hex string.
-
-    Params:
-        b58_sig (str): tezos b58check encoding of a signature
-
-    Returns:
-        str: hex string of signature
-    """
-    # we get rid of prefix and final checksum
-    return base58check.b58decode(b58_sig).hex()[10:-8]
-
-
-def hex_sig_to_b58(hexsig: str) -> str:
-    """Translate a hex signature to a tezos b58check encoding.
-
-    Params:
-        hexsig (str): hex string encoded signature
-
-    Returns:
-        str: b58check encoding of signature
-    """
-
-    def sha256(data):
-        return hashlib.sha256(data).digest()
-
-    bytes_sig = bytes.fromhex(hexsig)
-    # Before translating to b58check encoding, we add a prefix at the beginning
-    # of the sig, and a checksum at the end
-    # The prefix enforces that the b58_sig starts with 'edsig's
-    edsig_prefix = bytes([9, 245, 205, 134, 18])
-    prefixed_bytes_sig = edsig_prefix + bytes_sig
-    checksum = sha256(sha256(prefixed_bytes_sig))[0:4]
-    final_sig = prefixed_bytes_sig + checksum
-    b58_sig = base58check.b58encode(final_sig)
-    return b58_sig.decode('ascii')
-
-
-def sign_operation(encoded_operation: str, secret_key: str) -> str:
-    watermarked_operation = b'\x03' + bytes.fromhex(encoded_operation)
-    sender_sk_hex = b58_key_to_hex(secret_key)
-    sender_sk_bin = bytes.fromhex(sender_sk_hex)
-    sig_hex = sign(watermarked_operation, sender_sk_bin)
-    signed_op = encoded_operation + sig_hex
-    return signed_op
-
-
 def mutez_of_tez(tez: float):
     return int(tez * 1000000)
 
@@ -438,18 +354,13 @@ def assert_run_failure(pattern: str, mode: str = 'stderr'):
         yield None
         assert False, "Code ran without throwing exception"
     except subprocess.CalledProcessError as exc:
-        stdout_output = exc.stdout
-        stderr_output = exc.stderr
-        data = []  # type: List[str]
         if mode == 'stderr':
-            data = stderr_output.split('\n')
+            output = exc.stderr
         else:
-            data = stdout_output.split('\n')
-        for line in data:
-            if re.search(pattern, line):
-                return
-        data_pretty = "\n".join(data)
-        assert False, f"Could not find '{pattern}' in '{data_pretty}'"
+            output = exc.stdout
+        if re.search(pattern, output):
+            return
+        assert False, f"Could not find '{pattern}' in '{output}'"
     except Exception as exc:  # pylint: disable=broad-except
         assert_msg = f'Expected CalledProcessError but got {type(exc)}'
         assert False, assert_msg
@@ -729,3 +640,25 @@ def originate(
     bake(client, baker)
     assert check_block_contains_operations(client, [origination.operation_hash])
     return origination
+
+
+# Check if a binary is statically compiled
+# used to skip tests
+def check_static_binary(execname: str):
+    ret = subprocess.Popen(
+        ['file', execname], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    # Example of line returned by "file":
+    # tezos-node: ELF 64-bit LSB executable, x86-64, version 1 (SYSV),
+    # statically linked, no section header
+    return "statically linked" in str(ret.communicate()[0])
+
+
+def get_tezos_node_version() -> str:
+    cmd = ["dune", "exec", "tezos-version"]
+    process_ret = subprocess.run(
+        cmd, capture_output=True, text=True, check=True
+    )
+    version = process_ret.stdout.strip()
+    assert version, "version should not be empty"
+    return version

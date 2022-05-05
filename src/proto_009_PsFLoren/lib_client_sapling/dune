@@ -1,19 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_sapling_009_PsFLoren)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-sapling-009-PsFLoren)
- (libraries tezos-base
-            tezos-crypto
-            tezos-client-base
-            tezos-signer-backends
-            tezos-client-009-PsFLoren
-            tezos-client-009-PsFLoren-commands
-            tezos-protocol-009-PsFLoren)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-crypto
+  tezos-stdlib-unix
+  tezos-client-base
+  tezos-signer-backends
+  tezos-client-009-PsFLoren
+  tezos-client-009-PsFLoren-commands
+  tezos-protocol-009-PsFLoren
+  tezos-protocol-009-PsFLoren.environment)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_client_base
-                   -open Tezos_client_009_PsFLoren
-                   -open Tezos_client_009_PsFLoren_commands
-                   -open Tezos_protocol_009_PsFLoren
-                   -open Tezos_protocol_environment_009_PsFLoren)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base
+   -open Tezos_client_009_PsFLoren
+   -open Tezos_client_009_PsFLoren_commands
+   -open Tezos_protocol_009_PsFLoren
+   -open Tezos_protocol_environment_009_PsFLoren)))

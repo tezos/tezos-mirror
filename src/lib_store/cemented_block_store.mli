@@ -141,6 +141,13 @@ val close : t -> unit
    lowest known cycle of the store. *)
 val cemented_blocks_files : t -> cemented_blocks_file array option
 
+(** [cemented_metadata_files cemented_store] returns the {b current}
+   array of cemented metadata files. The returned array is sorted in
+   ascending order such that the first element of the array is the
+   lowest known cycle of the store. *)
+val cemented_metadata_files :
+  t -> cemented_metadata_file array option tzresult Lwt.t
+
 (** [cemented_block_level_index block_store] returns the hash to level
     index. *)
 val cemented_block_level_index : t -> Cemented_block_level_index.t

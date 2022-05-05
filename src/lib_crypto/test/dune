@@ -1,23 +1,46 @@
-(tests
- (names
-  test_run
-  test_prop_signature)
- (package tezos-crypto)
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+
+(executables
+ (names test_run test_prop_signature)
+ (modes native js)
  (libraries
-  tezos-crypto
   tezos-stdlib
+  tezos-crypto
+  tezos-error-monad
   zarith
   zarith_stubs_js
-  tezos-hacl-glue-unix
+  tezos-hacl
   data-encoding
   alcotest
-  alcotest-lwt
-  lwt.unix
   qcheck-alcotest
   tezos-test-helpers)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib
    -open Tezos_crypto
    -open Tezos_error_monad.TzLwtreslib
    -open Data_encoding)))
+
+(rule
+ (alias runtest)
+ (package tezos-crypto)
+ (action (run %{dep:./test_run.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-crypto)
+ (action (run %{dep:./test_prop_signature.exe})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-crypto)
+ (action (run node %{dep:./test_run.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-crypto)
+ (action (run node %{dep:./test_prop_signature.bc.js})))

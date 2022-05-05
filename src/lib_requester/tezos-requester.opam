@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -9,11 +11,12 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-stdlib-unix"
-  "lwt-watcher" { = "0.1" }
+  "lwt-watcher" { = "0.2" }
   "tezos-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
+  "tezos-stdlib" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

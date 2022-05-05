@@ -1,100 +1,78 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/reservoir.tz]
 
 Well typed
-Gas remaining: 1039963.237 units remaining
+Gas remaining: 1039969.237 units remaining
 { parameter unit ;
   storage (pair (pair (timestamp %T) (mutez %N)) (pair (address %A) (address %B))) ;
   code { CDR
-         /* [ @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+         /* [ pair (pair timestamp mutez) address address ] */ ;
          DUP
-         /* [ @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B)
-            : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+         /* [ pair (pair timestamp mutez) address address
+            : pair (pair timestamp mutez) address address ] */ ;
          CAAR %T ;
          NOW
-         /* [ @now timestamp : timestamp
-            : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+         /* [ timestamp : timestamp : pair (pair timestamp mutez) address address ] */ ;
          COMPARE
-         /* [ int
-            : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+         /* [ int : pair (pair timestamp mutez) address address ] */ ;
          LE
-         /* [ bool
-            : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+         /* [ bool : pair (pair timestamp mutez) address address ] */ ;
          IF { DUP
-              /* [ @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B)
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ pair (pair timestamp mutez) address address
+                 : pair (pair timestamp mutez) address address ] */ ;
               CADR %N ;
               BALANCE
-              /* [ @balance mutez : mutez
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ mutez : mutez : pair (pair timestamp mutez) address address ] */ ;
               COMPARE
-              /* [ int
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ int : pair (pair timestamp mutez) address address ] */ ;
               LE
-              /* [ bool
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ bool : pair (pair timestamp mutez) address address ] */ ;
               IF { NIL operation
-                   /* [ list operation
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ list operation : pair (pair timestamp mutez) address address ] */ ;
                    PAIR
-                   /* [ pair (list operation)
-                           (pair @storage (pair (timestamp %T) (mutez %N)) (address %A) (address %B)) ] */ }
+                   /* [ pair (list operation) (pair timestamp mutez) address address ] */ }
                  { DUP
-                   /* [ @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B)
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ pair (pair timestamp mutez) address address
+                      : pair (pair timestamp mutez) address address ] */ ;
                    CDDR %B ;
                    CONTRACT
                      unit
-                   /* [ @contract option (contract unit)
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ option (contract unit) : pair (pair timestamp mutez) address address ] */ ;
                    ASSERT_SOME ;
                    BALANCE
-                   /* [ @balance mutez : @contract.some contract unit
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ mutez : contract unit : pair (pair timestamp mutez) address address ] */ ;
                    UNIT
-                   /* [ unit : @balance mutez : @contract.some contract unit
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ unit : mutez : contract unit
+                      : pair (pair timestamp mutez) address address ] */ ;
                    TRANSFER_TOKENS
-                   /* [ operation
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ operation : pair (pair timestamp mutez) address address ] */ ;
                    NIL operation
-                   /* [ list operation : operation
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ list operation : operation : pair (pair timestamp mutez) address address ] */ ;
                    SWAP
-                   /* [ operation : list operation
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ operation : list operation : pair (pair timestamp mutez) address address ] */ ;
                    CONS
-                   /* [ list operation
-                      : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+                   /* [ list operation : pair (pair timestamp mutez) address address ] */ ;
                    PAIR
-                   /* [ pair (list operation)
-                           (pair @storage (pair (timestamp %T) (mutez %N)) (address %A) (address %B)) ] */ } }
+                   /* [ pair (list operation) (pair timestamp mutez) address address ] */ } }
             { DUP
-              /* [ @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B)
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ pair (pair timestamp mutez) address address
+                 : pair (pair timestamp mutez) address address ] */ ;
               CDAR %A ;
               CONTRACT
                 unit
-              /* [ @contract option (contract unit)
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ option (contract unit) : pair (pair timestamp mutez) address address ] */ ;
               ASSERT_SOME ;
               BALANCE
-              /* [ @balance mutez : @contract.some contract unit
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ mutez : contract unit : pair (pair timestamp mutez) address address ] */ ;
               UNIT
-              /* [ unit : @balance mutez : @contract.some contract unit
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ unit : mutez : contract unit
+                 : pair (pair timestamp mutez) address address ] */ ;
               TRANSFER_TOKENS
-              /* [ operation
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ operation : pair (pair timestamp mutez) address address ] */ ;
               NIL operation
-              /* [ list operation : operation
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ list operation : operation : pair (pair timestamp mutez) address address ] */ ;
               SWAP
-              /* [ operation : list operation
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ operation : list operation : pair (pair timestamp mutez) address address ] */ ;
               CONS
-              /* [ list operation
-                 : @storage pair (pair (timestamp %T) (mutez %N)) (address %A) (address %B) ] */ ;
+              /* [ list operation : pair (pair timestamp mutez) address address ] */ ;
               PAIR
-              /* [ pair (list operation)
-                      (pair @storage (pair (timestamp %T) (mutez %N)) (address %A) (address %B)) ] */ } } }
+              /* [ pair (list operation) (pair timestamp mutez) address address ] */ } } }

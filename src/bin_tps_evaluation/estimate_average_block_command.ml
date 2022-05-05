@@ -107,9 +107,8 @@ module Db = struct
     |}
         [%blob "./sql/get_all_operations.sql"]
     in
-    Caqti_request.collect
-      Caqti_type.(tup3 string string float)
-      Encoding.contract_row
+    Caqti_request.Infix.(
+      Caqti_type.(tup3 string string float) ->! Encoding.contract_row)
       query
 
   let get_top_contracts conn_str start_date end_date limit () =
@@ -145,9 +144,8 @@ module Db = struct
     |}
         [%blob "./sql/get_all_operations.sql"]
     in
-    Caqti_request.collect
-      Caqti_type.(tup2 string string)
-      Encoding.summary_row
+    Caqti_request.Infix.(
+      Caqti_type.(tup2 string string) ->! Encoding.summary_row)
       query
 
   let get_operation_summary conn_str start_date end_date () =
@@ -198,71 +196,38 @@ module Json = struct
 end
 
 (** Execute the query against the database and formats the result. *)
-let query_db start_date end_date limit conn_str =
-  Lwt_main.run
-    ( Lwt.bind
-        (Db.get_operation_summary conn_str start_date end_date ())
-        (function
-          | Ok rows -> Lwt.return rows
-          | Error e -> Stdlib.failwith (Caqti_error.show e))
-    >>= fun summary ->
-      Lwt.bind
-        (Db.get_top_contracts conn_str start_date end_date limit ())
-        (function
-          | Ok rows -> Lwt.return rows
-          | Error e -> Stdlib.failwith (Caqti_error.show e))
-      >>= fun top_contracts ->
-      Lwt.return (Json.show_summary summary top_contracts) )
+let query_db start_date end_date contract_min_percentage conn_str =
+  let open Lwt_result_syntax in
+  let* summary = Db.get_operation_summary conn_str start_date end_date () in
+  let* top_contracts =
+    Db.get_top_contracts conn_str start_date end_date contract_min_percentage ()
+  in
+  Json.show_summary summary top_contracts ;
+  return_unit
 
-module Term = struct
-  let connection_string_arg =
-    let open Cmdliner in
-    let doc = "PostgreSQL connection string" in
-    let docv = "CONNECTION_STRING" in
-    Arg.(
-      value
-      & opt string "postgresql://postgres:postgres@localhost:5432/postgres"
-      & info ["c"; "connection-string"] ~docv ~doc)
+let query_db start_date end_date contract_min_percentage conn_str =
+  let open Lwt_syntax in
+  let+ r = query_db start_date end_date contract_min_percentage conn_str in
+  WithExceptions.Result.to_exn_f
+    ~error:(fun e -> Stdlib.Failure (Caqti_error.show e))
+    r
 
-  let start_date_arg =
-    let open Cmdliner in
-    let doc = "The start date to use in the query" in
-    let docv = "START_DATE" in
-    let info = Arg.info ["s"; "start-date"] ~docv ~doc in
-    Arg.required (Arg.opt (Arg.some Arg.string) None info)
-
-  let end_date_arg =
-    let open Cmdliner in
-    let doc = "The end date to use in the the query" in
-    let docv = "END_DATE" in
-    let info = Arg.info ["e"; "end-date"] ~docv ~doc in
-    Arg.required (Arg.opt (Arg.some Arg.string) None info)
-
-  let contract_min_percentage_arg =
-    let open Cmdliner in
-    let doc =
-      "The minimum percentage of operations for a contract to be included"
-    in
-    let docv = "CONTRACT_MIN_PERCENTAGE" in
-    Arg.(
-      value & opt float 0.1 & info ["p"; "contract-min-percentage"] ~docv ~doc)
-
-  let estimate_average_block =
-    let open Cmdliner.Term in
-    const query_db $ start_date_arg $ end_date_arg $ contract_min_percentage_arg
-    $ connection_string_arg
-end
-
-module Manpage = struct
-  let command_description =
-    "Use historical data to estimate contents of the average block"
-
-  let description = [`S "DESCRIPTION"; `P command_description]
-
-  let man = description
-
-  let info =
-    Cmdliner.Term.info ~doc:command_description ~man "estimate-average-block"
-end
-
-let cmd = (Term.estimate_average_block, Manpage.info)
+let register () =
+  Long_test.register
+    ~__FILE__
+    ~title:Dashboard.Test.estimate_average_block
+    ~tags:[Dashboard.Test.estimate_average_block]
+    ~timeout:(Long_test.Minutes 60)
+    ~executors:Long_test.[x86_executor1]
+    (fun () ->
+      let connection_string =
+        Cli.get_string
+          ~default:"postgresql://postgres:postgres@localhost:5432/postgres"
+          "connection-string"
+      in
+      let start_date = Cli.get_string "start-date" in
+      let end_date = Cli.get_string "end-date" in
+      let contract_min_percentage =
+        Cli.get_float ~default:0.1 "contract-min-percentage"
+      in
+      query_db start_date end_date contract_min_percentage connection_string)

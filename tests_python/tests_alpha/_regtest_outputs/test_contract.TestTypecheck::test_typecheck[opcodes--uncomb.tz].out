@@ -1,11 +1,11 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/uncomb.tz]
 
 Well typed
-Gas remaining: 1039992.541 units remaining
+Gas remaining: 1039993.181 units remaining
 { parameter (pair nat nat nat) ;
   storage nat ;
   code { CAR
-         /* [ @parameter pair nat nat nat ] */ ;
+         /* [ pair nat nat nat ] */ ;
          UNPAIR 3
          /* [ nat : nat : nat ] */ ;
          PUSH nat 100

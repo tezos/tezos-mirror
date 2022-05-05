@@ -24,17 +24,30 @@
 (*****************************************************************************)
 
 (** This module is the location where the proxy tweaks the behavior of a vanilla
-    client. A regular mockup client uses a [Memory_context] in place of this
+    client. A regular mockup client uses a {!Memory_context} in place of this
     implementation. Compared to [Memory_context], this instance features a
-    [M.ProxyDelegate] which under the hood relies on [Proxy_getter].
+    {!Proxy_Delegate.T} which under the hood relies on [Proxy_getter].
+
+    Other [*_context] modules of {!Tezos_protocol_environment}, i.e.
+    siblings of this file, are backed by different type of values coming
+    from {!Tezos_context}. This file is backed by {!M.t} below, which
+    is a thin layer over {!Tezos_memory_context.Context}. Because of that,
+    this instance of {!Tezos_protocol_environment} is close to
+    the {!Memory_context} one.
 
     Whereas [Memory_context] is a regular recursive map, [Proxy_context] obtains
     values by delegating to endpoints when receiving requests. Hence, right
-    after having created an [empty] value with an instance of [M.ProxyDelegate],
-    this value is as filled as the distant endpoint it delegates to. *)
+    after having created an {!empty} value with an instance of [Proxy_Delegate.T],
+    this value behaves as the distant endpoint it delegates to. *)
 
 open Tezos_protocol_environment
 
+(** The module by which to parameterize
+    {!Tezos_protocol_environment.Context.kind} below.
+
+    [Proxy_Delegate.T] is packed as the type [M.proxy_delegate],
+    because it is used for obtaining pristine instances of [Proxy_context]
+    with {!empty} below. *)
 module M : sig
   type key = string list (* as in environment_context.mli *)
 
@@ -42,27 +55,17 @@ module M : sig
 
   type tree = Tezos_context_memory.Context.tree
 
-  module type ProxyDelegate = sig
-    (** Whether [mem] would return Some Dir _ *)
-    val proxy_dir_mem : key -> bool tzresult Lwt.t
-
-    (** The value associated to [key] *)
-    val proxy_get : key -> tree option tzresult Lwt.t
-
-    (** Whether [get] would return Some Key _ *)
-    val proxy_mem : key -> bool tzresult Lwt.t
-  end
-
-  type proxy_delegate = (module ProxyDelegate)
-
   val empty : tree
 
   type t
 end
 
+(** The additional kind identifying {!Proxy_context} values. Used to
+    detect at runtime when a proxy context is expected, to disambiguate
+    from other kinds. *)
 type _ Context.kind += Context : M.t Context.kind
 
 (** Constructs an empty context, possibly giving the delegate (the function
     querying the endpoint) right away.
     Otherwise set it later with [set delegate] *)
-val empty : M.proxy_delegate option -> Context.t
+val empty : Proxy_delegate.t option -> Context.t

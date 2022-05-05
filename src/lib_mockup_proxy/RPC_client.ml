@@ -26,8 +26,6 @@
 module Directory = RPC_directory
 module Service = RPC_service
 
-exception Rpc_dir_creation_failure of tztrace
-
 let media_types = [Tezos_rpc_http.Media_type.json]
 
 module NullLogger = struct
@@ -57,7 +55,7 @@ module Call =
     (RPC_encoding)
     (NullLogger)
 
-let local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
+let local_ctxt (directory : unit RPC_directory.t) : RPC_context.generic =
   let local_client =
     Call.launch ?cors:None ?agent:None ~media_types directory
   in
@@ -65,8 +63,6 @@ let local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
   let base = Uri.empty in
   object
     method base = base
-
-    method generic_json_call meth ?body uri = C.generic_json_call meth ?body uri
 
     method generic_media_type_call meth ?body uri =
       C.generic_media_type_call ~accept:media_types meth ?body uri

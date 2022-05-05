@@ -671,29 +671,9 @@ let make_endorsement_cache =
   match Sys.getenv_opt "TEZOS_DISABLE_ENDORSEMENT_SIGNATURE_CACHE" with
   | Some _ ->
       let module Fake_ring (H : Stdlib.Hashtbl.HashedType) = struct
-        type key = H.t
+        include Ringo.EmptyMap (H)
 
-        type _ t = unit
-
-        let create _ = ()
-
-        let replace () _ _ = ()
-
-        let fold _ _ acc = acc
-
-        let fold_v _ _ acc = acc
-
-        let find_opt _ _ = None
-
-        let remove _ _ = ()
-
-        let length _ = 0
-
-        let capacity _ = 0
-
-        let clear _ = ()
-
-        module H = H
+        let create (_ : int) = create ()
       end in
       (module Fake_ring : Ringo.MAP_MAKER)
   | None ->

@@ -1,0 +1,25 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[attic/after_strategy.tz]
+
+Well typed
+Gas remaining: 1039991.083 units remaining
+{ parameter nat ;
+  storage (pair (pair nat bool) timestamp) ;
+  code { DUP
+         /* [ pair nat (pair nat bool) timestamp : pair nat (pair nat bool) timestamp ] */ ;
+         CAR
+         /* [ nat : pair nat (pair nat bool) timestamp ] */ ;
+         DIP { CDDR ;
+               DUP
+               /* [ timestamp : timestamp ] */ ;
+               NOW
+               /* [ timestamp : timestamp : timestamp ] */ ;
+               CMPGT }
+         /* [ nat : bool : timestamp ] */ ;
+         PAIR
+         /* [ pair nat bool : timestamp ] */ ;
+         PAIR
+         /* [ pair (pair nat bool) timestamp ] */ ;
+         NIL operation
+         /* [ list operation : pair (pair nat bool) timestamp ] */ ;
+         PAIR
+         /* [ pair (list operation) (pair nat bool) timestamp ] */ } }

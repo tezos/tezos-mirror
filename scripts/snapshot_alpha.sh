@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -45,8 +45,8 @@ if [ -d src/proto_${version} ] ; then
     exit 1
 fi
 
-if [ -d docs/${version} ] ; then
-    echo "Error: you should remove the directory 'docs/${version}'"
+if [ -d docs/${label} ] ; then
+    echo "Error: you should remove the directory 'docs/${label}'"
     exit 1
 fi
 
@@ -60,10 +60,10 @@ rm /tmp/tezos_proto_snapshot/src/proto_alpha/README.md
 mv /tmp/tezos_proto_snapshot/src/proto_alpha src/proto_${version}
 rm -rf /tmp/tezos_proto_snapshot
 
-echo "Copying docs/alpha to docs/${version}"
+echo "Copying docs/alpha to docs/${label}"
 mkdir /tmp/tezos_proto_doc_snapshot
 git archive HEAD docs/alpha/ | tar -x -C /tmp/tezos_proto_doc_snapshot
-mv /tmp/tezos_proto_doc_snapshot/docs/alpha docs/${version}
+mv /tmp/tezos_proto_doc_snapshot/docs/alpha docs/${label}
 rm -rf /tmp/tezos_proto_doc_snapshot
 
 echo "Copying tests_python/{contracts,tests}_alpha to tests_python/{contracts,tests}_${version}"
@@ -90,12 +90,12 @@ mv src/proto_${version} src/proto_${version}_${short_hash}
 
 # fix versioned links (in labels, references, and paths) in docs
 echo "Fixing versioned links in docs"
-cd docs/${version}
-sed -i.old -e s/_alpha:/_${version}:/g \
+cd docs/${label}
+sed -i.old -e s/_alpha:/_${label}:/g \
        -e s,src/proto_alpha,src/proto_${version}_${short_hash},g \
-       -e s/_alpha\>/_${version}\>/g \
-       -e s/_alpha\`/_${version}\`/g \
-       -e s/-alpha.html/-${version}.html/g \
+       -e s/_alpha\>/_${label}\>/g \
+       -e s/_alpha\`/_${label}\`/g \
+       -e s/-alpha.html/-${label}.html/g \
     $(find . -name \*.rst)
 cd ../..
 
@@ -120,8 +120,8 @@ doc_index="docs/index.rst"
     grep -A9999 -F "$alpha_line" "$doc_index" \
       | grep -B9999 -F 'toctree' -m1 \
       | head -n-1 \
-      | sed -e "s/Alpha Development/${version} ${capitalized_label}/g" \
-            -e "s,alpha/,${version}/,g"
+      | sed -e "s/Alpha Development/${label} ${capitalized_label}/g" \
+            -e "s,alpha/,${label}/,g"
     grep -B9999 -F "$alpha_line" "$doc_index" \
       | tac \
       | grep -B9999 -F 'toctree' -m1 \

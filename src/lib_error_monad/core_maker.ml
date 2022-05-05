@@ -52,9 +52,6 @@ end = struct
 
   type error = ..
 
-  let error_encoding_name =
-    if Prefix.id = "" then "error" else Prefix.id ^ "error"
-
   module type Wrapped_error_monad = sig
     type unwrapped = ..
 
@@ -69,9 +66,7 @@ end = struct
     | Main of Error_category.t
     | Wrapped of (module Wrapped_error_monad)
 
-  type encoding_case =
-    | Non_recursive of error Data_encoding.case
-    | Recursive of (error Data_encoding.t -> error Data_encoding.case)
+  type encoding_case = error Data_encoding.case
 
   (* the toplevel store for error kinds *)
   type error_kind =
@@ -96,8 +91,6 @@ end = struct
 
   let error_kinds : error_kind list ref = ref []
 
-  let has_recursive_error = ref false
-
   let get_registered_errors () : error_info list =
     List.flatten
       (List.map
@@ -111,35 +104,18 @@ end = struct
                  category = Main category;
                  encoding_case;
                  _;
-               } -> (
-               match encoding_case with
-               | Non_recursive encoding_case ->
-                   [
-                     {
-                       id;
-                       title;
-                       description;
-                       category;
-                       schema =
-                         Data_encoding.Json.schema
-                           (Data_encoding.union [encoding_case]);
-                     };
-                   ]
-               | Recursive make_encoding_case ->
-                   [
-                     {
-                       id;
-                       title;
-                       description;
-                       category;
-                       schema =
-                         Data_encoding.Json.schema
-                           ( Data_encoding.mu error_encoding_name
-                           @@ fun error_encoding ->
-                             Data_encoding.union
-                               [make_encoding_case error_encoding] );
-                     };
-                   ])
+               } ->
+               [
+                 {
+                   id;
+                   title;
+                   description;
+                   category;
+                   schema =
+                     Data_encoding.Json.schema
+                       (Data_encoding.union [encoding_case]);
+                 };
+               ]
            | Error_kind {category = Wrapped (module WEM); _} ->
                List.map
                  (fun {WEM.id; title; description; category = _; schema} ->
@@ -203,7 +179,6 @@ end = struct
         from_error
         to_error
     in
-    let encoding_case = Non_recursive encoding_case in
     let pp ppf s = Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s in
     error_kinds :=
       Error_kind
@@ -225,7 +200,6 @@ end = struct
       let open Data_encoding in
       case Json_only ~title:"Unregistered error" json from_error to_error
     in
-    let encoding_case = Non_recursive encoding_case in
     let pp ppf json =
       Format.fprintf
         ppf
@@ -271,7 +245,7 @@ end = struct
             failwith "ignore wrapped error when deserializing"
         | res -> WEM.wrap res
       in
-      Non_recursive (case Json_only ~title:name WEM.error_encoding unwrap wrap)
+      case Json_only ~title:name WEM.error_encoding unwrap wrap
     in
     error_kinds :=
       Error_kind
@@ -317,15 +291,14 @@ end = struct
       from_error to_error =
     let name = prepare_registration id in
     let encoding_case =
-      Non_recursive
-        (add_kind_and_id
-           ~category
-           ~name
-           ~title
-           ~description
-           encoding
-           from_error
-           to_error)
+      add_kind_and_id
+        ~category
+        ~name
+        ~title
+        ~description
+        encoding
+        from_error
+        to_error
     in
     error_kinds :=
       Error_kind
@@ -340,83 +313,71 @@ end = struct
         }
       :: !error_kinds
 
-  let register_recursive_error_kind category ~id ~title ~description ~pp
-      make_encoding from_error to_error =
-    let name = prepare_registration id in
-    let encoding_case =
-      Recursive
-        (fun error_encoding ->
-          let encoding = make_encoding error_encoding in
-          add_kind_and_id
-            ~category
-            ~name
-            ~title
-            ~description
-            encoding
-            from_error
-            to_error)
-    in
-    has_recursive_error := true ;
-    error_kinds :=
-      Error_kind
-        {
-          id = name;
-          category = Main category;
-          title;
-          description;
-          from_error;
-          encoding_case;
-          pp;
-        }
-      :: !error_kinds
-
   let error_encoding () =
     match !error_encoding_cache with
     | None ->
         let encoding =
-          if !has_recursive_error then
-            Data_encoding.mu error_encoding_name @@ fun error_encoding ->
-            let cases =
-              List.map
-                (fun (Error_kind {encoding_case; _}) ->
-                  match encoding_case with
-                  | Non_recursive case -> case
-                  | Recursive make -> make error_encoding)
-                !error_kinds
-            in
-            let union_encoding = Data_encoding.union cases in
-            let open Data_encoding in
-            splitted
-              ~json:union_encoding
-              ~binary:
-                (conv
-                   (Json.construct union_encoding)
-                   (Json.destruct union_encoding)
-                   json)
-          else
-            let cases =
-              List.map
-                (fun (Error_kind {encoding_case; _}) ->
-                  match encoding_case with
-                  | Non_recursive case -> case
-                  | Recursive _ -> assert false)
-                !error_kinds
-            in
-            let union_encoding = Data_encoding.union cases in
-            let open Data_encoding in
-            splitted
-              ~json:union_encoding
-              ~binary:
-                (conv
-                   (Json.construct union_encoding)
-                   (Json.destruct union_encoding)
-                   json)
+          let cases =
+            List.map
+              (fun (Error_kind {encoding_case; _}) -> encoding_case)
+              !error_kinds
+          in
+          let union_encoding = Data_encoding.union cases in
+          let open Data_encoding in
+          splitted
+            ~json:union_encoding
+            ~binary:
+              (conv
+                 (Json.construct union_encoding)
+                 (Json.destruct union_encoding)
+                 json)
         in
         error_encoding_cache := Some encoding ;
         encoding
     | Some encoding -> encoding
 
   let error_encoding = Data_encoding.delayed error_encoding
+
+  let () =
+    (* HACK
+       There is an issue with the interaction of
+       (a) error-monad's delayed error-encoding
+       (b) data-encoding's cached json-encoding conversion
+
+       More specifically.
+
+       On the error-monad side: The [error_encoding] is a
+       [Data_encoding.delayed] encoding. The delaying allows to dynamically find
+       the list of registered errors and generate the encoding based on that.
+       (There is a cache mechanism to avoid recomputing it if no new errors have
+       been registered. That is the original purpose of the
+       [set_error_encoding_cache_dirty].)
+
+       On the data-encoding side: Each encoding is actually a record with the
+       [data-encoding] AST in one field and the [json-data-encoding] in the
+       other. The fields are used for serialisation/deserialisation in,
+       respectively, binary and in JSON. The JSON field is computed on-demand
+       (e.g., when `Data_encoding.Json.construct` is called). To avoid
+       expensive recomputations, the result of this conversion is stored in the
+       [json-data-encoding].
+
+       The end result is that, whilst the cache-invalidation mechanism can mark
+       the encoding {e inside} the [delayed] node dirty so it is recomputed on
+       each use, it cannot mark the json-encoding cache of the [delayed] node
+       itself dirty.
+
+       As a result, the json encoding for errors is set in stone as soon as it
+       is used, even if new errors are registered.
+
+       To circumvent this, we use the hack below: We explicitly tamper with the
+       internal representation of the encoding. More specifically, we reset the
+       json-encoding field of [error_encoding] to [None] to force it being
+       recomputed. *)
+    let set_older_caches_dirty = !set_error_encoding_cache_dirty in
+    set_error_encoding_cache_dirty :=
+      fun () ->
+        set_older_caches_dirty () ;
+        error_encoding.Data_encoding__Encoding.json_encoding <- None
 
   let json_of_error error = Data_encoding.Json.construct error_encoding error
 
@@ -443,31 +404,15 @@ end = struct
                   category = (* Can we do better ? *) default_category;
                   schema;
                 })
-        | Main category -> (
-            match encoding_case with
-            | Non_recursive encoding_case ->
-                {
-                  id;
-                  title;
-                  description;
-                  category;
-                  schema =
-                    Data_encoding.Json.schema
-                      (Data_encoding.union [encoding_case]);
-                }
-            | Recursive make_encoding_case ->
-                {
-                  id;
-                  title;
-                  description;
-                  category;
-                  schema =
-                    Data_encoding.Json.schema
-                      ( Data_encoding.mu error_encoding_name
-                      @@ fun error_encoding ->
-                        Data_encoding.union [make_encoding_case error_encoding]
-                      );
-                }))
+        | Main category ->
+            {
+              id;
+              title;
+              description;
+              category;
+              schema =
+                Data_encoding.Json.schema (Data_encoding.union [encoding_case]);
+            })
 
   let classify_error error =
     let rec find e = function

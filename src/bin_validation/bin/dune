@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (env (static (flags (:standard -ccopt -static))))
 
 (executable
@@ -6,16 +9,22 @@
  (package tezos-validator)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-base
+  tezos-context
+  tezos-stdlib-unix
+  tezos-shell
+  tezos-shell-services
+  tezos-validation
+  tezos-protocol-updater
   tezos-validator)
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_context
    -open Tezos_stdlib_unix
    -open Tezos_shell
    -open Tezos_shell_services
    -open Tezos_validation
    -open Tezos_protocol_updater
-   -open Tezos_validator))
-)
+   -open Tezos_validator)))

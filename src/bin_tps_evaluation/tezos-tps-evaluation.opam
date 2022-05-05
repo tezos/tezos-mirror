@@ -1,24 +1,28 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "cmdliner"
-  "data-encoding"
-  "lwt"
   "ppx_blob"
   "tezos-base"
+  "caqti"
+  "caqti-driver-postgresql"
+  "caqti-lwt"
+  "data-encoding" { >= "0.5.3" & < "0.6" }
+  "lwt" { >= "5.4.0" }
+  "tezos-baking-alpha"
+  "tezos-client-alpha-commands"
   "tezos-client-base-unix"
   "tezos-protocol-alpha"
   "tezt"
   "tezt-tezos"
-  "caqti"
-  "caqti-driver-postgresql"
-  "caqti-lwt"
+  "tezt-performance-regression"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

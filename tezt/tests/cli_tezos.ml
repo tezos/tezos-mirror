@@ -77,11 +77,15 @@ let check_connections_above_cap () =
   in
   Lwt.pick [is_ready; has_failed]
 
-let check_node_addr_colision_message net_port1 net_port2 rpc_port1 rpc_port2
-    title msg =
-  Test.register ~__FILE__ ~title ~tags:["cli"; "address"] @@ fun () ->
-  let* _node1 = Node.init ~net_port:net_port1 ~rpc_port:rpc_port1 [] in
-  let node2 = Node.create ~net_port:net_port2 ~rpc_port:rpc_port2 [] in
+let check_node_net_addr_colision_message () =
+  Test.register
+    ~__FILE__
+    ~title:"CLI --net-addr collision message"
+    ~tags:["cli"; "address"]
+  @@ fun () ->
+  let net_port = Port.fresh () in
+  let* _node1 = Node.init ~net_port [] in
+  let node2 = Node.create ~net_port [] in
   let readiness =
     fail_if_ready
       node2
@@ -92,25 +96,17 @@ let check_node_addr_colision_message net_port1 net_port2 rpc_port1 rpc_port2
     let* () = Node.identity_generate node2 in
     let* () = Node.config_init node2 [] in
     let* () = Node.run node2 [] in
-    let error_rex = rex ~opts:[`Dotall] msg in
+    let error_rex =
+      rex
+        ~opts:[`Dotall]
+        (Printf.sprintf
+           "127\\.0\\.0\\.1:%d.*Another tezos node is probably running on this \
+            address.*P2P"
+           net_port)
+    in
     Node.check_error ~msg:error_rex node2
   in
   Lwt.pick [error_checking; readiness]
-
-let check_node_net_addr_colision_message () =
-  let p1 = Node.fresh_port () in
-  let p2 = Node.fresh_port () in
-  let p3 = Node.fresh_port () in
-  check_node_addr_colision_message
-    p1
-    p1
-    p2
-    p3
-    "CLI --net-addr collision message"
-    (Printf.sprintf
-       "127\\.0\\.0\\.1:%d.*Another tezos node is probably running on this \
-        address.*P2P"
-       p1)
 
 let register_protocol_independent () =
   check_connections_below_cap () ;

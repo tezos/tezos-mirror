@@ -1,0 +1,46 @@
+---
+gitlab:release:
+  extends:
+    - .rules_template__release_tag
+  # https://gitlab.com/tezos/docker-images/ci-release
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.0.0"
+  stage: publish_release
+  dependencies:
+    - build:static-x86_64-linux-binaries
+    - build:static-arm64-linux-binaries
+    - docker:merge_manifests
+  script:
+    # we run the smoketest only for x86_64 since this job is executed on x86_64
+    - ./scripts/ci/static_smoke_test.sh x86_64 version
+    # create a GitLab generic package
+    - ./scripts/ci/create_gitlab_package.sh
+    # create a GitLab release
+    - ./scripts/ci/create_gitlab_release.sh
+
+# Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
+# Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
+# $IMAGE_ARCH_PREFIX is only used when building Docker images,
+# here we handle all architectures so there is no such variable.
+docker:merge_manifests:
+  extends:
+    - .rules_template__master_and_releases
+    - .image_template__docker
+    - .docker_registry_auth # Sets up a before_script
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
+  stage: publish_release
+  script:
+    # Environment variables from before_script
+    - . ./scripts/ci/docker.env
+    - ./scripts/ci/docker_merge_manifests.sh
+
+docker:promote_to_latest:
+  extends:
+    - .rules_template__latest_release
+    - .image_template__docker
+    - .docker_registry_auth # Sets up a before_script
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
+  stage: publish_release
+  script:
+    # Environment variables from before_script
+    - . ./scripts/ci/docker.env
+    - ./scripts/ci/docker_promote_to_latest.sh

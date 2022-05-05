@@ -1,0 +1,11 @@
+encoding/jakarta.vote.ballots.out
+
+./tezos-codec encode 013-PtJakart.vote.ballots from '{
+  "yay": "2147483647",
+  "nay": "0",
+  "pass": "455"
+}'
+000000007fffffff000000000000000000000000000001c7
+
+./tezos-codec decode 013-PtJakart.vote.ballots from 000000007fffffff000000000000000000000000000001c7
+{ "yay": "2147483647", "nay": "0", "pass": "455" }

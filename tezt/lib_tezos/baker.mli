@@ -61,34 +61,17 @@ val init :
   Client.t ->
   t Lwt.t
 
-(** Send SIGTERM (or SIGKILL) to a baker and wait for it to terminate. *)
+(** See [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
-(** Register an event handler that logs all events.
-
-    Use this when you need to debug or reverse engineer incoming events.
-    Usually you do not want to keep that in the final versions of your tests. *)
+(** See [Daemon.Make.log_events]. *)
 val log_events : t -> unit
 
-(** Same as [wait_for_full] but ignore metadata from the file descriptor sink.
-
-    More precisely, [filter] is applied to the value of field
-    ["fd-sink-item.v0"."event".<name>].
-
-    If the node receives a JSON value that does not match the right
-    JSON structure, it is not given to [filter] and the event is
-    ignored. See [wait_for_full] to know what the JSON value must
-    look like. *)
+(** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t}
 
-(** Add a callback to be called whenever the node emits an event.
-
-    Contrary to [wait_for] functions, this callback is never removed.
-
-    Listening to events with [on_event] will not prevent [wait_for] promises
-    to be fulfilled. You can also have multiple [on_event] handlers, although
-    the order in which they trigger is unspecified. *)
+(** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit

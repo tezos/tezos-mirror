@@ -178,6 +178,11 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
     let keyed_client =
       Tezos_client.Keyed.make client ~key_name:key ~secret_key:priv in
     keyed_client in
+  let lb_vote = match protocol.kind with `Alpha -> Some "pass" | _ -> None in
+  let hard_fork_lb_vote = function
+    | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> Some "pass"
+    | _ -> None
+  in
   let keys_and_daemons =
     let pick_a_node_and_client idx =
       match List.nth nodes (Int.rem (1 + idx) (List.length nodes)) with
@@ -194,9 +199,10 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
                , client
                , to_keyed acc client
                , Option.value_map hard_fork ~default:[]
-                   ~f:(Hard_fork.keyed_daemons ~client ~node ~key)
+                   ~f:(Hard_fork.keyed_daemons ~client ~node ~key
+                         ~lb_vote:hard_fork_lb_vote)
                  @ [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node
-                       ~key
+                       ~key ~lb_vote
                    ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client
                        node ~key ] ) ) in
   List_sequential.iter keys_and_daemons ~f:(fun (_, _, kc, _) ->
@@ -401,5 +407,5 @@ let cmd () =
         ; `P
             "There is also the option of running the sandbox non-interactively \
              for a given number of blocks, cf. `--until-level LEVEL`." ] in
-    info "mini-network" ~man ~doc in
-  (term, info)
+    Cmd.info "mini-network" ~man ~doc in
+  Cmd.v info term

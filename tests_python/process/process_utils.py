@@ -19,7 +19,7 @@ def format_command(cmd: List[str], color=True) -> str:
 def prepare_log(
     cmd: List[str], log_file: Optional[str], overwrite: bool = True
 ):
-    """ By default overwrite old log, append otherwise """
+    """By default overwrite old log, append otherwise"""
     stdout = 0  # type: Union[int, IO[Any]]
     cmd_str = format_command(cmd, color=False)
     if log_file:

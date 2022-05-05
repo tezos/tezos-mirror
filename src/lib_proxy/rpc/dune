@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_proxy_rpc)
+ (public_name tezos-proxy.rpc)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-client-base
+  tezos-mockup-proxy
+  tezos-rpc
+  tezos-proxy)
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))

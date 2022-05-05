@@ -74,7 +74,8 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
-  | Reconfigure_event_logging of Internal_event_unix.Configuration.t
+  | Reconfigure_event_logging of
+      Tezos_base_unix.Internal_event_unix.Configuration.t
 
 let request_pp ppf = function
   | Init -> Format.fprintf ppf "process handshake"
@@ -370,7 +371,7 @@ let request_encoding =
       case
         (Tag 6)
         ~title:"reconfigure_event_logging"
-        Internal_event_unix.Configuration.encoding
+        Tezos_base_unix.Internal_event_unix.Configuration.encoding
         (function Reconfigure_event_logging c -> Some c | _ -> None)
         (fun c -> Reconfigure_event_logging c);
       case_preapply (Tag 7);
@@ -422,7 +423,7 @@ let create_socket ~canceler =
   Lwt.return socket
 
 let create_socket_listen ~canceler ~max_requests ~socket_path =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! socket = create_socket ~canceler in
   let* () =
     Lwt.catch
@@ -433,7 +434,7 @@ let create_socket_listen ~canceler ~max_requests ~socket_path =
         | Unix.Unix_error (ENAMETOOLONG, _, _) ->
             (* Unix.ENAMETOOLONG (Filename too long (POSIX.1-2001)) can
                be thrown if the given directory has a too long path. *)
-            fail
+            tzfail
               Block_validator_errors.(
                 Validation_process_failed (Socket_path_too_long socket_path))
         | Unix.Unix_error (EACCES, _, _) ->
@@ -441,12 +442,12 @@ let create_socket_listen ~canceler ~max_requests ~socket_path =
                thrown when the given directory has wrong access rights.
                Unix.EPERM (Operation not permitted (POSIX.1-2001)) should
                not be thrown in this case. *)
-            fail
+            tzfail
               Block_validator_errors.(
                 Validation_process_failed
                   (Socket_path_wrong_permission socket_path))
         | exn ->
-            fail
+            tzfail
               (Block_validator_errors.Validation_process_failed
                  (Cannot_run_external_validator (Printexc.to_string exn))))
   in

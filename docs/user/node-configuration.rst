@@ -258,7 +258,7 @@ take two main forms:
 Thus all costly or risky endpoints are blocked by default. This can be
 relaxed or tightened by modifying the configuration file. It's
 worth noting that this default policy among other things disallows baking and
-endorsing by bakers and endorsers running on remote servers.
+endorsing by bakers running on remote servers.
 
 The following is the default ACL policy for the node,
 hard-coded in :src:`src/lib_rpc_http/RPC_server.ml` (remember to replace
@@ -266,6 +266,7 @@ hard-coded in :src:`src/lib_rpc_http/RPC_server.ml` (remember to replace
 actually listening on):
 
 .. literalinclude:: default-acl.json
+   :language: json
 
 The endpoints specifically required for baking can be found in
 :src:`vendors/flextesa-lib/tezos_node.ml`.

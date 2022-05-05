@@ -58,11 +58,3 @@ val worker :
   run:(unit -> unit Lwt.t) ->
   cancel:(unit -> unit Lwt.t) ->
   unit Lwt.t
-
-(** Evaluates fold_left_s on a batch of [n] elements and returns a pair
-    containing the result of the first batch and the unprocessed elements *)
-val fold_left_s_n :
-  n:int -> ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> ('a * 'b list) Lwt.t
-
-(** Lwt version of [TzList.find_map] *)
-val find_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b option Lwt.t

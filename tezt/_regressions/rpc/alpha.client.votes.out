@@ -1,10 +1,10 @@
-tezt/_regressions/rpc/alpha.client.votes.out
+rpc/alpha.client.votes.out
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
 []
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballots
-{ "yay": 0, "nay": 0, "pass": 0 }
+{ "yay": "0", "nay": "0", "pass": "0" }
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_period
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
@@ -17,21 +17,26 @@ null
 5500
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/listings
-[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/proposals
-[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 666 ] ]
+[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", "4000000000000" ] ]
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/successor_period
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 2, "remaining": 1 }
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/total_voting_power
-3330
+"20000000000000"
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
 [ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
@@ -39,7 +44,7 @@ null
   { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballots
-{ "yay": 666, "nay": 666, "pass": 666 }
+{ "yay": "4000001978209", "nay": "4000000000000", "pass": "4000000000000" }
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_period
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
@@ -52,11 +57,16 @@ null
 5500
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/listings
-[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000001978209" } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/proposals
 []
@@ -66,4 +76,4 @@ null
   "position": 1, "remaining": 2 }
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/total_voting_power
-3330
+"20000001978209"

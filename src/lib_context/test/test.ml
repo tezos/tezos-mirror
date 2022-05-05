@@ -25,6 +25,4 @@
 
 let () =
   Lwt_main.run
-    (Alcotest_lwt.run
-       "tezos-context"
-       [("context", Test_context.tests); ("utils", Test_utils.tests)])
+    (Alcotest_lwt.run "tezos-context" [("context", Test_context.tests)])

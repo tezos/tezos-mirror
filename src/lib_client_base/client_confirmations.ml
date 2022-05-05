@@ -43,6 +43,7 @@ type operation_status =
 
 let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     ?(predecessors = 10) ?(confirmations = 1) ?branch operation_hash =
+  let open Lwt_result_syntax in
   let exception WrapError of error list in
   let exception Outdated of Operation_hash.t in
   (* Table of known blocks:
@@ -59,23 +60,26 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
       let predecessor = header.Block_header.predecessor in
       if Block_hash.Table.mem blocks predecessor then return acc
       else
-        Chain_services.Blocks.Header.shell_header
-          ctxt
-          ~chain
-          ~block:(`Hash (predecessor, 0))
-          ()
-        >>=? fun shell ->
+        let* shell =
+          Chain_services.Blocks.Header.shell_header
+            ctxt
+            ~chain
+            ~block:(`Hash (predecessor, 0))
+            ()
+        in
         let block = (predecessor, shell) in
         loop (block :: acc) block
     in
-    loop [(hash, header.Block_header.shell)] (hash, header.shell) >>= function
+    let*! r = loop [(hash, header.Block_header.shell)] (hash, header.shell) in
+    match r with
     | Ok blocks -> Lwt.return blocks
     | Error err ->
-        ctxt#warning
-          "Error while fetching block (ignored): %a"
-          pp_print_trace
-          err
-        >>= fun () ->
+        let*! () =
+          ctxt#warning
+            "Error while fetching block (ignored): %a"
+            pp_print_trace
+            err
+        in
         (* Will be retried when a new head arrives *)
         Lwt.return_nil
   in
@@ -90,34 +94,37 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     in
     match pred_block with
     | Some (block_with_op, n) ->
-        ctxt#answer
-          "Operation received %d confirmations as of block: %a"
-          (n + 1)
-          Block_hash.pp
-          hash
-        >>= fun () ->
+        let*! () =
+          ctxt#answer
+            "Operation received %d confirmations as of block: %a"
+            (n + 1)
+            Block_hash.pp
+            hash
+        in
         Block_hash.Table.add blocks hash (Some (block_with_op, n + 1)) ;
         if n + 1 < confirmations then return Pending
         else return (Confirmed block_with_op)
     | None -> (
-        Shell_services.Blocks.Operation_hashes.operation_hashes
-          ctxt
-          ~chain
-          ~block
-          ()
-        >>=? fun operations ->
+        let* operations =
+          Shell_services.Blocks.Operation_hashes.operation_hashes
+            ctxt
+            ~chain
+            ~block
+            ()
+        in
         match in_block operation_hash operations with
         | None ->
             Block_hash.Table.add blocks hash None ;
             return Still_not_found
         | Some (i, j) ->
-            ctxt#answer
-              "Operation found in block: %a (pass: %d, offset: %d)"
-              Block_hash.pp
-              hash
-              i
-              j
-            >>= fun () ->
+            let*! () =
+              ctxt#answer
+                "Operation found in block: %a (pass: %d, offset: %d)"
+                Block_hash.pp
+                hash
+                i
+                j
+            in
             Block_hash.Table.add blocks hash (Some ((hash, i, j), 0)) ;
             if confirmations <= 0 then return (Confirmed (hash, i, j))
             else return Pending)
@@ -126,55 +133,68 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
   let check_branch_alive () =
     match branch with
     | Some branch_hash -> (
-        Shell_services.Blocks.live_blocks ctxt ~chain ~block:(`Head 0) ()
-        >>= function
+        let*! r =
+          Shell_services.Blocks.live_blocks ctxt ~chain ~block:(`Head 0) ()
+        in
+        match r with
         | Ok live_blocks ->
             if Block_hash.Set.mem branch_hash live_blocks then Lwt.return_unit
             else
-              ctxt#error
-                "The operation %a is outdated and may never be included in the \
-                 chain.@,\
-                 We recommend to use an external block explorer."
-                Operation_hash.pp
-                operation_hash
-              >>= fun () -> Lwt.fail (Outdated operation_hash)
+              let*! () =
+                ctxt#error
+                  "The operation %a is outdated and may never be included in \
+                   the chain.@,\
+                   We recommend to use an external block explorer."
+                  Operation_hash.pp
+                  operation_hash
+              in
+              Lwt.fail (Outdated operation_hash)
         | Error err -> Lwt.fail (WrapError err))
     | None -> Lwt.return_unit
   in
-  Shell_services.Monitor.heads ctxt chain >>=? fun (stream, stop) ->
-  Lwt_stream.get stream >>= function
+  let* (stream, stop) = Shell_services.Monitor.heads ctxt chain in
+  let*! o = Lwt_stream.get stream in
+  match o with
   | None -> assert false
   | Some (head, _) ->
       let rec loop n =
         if n >= 0 then
           (*Search for the operation in the n head predecessors*)
           let block = `Hash (head, n) in
-          Shell_services.Blocks.hash ctxt ~chain ~block () >>=? fun hash ->
-          Shell_services.Blocks.Header.shell_header ctxt ~chain ~block ()
-          >>=? fun shell ->
-          process hash shell >>=? function
+          let* hash = Shell_services.Blocks.hash ctxt ~chain ~block () in
+          let* shell =
+            Shell_services.Blocks.Header.shell_header ctxt ~chain ~block ()
+          in
+          let* r = process hash shell in
+          match r with
           | Confirmed block ->
               stop () ;
               return block
           | Pending | Still_not_found -> loop (n - 1)
         else
           (*Search for the operation in new heads*)
-          Lwt.catch
-            (fun () ->
-              (*Fetching potential unknown blocks from potential new heads*)
-              let stream = Lwt_stream.map_list_s fetch_predecessors stream in
-              Lwt_stream.find_s
-                (fun (hash, header) ->
-                  process hash header >>= function
-                  | Ok Pending -> Lwt.return_false
-                  | Ok Still_not_found ->
-                      check_branch_alive () >>= fun () -> Lwt.return_false
-                  | Ok (Confirmed _) -> Lwt.return_true
-                  | Error err -> Lwt.fail (WrapError err))
-                stream
-              >>= return)
-            (function WrapError e -> Lwt.return_error e | exn -> Lwt.fail exn)
-          >>=? function
+          let* o =
+            Lwt.catch
+              (fun () ->
+                Lwt_result.ok
+                @@
+                (*Fetching potential unknown blocks from potential new heads*)
+                let stream = Lwt_stream.map_list_s fetch_predecessors stream in
+                Lwt_stream.find_s
+                  (fun (hash, header) ->
+                    let*! r = process hash header in
+                    match r with
+                    | Ok Pending -> Lwt.return_false
+                    | Ok Still_not_found ->
+                        let*! () = check_branch_alive () in
+                        Lwt.return_false
+                    | Ok (Confirmed _) -> Lwt.return_true
+                    | Error err -> Lwt.fail (WrapError err))
+                  stream)
+              (function
+                | WrapError e -> Lwt.return_error e | exn -> Lwt.fail exn)
+          in
+          match o with
           | None -> failwith "..."
           | Some (hash, _) -> (
               stop () ;
@@ -182,60 +202,68 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
               | None | Some None -> assert false
               | Some (Some (hash, _)) -> return hash)
       in
-      (match branch with
-      | Some branch_hash ->
-          Shell_services.Blocks.Header.shell_header
-            ctxt
-            ~chain
-            ~block:(`Hash (branch_hash, 0))
-            ()
-          >>=? fun branch_header ->
-          let branch_level = branch_header.Block_header.level in
-          Shell_services.Blocks.Header.shell_header
-            ctxt
-            ~chain
-            ~block:(`Hash (head, 0))
-            ()
-          >>=? fun head_shell ->
-          let head_level = head_shell.Block_header.level in
-          return Int32.(to_int (sub head_level branch_level))
-      | None ->
-          Shell_services.Blocks.Header.shell_header ctxt ~chain ()
-          >>=? fun head_header ->
-          let head_level = Int32.to_int head_header.level in
-          let block_hook = min predecessors (head_level - 1) in
-          (* this assertion ensures that the RPC call right below does not fail *)
-          assert (head_level - (block_hook + 1) >= 0) ;
-          return block_hook)
-      >>=? fun block_hook ->
-      Block_services.Empty.hash
-        ctxt
-        ~chain
-        ~block:(`Hash (head, block_hook + 1))
-        ()
-      >>=? fun oldest ->
+      let* block_hook =
+        match branch with
+        | Some branch_hash ->
+            let* branch_header =
+              Shell_services.Blocks.Header.shell_header
+                ctxt
+                ~chain
+                ~block:(`Hash (branch_hash, 0))
+                ()
+            in
+            let branch_level = branch_header.Block_header.level in
+            let* head_shell =
+              Shell_services.Blocks.Header.shell_header
+                ctxt
+                ~chain
+                ~block:(`Hash (head, 0))
+                ()
+            in
+            let head_level = head_shell.Block_header.level in
+            return Int32.(to_int (sub head_level branch_level))
+        | None ->
+            let* head_header =
+              Shell_services.Blocks.Header.shell_header ctxt ~chain ()
+            in
+            let head_level = Int32.to_int head_header.level in
+            let block_hook = min predecessors (head_level - 1) in
+            (* this assertion ensures that the RPC call right below does not fail *)
+            assert (head_level - (block_hook + 1) >= 0) ;
+            return block_hook
+      in
+      let* oldest =
+        Block_services.Empty.hash
+          ctxt
+          ~chain
+          ~block:(`Hash (head, block_hook + 1))
+          ()
+      in
       Block_hash.Table.add blocks oldest None ;
       loop block_hook
 
 let lookup_operation_in_previous_block ctxt chain operation_hash i =
-  Block_services.Empty.hash ctxt ~block:(`Head i) () >>=? fun block ->
-  Shell_services.Blocks.Operation_hashes.operation_hashes
-    ctxt
-    ~chain
-    ~block:(`Hash (block, 0))
-    ()
-  >>=? fun operations ->
+  let open Lwt_result_syntax in
+  let* block = Block_services.Empty.hash ctxt ~block:(`Head i) () in
+  let* operations =
+    Shell_services.Blocks.Operation_hashes.operation_hashes
+      ctxt
+      ~chain
+      ~block:(`Hash (block, 0))
+      ()
+  in
   match in_block operation_hash operations with
   | None -> return_none
   | Some (a, b) -> return_some (block, a, b)
 
 let lookup_operation_in_previous_blocks (ctxt : #Client_context.full) ~chain
     ~predecessors operation_hash =
+  let open Lwt_result_syntax in
   let rec loop i =
     if i = predecessors + 1 then return_none
     else
-      lookup_operation_in_previous_block ctxt chain operation_hash i
-      >>=? function
+      let* o = lookup_operation_in_previous_block ctxt chain operation_hash i in
+      match o with
       | None -> loop (i + 1)
       | Some (block, a, b) -> return_some (block, a, b)
   in
@@ -243,35 +271,40 @@ let lookup_operation_in_previous_blocks (ctxt : #Client_context.full) ~chain
 
 let wait_for_bootstrapped ?(retry = fun f x -> f x)
     (ctxt : #Client_context.full) =
+  let open Lwt_result_syntax in
   let display = ref false in
   Lwt.dont_wait
     (fun () ->
-      ctxt#sleep 0.3 >>= fun () ->
+      let*! () = ctxt#sleep 0.3 in
       if not !display then (
-        ctxt#answer "Waiting for the node to be bootstrapped..." >>= fun () ->
+        let*! () = ctxt#answer "Waiting for the node to be bootstrapped..." in
         display := true ;
         Lwt.return_unit)
       else Lwt.return_unit)
     (fun exc ->
       let (_ : unit Lwt.t) =
-        ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
-        >>= fun () -> ctxt#error "Progress not monitored anymore\n%!"
+        let*! () =
+          ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
+        in
+        ctxt#error "Progress not monitored anymore\n%!"
       in
       ()) ;
-  retry Monitor_services.bootstrapped ctxt >>=? fun (stream, _stop) ->
-  Lwt_stream.iter_s
-    (fun (hash, time) ->
-      if !display then
-        ctxt#message
-          "Current head: %a (timestamp: %a, validation: %a)"
-          Block_hash.pp_short
-          hash
-          Time.System.pp_hum
-          (Time.System.of_protocol_exn time)
-          Time.System.pp_hum
-          (ctxt#now ())
-      else Lwt.return_unit)
-    stream
-  >>= fun () ->
+  let* (stream, _stop) = retry Monitor_services.bootstrapped ctxt in
+  let*! () =
+    Lwt_stream.iter_s
+      (fun (hash, time) ->
+        if !display then
+          ctxt#message
+            "Current head: %a (timestamp: %a, validation: %a)"
+            Block_hash.pp_short
+            hash
+            Time.System.pp_hum
+            (Time.System.of_protocol_exn time)
+            Time.System.pp_hum
+            (ctxt#now ())
+        else Lwt.return_unit)
+      stream
+  in
   display := true ;
-  ctxt#answer "Node is bootstrapped." >>= fun () -> return_unit
+  let*! () = ctxt#answer "Node is bootstrapped." in
+  return_unit

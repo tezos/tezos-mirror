@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_validator)
  (public_name tezos-validator)
@@ -8,18 +11,18 @@
   tezos-context
   tezos-stdlib-unix
   tezos-protocol-environment
-  tezos-protocol-updater
   tezos-shell
-  tezos-shell-context
-  tezos-validation)
+  tezos-shell-services
+  tezos-validation
+  tezos-protocol-updater
+  tezos-shell-context)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_context
    -open Tezos_stdlib_unix
    -open Tezos_shell
    -open Tezos_shell_services
    -open Tezos_validation
    -open Tezos_protocol_updater
-   -open Tezos_shell_context))
-)
+   -open Tezos_shell_context)))

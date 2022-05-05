@@ -82,7 +82,7 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
  (public_name tezos-protocol-%%VERSION%%)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_%%LIB_VERSION%%)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
@@ -97,7 +97,7 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
  (public_name tezos-protocol-functor-%%VERSION%%)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-%%VERSION%%.raw)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"

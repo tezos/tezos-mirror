@@ -474,7 +474,7 @@ include Tezos_raw_protocol_011_PtHangz2.Main
  (public_name tezos-protocol-011-PtHangz2)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_011_PtHangz2)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
@@ -489,7 +489,7 @@ include Tezos_raw_protocol_011_PtHangz2.Main
  (public_name tezos-protocol-functor-011-PtHangz2)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-011-PtHangz2.raw)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"

@@ -1,8 +1,0 @@
-tests_011/test_contract.py::TestNormalize::test_normalize_legacy_flag
-
-{ Elt 0 1 }
-At (unshown) location 0, value { Elt %a 0 1 }
-is invalid for type map nat nat.
-At (unshown) location 1, unexpected annotation.
-Fatal error:
-  ill-typed data expression

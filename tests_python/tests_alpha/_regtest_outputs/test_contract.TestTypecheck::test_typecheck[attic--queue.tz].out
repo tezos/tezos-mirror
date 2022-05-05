@@ -1,18 +1,15 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/queue.tz]
 
 Well typed
-Gas remaining: 1039952.504 units remaining
+Gas remaining: 1039958.584 units remaining
 { parameter (option string) ;
   storage (pair (option string) (pair (pair nat nat) (map nat string))) ;
   code { DUP
-         /* [ pair (option @parameter string)
-                 (pair @storage (option string) (pair nat nat) (map nat string))
-            : pair (option @parameter string)
-                 (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
+         /* [ pair (option string) (option string) (pair nat nat) (map nat string)
+            : pair (option string) (option string) (pair nat nat) (map nat string) ] */ ;
          CAR
-         /* [ @parameter option string
-            : pair (option @parameter string)
-                 (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
+         /* [ option string
+            : pair (option string) (option string) (pair nat nat) (map nat string) ] */ ;
          IF_NONE
            { CDDR ;
              DUP
@@ -68,20 +65,18 @@ Gas remaining: 1039952.504 units remaining
                  PAIR
                  /* [ pair (option string) (pair nat nat) (map nat string) ] */ } }
            { DIP { DUP
-                   /* [ pair (option @parameter string)
-                           (pair @storage (option string) (pair nat nat) (map nat string))
-                      : pair (option @parameter string)
-                           (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
+                   /* [ pair (option string) (option string) (pair nat nat) (map nat string)
+                      : pair (option string) (option string) (pair nat nat) (map nat string) ] */ ;
                    CDDAR ;
                    DIP { CDDDR }
                    /* [ pair nat nat : map nat string ] */ ;
                    DUP
                    /* [ pair nat nat : pair nat nat : map nat string ] */ }
-             /* [ @parameter.some string : pair nat nat : pair nat nat : map nat string ] */ ;
+             /* [ string : pair nat nat : pair nat nat : map nat string ] */ ;
              SWAP
-             /* [ pair nat nat : @parameter.some string : pair nat nat : map nat string ] */ ;
+             /* [ pair nat nat : string : pair nat nat : map nat string ] */ ;
              CAR
-             /* [ nat : @parameter.some string : pair nat nat : map nat string ] */ ;
+             /* [ nat : string : pair nat nat : map nat string ] */ ;
              DIP { SOME
                    /* [ option string : pair nat nat : map nat string ] */ ;
                    SWAP

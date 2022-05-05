@@ -90,6 +90,50 @@ val mk_reveal :
   Client.t ->
   manager_operation_content Lwt.t
 
+(** [mk_delegation] allows to construct a manager operation representing a
+    delegation to the [delegate] account.
+
+    - Default [counter] is the successor of the counter of [source].
+    - Default [fee] is [1000] mutez.
+    - Default [gas_limit] is [1040] gas.
+    - Default [storage_limit] is [0]. *)
+val mk_delegation :
+  source:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  delegate:string ->
+  Client.t ->
+  manager_operation_content Lwt.t
+
+(** [mk_rejection] allows to construct a mangager operation
+   representing a tx_rollup rejection operation.
+
+    - Default [counter] is the successor of the counter of [source].
+    - Default [fee] is [1_000_000] mutez.
+    - Default [gas_limit] is [1_000_000] gas.
+    - Default [storage_limit] is [0]. *)
+val mk_rejection :
+  source:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  tx_rollup:string ->
+  proof:string ->
+  level:int ->
+  message:Rollup.Tx_rollup.message ->
+  message_position:int ->
+  message_path:string list ->
+  message_result_hash:string ->
+  message_result_path:JSON.u ->
+  previous_message_result_path:JSON.u ->
+  previous_message_context_hash:string ->
+  previous_message_withdraw_list_hash:string ->
+  Client.t ->
+  manager_operation_content Lwt.t
+
 (** [mk_call] allows to construct a manager operation representing a call
     to a smart contract [entrypoint] with a given parameter [arg] from an
     implicit account [source].
@@ -189,8 +233,13 @@ val inject_operation :
   Client.t ->
   [`OpHash of string] Lwt.t
 
-val spawn_inject_operation :
-  ?async:bool -> unsigned_op:Hex.t -> signature:Hex.t -> Client.t -> Process.t
+val runnable_inject_operation :
+  ?async:bool ->
+  ?force:bool ->
+  unsigned_op:Hex.t ->
+  signature:Hex.t ->
+  Client.t ->
+  JSON.t Runnable.process
 
 (** [forge_and_inject_operation] allows to forge, sign and inject to a
     node, via the provided [client], the list [batch] of managed operations.
@@ -221,14 +270,15 @@ val forge_and_inject_operation :
   Client.t ->
   [`OpHash of string] Lwt.t
 
-val spawn_forge_and_inject_operation :
+val runnable_forge_and_inject_operation :
   ?protocol:Protocol.t ->
   ?branch:string ->
   ?async:bool ->
+  ?force:bool ->
   batch:manager_operation_content list ->
   signer:Account.key ->
   Client.t ->
-  Process.t Lwt.t
+  JSON.t Runnable.process Lwt.t
 
 (** {2 High-level injection functions} *)
 
@@ -277,6 +327,29 @@ val inject_public_key_revelation :
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?public_key:string ->
+  Client.t ->
+  [`OpHash of string] Lwt.t
+
+(** [inject_delegation] is a high-level wrapper that allows to build
+    delegation operations and to inject them using the given client. The
+    [signer] can be different from the [source] to be able to inject missigned
+    operations.
+
+    See {!mk_delegation} and {!forge_and_inject_operation} for the list of
+    parameters and their default values. *)
+val inject_delegation :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  source:Account.key ->
+  ?signer:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  delegate:string ->
   Client.t ->
   [`OpHash of string] Lwt.t
 
@@ -348,3 +421,54 @@ val inject_transfers :
   number_of_operations:int ->
   Client.t ->
   [`OpHash of string] list Lwt.t
+
+(** [inject_rejection] is a high-level wrapper around the tx_rollup
+   rejection operation (see {!mk_rejection}). *)
+val inject_rejection :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  source:Account.key ->
+  ?signer:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  tx_rollup:string ->
+  proof:string ->
+  level:int ->
+  message:Rollup.Tx_rollup.message ->
+  message_position:int ->
+  message_path:string list ->
+  message_result_hash:string ->
+  message_result_path:JSON.u ->
+  previous_message_result_path:JSON.u ->
+  previous_message_context_hash:string ->
+  previous_message_withdraw_list_hash:string ->
+  Client.t ->
+  [`OpHash of string] Lwt.t
+
+(** [inject_transfer_ticket] constructs and injects a mangager operation
+    representing a transfer ticket operation. *)
+val inject_transfer_ticket :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  source:Account.key ->
+  ?signer:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  contents:micheline ->
+  ty:micheline ->
+  ticketer:string ->
+  amount:int ->
+  destination:string ->
+  entrypoint:string ->
+  Client.t ->
+  [`OpHash of string] Lwt.t

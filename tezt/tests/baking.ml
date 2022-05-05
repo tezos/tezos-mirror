@@ -162,6 +162,18 @@ let mempool_operation_encoding : mempool_operation Data_encoding.t =
        (req "contents" (list operation_content_encoding))
        (opt "signature" signature_encoding))
 
+let ithaca_mempool_operation_encoding : mempool_operation Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (function
+      | Mempool_operation {protocol = _; shell_header; protocol_data} ->
+          (shell_header.branch, protocol_data.contents, protocol_data.signature))
+    (fun _ -> assert false)
+    (obj3
+       (req "branch" Block_hash.encoding)
+       (req "contents" (list operation_content_encoding))
+       (opt "signature" signature_encoding))
+
 let mempool_encoding : mempool Data_encoding.t =
   let open Data_encoding in
   let is_empty = function [] -> true | _ -> false in
@@ -247,7 +259,7 @@ let get_next_counter state key =
 let remove_signature (op : operation) : operation =
   {op with protocol_data = {op.protocol_data with signature = None}}
 
-let encode_unsigned_operation_to_binary state op =
+let encode_unsigned_operation_to_binary client op =
   let op = remove_signature op in
   let op = unsigned_operation_to_json op in
   let* json_hex =
@@ -256,31 +268,31 @@ let encode_unsigned_operation_to_binary state op =
         POST
         ["chains"; "main"; "blocks"; "head"; "helpers"; "forge"; "operations"]
         ~data:op
-        state.sandbox_client)
+        client)
   in
   return Hex.(to_bytes (`Hex (JSON.as_string json_hex)))
 
-let mempool_operation_from_op state signer op :
+let mempool_operation_from_op client protocol signer op :
     (mempool_operation * bytes) Lwt.t =
-  let* bin = encode_unsigned_operation_to_binary state op in
+  let* bin = encode_unsigned_operation_to_binary client op in
   let signature = Operation.sign_manager_op_bytes ~signer bin in
   let signature = Tezos_crypto.Signature.to_b58check signature in
   return
     ( Mempool_operation
         {
-          protocol = state.protocol;
+          protocol;
           shell_header = op.shell_header;
           protocol_data = {op.protocol_data with signature = Some signature};
         },
       bin )
 
-let mempool_from_list_of_ops state operations =
-  let rec loop state operations acc =
+let mempool_from_list_of_ops client protocol operations =
+  let rec loop operations acc =
     match operations with
     | [] -> return (List.rev acc)
     | (account, op) :: tl ->
         let* (mempool_op, binary_proto_data) =
-          mempool_operation_from_op state account op
+          mempool_operation_from_op client protocol account op
         in
         let shell_op =
           {
@@ -289,9 +301,9 @@ let mempool_from_list_of_ops state operations =
           }
         in
         let hash = Tezos_base.Operation.hash shell_op in
-        loop state tl ((hash, mempool_op) :: acc)
+        loop tl ((hash, mempool_op) :: acc)
   in
-  loop state operations []
+  loop operations []
 
 (* ------------------------------------------------------------------------- *)
 
@@ -331,8 +343,16 @@ let sample_next_transfer_for state ~fee ~branch ~account =
   in
   return operation
 
-let bake_with_mempool ?protocol state mempool =
-  let mempool_json = Data_encoding.Json.construct mempool_encoding mempool in
+let bake_with_mempool ?protocol node client mempool =
+  let mempool_json =
+    match protocol with
+    | Some Protocol.Ithaca ->
+        let open Data_encoding in
+        Json.construct
+          (list ithaca_mempool_operation_encoding)
+          (List.map snd mempool)
+    | _ -> Data_encoding.Json.construct mempool_encoding mempool
+  in
   let mempool_str = Ezjsonm.value_to_string mempool_json in
   let mempool = Temp.file "mempool.json" in
   let* _ =
@@ -345,8 +365,8 @@ let bake_with_mempool ?protocol state mempool =
     ?protocol
     ~mempool
     ~force:true
-    ~context_path:(Node.data_dir state.sandbox_node // "context")
-    state.sandbox_client
+    ~context_path:(Node.data_dir node // "context")
+    client
 
 let get_current_head_hash state =
   let* head =
@@ -411,7 +431,8 @@ let assert_block_is_well_baked block =
 
 let random_permutation list =
   assert (list <> []) ;
-  Tezos_stdlib.TzList.shuffle list
+  let rng = Random.State.make_self_init () in
+  Tezos_base.TzPervasives.List.shuffle ~rng list
 
 let single_baker_increasing_fees state ~account : mempool Lwt.t =
   let* branch = get_current_head_hash state in
@@ -428,7 +449,7 @@ let single_baker_increasing_fees state ~account : mempool Lwt.t =
   let ops =
     random_permutation [(account, op1); (account, op2); (account, op3)]
   in
-  mempool_from_list_of_ops state ops
+  mempool_from_list_of_ops state.sandbox_client state.protocol ops
 
 let distinct_bakers_increasing_fees state : mempool Lwt.t =
   let* branch = get_current_head_hash state in
@@ -452,13 +473,15 @@ let distinct_bakers_increasing_fees state : mempool Lwt.t =
         return (account, op))
       (List.combine accounts fees)
   in
-  mempool_from_list_of_ops state ops
+  mempool_from_list_of_ops state.sandbox_client state.protocol ops
 
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
 
 let bake_and_check state ~protocol ~mempool =
-  let* () = bake_with_mempool ~protocol state mempool in
+  let* () =
+    bake_with_mempool ~protocol state.sandbox_node state.sandbox_client mempool
+  in
   let* block =
     Client.(rpc GET ["chains"; "main"; "blocks"; "head"] state.sandbox_client)
   in
@@ -522,20 +545,13 @@ let wrong_branch_operation_dismissal =
       ]
   in
   let* () =
-    Client.activate_protocol
-      ~timestamp_delay:0.
-      ~protocol
-      ~parameter_file
-      client
+    Client.activate_protocol ~timestamp:Now ~protocol ~parameter_file client
   in
   Log.info "Activated protocol." ;
   Log.info "Baking a first proposal." ;
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
   (* Retrieve head's hash *)
-  let* head_hash =
-    let* json = RPC.get_block_hash client in
-    return (JSON.as_string json)
-  in
+  let* head_hash = RPC.get_block_hash client in
   Log.info "Injecting a transfer branched on the current head." ;
   let* (`OpHash oph) =
     Operation.inject_transfer
@@ -545,7 +561,7 @@ let wrong_branch_operation_dismissal =
       ~dest:Constant.bootstrap2
       client
   in
-  let* current_mempool = RPC.get_mempool client in
+  let* current_mempool = Mempool.get_mempool client in
   Check.(
     (current_mempool <> Tezt_tezos.Mempool.empty)
       Tezt_tezos.Mempool.typ
@@ -555,7 +571,7 @@ let wrong_branch_operation_dismissal =
   Log.info "Bake a second proposal at a different round." ;
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
   Log.info "Checking that the transfer is dismissed from the current mempool." ;
-  let* current_mempool = RPC.get_mempool client in
+  let* current_mempool = Mempool.get_mempool client in
   Check.(
     (current_mempool = Tezt_tezos.Mempool.empty)
       Tezt_tezos.Mempool.typ
@@ -563,6 +579,115 @@ let wrong_branch_operation_dismissal =
   Log.info "Checking that the transfer is not included in the current head." ;
   check_op_not_in_baked_block client oph
 
+let baking_operation_exception_ithaca =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"ensure we can still bake with a faulty operation"
+    ~tags:["baking"; "exception"]
+    ~supports:Protocol.(Between_protocols (number Ithaca, number Ithaca))
+  @@ fun protocol ->
+  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let data_dir = Node.data_dir node in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let* new_account = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~giver:"bootstrap1"
+      ~receiver:new_account.alias
+      ~amount:(Tez.of_int 10)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = wait_injection in
+  (* We use [context_path] to ensure the baker will not use the
+     preapply RPC. Indeed, this test was introduced because of a bug
+     that happens when the baker does not use the preapply RPC. *)
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
+  let* () = wait_injection in
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let*! json_balance =
+    RPC.Contracts.get_balance ~contract_id:new_account.public_key_hash client
+  in
+  let _balance = JSON.as_string json_balance in
+  let* branch = RPC.get_branch client in
+  let branch = Block_hash.of_b58check_exn (JSON.as_string branch) in
+  let operation =
+    {
+      shell_header = {branch};
+      protocol_data =
+        {
+          contents =
+            [
+              {
+                kind = "transaction";
+                source = new_account.Account.public_key_hash;
+                fee = "0";
+                counter = string_of_int 1;
+                gas_limit = string_of_int 2000;
+                storage_limit = string_of_int 0;
+                amount = string_of_int 0;
+                destination = Constant.bootstrap1.public_key_hash;
+              };
+            ];
+          signature = None;
+        };
+    }
+  in
+  let* mempool =
+    mempool_from_list_of_ops
+      client
+      (Protocol_hash.of_b58check_exn (Protocol.hash protocol))
+      [(new_account, operation)]
+  in
+  let* () = bake_with_mempool ~protocol:Ithaca node client mempool in
+  let* _ = Node.wait_for_level node 4 in
+  unit
+
+let baking_operation_exception =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"ensure we can still bake with a faulty operation"
+    ~tags:["baking"; "exception"]
+    ~supports:Protocol.(From_protocol (number Alpha))
+  @@ fun protocol ->
+  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let data_dir = Node.data_dir node in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let* new_account = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~giver:"bootstrap1"
+      ~receiver:new_account.alias
+      ~amount:(Tez.of_int 10)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = wait_injection in
+  (* We use [context_path] to ensure the baker will not use the
+     preapply RPC. Indeed, this test was introduced because of a bug
+     that happens when the baker does not use the preapply RPC. *)
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
+  let* () = wait_injection in
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let* _ =
+    Operation.inject_delegation
+      ~fee:9_000_000
+      ~source:new_account
+      ~delegate:new_account.public_key_hash
+      client
+  in
+  let* () = wait_injection in
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* _ = Node.wait_for_level node 4 in
+  unit
+
 let register ~protocols =
-  test_ordering ~protocols ;
-  wrong_branch_operation_dismissal ~protocols
+  test_ordering protocols ;
+  wrong_branch_operation_dismissal protocols ;
+  baking_operation_exception_ithaca protocols ;
+  baking_operation_exception protocols

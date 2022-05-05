@@ -164,6 +164,11 @@ module Acl = struct
     in
     conv addr_port_id_to_string parse string
 
+  let policy_type p =
+    if p = secure then "Secure"
+    else if p = allow_all then "AllowAll"
+    else "Custom"
+
   let policy_encoding : (endpoint * t) list Data_encoding.t =
     let open Data_encoding in
     list
@@ -209,19 +214,25 @@ module Acl = struct
   module Internal_for_test = struct
     type nonrec endpoint = endpoint
 
-    let rec resolve_domain_names resolve = function
-      | [] -> Lwt.return []
+    let rec resolve_domain_names resolve =
+      let open Lwt_syntax in
+      function
+      | [] -> return_nil
       | (endpoint, acl) :: remainder ->
           let open P2p_point.Id in
-          resolve endpoint
-          >|= List.map (fun (ip_addr, _) ->
-                  ( {
-                      endpoint with
-                      addr = Format.asprintf "%a" Ipaddr.V6.pp ip_addr;
-                    },
-                    acl ))
-          >>= fun resolved ->
-          resolve_domain_names resolve remainder >|= fun rem -> resolved @ rem
+          let* resolved = resolve endpoint in
+          let resolved =
+            List.map
+              (fun (ip_addr, _) ->
+                ( {
+                    endpoint with
+                    addr = Format.asprintf "%a" Ipaddr.V6.pp ip_addr;
+                  },
+                  acl ))
+              resolved
+          in
+          let+ rem = resolve_domain_names resolve remainder in
+          resolved @ rem
   end
 
   let resolve_domain_names =

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2018-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -57,5 +57,3 @@ let tests =
         ("hash_matches_secp256k1", `Quick, test_hash_matches secp256k1);
       ] );
   ]
-
-let tests_lwt = []

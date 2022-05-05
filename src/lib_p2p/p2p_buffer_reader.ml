@@ -81,28 +81,30 @@ let mk_readable ~read_buffer ~read_queue =
 type buffer = {length_to_copy : int; pos : int; buf : Bytes.t}
 
 let mk_buffer ?pos ?length_to_copy buf : buffer tzresult =
+  let open Result_syntax in
   let buflen = Bytes.length buf in
   let pos = Option.value ~default:0 pos in
   let length_to_copy = Option.value ~default:(buflen - pos) length_to_copy in
   let check cond ~expected =
-    if cond then ok ()
+    if cond then return_unit
     else
-      error
-        Int64.(
-          Invalid_read_request
-            {
-              expected;
-              pos = of_int pos;
-              length_to_copy = of_int pos;
-              buflen = of_int buflen;
-            })
+      tzfail
+        (Invalid_read_request
+           {
+             expected;
+             pos = Int64.of_int pos;
+             length_to_copy = Int64.of_int pos;
+             buflen = Int64.of_int buflen;
+           })
   in
-  check (0 <= length_to_copy) ~expected:"0 <= length_to_copy" >>? fun () ->
-  check (0 <= pos) ~expected:"0 <= pos" >>? fun () ->
-  check
-    (pos + length_to_copy <= buflen)
-    ~expected:"pos + length_to_copy <= buflen"
-  >>? fun () -> Ok {length_to_copy; pos; buf}
+  let* () = check (0 <= length_to_copy) ~expected:"0 <= length_to_copy" in
+  let* () = check (0 <= pos) ~expected:"0 <= pos" in
+  let* () =
+    check
+      (pos + length_to_copy <= buflen)
+      ~expected:"pos + length_to_copy <= buflen"
+  in
+  Ok {length_to_copy; pos; buf}
 
 let mk_buffer_safe buf : buffer =
   {length_to_copy = Bytes.length buf; pos = 0; buf}
@@ -129,28 +131,33 @@ let read_from readable {pos = offset; length_to_copy; buf} data =
            ~into:buf
            ~offset) ;
       Ok read_len
-  | Error _ -> error P2p_errors.Connection_closed
+  | Error _ -> Result_syntax.tzfail P2p_errors.Connection_closed
 
 let read ?canceler readable buffer =
+  let open Lwt_syntax in
   match readable.partial_read with
   | Some msg ->
       readable.partial_read <- None ;
       Lwt.return (read_from readable buffer (Ok msg))
   | None ->
-      protect ?canceler (fun () ->
-          Lwt_pipe.Maybe_bounded.pop readable.read_queue)
-      >|= read_from readable buffer
+      let+ m =
+        protect ?canceler (fun () ->
+            Lwt_pipe.Maybe_bounded.pop readable.read_queue)
+      in
+      read_from readable buffer m
 
 let read_full ?canceler readable buffer =
+  let open Lwt_result_syntax in
   let rec loop ({length_to_copy; _} as buffer) =
     if length_to_copy = 0 then return_unit
     else
-      read ?canceler readable buffer >>=? fun read_len ->
+      let* read_len = read ?canceler readable buffer in
       (* This is safe - even if the initial [length_to_copy] is not a multiple of the
          readable's pending bytes - because [read] reads *at most*
          the requested number of bytes: it doesn't try to read more
          than available. *)
-      shift read_len buffer >>?= loop
+      let*? buffer = shift read_len buffer in
+      loop buffer
   in
   loop buffer
 

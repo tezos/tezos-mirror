@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,26 +34,12 @@
 (** [value_size ty v] returns an overapproximation of the size of the
    in-memory representation of [v] of type [ty]. *)
 val value_size :
-  'a Script_typed_ir.ty -> 'a -> Cache_memory_helpers.nodes_and_size
-
-(** [ty_size ty] returns an overapproximation of the size of the
-   in-memory representation of type [ty]. *)
-val ty_size : 'a Script_typed_ir.ty -> Cache_memory_helpers.nodes_and_size
-
-(** [comparable_ty_size cty] returns an overapproximation of the size
-   of the in-memory representation of comparable type [cty]. *)
-val comparable_ty_size :
-  'a Script_typed_ir.comparable_ty -> Cache_memory_helpers.nodes_and_size
+  ('a, _) Script_typed_ir.ty -> 'a -> Cache_memory_helpers.nodes_and_size
 
 (** [lambda_size l] returns an overapproximation of the size of the
     internal IR for the Michelson lambda abstraction [l]. *)
 val lambda_size :
   ('a, 'b) Script_typed_ir.lambda -> Cache_memory_helpers.nodes_and_size
-
-(** [kinstr_size i] returns an overapproximation of the size of the
-    internal IR [i]. *)
-val kinstr_size :
-  ('a, 's, 'r, 'f) Script_typed_ir.kinstr -> Cache_memory_helpers.nodes_and_size
 
 (** [node_size root] returns the size of the in-memory representation
    of [root] in bytes. This is an over-approximation of the memory
@@ -69,3 +55,18 @@ val ( ++ ) :
 
 (** Zero vector (reexport from {!Cache_memory_helpers}) *)
 val zero : Cache_memory_helpers.nodes_and_size
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** [ty_size ty] returns an overapproximation of the size of the
+   in-memory representation of type [ty]. *)
+  val ty_size :
+    ('a, _) Script_typed_ir.ty -> Cache_memory_helpers.nodes_and_size
+
+  (** [kinstr_size i] returns an overapproximation of the size of the
+      internal IR [i]. *)
+  val kinstr_size :
+    ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
+    Cache_memory_helpers.nodes_and_size
+end

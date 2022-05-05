@@ -42,7 +42,7 @@ class mock_wallet (entities : string) : Tezos_client_base.Client_context.wallet
 
     method read_file _path = failwith "mock_wallet:read_file"
 
-    method get_base_dir = assert false
+    method get_base_dir = ""
 
     method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = fun _f -> _f ()
 
@@ -55,6 +55,9 @@ class mock_wallet (entities : string) : Tezos_client_base.Client_context.wallet
     method write : type a.
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
       fun _alias_name _list _encoding -> failwith "mock_wallet:write"
+
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      fun _ -> Lwt_result_syntax.return_none
   end
 
 (**

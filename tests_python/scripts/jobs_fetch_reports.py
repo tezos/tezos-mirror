@@ -154,6 +154,7 @@ def fetch_and_merge_reports(
         sys.exit(1)
 
     (nb_testcases, merged_junit_report) = merge_junit_reports(junit_reports)
+    ET.indent(merged_junit_report)
     merged_junit_report.write(merged_report_output_file, encoding='unicode')
     print(
         f"Wrote merged report with {nb_testcases} testcases "

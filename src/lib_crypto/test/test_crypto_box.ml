@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,9 +42,13 @@ let chkey = Crypto_box.precompute sk pk
     by [Crypto_box.check_proof_of_work].
 *)
 let test_check_pow () =
-  let open Lwt.Infix in
   let target = Crypto_box.make_pow_target 2. in
-  Crypto_box.generate_proof_of_work pk target >|= fun pow ->
+  let pow =
+    Crypto_box.For_testing_only.generate_proof_of_work_n_attempts
+      ~max:1000
+      pk
+      target
+  in
   Alcotest.(check bool)
     "check_pow"
     (Crypto_box.check_proof_of_work pk pow target)
@@ -107,7 +112,6 @@ let tests =
           `Quick,
           test_fast_box_noalloc (Bytes.of_string "test") );
         ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test"));
+        ("Check PoW", `Slow, test_check_pow);
       ] );
   ]
-
-let tests_lwt = [("crypto_box", [("Check PoW", `Slow, test_check_pow)])]

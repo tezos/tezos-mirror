@@ -49,6 +49,10 @@ type t = private {
           do not pass [--sym-block-caching-time]. If your node's load
           is too high, pass a bigger value than [time_between_blocks] (if
           your clients are fine seeing slightly deprecated values) *)
+  data_dir : string option;
+      (** Path to the data-dir of a running tezos-node. If specified, we use
+          the [context] subdirectory to obtain data instead of using the
+          [../raw/bytes] RPC call (hereby reducing the node's IO). *)
 }
 
 (** Pretty printer for [t] *)
@@ -65,6 +69,10 @@ type runtime = private {
       (** The paths to the certificate and key to use for TLS *)
   sym_block_caching_time : int option;
       (** The duration during which data of symbolic blocks is kept *)
+  data_dir : string option;
+      (** Path to the data-dir of a running tezos-node. If specified, we use
+          the [context] subdirectory to obtain data instead of using the
+          [../raw/bytes] RPC call (hereby reducing the node's IO). *)
 }
 
 (** [make endpoint rpc_addr rpc_tls sym_block_caching_time]
@@ -75,6 +83,7 @@ val make :
   rpc_addr:Uri.t option ->
   rpc_tls:string option ->
   sym_block_caching_time:int option ->
+  data_dir:string option ->
   t
 
 (** Valid config file: if passed to [destruct_config], [Valid] is returned. *)

@@ -117,14 +117,15 @@ let may_update_proposal state (proposal : proposal) =
   else Lwt.return state
 
 let preendorse state proposal =
-  Events.(emit preendorsing_proposal proposal.block.hash) >>= fun () ->
   if Protocol_hash.(proposal.block.protocol <> proposal.block.next_protocol)
   then
-    (* We do not endorse the first transition block *)
+    (* We do not preendorse the first transition block *)
     let new_round_state = {state.round_state with current_phase = Idle} in
     let new_state = {state with round_state = new_round_state} in
     Lwt.return (new_state, Do_nothing)
-  else Lwt.return (state, make_preendorse_action state proposal)
+  else
+    Events.(emit attempting_preendorse_proposal proposal.block.hash)
+    >>= fun () -> Lwt.return (state, make_preendorse_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
@@ -418,12 +419,12 @@ let propose_fresh_block_action ~endorsements ?last_proposal
   in
   Lwt.return @@ Inject_block {block_to_bake; updated_state}
 
-let repropose_block_action state delegate round (proposal : proposal) =
-  (* Possible cases: 1. There was a proposal but the PQC was not
-     reached 2. There was a proposal and the PQC and/or QC was
-     reached *)
-  (* We repropose the [endorsable_payload] if it exists, not the
-     [locked_round] as it may be older. *)
+let propose_block_action state delegate round (proposal : proposal) =
+  (* Possible cases:
+     1. There was a proposal but the PQC was not reached.
+     2. There was a proposal and the PQC was reached. We repropose the
+     [endorsable_payload] if it exists, not the [locked_round] as it
+     may be older. *)
   match state.level_state.endorsable_payload with
   | None ->
       Events.(emit no_endorsable_payload_fresh_block ()) >>= fun () ->
@@ -532,18 +533,24 @@ let end_of_round state current_round =
       let new_state = {state with round_state = new_round_state} in
       do_nothing new_state
   | Some (delegate, _) ->
-      Events.(
-        emit
-          proposal_slot
-          (current_round, state.level_state.current_level, new_round, delegate))
-      >>= fun () ->
-      (* We have a delegate, we need to determine what to inject *)
-      repropose_block_action
-        new_state
-        delegate
-        new_round
-        state.level_state.latest_proposal
-      >>= fun action -> Lwt.return (new_state, action)
+      let last_proposal = state.level_state.latest_proposal.block in
+      if Protocol_hash.(last_proposal.protocol <> Protocol.hash) then
+        (* Do not inject a block for the previous protocol! (Let the
+           baker of the previous protocol do it.) *)
+        do_nothing new_state
+      else
+        Events.(
+          emit
+            proposal_slot
+            (current_round, state.level_state.current_level, new_round, delegate))
+        >>= fun () ->
+        (* We have a delegate, we need to determine what to inject *)
+        propose_block_action
+          new_state
+          delegate
+          new_round
+          state.level_state.latest_proposal
+        >>= fun action -> Lwt.return (new_state, action)
 
 let time_to_bake state at_round =
   (* It is now time to update the state level *)

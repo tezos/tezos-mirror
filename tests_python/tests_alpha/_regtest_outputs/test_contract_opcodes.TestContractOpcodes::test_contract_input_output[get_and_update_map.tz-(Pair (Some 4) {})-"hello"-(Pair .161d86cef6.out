@@ -7,28 +7,28 @@ emitted operations
 big_map diff
   
 trace
-  - location: 13 (remaining gas: 1039989.746 units remaining)
-    [ (Pair "hello" (Some 4) {})  	 ]
-  - location: 13 (remaining gas: 1039989.736 units remaining)
-    [ "hello"  	@parameter
-      (Pair (Some 4) {})  	@storage ]
-  - location: 14 (remaining gas: 1039989.721 units remaining)
-    [ (Pair (Some 4) {})  	@storage ]
-  - location: 16 (remaining gas: 1039989.711 units remaining)
-    [ (Some 4)  	
-      {}  	 ]
-  - location: 14 (remaining gas: 1039989.681 units remaining)
-    [ "hello"  	@parameter
-      (Some 4)  	
-      {}  	 ]
-  - location: 17 (remaining gas: 1039989.496 units remaining)
-    [ None  	
-      { Elt "hello" 4 }  	 ]
-  - location: 18 (remaining gas: 1039989.481 units remaining)
-    [ (Pair None { Elt "hello" 4 })  	 ]
-  - location: 19 (remaining gas: 1039989.466 units remaining)
-    [ {}  	
-      (Pair None { Elt "hello" 4 })  	 ]
-  - location: 21 (remaining gas: 1039989.451 units remaining)
-    [ (Pair {} None { Elt "hello" 4 })  	 ]
+  - location: 13 (remaining gas: 1039991.561 units remaining)
+    [ (Pair "hello" (Some 4) {}) ]
+  - location: 13 (remaining gas: 1039991.551 units remaining)
+    [ "hello"
+      (Pair (Some 4) {}) ]
+  - location: 14 (remaining gas: 1039991.541 units remaining)
+    [ (Pair (Some 4) {}) ]
+  - location: 16 (remaining gas: 1039991.531 units remaining)
+    [ (Some 4)
+      {} ]
+  - location: 14 (remaining gas: 1039991.511 units remaining)
+    [ "hello"
+      (Some 4)
+      {} ]
+  - location: 17 (remaining gas: 1039991.416 units remaining)
+    [ None
+      { Elt "hello" 4 } ]
+  - location: 18 (remaining gas: 1039991.406 units remaining)
+    [ (Pair None { Elt "hello" 4 }) ]
+  - location: 19 (remaining gas: 1039991.396 units remaining)
+    [ {}
+      (Pair None { Elt "hello" 4 }) ]
+  - location: 21 (remaining gas: 1039991.386 units remaining)
+    [ (Pair {} None { Elt "hello" 4 }) ]
 

@@ -1,0 +1,9 @@
+{0 tezos-shell index}
+
+{1 Library tezos-shell}
+
+The entry point of this library is the module: {!Tezos_shell}.
+
+{1 Prevalidator implementation overview}
+
+You can find the implementation overview of the prevalidator {{!page-prevalidator} here}.

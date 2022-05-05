@@ -35,7 +35,7 @@ module Alpha_block_services =
 (** Client RPC context *)
 class type rpc_context =
   object
-    inherit RPC_context.json
+    inherit RPC_context.generic
 
     inherit
       [Shell_services.chain * Shell_services.block] Protocol.Environment
@@ -44,14 +44,12 @@ class type rpc_context =
   end
 
 (** The class [wrap_rpc_context] is a wrapper class used by the proxy
-    mode clients. From a general-purpose RPC_context.json [t], the
+    mode clients. From a general-purpose RPC_context.generic [t], the
     class is augmented with shell services to provide RPC calls that
     are protocol-dependent. *)
-class wrap_rpc_context (t : RPC_context.json) : rpc_context =
+class wrap_rpc_context (t : RPC_context.generic) : rpc_context =
   object
     method base : Uri.t = t#base
-
-    method generic_json_call = t#generic_json_call
 
     method generic_media_type_call = t#generic_media_type_call
 
@@ -181,11 +179,6 @@ let () =
   @@ def "contract" [] Protocol.Alpha_context.Contract.encoding ;
   register
   @@ def
-       "contract"
-       ["big_map_diff"]
-       Protocol.Alpha_context.Lazy_storage.legacy_big_map_diff_encoding ;
-  register
-  @@ def
        "receipt"
        ["balance_updates"]
        Protocol.Alpha_context.Receipt.balance_updates_encoding ;
@@ -213,7 +206,7 @@ let () =
   @@ def
        "operation"
        ["internal"]
-       Protocol.Alpha_context.Operation.internal_operation_encoding ;
+       Protocol.Apply_results.internal_contents_encoding ;
   register
   @@ def
        "operation"
@@ -230,7 +223,7 @@ let () =
   @@ def
        "constants"
        ["parametric"]
-       Protocol.Alpha_context.Constants.parametric_encoding ;
+       Protocol.Alpha_context.Constants.Parametric.encoding ;
   register @@ def "nonce" [] Protocol.Alpha_context.Nonce.encoding ;
   register @@ def "block_header" [] Protocol.Alpha_context.Block_header.encoding ;
   register

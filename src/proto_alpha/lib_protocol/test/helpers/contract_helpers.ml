@@ -30,12 +30,7 @@ open Error_monad_operators
 (** Initializes 2 addresses to do only operations plus one that will be
     used to bake. *)
 let init () =
-  Context.init ~consensus_threshold:0 3 >|=? fun (b, contracts) ->
-  let (src0, src1, src2) =
-    match contracts with
-    | src0 :: src1 :: src2 :: _ -> (src0, src1, src2)
-    | _ -> assert false
-  in
+  Context.init3 ~consensus_threshold:0 () >|=? fun (b, (src0, src1, src2)) ->
   let baker =
     match Alpha_context.Contract.is_implicit src0 with
     | Some v -> v
@@ -73,6 +68,7 @@ let default_step_constants =
       payer = default_source;
       self = default_source;
       amount = Tez.zero;
+      balance = Tez.zero;
       chain_id = Chain_id.zero;
       now = Script_timestamp.of_zint Z.zero;
       level = Script_int.zero_n;
@@ -82,7 +78,7 @@ let default_step_constants =
    parameters from strings. It then executes the typed script with the storage
    and parameter and returns the result. *)
 let run_script ctx ?(step_constants = default_step_constants) contract
-    ?(entrypoint = "default") ~storage ~parameter () =
+    ?(entrypoint = Entrypoint.default) ~storage ~parameter () =
   let contract_expr = Expr.from_string contract in
   let storage_expr = Expr.from_string storage in
   let parameter_expr = Expr.from_string parameter in
@@ -99,3 +95,21 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~parameter:parameter_expr
     ~internal:false
   >>=?? fun res -> return res
+
+let originate_contract_from_string ~script ~storage ~source_contract ~baker
+    block =
+  let code = Expr.toplevel_from_string script in
+  let storage = Expr.from_string storage in
+  let script =
+    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+  in
+  Op.contract_origination
+    (B block)
+    source_contract
+    ~fee:(Test_tez.of_int 10)
+    ~script
+  >>=? fun (operation, dst) ->
+  Incremental.begin_construction ~policy:Block.(By_account baker) block
+  >>=? fun incr ->
+  Incremental.add_operation incr operation >>=? fun incr ->
+  Incremental.finalize_block incr >|=? fun b -> (dst, script, b)

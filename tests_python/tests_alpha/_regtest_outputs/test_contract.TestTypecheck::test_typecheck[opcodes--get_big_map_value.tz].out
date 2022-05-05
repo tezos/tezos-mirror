@@ -1,17 +1,16 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/get_big_map_value.tz]
 
 Well typed
-Gas remaining: 1039990.479 units remaining
+Gas remaining: 1039992.079 units remaining
 { parameter string ;
   storage (pair (big_map string string) (option string)) ;
   code { DUP
-         /* [ pair (string @parameter) (pair @storage (big_map string string) (option string))
-            : pair (string @parameter) (pair @storage (big_map string string) (option string)) ] */ ;
+         /* [ pair string (big_map string string) (option string)
+            : pair string (big_map string string) (option string) ] */ ;
          CAR
-         /* [ @parameter string
-            : pair (string @parameter) (pair @storage (big_map string string) (option string)) ] */ ;
+         /* [ string : pair string (big_map string string) (option string) ] */ ;
          DIP { CDAR ; DUP /* [ big_map string string : big_map string string ] */ }
-         /* [ @parameter string : big_map string string : big_map string string ] */ ;
+         /* [ string : big_map string string : big_map string string ] */ ;
          GET
          /* [ option string : big_map string string ] */ ;
          SWAP

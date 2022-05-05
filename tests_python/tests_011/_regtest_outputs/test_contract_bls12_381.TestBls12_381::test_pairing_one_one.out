@@ -1,9 +1,0 @@
-tests_011/test_contract_bls12_381.py::TestBls12_381::test_pairing_one_one
-
-storage
-  (Some False)
-emitted operations
-  
-big_map diff
-  
-

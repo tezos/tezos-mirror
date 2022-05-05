@@ -41,10 +41,19 @@ val make_with_animation :
   'seed ->
   'result Lwt.t
 
+type progress_display_mode = Auto | Always | Never
+
+(** This list associates each [progress_display_mode] constructor with its
+    textual representation. The main use case of this list is [enum] combinator,
+    e.g. from [cmdliner] or [data_encoding] libraries.*)
+val progress_display_mode_enum : (string * progress_display_mode) list
+
+val progress_display_mode_encoding : progress_display_mode Data_encoding.t
+
 (** The number of steps that the animation cycles through. *)
 val number_of_frames : int
 
-(** [display_progress ?every ?out ~pp_print_step f] calls
+(** [display_progress ?every ?out ~progress_display_mode ~pp_print_step f] calls
     [pp_print_step] when the first argument of [f] is called and
     increments the number of steps which will be given to
     [pp_print_step].
@@ -54,13 +63,19 @@ val number_of_frames : int
     called, the previous output will be erased and replaced by the new
     output.
 
+    [progress_display_mode] determines whether progress animation should be
+    displayed to the given [out]. When [Auto], animation is displayed
+    based on [isatty] result. When [Always], animation is always displayed
+    in the [out]. When [Never], animation isn't displayed in the [out].
+
     [pp_print_step] must only write on a single-line with no carriage
     return.
 
-    @raise [Invalid_argument] if the given [every] is less than 1.*)
+    @raise Invalid_argument if the given [every] is less than 1.*)
 val display_progress :
   ?every:int ->
   ?out:Lwt_unix.file_descr ->
+  progress_display_mode:progress_display_mode ->
   pp_print_step:(Format.formatter -> int -> unit) ->
   ((unit -> unit Lwt.t) -> 'a Lwt.t) ->
   'a Lwt.t

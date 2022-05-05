@@ -1,22 +1,22 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_mutual_recursion.tz]
 
 Well typed
-Gas remaining: 1039992.695 units remaining
+Gas remaining: 1039993.335 units remaining
 { parameter (pair nat address) ;
   storage nat ;
   code { CAR
-         /* [ @parameter pair nat address ] */ ;
+         /* [ pair nat address ] */ ;
          DUP
-         /* [ @parameter pair nat address : @parameter pair nat address ] */ ;
+         /* [ pair nat address : pair nat address ] */ ;
          CDR
-         /* [ address : @parameter pair nat address ] */ ;
+         /* [ address : pair nat address ] */ ;
          SWAP
-         /* [ @parameter pair nat address : address ] */ ;
+         /* [ pair nat address : address ] */ ;
          VIEW "is_twenty" nat
-         /* [ @contract option nat ] */ ;
+         /* [ option nat ] */ ;
          IF_SOME
            { NIL operation
-             /* [ list operation : @contract.some nat ] */ ;
+             /* [ list operation : nat ] */ ;
              PAIR
-             /* [ pair (list operation) (nat @contract.some) ] */ }
+             /* [ pair (list operation) nat ] */ }
            { FAIL } } }

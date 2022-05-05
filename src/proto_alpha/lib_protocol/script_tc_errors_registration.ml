@@ -28,21 +28,18 @@ open Script
 open Script_tc_errors
 
 (* Helpers for encoding *)
+let stack_ty_enc = Data_encoding.list Script.expr_encoding
+
 let type_map_enc =
   let open Data_encoding in
-  let stack_enc = list (tup2 Script.expr_encoding (list string)) in
   list
     (conv
        (fun (loc, (bef, aft)) -> (loc, bef, aft))
        (fun (loc, bef, aft) -> (loc, (bef, aft)))
        (obj3
           (req "location" Script.location_encoding)
-          (req "stack_before" stack_enc)
-          (req "stack_after" stack_enc)))
-
-let stack_ty_enc =
-  let open Data_encoding in
-  list (obj2 (req "type" Script.expr_encoding) (dft "annots" (list string) []))
+          (req "stack_before" stack_ty_enc)
+          (req "stack_after" stack_ty_enc)))
 
 (* main registration *)
 let () =
@@ -220,7 +217,7 @@ let () =
     ~id:"michelson_v1.no_such_entrypoint"
     ~title:"No such entrypoint (type error)"
     ~description:"An entrypoint was not found when calling a contract."
-    (obj1 (req "entrypoint" string))
+    (obj1 (req "entrypoint" Entrypoint.simple_encoding))
     (function No_such_entrypoint entrypoint -> Some entrypoint | _ -> None)
     (fun entrypoint -> No_such_entrypoint entrypoint) ;
   (* Unreachable entrypoint *)
@@ -232,26 +229,49 @@ let () =
     (obj1 (req "path" (list prim_encoding)))
     (function Unreachable_entrypoint path -> Some path | _ -> None)
     (fun path -> Unreachable_entrypoint path) ;
+  (* Tx rollup bad deposit parameter *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.tx_rollup_bad_deposit_parameter"
+    ~title:"Bad deposit parameter"
+    ~description:
+      "The parameter to the deposit entrypoint of a transaction rollup should \
+       be a pair of a ticket and the address of a recipient transaction \
+       rollup."
+    (located (obj1 (req "parameter" Script.expr_encoding)))
+    (function
+      | Tx_rollup_bad_deposit_parameter (loc, expr) -> Some (loc, expr)
+      | _ -> None)
+    (fun (loc, expr) -> Tx_rollup_bad_deposit_parameter (loc, expr)) ;
+  (* Tx rollup invalid ticket amount *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.invalid_tx_rollup_ticket_amount"
+    ~title:"Invalid ticket amount"
+    ~description:
+      "Ticket amount to be deposited in a transaction rollup should be \
+       strictly positive and fit in a signed 64-bit integer"
+    (obj1 (req "requested_value" Data_encoding.z))
+    (function Tx_rollup_invalid_ticket_amount z -> Some z | _ -> None)
+    (fun z -> Tx_rollup_invalid_ticket_amount z) ;
+  (* Tx rollup addresses disabled *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.tx_rollup_addresses_disabled"
+    ~title:"Tx rollup addresses are disabled"
+    ~description:"Cannot parse a tx_rollup address as tx rollups are disabled."
+    (obj1 (req "location" Script.location_encoding))
+    (function Tx_rollup_addresses_disabled loc -> Some loc | _ -> None)
+    (fun loc -> Tx_rollup_addresses_disabled loc) ;
   (* Duplicate entrypoint *)
   register_error_kind
     `Permanent
     ~id:"michelson_v1.duplicate_entrypoint"
     ~title:"Duplicate entrypoint (type error)"
     ~description:"Two entrypoints have the same name."
-    (obj1 (req "path" string))
+    (obj1 (req "path" Entrypoint.simple_encoding))
     (function Duplicate_entrypoint entrypoint -> Some entrypoint | _ -> None)
     (fun entrypoint -> Duplicate_entrypoint entrypoint) ;
-  (* Entrypoint name too long *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.entrypoint_name_too_long"
-    ~title:"Entrypoint name too long (type error)"
-    ~description:
-      "An entrypoint name exceeds the maximum length of 31 characters."
-    (obj1 (req "name" string))
-    (function
-      | Entrypoint_name_too_long entrypoint -> Some entrypoint | _ -> None)
-    (fun entrypoint -> Entrypoint_name_too_long entrypoint) ;
   (* Unexpected contract *)
   register_error_kind
     `Permanent
@@ -379,43 +399,6 @@ let () =
     (function
       | Bad_stack (loc, name, s, sty) -> Some (loc, (name, s, sty)) | _ -> None)
     (fun (loc, (name, s, sty)) -> Bad_stack (loc, name, s, sty)) ;
-  (* Inconsistent annotations *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.inconsistent_annotations"
-    ~title:"Annotations inconsistent between branches"
-    ~description:"The annotations on two types could not be merged"
-    (obj2 (req "annot1" string) (req "annot2" string))
-    (function
-      | Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
-      | _ -> None)
-    (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
-  (* Inconsistent field annotations *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.inconsistent_field_annotations"
-    ~title:"Annotations for field accesses is inconsistent"
-    ~description:
-      "The specified field does not match the field annotation in the type"
-    (obj2 (req "annot1" string) (req "annot2" string))
-    (function
-      | Inconsistent_field_annotations (annot1, annot2) -> Some (annot1, annot2)
-      | _ -> None)
-    (fun (annot1, annot2) -> Inconsistent_field_annotations (annot1, annot2)) ;
-  (* Inconsistent type annotations *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.inconsistent_type_annotations"
-    ~title:"Types contain inconsistent annotations"
-    ~description:"The two types contain annotations that do not match"
-    (located
-       (obj2
-          (req "type1" Script.expr_encoding)
-          (req "type2" Script.expr_encoding)))
-    (function
-      | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (ty1, ty2))
-      | _ -> None)
-    (fun (loc, (ty1, ty2)) -> Inconsistent_type_annotations (loc, ty1, ty2)) ;
   (* Unexpected annotation *)
   register_error_kind
     `Permanent
@@ -590,7 +573,7 @@ let () =
        where the equality of two types have to be proven, it is always \
        accompanied with another error that provides more context."
     (obj3
-       (opt "loc" Script.location_encoding)
+       (req "loc" Script.location_encoding)
        (req "first_type" Script.expr_encoding)
        (req "other_type" Script.expr_encoding))
     (function
@@ -813,4 +796,13 @@ let () =
     ~description:"DUP was used on a non-dupable type (e.g. tickets)."
     (obj2 (req "loc" location_encoding) (req "type" Script.expr_encoding))
     (function Non_dupable_type (loc, ty) -> Some (loc, ty) | _ -> None)
-    (fun (loc, ty) -> Non_dupable_type (loc, ty))
+    (fun (loc, ty) -> Non_dupable_type (loc, ty)) ;
+  (* Unexpected ticket owner*)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.unexpected_ticket_owner"
+    ~title:"Unexpected ticket owner"
+    ~description:"Ticket can only be created by a smart contract"
+    (obj1 (req "ticketer" Destination.encoding))
+    (function Unexpected_ticket_owner t -> Some t | _ -> None)
+    (fun t -> Unexpected_ticket_owner t)

@@ -1,0 +1,19 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/self_address_receiver.tz]
+
+Well typed
+Gas remaining: 1039992.679 units remaining
+{ parameter (lambda unit address) ;
+  storage unit ;
+  code { UNPAIR
+         /* [ lambda unit address : unit ] */ ;
+         UNIT
+         /* [ unit : lambda unit address : unit ] */ ;
+         EXEC
+         /* [ address : unit ] */ ;
+         SELF_ADDRESS
+         /* [ address : address : unit ] */ ;
+         ASSERT_CMPEQ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

@@ -46,7 +46,7 @@ val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
     More precisely, if one of the two promises is rejected
     or canceled, cancel the other promise and reject the resulting
     promise immediately with the original exception. *)
-val ( and*! ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+val lwt_both_fail_early : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
 (** Same as [Lwt.return]. *)
 val return : 'a -> 'a Lwt.t
@@ -82,6 +82,10 @@ val list_find_map : ('a -> 'b option) -> 'a list -> 'b option
     else [l] itself. *)
 val take : int -> 'a list -> 'a list
 
+(** [drop n l] removes the first [n] elements of [l] if longer than [n],
+    else the empty list. Raise [invalid_arg] if [n] is negative. *)
+val drop : int -> 'a list -> 'a list
+
 (** {2 Regular Expressions} *)
 
 (** Compiled regular expressions. *)
@@ -107,6 +111,15 @@ val ( =~* ) : string -> rex -> string option
 (** Match a regular expression with two capture groups. *)
 val ( =~** ) : string -> rex -> (string * string) option
 
+(** Match a regular expression with three capture groups. *)
+val ( =~*** ) : string -> rex -> (string * string * string) option
+
+(** Match a regular expression with four capture groups. *)
+val ( =~**** ) : string -> rex -> (string * string * string * string) option
+
+(** Match a regular expression with one capture group and return all results. *)
+val matches : string -> rex -> string list
+
 (** [replace_string ~all rex ~by s] iterates on [s], and replaces every
     occurrence of [rex] with [by]. If [all = false], then only the first
     occurrence of [rex] is replaced. *)
@@ -129,6 +142,9 @@ val replace_string :
 (** Repeat something a given amount of times. *)
 val repeat : int -> (unit -> unit Lwt.t) -> unit Lwt.t
 
+(** Fold n times a given function. *)
+val fold : int -> 'a -> (int -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+
 (** {2 Input/Output} *)
 
 (** Open file, use function to write output then close the output. In case of
@@ -139,11 +155,24 @@ val with_open_out : string -> (out_channel -> unit) -> unit
    error while reading, the channel is closed before raising the exception **)
 val with_open_in : string -> (in_channel -> 'a) -> 'a
 
-(** [read_file filename] returns the full contents of file [filename] *)
-val read_file : string -> string Lwt.t
+(** Write a string into a file, overwriting the file if it already exists.
+
+    Usage: [write_file filename ~contents] *)
+val write_file : string -> contents:string -> unit
+
+(** Read the whole contents of a file. *)
+val read_file : string -> string
 
 (** {2 Common structures} *)
 
 module String_map : Map.S with type key = string
 
-module String_set : Set.S with type elt = string
+module String_set : sig
+  include Set.S with type elt = string
+
+  (** Pretty-print a set of strings.
+
+      Items are quoted, separated by commas and breakable spaces,
+      and the result is surrounded by braces. *)
+  val pp : Format.formatter -> t -> unit
+end

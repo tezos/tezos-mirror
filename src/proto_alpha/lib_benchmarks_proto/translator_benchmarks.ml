@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+module Size = Gas_input_size
 
 (** {2 [Script_ir_translator] benchmarks} *)
 
@@ -510,7 +511,7 @@ let check_printable_benchmark =
 
 let () = Registration_helpers.register check_printable_benchmark
 
-module Merge_types : Benchmark.S = struct
+module Ty_eq : Benchmark.S = struct
   type config = {max_size : int}
 
   let config_encoding =
@@ -522,23 +523,23 @@ module Merge_types : Benchmark.S = struct
 
   let default_config = {max_size = 64}
 
-  type workload = Merge_types_workload of {nodes : int; consumed : Size.t}
+  type workload = Ty_eq_workload of {nodes : int; consumed : Size.t}
 
   let workload_encoding =
     let open Data_encoding in
     conv
-      (function Merge_types_workload {nodes; consumed} -> (nodes, consumed))
-      (fun (nodes, consumed) -> Merge_types_workload {nodes; consumed})
+      (function Ty_eq_workload {nodes; consumed} -> (nodes, consumed))
+      (fun (nodes, consumed) -> Ty_eq_workload {nodes; consumed})
       (obj2 (req "nodes" int31) (req "consumed" int31))
 
   let workload_to_vector = function
-    | Merge_types_workload {nodes; consumed} ->
+    | Ty_eq_workload {nodes; consumed} ->
         Sparse_vec.String.of_list
           [("nodes", float_of_int nodes); ("consumed", float_of_int consumed)]
 
-  let name = "MERGE_TYPES"
+  let name = "TY_EQ"
 
-  let info = "Benchmarking merging of types"
+  let info = "Benchmarking equating types"
 
   let tags = [Tags.translator]
 
@@ -548,7 +549,7 @@ module Merge_types : Benchmark.S = struct
 
   let size_model =
     Model.make
-      ~conv:(function Merge_types_workload {nodes; _} -> (nodes, ()))
+      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
       ~model:
         (Model.affine_split_const
            ~intercept1:Builtin_benchmarks.timer_variable
@@ -557,7 +558,7 @@ module Merge_types : Benchmark.S = struct
 
   let codegen_model =
     Model.make
-      ~conv:(function Merge_types_workload {nodes; _} -> (nodes, ()))
+      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
       ~model:(Model.affine ~intercept:intercept_var ~coeff:coeff_var)
 
   let () =
@@ -568,25 +569,36 @@ module Merge_types : Benchmark.S = struct
   let models =
     [("size_translator_model", size_model); ("codegen", codegen_model)]
 
-  let merge_type_benchmark rng_state nodes (ty : Script_ir_translator.ex_ty) =
-    let open Error_monad in
+  let ty_eq_benchmark rng_state nodes (ty : Script_ir_translator.ex_ty) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
         let ctxt = Gas_helpers.set_limit ctxt in
         match ty with
         | Ex_ty ty ->
             let dummy_loc = 0 in
-            Lwt.return (Script_ir_translator.ty_eq ctxt dummy_loc ty ty)
+            Lwt.return
+              (Gas_monad.run ctxt
+              @@ Script_ir_translator.ty_eq
+                   ~error_details:(Informative dummy_loc)
+                   ty
+                   ty)
             >|= Environment.wrap_tzresult
             >>=? fun (_, ctxt') ->
             let consumed =
               Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'
             in
             let workload =
-              Merge_types_workload
+              Ty_eq_workload
                 {nodes; consumed = Z.to_int (Gas_helpers.fp_to_z consumed)}
             in
-            let closure () = ignore (Script_ir_translator.ty_eq ctxt 0 ty ty) in
+            let closure () =
+              ignore
+                (Gas_monad.run ctxt
+                @@ Script_ir_translator.ty_eq
+                     ~error_details:(Informative dummy_loc)
+                     ty
+                     ty)
+            in
             return (Generator.Plain {workload; closure}) )
     |> function
     | Ok closure -> closure
@@ -600,13 +612,13 @@ module Merge_types : Benchmark.S = struct
     let ty =
       Michelson_generation.Samplers.Random_type.m_type ~size:nodes rng_state
     in
-    merge_type_benchmark rng_state nodes ty
+    ty_eq_benchmark rng_state nodes ty
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Merge_types)
+let () = Registration_helpers.register (module Ty_eq)
 
 (* A dummy type generator, sampling linear terms of a given size.
    The generator always returns types of the shape:
@@ -619,27 +631,26 @@ let () = Registration_helpers.register (module Merge_types)
 let rec dummy_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if size <= 1 then Ex_ty (unit_t ~annot:None)
+  if size <= 1 then Ex_ty unit_t
   else
     match dummy_type_generator (size - 2) with
-    | Ex_ty r ->
-        let l = unit_t ~annot:None in
-        Ex_ty
-          (match pair_t (-1) (l, None, None) (r, None, None) ~annot:None with
-          | Error _ -> assert false
-          | Ok t -> t)
+    | Ex_ty r -> (
+        let l = unit_t in
+        match pair_t (-1) l r with
+        | Error _ -> assert false
+        | Ok (Ty_ex_c t) -> Ex_ty t)
 
 (* A dummy comparable type generator, sampling linear terms of a given size. *)
 let rec dummy_comparable_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if size <= 0 then Ex_comparable_ty (unit_key ~annot:None)
+  if size <= 0 then Ex_comparable_ty unit_t
   else
     match dummy_comparable_type_generator (size - 2) with
     | Ex_comparable_ty r ->
-        let l = unit_key ~annot:None in
+        let l = unit_t in
         Ex_comparable_ty
-          (match pair_key (-1) (l, None) (r, None) ~annot:None with
+          (match comparable_pair_t (-1) l r with
           | Error _ -> assert false
           | Ok t -> t)
 
@@ -692,7 +703,6 @@ module Parse_type_benchmark : Benchmark.S = struct
   let info = "Benchmarking parse_ty"
 
   let make_bench rng_state config () =
-    let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let size = Random.State.int rng_state config.max_size in
@@ -744,7 +754,6 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let info = "Benchmarking unparse_ty"
 
   let make_bench rng_state config () =
-    let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let size = Random.State.int rng_state config.max_size in
@@ -789,66 +798,3 @@ module Unparse_type_benchmark : Benchmark.S = struct
 end
 
 let () = Registration_helpers.register (module Unparse_type_benchmark)
-
-module Unparse_comparable_type_benchmark : Benchmark.S = struct
-  include Parse_type_shared
-
-  let name = "UNPARSE_COMPARABLE_TYPE"
-
-  let info = "Benchmarking unparse_comparable_ty"
-
-  let make_bench rng_state config () =
-    let open Error_monad in
-    let res =
-      Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
-      let ctxt = Gas_helpers.set_limit ctxt in
-      let size = Random.State.int rng_state config.max_size in
-      let ty = dummy_comparable_type_generator size in
-      let nodes =
-        let (Script_ir_translator.Ex_comparable_ty ty) = ty in
-        let x = Script_typed_ir.comparable_ty_size ty in
-        Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
-      in
-      match ty with
-      | Ex_comparable_ty comp_ty ->
-          Environment.wrap_tzresult
-          @@ Script_ir_translator.unparse_comparable_ty ~loc:() ctxt comp_ty
-          >>? fun (_, ctxt') ->
-          let consumed =
-            Z.to_int
-              (Gas_helpers.fp_to_z
-                 (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
-          in
-          let workload = Type_workload {nodes; consumed} in
-          let closure () =
-            ignore
-              (Script_ir_translator.unparse_comparable_ty ~loc:() ctxt comp_ty)
-          in
-          ok (Generator.Plain {workload; closure})
-    in
-    match res with
-    | Ok closure -> closure
-    | Error errs -> global_error name errs
-
-  let size_model =
-    Model.make
-      ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
-           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
-
-  let () =
-    Registration_helpers.register_for_codegen
-      name
-      (Model.For_codegen size_model)
-
-  let models = [("size_translator_model", size_model)]
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
-end
-
-let () =
-  Registration_helpers.register (module Unparse_comparable_type_benchmark)

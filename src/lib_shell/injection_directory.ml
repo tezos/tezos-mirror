@@ -25,19 +25,29 @@
 (*****************************************************************************)
 
 let read_chain_id validator chain =
+  let open Lwt_syntax in
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in
   match chain with
   | None -> Lwt.return_none
-  | Some chain -> Chain_directory.get_chain_id store chain >>= Lwt.return_some
+  | Some chain ->
+      let* v = Chain_directory.get_chain_id store chain in
+      Lwt.return_some v
 
 let inject_block validator ?force ?chain bytes operations =
-  read_chain_id validator chain >>= fun chain_id ->
-  Validator.validate_block validator ?force ?chain_id bytes operations
-  >>=? fun (hash, block) -> return (hash, block >>=? fun _ -> return_unit)
+  let open Lwt_result_syntax in
+  let*! chain_id = read_chain_id validator chain in
+  let* (hash, block) =
+    Validator.validate_block validator ?force ?chain_id bytes operations
+  in
+  return
+    ( hash,
+      let* _ = block in
+      return_unit )
 
 let inject_operation validator ~force ?chain bytes =
-  read_chain_id validator chain >>= fun chain_id ->
+  let open Lwt_result_syntax in
+  let*! chain_id = read_chain_id validator chain in
   let t =
     match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
     | None -> failwith "Can't parse the operation"
@@ -47,13 +57,16 @@ let inject_operation validator ~force ?chain bytes =
   Lwt.return (hash, t)
 
 let inject_protocol store proto =
+  let open Lwt_result_syntax in
   let proto_bytes = Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
   let validation =
-    Updater.compile hash proto >>= function
+    let*! b = Updater.compile hash proto in
+    match b with
     | false -> failwith "Compilation failed (%a)" Protocol_hash.pp_short hash
     | true -> (
-        Store.Protocol.store store hash proto >>= function
+        let*! o = Store.Protocol.store store hash proto in
+        match o with
         | None ->
             failwith
               "Previously registered protocol (%a)"
@@ -64,6 +77,7 @@ let inject_protocol store proto =
   Lwt.return (hash, validation)
 
 let build_rpc_directory validator =
+  let open Lwt_result_syntax in
   let distributed_db = Validator.distributed_db validator in
   let state = Distributed_db.store distributed_db in
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
@@ -71,19 +85,24 @@ let build_rpc_directory validator =
     dir := RPC_directory.register !dir s (fun () p q -> f p q)
   in
   let inject_operation ~force q contents =
-    inject_operation validator ~force ?chain:q#chain contents
-    >>= fun (hash, wait) ->
-    (if q#async then return_unit else wait) >>=? fun () -> return hash
+    let*! (hash, wait) =
+      inject_operation validator ~force ?chain:q#chain contents
+    in
+    let* () = if q#async then return_unit else wait in
+    return hash
   in
   register0 Injection_services.S.block (fun q (raw, operations) ->
-      inject_block validator ?chain:q#chain ~force:q#force raw operations
-      >>=? fun (hash, wait) ->
-      (if q#async then return_unit else wait) >>=? fun () -> return hash) ;
+      let* (hash, wait) =
+        inject_block validator ?chain:q#chain ~force:q#force raw operations
+      in
+      let* () = if q#async then return_unit else wait in
+      return hash) ;
   register0 Injection_services.S.operation (inject_operation ~force:false) ;
   register0
     Injection_services.S.private_operation
     (inject_operation ~force:true) ;
   register0 Injection_services.S.protocol (fun q protocol ->
-      inject_protocol state protocol >>= fun (hash, wait) ->
-      (if q#async then return_unit else wait) >>=? fun () -> return hash) ;
+      let*! (hash, wait) = inject_protocol state protocol in
+      let* () = if q#async then return_unit else wait in
+      return hash) ;
   !dir

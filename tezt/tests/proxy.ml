@@ -132,7 +132,7 @@ let test_cache_at_most_once ~protocols =
       test_cache_at_most_once
         ~query_string
         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-        ~protocols)
+        protocols)
     paths
 
 (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
@@ -242,7 +242,7 @@ let test_context_suffix_no_rpc ~protocols =
   test_context_suffix_no_rpc
     ~query_string
     ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-    ~protocols:[protocol]
+    [protocol]
 
 (** Test.
     Test that [tezos-client --mode proxy --protocol P] fails
@@ -724,11 +724,11 @@ let test_split_key_heuristic =
   Lwt_list.iter_s test_one paths
 
 let register ~protocols =
-  test_bake ~protocols ;
-  test_transfer ~protocols ;
-  test_wrong_proto ~protocols ;
+  test_bake protocols ;
+  test_transfer protocols ;
+  test_wrong_proto protocols ;
   test_context_suffix_no_rpc ~protocols ;
   test_cache_at_most_once ~protocols ;
-  Location.test_locations_proxy ~protocols ;
-  Location.test_compare_proxy ~protocols ;
-  test_split_key_heuristic ~protocols
+  Location.test_locations_proxy protocols ;
+  Location.test_compare_proxy protocols ;
+  test_split_key_heuristic protocols

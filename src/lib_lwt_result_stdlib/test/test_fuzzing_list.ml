@@ -55,10 +55,17 @@ let () =
       (* Test internal consistency *)
       ("TestIterFold", (module TestIterFold : F));
       ("TestRevMapRevMap", (module TestRevMapRevMap : F));
+      ("TestRevConcatMapRevConcatMap", (module TestRevConcatMapRevConcatMap : F));
+      ("TestConcatMapConcatMap", (module TestConcatMapConcatMap : F));
+      ("Filters", (module TestFilters : F));
+      ("Partitions", (module TestPartitions : F));
+      ("PartitionMap", (module TestPartitionMap : F));
       (* Test consistency with Stdlib *)
       ("ExistForall", (module TestExistForallAgainstStdlibList : F));
       ("Filter", (module TestFilterAgainstStdlibList : F));
       ("Filterp", (module TestFilterpAgainstStdlibList : F));
+      ("Filteri", (module TestFilteriAgainstStdlibList : F));
+      ("Filterip", (module TestFilteripAgainstStdlibList : F));
       ("Filtermap", (module TestFiltermapAgainstStdlibList : F));
       ("Filtermapp", (module TestFiltermappAgainstStdlibList : F));
       ("Concatmap", (module TestConcatmapAgainstStdlibList : F));
@@ -72,6 +79,7 @@ let () =
       ("Map", (module TestMapAgainstStdlibList : F));
       ("Mapp", (module TestMappAgainstStdlibList : F));
       ("Find", (module TestFindStdlibList : F));
+      ("FindMap", (module TestFindMapStdlibList : F));
       ("Partition", (module TestPartitionStdlibList : F));
       ("Double", (module TestDoubleTraversorsStdlibList : F));
     ]

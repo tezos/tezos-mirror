@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestTrades::test_sell_tok
 
 Node is bootstrapped.
-Estimated gas: 9818.099 units (will add 100 for safety)
+Estimated gas: 7916.814 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001337
+    Fee to the baker: ꜩ0.001147
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 9919
+    Gas limit: 8017
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.001337
-      payload fees(the block proposer) ....... +ꜩ0.001337
+      [CONTRACT_HASH] ... -ꜩ0.001147
+      payload fees(the block proposer) ....... +ꜩ0.001147
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -33,7 +33,7 @@ This sequence of operations was run:
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4633 bytes
-      Consumed gas: 2403.612
+      Consumed gas: 1751.089
     Internal operations:
       Transaction:
         Amount: ꜩ0
@@ -51,13 +51,13 @@ This sequence of operations was run:
           Unset map(0)[0x0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd6]
           Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 461
         Storage size: 2331 bytes
-        Consumed gas: 4574.487
+        Consumed gas: 3265.725
       Transaction:
         Amount: ꜩ3891.966034
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
         This transaction was successfully applied
-        Consumed gas: 1420
+        Consumed gas: 1450
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ3891.966034
           [CONTRACT_HASH] ... +ꜩ3891.966034
@@ -66,7 +66,7 @@ This sequence of operations was run:
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
         This transaction was successfully applied
-        Consumed gas: 1420
+        Consumed gas: 1450
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ3.895862
           [CONTRACT_HASH] ... +ꜩ3.895862

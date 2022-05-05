@@ -44,12 +44,15 @@ It requires protocol environment V4, compared to V3 for Hangzhou.
 
 - Expose an order for folding over the context. (MR :gl:`!3910`)
 
+- List: fix to_seq signature. (MR :gl:`!3961`)
+
 Tenderbake
 ----------
 
 - Tenderbake is a new consensus algorithm replacing Emmy* in order to provide
   deterministic finality. (MRs :gl:`!3738`, :gl:`!3822`, :gl:`!3832`,
-  :gl:`!3811`, :gl:`!3850`, :gl:`!3906`, :gl:`!3977`, :gl:`!3987`)
+  :gl:`!3811`, :gl:`!3850`, :gl:`!3906`, :gl:`!3977`, :gl:`!3987`, :gl:`!4033`,
+  :gl:`!4036`)
 
 - The list of breaking changes related to Tenderbake are described in a separate :doc:`change log<tenderbake>`.
 
@@ -99,6 +102,8 @@ Bug Fixes
 - Fix gas accounting for the deserialization of Michelson arguments in
   operations. (MR :gl:`!3930`)
 
+- Do not count type annotation size. (MR :gl:`!4075`)
+
 Minor Changes
 -------------
 
@@ -139,6 +144,19 @@ Minor Changes
 
 - Bump up bls12-381.1.1.0. (MRs :gl:`!3914`, :gl:`!3942`)
 
+- Refactor empty transactions. (MR :gl:`!3867`)
+
+- Fix storage error during transfer. (MR :gl:`!3963`)
+
+- Update gas costs for the new version of bls12-381, and other minor gas changes. (MR :gl:`!3955`)
+
+- In the ``michelson_v1.runtime_error`` error, which appears in the
+  error trace of operations failing because of runtime errors (such as
+  interpreting the ``FAILWITH`` instruction) during the execution of a
+  smart contract, the ``contract_code`` field is deprecated. The
+  failed script can still be fetched from the address returned in the
+  ``contract_handle`` field. (MR :gl:`!4223`)
+
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
   :gl:`!3622`, :gl:`!3631`, :gl:`!3630`, :gl:`!3707`, :gl:`!3644`,
@@ -152,3 +170,4 @@ Minor Changes
   Context entries located in
   ``/chains/main/blocks/<block>/context/raw/bytes/cycle/<cycle>/roll_snapshot``
   are no longer accessible after Tenderbake.
+  As observed in issue `:gl:`#2764`, the RPC is buggy for cycle ``474``: the correct result for that cycle is index 16 (not 4).

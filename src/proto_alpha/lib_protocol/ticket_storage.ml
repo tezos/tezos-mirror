@@ -23,34 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type key_hash = Script_expr_hash.t
-
 type error +=
-  | Negative_ticket_balance of {key : Script_expr_hash.t; balance : Z.t}
-  | Failed_to_hash_node
-
-let script_expr_hash_of_key_hash key_hash = key_hash
-
-let hash_bytes_cost bytes =
-  let module S = Saturation_repr in
-  let ( + ) = S.add in
-  let v0 = S.safe_int @@ Bytes.length bytes in
-  let ( lsr ) = S.shift_right in
-  S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
-
-let hash_of_node ctxt node =
-  Raw_context.consume_gas ctxt (Script_repr.strip_locations_cost node)
-  >>? fun ctxt ->
-  let node = Micheline.strip_locations node in
-  match Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node with
-  | Some bytes ->
-      Raw_context.consume_gas ctxt (hash_bytes_cost bytes) >|? fun ctxt ->
-      (Script_expr_hash.hash_bytes [bytes], ctxt)
-  | None -> error Failed_to_hash_node
-
-let make_key_hash ctxt ~ticketer ~typ ~contents ~owner =
-  hash_of_node ctxt
-  @@ Micheline.Seq (Micheline.dummy_location, [ticketer; typ; contents; owner])
+  | Negative_ticket_balance of {key : Ticket_hash_repr.t; balance : Z.t}
+  | Used_storage_space_underflow
 
 let () =
   let open Data_encoding in
@@ -65,25 +40,22 @@ let () =
         "Attempted to set negative ticket balance value '%a' for key %a."
         Z.pp_print
         balance
-        Script_expr_hash.pp
+        Ticket_hash_repr.pp
         key)
-    (obj2 (req "key" Script_expr_hash.encoding) (req "balance" Data_encoding.z))
+    (obj2 (req "key" Ticket_hash_repr.encoding) (req "balance" Data_encoding.z))
     (function
       | Negative_ticket_balance {key; balance} -> Some (key, balance)
       | _ -> None)
     (fun (key, balance) -> Negative_ticket_balance {key; balance}) ;
   register_error_kind
-    `Branch
-    ~id:"Failed_to_hash_node"
-    ~title:"Failed to hash node"
-    ~description:"Failed to hash node for a key in the ticket-balance table"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Failed to hash node for a key in the ticket-balance table")
-    Data_encoding.empty
-    (function Failed_to_hash_node -> Some () | _ -> None)
-    (fun () -> Failed_to_hash_node)
+    `Permanent
+    ~id:"Used_storage_underflow"
+    ~title:"Ticket balance used storage underflow"
+    ~description:
+      "Attempt to free more bytes than allocated for the tickets balance"
+    empty
+    (function Used_storage_space_underflow -> Some () | _ -> None)
+    (fun () -> Used_storage_space_underflow)
 
 let get_balance ctxt key =
   Storage.Ticket_balance.Table.find ctxt key >|=? fun (ctxt, res) -> (res, ctxt)
@@ -117,3 +89,33 @@ let adjust_balance ctxt key ~delta =
   get_balance ctxt key >>=? fun (res, ctxt) ->
   let old_balance = Option.value ~default:Z.zero res in
   set_balance ctxt key (Z.add old_balance delta)
+
+let adjust_storage_space ctxt ~storage_diff =
+  if Compare.Z.(storage_diff = Z.zero) then return (Z.zero, ctxt)
+  else
+    Storage.Ticket_balance.Used_storage_space.find ctxt >>=? fun used_storage ->
+    let used_storage = Option.value ~default:Z.zero used_storage in
+    Storage.Ticket_balance.Paid_storage_space.find ctxt >>=? fun paid_storage ->
+    let paid_storage = Option.value ~default:Z.zero paid_storage in
+    let new_used_storage = Z.add used_storage storage_diff in
+    error_when
+      Compare.Z.(new_used_storage < Z.zero)
+      Used_storage_space_underflow
+    >>?= fun () ->
+    Storage.Ticket_balance.Used_storage_space.add ctxt new_used_storage
+    >>= fun ctxt ->
+    let diff = Z.sub new_used_storage paid_storage in
+    if Compare.Z.(Z.zero < diff) then
+      Storage.Ticket_balance.Paid_storage_space.add ctxt new_used_storage
+      >>= fun ctxt -> return (diff, ctxt)
+    else return (Z.zero, ctxt)
+
+module Internal_for_tests = struct
+  let used_storage_space c =
+    Storage.Ticket_balance.Used_storage_space.find c
+    >|=? Option.value ~default:Z.zero
+
+  let paid_storage_space c =
+    Storage.Ticket_balance.Paid_storage_space.find c
+    >|=? Option.value ~default:Z.zero
+end

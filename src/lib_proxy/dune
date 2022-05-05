@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_proxy)
  (public_name tezos-proxy)
@@ -7,9 +10,9 @@
   tezos-base
   tezos-clic
   tezos-client-base
-  tezos-mockup-proxy
   tezos-protocol-environment
   tezos-rpc
   tezos-shell-services
-  tezos-context)
- (flags (:standard -open Tezos_base__TzPervasives)))
+  tezos-context.memory)
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))

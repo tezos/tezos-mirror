@@ -1,0 +1,32 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[xor.tz-None-Left (Pair False False)-(Some (Left False))]
+
+storage
+  (Some (Left False))
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 16 (remaining gas: 1039988.479 units remaining)
+    [ (Pair (Left (Pair False False)) None) ]
+  - location: 16 (remaining gas: 1039988.469 units remaining)
+    [ (Left (Pair False False)) ]
+  - location: 17 (remaining gas: 1039988.459 units remaining)
+    [ (Pair False False) ]
+  - location: 19 (remaining gas: 1039988.449 units remaining)
+    [ False
+      False ]
+  - location: 20 (remaining gas: 1039988.434 units remaining)
+    [ False ]
+  - location: 21 (remaining gas: 1039988.424 units remaining)
+    [ (Left False) ]
+  - location: 17 (remaining gas: 1039988.414 units remaining)
+    [ (Left False) ]
+  - location: 28 (remaining gas: 1039988.404 units remaining)
+    [ (Some (Left False)) ]
+  - location: 29 (remaining gas: 1039988.394 units remaining)
+    [ {}
+      (Some (Left False)) ]
+  - location: 31 (remaining gas: 1039988.384 units remaining)
+    [ (Pair {} (Some (Left False))) ]
+

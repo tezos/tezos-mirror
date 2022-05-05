@@ -3,7 +3,7 @@ Python Execution and Testing Environment
 
 The directory ``tests_python`` contains:
 
-- A scripting API to write execution scenarios involving several node, bakers, endorsers,
+- A scripting API to write execution scenarios involving several nodes and/or bakers,
 - a system testing environment based on the `pytest  <https://docs.pytest.org/en/latest>`_ package.
 
 Code organization
@@ -126,7 +126,7 @@ This can be run with
 ``PYTHONPATH=./:$PYTHONPATH poetry run python examples/example.py``.
 It should display all the clients commands and their results.
 
-The ``sandbox`` object allows users to add nodes, bakers or endorsers
+The ``sandbox`` object allows users to add nodes or bakers
 running in tezos sandboxed mode. Whenever a node has been added, one can
 access it using a client object.
 

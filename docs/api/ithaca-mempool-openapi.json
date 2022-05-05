@@ -1,0 +1,2365 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Tezos RPC",
+    "description": "Tezos client RPC API.",
+    "version": "12.0~rc2"
+  },
+  "paths": {
+    "/ban_operation": {
+      "post": {
+        "description": "Remove an operation from the mempool if present, reverting its effect if it was applied. Add it to the set of banned operations to prevent it from being fetched/processed/injected in the future. Note: If the baker has already received the operation, then it's necessary to restart it to flush the operation from it.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "A Tezos operation ID (Base58Check-encoded)",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/filter": {
+      "get": {
+        "description": "Get the configuration of the mempool filter. The minimal_fees are in mutez. Each field minimal_nanotez_per_xxx is a rational number given as a numerator and a denominator, e.g. \"minimal_nanotez_per_gas_unit\": [ \"100\", \"1\" ].",
+        "parameters": [
+          {
+            "name": "include_default",
+            "in": "query",
+            "description": "Show fields equal to their default value (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor_operations": {
+      "get": {
+        "description": "Monitor the mempool operations.",
+        "parameters": [
+          {
+            "name": "applied",
+            "in": "query",
+            "description": "Include applied operations (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "refused",
+            "in": "query",
+            "description": "Include refused operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outdated",
+            "in": "query",
+            "description": "Include outdated operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_refused",
+            "in": "query",
+            "description": "Include branch refused operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_delayed",
+            "in": "query",
+            "description": "Include branch delayed operations (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "description": "An operation's shell header.",
+                    "type": "object",
+                    "properties": {
+                      "hash": {
+                        "$ref": "#/components/schemas/Operation_hash"
+                      },
+                      "protocol": {
+                        "type": "string",
+                        "enum": [
+                          "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                        ]
+                      },
+                      "branch": {
+                        "$ref": "#/components/schemas/block_hash"
+                      },
+                      "contents": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                        }
+                      },
+                      "signature": {
+                        "$ref": "#/components/schemas/Signature"
+                      },
+                      "error": {
+                        "$ref": "#/components/schemas/error_opt"
+                      }
+                    },
+                    "required": [
+                      "hash",
+                      "protocol",
+                      "branch",
+                      "contents",
+                      "signature"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pending_operations": {
+      "get": {
+        "description": "List the prevalidated operations.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "new_encoding_pending_operations",
+                      "type": "object",
+                      "properties": {
+                        "applied": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "branch",
+                              "contents",
+                              "signature"
+                            ]
+                          }
+                        },
+                        "refused": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "signature",
+                              "error"
+                            ]
+                          }
+                        },
+                        "outdated": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "signature",
+                              "error"
+                            ]
+                          }
+                        },
+                        "branch_refused": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "signature",
+                              "error"
+                            ]
+                          }
+                        },
+                        "branch_delayed": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature"
+                              },
+                              "error": {
+                                "$ref": "#/components/schemas/error"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "signature",
+                              "error"
+                            ]
+                          }
+                        },
+                        "unprocessed": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "protocol": {
+                                "type": "string",
+                                "enum": [
+                                  "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                ]
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "protocol",
+                              "branch",
+                              "contents",
+                              "signature"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "applied",
+                        "refused",
+                        "outdated",
+                        "branch_refused",
+                        "branch_delayed",
+                        "unprocessed"
+                      ]
+                    },
+                    {
+                      "title": "old_encoding_pending_operations",
+                      "type": "object",
+                      "properties": {
+                        "applied": {
+                          "type": "array",
+                          "items": {
+                            "description": "An operation's shell header.",
+                            "type": "object",
+                            "properties": {
+                              "hash": {
+                                "$ref": "#/components/schemas/Operation_hash"
+                              },
+                              "branch": {
+                                "$ref": "#/components/schemas/block_hash"
+                              },
+                              "contents": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                }
+                              },
+                              "signature": {
+                                "$ref": "#/components/schemas/Signature"
+                              }
+                            },
+                            "required": [
+                              "hash",
+                              "branch",
+                              "contents",
+                              "signature"
+                            ]
+                          }
+                        },
+                        "refused": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/components/schemas/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/components/schemas/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "protocol",
+                                    "branch",
+                                    "contents",
+                                    "signature",
+                                    "error"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "outdated": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/components/schemas/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/components/schemas/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "protocol",
+                                    "branch",
+                                    "contents",
+                                    "signature",
+                                    "error"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "branch_refused": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/components/schemas/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/components/schemas/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "protocol",
+                                    "branch",
+                                    "contents",
+                                    "signature",
+                                    "error"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "branch_delayed": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/components/schemas/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/components/schemas/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "protocol",
+                                    "branch",
+                                    "contents",
+                                    "signature",
+                                    "error"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "unprocessed": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/Operation_hash"
+                                },
+                                {
+                                  "$ref": "#/components/schemas/next_operation"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "applied",
+                        "refused",
+                        "outdated",
+                        "branch_refused",
+                        "branch_delayed",
+                        "unprocessed"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/request_operations": {
+      "post": {
+        "description": "Request the operations of our peers or a specific peer if specified via a query parameter.",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "query",
+            "description": "A cryptographic node identity (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unban_all_operations": {
+      "post": {
+        "description": "Clear the set of banned operations.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unban_operation": {
+      "post": {
+        "description": "Remove an operation from the set of banned operations (nothing happens if it was not banned).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "A Tezos operation ID (Base58Check-encoded)",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "012-Psithaca.block_header.alpha.full_header": {
+        "title": "Shell header",
+        "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "proto": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "predecessor": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/timestamp.protocol"
+          },
+          "validation_pass": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "operations_hash": {
+            "$ref": "#/components/schemas/Operation_list_list_hash"
+          },
+          "fitness": {
+            "$ref": "#/components/schemas/fitness"
+          },
+          "context": {
+            "$ref": "#/components/schemas/Context_hash"
+          },
+          "payload_hash": {
+            "$ref": "#/components/schemas/value_hash"
+          },
+          "payload_round": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "proof_of_work_nonce": {
+            "type": "string",
+            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+          },
+          "seed_nonce_hash": {
+            "$ref": "#/components/schemas/cycle_nonce"
+          },
+          "liquidity_baking_escape_vote": {
+            "type": "boolean"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        },
+        "required": [
+          "level",
+          "proto",
+          "predecessor",
+          "timestamp",
+          "validation_pass",
+          "operations_hash",
+          "fitness",
+          "context",
+          "payload_hash",
+          "payload_round",
+          "proof_of_work_nonce",
+          "liquidity_baking_escape_vote",
+          "signature"
+        ]
+      },
+      "012-Psithaca.contract_id": {
+        "title": "A contract handle",
+        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "012-Psithaca.entrypoint": {
+        "title": "entrypoint",
+        "description": "Named entrypoint to a Michelson smart contract",
+        "oneOf": [
+          {
+            "title": "default",
+            "type": "string",
+            "enum": [
+              "default"
+            ]
+          },
+          {
+            "title": "root",
+            "type": "string",
+            "enum": [
+              "root"
+            ]
+          },
+          {
+            "title": "do",
+            "type": "string",
+            "enum": [
+              "do"
+            ]
+          },
+          {
+            "title": "set_delegate",
+            "type": "string",
+            "enum": [
+              "set_delegate"
+            ]
+          },
+          {
+            "title": "remove_delegate",
+            "type": "string",
+            "enum": [
+              "remove_delegate"
+            ]
+          },
+          {
+            "title": "named",
+            "type": "string"
+          }
+        ]
+      },
+      "012-Psithaca.inlined.endorsement": {
+        "description": "An operation's shell header.",
+        "type": "object",
+        "properties": {
+          "branch": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "operations": {
+            "$ref": "#/components/schemas/012-Psithaca.inlined.endorsement_mempool.contents"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        },
+        "required": [
+          "branch",
+          "operations"
+        ]
+      },
+      "012-Psithaca.inlined.endorsement_mempool.contents": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "endorsement"
+            ]
+          },
+          "slot": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "level": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "round": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "block_payload_hash": {
+            "$ref": "#/components/schemas/value_hash"
+          }
+        },
+        "required": [
+          "kind",
+          "slot",
+          "level",
+          "round",
+          "block_payload_hash"
+        ]
+      },
+      "012-Psithaca.inlined.preendorsement": {
+        "description": "An operation's shell header.",
+        "type": "object",
+        "properties": {
+          "branch": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "operations": {
+            "$ref": "#/components/schemas/012-Psithaca.inlined.preendorsement.contents"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        },
+        "required": [
+          "branch",
+          "operations"
+        ]
+      },
+      "012-Psithaca.inlined.preendorsement.contents": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "preendorsement"
+            ]
+          },
+          "slot": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "level": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "round": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "block_payload_hash": {
+            "$ref": "#/components/schemas/value_hash"
+          }
+        },
+        "required": [
+          "kind",
+          "slot",
+          "level",
+          "round",
+          "block_payload_hash"
+        ]
+      },
+      "012-Psithaca.michelson.v1.primitives": {
+        "type": "string",
+        "enum": [
+          "ABS",
+          "IF",
+          "SENDER",
+          "NEVER",
+          "False",
+          "DUG",
+          "DIG",
+          "chest_key",
+          "BLAKE2B",
+          "list",
+          "bls12_381_g1",
+          "Pair",
+          "INT",
+          "nat",
+          "never",
+          "storage",
+          "SIZE",
+          "view",
+          "SHA256",
+          "AND",
+          "VIEW",
+          "bytes",
+          "NIL",
+          "map",
+          "SUB",
+          "SAPLING_EMPTY_STATE",
+          "CHECK_SIGNATURE",
+          "VOTING_POWER",
+          "operation",
+          "MAP",
+          "option",
+          "bls12_381_fr",
+          "ADD",
+          "IMPLICIT_ACCOUNT",
+          "SHA512",
+          "int",
+          "LSL",
+          "bls12_381_g2",
+          "ticket",
+          "sapling_transaction",
+          "COMPARE",
+          "SWAP",
+          "STEPS_TO_QUOTA",
+          "DROP",
+          "pair",
+          "BALANCE",
+          "CONCAT",
+          "MUL",
+          "FAILWITH",
+          "Elt",
+          "lambda",
+          "OR",
+          "DIP",
+          "MEM",
+          "ITER",
+          "key_hash",
+          "XOR",
+          "Some",
+          "parameter",
+          "address",
+          "EMPTY_MAP",
+          "None",
+          "TRANSFER_TOKENS",
+          "or",
+          "AMOUNT",
+          "signature",
+          "SHA3",
+          "string",
+          "CHAIN_ID",
+          "HASH_KEY",
+          "IF_LEFT",
+          "CREATE_ACCOUNT",
+          "LT",
+          "TOTAL_VOTING_POWER",
+          "UNPACK",
+          "READ_TICKET",
+          "SELF_ADDRESS",
+          "timestamp",
+          "SET_DELEGATE",
+          "LE",
+          "SOURCE",
+          "CREATE_CONTRACT",
+          "Unit",
+          "SAPLING_VERIFY_UPDATE",
+          "NONE",
+          "CONTRACT",
+          "GE",
+          "SOME",
+          "key",
+          "SELF",
+          "set",
+          "CAR",
+          "NOT",
+          "unit",
+          "CDR",
+          "LOOP_LEFT",
+          "PAIRING_CHECK",
+          "RIGHT",
+          "LEFT",
+          "CAST",
+          "True",
+          "Right",
+          "PACK",
+          "IF_CONS",
+          "KECCAK",
+          "chest",
+          "UNIT",
+          "EMPTY_SET",
+          "NEQ",
+          "LAMBDA",
+          "mutez",
+          "TICKET",
+          "LOOP",
+          "Left",
+          "contract",
+          "LSR",
+          "EMPTY_BIG_MAP",
+          "sapling_state",
+          "JOIN_TICKETS",
+          "LEVEL",
+          "UNPAIR",
+          "SPLIT_TICKET",
+          "PUSH",
+          "big_map",
+          "GT",
+          "chain_id",
+          "constant",
+          "NOW",
+          "IF_NONE",
+          "PAIR",
+          "GET_AND_UPDATE",
+          "UPDATE",
+          "ISNAT",
+          "RENAME",
+          "OPEN_CHEST",
+          "EDIV",
+          "EQ",
+          "ADDRESS",
+          "bool",
+          "EXEC",
+          "GET",
+          "NEG",
+          "SLICE",
+          "DUP",
+          "CONS",
+          "APPLY",
+          "SUB_MUTEZ",
+          "code"
+        ]
+      },
+      "012-Psithaca.mutez": {
+        "$ref": "#/components/schemas/positive_bignum"
+      },
+      "012-Psithaca.operation.alpha.contents": {
+        "oneOf": [
+          {
+            "title": "Endorsement",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "endorsement"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
+          {
+            "title": "Preendorsement",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preendorsement"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
+          {
+            "title": "Seed_nonce_revelation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "seed_nonce_revelation"
+                ]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "nonce": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "level",
+              "nonce"
+            ]
+          },
+          {
+            "title": "Double_endorsement_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "double_endorsement_evidence"
+                ]
+              },
+              "op1": {
+                "$ref": "#/components/schemas/012-Psithaca.inlined.endorsement"
+              },
+              "op2": {
+                "$ref": "#/components/schemas/012-Psithaca.inlined.endorsement"
+              }
+            },
+            "required": [
+              "kind",
+              "op1",
+              "op2"
+            ]
+          },
+          {
+            "title": "Double_preendorsement_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "double_preendorsement_evidence"
+                ]
+              },
+              "op1": {
+                "$ref": "#/components/schemas/012-Psithaca.inlined.preendorsement"
+              },
+              "op2": {
+                "$ref": "#/components/schemas/012-Psithaca.inlined.preendorsement"
+              }
+            },
+            "required": [
+              "kind",
+              "op1",
+              "op2"
+            ]
+          },
+          {
+            "title": "Double_baking_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "double_baking_evidence"
+                ]
+              },
+              "bh1": {
+                "$ref": "#/components/schemas/012-Psithaca.block_header.alpha.full_header"
+              },
+              "bh2": {
+                "$ref": "#/components/schemas/012-Psithaca.block_header.alpha.full_header"
+              }
+            },
+            "required": [
+              "kind",
+              "bh1",
+              "bh2"
+            ]
+          },
+          {
+            "title": "Activate_account",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "activate_account"
+                ]
+              },
+              "pkh": {
+                "$ref": "#/components/schemas/Ed25519.Public_key_hash"
+              },
+              "secret": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "pkh",
+              "secret"
+            ]
+          },
+          {
+            "title": "Proposals",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "proposals"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "period": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "proposals": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Protocol_hash"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "period",
+              "proposals"
+            ]
+          },
+          {
+            "title": "Ballot",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ballot"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "period": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "proposal": {
+                "$ref": "#/components/schemas/Protocol_hash"
+              },
+              "ballot": {
+                "type": "string",
+                "enum": [
+                  "nay",
+                  "yay",
+                  "pass"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "period",
+              "proposal",
+              "ballot"
+            ]
+          },
+          {
+            "title": "Reveal",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reveal"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "public_key": {
+                "$ref": "#/components/schemas/Signature.Public_key"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "public_key"
+            ]
+          },
+          {
+            "title": "Transaction",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "transaction"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "amount": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "destination": {
+                "$ref": "#/components/schemas/012-Psithaca.contract_id"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "entrypoint": {
+                    "$ref": "#/components/schemas/012-Psithaca.entrypoint"
+                  },
+                  "value": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Prim__generic",
+                        "description": "Generic primitive (any number of args with or without annotations)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/012-Psithaca.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "entrypoint",
+                  "value"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "amount",
+              "destination"
+            ]
+          },
+          {
+            "title": "Origination",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "origination"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "balance": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "delegate": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "script": {
+                "$ref": "#/components/schemas/012-Psithaca.scripted.contracts"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "balance",
+              "script"
+            ]
+          },
+          {
+            "title": "Delegation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "delegation"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "delegate": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit"
+            ]
+          },
+          {
+            "title": "Set_deposits_limit",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "set_deposits_limit"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "limit": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit"
+            ]
+          },
+          {
+            "title": "Failing_noop",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "failing_noop"
+                ]
+              },
+              "arbitrary": {
+                "$ref": "#/components/schemas/unistring"
+              }
+            },
+            "required": [
+              "kind",
+              "arbitrary"
+            ]
+          },
+          {
+            "title": "Register_global_constant",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "register_global_constant"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/012-Psithaca.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "title": "Int",
+                    "type": "object",
+                    "properties": {
+                      "int": {
+                        "$ref": "#/components/schemas/bignum"
+                      }
+                    },
+                    "required": [
+                      "int"
+                    ]
+                  },
+                  {
+                    "title": "String",
+                    "type": "object",
+                    "properties": {
+                      "string": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
+                    },
+                    "required": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "title": "Bytes",
+                    "type": "object",
+                    "properties": {
+                      "bytes": {
+                        "type": "string",
+                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                      }
+                    },
+                    "required": [
+                      "bytes"
+                    ]
+                  },
+                  {
+                    "title": "Sequence",
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                    }
+                  },
+                  {
+                    "title": "Prim__generic",
+                    "description": "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties": {
+                      "prim": {
+                        "$ref": "#/components/schemas/012-Psithaca.michelson.v1.primitives"
+                      },
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                        }
+                      },
+                      "annots": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "prim"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "value"
+            ]
+          }
+        ]
+      },
+      "012-Psithaca.scripted.contracts": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "oneOf": [
+              {
+                "title": "Int",
+                "type": "object",
+                "properties": {
+                  "int": {
+                    "$ref": "#/components/schemas/bignum"
+                  }
+                },
+                "required": [
+                  "int"
+                ]
+              },
+              {
+                "title": "String",
+                "type": "object",
+                "properties": {
+                  "string": {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                },
+                "required": [
+                  "string"
+                ]
+              },
+              {
+                "title": "Bytes",
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                },
+                "required": [
+                  "bytes"
+                ]
+              },
+              {
+                "title": "Sequence",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                }
+              },
+              {
+                "title": "Prim__generic",
+                "description": "Generic primitive (any number of args with or without annotations)",
+                "type": "object",
+                "properties": {
+                  "prim": {
+                    "$ref": "#/components/schemas/012-Psithaca.michelson.v1.primitives"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                    }
+                  },
+                  "annots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "prim"
+                ]
+              }
+            ]
+          },
+          "storage": {
+            "oneOf": [
+              {
+                "title": "Int",
+                "type": "object",
+                "properties": {
+                  "int": {
+                    "$ref": "#/components/schemas/bignum"
+                  }
+                },
+                "required": [
+                  "int"
+                ]
+              },
+              {
+                "title": "String",
+                "type": "object",
+                "properties": {
+                  "string": {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                },
+                "required": [
+                  "string"
+                ]
+              },
+              {
+                "title": "Bytes",
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                },
+                "required": [
+                  "bytes"
+                ]
+              },
+              {
+                "title": "Sequence",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                }
+              },
+              {
+                "title": "Prim__generic",
+                "description": "Generic primitive (any number of args with or without annotations)",
+                "type": "object",
+                "properties": {
+                  "prim": {
+                    "$ref": "#/components/schemas/012-Psithaca.michelson.v1.primitives"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                    }
+                  },
+                  "annots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "prim"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "storage"
+        ]
+      },
+      "Context_hash": {
+        "title": "A hash of context (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Ed25519.Public_key_hash": {
+        "title": "An Ed25519 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_hash": {
+        "title": "A Tezos operation ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_list_list_hash": {
+        "title": "A list of list of operations (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Protocol_hash": {
+        "title": "A Tezos protocol ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature": {
+        "title": "A Ed25519, Secp256k1 or P256 signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key": {
+        "title": "A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key_hash": {
+        "title": "A Ed25519, Secp256k1, or P256 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "bignum": {
+        "title": "Big number",
+        "description": "Decimal representation of a big number",
+        "type": "string"
+      },
+      "block_hash": {
+        "title": "A block identifier (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "cycle_nonce": {
+        "title": "A nonce hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "error": {
+        "description": "The full list of errors is available with the global RPC `GET errors`"
+      },
+      "error_opt": {
+        "description": "An optional error-trace (None indicates no error). The full list of errors is available with the global RPC `GET errors`"
+      },
+      "fitness": {
+        "title": "Block fitness",
+        "description": "The fitness, or score, of a block, that allow the Tezos to decide which chain is the best. A fitness value is a list of byte sequences. They are compared as follows: shortest lists are smaller; lists of the same length are compared according to the lexicographical order.",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+        }
+      },
+      "micheline.012-Psithaca.michelson_v1.expression": {
+        "oneOf": [
+          {
+            "title": "Int",
+            "type": "object",
+            "properties": {
+              "int": {
+                "$ref": "#/components/schemas/bignum"
+              }
+            },
+            "required": [
+              "int"
+            ]
+          },
+          {
+            "title": "String",
+            "type": "object",
+            "properties": {
+              "string": {
+                "$ref": "#/components/schemas/unistring"
+              }
+            },
+            "required": [
+              "string"
+            ]
+          },
+          {
+            "title": "Bytes",
+            "type": "object",
+            "properties": {
+              "bytes": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "bytes"
+            ]
+          },
+          {
+            "title": "Sequence",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+            }
+          },
+          {
+            "title": "Prim__generic",
+            "description": "Generic primitive (any number of args with or without annotations)",
+            "type": "object",
+            "properties": {
+              "prim": {
+                "$ref": "#/components/schemas/012-Psithaca.michelson.v1.primitives"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/micheline.012-Psithaca.michelson_v1.expression"
+                }
+              },
+              "annots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "prim"
+            ]
+          }
+        ]
+      },
+      "next_operation": {
+        "description": "An operation's shell header.",
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
+            ]
+          },
+          "branch": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "contents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/012-Psithaca.operation.alpha.contents"
+            }
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        },
+        "required": [
+          "protocol",
+          "branch",
+          "contents",
+          "signature"
+        ]
+      },
+      "positive_bignum": {
+        "title": "Positive big number",
+        "description": "Decimal representation of a positive big number",
+        "type": "string"
+      },
+      "timestamp.protocol": {
+        "description": "A timestamp as seen by the protocol: second-level precision, epoch based.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "unistring": {
+        "title": "Universal string representation",
+        "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "invalid_utf8_string": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            },
+            "required": [
+              "invalid_utf8_string"
+            ]
+          }
+        ]
+      },
+      "value_hash": {
+        "title": "Hash of a consensus value (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Hangzhou | Ithaca | Alpha
+type t = Ithaca | Jakarta | Alpha
 
 (** Protocol parameters.
 
@@ -37,11 +37,30 @@ val default_constants : constants
 (** Get the name of a protocol, capitalized (e.g. ["Edo"]). *)
 val name : t -> string
 
+(** Get the number of a protocol, e.g. 012 for Ithaca.
+
+    The number for [Alpha] is the number it will have once snapshotted.
+
+    Use this to specify constraints that should not change once Alpha is snapshotted.
+    For instance, [number protocol >= 012] meant "at least Ithaca" even when
+    Ithaca was still Alpha, while [number protocol >= number Alpha] stopped being true
+    for Ithaca after it was snapshotted. *)
+val number : t -> int
+
+(** Get the directory of a protocol (e.g. ["proto_012_Psithaca"]). *)
+val directory : t -> string
+
 (** Get the name of a protocol as a tag, for use when registering tests (e.g. ["edo"]). *)
 val tag : t -> string
 
 (** Get the full hash of a protocol. *)
 val hash : t -> string
+
+(** Hash of protocol genesis *)
+val genesis_hash : string
+
+(** Hash of protocol demo_counter *)
+val demo_counter_hash : string
 
 (** Get the location of the parameter file.
 
@@ -113,6 +132,31 @@ val previous_protocol : t -> t option
       defined where the test is registered. *)
 val all : t list
 
+(** Constraints on the set protocols that a test supports.
+
+    Do not use this to decide which protocols the test should run on, this is the role
+    of the last argument of [register_test] and [register_regression_test].
+    Instead, declare what the test *could* run on.
+
+    - [Any_protocol]: the test can run on all active protocols. This is the default.
+    - [From_protocol n]: the test can run on protocols [p] such that [number p >= n].
+    - [Until_protocol n]: the test can run on protocols [p] such that [number p <= n].
+    - [Between_protocols (a, b)]: the test can run on protocols [p]
+      such that [a <= number p <= b].
+
+    Always write the number itself, do not compute it.
+    For instance, writing [Until_protocol (number Alpha)] would make your test
+    not support the snapshotted version Alpha after Alpha is snapshotted,
+    even though it actually does.
+
+    It is recommended to write protocol numbers with leading zeros.
+    For instance, write [From_protocol 008] instead of [From_protocol 8].*)
+type supported_protocols =
+  | Any_protocol
+  | From_protocol of int
+  | Until_protocol of int
+  | Between_protocols of int * int
+
 (** Register a test that uses the protocol.
 
     This is the same as [Test.register] except that:
@@ -133,20 +177,38 @@ val register_test :
   __FILE__:string ->
   title:string ->
   tags:string list ->
+  ?supports:supported_protocols ->
   (t -> unit Lwt.t) ->
-  protocols:t list ->
+  t list ->
+  unit
+
+(** Register a long-test that uses the propocol.
+
+    This is the same as [Long_test.register], with the same differences
+    as [Protocol.register_test] compared to [Test.register]. *)
+val register_long_test :
+  __FILE__:string ->
+  title:string ->
+  tags:string list ->
+  ?supports:supported_protocols ->
+  ?team:string ->
+  executors:Long_test.executor list ->
+  timeout:Long_test.timeout ->
+  (t -> unit Lwt.t) ->
+  t list ->
   unit
 
 (** Register a regression test that uses the protocol.
 
     This is the same as [Regression.register], with the same differences
-    as [Protocol.register_test] compared to [Test.register]. *)
+    as [Protocol.register_test] compared to [Test.register], and where
+    [output_file] is parameterized by the protocol. *)
 val register_regression_test :
   __FILE__:string ->
   title:string ->
   tags:string list ->
-  output_file:string ->
-  ?regression_output_path:string ->
+  ?supports:supported_protocols ->
+  output_file:(t -> string) ->
   (t -> unit Lwt.t) ->
-  protocols:t list ->
+  t list ->
   unit

@@ -1,156 +1,116 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/slices.tz]
 
 Well typed
-Gas remaining: 1039935.257 units remaining
+Gas remaining: 1039937.057 units remaining
 { parameter (pair bytes signature) ;
   storage key ;
   code { DUP
-         /* [ pair (pair @parameter bytes signature) (key @storage)
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ pair (pair bytes signature) key : pair (pair bytes signature) key ] */ ;
          CAAR ;
          DUP
-         /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
          SIZE
-         /* [ nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
-         PUSH nat
-              128
-         /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ nat : bytes : pair (pair bytes signature) key ] */ ;
+         PUSH nat 128
+         /* [ nat : nat : bytes : pair (pair bytes signature) key ] */ ;
          SWAP
-         /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ nat : nat : bytes : pair (pair bytes signature) key ] */ ;
          SUB
-         /* [ int : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ int : bytes : pair (pair bytes signature) key ] */ ;
          ISNAT
-         /* [ option nat : bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
-         IF_SOME
-           { /* [ @some nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ }
-           { FAIL } ;
-         PUSH nat
-              128
-         /* [ nat : @some nat : bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ option nat : bytes : pair (pair bytes signature) key ] */ ;
+         IF_SOME { /* [ nat : bytes : pair (pair bytes signature) key ] */ } { FAIL } ;
+         PUSH nat 128
+         /* [ nat : nat : bytes : pair (pair bytes signature) key ] */ ;
          SLICE @payload
-         /* [ @payload option bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ option bytes : pair (pair bytes signature) key ] */ ;
          ASSERT_SOME ;
          DUP
-         /* [ @payload.some bytes : @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
          DIP { DIP { DUP
-                     /* [ pair (pair @parameter bytes signature) (key @storage)
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ pair (pair bytes signature) key : pair (pair bytes signature) key ] */ ;
                      CAAR ;
-                     PUSH nat
-                          32
-                     /* [ nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
-                     PUSH nat
-                          0
-                     /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     PUSH nat 32
+                     /* [ nat : bytes : pair (pair bytes signature) key ] */ ;
+                     PUSH nat 0
+                     /* [ nat : nat : bytes : pair (pair bytes signature) key ] */ ;
                      SLICE
-                     /* [ @slice option bytes
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ option bytes : pair (pair bytes signature) key ] */ ;
                      ASSERT_SOME }
-               /* [ @payload.some bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
                SHA256
-               /* [ bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
                ASSERT_CMPEQ }
-         /* [ @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : pair (pair bytes signature) key ] */ ;
          DUP
-         /* [ @payload.some bytes : @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
          DIP { DIP { DUP
-                     /* [ pair (pair @parameter bytes signature) (key @storage)
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ pair (pair bytes signature) key : pair (pair bytes signature) key ] */ ;
                      CAAR ;
-                     PUSH nat
-                          32
-                     /* [ nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
-                     PUSH nat
-                          32
-                     /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     PUSH nat 32
+                     /* [ nat : bytes : pair (pair bytes signature) key ] */ ;
+                     PUSH nat 32
+                     /* [ nat : nat : bytes : pair (pair bytes signature) key ] */ ;
                      SLICE
-                     /* [ @slice option bytes
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ option bytes : pair (pair bytes signature) key ] */ ;
                      ASSERT_SOME }
-               /* [ @payload.some bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
                BLAKE2B
-               /* [ bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
                ASSERT_CMPEQ }
-         /* [ @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : pair (pair bytes signature) key ] */ ;
          DUP
-         /* [ @payload.some bytes : @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
          DIP { DIP { DUP
-                     /* [ pair (pair @parameter bytes signature) (key @storage)
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ pair (pair bytes signature) key : pair (pair bytes signature) key ] */ ;
                      CAAR ;
-                     PUSH nat
-                          64
-                     /* [ nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
-                     PUSH nat
-                          64
-                     /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     PUSH nat 64
+                     /* [ nat : bytes : pair (pair bytes signature) key ] */ ;
+                     PUSH nat 64
+                     /* [ nat : nat : bytes : pair (pair bytes signature) key ] */ ;
                      SLICE
-                     /* [ @slice option bytes
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ option bytes : pair (pair bytes signature) key ] */ ;
                      ASSERT_SOME }
-               /* [ @payload.some bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
                SHA512
-               /* [ bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair bytes signature) key ] */ ;
                ASSERT_CMPEQ }
-         /* [ @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : pair (pair bytes signature) key ] */ ;
          DIP { DUP
-               /* [ pair (pair @parameter bytes signature) (key @storage)
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ pair (pair bytes signature) key : pair (pair bytes signature) key ] */ ;
                CDR
-               /* [ @storage key : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ key : pair (pair bytes signature) key ] */ ;
                DIP { DUP
-                     /* [ pair (pair @parameter bytes signature) (key @storage)
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ pair (pair bytes signature) key : pair (pair bytes signature) key ] */ ;
                      CADR }
-               /* [ @storage key : signature
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ }
-         /* [ @payload.some bytes : @storage key : signature
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ key : signature : pair (pair bytes signature) key ] */ }
+         /* [ bytes : key : signature : pair (pair bytes signature) key ] */ ;
          SWAP
-         /* [ @storage key : @payload.some bytes : signature
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
-         DIP { SWAP
-               /* [ signature : @payload.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ }
-         /* [ @storage key : signature : @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ key : bytes : signature : pair (pair bytes signature) key ] */ ;
+         DIP { SWAP /* [ signature : bytes : pair (pair bytes signature) key ] */ }
+         /* [ key : signature : bytes : pair (pair bytes signature) key ] */ ;
          CHECK_SIGNATURE
-         /* [ bool : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bool : pair (pair bytes signature) key ] */ ;
          ASSERT ;
          CDR
-         /* [ @storage key ] */ ;
+         /* [ key ] */ ;
          DUP
-         /* [ @storage key : @storage key ] */ ;
+         /* [ key : key ] */ ;
          HASH_KEY
-         /* [ key_hash : @storage key ] */ ;
+         /* [ key_hash : key ] */ ;
          IMPLICIT_ACCOUNT
-         /* [ contract unit : @storage key ] */ ;
+         /* [ contract unit : key ] */ ;
          BALANCE
-         /* [ @balance mutez : contract unit : @storage key ] */ ;
+         /* [ mutez : contract unit : key ] */ ;
          UNIT
-         /* [ unit : @balance mutez : contract unit : @storage key ] */ ;
+         /* [ unit : mutez : contract unit : key ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : @storage key ] */ ;
+         /* [ operation : key ] */ ;
          NIL operation
-         /* [ list operation : operation : @storage key ] */ ;
+         /* [ list operation : operation : key ] */ ;
          SWAP
-         /* [ operation : list operation : @storage key ] */ ;
+         /* [ operation : list operation : key ] */ ;
          CONS
-         /* [ list operation : @storage key ] */ ;
+         /* [ list operation : key ] */ ;
          PAIR
-         /* [ pair (list operation) (key @storage) ] */ } }
+         /* [ pair (list operation) key ] */ } }

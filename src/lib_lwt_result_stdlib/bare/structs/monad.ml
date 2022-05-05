@@ -26,6 +26,40 @@
 module Lwt_syntax = struct
   include Lwt
   include Lwt.Syntax
+
+  let return_ok_unit = Lwt.return (Ok ())
+
+  let return_ok_true = Lwt.return (Ok true)
+
+  let return_ok_false = Lwt.return (Ok false)
+
+  let return_ok_none = Lwt.return (Ok None)
+
+  let return_ok_nil = Lwt.return (Ok [])
+end
+
+module Option_syntax = struct
+  let (return[@ocaml.inline "always"]) = fun x -> Some x
+
+  let (fail[@ocaml.inline "always"]) = None
+
+  let return_unit = return ()
+
+  let return_nil = return []
+
+  let return_true = return true
+
+  let return_false = return false
+
+  let ( let* ) = Stdlib.Option.bind
+
+  let ( let+ ) o f = Stdlib.Option.map f o
+
+  let both a b = match (a, b) with (Some x, Some y) -> Some (x, y) | _ -> None
+
+  let ( and* ) = both
+
+  let ( and+ ) = both
 end
 
 module Result_syntax = struct
@@ -74,22 +108,53 @@ module Result_syntax = struct
     | (Error erra, Error errb) -> Error [erra; errb]
 end
 
+module Lwt_option_syntax = struct
+  let (return[@ocaml.iniline "always"]) = fun x -> Lwt.return (Some x)
+
+  let (fail[@ocaml.iniline "always"]) = Lwt.return None
+
+  let return_unit = Lwt_syntax.return_some ()
+
+  let return_true = Lwt_syntax.return_some true
+
+  let return_false = Lwt_syntax.return_some false
+
+  let return_nil = Lwt_syntax.return_some []
+
+  let both a b =
+    let open Lwt_syntax in
+    let+ (a, b) = both a b in
+    Option_syntax.both a b
+
+  let ( let* ) lo f = Lwt.bind lo (function None -> fail | Some x -> f x)
+
+  let ( and* ) = both
+
+  let ( let+ ) lo f = Lwt.map (Stdlib.Option.map f) lo
+
+  let ( and+ ) = both
+
+  let ( let*! ) = Lwt.bind
+
+  let ( let*? ) o f = match o with Some x -> f x | None -> fail
+end
+
 module Lwt_result_syntax = struct
   let (return[@ocaml.iniline "always"]) = fun x -> Lwt.return (Ok x)
 
   let (fail[@ocaml.iniline "always"]) = fun x -> Lwt.return (Error x)
 
-  let return_unit = Lwt.return (Ok ())
+  let return_unit = Lwt_syntax.return_ok_unit
 
-  let return_none = Lwt.return (Ok None)
+  let return_none = Lwt_syntax.return_ok_none
 
   let return_some x = Lwt.return (Ok (Some x))
 
-  let return_true = Lwt.return (Ok true)
+  let return_true = Lwt_syntax.return_ok_true
 
-  let return_false = Lwt.return (Ok false)
+  let return_false = Lwt_syntax.return_ok_false
 
-  let return_nil = Lwt.return (Ok [])
+  let return_nil = Lwt_syntax.return_ok_nil
 
   let ( let* ) = Lwt_result.bind
 

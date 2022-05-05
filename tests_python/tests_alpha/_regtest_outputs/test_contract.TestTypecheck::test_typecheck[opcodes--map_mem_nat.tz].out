@@ -1,13 +1,13 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/map_mem_nat.tz]
 
 Well typed
-Gas remaining: 1039991.954 units remaining
+Gas remaining: 1039993.554 units remaining
 { parameter nat ;
   storage (pair (map nat nat) (option bool)) ;
   code { UNPAIR
-         /* [ @parameter nat : @storage pair (map nat nat) (option bool) ] */ ;
+         /* [ nat : pair (map nat nat) (option bool) ] */ ;
          DIP { CAR /* [ map nat nat ] */ ; DUP /* [ map nat nat : map nat nat ] */ }
-         /* [ @parameter nat : map nat nat : map nat nat ] */ ;
+         /* [ nat : map nat nat : map nat nat ] */ ;
          MEM
          /* [ bool : map nat nat ] */ ;
          SOME

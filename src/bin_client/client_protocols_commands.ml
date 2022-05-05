@@ -34,6 +34,7 @@ let proto_param ~name ~desc t =
 
 let commands () =
   let open Clic in
+  let open Lwt_result_syntax in
   let check_dir _ dn =
     if Sys.is_directory dn then return dn
     else failwith "%s is not a directory" dn
@@ -46,9 +47,11 @@ let commands () =
       no_options
       (prefixes ["list"; "protocols"] stop)
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.list cctxt >>=? fun protos ->
-        List.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos
-        >>= fun () -> return_unit);
+        let* protos = Shell_services.Protocol.list cctxt in
+        let*! () =
+          List.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos
+        in
+        return_unit);
     command
       ~group
       ~desc:"Inject a new protocol into the node."
@@ -62,29 +65,33 @@ let commands () =
       (fun () dirname (cctxt : #Client_context.full) ->
         Lwt.catch
           (fun () ->
-            Tezos_base_unix.Protocol_files.read_dir dirname
-            >>=? fun (_hash, proto) ->
-            Shell_services.Injection.protocol cctxt proto >>= function
+            let* (_hash, proto) =
+              Tezos_base_unix.Protocol_files.read_dir dirname
+            in
+            let*! injection_result =
+              Shell_services.Injection.protocol cctxt proto
+            in
+            match injection_result with
             | Ok hash ->
-                cctxt#message
-                  "Injected protocol %a successfully"
-                  Protocol_hash.pp
-                  hash
-                >>= fun () -> return_unit
+                let*! () =
+                  cctxt#message
+                    "Injected protocol %a successfully"
+                    Protocol_hash.pp
+                    hash
+                in
+                return_unit
             | Error err ->
                 cctxt#error
-                  "Error while injecting protocol from %s: %a"
+                  "Error (error) while injecting protocol from %s: %a"
                   dirname
                   Error_monad.pp_print_trace
-                  err
-                >>= fun () -> return_unit)
+                  err)
           (fun exn ->
             cctxt#error
-              "Error while injecting protocol from %s: %a"
+              "Error (exn) while injecting protocol from %s: %a"
               dirname
               Error_monad.pp_print_trace
-              [Error_monad.Exn exn]
-            >>= fun () -> return_unit));
+              [Error_monad.Exn exn]));
     command
       ~group
       ~desc:"Dump a protocol from the node's record of protocol."
@@ -93,14 +100,17 @@ let commands () =
       @@ proto_param ~name:"protocol hash" ~desc:""
       @@ stop)
       (fun () ph (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.contents cctxt ph >>=? fun proto ->
-        Tezos_base_unix.Protocol_files.write_dir
-          (Protocol_hash.to_short_b58check ph)
-          ~hash:ph
-          proto
-        >>=? fun () ->
-        cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph
-        >>= fun () -> return_unit);
+        let* proto = Shell_services.Protocol.contents cctxt ph in
+        let* () =
+          Tezos_base_unix.Protocol_files.write_dir
+            (Protocol_hash.to_short_b58check ph)
+            ~hash:ph
+            proto
+        in
+        let*! () =
+          cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph
+        in
+        return_unit);
     command
       ~group
       ~desc:"Show the environment version used by a protocol."
@@ -109,13 +119,15 @@ let commands () =
       @@ proto_param ~name:"protocol hash" ~desc:""
       @@ stop)
       (fun () protocol_hash (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.environment cctxt protocol_hash >>=? fun env ->
-        cctxt#message
-          "Protocol %a uses environment %s"
-          Protocol_hash.pp
-          protocol_hash
-          (Protocol.module_name_of_env_version env)
-        >>= fun () -> return_unit);
+        let* env = Shell_services.Protocol.environment cctxt protocol_hash in
+        let*! () =
+          cctxt#message
+            "Protocol %a uses environment %s"
+            Protocol_hash.pp
+            protocol_hash
+            (Protocol.module_name_of_env_version env)
+        in
+        return_unit);
     command
       ~group
       ~desc:"Fetch a protocol from the network."
@@ -124,17 +136,22 @@ let commands () =
       @@ proto_param ~name:"protocol hash" ~desc:""
       @@ stop)
       (fun () hash (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.fetch cctxt hash >>= function
+        let*! fetch_result = Shell_services.Protocol.fetch cctxt hash in
+        match fetch_result with
         | Ok () ->
-            cctxt#message
-              "Protocol %a successfully fetched."
-              Protocol_hash.pp_short
-              hash
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#message
+                "Protocol %a successfully fetched."
+                Protocol_hash.pp_short
+                hash
+            in
+            return_unit
         | Error err ->
-            cctxt#error
-              "Error while fetching protocol: %a"
-              Error_monad.pp_print_trace
-              err
-            >>= fun () -> return_unit);
+            let*! () =
+              cctxt#error
+                "Error while fetching protocol: %a"
+                Error_monad.pp_print_trace
+                err
+            in
+            return_unit);
   ]

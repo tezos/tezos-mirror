@@ -1,0 +1,45 @@
+# THIS CONTRACT IS VULNERABLE TO MALLEABILITY
+# USE PROTOCOL 13+
+
+storage (sapling_state 8);
+parameter (list (pair (sapling_transaction 8) (option key_hash) ) );
+code {
+       UNPAIR;
+       NIL operation;
+       SWAP;
+       DIP { SWAP};
+       AMOUNT ;
+       SWAP ;
+       DIP {SWAP} ;
+       ITER { UNPAIR;
+              DIP { SWAP };
+              SAPLING_VERIFY_UPDATE;
+              ASSERT_SOME;
+              UNPAIR;
+              DUP;
+              DIP { ABS;
+                    PUSH mutez 1;
+                    MUL; };
+              IFGT {
+                     DIIP { ASSERT_SOME;
+                            IMPLICIT_ACCOUNT };
+                     SWAP;
+                     DIP { UNIT;
+                           TRANSFER_TOKENS;
+                           SWAP;
+                           DIP {CONS} ;};
+                   }
+                   {
+                     DIIP {SWAP};
+                     DIP {SWAP};
+                     SWAP;
+                     SUB_MUTEZ; ASSERT_SOME;
+                     DIIP { ASSERT_NONE;};
+                     SWAP;
+                   };
+            };
+       DIP {
+             PUSH mutez 0;
+             ASSERT_CMPEQ;};
+       SWAP;
+       PAIR}

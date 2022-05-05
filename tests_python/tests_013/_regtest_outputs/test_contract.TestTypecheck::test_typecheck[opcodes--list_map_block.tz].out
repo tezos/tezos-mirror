@@ -1,0 +1,25 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/list_map_block.tz]
+
+Well typed
+Gas remaining: 1039991.624 units remaining
+{ parameter (list int) ;
+  storage (list int) ;
+  code { CAR
+         /* [ list int ] */ ;
+         PUSH int 0
+         /* [ int : list int ] */ ;
+         SWAP
+         /* [ list int : int ] */ ;
+         MAP { DIP { DUP /* [ int : int ] */ }
+               /* [ int : int : int ] */ ;
+               ADD
+               /* [ int : int ] */ ;
+               DIP { PUSH int 1 /* [ int : int ] */ ; ADD /* [ int ] */ }
+               /* [ int : int ] */ }
+         /* [ list int : int ] */ ;
+         NIL operation
+         /* [ list operation : list int : int ] */ ;
+         PAIR
+         /* [ pair (list operation) (list int) : int ] */ ;
+         DIP { DROP /* [] */ }
+         /* [ pair (list operation) (list int) ] */ } }

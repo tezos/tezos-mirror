@@ -2,7 +2,7 @@ Octez Merge Team
 ================
 
 The Octez merge team is a `group of developers
-<https://gitlab.com/tezos/tezos/-/project_members>`_
+<https://gitlab.com/groups/tezos/-/group_members>`_
 from different teams of the
 Tezos ecosystem.
 They are automatically selected as approvers when you create a merge

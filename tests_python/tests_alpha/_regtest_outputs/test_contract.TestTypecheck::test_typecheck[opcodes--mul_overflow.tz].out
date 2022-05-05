@@ -1,28 +1,28 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/mul_overflow.tz]
 
 Well typed
-Gas remaining: 1039991.544 units remaining
+Gas remaining: 1039992.344 units remaining
 { parameter (or unit unit) ;
   storage unit ;
   code { CAR
-         /* [ @parameter or unit unit ] */ ;
+         /* [ or unit unit ] */ ;
          IF_LEFT
            { PUSH nat 922337203685477580700
-             /* [ nat : @parameter.left unit ] */ ;
+             /* [ nat : unit ] */ ;
              PUSH mutez 10
-             /* [ mutez : nat : @parameter.left unit ] */ ;
+             /* [ mutez : nat : unit ] */ ;
              MUL
-             /* [ mutez : @parameter.left unit ] */ ;
+             /* [ mutez : unit ] */ ;
              DROP
-             /* [ @parameter.left unit ] */ }
+             /* [ unit ] */ }
            { PUSH mutez 10
-             /* [ mutez : @parameter.right unit ] */ ;
+             /* [ mutez : unit ] */ ;
              PUSH nat 922337203685477580700
-             /* [ nat : mutez : @parameter.right unit ] */ ;
+             /* [ nat : mutez : unit ] */ ;
              MUL
-             /* [ mutez : @parameter.right unit ] */ ;
+             /* [ mutez : unit ] */ ;
              DROP
-             /* [ @parameter.right unit ] */ } ;
+             /* [ unit ] */ } ;
          NIL operation
          /* [ list operation : unit ] */ ;
          PAIR

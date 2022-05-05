@@ -1,0 +1,27 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "tezos-base"
+  "tezos-client-base"
+  "tezos-client-013-PtJakart"
+  "tezos-client-commands"
+  "tezos-stdlib-unix"
+  "tezos-client-base-unix"
+  "tezos-rpc-http"
+  "tezos-rpc-http-client-unix"
+  "tezos-protocol-013-PtJakart"
+  "tezos-sc-rollup-013-PtJakart"
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: `tezos-sc-rollup-client-alpha` client binary"

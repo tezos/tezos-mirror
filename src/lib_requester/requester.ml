@@ -45,6 +45,8 @@ module type REQUESTER = sig
 
   val read_opt : t -> key -> value option Lwt.t
 
+  val inject : t -> key -> value -> bool Lwt.t
+
   val fetch :
     t ->
     ?peer:P2p_peer.Id.t ->
@@ -68,8 +70,6 @@ module type FULL_REQUESTER = sig
   val pending : t -> key -> bool
 
   val watch : t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
-
-  val inject : t -> key -> value -> bool Lwt.t
 
   val notify : t -> P2p_peer.Id.t -> key -> notified_value -> unit Lwt.t
 
@@ -106,7 +106,7 @@ module type MEMORY_TABLE = sig
 
   type key
 
-  val create : ?random:bool -> int -> 'a t
+  val create : entry_type:string -> ?random:bool -> int -> 'a t
 
   val find : 'a t -> key -> 'a option
 
@@ -221,7 +221,8 @@ end = struct
   let request t p k = Lwt_pipe.Unbounded.push t.queue (Request (p, k))
 
   let notify t p k =
-    Events.(emit notify_push) (k, p) >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Events.(emit notify_push) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify (p, k)) ;
     Lwt.return ()
 
@@ -234,17 +235,20 @@ end = struct
     Lwt_pipe.Unbounded.push t.queue (Notify_cancellation k)
 
   let notify_invalid t p k =
-    Events.(emit notify_push_invalid) (k, p) >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Events.(emit notify_push_invalid) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify_invalid (p, k)) ;
     Lwt.return ()
 
   let notify_duplicate t p k =
-    Events.(emit notify_push_duplicate) (k, p) >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Events.(emit notify_push_duplicate) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify_duplicate (p, k)) ;
     Lwt.return ()
 
   let notify_unrequested t p k =
-    Events.(emit notify_push_unrequested) (k, p) >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Events.(emit notify_push_unrequested) (k, p) in
     Lwt_pipe.Unbounded.push t.queue (Notify_unrequested (p, k)) ;
     Lwt.return ()
 
@@ -261,14 +265,16 @@ end = struct
     match next with
     | None -> fst @@ Lwt.task ()
     | Some next ->
-        let now = Systime_os.now () in
+        let now = Time.System.now () in
         let delay = Ptime.diff next now in
         if Ptime.Span.compare delay Ptime.Span.zero <= 0 then Lwt.return_unit
         else Systime_os.sleep delay
 
-  let process_event state now = function
+  let process_event state now =
+    let open Lwt_syntax in
+    function
     | Request (peer, key) -> (
-        Events.(emit registering_request) (key, peer) >>= fun () ->
+        let* () = Events.(emit registering_request) (key, peer) in
         match Table.find state.pending key with
         | Some data ->
             let peers =
@@ -309,20 +315,29 @@ end = struct
         Events.(emit notify_duplicate) (key, peer)
 
   let worker_loop state =
+    let open Lwt_syntax in
     let shutdown = Lwt_canceler.when_canceling state.canceler in
     let rec loop state =
       let timeout = compute_timeout state in
-      Lwt.choose [(state.events >|= fun _ -> ()); timeout; shutdown]
-      >>= fun () ->
+      let* () =
+        Lwt.choose
+          [
+            (let* _ = state.events in
+             Lwt.return_unit);
+            timeout;
+            shutdown;
+          ]
+      in
       if Lwt.state shutdown <> Lwt.Sleep then Events.(emit terminated) ()
       else if Lwt.state state.events <> Lwt.Sleep then (
-        let now = Systime_os.now () in
-        state.events >>= fun events ->
+        let now = Time.System.now () in
+        let* events = state.events in
         state.events <- Lwt_pipe.Unbounded.pop_all state.queue ;
-        List.iter_s (process_event state now) events >>= fun () -> loop state)
+        let* () = List.iter_s (process_event state now) events in
+        loop state)
       else
-        Events.(emit timeout) () >>= fun () ->
-        let now = Systime_os.now () in
+        let* () = Events.(emit timeout) () in
+        let now = Time.System.now () in
         let active_peers = Request.active state.param in
         let requests =
           Table.fold
@@ -366,13 +381,15 @@ end = struct
             P2p_peer.Map.empty
         in
         P2p_peer.Map.iter (Request.send state.param) requests ;
-        P2p_peer.Map.iter_s
-          (fun peer request ->
-            List.iter_s
-              (fun (key : key) -> Events.(emit requested) (key, peer))
-              request)
-          requests
-        >>= fun () -> loop state
+        let* () =
+          P2p_peer.Map.iter_s
+            (fun peer request ->
+              List.iter_s
+                (fun (key : key) -> Events.(emit requested) (key, peer))
+                request)
+            requests
+        in
+        loop state
     in
     loop state
 
@@ -381,7 +398,7 @@ end = struct
       {
         param;
         queue = Lwt_pipe.Unbounded.create ();
-        pending = Table.create ~random:true 17;
+        pending = Table.create ~entry_type:"pending_requests" ~random:true 17;
         events = Lwt.return_nil;
         canceler = Lwt_canceler.create ();
         worker = Lwt.return_unit;
@@ -498,12 +515,14 @@ module Make
       (fun key -> Timeout key)
 
   let read s k =
+    let open Lwt_result_syntax in
     match Memory_table.find s.memory k with
     | None -> trace (Missing_data k) @@ Disk_table.read s.disk k
     | Some (Found v) -> return v
-    | Some (Pending _) -> fail (Missing_data k)
+    | Some (Pending _) -> tzfail (Missing_data k)
 
   let wrap s k ?timeout t =
+    let open Lwt_syntax in
     let t = Lwt.protected t in
     Lwt.on_cancel t (fun () ->
         match Memory_table.find s.memory k with
@@ -514,18 +533,23 @@ module Make
             if data.waiters = 0 then (
               Memory_table.remove s.memory k ;
               Scheduler.notify_cancellation s.scheduler k ;
-              Lwt.wakeup_later w (error (Canceled k)))) ;
+              Lwt.wakeup_later w (Result_syntax.tzfail (Canceled k)))) ;
     match timeout with
     | None -> t
     | Some delay ->
-        let timeout = Systime_os.sleep delay >>= fun () -> fail (Timeout k) in
+        let timeout =
+          let* () = Systime_os.sleep delay in
+          Lwt_result_syntax.tzfail (Timeout k)
+        in
         Lwt.pick [t; timeout]
 
   let fetch s ?peer ?timeout k param =
+    let open Lwt_syntax in
     match Memory_table.find s.memory k with
     | None -> (
-        Disk_table.read_opt s.disk k >>= function
-        | Some v -> return v
+        let* o = Disk_table.read_opt s.disk k in
+        match o with
+        | Some v -> return_ok v
         | None -> (
             (* It is necessary to check the memory-table again in case another
                promise has altered it whilst this one was waiting for the
@@ -543,18 +567,19 @@ module Make
                 Scheduler.request s.scheduler peer k ;
                 data.waiters <- data.waiters + 1 ;
                 wrap s k ?timeout data.waiter
-            | Some (Found v) -> return v))
+            | Some (Found v) -> return_ok v))
     | Some (Pending data) ->
         Scheduler.request s.scheduler peer k ;
         data.waiters <- data.waiters + 1 ;
         wrap s k ?timeout data.waiter
-    | Some (Found v) -> return v
+    | Some (Found v) -> return_ok v
 
   let notify_when_pending s p k w param v =
+    let open Lwt_syntax in
     match Probe.probe k param v with
     | None -> Scheduler.notify_invalid s.scheduler p k
     | Some v ->
-        Scheduler.notify s.scheduler p k >>= fun () ->
+        let* () = Scheduler.notify s.scheduler p k in
         Memory_table.replace s.memory k (Found v) ;
         Lwt.wakeup_later w (Ok v) ;
         Option.iter
@@ -564,9 +589,11 @@ module Make
         Lwt.return_unit
 
   let notify s p k v =
+    let open Lwt_syntax in
     match Memory_table.find s.memory k with
     | None -> (
-        Disk_table.known s.disk k >>= function
+        let* b = Disk_table.known s.disk k in
+        match b with
         | true -> Scheduler.notify_duplicate s.scheduler p k
         | false -> (
             (* It is necessary to check the memory-table again in case another
@@ -582,9 +609,11 @@ module Make
     | Some (Found _) -> Scheduler.notify_duplicate s.scheduler p k
 
   let inject s k v =
+    let open Lwt_syntax in
     match Memory_table.find s.memory k with
     | None -> (
-        Disk_table.known s.disk k >>= function
+        let* b = Disk_table.known s.disk k in
+        match b with
         | true -> Lwt.return_false
         | false -> (
             (* It is necessary to check the memory-table again in case another
@@ -600,17 +629,19 @@ module Make
   let clear_or_cancel s k =
     match Memory_table.find s.memory k with
     | None -> ()
-    | Some (Pending {wakener = w; _}) ->
-        Scheduler.notify_cancellation s.scheduler k ;
-        Memory_table.remove s.memory k ;
-        Lwt.wakeup_later w (error (Canceled k))
+    | Some (Pending status) ->
+        if status.waiters <= 1 then (
+          Scheduler.notify_cancellation s.scheduler k ;
+          Memory_table.remove s.memory k ;
+          Lwt.wakeup_later status.wakener (Result_syntax.tzfail (Canceled k)))
+        else status.waiters <- status.waiters - 1
     | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input
 
   let create ?random_table:random ?global_input request_param disk =
     let scheduler = Scheduler.create request_param in
-    let memory = Memory_table.create ?random 17 in
+    let memory = Memory_table.create ~entry_type:"entries" ?random 17 in
     let input = Lwt_watcher.create_input () in
     {scheduler; disk; memory; input; global_input}
 

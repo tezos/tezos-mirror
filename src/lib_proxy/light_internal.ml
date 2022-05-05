@@ -28,7 +28,7 @@
 let key_to_string = String.concat ";"
 
 module Store = Local_context
-module StringMap = TzString.Map
+module StringMap = String.Map
 
 let rec raw_context_to_irmin_tree
     (raw : Tezos_shell_services.Block_services.raw_context) : Store.tree Lwt.t =
@@ -44,7 +44,7 @@ let rec raw_context_to_irmin_tree
       List.fold_left_s
         process_recursively
         (Store.Tree.empty Store.empty)
-        (TzString.Map.bindings pairs)
+        (String.Map.bindings pairs)
 
 module Merkle = struct
   (** Parse a [string] to a [Context_hash.t], transforming the error into
@@ -59,8 +59,8 @@ module Merkle = struct
 
   let rec merkle_node_to_irmin_tree repo mnode :
       (Store.tree, string) result Lwt.t =
-    let open Tezos_shell_services.Block_services in
     let open Lwt_result_syntax in
+    let open Tezos_shell_services.Block_services in
     match mnode with
     | Hash (kind, s) -> (
         match string_to_hash s with
@@ -68,7 +68,7 @@ module Merkle = struct
         | Ok hash_str ->
             let irmin_hash =
               match kind with
-              | Contents -> `Contents hash_str
+              | Contents -> `Value hash_str
               | Node -> `Node hash_str
             in
             return @@ Store.Tree.shallow repo irmin_hash)
@@ -189,7 +189,7 @@ module Merkle = struct
     else return_none
 
   let union_irmin_tree_merkle_tree repo tree mtree =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree_opt = union_irmin_tree_merkle_tree repo [] tree mtree in
     let tree = Option.value ~default:tree tree_opt in
     return tree
@@ -284,7 +284,7 @@ module Merkle = struct
   and trees_shape_match path_to_ignore
       (left : Tezos_shell_services.Block_services.merkle_tree)
       (right : Tezos_shell_services.Block_services.merkle_tree) =
-    TzString.Map.merge
+    String.Map.merge
       (fun key left_val_opt right_val_opt ->
         match (left_val_opt, right_val_opt, path_to_ignore) with
         | (Some _, None, _) | (None, Some _, _) ->
@@ -300,7 +300,7 @@ module Merkle = struct
             nodes_shape_match NotThisPath left_value right_value)
       left
       right
-    |> TzString.Map.bindings
+    |> String.Map.bindings
     |> List.map (fun (_key, errors) -> errors)
     |> List.flatten
 

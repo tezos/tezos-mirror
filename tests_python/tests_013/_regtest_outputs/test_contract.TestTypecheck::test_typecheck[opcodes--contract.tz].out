@@ -1,0 +1,19 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/contract.tz]
+
+Well typed
+Gas remaining: 1039994.190 units remaining
+{ parameter address ;
+  storage unit ;
+  code { CAR
+         /* [ address ] */ ;
+         CONTRACT unit
+         /* [ option (contract unit) ] */ ;
+         ASSERT_SOME ;
+         DROP
+         /* [] */ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

@@ -1,11 +1,11 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/assert.tz]
 
 Well typed
-Gas remaining: 1039994.573 units remaining
+Gas remaining: 1039995.213 units remaining
 { parameter bool ;
   storage unit ;
   code { CAR
-         /* [ @parameter bool ] */ ;
+         /* [ bool ] */ ;
          ASSERT ;
          UNIT
          /* [ unit ] */ ;

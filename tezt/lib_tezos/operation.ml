@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Lwt.Infix
+open Runnable.Syntax
 
 (* For Smart contracts' script, initial storage and arguments, we offer
    several syntaxes, depending on the test context *)
@@ -44,6 +45,28 @@ type manager_op_kind =
     }
   | Reveal of string (* public key *)
   | Origination of {code : micheline; storage : micheline; balance : int}
+  | Rejection of {
+      proof : string;
+      tx_rollup : string;
+      level : int;
+      message : Rollup.Tx_rollup.message;
+      message_position : int;
+      message_path : string list;
+      message_result_hash : string;
+      message_result_path : JSON.u;
+      previous_message_result_path : JSON.u;
+      previous_message_context_hash : string;
+      previous_message_withdraw_list_hash : string;
+    }
+  | Delegation of (* public key hash *) string
+  | Transfer_ticket of {
+      contents : micheline;
+      ty : micheline;
+      ticketer : string;
+      amount : int;
+      destination : string;
+      entrypoint : string;
+    }
 
 (* This is the manager operations' content type *)
 type manager_operation_content = {
@@ -75,8 +98,10 @@ let data_to_json =
 
 (* Some basic auxiliary functions *)
 let get_counter ~source client =
-  RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
-  >|= JSON.as_int
+  let*! json =
+    RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
+  in
+  return (JSON.as_int json)
 
 let get_next_counter ~source client = get_counter client ~source >|= succ
 
@@ -119,6 +144,38 @@ let mk_reveal ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Reveal source.Account.public_key
 
+let mk_delegation ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
+    ?(storage_limit = 0) ~delegate client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Delegation delegate
+
+let mk_rejection ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 1_000_000)
+    ?(storage_limit = 0) ~tx_rollup ~proof ~level ~message ~message_position
+    ~message_path ~message_result_hash ~message_result_path
+    ~previous_message_result_path ~previous_message_context_hash
+    ~previous_message_withdraw_list_hash client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Rejection
+       {
+         tx_rollup;
+         proof;
+         level;
+         message;
+         message_position;
+         message_path;
+         message_result_hash;
+         message_result_path;
+         previous_message_result_path;
+         previous_message_context_hash;
+         previous_message_withdraw_list_hash;
+       }
+
+let mk_transfer_ticket ~source ?counter ?(fee = 1_000_000)
+    ?(gas_limit = 1_000_000) ?(storage_limit = 0) ~contents ~ty ~ticketer
+    ~amount ~destination ~entrypoint client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
+
 let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
     ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
@@ -129,7 +186,13 @@ let manager_op_content_to_json_string
     {op_kind; fee; gas_limit; storage_limit; source; counter} client =
   let jz_string_of_int n = Ezjsonm.string @@ string_of_int n in
   let mk_jsonm ?(amount = `Null) ?(destination = `Null) ?(parameter = `Null)
-      ?(public_key = `Null) ?(balance = `Null) ?(script = `Null) kind =
+      ?(public_key = `Null) ?(delegate = `Null) ?(balance = `Null)
+      ?(script = `Null) ?(proof = `Null) ?(rollup = `Null) ?(message = `Null)
+      ?(message_position = `Null) ?(message_path = `Null) ?(level = `Null)
+      ?(previous_message_result = `Null) ?(message_result_hash = `Null)
+      ?(message_result_path = `Null) ?(previous_message_result_path = `Null)
+      ?(ticket_contents = `Null) ?(ticket_ty = `Null) ?(ticket_ticketer = `Null)
+      ?(ticket_amount = `Null) ?(entrypoint = `Null) kind =
     let filter = List.filter (fun (_k, v) -> v <> `Null) in
     return
     @@ `O
@@ -148,9 +211,28 @@ let manager_op_content_to_json_string
               ("parameters", parameter);
               (* Pk reveal *)
               ("public_key", public_key);
+              (* Delegation *)
+              ("delegate", delegate);
               (* Smart Contract origination *)
               ("balance", balance);
               ("script", script);
+              (* Rejection *)
+              ("proof", proof);
+              ("rollup", rollup);
+              ("message", message);
+              ("message_position", message_position);
+              ("message_path", message_path);
+              ("previous_message_result", previous_message_result);
+              ("level", level);
+              ("message_result_hash", message_result_hash);
+              ("message_result_path", message_result_path);
+              ("previous_message_result_path", previous_message_result_path);
+              (* Transfer ticket *)
+              ("ticket_contents", ticket_contents);
+              ("ticket_ty", ticket_ty);
+              ("ticket_ticketer", ticket_ticketer);
+              ("ticket_amount", ticket_amount);
+              ("entrypoint", entrypoint);
             ])
   in
   match op_kind with
@@ -170,11 +252,64 @@ let manager_op_content_to_json_string
         ~parameter
         "transaction"
   | Reveal pk -> mk_jsonm ~public_key:(Ezjsonm.string pk) "reveal"
+  | Delegation delegate ->
+      mk_jsonm ~delegate:Ezjsonm.(string delegate) "delegation"
   | Origination {code; storage; balance} ->
       let* code = script_to_json client code in
       let* storage = data_to_json client storage in
       let script : Ezjsonm.value = `O [("code", code); ("storage", storage)] in
       mk_jsonm ~balance:(jz_string_of_int balance) ~script "origination"
+  | Rejection
+      {
+        proof;
+        tx_rollup;
+        level;
+        message;
+        message_position;
+        message_path;
+        previous_message_context_hash;
+        message_result_hash;
+        message_result_path;
+        previous_message_result_path;
+        previous_message_withdraw_list_hash;
+      } ->
+      let rollup = `String tx_rollup in
+      let proof = Ezjsonm.value_from_string proof in
+      let level = `Float (float_of_int level) in
+      let message = Rollup.Tx_rollup.json_of_message message in
+      let message_position = `String (string_of_int message_position) in
+      let message_path = `A (List.map (fun x -> `String x) message_path) in
+      let previous_message_result =
+        `O
+          [
+            ("context_hash", `String previous_message_context_hash);
+            ("withdraw_list_hash", `String previous_message_withdraw_list_hash);
+          ]
+      in
+      let message_result_hash = `String message_result_hash in
+      mk_jsonm
+        ~rollup
+        ~proof
+        ~level
+        ~message
+        ~message_position
+        ~message_path
+        ~previous_message_result
+        ~message_result_hash
+        ~message_result_path
+        ~previous_message_result_path
+        "tx_rollup_rejection"
+  | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
+      let* ticket_contents = data_to_json client contents in
+      let* ticket_ty = data_to_json client ty in
+      mk_jsonm
+        ~ticket_amount:(jz_string_of_int amount)
+        ~destination:(Ezjsonm.string destination)
+        ~ticket_contents
+        ~ticket_ty
+        ~ticket_ticketer:(Ezjsonm.string ticketer)
+        ~entrypoint:(Ezjsonm.string entrypoint)
+        "transfer_ticket"
 
 (* construct a JSON operations with contents and branch *)
 let manager_op_to_json_string ~branch operations_json =
@@ -217,15 +352,18 @@ let inject_operation ?(async = false) ?(force = false) ?wait_for_injection
     | None -> Lwt.return_unit
     | Some node -> Node.wait_for_request ~request:`Inject node
   in
-  let* oph_json = inject ~async ~data:(`String signed_op) client in
+  let*! oph_json = inject ~async ~data:(`String signed_op) client in
   let* () = waiter in
   return (`OpHash (JSON.as_string oph_json))
 
-let spawn_inject_operation ?(async = false) ~unsigned_op ~signature client =
+let runnable_inject_operation ?(async = false) ?(force = false) ~unsigned_op
+    ~signature client =
   let (`Hex unsigned_op) = unsigned_op in
   let (`Hex signature) = signature in
   let signed_op = unsigned_op ^ signature in
-  let inject = RPC.spawn_inject_operation in
+  let inject =
+    if force then RPC.private_inject_operation else RPC.inject_operation
+  in
   inject ~async ~data:(`String signed_op) client
 
 let forge_and_inject_operation ?protocol ?branch ?async ?force
@@ -241,12 +379,13 @@ let forge_and_inject_operation ?protocol ?branch ?async ?force
     ~signature
     client
 
-let spawn_forge_and_inject_operation ?protocol ?branch ?async ~batch ~signer
-    client =
+let runnable_forge_and_inject_operation ?protocol ?branch ?async ?force ~batch
+    ~signer client =
   let* branch = get_injection_branch ?branch client in
   let* unsigned_op = forge_operation ?protocol ~batch ~branch client in
   let signature = sign_manager_op_hex ~signer unsigned_op in
-  return (spawn_inject_operation ?async ~unsigned_op ~signature client)
+  return
+    (runnable_inject_operation ?async ?force ~unsigned_op ~signature client)
 
 (** High level operations injection wrappers *)
 
@@ -297,6 +436,29 @@ let inject_public_key_revelation ?protocol ?async ?force ?wait_for_injection
     ~signer
     client
 
+let inject_delegation ?protocol ?async ?force ?wait_for_injection ?branch
+    ~source ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~delegate
+    client =
+  let* op =
+    mk_delegation
+      ~source
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      ~delegate
+      client
+  in
+  forge_and_inject_operation
+    ?protocol
+    ?async
+    ?force
+    ?wait_for_injection
+    ?branch
+    ~batch:[op]
+    ~signer
+    client
+
 let inject_transfer ?protocol ?async ?force ?wait_for_injection ?branch ~source
     ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~dest ?amount
     client =
@@ -310,6 +472,69 @@ let inject_transfer ?protocol ?async ?force ?wait_for_injection ?branch ~source
       ~dest
       ?amount
       client
+  in
+  forge_and_inject_operation
+    ?protocol
+    ?async
+    ?force
+    ?wait_for_injection
+    ?branch
+    ~batch:[op]
+    ~signer
+    client
+
+let inject_rejection ?protocol ?async ?force ?wait_for_injection ?branch ~source
+    ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~tx_rollup ~proof
+    ~level ~message ~message_position ~message_path ~message_result_hash
+    ~message_result_path ~previous_message_result_path
+    ~previous_message_context_hash ~previous_message_withdraw_list_hash client =
+  let* op =
+    mk_rejection
+      ~source
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      ~tx_rollup
+      ~proof
+      ~level
+      ~message
+      ~message_position
+      ~message_path
+      ~message_result_hash
+      ~message_result_path
+      ~previous_message_result_path
+      ~previous_message_context_hash
+      ~previous_message_withdraw_list_hash
+      client
+  in
+  forge_and_inject_operation
+    ?protocol
+    ?async
+    ?force
+    ?wait_for_injection
+    ?branch
+    ~batch:[op]
+    ~signer
+    client
+
+let inject_transfer_ticket ?protocol ?async ?force ?wait_for_injection ?branch
+    ~source ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~contents
+    ~ty ~ticketer ~amount ~destination ~entrypoint client =
+  let* op =
+    mk_transfer_ticket
+      ~source
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      client
+      ~contents
+      ~ty
+      ~ticketer
+      ~amount
+      ~destination
+      ~entrypoint
   in
   forge_and_inject_operation
     ?protocol

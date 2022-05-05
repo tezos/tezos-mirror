@@ -47,12 +47,12 @@ let encoding_length =
 let state_key = ["state"]
 
 let get_state context =
-  Context.get context state_key
+  Context.find context state_key
   >|= function
   | None ->
       assert false
   | Some encoded_state -> (
-    match Data_encoding.Binary.of_bytes encoding encoded_state with
+    match Data_encoding.Binary.of_bytes_opt encoding encoded_state with
     | Some x ->
         x
     | None ->
@@ -60,4 +60,4 @@ let get_state context =
 
 let update_state context state =
   let encoded_state = Data_encoding.Binary.to_bytes_exn encoding state in
-  Context.set context state_key encoded_state
+  Context.add context state_key encoded_state

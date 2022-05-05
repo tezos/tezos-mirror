@@ -1,56 +1,58 @@
 # You can set these variables from the command line.
-SPHINXOPTS    = -aE -n -W --keep-going
+SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SPHINXPROJ    = Tezos
 SOURCEDIR     = .
 BUILDDIR      = _build
+TOPBUILDDIR   = ../_build/default
 
 DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
-DOCRPCDIR     = $(DOCGENDIR)/rpcs
+P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
+RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
+ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+JAKARTA_LONG  = PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 ITHACA_LONG   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
-HANGZHOU_LONG = PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
-ACTIVE_LONG = $(HANGZHOU_LONG)
+ACTIVE_LONG   = $(ITHACA_LONG)
 
 ALPHA_SHORT    = alpha
-HANGZHOU_SHORT = 011-PtHangz2
 ITHACA_SHORT   = 012-Psithaca
-ACTIVE_SHORT = $(HANGZHOU_SHORT)
+JAKARTA_SHORT  = 013-PtJakart
+ACTIVE_SHORT   = $(ITHACA_SHORT)
 
-SCRIPTSDIR		= scripts
-CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
+SCRIPTSDIR     = scripts
+CHECKXREFS     = $(SCRIPTSDIR)/check_proto_xrefs.py
 
 all: manuals odoc html
 
 main:
-	@${MAKE} -C .. all
+	${MAKE} -C .. all
 
 manuals: main
     # alpha protocol
 	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client.html
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
-    # 012 (Ithaca) protocol
-	@../tezos-client -protocol $(ITHACA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-client.html
-	@../tezos-baker-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-baker.html
-	@../tezos-endorser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-endorser.html
-	@../tezos-accuser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-accuser.html
-    # 011 (Hangzhou) protocol
-	@../tezos-client -protocol $(HANGZHOU_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-client.html
-	@../tezos-baker-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-baker.html
-	@../tezos-endorser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-endorser.html
-	@../tezos-accuser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-accuser.html
+    # Jakarta protocol
+	@../tezos-client -protocol $(JAKARTA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-client.html
+	@../tezos-baker-$(JAKARTA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-baker.html
+	@../tezos-accuser-$(JAKARTA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-accuser.html
+    # Ithaca protocol
+	@../tezos-client -protocol $(ITHACA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-client.html
+	@../tezos-baker-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-baker.html
+	@../tezos-accuser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-accuser.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
 	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
 	@../tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
 
+# artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
-odoc: main
-	@cd $$(pwd)/.. ; dune build @doc
+odoc: main docexes
+	cd $$(pwd)/.. ; dune build @doc
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
@@ -71,15 +73,17 @@ redirectcheck:
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) 011
-	$(CHECKXREFS) -l 012
+	$(CHECKXREFS) ithaca
+	$(CHECKXREFS) -l jakarta
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
 	introduction/test_howtoget.sh install-bin-bionic
 	introduction/test_howtoget.sh install-bin-focal
-	introduction/test_howtoget.sh install-bin-fedora33
 	introduction/test_howtoget.sh install-bin-fedora34
+	introduction/test_howtoget.sh install-bin-rc-bionic
+	introduction/test_howtoget.sh install-bin-rc-focal
+	introduction/test_howtoget.sh install-bin-rc-fedora34
 	introduction/test_howtoget.sh install-opam-scratch
 	introduction/test_howtoget.sh install-opam-bionic
 	introduction/test_howtoget.sh install-opam-focal
@@ -93,27 +97,34 @@ sanitycheck:
 		exit 1;								\
 	fi
 
-api/errors.rst: $(DOCERRORDIR)/error_doc.ml
-	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
-	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst
+# build dune targets together to avoid concurrent dunes
+docexes: main
+	cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe docs/$(DOCGENDIR)/rpc_doc.exe docs/$(DOCGENDIR)/p2p_doc.exe
 
-$(DOCGENDIR)/rpc_doc.exe:
-	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
+developer/metrics.csv: main
+	../tezos-node dump-metrics > developer/metrics.csv
 
-rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index "" > active/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index "012" > 012/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index alpha > alpha/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index shell > shell/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe acl > user/default-acl.json
+$(ERRDOCEXE): docexes
+$(RPCDOCEXE): docexes
+$(P2PDOCEXE): docexes
 
-$(DOCGENDIR)/p2p_doc.exe:
-	@cd .. && dune build docs/$(DOCGENDIR)/p2p_doc.exe
+api/errors.rst: $(ERRDOCEXE)
+	$(ERRDOCEXE) > api/errors.rst
 
-p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
-	@dune exec $(DOCGENDIR)/p2p_doc.exe < shell/p2p_usage.rst.inc > shell/p2p_api.rst
+active/rpc.rst: $(RPCDOCEXE)
+	$(RPCDOCEXE) index "" > $@
 
-.PHONY: help Makefile
+%/rpc.rst: $(RPCDOCEXE)
+	$(RPCDOCEXE) index $(@D) > $@
+
+user/default-acl.json: $(RPCDOCEXE)
+	$(RPCDOCEXE) acl > $@
+
+rpc: user/default-acl.json shell/rpc.rst \
+			active/rpc.rst jakarta/rpc.rst alpha/rpc.rst
+
+p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
+	@$(P2PDOCEXE) < shell/p2p_usage.rst.inc > shell/p2p_api.rst
 
 .PHONY: install-dependencies
 install-dependencies:
@@ -121,10 +132,10 @@ install-dependencies:
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: Makefile api/errors.rst rpc p2p install-dependencies
-	echo "$$(echo ':orphan:'; echo ''; cat ../CHANGES.rst)" > CHANGES.rst
+html: api/errors.rst developer/metrics.csv rpc p2p install-dependencies
+	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/011" || true
+	@ln -s active "$(BUILDDIR)/ithaca" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -167,5 +178,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst active/rpc.rst 011/rpc.rst 012/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 011/tezos-*.html 012/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html ithaca/tezos-*.html jakarta/tezos-*.html alpha/tezos-*.html

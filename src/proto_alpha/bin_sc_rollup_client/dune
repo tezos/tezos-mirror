@@ -1,0 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (static (flags (:standard -ccopt -static))))
+
+(executable
+ (name main_sc_rollup_client_alpha)
+ (public_name tezos-sc-rollup-client-alpha)
+ (package tezos-sc-rollup-client-alpha)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-client-base
+  tezos-client-alpha
+  tezos-client-commands
+  tezos-stdlib-unix
+  tezos-client-base-unix
+  tezos-rpc-http
+  tezos-rpc-http-client-unix
+  tezos-protocol-alpha
+  tezos-sc-rollup-alpha)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_client_alpha
+   -open Tezos_client_commands
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base_unix
+   -open Tezos_rpc_http_client_unix
+   -open Tezos_protocol_alpha
+   -open Tezos_sc_rollup_alpha)))

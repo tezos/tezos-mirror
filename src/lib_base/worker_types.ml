@@ -102,8 +102,8 @@ let worker_information_encoding error_encoding =
 
 type request_status = {
   pushed : Time.System.t;
-  treated : Time.System.Span.t;
-  completed : Time.System.Span.t;
+  treated : Time.System.t;
+  completed : Time.System.t;
 }
 
 let request_status_encoding =
@@ -113,8 +113,8 @@ let request_status_encoding =
     (fun (pushed, treated, completed) -> {pushed; treated; completed})
     (obj3
        (req "pushed" Time.System.encoding)
-       (req "treated" Time.System.Span.encoding)
-       (req "completed" Time.System.Span.encoding))
+       (req "treated" Time.System.encoding)
+       (req "completed" Time.System.encoding))
 
 type 'req full_status = {
   status : worker_status;
@@ -153,6 +153,6 @@ let pp_status ppf {pushed; treated; completed} =
     Time.System.pp_hum
     pushed
     Ptime.Span.pp
-    treated
+    (Ptime.diff treated pushed)
     Ptime.Span.pp
-    completed
+    (Ptime.diff completed treated)
