@@ -346,22 +346,21 @@ end
 
 module Proto_plugin = struct
   module type PROTOMETRICS = sig
-    type t = {cycle : float; consumed_gas : float}
-
     val hash : Protocol_hash.t
 
-    val decode_metadata : bytes -> t
+    val update_metrics :
+      protocol_metadata:bytes ->
+      (cycle:float -> consumed_gas:float -> unit) ->
+      unit
   end
 
   module UndefinedProtoMetrics (P : sig
     val hash : Protocol_hash.t
   end) =
   struct
-    type t = {cycle : float; consumed_gas : float}
-
     let hash = P.hash
 
-    let decode_metadata _ = {cycle = -1.; consumed_gas = -1.}
+    let update_metrics ~protocol_metadata:_ _ = ()
   end
 
   let proto_metrics_table : (module PROTOMETRICS) Protocol_hash.Table.t =

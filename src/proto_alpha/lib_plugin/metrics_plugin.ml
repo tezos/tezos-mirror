@@ -26,25 +26,28 @@
 open Protocol
 open Alpha_context
 
-type t = {cycle : float; consumed_gas : float}
-
-let zero = {cycle = -1.; consumed_gas = -1.}
-
-let decode_metadata metadata =
-  match
-    Data_encoding.Binary.of_bytes_opt
-      Protocol.block_header_metadata_encoding
-      metadata
-  with
-  | None ->
-      (* this is the case of the genesis block and the activation block
-         in a sandbox environment *)
-      zero
-  | Some protocol_data ->
-      {
-        cycle = Int32.to_float (Cycle.to_int32 protocol_data.level_info.cycle);
-        consumed_gas =
+let update_metrics ~protocol_metadata update_metrics_callback =
+  let proto_metrics =
+    match
+      Data_encoding.Binary.of_bytes_opt
+        Protocol.block_header_metadata_encoding
+        protocol_metadata
+    with
+    | None ->
+        (* this is the case of the genesis block and the activation block
+           in a sandbox environment *)
+        None
+    | Some protocol_data ->
+        let cycle =
+          Int32.to_float (Cycle.to_int32 protocol_data.level_info.cycle)
+        in
+        let consumed_gas =
           Z.to_float
             (Gas.Arith.integral_to_z
-               (Gas.Arith.ceil protocol_data.consumed_gas));
-      }
+               (Gas.Arith.ceil protocol_data.consumed_gas))
+        in
+        Some (cycle, consumed_gas)
+  in
+  match proto_metrics with
+  | Some (cycle, consumed_gas) -> update_metrics_callback ~cycle ~consumed_gas
+  | None -> ()

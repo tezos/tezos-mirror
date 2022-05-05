@@ -79,11 +79,12 @@ module Proto_plugin : sig
    * allows to decode protocol data payload and provide back basic
    * types that can be used as metrics. *)
   module type PROTOMETRICS = sig
-    type t = {cycle : float; consumed_gas : float}
-
     val hash : Protocol_hash.t
 
-    val decode_metadata : bytes -> t
+    val update_metrics :
+      protocol_metadata:bytes ->
+      (cycle:float -> consumed_gas:float -> unit) ->
+      unit
   end
 
   (** Emtpy metrics module. All metrics are -1. *)
