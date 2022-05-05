@@ -308,7 +308,12 @@ let inbox ctxt rollup =
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some inbox -> return (inbox, ctxt)
 
-let assert_inbox_size_ok ctxt next_size =
+let assert_inbox_size_ok ctxt inbox extra_num_messages =
+  let next_size =
+    Z.add
+      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
+      (Z.of_int extra_num_messages)
+  in
   let max_size = Constants_storage.sc_rollup_max_available_messages ctxt in
   fail_unless
     Compare.Z.(next_size <= Z.of_int max_size)
@@ -336,12 +341,7 @@ let add_messages ctxt rollup messages =
       (0, 0, ctxt)
       messages
   in
-  let next_size =
-    Z.add
-      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
-      (Z.of_int num_messages)
-  in
-  let* () = assert_inbox_size_ok ctxt next_size in
+  let* () = assert_inbox_size_ok ctxt inbox num_messages in
   let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
   let* origination_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
   let levels =
