@@ -141,3 +141,27 @@ let commit ~time ?message (context : Environment_context.Context.t) =
       Environment_context.err_implementation_mismatch
         ~expected:"shell or memory"
         ~got:t.impl_name
+
+let commit_test_chain_genesis (context : Environment_context.Context.t)
+    block_header =
+  match context with
+  | Context {kind = Shell_context.Context; ctxt; _} ->
+      Context.commit_test_chain_genesis ctxt block_header
+  | Context {kind = Memory_context.Context; ctxt; _} ->
+      Tezos_context_memory.Context.commit_test_chain_genesis ctxt block_header
+  | Context t ->
+      Environment_context.err_implementation_mismatch
+        ~expected:"shell or memory"
+        ~got:t.impl_name
+
+let compute_testchain_genesis (context : Environment_context.Context.t)
+    block_hash =
+  match context with
+  | Context {kind = Shell_context.Context; _} ->
+      Context.compute_testchain_genesis block_hash
+  | Context {kind = Memory_context.Context; _} ->
+      Tezos_context_memory.Context.compute_testchain_genesis block_hash
+  | Context t ->
+      Environment_context.err_implementation_mismatch
+        ~expected:"shell or memory"
+        ~got:t.impl_name

@@ -1957,7 +1957,7 @@ let tezos_validation =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_context |> open_;
-        tezos_shell_context |> open_;
+        tezos_context_ops |> open_;
         tezos_shell_services |> open_;
         tezos_protocol_updater |> open_;
         tezos_stdlib_unix |> open_;
