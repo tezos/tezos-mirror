@@ -1218,10 +1218,17 @@ let _tezos_p2p_tests =
         astring;
       ]
     ~linkall:true
-    ~preprocess:[pps bisect_ppx ~args:["--bisect-sigterm"]]
     ~runtest:false
     ~dune:
-      Dune.
+      Dune.(
+        (* At the termination of the tests, or if an unexpected
+           error occurs, detached processes are terminated through a
+           SIGKILL.
+           See https://github.com/aantron/bisect_ppx/blob/master/doc/advanced.md#SIGTERM
+           See https://gitlab.com/tezos/tezos/-/issues/1946 *)
+        let run_exe prog args =
+          setenv "BISECT_SIGTERM" "yes" @@ run_exe prog args
+        in
         [
           alias_rule
             "runtest_p2p_socket"
@@ -1318,7 +1325,7 @@ let _tezos_p2p_tests =
                 "runtest_p2p_node";
                 "runtest_p2p_connect_handler";
               ];
-        ]
+        ])
 
 let tezos_context_sigs =
   public_lib

@@ -23,7 +23,6 @@
   tezos-p2p-services
   alcotest-lwt
   astring)
- (preprocess (pps bisect_ppx --bisect-sigterm))
  (link_flags (:standard -linkall))
  (flags
   (:standard
@@ -38,62 +37,72 @@
 (rule
  (alias runtest_p2p_socket)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_socket.exe})))
+ (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_socket.exe}))))
 
 (rule
  (alias runtest_p2p_pool)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5)))
+ (action
+  (setenv BISECT_SIGTERM yes
+   (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5))))
 
 (rule
  (alias runtest_p2p_io_scheduler)
  (locks /ports/49152-65535)
  (action
-  (run
-   %{exe:test_p2p_io_scheduler.exe}
-   --delay 5 --clients 8 --max-upload-speed 262144 --max-download-speed
-   1048576)))
+  (setenv BISECT_SIGTERM yes
+   (run
+    %{exe:test_p2p_io_scheduler.exe}
+    --delay 5 --clients 8 --max-upload-speed 262144 --max-download-speed
+    1048576))))
 
 (rule
  (alias runtest_p2p_socket_ipv4)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_socket.exe} --addr ::ffff:127.0.0.1)))
+ (action
+  (setenv BISECT_SIGTERM yes
+   (run %{exe:test_p2p_socket.exe} --addr ::ffff:127.0.0.1))))
 
 (rule
  (alias runtest_p2p_pool_ipv4)
  (locks /ports/49152-65535)
  (action
-  (run
-   %{exe:test_p2p_pool.exe}
-   --clients 10 --repeat 5 --addr ::ffff:127.0.0.1)))
+  (setenv BISECT_SIGTERM yes
+   (run
+    %{exe:test_p2p_pool.exe}
+    --clients 10 --repeat 5 --addr ::ffff:127.0.0.1))))
 
 (rule
  (alias runtest_p2p_io_scheduler_ipv4)
  (locks /ports/49152-65535)
  (action
-  (run
-   %{exe:test_p2p_io_scheduler.exe}
-   --delay 5 --clients 8 --max-upload-speed 262144 --max-download-speed
-   1048576 --addr ::ffff:127.0.0.1)))
+  (setenv BISECT_SIGTERM yes
+   (run
+    %{exe:test_p2p_io_scheduler.exe}
+    --delay 5 --clients 8 --max-upload-speed 262144 --max-download-speed
+    1048576 --addr ::ffff:127.0.0.1))))
 
-(rule (alias runtest_p2p_peerset) (action (run %{exe:test_p2p_peerset.exe})))
+(rule
+ (alias runtest_p2p_peerset)
+ (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_peerset.exe}))))
 
 (rule
  (alias runtest_p2p_buffer_reader)
- (action (run %{exe:test_p2p_buffer_reader.exe})))
+ (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_buffer_reader.exe}))))
 
 (rule
  (alias runtest_p2p_banned_peers)
- (action (run %{exe:test_p2p_banned_peers.exe})))
+ (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_banned_peers.exe}))))
 
 (rule
  (alias runtest_p2p_node)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_node.exe})))
+ (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_node.exe}))))
 
 (rule
  (alias runtest_p2p_connect_handler)
- (action (run %{exe:test_p2p_connect_handler.exe})))
+ (action
+  (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_connect_handler.exe}))))
 
 (rule
  (alias runtest)
