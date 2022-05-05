@@ -46,6 +46,8 @@ type error +=
   | (* `Temporary *) Sc_rollup_no_game
   | (* `Temporary *) Sc_rollup_staker_in_game
   | (* `Temporary *) Sc_rollup_timeout_level_not_reached
+  | (* `Temporary *)
+      Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
 let () =
   register_error_kind
@@ -90,6 +92,18 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_wrong_turn -> Some () | _ -> None)
     (fun () -> Sc_rollup_wrong_turn) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_max_number_of_messages_reached_for_commitment_period"
+    ~title:"Maximum number of messages reached for commitment period"
+    ~description:"Maximum number of messages reached for commitment period"
+    Data_encoding.unit
+    (function
+      | Sc_rollup_max_number_of_messages_reached_for_commitment_period ->
+          Some ()
+      | _ -> None)
+    (fun () -> Sc_rollup_max_number_of_messages_reached_for_commitment_period) ;
+
   let description = "Already staked." in
   register_error_kind
     `Temporary
@@ -319,9 +333,24 @@ let assert_inbox_size_ok ctxt inbox extra_num_messages =
     Compare.Z.(next_size <= Z.of_int max_size)
     Sc_rollup_max_number_of_available_messages_reached
 
+let assert_inbox_nb_messages_in_commitment_period inbox extra_messages =
+  let nb_messages_in_commitment_period =
+    Int64.add
+      (Sc_rollup_inbox_repr.number_of_messages_during_commitment_period inbox)
+      (Int64.of_int extra_messages)
+  in
+  let limit = Int64.of_int32 Sc_rollup_repr.Number_of_messages.max_int in
+  fail_when
+    Compare.Int64.(nb_messages_in_commitment_period > limit)
+    Sc_rollup_max_number_of_messages_reached_for_commitment_period
+
 let add_messages ctxt rollup messages =
+  let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_tzresult_syntax in
   let open Raw_context in
+  let commitment_period =
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
+  in
   let* inbox, ctxt = inbox ctxt rollup in
   let* num_messages, total_messages_size, ctxt =
     List.fold_left_es
@@ -342,6 +371,26 @@ let add_messages ctxt rollup messages =
       messages
   in
   let* () = assert_inbox_size_ok ctxt inbox num_messages in
+  let start =
+    Sc_rollup_inbox_repr.starting_level_of_current_commitment_period inbox
+  in
+  let freshness = Raw_level_repr.diff level start in
+  let inbox =
+    let open Int32 in
+    let open Compare.Int32 in
+    if freshness >= commitment_period then (
+      let nb_periods =
+        to_int ((mul (div freshness commitment_period)) commitment_period)
+      in
+      let new_starting_level = Raw_level_repr.(add start nb_periods) in
+      assert (Raw_level_repr.(new_starting_level <= level)) ;
+      assert (
+        rem (Raw_level_repr.diff new_starting_level start) commitment_period
+        = 0l) ;
+      Sc_rollup_inbox_repr.start_new_commitment_period inbox new_starting_level)
+    else inbox
+  in
+  let* () = assert_inbox_nb_messages_in_commitment_period inbox num_messages in
   let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
   let* origination_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
   let levels =
@@ -356,7 +405,6 @@ let add_messages ctxt rollup messages =
     Sc_rollup_costs.cost_add_messages ~num_messages ~total_messages_size levels
   in
   let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_messages in
-  let {Level_repr.level; _} = Raw_context.current_level ctxt in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup

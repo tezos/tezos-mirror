@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1733,6 +1734,46 @@ let test_carbonated_memory_inbox_set_messages () =
   let consumed_gas = check_gas_consumed ~since:ctxt ~until:ctxt' in
   Assert.equal_int ~loc:__LOC__ consumed_gas 201
 
+let test_limit_on_number_of_messages_during_commitment_period with_gap () =
+  let* ctxt = new_context () in
+  let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
+  let commitment_period =
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
+  in
+  let max_number = Int32.to_int Sc_rollup_repr.Number_of_messages.max_int in
+  let*? payload =
+    List.init
+      ~when_negative_length:[]
+      (1 + (max_number / (commitment_period - 1)))
+    @@ fun _ -> "a"
+  in
+  let*! add_too_many_messages =
+    List.fold_left_es
+      (fun ctxt i ->
+        let ctxt =
+          if with_gap && i = commitment_period / 2 then
+            Raw_context.Internal_for_tests.add_level ctxt commitment_period
+          else ctxt
+        in
+        let* (_inbox, _size_diff, ctxt) =
+          lift @@ Sc_rollup_storage.add_messages ctxt rollup payload
+        in
+        return ctxt)
+      ctxt
+      (1 -- (commitment_period - 1))
+  in
+  if with_gap then
+    (* Changing the commitment period is enough to accept that many messages... *)
+    let*? _r = add_too_many_messages in
+    return ()
+  else
+    (* ... but if we stay in the same commitment period, it fails. *)
+    Assert.proto_error ~loc:__LOC__ add_too_many_messages @@ function
+    | Sc_rollup_storage
+      .Sc_rollup_max_number_of_messages_reached_for_commitment_period ->
+        true
+    | _ -> false
+
 let tests =
   [
     Tztest.tztest
@@ -1935,6 +1976,16 @@ let tests =
       "Setting messages in in-memory message inbox consumes gas"
       `Quick
       test_carbonated_memory_inbox_set_messages;
+    Tztest.tztest
+      "The number of messages pushed during commitment period stays under \
+       limit (without gap)"
+      `Quick
+      (test_limit_on_number_of_messages_during_commitment_period false);
+    Tztest.tztest
+      "The number of messages pushed during commitment period stays under \
+       limit (with gap)"
+      `Quick
+      (test_limit_on_number_of_messages_during_commitment_period true);
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460

@@ -142,6 +142,8 @@ type error +=
       Sc_rollup_staker_in_game
   | (* `Temporary *)
       Sc_rollup_bad_inbox_level
+  | (* `Temporary *)
+      Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
 (** Module [Internal] implements functions that are used only internally by
     the [Sc_rollup_storage] module, but need to be exposed in tests or
@@ -182,7 +184,9 @@ val kind :
 
     May fail with:
     {ul
-      {li [sc_rollup_max_available_messages] if [inbox] is full}
+      {li [Sc_rollup_max_available_messages] if [inbox] is full}
+      {li [Sc_rollup_max_number_of_messages_reached_for_commitment_period] if
+      the number of messages pushed during commitment period is too high}
     }
 *)
 val add_messages :
