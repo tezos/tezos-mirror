@@ -44,6 +44,8 @@ type t = {
   kind : Sc_rollup.Kind.t;  (** Kind of the smart contract rollup. *)
   fee_parameter : Injection.fee_parameter;
       (** Fee parameter to use when injecting operations in layer 1. *)
+  protocol_constants : Constants.t;
+      (** Protocol constants retrieved from the Tezos node. *)
 }
 
 (** [get_operator_keys cctxt] returns a triple [(pkh, pk, sk)] corresponding

@@ -35,12 +35,22 @@ type t = {
   block_finality_time : int;
   kind : Sc_rollup.Kind.t;
   fee_parameter : Injection.fee_parameter;
+  protocol_constants : Constants.t;
 }
 
 let get_operator_keys node_ctxt =
   let open Lwt_result_syntax in
   let+ _, pk, sk = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
   (node_ctxt.operator, pk, sk)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
+   The constants are retrieved from the latest tezos block. These constants can
+   be different from the ones used at the creation at the rollup because of a
+   protocol amendment that modifies some of them. This need to be fixed when the
+   rollup nodes will be able to handle the migration of protocol.
+*)
+let retrieve_constants cctxt =
+  Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
 let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address operator
     fee_parameter =
@@ -51,6 +61,7 @@ let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address operator
       (cctxt#chain, cctxt#block)
       rollup_address
   in
+  let* protocol_constants = retrieve_constants cctxt in
   let+ kind =
     Plugin.RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
   in
@@ -63,4 +74,5 @@ let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address operator
     kind;
     block_finality_time = 2;
     fee_parameter;
+    protocol_constants;
   }
