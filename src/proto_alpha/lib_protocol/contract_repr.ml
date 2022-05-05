@@ -150,6 +150,24 @@ let encoding =
     ~to_b58check
     ~of_b58data:contract_of_b58data
 
+let implicit_encoding =
+  encoding_gen
+    ~id_extra:".implicit"
+    ~title_extra:" -- implicit account"
+    ~can_be:"implicit contract hash."
+    ~cases:(fun proj inj -> [implicit_case ~proj ~inj])
+    ~to_b58check:Signature.Public_key_hash.to_b58check
+    ~of_b58data:implicit_of_b58data
+
+let originated_encoding =
+  encoding_gen
+    ~id_extra:".originated"
+    ~title_extra:" -- originated account"
+    ~can_be:"originated contract hash."
+    ~cases:(fun proj inj -> [originated_case ~proj ~inj])
+    ~to_b58check:Contract_hash.to_b58check
+    ~of_b58data:originated_of_b58data
+
 let () =
   let open Data_encoding in
   register_error_kind
