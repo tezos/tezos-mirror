@@ -180,6 +180,21 @@ val get_operations :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /chain/[chain]/blocks/[block]/operations/[validation_pass] if
+  [operation_offset] is unset
+
+  Call RPC /chain/[chain]/blocks/[block]/operations/[validation_pass]/[operation_offset] otherwise.
+ *)
+val get_operations_of_validation_pass :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?operation_offset:int ->
+  validation_pass:int ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /chains/[chain]/mempool/pending_operations *)
 val get_mempool_pending_operations :
   ?endpoint:Client.endpoint ->

@@ -101,6 +101,21 @@ let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "operations"] in
   Client.rpc ?endpoint ?hooks GET path client
 
+let get_operations_of_validation_pass ?endpoint ?hooks ?(chain = "main")
+    ?(block = "head") ?operation_offset ~validation_pass client =
+  let path =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operations";
+      string_of_int validation_pass;
+    ]
+    @ match operation_offset with None -> [] | Some m -> [string_of_int m]
+  in
+  Client.rpc ?endpoint ?hooks GET path client
+
 let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
     ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
