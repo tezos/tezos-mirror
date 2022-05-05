@@ -51,6 +51,7 @@ type t = {
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
   signers : Node_config.signers;
+  caps : Node_config.caps;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
@@ -448,8 +449,9 @@ let init_head (stores : Stores.t) context_index rollup rollup_info =
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
-let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
-    ~l2_blocks_cache_size ~(signers : Node_config.signers) rollup =
+let init (cctxt : #Protocol_client_context.full) ~data_dir ?(readonly = false)
+    ?rollup_genesis ~l2_blocks_cache_size ~(signers : Node_config.signers) ~caps
+    rollup =
   let open Lwt_result_syntax in
   let*! stores =
     Stores.init ~data_dir ~readonly ~blocks_cache_size:l2_blocks_cache_size
@@ -474,4 +476,5 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       tezos_blocks_cache;
       constants;
       signers;
+      caps;
     }

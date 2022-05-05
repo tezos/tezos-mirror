@@ -828,6 +828,7 @@ let run configuration cctxt =
     signers;
     reconnection_delay;
     l2_blocks_cache_size;
+    caps;
     _;
   } =
     configuration
@@ -838,6 +839,7 @@ let run configuration cctxt =
       ~data_dir
       ~l2_blocks_cache_size
       ~signers
+      ~caps
       ?rollup_genesis
       rollup_id
   in

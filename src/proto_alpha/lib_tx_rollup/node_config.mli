@@ -41,14 +41,23 @@ type mode =
       (** This mode allows to tweak which operations are injected by selecting the
           signers *)
 
-type signers = {
-  operator : Signature.public_key_hash option;
-  submit_batch : Signature.public_key_hash option;
-  finalize_commitment : Signature.public_key_hash option;
-  remove_commitment : Signature.public_key_hash option;
-  rejection : Signature.public_key_hash option;
-  dispatch_withdrawals : Signature.public_key_hash option;
+type 'a purposed = {
+  operator : 'a;
+  submit_batch : 'a;
+  finalize_commitment : 'a;
+  remove_commitment : 'a;
+  rejection : 'a;
+  dispatch_withdrawals : 'a;
 }
+
+type signers = Signature.public_key_hash option purposed
+
+type cost_caps = {
+  fee_cap : Protocol.Alpha_context.Tez.t;
+  burn_cap : Protocol.Alpha_context.Tez.t;
+}
+
+type caps = cost_caps purposed
 
 type t = {
   data_dir : string;
@@ -60,6 +69,7 @@ type t = {
   signers : signers;
   allow_deposit : bool;
   l2_blocks_cache_size : int;
+  caps : caps;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -74,6 +84,12 @@ val default_reconnection_delay : float
 (** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
     cached by the rollup node *)
 val default_l2_blocks_cache_size : int
+
+(** The default fees/burn caps *)
+val default_cost_caps : cost_caps
+
+(** The default fees/burn caps for operations of the injector *)
+val default_caps : caps
 
 val modes : mode list
 
