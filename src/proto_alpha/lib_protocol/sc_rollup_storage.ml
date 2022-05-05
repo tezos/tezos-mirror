@@ -361,7 +361,7 @@ let add_messages ctxt rollup messages =
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
-    *)
+  *)
   let* current_messages, inbox =
     Sc_rollup_inbox_repr.(
       add_messages_no_history inbox level messages current_messages)
