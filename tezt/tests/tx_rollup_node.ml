@@ -567,6 +567,49 @@ let build_commitment_info ~tx_level ~tx_rollup_hash ~tx_node ~client =
   in
   return {roots; context_hashes; predecessor; inbox_merkle_root}
 
+let check_commitment_content block ~tx_level ~tx_rollup_hash ~tx_node ~client =
+  let* expected =
+    build_commitment_info ~tx_level ~tx_rollup_hash ~tx_node ~client
+  in
+  let commitment = JSON.(block |-> "commitment") in
+  let predecessor = JSON.(commitment |-> "predecessor" |> as_string_opt) in
+  (if predecessor <> expected.predecessor then
+   let to_string = Option.value ~default:"None" in
+   Test.fail
+     "Commitment predecessor for level %d is %s but should be %s"
+     tx_level
+     (to_string predecessor)
+     (to_string expected.predecessor)) ;
+  let messages =
+    JSON.(commitment |-> "messages" |> as_list |> List.map as_string)
+  in
+  (if messages <> expected.roots then
+   let to_string =
+     let pp = Format.pp_print_list Format.pp_print_string in
+     Format.asprintf "%a" pp
+   in
+   Test.fail
+     "Commitment roots for level %d is %s but should be %s"
+     tx_level
+     (to_string messages)
+     (to_string expected.roots)) ;
+  let inbox = JSON.(commitment |-> "inbox_merkle_root" |> as_string) in
+  if inbox <> expected.inbox_merkle_root then
+    Test.fail
+      "Commitment inbox merkle root for level %d is %s but should be %s"
+      tx_level
+      inbox
+      expected.inbox_merkle_root ;
+  unit
+
+let check_commitments_content ~tx_node ~tx_rollup_hash ~client list =
+  Lwt_list.iter_p
+    (fun block ->
+      let tx_level = int_of_string block in
+      let* block = Rollup_node.Client.get_block ~tx_node ~block in
+      check_commitment_content block ~tx_level ~tx_rollup_hash ~tx_node ~client)
+    list
+
 type rejection_info = {
   proof : string;
   message : string;
@@ -1901,6 +1944,13 @@ let test_committer =
         check_commitments_inclusion
           ~tx_node
           [("0", true); ("1", true); ("2", true); ("3", false)]
+      in
+      let* () =
+        check_commitments_content
+          ~tx_node
+          ~tx_rollup_hash
+          ~client
+          ["0"; "1"; "2"; "3"]
       in
       unit)
 
