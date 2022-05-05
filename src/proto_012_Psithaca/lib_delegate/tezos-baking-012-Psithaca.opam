@@ -27,7 +27,6 @@ depends: [
   "tezos-rpc-http"
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
-  "tezos-tooling"
   "tezos-client-base-unix"
   "tezos-protocol-012-Psithaca-parameters"
   "tezos-mockup"

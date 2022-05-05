@@ -1141,13 +1141,13 @@ let _tezos_shell_service_test_helpers_tests =
         alcotest_lwt;
       ]
 
-let tezos_tooling =
+let _tezos_tooling =
   public_lib
     "tezos-tooling"
     ~path:"src/tooling"
     ~synopsis:"Tezos: tooling for the project"
     ~modules:[]
-    ~deps:
+    ~opam_only_deps:
       [
         bisect_ppx;
         (* These next are only used in the CI, we add this dependency so that
@@ -1217,7 +1217,6 @@ let _tezos_p2p_tests =
         alcotest_lwt;
         astring;
       ]
-    ~opam_only_deps:[tezos_tooling]
     ~linkall:true
     ~preprocess:[pps bisect_ppx ~args:["--bisect-sigterm"]]
     ~runtest:false
@@ -3183,7 +3182,6 @@ end = struct
             lwt_canceler;
             lwt_exit;
           ]
-        ~opam_only_deps:(if N.(number <= 011) then [] else [tezos_tooling])
         ~linkall:true
         ~all_modules_except:
           (if N.(number <= 011) then
@@ -3680,7 +3678,6 @@ end = struct
             test_helpers |> open_;
             tezos_sapling;
             client |> if_some |> open_;
-            tezos_tooling;
             tezos_protocol_environment;
           ]
         ~linkall:true
