@@ -192,6 +192,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_management_protocol.mli sc_rollup_management_protocol.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
    sc_rollup_PVM_sem.ml
    sc_rollup_game.mli sc_rollup_game.ml
@@ -381,6 +382,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_management_protocol.mli sc_rollup_management_protocol.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
    sc_rollup_PVM_sem.ml
    sc_rollup_game.mli sc_rollup_game.ml
@@ -570,6 +572,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_management_protocol.mli sc_rollup_management_protocol.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
    sc_rollup_PVM_sem.ml
    sc_rollup_game.mli sc_rollup_game.ml
@@ -781,6 +784,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_ticket
    Script_interpreter_defs
    Script_interpreter
+   Sc_rollup_management_protocol
    Sc_rollup_operations
    Sc_rollup_PVM_sem
    Sc_rollup_game
@@ -1011,6 +1015,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_management_protocol.mli sc_rollup_management_protocol.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
    sc_rollup_PVM_sem.ml
    sc_rollup_game.mli sc_rollup_game.ml
