@@ -237,3 +237,22 @@ let inject_batcher_transaction ?expect_failure tx_client ~transactions_and_sig =
          ["inject"; "batcher"; "transaction"; JSON.encode transactions_and_sig]
   in
   Lwt.return out
+
+module RPC = struct
+  let get tx_client uri =
+    let* out =
+      spawn_command tx_client ["rpc"; "get"; uri]
+      |> Process.check_and_read_stdout
+    in
+    Lwt.return out
+
+  let post tx_client ?data uri =
+    let data =
+      Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
+    in
+    let* out =
+      spawn_command tx_client (["rpc"; "post"; uri] @ data)
+      |> Process.check_and_read_stdout
+    in
+    Lwt.return out
+end

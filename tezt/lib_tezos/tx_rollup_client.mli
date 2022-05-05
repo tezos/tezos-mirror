@@ -106,3 +106,9 @@ val inject_batcher_transaction :
   t ->
   transactions_and_sig:JSON.t ->
   (string * string) Lwt.t
+
+module RPC : sig
+  val get : t -> string -> string Lwt.t
+
+  val post : t -> ?data:Ezjsonm.value -> string -> string Lwt.t
+end
