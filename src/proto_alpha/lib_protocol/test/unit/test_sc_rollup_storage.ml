@@ -301,6 +301,31 @@ let test_publish () =
      in
      assert_true ctxt
 
+let test_withdraw_and_cement () =
+  let* (ctxt, rollup, staker1, staker2) =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* (c1, ctxt) =
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
+  in
+  let* ctxt = lift @@ Sc_rollup_storage.withdraw_stake ctxt rollup staker2 in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
+  assert_true ctxt
+
 let test_deposit_then_publish () =
   let* ctxt = new_context () in
   lift
@@ -1605,6 +1630,10 @@ let tests =
       test_deposit_then_refine_bad_inbox;
     Tztest.tztest "stake on existing node" `Quick test_stake_on_existing_node;
     Tztest.tztest "publish commitment" `Quick test_publish;
+    Tztest.tztest
+      "withdraw stake of another staker before cementing"
+      `Quick
+      test_withdraw_and_cement;
     Tztest.tztest "stake then publish" `Quick test_deposit_then_publish;
     Tztest.tztest "publish with no rollup" `Quick test_publish_missing_rollup;
     Tztest.tztest
