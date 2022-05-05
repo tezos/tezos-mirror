@@ -22,7 +22,6 @@
   tezos-alpha-test-helpers
   tezos-sapling
   tezos-client-alpha
-  tezos-tooling
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags

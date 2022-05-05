@@ -22,7 +22,6 @@
   tezos-013-PtJakart-test-helpers
   tezos-sapling
   tezos-client-013-PtJakart
-  tezos-tooling
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags

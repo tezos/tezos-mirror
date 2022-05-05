@@ -27,7 +27,6 @@ depends: [
   "tezos-rpc-http"
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
-  "tezos-tooling"
   "data-encoding" { >= "0.5.3" & < "0.6" }
   "tezos-client-base-unix"
   "tezos-protocol-alpha-parameters"

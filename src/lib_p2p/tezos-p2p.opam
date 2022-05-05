@@ -24,7 +24,6 @@ depends: [
   "tezos-event-logging-test-helpers" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "astring" {with-test}
-  "tezos-tooling" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

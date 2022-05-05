@@ -22,7 +22,6 @@
   tezos-012-Psithaca-test-helpers
   tezos-sapling
   tezos-client-012-Psithaca
-  tezos-tooling
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
