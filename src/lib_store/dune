@@ -12,6 +12,7 @@
   index
   irmin-pack
   tezos-context
+  tezos-shell-context
   tezos-validation
   tezos-protocol-updater
   tezos-stdlib-unix

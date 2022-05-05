@@ -185,6 +185,9 @@ module MakeAbstract
       Store.Block.header predecessor
     in
     let* predecessor_context = Chain_store.context chain_store predecessor in
+    let predecessor_context =
+      Shell_context.wrap_disk_context predecessor_context
+    in
     let predecessor_hash = Store.Block.hash predecessor in
     let*! predecessor_context =
       Block_validation.update_testchain_status
@@ -203,9 +206,6 @@ module MakeAbstract
           with
           | None -> failwith "Invalid block header"
           | Some protocol_data -> return_some protocol_data)
-    in
-    let predecessor_context =
-      Shell_context.wrap_disk_context predecessor_context
     in
     let* state =
       Proto.begin_construction

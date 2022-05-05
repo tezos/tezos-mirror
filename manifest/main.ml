@@ -1976,6 +1976,7 @@ let tezos_store =
         index;
         irmin_pack;
         tezos_context |> open_;
+        tezos_shell_context;
         tezos_validation |> open_;
         tezos_protocol_updater |> open_;
         tezos_stdlib_unix |> open_;
@@ -2149,6 +2150,7 @@ let tezos_validator_lib =
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
         tezos_context |> open_;
+        tezos_context_ops |> open_;
         tezos_stdlib_unix |> open_;
         tezos_protocol_environment;
         tezos_shell |> open_;

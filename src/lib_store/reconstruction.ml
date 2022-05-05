@@ -208,6 +208,9 @@ let apply_context context_index chain_id ~user_activated_upgrades
           (Store_errors.Cannot_checkout_context
              (Store.Block.hash predecessor_block, context_hash))
   in
+  let predecessor_context =
+    Tezos_shell_context.Shell_context.wrap_disk_context predecessor_context
+  in
   let apply_environment =
     {
       Block_validation.max_operations_ttl =
