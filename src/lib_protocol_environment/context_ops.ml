@@ -35,6 +35,20 @@ let mem (context : Environment_context.Context.t) key =
         ~expected:"shell or memory"
         ~got:t.impl_name
 
+let add_protocol (context : Environment_context.Context.t) proto_hash =
+  let open Lwt_syntax in
+  match context with
+  | Context {kind = Shell_context.Context; ctxt; _} ->
+      let+ ctxt = Context.add_protocol ctxt proto_hash in
+      Shell_context.wrap_disk_context ctxt
+  | Context {kind = Memory_context.Context; ctxt; _} ->
+      let+ ctxt = Tezos_context_memory.Context.add_protocol ctxt proto_hash in
+      Memory_context.wrap_memory_context ctxt
+  | Context t ->
+      Environment_context.err_implementation_mismatch
+        ~expected:"shell or memory"
+        ~got:t.impl_name
+
 let get_protocol (context : Environment_context.Context.t) =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} -> Context.get_protocol ctxt
@@ -112,6 +126,17 @@ let add_test_chain (context : Environment_context.Context.t) status =
   | Context {kind = Memory_context.Context; ctxt; _} ->
       let+ ctxt = Tezos_context_memory.Context.add_test_chain ctxt status in
       Memory_context.wrap_memory_context ctxt
+  | Context t ->
+      Environment_context.err_implementation_mismatch
+        ~expected:"shell or memory"
+        ~got:t.impl_name
+
+let commit ~time ?message (context : Environment_context.Context.t) =
+  match context with
+  | Context {kind = Shell_context.Context; ctxt; _} ->
+      Context.commit ~time ?message ctxt
+  | Context {kind = Memory_context.Context; ctxt; _} ->
+      Tezos_context_memory.Context.commit ~time ?message ctxt
   | Context t ->
       Environment_context.err_implementation_mismatch
         ~expected:"shell or memory"
