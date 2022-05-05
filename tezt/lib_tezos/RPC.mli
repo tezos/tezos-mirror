@@ -1047,6 +1047,16 @@ module Sc_rollup : sig
     sc_rollup_address:string ->
     Client.t ->
     JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/lcc_hash_with_level *)
+  val get_last_cemented_commitment_hash_with_level :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    sc_rollup_address:string ->
+    Client.t ->
+    JSON.t Lwt.t
 end
 
 val raw_bytes :
