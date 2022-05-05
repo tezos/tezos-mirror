@@ -1,6 +1,7 @@
 (lang dune 2.9)
 (formatting (enabled_for ocaml))
 (cram enable)
+(package (name internal-devtools))
 (package (name tezos-accuser-012-Psithaca))
 (package (name tezos-accuser-013-PtJakart))
 (package (name tezos-accuser-alpha))

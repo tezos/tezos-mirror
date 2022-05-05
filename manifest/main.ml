@@ -3814,6 +3814,18 @@ let _node_wrapper =
     ~modules:["node_wrapper"]
     ~bisect_ppx:false
 
+let _git_gas_diff =
+  public_exe
+    "git-gas-diff"
+    ~path:"devtools/git-gas-diff/bin"
+    ~synopsis:"Internal dev tools"
+    ~internal_name:"main"
+    ~opam:"internal-devtools"
+    ~deps:[external_lib "num" V.True; re]
+    ~static:false
+    ~release:false
+    ~bisect_ppx:false
+
 let _tezos_protocol_compiler_bin =
   public_exe
     "tezos-protocol-compiler"
@@ -4236,7 +4248,6 @@ let exclude filename =
   | "vendors" :: _ -> true
   | "scripts" :: _ -> true
   | "docs" :: _ -> true
-  | "devtools" :: _ -> true
   (* tezt is partially managed by the manifest. *)
   | "tezt" :: "long_tests" :: _ -> true
   | "tezt" :: "manual_tests" :: _ -> true

@@ -1,4 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
- (public_name git-gas-diff)
  (name main)
- (libraries num re))
+ (public_name git-gas-diff)
+ (package internal-devtools)
+ (libraries
+  num
+  re))

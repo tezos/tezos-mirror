@@ -1,8 +1,0 @@
-(lang dune 2.9)
-(name git-gas-diff)
-
-(package
- (name git-gas-diff)
- (depends
-  (num (>= 1.4))
-  (re (>= 10.1.3))))
