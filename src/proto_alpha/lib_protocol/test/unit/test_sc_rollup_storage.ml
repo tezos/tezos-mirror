@@ -630,6 +630,42 @@ let test_cement_deadline_uses_oldest_add_time () =
   let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
 
+let test_last_cemented_commitment_hash_with_level () =
+  let* ctxt = new_context () in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let inbox_level = Raw_level_repr.of_int32_exn 21l in
+  let* ctxt = lift @@ Sc_rollup_storage.deposit_stake ctxt rollup staker in
+  let commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        inbox_level;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* (c1, ctxt) =
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
+  let* (c1', inbox_level', ctxt) =
+    lift
+    @@ Sc_rollup_storage.last_cemented_commitment_hash_with_level ctxt rollup
+  in
+  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c1' in
+  Assert.equal_int32
+    ~loc:__LOC__
+    (Raw_level_repr.to_int32 inbox_level)
+    (Raw_level_repr.to_int32 inbox_level')
+
 let test_withdrawal_fails_when_not_staked_on_lcc () =
   let* ctxt = new_context () in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
@@ -1336,6 +1372,11 @@ let test_last_cemented_commitment_of_missing_rollup () =
     ~loc:__LOC__
     Sc_rollup_storage.last_cemented_commitment
 
+let test_last_cemented_commitment_hash_with_level_of_missing_rollup () =
+  assert_fails_with_missing_rollup
+    ~loc:__LOC__
+    Sc_rollup_storage.last_cemented_commitment_hash_with_level
+
 let test_cement_commitment_of_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
       Sc_rollup_storage.cement_commitment
@@ -1604,6 +1645,10 @@ let tests =
       "cement deadline uses oldest add time"
       `Quick
       test_cement_deadline_uses_oldest_add_time;
+    Tztest.tztest
+      "last cemented commitment hash and level returns correct information"
+      `Quick
+      test_last_cemented_commitment_hash_with_level;
     Tztest.tztest "cement with two stakers" `Quick test_cement_with_two_stakers;
     Tztest.tztest "no cement on conflict" `Quick test_no_cement_on_conflict;
     Tztest.tztest
@@ -1678,6 +1723,10 @@ let tests =
       "fetching last final commitment of missing rollup fails"
       `Quick
       test_last_cemented_commitment_of_missing_rollup;
+    Tztest.tztest
+      "fetching last final commitment hash and level of missing rollup fails"
+      `Quick
+      test_last_cemented_commitment_hash_with_level_of_missing_rollup;
     Tztest.tztest
       "Finalizing commitment of missing rollup fails"
       `Quick

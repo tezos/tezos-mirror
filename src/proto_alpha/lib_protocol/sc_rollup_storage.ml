@@ -775,3 +775,15 @@ let get_boot_sector ctxt rollup =
   match boot_sector with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some boot_sector -> return boot_sector
+
+let last_cemented_commitment_hash_with_level ctxt rollup =
+  let open Lwt_tzresult_syntax in
+  let* (commitment_hash, ctxt) = last_cemented_commitment ctxt rollup in
+  if Commitment_hash.(commitment_hash = zero) then
+    let+ initial_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
+    (commitment_hash, initial_level, ctxt)
+  else
+    let+ ({inbox_level; _}, ctxt) =
+      get_commitment_internal ctxt rollup commitment_hash
+    in
+    (commitment_hash, inbox_level, ctxt)
