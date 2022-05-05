@@ -1793,9 +1793,8 @@ let as_opam_monorepo_opam_provided = function
   | Target.Opam_only {can_vendor = false; name; _} -> Some name
   | _ -> None
 
-let generate_opam ?release this_package (internals : Target.internal list) :
+let generate_opam ?release for_package (internals : Target.internal list) :
     Opam.t =
-  let for_package = this_package in
   let map l f = List.map f l in
   let (depends, x_opam_monorepo_opam_provided) =
     List.split @@ map internals
@@ -1910,15 +1909,6 @@ let generate_opam ?release this_package (internals : Target.internal list) :
         [
           {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = false};
           build;
-          {
-            Opam.command =
-              [
-                S "mv";
-                S (Filename.dirname this_package ^ "/%{name}%.install");
-                S "./";
-              ];
-            with_test = false;
-          };
           runtest;
         ]
   in
