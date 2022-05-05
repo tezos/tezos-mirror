@@ -1473,7 +1473,11 @@ module Ticket_hash : sig
 end
 
 module Contract : sig
-  include BASIC_DATA
+  type t =
+    | Implicit of Signature.Public_key_hash.t
+    | Originated of Contract_hash.t
+
+  include BASIC_DATA with type t := t
 
   val in_memory_size : t -> Cache_memory_helpers.sint
 
@@ -1482,12 +1486,6 @@ module Contract : sig
   val to_b58check : t -> string
 
   val of_b58check : string -> t tzresult
-
-  val implicit_contract : public_key_hash -> t
-
-  val is_implicit : t -> public_key_hash option
-
-  val is_originated : t -> Contract_hash.t option
 
   val exists : context -> t -> bool Lwt.t
 

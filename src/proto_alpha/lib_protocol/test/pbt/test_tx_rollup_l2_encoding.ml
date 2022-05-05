@@ -91,9 +91,7 @@ let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
      we could introduce a bit more randomness here *)
   let ticketer_b58 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
   let ticketer_pkh = Signature.Public_key_hash.of_b58check_exn ticketer_b58 in
-  let ticketer =
-    Protocol.Alpha_context.Contract.implicit_contract ticketer_pkh
-  in
+  let ticketer = Protocol.Alpha_context.Contract.Implicit ticketer_pkh in
   Tx_rollup_l2_helpers.make_unit_ticket_key ticketer l2_address
 
 let idx_ticket_hash_idx_gen :

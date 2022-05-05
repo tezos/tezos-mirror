@@ -89,7 +89,7 @@ let test_invariants () =
      why we go through new_account as an intermediate *)
   Context.Contract.balance (B genesis) contract2 >>=? fun spendable_balance2 ->
   let new_account = (Account.new_account ()).pkh in
-  let new_contract = Contract.implicit_contract new_account in
+  let new_contract = Contract.Implicit new_account in
   (* we first put some money in new_account *)
   Op.transaction (B genesis) contract2 new_contract spendable_balance2
   >>=? fun transfer ->
@@ -419,7 +419,7 @@ let test_frozen_deposits_with_delegation () =
   >>=? fun initial_frozen_deposits ->
   Context.Contract.balance (B genesis) contract2 >>=? fun delegated_amount ->
   let new_account = Account.new_account () in
-  let new_contract = Contract.implicit_contract new_account.pkh in
+  let new_contract = Contract.Implicit new_account.pkh in
   Op.transaction (B genesis) contract2 new_contract delegated_amount
   >>=? fun transfer ->
   Block.bake ~operation:transfer genesis >>=? fun b ->
@@ -484,7 +484,7 @@ let test_frozen_deposits_with_overdelegation () =
   Context.Contract.balance (B genesis) contract1 >>=? fun amount ->
   Context.Contract.balance (B genesis) contract2 >>=? fun amount' ->
   let new_account = (Account.new_account ()).pkh in
-  let new_contract = Contract.implicit_contract new_account in
+  let new_contract = Contract.Implicit new_account in
   Op.transaction (B genesis) contract1 new_contract amount >>=? fun transfer1 ->
   Op.transaction (B genesis) contract2 new_contract amount'
   >>=? fun transfer2 ->
@@ -564,7 +564,7 @@ let test_set_limit_with_overdelegation () =
   let amount' = Test_tez.(initial_staking_balance' *! 8L /! 10L) in
   let limit = Test_tez.(initial_staking_balance *! 15L /! 100L) in
   let new_account = (Account.new_account ()).pkh in
-  let new_contract = Contract.implicit_contract new_account in
+  let new_contract = Contract.Implicit new_account in
   Op.transaction (B genesis) contract1 new_contract amount >>=? fun transfer1 ->
   Op.transaction (B genesis) contract2 new_contract amount'
   >>=? fun transfer2 ->
@@ -627,7 +627,7 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
      than [new_cycle + preserved_cycles]. *)
   Context.Contract.balance (B genesis) contract2 >>=? fun delegated_amount ->
   let new_account = Account.new_account () in
-  let new_contract = Contract.implicit_contract new_account.pkh in
+  let new_contract = Contract.Implicit new_account.pkh in
   Op.transaction (B genesis) contract2 new_contract delegated_amount
   >>=? fun transfer ->
   Block.bake ~operation:transfer genesis >>=? fun b ->

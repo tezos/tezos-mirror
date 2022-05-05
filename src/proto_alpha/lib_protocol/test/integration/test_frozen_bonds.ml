@@ -75,13 +75,13 @@ let create_context () =
 let init_test ~user_is_delegate =
   create_context () >>=? fun (ctxt, _) ->
   let (delegate, delegate_pk, _) = Signature.generate_key () in
-  let delegate_contract = Contract.implicit_contract delegate in
-  let delegate_account = `Contract (Contract.implicit_contract delegate) in
+  let delegate_contract = Contract.Implicit delegate in
+  let delegate_account = `Contract (Contract.Implicit delegate) in
   let user_contract =
     if user_is_delegate then delegate_contract
     else
       let (user, _, _) = Signature.generate_key () in
-      Contract.implicit_contract user
+      Contract.Implicit user
   in
   let user_account = `Contract user_contract in
   (* Allocate contracts for user and delegate. *)
@@ -321,7 +321,7 @@ let test_scenario scenario =
   init_test ~user_is_delegate:false
   >>=? fun (ctxt, user_contract, user_account, delegate1) ->
   let (delegate2, delegate_pk2, _) = Signature.generate_key () in
-  let delegate_contract2 = Contract.implicit_contract delegate2 in
+  let delegate_contract2 = Contract.Implicit delegate2 in
   let delegate_account2 = `Contract delegate_contract2 in
   let delegate_balance2 = big_random_amount () in
   Token.transfer ctxt `Minted delegate_account2 delegate_balance2

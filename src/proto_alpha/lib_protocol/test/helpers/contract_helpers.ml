@@ -32,9 +32,7 @@ open Error_monad_operators
 let init () =
   Context.init3 ~consensus_threshold:0 () >|=? fun (b, (src0, src1, src2)) ->
   let baker =
-    match Alpha_context.Contract.is_implicit src0 with
-    | Some v -> v
-    | None -> assert false
+    match src0 with Implicit v -> v | Originated _ -> assert false
   in
   (b, baker, src1, src2)
 
@@ -59,7 +57,7 @@ let originate_contract file storage src b baker =
   Incremental.add_operation incr operation >>=? fun incr ->
   Incremental.finalize_block incr >|=? fun b -> (dst, b)
 
-let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
+let default_source = Contract.Implicit Signature.Public_key_hash.zero
 
 let default_step_constants =
   Script_interpreter.

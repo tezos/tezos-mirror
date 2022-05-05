@@ -246,7 +246,7 @@ let () = Registration_helpers.register (module Has_tickets_type_benchmark)
 let ticket_sampler rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
   let (pkh, _, _) = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
-  let ticketer = Alpha_context.Contract.implicit_contract pkh in
+  let ticketer = Alpha_context.Contract.Implicit pkh in
   Script_typed_ir.
     {ticketer; contents = Script_int.zero; amount = Script_int.one_n}
 

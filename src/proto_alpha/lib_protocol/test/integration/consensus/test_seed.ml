@@ -74,7 +74,7 @@ let test_revelation_early_wrong_right_twice () =
   in
   (* get the pkh of a baker *)
   Block.get_next_baker b >>=? fun (pkh, _, _) ->
-  let id = Alpha_context.Contract.implicit_contract pkh in
+  let id = Alpha_context.Contract.Implicit pkh in
   let policy = Block.Excluding [pkh] in
   (* bake until commitment - 2, excluding id *)
   Block.bake_n ~policy (blocks_per_commitment - 2) b >>=? fun b ->
@@ -120,7 +120,7 @@ let test_revelation_early_wrong_right_twice () =
     (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.get_next_baker ~policy b >>=? fun (baker_pkh, _, _) ->
-  let baker = Alpha_context.Contract.implicit_contract baker_pkh in
+  let baker = Alpha_context.Contract.Implicit baker_pkh in
   Context.Contract.balance (B b) baker >>=? fun baker_bal ->
   Block.bake ~policy:(Block.By_account baker_pkh) ~operation b >>=? fun b ->
   (* test that the baker gets the tip reward plus the baking reward*)

@@ -38,19 +38,13 @@
     used to create it. The owner of the corresponding private key is the
     holder of the account. An originated contract's hash is derived from its
     origination nonce (see below). *)
-type t = private
+type t =
   | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
 
 include Compare.S with type t := t
 
 val in_memory_size : t -> Cache_memory_helpers.sint
-
-(** {2 Implicit contracts} *)
-
-val implicit_contract : Signature.Public_key_hash.t -> t
-
-val is_implicit : t -> Signature.Public_key_hash.t option
 
 (** {2 Originated contracts} *)
 
@@ -64,8 +58,6 @@ val originated_contract : Origination_nonce.t -> t
     returned list is empty *)
 val originated_contracts :
   since:Origination_nonce.t -> until:Origination_nonce.t -> t list
-
-val is_originated : t -> Contract_hash.t option
 
 (** {2 Human readable notation} *)
 

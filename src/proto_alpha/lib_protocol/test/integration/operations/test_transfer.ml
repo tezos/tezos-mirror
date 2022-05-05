@@ -118,7 +118,7 @@ let test_transfer_zero_implicit () =
   Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
-  let src = Contract.implicit_contract account.Account.pkh in
+  let src = Contract.Implicit account.Account.pkh in
   Op.transaction (I i) src dest Tez.zero >>=? fun op ->
   Incremental.add_operation i op >>= fun res ->
   Assert.proto_error_with_info ~loc:__LOC__ res "Empty implicit contract"
@@ -184,7 +184,7 @@ let test_transfer_zero_implicit_with_bal_src_as_fee () =
   Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
-  let src = Contract.implicit_contract account.Account.pkh in
+  let src = Contract.Implicit account.Account.pkh in
   Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) src >>=? fun bal_src ->
@@ -198,7 +198,7 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
   Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
-  let src = Contract.implicit_contract account.Account.pkh in
+  let src = Contract.Implicit account.Account.pkh in
   Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Op.contract_origination (I i) dest ~script:Op.dummy_script
@@ -215,7 +215,7 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
   Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
-  let src = Contract.implicit_contract account.Account.pkh in
+  let src = Contract.Implicit account.Account.pkh in
   Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) src >>=? fun bal_src ->
@@ -239,7 +239,7 @@ let test_transfer_from_implicit_to_implicit_contract () =
   let account_a = Account.new_account () in
   let account_b = Account.new_account () in
   Incremental.begin_construction b >>=? fun b ->
-  let src = Contract.implicit_contract account_a.Account.pkh in
+  let src = Contract.Implicit account_a.Account.pkh in
   two_over_n_of_balance b bootstrap_contract 3L >>=? fun amount1 ->
   two_over_n_of_balance b bootstrap_contract 10L >>=? fun fee1 ->
   transfer_and_check_balances
@@ -252,7 +252,7 @@ let test_transfer_from_implicit_to_implicit_contract () =
     amount1
   >>=? fun (b, _) ->
   (* Create an implicit contract as a destination contract. *)
-  let dest = Contract.implicit_contract account_b.pkh in
+  let dest = Contract.Implicit account_b.pkh in
   two_over_n_of_balance b bootstrap_contract 4L >>=? fun amount2 ->
   two_over_n_of_balance b bootstrap_contract 10L >>=? fun fee2 ->
   (* Transfer from implicit contract to another implicit contract. *)
@@ -272,7 +272,7 @@ let test_transfer_from_implicit_to_originated_contract () =
   Context.init1 () >>=? fun (b, bootstrap_contract) ->
   let contract = bootstrap_contract in
   let account = Account.new_account () in
-  let src = Contract.implicit_contract account.Account.pkh in
+  let src = Contract.Implicit account.Account.pkh in
   Incremental.begin_construction b >>=? fun b ->
   two_over_n_of_balance b bootstrap_contract 3L >>=? fun amount1 ->
   (* transfer the money to implicit contract *)
@@ -368,7 +368,7 @@ let test_empty_implicit () =
   Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun incr ->
-  let src = Contract.implicit_contract account.Account.pkh in
+  let src = Contract.Implicit account.Account.pkh in
   two_over_n_of_balance incr dest 3L >>=? fun amount ->
   (* Transfer zero tez from an implicit contract. *)
   Op.transaction (I incr) src dest amount >>=? fun op ->
@@ -491,8 +491,7 @@ let test_ownership_sender () =
   Incremental.begin_construction b >>=? fun b ->
   (* get the manager of the contract_1 as a sender *)
   Context.Contract.manager (I b) contract_1 >>=? fun manager ->
-  (* create an implicit_contract *)
-  let imcontract_1 = Alpha_context.Contract.implicit_contract manager.pkh in
+  let imcontract_1 = Alpha_context.Contract.Implicit manager.pkh in
   transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
@@ -587,7 +586,7 @@ let test_bad_parameter () =
            ~equal:( = )
            (Environment.Ecoproto_error
               (Script_interpreter.Bad_contract_parameter
-                 (Contract.implicit_contract Signature.Public_key_hash.zero)))
+                 (Contract.Implicit Signature.Public_key_hash.zero)))
            lst ->
       return ()
   | Error errs ->

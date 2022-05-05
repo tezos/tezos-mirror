@@ -175,10 +175,10 @@ let originate_command =
          ~desc:"name of the source contract"
     @@ stop)
     (fun () (_, source) (cctxt : Protocol_client_context.full) ->
-      match Contract.is_implicit source with
-      | None ->
+      match source with
+      | Originated _ ->
           failwith "only implicit accounts can be the source of an origination"
-      | Some source ->
+      | Implicit source ->
           Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
           let originate_one (scontract : smart_contract) =
             let fee_parameter =

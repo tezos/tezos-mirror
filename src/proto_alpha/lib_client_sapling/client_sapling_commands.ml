@@ -42,10 +42,11 @@ let group =
     title = "Commands for working with Sapling transactions";
   }
 
-let keys_of_implicit_account cctxt source =
-  match Protocol.Alpha_context.Contract.is_implicit source with
-  | None -> assert false
-  | Some src ->
+let keys_of_implicit_account cctxt (source : Protocol.Alpha_context.Contract.t)
+    =
+  match source with
+  | Originated _ -> assert false
+  | Implicit src ->
       Client_keys.get_key cctxt src >>=? fun (_, pk, sk) -> return (src, pk, sk)
 
 let viewing_key_of_string s =

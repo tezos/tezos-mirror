@@ -26,7 +26,7 @@
 let init ctxt delegate =
   Storage.Contract.Frozen_deposits.init
     ctxt
-    (Contract_repr.implicit_contract delegate)
+    (Contract_repr.Implicit delegate)
     {initial_amount = Tez_repr.zero; current_amount = Tez_repr.zero}
 
 let allocated = Storage.Contract.Frozen_deposits.mem
@@ -36,7 +36,7 @@ let get = Storage.Contract.Frozen_deposits.get
 let find = Storage.Contract.Frozen_deposits.find
 
 let update_balance ctxt delegate f amount =
-  let delegate_contract = Contract_repr.implicit_contract delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
   get ctxt delegate_contract >>=? fun frozen_deposits ->
   f frozen_deposits.current_amount amount >>?= fun new_amount ->
   Storage.Contract.Frozen_deposits.update

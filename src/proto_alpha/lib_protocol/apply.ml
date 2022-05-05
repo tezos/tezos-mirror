@@ -872,7 +872,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
     let open Script_interpreter in
     {
       source;
-      payer = Contract.implicit_contract payer;
+      payer = Contract.Implicit payer;
       self = contract;
       amount;
       chain_id;
@@ -939,10 +939,10 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
       in
       (ctxt, result, operations) )
 
-let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
-    ~before_operation ~payer ~chain_id ~mode ~internal =
-  (match Contract.is_implicit contract with
-  | None ->
+let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
+    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
+  (match contract with
+  | Originated _ ->
       (if Tez.(amount = zero) then
        (* Detect potential call to non existent contract. *)
        Contract.must_exist ctxt contract
@@ -951,7 +951,7 @@ let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
       (* Since the contract is originated, nothing will be allocated
          or the next transfer of tokens will fail. *)
       return_false
-  | Some _ ->
+  | Implicit _ ->
       (* Transfers of zero to implicit accounts are forbidden. *)
       error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
       (* If the implicit contract is not yet allocated at this point then
@@ -1056,11 +1056,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     in
     Tx_rollup_state.get ctxt dst_rollup >>=? fun (ctxt, state) ->
     Tx_rollup_state.burn_cost ~limit:None state message_size >>?= fun cost ->
-    Token.transfer
-      ctxt
-      (`Contract (Contract.implicit_contract payer))
-      `Burned
-      cost
+    Token.transfer ctxt (`Contract (Contract.Implicit payer)) `Burned cost
     >>=? fun (ctxt, balance_updates) ->
     Tx_rollup_inbox.append_message ctxt dst_rollup state deposit
     >>=? fun (ctxt, state, paid_storage_size_diff) ->
@@ -1267,7 +1263,7 @@ let apply_external_manager_operation_content :
     tzresult
     Lwt.t =
  fun ctxt mode ~source ~chain_id ~gas_consumed_in_precheck operation ->
-  let source_contract = Contract.implicit_contract source in
+  let source_contract = Contract.Implicit source in
   prepare_apply_manager_operation_content
     ~ctxt
     ~source:source_contract
@@ -1371,7 +1367,7 @@ let apply_external_manager_operation_content :
         let amount = Tx_rollup_l2_qty.to_z amount in
         Ticket_balance_key.of_ex_token
           ctxt
-          ~owner:(Contract (Contract.implicit_contract claimer))
+          ~owner:(Contract (Contract.Implicit claimer))
           ticket_token
         >>=? fun (claimer_ticket_hash, ctxt) ->
         Tx_rollup_ticket.transfer_ticket_with_hashes
@@ -1401,7 +1397,7 @@ let apply_external_manager_operation_content :
       error_when Compare.Z.(amount <= Z.zero) Forbidden_zero_ticket_quantity
       >>?= fun () ->
       error_when
-        (Option.is_some @@ Contract.is_implicit destination)
+        (match destination with Implicit _ -> true | Originated _ -> false)
         Cannot_transfer_ticket_to_implicit
       >>?= fun () ->
       Tx_rollup_ticket.parse_ticket_and_operation
@@ -1579,7 +1575,7 @@ let apply_external_manager_operation_content :
       >>=? fun (ctxt, state, to_slash) ->
       (match to_slash with
       | Some pkh ->
-          let committer = Contract.implicit_contract pkh in
+          let committer = Contract.Implicit pkh in
           Tx_rollup_commitment.slash_bond ctxt tx_rollup pkh
           >>=? fun (ctxt, slashed) ->
           if slashed then
@@ -1725,7 +1721,7 @@ let apply_external_manager_operation_content :
       Tx_rollup_commitment.slash_bond ctxt tx_rollup commitment.committer
       >>=? fun (ctxt, slashed) ->
       (if slashed then
-       let committer = Contract.implicit_contract commitment.committer in
+       let committer = Contract.Implicit commitment.committer in
        let bid = Bond_id.Tx_rollup_bond_id tx_rollup in
        Token.balance ctxt (`Frozen_bonds (committer, bid))
        >>=? fun (ctxt, burn) ->
@@ -1855,7 +1851,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt_before = ctxt in
   Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
-  let source_contract = Contract.implicit_contract source in
+  let source_contract = Contract.Implicit source in
   Contract.must_be_allocated ctxt source_contract >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
   let consume_deserialization_gas = Script.Always in
@@ -2009,7 +2005,7 @@ let burn_storage_fees :
     payer:public_key_hash ->
     (context * Z.t * kind successful_manager_operation_result) tzresult Lwt.t =
  fun ctxt smopr ~storage_limit ~payer ->
-  let payer = `Contract (Contract.implicit_contract payer) in
+  let payer = `Contract (Contract.Implicit payer) in
   match smopr with
   | Transaction_result (Transaction_to_contract_result payload) ->
       let consumed = payload.paid_storage_size_diff in
@@ -2757,7 +2753,7 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
       Token.transfer
         ctxt
         `Double_signing_evidence_rewards
-        (`Contract (Contract.implicit_contract payload_producer))
+        (`Contract (Contract.Implicit payload_producer))
         reward
   | Error _ -> (* reward is Tez.zero *) return (ctxt, []))
   >|=? fun (ctxt, reward_balance_updates) ->
@@ -2969,7 +2965,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
       let tip = Constants.seed_nonce_revelation_tip ctxt in
-      let contract = Contract.implicit_contract payload_producer in
+      let contract = Contract.Implicit payload_producer in
       Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
@@ -2998,7 +2994,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       let src = `Collected_commitments blinded_pkh in
       Token.allocated ctxt src >>=? fun (ctxt, src_exists) ->
       fail_unless src_exists (Invalid_activation {pkh}) >>=? fun () ->
-      let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
+      let contract = Contract.Implicit (Signature.Ed25519 pkh) in
       Token.balance ctxt src >>=? fun (ctxt, amount) ->
       Token.transfer ctxt src (`Contract contract) amount
       >>=? fun (ctxt, bupds) ->

@@ -39,7 +39,7 @@
 (** [container] is the type of token holders with finite capacity, and whose assets
     are contained in the context. Let [d] be a delegate. Be aware that transferring
     to/from [`Delegate_balance d] will not update [d]'s stake, while transferring
-    to/from [`Contract (Contract_repr.implicit_contract d)] will update [d]'s
+    to/from [`Contract (Contract_repr.Implicit d)] will update [d]'s
     stake. *)
 
 type container =

@@ -61,36 +61,9 @@ module Test_contract_repr = struct
     in
     Contract_hash.hash_bytes [data]
 
-  let dummy_implicit_contract = implicit_contract Signature.Public_key_hash.zero
+  let dummy_implicit_contract = Implicit Signature.Public_key_hash.zero
 
   let dummy_originated_contract = originated_contract @@ dummy_origination_nonce
-
-  let test_implicit () =
-    match is_implicit dummy_implicit_contract with
-    | Some _ -> return_unit
-    | None ->
-        failwith
-          "must have returned the public key hash of implicit contract. \n\
-          \           Instead, returned None"
-
-  (** Check if [is_implicit] catches a non-implicit (originated) contract and returns None *)
-  let test_not_implicit () =
-    match is_implicit dummy_originated_contract with
-    | None -> return_unit
-    | Some _ -> failwith "must have returned the None. Instead, returned Some _"
-
-  let test_originated () =
-    match is_originated dummy_originated_contract with
-    | Some _ -> return_unit
-    | None ->
-        failwith
-          "must have returned the origination nonce correctly. Instead \
-           returned None."
-
-  let test_not_originated () =
-    match is_originated dummy_implicit_contract with
-    | None -> return_unit
-    | Some _ -> failwith "must have returned the None. Instead, returned Some _"
 
   let test_to_b58check_implicit () =
     Assert.equal
@@ -128,26 +101,6 @@ end
 
 let tests =
   [
-    tztest
-      "Contract_repr.is_implicit: must correctly identify a valid implicit \
-       contract"
-      `Quick
-      Test_contract_repr.test_implicit;
-    tztest
-      "Contract_repr.is_implicit: must correctly return None for a originated \
-       contract"
-      `Quick
-      Test_contract_repr.test_not_implicit;
-    tztest
-      "Contract_repr.is_originated: must correctly return operation hash of \
-       the originated contract"
-      `Quick
-      Test_contract_repr.test_originated;
-    tztest
-      "Contract_repr.is_originated: must correctly return None for an implicit \
-       contract contract"
-      `Quick
-      Test_contract_repr.test_not_originated;
     tztest
       "Contract_repr.to_b58check: must correctly stringify, b58check encoded, \
        an implicit contract"

@@ -199,7 +199,7 @@ let transaction_costs_encoding =
 
 let destination_to_contract dst =
   match dst with
-  | Implicit x -> Contract.implicit_contract x
+  | Implicit x -> Contract.Implicit x
   | Originated x -> x.destination
 
 let parse_strategy s =
@@ -429,7 +429,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
   Alpha_services.Contract.balance
     cctxt
     (chain, block)
-    (Contract.implicit_contract src.pkh)
+    (Contract.Implicit src.pkh)
   >>=? fun tez ->
   if Tez.(tez = zero) then
     log Debug (fun () ->

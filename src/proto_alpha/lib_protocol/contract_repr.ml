@@ -130,12 +130,6 @@ let () =
     (function Invalid_contract_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_contract_notation loc)
 
-let implicit_contract id = Implicit id
-
-let is_implicit = function Implicit m -> Some m | Originated _ -> None
-
-let is_originated = function Implicit _ -> None | Originated h -> Some h
-
 let originated_contract nonce =
   let data =
     Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce
