@@ -2023,7 +2023,9 @@ let octez_store =
         octez_version;
         index;
         irmin_pack;
+        octez_protocol_environment |> open_;
         octez_context |> open_;
+        octez_context_ops |> open_;
         octez_shell_context;
         octez_validation |> open_;
         octez_protocol_updater |> open_;
@@ -2084,6 +2086,8 @@ let octez_shell =
         octez_base_unix |> open_;
         octez_context |> open_;
         octez_store |> open_;
+        octez_protocol_environment |> open_;
+        octez_context_ops |> open_;
         octez_shell_context |> open_;
         octez_p2p |> open_;
         octez_stdlib_unix |> open_;
@@ -4525,6 +4529,7 @@ let _octez_store_tests =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_context_ops |> open_;
         octez_store |> open_;
         octez_shell_services |> open_;
         octez_stdlib_unix |> open_;
@@ -4578,6 +4583,7 @@ let _octez_shell_tests =
         octez_base_test_helpers |> open_;
         octez_store |> open_;
         octez_context |> open_;
+        octez_context_ops |> open_;
         octez_shell_context |> open_;
         octez_protocol_updater |> open_;
         octez_p2p |> open_;

@@ -180,7 +180,13 @@ let init input =
   in
   let* context_index =
     Context.init
-      ~patch_context:(Patch_context.patch_context genesis sandbox_parameters)
+      ~patch_context:(fun ctxt ->
+        let open Lwt_result_syntax in
+        let ctxt = Shell_context.wrap_disk_context ctxt in
+        let+ ctxt =
+          Patch_context.patch_context genesis sandbox_parameters ctxt
+        in
+        Shell_context.unwrap_disk_context ctxt)
       context_root
   in
   Lwt.return

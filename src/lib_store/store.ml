@@ -60,7 +60,7 @@ type store = {
      to be modified. *)
   (* Invariant : main_chain_store <> None *)
   mutable main_chain_store : chain_store option;
-  context_index : Context.index;
+  context_index : Context_ops.index;
   protocol_store : Protocol_store.t;
   allow_testchains : bool;
   protocol_watcher : Protocol_hash.t Lwt_watcher.input;
@@ -588,11 +588,11 @@ module Block = struct
 
   let context_exn chain_store block =
     let context_index = chain_store.global_store.context_index in
-    Context.checkout_exn context_index (Block_repr.context block)
+    Context_ops.checkout_exn context_index (Block_repr.context block)
 
   let context_opt chain_store block =
     let context_index = chain_store.global_store.context_index in
-    Context.checkout context_index (Block_repr.context block)
+    Context_ops.checkout context_index (Block_repr.context block)
 
   let context chain_store block =
     let open Lwt_result_syntax in
@@ -606,7 +606,7 @@ module Block = struct
 
   let context_exists chain_store block =
     let context_index = chain_store.global_store.context_index in
-    Context.exists context_index (Block_repr.context block)
+    Context_ops.exists context_index (Block_repr.context block)
 
   let testchain_status chain_store block =
     let open Lwt_result_syntax in
@@ -619,7 +619,7 @@ module Block = struct
             (Cannot_checkout_context
                (Block_repr.hash block, Block_repr.context block))
     in
-    let*! status = Context.get_test_chain context in
+    let*! status = Context_ops.get_test_chain context in
     match status with
     | Running {genesis; _} ->
         Shared.use chain_store.chain_state (fun chain_state ->
@@ -2029,7 +2029,7 @@ module Chain = struct
           Error_monad.pp_print_trace
           err)
       (fun () ->
-        let* tup = Context.retrieve_commit_info index header in
+        let* tup = Context_ops.retrieve_commit_info index header in
         return (Protocol_levels.commit_info_of_tuple tup))
 
   let get_commit_info_opt index header =
@@ -2579,7 +2579,7 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
   let global_store =
     {
       store_dir;
-      context_index;
+      context_index = Context_ops.Disk_index context_index;
       main_chain_store = None;
       protocol_store;
       allow_testchains;
@@ -2624,6 +2624,15 @@ let main_chain_store store =
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ~store_dir ~context_dir ~allow_testchains genesis =
   let open Lwt_result_syntax in
+  let patch_context =
+    Option.map
+      (fun f ctxt ->
+        let open Tezos_shell_context in
+        let ctxt = Shell_context.wrap_disk_context ctxt in
+        let+ ctxt = f ctxt in
+        Shell_context.unwrap_disk_context ctxt)
+      patch_context
+  in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let*! context_index, commit_genesis =
@@ -2667,7 +2676,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     create_store
       ?block_cache_limit
       store_dir
-      ~context_index
+      ~context_index:(Context_ops.Disk_index context_index)
       ~chain_id
       ~genesis
       ~genesis_context
@@ -2682,7 +2691,7 @@ let close_store global_store =
     WithExceptions.Option.get ~loc:__LOC__ global_store.main_chain_store
   in
   let* () = Chain.close_chain_store main_chain_store in
-  Context.close global_store.context_index
+  Context_ops.close global_store.context_index
 
 let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
   let open Lwt_result_syntax in

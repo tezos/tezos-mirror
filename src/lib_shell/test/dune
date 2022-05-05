@@ -17,6 +17,7 @@
   tezos-base-test-helpers
   tezos-store
   tezos-context
+  tezos-context-ops
   tezos-shell-context
   tezos-protocol-updater
   tezos-p2p
@@ -36,6 +37,7 @@
   -open Tezos_base_test_helpers
   -open Tezos_store
   -open Tezos_context
+  -open Tezos_context_ops
   -open Tezos_shell_context
   -open Tezos_protocol_updater
   -open Tezos_p2p

@@ -210,7 +210,9 @@ type chain_store
       Default: false
 *)
 val init :
-  ?patch_context:(Context.t -> Context.t tzresult Lwt.t) ->
+  ?patch_context:
+    (Tezos_protocol_environment.Context.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t) ->
   ?commit_genesis:(chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t) ->
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
@@ -249,7 +251,7 @@ val directory : store -> [`Store_dir] Naming.directory
 
 (** [context_index global_store] returns the context's index
     initialized in [global_store]. *)
-val context_index : store -> Context.index
+val context_index : store -> Context_ops.index
 
 (** [allow_testchains global_store] returns true if the store is
     allowed to fork testchains. *)
@@ -450,15 +452,18 @@ module Block : sig
 
   (** [context_exn chain_store block] checkouts the context of the
       [block]. *)
-  val context_exn : chain_store -> block -> Context.t Lwt.t
+  val context_exn :
+    chain_store -> block -> Tezos_protocol_environment.Context.t Lwt.t
 
   (** [context_opt chain_store block] optional version of
       [context_exn]. *)
-  val context_opt : chain_store -> block -> Context.t option Lwt.t
+  val context_opt :
+    chain_store -> block -> Tezos_protocol_environment.Context.t option Lwt.t
 
   (** [context chain_store block] error monad version of
       [context_exn]. *)
-  val context : chain_store -> block -> Context.t tzresult Lwt.t
+  val context :
+    chain_store -> block -> Tezos_protocol_environment.Context.t tzresult Lwt.t
 
   (** [context_exists chain_store block] tests the existence of the
       [block]'s commit in the context. *)

@@ -565,7 +565,6 @@ let run (module Main : Sigs.MAIN) =
   Format.printf "Protocol is %a\n%!" Protocol_hash.pp proto_hash ;
   let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
   print_endline "Pre-preparing raw context..." ;
-  let ctxt = Tezos_shell_context.Shell_context.wrap_disk_context ctxt in
   Main.main ~output_dir ctxt ~head
 
 let main (module Main : Sigs.MAIN) =

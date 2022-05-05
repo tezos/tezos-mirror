@@ -35,24 +35,24 @@ let read_partial_context =
            folding over a value is a no-op".
          Therefore, we first need to check that whether its a value.
       *)
-      let* o = Context.find context path in
+      let* o = Context_ops.find context path in
       match o with
       | Some v -> Lwt.return (Block_services.Key v)
       | None ->
           (* try to read as directory *)
-          Context.fold
+          Context_ops.fold_value
             ~depth:(`Le depth)
             context
             path
             ~order:`Sorted
             ~init
-            ~f:(fun k tree acc ->
+            ~f:(fun k lazy_value acc ->
               let open Block_services in
               if List.compare_length_with k depth >= 0 then
                 (* only [=] case is possible because [~depth] is [(`Le depth)] *)
                 Lwt.return (raw_context_insert (k, Cut) acc)
               else
-                let+ o = Context.Tree.to_value tree in
+                let+ o = lazy_value () in
                 match o with
                 | None -> acc
                 | Some v -> raw_context_insert (k, Key v) acc)
@@ -284,13 +284,11 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     let* context = Store.Block.context chain_store predecessor_block in
     let* predecessor_context =
       let*! ctxt =
-        Context.checkout
-          (Context.index context)
+        Context_ops.checkout
+          (Context_ops.index context)
           (Store.Block.context_hash predecessor_block)
       in
-      match ctxt with
-      | Some c -> return (Shell_context.wrap_disk_context c)
-      | None -> fail_with_exn Not_found
+      match ctxt with Some c -> return c | None -> fail_with_exn Not_found
     in
     let predecessor_block_metadata_hash =
       Store.Block.block_metadata_hash predecessor_block
@@ -521,8 +519,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       (* [depth] is defined as a [uint] not an [int] *)
       assert (depth >= 0) ;
       let* context = Store.Block.context chain_store block in
-      let*! mem = Context.mem context path in
-      let*! dir_mem = Context.mem_tree context path in
+      let*! mem = Context_ops.mem context path in
+      let*! dir_mem = Context_ops.mem_tree context path in
       if not (mem || dir_mem) then Lwt.fail Not_found
       else
         let*! v = read_partial_context context path depth in
@@ -537,7 +535,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
             let open Tezos_shell_services.Block_services in
             if holey then Hole else Raw_context
           in
-          let*! v = Context.merkle_tree context leaf_kind path in
+          let*! v = Context_ops.merkle_tree context leaf_kind path in
           return_some v) ;
   (* info *)
   register0 S.info (fun (chain_store, block) q () ->
@@ -646,7 +644,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       let* ctxt = Store.Block.context chain_store block in
       let predecessor = Store.Block.hash block in
       let header = Store.Block.shell_header block in
-      let predecessor_context = Shell_context.wrap_disk_context ctxt in
+      let predecessor_context = ctxt in
       let* state =
         Next_proto.begin_construction
           ~chain_id:(Store.Chain.chain_id chain_store)
@@ -674,7 +672,6 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
       let* ctxt = Store.Block.context chain_store block in
       let*! l1 = Base58.complete prefix in
-      let ctxt = Shell_context.wrap_disk_context ctxt in
       let*! l2 = Next_proto.complete_b58prefix ctxt prefix in
       return (l1 @ l2)) ;
   (* merge protocol rpcs... *)
@@ -695,7 +692,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
        (fun (chain_store, block) ->
          let*! r =
            let*! context = Store.Block.context_exn chain_store block in
-           let predecessor_context = Shell_context.wrap_disk_context context in
+           let predecessor_context = context in
            let chain_id = Store.Chain.chain_id chain_store in
            let Block_header.
                  {

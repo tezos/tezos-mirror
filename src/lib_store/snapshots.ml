@@ -3323,7 +3323,9 @@ module type Snapshot_importer = sig
 
   val import :
     snapshot_path:string ->
-    ?patch_context:(Context.t -> Context.t tzresult Lwt.t) ->
+    ?patch_context:
+      (Tezos_protocol_environment.Context.t ->
+      Tezos_protocol_environment.Context.t tzresult Lwt.t) ->
     ?block:Block_hash.t ->
     ?check_consistency:bool ->
     dst_store_dir:[`Store_dir] Naming.directory ->
@@ -3661,6 +3663,15 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let* legacy = Version.is_legacy snapshot_version in
     let indexing_strategy = if legacy then `Always else `Minimal in
+    let patch_context =
+      Option.map
+        (fun f ctxt ->
+          let open Tezos_shell_context in
+          let ctxt = Shell_context.wrap_disk_context ctxt in
+          let+ ctxt = f ctxt in
+          Shell_context.unwrap_disk_context ctxt)
+        patch_context
+    in
     let*! context_index =
       Context.init
         ~readonly:false

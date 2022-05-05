@@ -59,8 +59,10 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
   let*! empty_context = Store.Block.context_exn chain_store genesis in
   let header = Store.Block.header genesis in
   let timestamp = Store.Block.timestamp genesis in
-  let empty_context_hash = Context.hash ~time:timestamp empty_context in
-  let*! context = Context.commit ~time:header.shell.timestamp empty_context in
+  let empty_context_hash = Context_ops.hash ~time:timestamp empty_context in
+  let*! context =
+    Context_ops.commit ~time:header.shell.timestamp empty_context
+  in
   let header = {header with shell = {header.shell with context}} in
   let context_hash = empty_context_hash in
   let message = None in
@@ -114,7 +116,9 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
   let genesis = WithExceptions.Option.get ~loc:__LOC__ genesis in
   let*! empty_context = Store.Block.context_exn chain_store genesis in
   let header = Store.Block.header genesis in
-  let*! context = Context.commit ~time:header.shell.timestamp empty_context in
+  let*! context =
+    Context_ops.commit ~time:header.shell.timestamp empty_context
+  in
   let genesis_header = {header with shell = {header.shell with context}} in
   let empty_result =
     {
