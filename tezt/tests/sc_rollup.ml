@@ -1540,9 +1540,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_address
   let* init_level =
     RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
   in
-  let* commitment_frequency =
-    get_sc_rollup_commitment_frequency_in_blocks client
-  in
+  let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
   let init_level = init_level |> JSON.as_int in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
@@ -1550,14 +1548,12 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_address
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* () = bake_levels commitment_frequency client in
+  let* () = bake_levels commitment_period client in
   let* commitment_inbox_level =
-    Sc_rollup_node.wait_for_level
-      sc_rollup_node
-      (init_level + commitment_frequency)
+    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + commitment_period)
   in
   (* Bake `block_finality_time` additional level to ensure that block number
-     `init_level + sc_rollup_commitment_frequency_in_blocks` is processed by
+     `init_level + sc_rollup_commitment_period_in_blocks` is processed by
      the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
   let* commitment_finalized_level =

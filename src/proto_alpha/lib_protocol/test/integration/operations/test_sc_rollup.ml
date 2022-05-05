@@ -138,7 +138,7 @@ let dummy_commitment ctxt rollup =
   in
   let inbox_level =
     let commitment_freq =
-      Constants_storage.sc_rollup_commitment_frequency_in_blocks
+      Constants_storage.sc_rollup_commitment_period_in_blocks
         (Alpha_context.Internal_for_tests.to_raw ctxt)
     in
 

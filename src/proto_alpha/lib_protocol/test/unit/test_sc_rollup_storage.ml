@@ -235,7 +235,7 @@ let number_of_ticks_exn n =
 let valid_inbox_level ctxt =
   let root_level = Raw_level_repr.to_int32 Level_storage.(current ctxt).level in
   let commitment_freq =
-    Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
   fun i ->
     Raw_level_repr.of_int32_exn
@@ -1225,7 +1225,7 @@ let test_conflict_point_computation_fits_in_gas_limit () =
   let level = valid_inbox_level ctxt in
   let max_commits =
     let commitment_freq =
-      Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+      Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
     in
     Int32.div
       (Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt)

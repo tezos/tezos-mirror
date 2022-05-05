@@ -528,7 +528,7 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
 (** Enfore that a commitment's inbox level increases by an exact fixed amount over its predecessor.
     This property is used in several places - not obeying it causes severe breakage.
 *)
-let assert_commitment_frequency ctxt rollup commitment =
+let assert_commitment_period ctxt rollup commitment =
   let open Lwt_tzresult_syntax in
   let pred = Commitment.(commitment.predecessor) in
   let* ctxt, pred_level =
@@ -542,7 +542,7 @@ let assert_commitment_frequency ctxt rollup commitment =
       return (ctxt, Commitment.(pred.inbox_level))
   in
   (* We want to check the following inequalities on [commitment.inbox_level],
-     [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_frequency].
+     [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_period].
 
      - Greater-than-or-equal (>=), to ensure inbox_levels are monotonically
      increasing.  along each branch of commitments. Together with
@@ -558,12 +558,12 @@ let assert_commitment_frequency ctxt rollup commitment =
      Because [a >= b && a = b] is equivalent to [a = b], we can the latter as
      an optimization.
   *)
-  let sc_rollup_commitment_frequency =
-    Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+  let sc_rollup_commitment_period =
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
   if
     Raw_level_repr.(
-      commitment.inbox_level = add pred_level sc_rollup_commitment_frequency)
+      commitment.inbox_level = add pred_level sc_rollup_commitment_period)
   then return ctxt
   else fail Sc_rollup_bad_inbox_level
 
@@ -577,7 +577,7 @@ let assert_commitment_frequency ctxt rollup commitment =
 let assert_refine_conditions_met ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
-  assert_commitment_frequency ctxt rollup commitment
+  assert_commitment_period ctxt rollup commitment
 
 let refine_stake ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
@@ -609,7 +609,7 @@ let refine_stake ctxt rollup staker commitment =
       in
       (* WARNING: [commitment_storage_size] is a defined constant, and used
          to set a bound on the relationship between [max_lookahead],
-         [commitment_frequency] and [stake_amount].  Be careful changing this
+         [commitment_period] and [stake_amount].  Be careful changing this
          calculation. *)
       let size_diff =
         commitment_size_diff + commitment_added_size_diff

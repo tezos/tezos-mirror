@@ -264,7 +264,7 @@ val withdraw_stake :
       {li [Sc_rollup_too_far_ahead] if [staker] would be more than
         [sc_rollup_max_future_commitments] ahead of the Last Cemented Commitment}
       {li [Sc_rollup_bad_inbox_level] if [commitment]'s predecessor is
-        less than [sc_rollup_commitment_frequency] blocks ahead}
+        less than [sc_rollup_commitment_period] blocks ahead}
       {li [Sc_rollup_not_staked] if [staker] is not staked}
       {li [Sc_rollup_staker_backtracked] if [staker] is not staked on an ancestor of [commitment]}
       {li [Sc_rollup_unknown_commitment] if the parent of the given commitment does not exist}
@@ -293,7 +293,7 @@ val refine_stake :
       {li [Sc_rollup_too_far_ahead] if [staker] would be more than
         [sc_rollup_max_future_commitments] ahead of the Last Cemented Commitment}
       {li [Sc_rollup_bad_inbox_level] if [commitment]'s predecessor is
-        less than [sc_rollup_commitment_frequency] blocks ahead}
+        less than [sc_rollup_commitment_period] blocks ahead}
       {li [Sc_rollup_staker_backtracked] if [staker] is not staked on an ancestor
         of [commitment]}
       {li [Sc_rollup_unknown_commitment] if the parent of the given commitment

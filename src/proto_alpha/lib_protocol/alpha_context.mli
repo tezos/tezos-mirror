@@ -778,7 +778,7 @@ module Constants : sig
       sc_rollup_challenge_window_in_blocks : int;
       sc_rollup_max_available_messages : int;
       sc_rollup_stake_amount_in_mutez : int;
-      sc_rollup_commitment_frequency_in_blocks : int;
+      sc_rollup_commitment_period_in_blocks : int;
       sc_rollup_commitment_storage_size_in_bytes : int;
       sc_rollup_max_lookahead_in_blocks : int32;
     }
