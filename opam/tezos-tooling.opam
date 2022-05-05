@@ -13,14 +13,6 @@ depends: [
   "ocamlformat" { = "0.18.0" }
   "parsexp" {with-test}
   "base-unix" {with-test}
-  "tezos-protocol-compiler"
-  "tezos-base"
-]
-depopts: [
-  "utop"
-]
-conflicts: [
-  "utop" { < "2.8" }
 ]
 build: [
   ["rm" "-r" "vendors"]

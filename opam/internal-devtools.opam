@@ -11,6 +11,14 @@ depends: [
   "dune" { >= "2.9" }
   "num"
   "re" { >= "1.7.2" }
+  "tezos-protocol-compiler"
+  "tezos-base"
+]
+depopts: [
+  "utop"
+]
+conflicts: [
+  "utop" { < "2.8" }
 ]
 build: [
   ["rm" "-r" "vendors"]

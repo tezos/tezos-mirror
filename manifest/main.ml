@@ -4149,9 +4149,9 @@ let _tezos_snoop =
 let _tztop =
   public_exe
     "tztop"
-    ~path:"src/tooling/tztop"
+    ~path:"devtools/tztop"
     ~internal_name:"tztop_main"
-    ~opam:"tezos-tooling"
+    ~opam:"internal-devtools"
     ~modes:[Byte]
     ~bisect_ppx:false
     ~release:false
