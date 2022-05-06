@@ -29,7 +29,7 @@
 
    This rollup is a stack machine equipped with addition.
 
-   It processed postfix arithmetic expressions written as sequence of
+   It processes postfix arithmetic expressions written as sequence of
    (space separated) [int] and [+] using the following rules:
 
    - a number [x] is interpreted as pushing [x] on the stack ;
@@ -75,7 +75,7 @@ module type S = sig
   (** [get_tick state] returns the current tick of [state]. *)
   val get_tick : state -> Sc_rollup.Tick.t Lwt.t
 
-  (** The machine has three possible states: *)
+  (** The machine has three possible statuses: *)
   type status = Halted | WaitingForInputMessage | Parsing | Evaluating
 
   (** [get_status state] returns the machine status in [state]. *)

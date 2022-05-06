@@ -92,7 +92,7 @@
    {1 Clients}
 
    This module is meant to be used both by the protocol and by the
-   rollup node in order to maintain consistent inboxes on both side.
+   rollup node in order to maintain consistent inboxes on both sides.
    These two clients slightly differ on the amount of information they
    store about the inbox.
 
@@ -135,7 +135,7 @@ val encoding : t Data_encoding.t
     message at all. *)
 val empty : Sc_rollup_repr.t -> Raw_level_repr.t -> t
 
-(** [level inbox] returns the maximum level of message insertion in
+(** [inbox_level inbox] returns the maximum level of message insertion in
    [inbox] or its initial level. *)
 val inbox_level : t -> Raw_level_repr.t
 
@@ -199,7 +199,7 @@ module type MerkelizedOperations = sig
      To archive a sequence of [messages] for a given [level], we push
      it at the end of the [history] and update the witness of this
      history in the [inbox]. The [inbox]'s messages for the current
-     level is also emptied to insert the [payloads] in a fresh sequence
+     level are also emptied to insert the [payloads] in a fresh sequence
      of [messages] for [level].
 
      This function fails if [level] is older than [inbox]'s [level].

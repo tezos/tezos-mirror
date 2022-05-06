@@ -593,17 +593,17 @@ let assert_commitment_period ctxt rollup commitment =
      [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_period].
 
      - Greater-than-or-equal (>=), to ensure inbox_levels are monotonically
-     increasing.  along each branch of commitments. Together with
+     increasing along each branch of commitments. Together with
      [assert_commitment_not_too_far_ahead] this is sufficient to limit the
-     depth of the commitment tree, which is also the number commitments stored
+     depth of the commitment tree, which is also the number of commitments stored
      per staker. This constraint must be enforced at submission time.
 
-     - Equality (=), so that that L2 blocks are produced at a regular rate.  This
+     - Equality (=), so that L2 blocks are produced at a regular rate.  This
      ensures that there is only ever one branch of correct commitments,
      simplifying refutation logic. This could also be enforced at refutation time
      rather than submission time, but doing it here works too.
 
-     Because [a >= b && a = b] is equivalent to [a = b], we can the latter as
+     Because [a >= b && a = b] is equivalent to [a = b], we can just keep the latter as
      an optimization.
   *)
   let sc_rollup_commitment_period =
@@ -616,10 +616,10 @@ let assert_commitment_period ctxt rollup commitment =
   else fail Sc_rollup_bad_inbox_level
 
 (** Check invariants on [inbox_level], enforcing overallocation of storage and
-    regularity of block prorudction.
+    regularity of block production.
 
      The constants used by [assert_refine_conditions_met] must be chosen such
-     that the maximum cost of storage allocated by each staker at most the size
+     that the maximum cost of storage allocated by each staker is at most the size
      of their deposit.
  *)
 let assert_refine_conditions_met ctxt rollup lcc commitment =

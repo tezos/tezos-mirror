@@ -68,7 +68,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"sc_rollup_inbox.invalid_level_add_messages"
-    ~title:"Internal error: Trying to add an message to an inbox from the past"
+    ~title:"Internal error: Trying to add a message to an inbox from the past"
     ~description:
       "An inbox can only accept messages for its current level or for the next \
        levels."
