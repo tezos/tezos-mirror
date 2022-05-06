@@ -1,0 +1,8 @@
+(lang dune 2.9)
+
+(generate_opam_files true)
+
+(package
+ (name tezos-webassembly-interpreter)
+ (maintainers "Tezos Developers")
+ (synopsis "WebAssembly reference interpreter with tweaks for Tezos"))

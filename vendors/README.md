@@ -85,3 +85,11 @@ Unknown
 The ocaml bindings are slowly evolving to serve Tezos.
 
 The C code has not evolved much.
+
+### webassembly-spec
+
+- WebAssembly reference interpreter for SCORU's WASM purposes
+
+#### Differences with the initial library
+
+Various changes that are required for SCORU WASM's needs.

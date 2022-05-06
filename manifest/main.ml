@@ -2543,6 +2543,14 @@ let tezos_openapi =
        format"
     ~deps:[ezjsonm; json_data_encoding; tezt]
 
+let _tezos_scoru_wasm =
+  public_lib
+    "tezos-scoru-wasm"
+    ~path:"src/lib_scoru_wasm"
+    ~synopsis:
+      "Protocol environment dependency providing WASM functionality for SCORU"
+    ~deps:[external_lib "tezos-webassembly-interpreter" V.True]
+
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig
@@ -4272,6 +4280,8 @@ let exclude filename =
   (* src/lib_protocol_compiler/test/dune (it does not define any library,
      executable or test stanza, it only defines aliases). *)
   | ["src"; "lib_protocol_compiler"; "test"; "dune"] -> true
+  (* WebAssembly interpreter (Dune will come from upstream) *)
+  | "src" :: "lib_webassembly" :: _ -> true
   (* We don't generate the toplevel dune file. *)
   | ["dune"] -> true
   (* ignore the following directories: *)
