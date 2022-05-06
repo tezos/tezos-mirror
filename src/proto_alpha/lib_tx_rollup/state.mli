@@ -168,6 +168,10 @@ val set_finalized_level : t -> Tx_rollup_level.t -> unit tzresult Lwt.t
 (** Delete the last finalized (on L1) rollup level. *)
 val delete_finalized_level : t -> unit Lwt.t
 
+(** Register the origination level of the rollup for this node. *)
+val set_rollup_info :
+  t -> Tx_rollup.t -> origination_level:int32 -> unit tzresult Lwt.t
+
 (** {2 Misc}  *)
 
 (** [rollup_operation_index] returns the index in which the rollup operation are

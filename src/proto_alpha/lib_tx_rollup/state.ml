@@ -339,6 +339,10 @@ let get_block_and_metadata state hash =
       let* metadata = get_block_metadata state block.header in
       return_some (block, metadata)
 
+let set_rollup_info state rollup_id ~origination_level =
+  let rollup_info = {rollup_id; origination_level = Some origination_level} in
+  Stores.Rollup_info_store.write state.stores.Stores.rollup_info rollup_info
+
 let init_rollup_info stores ?origination_level rollup_id =
   let open Lwt_result_syntax in
   let*! stored_info = Stores.Rollup_info_store.read stores.Stores.rollup_info in

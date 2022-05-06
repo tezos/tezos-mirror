@@ -419,6 +419,9 @@ let rec process_block state current_hash rollup_id =
           let*! () =
             Event.(emit detected_origination) (rollup_id, current_hash)
           in
+          let* () =
+            State.set_rollup_info state rollup_id ~origination_level:block_level
+          in
           return (None, None, [])
         else process_block state predecessor_hash rollup_id
       in
