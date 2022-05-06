@@ -709,10 +709,13 @@ let craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket =
       tx_client
       ?counter
       {qty; destination = dest; ticket}
-      ~signer
+      ~signer:signer.Account.aggregate_public_key
   in
   let* signature =
-    Tx_rollup_client.sign_transaction ~transaction ~signers:[signer] tx_client
+    Tx_rollup_client.sign_transaction
+      ~transaction
+      ~signers:[signer.aggregate_alias]
+      tx_client
   in
   return (transaction, signature)
 
@@ -865,7 +868,7 @@ let test_l2_to_l2_transaction =
         craft_batch_for_one_tx
           tx_client
           ~qty:1L
-          ~signer:bls_keys_1.aggregate_alias
+          ~signer:bls_keys_1
           ~dest:bls_keys_2.aggregate_public_key_hash
           ~ticket:ticket_id
       in
@@ -1096,7 +1099,7 @@ let test_batcher =
         craft_tx_and_inject
           tx_client
           ~qty:1L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
@@ -1109,7 +1112,7 @@ let test_batcher =
         craft_tx_and_inject
           tx_client
           ~qty:5L
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
       in
@@ -1121,7 +1124,7 @@ let test_batcher =
           ~failswith:"proto.alpha.tx_rollup_operation_counter_mismatch"
           ~qty:5L
           ~counter:5L
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_key_1.aggregate_public_key_hash
           ~ticket:ticket_id
       in
@@ -1133,7 +1136,7 @@ let test_batcher =
           craft_tx_and_sign
             tx_client
             ~qty:1L
-            ~signer:bls_key_1.aggregate_alias
+            ~signer:bls_key_1
             ~dest:bls_key_2.aggregate_public_key_hash
             ~ticket:ticket_id
         in
@@ -1142,7 +1145,7 @@ let test_batcher =
           craft_tx_and_sign
             tx_client
             ~qty:2L
-            ~signer:bls_key_1.aggregate_alias
+            ~signer:bls_key_1
             ~dest:bls_key_2.aggregate_public_key_hash
             ~ticket:ticket_id
         in
@@ -1159,7 +1162,7 @@ let test_batcher =
         craft_tx_and_inject
           tx_client
           ~qty:1_000_000L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_key_2.aggregate_public_key_hash
           ~ticket:ticket_id
           ~counter:2L
@@ -1198,7 +1201,7 @@ let test_batcher =
           tx_client
           ~qty:amount
           ~counter
-          ~signer:from.Account.aggregate_alias
+          ~signer:from
           ~dest
           ~ticket:ticket_id
       in
@@ -1319,7 +1322,7 @@ let test_reorganization =
         craft_batch_for_one_tx
           tx_client
           ~qty:10L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
@@ -1439,7 +1442,7 @@ let test_l2_proof_rpc_position =
         craft_batch_for_one_tx
           tx_client
           ~counter:1L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:5L
@@ -1448,7 +1451,7 @@ let test_l2_proof_rpc_position =
         craft_batch_for_one_tx
           tx_client
           ~counter:1L
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:10L
@@ -1713,7 +1716,7 @@ let test_committer =
           tx_client
           ~qty:amount
           ?counter
-          ~signer:from.Account.aggregate_alias
+          ~signer:from
           ~dest
           ~ticket:ticket_id
       in
@@ -1860,7 +1863,7 @@ let test_tickets_context =
       let* _txh1 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
@@ -1868,7 +1871,7 @@ let test_tickets_context =
       let* _txh2 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L
@@ -1966,7 +1969,7 @@ let test_withdrawals =
       let* _txh1 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
@@ -1974,7 +1977,7 @@ let test_withdrawals =
       let* _txh2 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L

@@ -125,30 +125,6 @@ let bls_pkh_param ?(name = "public key hash")
     ~desc
     (map_parameter ~f:conv_bls_pkh_to_l2_addr (bls_pkh_parameter ()))
 
-let bls_pk_parameter () =
-  parameter
-    ~autocomplete:Client_keys.Aggregate_alias.Public_key.autocomplete
-    (fun cctxt s ->
-      let open Lwt_result_syntax in
-      let from_alias s =
-        let* pk_opt = Client_keys.Aggregate_alias.Public_key.find cctxt s in
-        match pk_opt with
-        | (_pk_uri, Some (Bls12_381 pk)) -> return pk
-        | (_pk_uri, None) -> failwith "it is not a valid bls public key"
-      in
-      let from_key s = Bls.Public_key.of_b58check s |> Lwt.return in
-      alias_or_literal ~from_alias ~from_key s)
-
-let bls_pk_param ?(name = "public key") ?(desc = "Bls public key to use.") =
-  let desc =
-    String.concat
-      "\n"
-      [
-        desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
-      ]
-  in
-  param ~name ~desc (bls_pk_parameter ())
-
 let bls_sk_uri_parameter () =
   parameter
     ~autocomplete:Client_keys.Aggregate_alias.Secret_key.autocomplete
@@ -353,28 +329,30 @@ let conv_qty =
 
 let conv_counter = parameter (fun _ counter -> return (Int64.of_string counter))
 
-let signer_next_counter cctxt signer_pk counter =
+let signer_to_address : Tx_rollup_l2_batch.signer -> Tx_rollup_l2_address.t =
+  function
+  | Bls_pk pk -> Tx_rollup_l2_address.of_bls_pk pk
+  | L2_addr addr -> addr
+
+let signer_next_counter cctxt signer counter =
   let open Lwt_result_syntax in
   match counter with
-  | Some c -> return c
+  | Some counter -> return counter
   | None ->
       (* Retrieve the counter of the current head and increments it
          by one. *)
-      let* head =
-        match RPC.destruct_block_id "head" with
-        | Ok v -> return v
-        | Error e ->
-            let pkh_str =
-              Bls12_381.Signature.MinPk.pk_to_bytes signer_pk
-              |> Data_encoding.Binary.of_bytes_exn
-                   Tezos_crypto.Bls.Public_key.encoding
-              |> Tezos_crypto.Bls.Public_key.to_b58check
-            in
-            failwith "Cannot get counter of %s (%s)" pkh_str e
-      in
-      let pkh = Tx_rollup_l2_address.of_bls_pk signer_pk in
-      let* counter = RPC.counter cctxt head pkh in
+      let* counter = RPC.counter cctxt `Head @@ signer_to_address signer in
       return (Int64.succ counter)
+
+let signer_parameter =
+  let open Lwt_result_syntax in
+  parameter (fun _ s ->
+      match Tx_rollup_l2_address.of_b58check_opt s with
+      | Some pkh -> return @@ Tx_rollup_l2_batch.L2_addr pkh
+      | None -> (
+          match Bls.Public_key.of_b58check_opt s with
+          | Some pk -> return @@ Tx_rollup_l2_batch.Bls_pk pk
+          | None -> failwith "cannot parse %s to get a valid signer" s))
 
 let craft_tx_transfers () =
   command
@@ -386,7 +364,10 @@ let craft_tx_transfers () =
           ~doc:"counter value of the destination"
           conv_counter))
     (prefixes ["craft"; "tx"; "transfers"; "from"]
-    @@ bls_pk_param ~name:"signer_pk" ~desc:"public key of the signer"
+    @@ param
+         ~name:"signer"
+         ~desc:"public key or public key hash of the signer"
+         signer_parameter
     @@ prefix "using"
     @@ param
          ~name:"transfers.json"
@@ -398,7 +379,7 @@ let craft_tx_transfers () =
          json_file_or_text_parameter
     @@ stop)
     (fun counter
-         signer_pk
+         signer
          transfers_json
          (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
@@ -423,8 +404,7 @@ let craft_tx_transfers () =
                   Alpha_context.Ticket_hash.of_b58check_exn ticket ))
               transfers
           in
-          let* counter = signer_next_counter cctxt signer_pk counter in
-          let signer = Tx_rollup_l2_batch.Bls_pk signer_pk in
+          let* counter = signer_next_counter cctxt signer counter in
           let op = craft_transfers ~counter ~signer transfers in
           let json =
             Data_encoding.Json.construct
@@ -446,7 +426,10 @@ let craft_tx_transaction () =
     (prefixes ["craft"; "tx"; "transferring"]
     @@ param ~name:"qty" ~desc:"qty to transfer" conv_qty
     @@ prefixes ["from"]
-    @@ bls_pk_param ~name:"signer_pk" ~desc:"public key of the signer"
+    @@ param
+         ~name:"signer"
+         ~desc:"public key or public key hash of the signer"
+         signer_parameter
     @@ prefixes ["to"]
     @@ bls_pkh_param ~name:"dest" ~desc:"tz4 destination address"
     @@ prefixes ["for"]
@@ -454,13 +437,12 @@ let craft_tx_transaction () =
     @@ stop)
     (fun counter
          qty
-         signer_pk
+         signer
          destination
          ticket_hash
          (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
-      let* counter = signer_next_counter cctxt signer_pk counter in
-      let signer = Tx_rollup_l2_batch.Bls_pk signer_pk in
+      let* counter = signer_next_counter cctxt signer counter in
       let op = craft_tx ~counter ~signer ~destination ~ticket_hash ~qty in
       let json =
         Data_encoding.Json.construct
@@ -482,7 +464,10 @@ let craft_tx_withdrawal () =
     (prefixes ["craft"; "tx"; "withdrawing"]
     @@ param ~name:"qty" ~desc:"qty to withdraw" conv_qty
     @@ prefixes ["from"]
-    @@ bls_pk_param ~name:"signer_pk" ~desc:"public key of the signer"
+    @@ param
+         ~name:"signer"
+         ~desc:"public key or public key hash of the signer"
+         signer_parameter
     @@ prefixes ["to"]
     @@ param
          ~name:"dest"
@@ -493,27 +478,12 @@ let craft_tx_withdrawal () =
     @@ stop)
     (fun counter
          qty
-         signer_pk
+         signer
          destination
          ticket_hash
          (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
-      let* counter =
-        match counter with
-        | Some c -> return c
-        | None ->
-            (* Retrieve the counter of the current head and increments it
-               by one. *)
-            let* head =
-              match RPC.destruct_block_id "head" with
-              | Ok v -> return v
-              | Error e -> failwith "Cannot get counter of current head (%s)" e
-            in
-            let pkh = Tx_rollup_l2_address.of_bls_pk signer_pk in
-            let* counter = RPC.counter cctxt head pkh in
-            return (Int64.succ counter)
-      in
-      let signer = Tx_rollup_l2_batch.Bls_pk signer_pk in
+      let* counter = signer_next_counter cctxt signer counter in
       let op = craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty in
       let json =
         Data_encoding.Json.construct
