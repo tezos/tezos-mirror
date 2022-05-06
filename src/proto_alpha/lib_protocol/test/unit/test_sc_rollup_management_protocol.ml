@@ -36,19 +36,30 @@ open Alpha_context
 
 let wrap m = m >|= Environment.wrap_tzresult
 
-let check_encode_decode_inbox_message effect =
+let check_encode_decode_inbox_message message =
   let open Lwt_result_syntax in
+  let open Sc_rollup_management_protocol in
+  let*? bytes = Environment.wrap_tzresult @@ bytes_of_inbox_message message in
+  let*? message' =
+    Environment.wrap_tzresult @@ Internal_for_tests.inbox_message_of_bytes bytes
+  in
+  let*? bytes' = Environment.wrap_tzresult @@ bytes_of_inbox_message message' in
+  Assert.equal_string
+    ~loc:__LOC__
+    (Bytes.to_string bytes)
+    (Bytes.to_string bytes')
+
+let check_encode_decode_outbox_message ctxt message =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult
-    @@ Sc_rollup_management_protocol.bytes_of_inbox_message effect
+    @@ Internal_for_tests.bytes_of_outbox_message message
   in
-  let*? message' =
-    Environment.wrap_tzresult
-    @@ Sc_rollup_management_protocol.inbox_message_of_bytes bytes
-  in
+  let* (message', _ctxt) = wrap @@ outbox_message_of_bytes ctxt bytes in
   let*? bytes' =
     Environment.wrap_tzresult
-    @@ Sc_rollup_management_protocol.bytes_of_inbox_message message'
+    @@ Internal_for_tests.bytes_of_outbox_message message'
   in
   Assert.equal_string
     ~loc:__LOC__
@@ -70,7 +81,7 @@ let init_ctxt () =
   let+ incr = Incremental.begin_construction block in
   Incremental.alpha_ctxt incr
 
-let test_encode_decode_deposit () =
+let test_encode_decode_inbox_message () =
   let open WithExceptions in
   let open Lwt_result_syntax in
   let* ctxt = init_ctxt () in
@@ -106,5 +117,62 @@ let test_encode_decode_deposit () =
   in
   check_encode_decode_inbox_message deposit
 
+let test_encode_decode_outbox_message () =
+  let open Lwt_result_syntax in
+  let* ctxt = init_ctxt () in
+  let*? (Script_typed_ir.Ty_ex_c pair_nat_ticket_string_ty) =
+    Environment.wrap_tzresult
+      (let open Result_syntax in
+      let open Script_typed_ir in
+      let* ticket_t = ticket_t (-1) string_t in
+      pair_t (-1) nat_t ticket_t)
+  in
+  let parameters =
+    ( Script_int.(abs @@ of_int 42),
+      string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 )
+  in
+  let* (transaction1, ctxt) =
+    let*? destination_contract =
+      Environment.wrap_tzresult
+        (Contract.of_b58check "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc")
+    in
+    let destination = Destination.Contract destination_contract in
+    wrap
+    @@ Sc_rollup_management_protocol.Internal_for_tests.make_transaction
+         ctxt
+         pair_nat_ticket_string_ty
+         ~parameters
+         ~destination
+         ~entrypoint:Entrypoint.default
+  in
+  let* (transaction2, ctxt) =
+    let*? destination_contract =
+      Environment.wrap_tzresult
+        (Contract.of_b58check "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc")
+    in
+    let destination = Destination.Contract destination_contract in
+    wrap
+    @@ Sc_rollup_management_protocol.Internal_for_tests.make_transaction
+         ctxt
+         Script_typed_ir.nat_t
+         ~parameters:Script_int.(abs @@ of_int 10)
+         ~destination
+         ~entrypoint:Entrypoint.default
+  in
+  let outbox_message =
+    Sc_rollup_management_protocol.Internal_for_tests.make_atomic_batch
+      [transaction1; transaction2]
+  in
+  check_encode_decode_outbox_message ctxt outbox_message
+
 let tests =
-  [Tztest.tztest "Encode/decode deposit" `Quick test_encode_decode_deposit]
+  [
+    Tztest.tztest
+      "Encode/decode inbox message"
+      `Quick
+      test_encode_decode_inbox_message;
+    Tztest.tztest
+      "Encode/decode outbox message"
+      `Quick
+      test_encode_decode_outbox_message;
+  ]
