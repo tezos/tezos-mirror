@@ -26,7 +26,6 @@
 (*****************************************************************************)
 
 open Protocol.Alpha_context
-open Protocol.Apply_results
 open Protocol_client_context
 open Common
 
@@ -38,8 +37,7 @@ module Tezos_blocks_cache =
 
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 type t = {
@@ -341,77 +339,16 @@ let get_block_and_metadata state hash =
       let* metadata = get_block_metadata state block.header in
       return_some (block, metadata)
 
-let check_origination_in_block_info rollup block_info =
-  let extract_originated_tx_rollup :
-      type kind. kind manager_operation_result -> Tx_rollup.t option = function
-    | Applied (Tx_rollup_origination_result {originated_tx_rollup; _}) ->
-        Some originated_tx_rollup
-    | _ -> None
-  in
-  let check_origination_content_result : type kind. kind contents_result -> bool
-      = function
-    | Manager_operation_result {operation_result; _} ->
-        operation_result |> extract_originated_tx_rollup
-        |> Option.fold ~none:false ~some:(Tx_rollup.equal rollup)
-    | _ -> false
-  in
-  let rec check_origination_content_result_list :
-      type kind. kind contents_result_list -> bool = function
-    | Single_result x -> check_origination_content_result x
-    | Cons_result (x, xs) ->
-        check_origination_content_result x
-        || check_origination_content_result_list xs
-  in
-  let managed_operation =
-    List.nth_opt
-      block_info.Alpha_block_services.operations
-      rollup_operation_index
-  in
-  let check_receipt operation =
-    match operation.Alpha_block_services.receipt with
-    | Receipt (Operation_metadata {contents}) ->
-        check_origination_content_result_list contents
-    | Receipt No_operation_metadata | Empty | Too_large -> false
-  in
-  match Option.bind managed_operation @@ List.find_opt check_receipt with
-  | Some _ -> return_unit
-  | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
-
-let init_rollup_info cctxt stores ?rollup_genesis rollup =
+let init_rollup_info stores ?origination_level rollup_id =
   let open Lwt_result_syntax in
-  let*! rollup_info = Stores.Rollup_info_store.read stores.Stores.rollup_info in
+  let*! stored_info = Stores.Rollup_info_store.read stores.Stores.rollup_info in
   let* rollup_info =
-    match (rollup_info, rollup_genesis) with
-    | (None, None) ->
-        fail
-          [Error.Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given]
-    | (Some stored, __) when Tx_rollup.(stored.rollup_id <> rollup) ->
+    match stored_info with
+    | Some stored when Tx_rollup.(stored.rollup_id <> rollup_id) ->
         fail [Error.Tx_rollup_mismatch]
-    | (Some stored, Some genesis)
-      when Block_hash.(stored.origination_block <> genesis) ->
-        fail
-          [
-            Error
-            .Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
-              {
-                disk_rollup_origination = stored.origination_block;
-                given_rollup_genesis = genesis;
-              };
-          ]
-    | (Some stored, _) -> return stored
-    | (None, Some rollup_genesis) ->
-        let block = `Hash (rollup_genesis, 0) in
-        let* block_info =
-          Alpha_block_services.info cctxt ~chain:cctxt#chain ~block ()
-        in
-        let* () = check_origination_in_block_info rollup block_info in
-        let rollup_info =
-          {
-            rollup_id = rollup;
-            origination_block = rollup_genesis;
-            origination_level = block_info.header.shell.level;
-          }
-        in
+    | Some stored -> return stored
+    | None ->
+        let rollup_info = {rollup_id; origination_level} in
         let* () =
           Stores.Rollup_info_store.write stores.rollup_info rollup_info
         in
@@ -440,7 +377,7 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
   let {
     Node_config.data_dir;
     rollup_id;
-    rollup_genesis;
+    origination_level;
     signers;
     l2_blocks_cache_size;
     caps;
@@ -453,7 +390,7 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
   in
   let* (rollup_info, context_index) =
     both
-      (init_rollup_info cctxt stores ?rollup_genesis rollup_id)
+      (init_rollup_info stores ?origination_level rollup_id)
       (init_context ~data_dir)
     |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in

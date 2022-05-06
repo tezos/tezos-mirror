@@ -62,7 +62,7 @@ type caps = cost_caps purposed
 type t = {
   data_dir : string;
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t option;
+  origination_level : int32 option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
   mode : mode;

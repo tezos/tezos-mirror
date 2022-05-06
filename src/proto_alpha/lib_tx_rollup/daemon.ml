@@ -356,6 +356,40 @@ let set_head state head =
   | Ok () -> return_unit
   | Error _ as res -> Lwt.return res
 
+let originated_in_block rollup_id block =
+  let check_origination_content_result : type kind. kind contents_result -> bool
+      = function
+    | Manager_operation_result
+        {
+          operation_result =
+            Applied (Tx_rollup_origination_result {originated_tx_rollup; _});
+          _;
+        } ->
+        Tx_rollup.(originated_tx_rollup = rollup_id)
+    | _ -> false
+  in
+  let rec check_origination_content_result_list :
+      type kind. kind contents_result_list -> bool = function
+    | Single_result x -> check_origination_content_result x
+    | Cons_result (x, xs) ->
+        check_origination_content_result x
+        || check_origination_content_result_list xs
+  in
+  let manager_operations =
+    List.nth_opt
+      block.Alpha_block_services.operations
+      State.rollup_operation_index
+  in
+  let has_rollup_origination operation =
+    match operation.Alpha_block_services.receipt with
+    | Receipt (Operation_metadata {contents}) ->
+        check_origination_content_result_list contents
+    | Receipt No_operation_metadata | Empty | Too_large -> false
+  in
+  match manager_operations with
+  | None -> false
+  | Some ops -> List.exists has_rollup_origination ops
+
 let rec process_block state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! l2_block = State.get_tezos_l2_block state current_hash in
@@ -370,10 +404,10 @@ let rec process_block state current_hash rollup_id =
       let predecessor_hash = block_info.header.shell.predecessor in
       let block_level = block_info.header.shell.level in
       let* () =
-        Error.trace_fatal
-        @@ fail_when
-             (block_level < state.State.rollup_info.origination_level)
-             Tx_rollup_originated_in_fork
+        match state.State.rollup_info.origination_level with
+        | Some origination_level when block_level < origination_level ->
+            tzfail Tx_rollup_originated_in_fork
+        | _ -> return_unit
       in
       (* Handle predecessor Tezos block first *)
       let*! () =
@@ -381,8 +415,11 @@ let rec process_block state current_hash rollup_id =
           (predecessor_hash, Int32.pred block_level)
       in
       let* (l2_predecessor, predecessor_context, blocks_to_commit) =
-        if Block_hash.(current_hash = state.State.rollup_info.origination_block)
-        then return (None, None, [])
+        if originated_in_block rollup_id block_info then
+          let*! () =
+            Event.(emit detected_origination) (rollup_id, current_hash)
+          in
+          return (None, None, [])
         else process_block state predecessor_hash rollup_id
       in
       let*! () =

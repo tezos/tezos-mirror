@@ -711,8 +711,7 @@ end)
 
 type rollup_info = {
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 module Rollup_info_store = Make_singleton (struct
@@ -723,14 +722,11 @@ module Rollup_info_store = Make_singleton (struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {rollup_id; origination_block; origination_level} ->
-        (rollup_id, origination_block, origination_level))
-      (fun (rollup_id, origination_block, origination_level) ->
-        {rollup_id; origination_block; origination_level})
-    @@ obj3
+      (fun {rollup_id; origination_level} -> (rollup_id, origination_level))
+      (fun (rollup_id, origination_level) -> {rollup_id; origination_level})
+    @@ obj2
          (req "rollup_id" Protocol.Alpha_context.Tx_rollup.encoding)
-         (req "origination_block" Block_hash.encoding)
-         (req "origination_level" int32)
+         (opt "origination_level" int32)
 end)
 
 module Finalized_level_store = Make_singleton (struct

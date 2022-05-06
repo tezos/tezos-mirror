@@ -38,8 +38,7 @@ module Tezos_blocks_cache :
 (** Information about the rollup that is kept in the state. *)
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 type t = private {

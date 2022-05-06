@@ -100,16 +100,15 @@ let rollup_id_arg =
     ~doc:"The rollup id of the rollup to target"
     rollup_id_param
 
-let rollup_genesis_arg =
+let origination_level_arg =
   Clic.arg
-    ~long:"rollup-genesis"
-    ~placeholder:"rollup_genesis"
-    ~doc:"The hash of the block where the rollup was created"
+    ~long:"origination-level"
+    ~placeholder:"origination_level"
+    ~doc:"The level of the block where the rollup was originated"
     (Clic.parameter (fun _ str ->
-         Option.fold_f
-           ~none:(fun () -> failwith "Invalid Block Hash")
-           ~some:return
-         @@ Block_hash.of_b58check_opt str))
+         match Int32.of_string_opt str with
+         | None -> failwith "Invalid origination level"
+         | Some l -> return l))
 
 let rpc_addr_arg =
   let default = P2p_point.Id.to_string Node_config.default_rpc_addr in
@@ -179,7 +178,7 @@ let configuration_init_command =
        remove_commitment_signer_arg
        rejection_signer_arg
        dispatch_withdrawals_signer_arg
-       rollup_genesis_arg
+       origination_level_arg
        rpc_addr_arg
        allow_deposit_arg
        reconnection_delay_arg)
@@ -197,7 +196,7 @@ let configuration_init_command =
            remove_commitment_signer,
            rejection_signer,
            dispatch_withdrawals_signer,
-           rollup_genesis,
+           origination_level,
            rpc_addr,
            allow_deposit,
            reconnection_delay )
@@ -226,7 +225,7 @@ let configuration_init_command =
                 dispatch_withdrawals = dispatch_withdrawals_signer;
               };
             rollup_id;
-            rollup_genesis;
+            origination_level;
             rpc_addr;
             reconnection_delay;
             allow_deposit;

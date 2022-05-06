@@ -121,6 +121,15 @@ let processing_block =
     ("block_hash", Block_hash.encoding)
     ("predecessor_hash", Block_hash.encoding)
 
+let detected_origination =
+  declare_2
+    ~section
+    ~name:"tx_rollup_node_detected_origination"
+    ~msg:"Detected rollup {rollup} origination in {block}"
+    ~level:Debug
+    ("rollup", Protocol.Alpha_context.Tx_rollup.encoding)
+    ("block", Block_hash.encoding)
+
 let tezos_block_processed =
   declare_2
     ~section
