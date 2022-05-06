@@ -469,7 +469,6 @@ let withdraw_stake ctxt rollup staker =
         let* (ctxt, _size_freed) =
           Store.Stakers.remove_existing (ctxt, rollup) staker
         in
-        let* ctxt = modify_staker_count ctxt rollup Int32.pred in
         modify_staker_count ctxt rollup Int32.pred
       else fail Sc_rollup_not_staked_on_lcc
 
