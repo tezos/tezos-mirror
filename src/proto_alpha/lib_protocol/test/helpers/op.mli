@@ -128,6 +128,19 @@ val contract_origination :
   Contract.t ->
   (Operation.packed * Contract.t) tzresult Lwt.t
 
+val contract_origination_hash :
+  ?counter:Z.t ->
+  ?delegate:public_key_hash ->
+  script:Script.t ->
+  ?public_key:public_key ->
+  ?credit:Tez.tez ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  (Operation.packed * Contract_hash.t) tzresult Lwt.t
+
 val originated_contract : Operation.packed -> Contract.t
 
 val register_global_constant :
