@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_store_shared)
+ (public_name tezos-store.shared)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  ringo-lwt
+  tezos-validation)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_shell_services
+  -open Tezos_validation)
+ (modules naming block_repr store_types store_events block_key block_level))

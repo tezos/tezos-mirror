@@ -9,8 +9,10 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
-  "tezos-shell-services"
   "tezos-base"
+  "tezos-shell-services"
+  "ringo-lwt" { >= "0.9" }
+  "tezos-validation"
   "tezos-version"
   "index" { >= "1.6.0" & < "1.7.0" }
   "irmin-pack" { >= "3.3.1" & < "3.4.0" }
@@ -18,12 +20,10 @@ depends: [
   "tezos-context"
   "tezos-context-ops"
   "tezos-shell-context"
-  "tezos-validation"
   "tezos-protocol-updater"
   "tezos-stdlib-unix"
   "tezos-stdlib"
   "lwt-watcher" { = "0.2" }
-  "ringo-lwt" { >= "0.9" }
   "camlzip" { >= "1.11" & < "1.12" }
   "tar"
   "tar-unix" { = "2.0.0" }

@@ -13,6 +13,7 @@
   tezos-base.unix
   tezos-context
   tezos-store
+  tezos-store.shared
   tezos-protocol-environment
   tezos-context-ops
   tezos-shell-context
@@ -33,6 +34,7 @@
   -open Tezos_base_unix
   -open Tezos_context
   -open Tezos_store
+  -open Tezos_store_shared
   -open Tezos_protocol_environment
   -open Tezos_context_ops
   -open Tezos_shell_context

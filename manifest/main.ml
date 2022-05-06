@@ -2011,6 +2011,28 @@ let octez_validation =
         octez_stdlib_unix |> open_;
       ]
 
+let octez_store_shared =
+  public_lib
+    "tezos-store.shared"
+    ~path:"src/lib_store/shared"
+    ~opam:"tezos-store"
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_shell_services |> open_;
+        ringo_lwt;
+        octez_validation |> open_;
+      ]
+    ~modules:
+      [
+        "naming";
+        "block_repr";
+        "store_types";
+        "store_events";
+        "block_key";
+        "block_level";
+      ]
+
 let octez_store =
   public_lib
     "tezos-store"
@@ -2023,6 +2045,7 @@ let octez_store =
         octez_version;
         index;
         irmin_pack;
+        octez_store_shared |> open_;
         octez_protocol_environment |> open_;
         octez_context |> open_;
         octez_context_ops |> open_;
@@ -2040,22 +2063,16 @@ let octez_store =
       ]
     ~modules:
       [
-        "block_key";
-        "block_level";
-        "block_repr";
         "block_repr_unix";
         "block_store";
         "cemented_block_store";
         "consistency";
         "floating_block_index";
         "floating_block_store";
-        "naming";
         "protocol_store";
         "stored_data";
-        "store_events";
         "store_metrics";
         "store";
-        "store_types";
       ]
 
 let octez_store_reconstruction =
@@ -2071,6 +2088,7 @@ let octez_store_reconstruction =
         octez_protocol_updater |> open_;
         octez_validation |> open_;
         octez_context_ops |> open_;
+        octez_store_shared |> open_;
         octez_store |> open_;
       ]
     ~modules:["reconstruction"; "reconstruction_events"]
@@ -2088,6 +2106,7 @@ let octez_store_snapshots =
         octez_context |> open_;
         octez_validation |> open_;
         octez_store |> open_;
+        octez_store_shared |> open_;
       ]
     ~modules:["snapshots"; "snapshots_events"]
 
@@ -2138,6 +2157,7 @@ let octez_shell =
         octez_base_unix |> open_;
         octez_context |> open_;
         octez_store |> open_;
+        octez_store_shared |> open_;
         octez_protocol_environment |> open_;
         octez_context_ops |> open_;
         octez_shell_context |> open_;
@@ -4583,6 +4603,7 @@ let _octez_store_tests =
         octez_base |> open_ ~m:"TzPervasives";
         octez_context_ops |> open_;
         octez_store |> open_;
+        octez_store_shared |> open_;
         octez_store_reconstruction |> open_;
         octez_store_snapshots |> open_;
         octez_shell_services |> open_;
@@ -4636,6 +4657,7 @@ let _octez_shell_tests =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_test_helpers |> open_;
         octez_store |> open_;
+        octez_store_shared |> open_;
         octez_context |> open_;
         octez_context_ops |> open_;
         octez_shell_context |> open_;

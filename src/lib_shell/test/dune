@@ -16,6 +16,7 @@
   tezos-base
   tezos-base-test-helpers
   tezos-store
+  tezos-store.shared
   tezos-context
   tezos-context-ops
   tezos-shell-context
@@ -36,6 +37,7 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
   -open Tezos_store
+  -open Tezos_store_shared
   -open Tezos_context
   -open Tezos_context_ops
   -open Tezos_shell_context
