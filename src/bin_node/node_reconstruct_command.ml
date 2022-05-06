@@ -76,7 +76,7 @@ module Term = struct
       let patch_context =
         Patch_context.patch_context genesis sandbox_parameters
       in
-      Tezos_store.Reconstruction.reconstruct
+      Reconstruction.reconstruct
         ~patch_context
         ~store_dir
         ~context_dir

@@ -17,6 +17,8 @@
   tezos-p2p
   tezos-shell
   tezos-store
+  tezos-store.reconstruction
+  tezos-store.snapshots
   tezos-context
   tezos-validator
   tezos-validation
@@ -120,6 +122,8 @@
   -open Tezos_p2p
   -open Tezos_shell
   -open Tezos_store
+  -open Tezos_store_reconstruction
+  -open Tezos_store_snapshots
   -open Tezos_context
   -open Tezos_validator
   -open Tezos_validation

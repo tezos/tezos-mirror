@@ -2038,6 +2038,57 @@ let octez_store =
         tar_unix;
         prometheus;
       ]
+    ~modules:
+      [
+        "block_key";
+        "block_level";
+        "block_repr";
+        "block_store";
+        "cemented_block_store";
+        "consistency";
+        "floating_block_index";
+        "floating_block_store";
+        "naming";
+        "protocol_store";
+        "stored_data";
+        "store_events";
+        "store_metrics";
+        "store";
+        "store_types";
+      ]
+
+let octez_store_reconstruction =
+  public_lib
+    "tezos-store.reconstruction"
+    ~path:"src/lib_store"
+    ~opam:"tezos-store"
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_stdlib_unix |> open_;
+        octez_shell_services |> open_;
+        octez_protocol_updater |> open_;
+        octez_validation |> open_;
+        octez_context_ops |> open_;
+        octez_store |> open_;
+      ]
+    ~modules:["reconstruction"; "reconstruction_events"]
+
+let octez_store_snapshots =
+  public_lib
+    "tezos-store.snapshots"
+    ~path:"src/lib_store"
+    ~opam:"tezos-store"
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_stdlib_unix |> open_;
+        octez_shell_services |> open_;
+        octez_context |> open_;
+        octez_validation |> open_;
+        octez_store |> open_;
+      ]
+    ~modules:["snapshots"; "snapshots_events"]
 
 let octez_requester =
   public_lib
@@ -4531,6 +4582,8 @@ let _octez_store_tests =
         octez_base |> open_ ~m:"TzPervasives";
         octez_context_ops |> open_;
         octez_store |> open_;
+        octez_store_reconstruction |> open_;
+        octez_store_snapshots |> open_;
         octez_shell_services |> open_;
         octez_stdlib_unix |> open_;
         octez_validation |> open_;
@@ -4762,6 +4815,8 @@ let _octez_node =
          octez_p2p |> open_;
          octez_shell |> open_;
          octez_store |> open_;
+         octez_store_reconstruction |> open_;
+         octez_store_snapshots |> open_;
          octez_context |> open_;
          octez_validator_lib |> open_;
          octez_validation |> open_;

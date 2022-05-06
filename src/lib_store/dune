@@ -36,4 +36,66 @@
   -open Tezos_validation
   -open Tezos_protocol_updater
   -open Tezos_stdlib_unix
-  -open Tezos_stdlib))
+  -open Tezos_stdlib)
+ (modules
+  block_key
+  block_level
+  block_repr
+  block_store
+  cemented_block_store
+  consistency
+  floating_block_index
+  floating_block_store
+  naming
+  protocol_store
+  stored_data
+  store_events
+  store_metrics
+  store
+  store_types))
+
+(library
+ (name tezos_store_reconstruction)
+ (public_name tezos-store.reconstruction)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-shell-services
+  tezos-protocol-updater
+  tezos-validation
+  tezos-context-ops
+  tezos-store)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_protocol_updater
+  -open Tezos_validation
+  -open Tezos_context_ops
+  -open Tezos_store)
+ (modules reconstruction reconstruction_events))
+
+(library
+ (name tezos_store_snapshots)
+ (public_name tezos-store.snapshots)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-shell-services
+  tezos-context
+  tezos-validation
+  tezos-store)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_context
+  -open Tezos_validation
+  -open Tezos_store)
+ (modules snapshots snapshots_events))
