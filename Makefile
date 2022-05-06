@@ -1,4 +1,5 @@
-PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
+PACKAGES_SUBPROJECT:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
+PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find opam -name \*.opam -print)))
 
 active_protocol_versions := $(shell cat active_protocol_versions)
 tx_rollup_protocol_versions := $(shell cat tx_rollup_protocol_versions)
@@ -113,13 +114,19 @@ all.pkg: generate_dune
 	@dune build --profile=$(PROFILE) \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
 
-$(addsuffix .pkg,${PACKAGES}): %.pkg:
+$(addsuffix .pkg,${PACKAGES_SUBPROJECT}): %.pkg:
 	@dune build --profile=$(PROFILE) \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name $*.opam -print))
 
-$(addsuffix .test,${PACKAGES}): %.test:
+$(addsuffix .pkg,${PACKAGES}): %.pkg:
+	dune build --profile=$(PROFILE) $(patsubst %.opam,%.install,$*.opam)
+
+$(addsuffix .test,${PACKAGES_SUBPROJECT}): %.test:
 	@dune build --profile=$(PROFILE) \
 	    @$(patsubst %/$*.opam,%,$(shell find src vendors -name $*.opam))/runtest
+
+$(addsuffix .test,${PACKAGES}): %.test:
+	@echo "'make $*.test' is no longer supported"
 
 .PHONY: coverage-report
 coverage-report:
