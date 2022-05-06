@@ -40,7 +40,7 @@ module Parameters = struct
     remove_commitment_signer : string option;
     dispatch_withdrawals_signer : string option;
     rejection_signer : string option;
-    rollup_genesis : string;
+    origination_level : int option;
     rpc_addr : string;
     allow_deposit : bool;
     dormant_mode : bool;
@@ -94,12 +94,12 @@ let spawn_init_config node =
         node.persistent_state.rollup_id;
         "--data-dir";
         data_dir node;
-        "--rollup-genesis";
-        node.persistent_state.rollup_genesis;
         "--rpc-addr";
         rpc_addr node;
       ]
      @ if node.persistent_state.allow_deposit then ["--allow-deposit"] else [])
+    |> add_option "--origination-level"
+       @@ Option.map string_of_int node.persistent_state.origination_level
     |> add_option "--operator" @@ operator node
     |> add_option "--batch-signer" node.persistent_state.batch_signer
     |> add_option
@@ -225,7 +225,7 @@ let wait_for ?where node name filter =
 
 let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
     ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name mode
-    ~rollup_id ~rollup_genesis ?operator ?batch_signer
+    ~rollup_id ?origination_level ?operator ?batch_signer
     ?finalize_commitment_signer ?remove_commitment_signer
     ?dispatch_withdrawals_signer ?rejection_signer ?(allow_deposit = false)
     client tezos_node =
@@ -250,7 +250,7 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
         data_dir;
         rollup_id;
         rpc_addr;
-        rollup_genesis;
+        origination_level;
         runner;
         operator;
         batch_signer;

@@ -228,14 +228,8 @@ let test_node_configuration =
       let operator = Constant.bootstrap1.public_key_hash in
       (* Originate a rollup with a given operator *)
       let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
-      let* block_hash = RPC.get_block_hash client in
       let* () =
-        Rollup_node.create
-          Operator
-          ~rollup_id:tx_rollup_hash
-          ~rollup_genesis:block_hash
-          client
-          node
+        Rollup_node.create Operator ~rollup_id:tx_rollup_hash client node
         |> Rollup_node.spawn_init_config
         |> Process.check_error ~exit_code:1 ~msg:(rex "Missing signers")
       in
@@ -243,7 +237,6 @@ let test_node_configuration =
         Rollup_node.create
           Observer
           ~rollup_id:tx_rollup_hash
-          ~rollup_genesis:block_hash
           ~allow_deposit:true
           client
           node
@@ -273,12 +266,10 @@ let init_and_run_rollup_node ~originator ?operator ?batch_signer
   let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:originator client in
   let* () = Client.bake_for_and_wait client in
   Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
-  let* block_hash = RPC.get_block_hash client in
   let tx_node =
     Rollup_node.create
       Custom
       ~rollup_id:tx_rollup_hash
-      ~rollup_genesis:block_hash
       ?operator
       ?batch_signer
       ?finalize_commitment_signer
@@ -329,12 +320,10 @@ let test_not_allow_deposit =
       in
       let* () = Client.bake_for_and_wait client in
       Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
-      let* block_hash = RPC.get_block_hash client in
       let tx_node =
         Rollup_node.create
           Custom
           ~rollup_id:tx_rollup_hash
-          ~rollup_genesis:block_hash
           ~operator
           ~allow_deposit:false
           client
@@ -425,12 +414,10 @@ let test_tx_node_store_inbox =
       let operator = Constant.bootstrap1.public_key_hash in
       let*! rollup = Client.Tx_rollup.originate ~src:operator client in
       let* () = Client.bake_for_and_wait client in
-      let* block_hash = RPC.get_block_hash client in
       let tx_node =
         Rollup_node.create
           Observer
           ~rollup_id:rollup
-          ~rollup_genesis:block_hash
           ~allow_deposit:true
           client
           node
@@ -519,17 +506,10 @@ let test_node_cannot_connect =
   Log.info "Originate rollup" ;
   let*! rollup_id = Client.Tx_rollup.originate ~src:originator client in
   let* () = Client.bake_for_and_wait client in
-  let* block_hash = RPC.get_block_hash client in
   Log.info "Stopping Tezos node" ;
   let* () = Node.terminate node in
   let tx_node =
-    Rollup_node.create
-      Custom
-      ~rollup_id
-      ~rollup_genesis:block_hash
-      ~allow_deposit:false
-      client
-      node
+    Rollup_node.create Custom ~rollup_id ~allow_deposit:false client node
   in
   let* _ = Rollup_node.init_config tx_node in
   let* () = Rollup_node.run tx_node in
