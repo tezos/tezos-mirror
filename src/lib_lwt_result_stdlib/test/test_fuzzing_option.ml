@@ -30,13 +30,13 @@ open Test_fuzzing_helpers
 
 (* First-1: testing equivalence of iter* *)
 module TestIter = struct
-  open QCheck
+  open QCheck2
   open Monad
 
   let iter =
     Test.make
       ~name:"{Option,List([01])}.iter"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), init, input) ->
         eq
           (let acc = ref init in
@@ -49,7 +49,7 @@ module TestIter = struct
   let iter_e =
     Test.make
       ~name:"{Option,List([01])}.iter_e"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), init, input) ->
         let open Result_syntax in
         eq_e
@@ -63,7 +63,7 @@ module TestIter = struct
   let iter_s =
     Test.make
       ~name:"{Option,List([01])}.iter_s"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), init, input) ->
         let open Lwt_syntax in
         eq_s
@@ -77,7 +77,7 @@ module TestIter = struct
   let iter_es =
     Test.make
       ~name:"{Option,List([01])}.iter_es"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), init, input) ->
         let open Lwt_result_syntax in
         eq_es
@@ -93,13 +93,13 @@ end
 
 (* First-2: testing equivalence of filter* *)
 module TestFilter = struct
-  open QCheck
+  open QCheck2
   open Monad
 
   let filter =
     Test.make
       ~name:"{Option,List([01])}.filter"
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (fn, const, input) ->
         eq
           (Option.filter (CondOf.fn fn const) input)
@@ -108,7 +108,7 @@ module TestFilter = struct
   let filter_e =
     Test.make
       ~name:"{Option,List([01])}.filter_e"
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (fn, const, input) ->
         let open Result_syntax in
         eq_e
@@ -121,7 +121,7 @@ module TestFilter = struct
   let filter_s =
     Test.make
       ~name:"{Option,List([01])}.filter_s"
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (fn, const, input) ->
         let open Lwt_syntax in
         eq_s
@@ -134,7 +134,7 @@ module TestFilter = struct
   let filter_es =
     Test.make
       ~name:"{Option,List([01])}.filter_es"
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (fn, const, input) ->
         let open Lwt_result_syntax in
         eq_es
@@ -147,7 +147,7 @@ module TestFilter = struct
   let filter_left =
     Test.make
       ~name:(Format.asprintf "Option.{filter,filter_left}")
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (pred, const, input) ->
         let cond = CondOf.fn pred const in
         eq
@@ -160,7 +160,7 @@ module TestFilter = struct
   let filter_right =
     Test.make
       ~name:(Format.asprintf "Option.{filter,Option.filter_right}")
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (pred, const, input) ->
         let cond = CondOf.fn pred const in
         eq
@@ -173,7 +173,7 @@ module TestFilter = struct
   let filter_ok =
     Test.make
       ~name:(Format.asprintf "Option.{filter,filter_ok}")
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (pred, const, input) ->
         let cond = CondOf.fn pred const in
         eq
@@ -184,7 +184,7 @@ module TestFilter = struct
   let filter_error =
     Test.make
       ~name:(Format.asprintf "Option.{filter,Option.filter_error}")
-      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.pred one maybe)
       (fun (pred, const, input) ->
         let cond = CondOf.fn pred const in
         eq
@@ -207,13 +207,13 @@ end
 
 (* First-3: testing equivalence of filter_map* *)
 module TestFilterMap = struct
-  open QCheck
+  open QCheck2
   open Monad
 
   let filter_map =
     Test.make
       ~name:"{Option,List([01])}.filter_map"
-      (quad
+      (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
@@ -229,7 +229,7 @@ module TestFilterMap = struct
   let filter_map_e =
     Test.make
       ~name:"{Option,List([01])}.filter_map_e"
-      (quad
+      (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
@@ -248,7 +248,7 @@ module TestFilterMap = struct
   let filter_map_s =
     Test.make
       ~name:"{Option,List([01])}.filter_map_s"
-      (quad
+      (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
@@ -267,7 +267,7 @@ module TestFilterMap = struct
   let filter_map_es =
     Test.make
       ~name:"{Option,List([01])}.filter_map_es"
-      (quad
+      (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
@@ -288,13 +288,13 @@ end
 
 (* First-4: testing equivalence of map* *)
 module TestMap = struct
-  open QCheck
+  open QCheck2
   open Monad
 
   let map =
     Test.make
       ~name:"{Option,List([01])}.map"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), const, input) ->
         eq
           (Option.map (MapOf.fn const fn) input)
@@ -303,7 +303,7 @@ module TestMap = struct
   let map_e =
     Test.make
       ~name:"{Option,List([01])}.map_e"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), const, input) ->
         let open Result_syntax in
         eq
@@ -314,7 +314,7 @@ module TestMap = struct
   let map_s =
     Test.make
       ~name:"{Option,List([01])}.map_s"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), const, input) ->
         let open Lwt_syntax in
         eq
@@ -325,7 +325,7 @@ module TestMap = struct
   let map_es =
     Test.make
       ~name:"{Option,List([01])}.map_es"
-      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one maybe)
       (fun (Fun (_, fn), const, input) ->
         let open Lwt_result_syntax in
         eq
