@@ -1082,7 +1082,14 @@ module Target = struct
     let opam =
       match opam with
       | Some "" -> None
-      | Some _ as x -> x
+      | Some opam as x -> (
+          let pkg_name = Filename.basename opam in
+          match String.index_opt pkg_name '.' with
+          | None -> x
+          | Some _ ->
+              invalid_argf
+                "%s is not a valid opam package name: '.' (dot) are not allowed"
+                pkg_name)
       | None -> (
           match kind with
           | Public_library {public_name; _}
