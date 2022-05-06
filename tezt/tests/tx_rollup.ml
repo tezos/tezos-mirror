@@ -144,7 +144,7 @@ let submit_rejection ?(src = Constant.bootstrap1.public_key_hash) ~level
    tests should be used to ensure there is no regressions with the
    various RPCs exported by the tx_rollups. *)
 module Regressions = struct
-  module RPC = struct
+  module RPC_tests = struct
     let rpc_state =
       Protocol.register_regression_test
         ~__FILE__
@@ -669,16 +669,16 @@ module Regressions = struct
   end
 
   let register protocols =
-    RPC.rpc_state protocols ;
-    RPC.rpc_inbox protocols ;
-    RPC.rpc_inbox_message_hash protocols ;
-    RPC.rpc_inbox_merkle_tree_hash protocols ;
-    RPC.rpc_inbox_merkle_tree_path protocols ;
-    RPC.rpc_commitment protocols ;
-    RPC.rpc_commitment_remove protocols ;
-    RPC.rpc_pending_bonded_commitment protocols ;
-    RPC.batch_encoding protocols ;
-    RPC.rpc_inbox_future protocols ;
+    RPC_tests.rpc_state protocols ;
+    RPC_tests.rpc_inbox protocols ;
+    RPC_tests.rpc_inbox_message_hash protocols ;
+    RPC_tests.rpc_inbox_merkle_tree_hash protocols ;
+    RPC_tests.rpc_inbox_merkle_tree_path protocols ;
+    RPC_tests.rpc_commitment protocols ;
+    RPC_tests.rpc_commitment_remove protocols ;
+    RPC_tests.rpc_pending_bonded_commitment protocols ;
+    RPC_tests.batch_encoding protocols ;
+    RPC_tests.rpc_inbox_future protocols ;
     Limits.submit_empty_batch protocols ;
     Limits.submit_maximum_size_batch protocols ;
     Limits.inbox_maximum_size protocols ;
