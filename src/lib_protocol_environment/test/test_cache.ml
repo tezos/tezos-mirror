@@ -103,21 +103,21 @@ let insert_entries cache entries =
     cache
     entries
 
-let gen_cache ?(high_init_entries = high_init_entries) () =
+let gen_cache ?(allow_empty = true) ?(high_init_entries = high_init_entries) ()
+    =
   QCheck.(
     Gen.(
       let* ncaches = int_range 1 3 in
       let layout = generate ~n:ncaches (int_range low_size high_size) in
       let cache = from_layout layout in
-      (* One out of a hundred generated caches have no entries. *)
-      frequency
-        [
-          (1, return (layout, [], cache));
-          ( 99,
-            let* entries = gen_entries ~high_init_entries ncaches in
-            let cache = insert_entries cache entries in
-            return (layout, entries, cache) );
-        ]))
+      let gen =
+        let* entries = gen_entries ~high_init_entries ncaches in
+        let cache = insert_entries cache entries in
+        return (layout, entries, cache)
+      in
+      (* If allow_empty is true, then one out of a hundred generated caches have no entries. *)
+      if allow_empty then frequency [(1, return (layout, [], cache)); (99, gen)]
+      else gen))
 
 let pp_option what fmt = function
   | None -> Format.fprintf fmt "None"
@@ -752,7 +752,7 @@ let check_load_cache_fails_if_builder_fails mode_label mode =
     ~name:("load_cache fails if builder fails " ^ mode_label)
     (QCheck.make
        ~print:(fun c -> Format.asprintf "%a" pp_cache c)
-       (gen_cache ~high_init_entries:low_init_entries ()))
+       (gen_cache ~allow_empty:false ~high_init_entries:low_init_entries ()))
     (fun x ->
       Lwt_main.run
         (load_cache_correctly_restores_cache_in_memory_fatal_error_case mode x)
