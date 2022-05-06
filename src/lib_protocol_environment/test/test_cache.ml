@@ -126,6 +126,30 @@ let pp_identifier fmt s = Format.fprintf fmt "%s" s
 
 let pp_layout = Format.pp_print_list pp_int
 
+let pp_entries =
+  let pp_entry fmt (size, identifier, key, size') =
+    Format.fprintf
+      fmt
+      "(%d, %s, %s, %d)"
+      size
+      (identifier_of_key key)
+      identifier
+      size'
+  in
+  Format.pp_print_list pp_entry
+
+let pp_cache fmt cache =
+  let (layout, entries, cache) = cache in
+  Format.fprintf
+    fmt
+    "(layout: %a, entries: [%a], cache: %a)"
+    pp_layout
+    layout
+    pp_entries
+    entries
+    pp
+    cache
+
 (*
 
    Cache-level tests
@@ -723,7 +747,9 @@ let load_cache_correctly_restores_cache_in_memory_fatal_error_case =
 let check_load_cache_fails_if_builder_fails mode_label mode =
   QCheck.Test.make
     ~name:("load_cache fails if builder fails " ^ mode_label)
-    (QCheck.make (gen_cache ~high_init_entries:low_init_entries ()))
+    (QCheck.make
+       ~print:(fun c -> Format.asprintf "%a" pp_cache c)
+       (gen_cache ~high_init_entries:low_init_entries ()))
     (fun x ->
       Lwt_main.run
         (load_cache_correctly_restores_cache_in_memory_fatal_error_case mode x)
