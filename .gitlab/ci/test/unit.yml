@@ -122,6 +122,7 @@ unit:alpha:
     proto_alpha__lib_protocol__3: >
         @src/proto_alpha/lib_protocol/test/pbt/runtest
         @src/proto_alpha/lib_protocol/test/unit/runtest
+        @src/proto_alpha/lib_protocol/test/regression/runtest
     proto_alpha: >
         @src/proto_alpha/lib_benchmark/runtest
         @src/proto_alpha/lib_client/runtest
