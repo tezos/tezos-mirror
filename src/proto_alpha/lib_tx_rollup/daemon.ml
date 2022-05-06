@@ -263,12 +263,11 @@ let commit_block_on_l1 state block =
       Committer.commit_block ~operator state.State.rollup_info.rollup_id block
 
 let process_messages_and_inboxes (state : State.t)
-    ~(predecessor : L2block.t option) ?predecessor_context block_info rollup_id
-    =
+    ~(predecessor : L2block.t option) ?predecessor_context block_info =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
   let*? (messages, new_tickets) =
-    extract_messages_from_block block_info rollup_id
+    extract_messages_from_block block_info state.State.rollup_info.rollup_id
   in
   let*! () = Event.(emit messages_application) (List.length messages) in
   let* predecessor_context =
@@ -390,8 +389,9 @@ let originated_in_block rollup_id block =
   | None -> false
   | Some ops -> List.exists has_rollup_origination ops
 
-let rec process_block state current_hash rollup_id =
+let rec process_block state current_hash =
   let open Lwt_result_syntax in
+  let rollup_id = state.State.rollup_info.rollup_id in
   let*! l2_block = State.get_tezos_l2_block state current_hash in
   match l2_block with
   | Some l2_block ->
@@ -423,7 +423,7 @@ let rec process_block state current_hash rollup_id =
             State.set_rollup_info state rollup_id ~origination_level:block_level
           in
           return (None, None, [])
-        else process_block state predecessor_hash rollup_id
+        else process_block state predecessor_hash
       in
       let*! () =
         Event.(emit processing_block) (current_hash, predecessor_hash)
@@ -434,7 +434,6 @@ let rec process_block state current_hash rollup_id =
           ~predecessor:l2_predecessor
           ?predecessor_context
           block_info
-          rollup_id
       in
       let blocks_to_commit =
         match l2_block with
@@ -737,10 +736,10 @@ let handle_l1_reorg state acc reorg =
   in
   return acc
 
-let process_head state (current_hash, current_header) rollup_id =
+let process_head state (current_hash, current_header) =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* (_, _, blocks_to_commit) = process_block state current_hash rollup_id in
+  let* (_, _, blocks_to_commit) = process_block state current_hash in
   let* l1_reorg = State.set_tezos_head state current_hash in
   let* () = handle_l1_reorg state () l1_reorg in
   let* () = List.iter_es (commit_block_on_l1 state) blocks_to_commit in
@@ -925,7 +924,7 @@ let run configuration cctxt =
           let*! () =
             Lwt_stream.iter_s
               (fun head ->
-                let*! r = process_head state head rollup_id in
+                let*! r = process_head state head in
                 match r with
                 | Ok _ -> Lwt.return ()
                 | Error trace when is_connection_error trace ->
