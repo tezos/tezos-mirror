@@ -109,12 +109,15 @@ let gen_cache ?(high_init_entries = high_init_entries) () =
       let* ncaches = int_range 1 3 in
       let layout = generate ~n:ncaches (int_range low_size high_size) in
       let cache = from_layout layout in
-      let* k = int_range 0 100 in
-      if k = 0 then return (layout, [], cache)
-      else
-        let* entries = gen_entries ~high_init_entries ncaches in
-        let cache = insert_entries cache entries in
-        return (layout, entries, cache)))
+      (* One out of a hundred generated caches have no entries. *)
+      frequency
+        [
+          (1, return (layout, [], cache));
+          ( 99,
+            let* entries = gen_entries ~high_init_entries ncaches in
+            let cache = insert_entries cache entries in
+            return (layout, entries, cache) );
+        ]))
 
 let pp_option what fmt = function
   | None -> Format.fprintf fmt "None"
