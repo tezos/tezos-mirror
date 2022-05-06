@@ -23,10 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol.Alpha_context
+
+(** [build_rejection state ~reject_commitment block ~position] constructs a
+    rejection operation for rejecting message at position [position] in the (bad)
+    commitment [reject_commitment], using the actual L2 block [block].  *)
+val build_rejection :
+  State.t ->
+  reject_commitment:Tx_rollup_commitment.Full.t ->
+  L2block.t ->
+  position:int ->
+  Kind.tx_rollup_rejection manager_operation tzresult Lwt.t
+
 (** [reject_bad_commitment ~source state commitment] injects a rejection
     operation with [source] if the [commitment] is rejectable. *)
 val reject_bad_commitment :
   source:Signature.Public_key_hash.t ->
   State.t ->
-  Protocol.Alpha_context.Tx_rollup_commitment.Full.t ->
+  Tx_rollup_commitment.Full.t ->
   unit tzresult Lwt.t

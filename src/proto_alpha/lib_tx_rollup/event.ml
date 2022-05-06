@@ -121,7 +121,7 @@ let processing_block =
     ("block_hash", Block_hash.encoding)
     ("predecessor_hash", Block_hash.encoding)
 
-let block_processed =
+let tezos_block_processed =
   declare_2
     ~section
     ~name:"tx_rollup_node_tezos_block_processed"
@@ -141,12 +141,15 @@ let block_already_processed =
     ("block_hash", Block_hash.encoding)
 
 let processing_block_predecessor =
-  declare_1
+  declare_2
     ~section
     ~name:"tx_rollup_node_processing_block_predecessor"
-    ~msg:"processing block predecessor: {predecessor_hash}"
+    ~msg:
+      "processing block predecessor {predecessor_hash} at level \
+       {predecessor_level}"
     ~level:Debug
     ("predecessor_hash", Block_hash.encoding)
+    ("predecessor_level", Data_encoding.int32)
 
 let messages_application =
   declare_1

@@ -46,7 +46,7 @@ type t = {
   stores : Stores.t;
   cctxt : Protocol_client_context.full;
   context_index : Context.index;
-  mutable head : L2block.t;
+  mutable head : L2block.t option;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
@@ -195,16 +195,17 @@ let save_block state (block : L2block.t) =
   join [save_level state block.header.level block.hash; save_block state block]
 
 let distance_l2_levels l1 l2 =
-  let to_int32 = function
-    | L2block.Genesis -> -1l
-    | Rollup_level l -> Tx_rollup_level.to_int32 l
-  in
-  Int32.sub (to_int32 l2) (to_int32 l1)
+  Int32.sub (Tx_rollup_level.to_int32 l2) (Tx_rollup_level.to_int32 l1)
 
 (* Compute the reorganization of L2 blocks from the chain whose head is
    [old_head_hash] and the chain whose head [new_head_hash]. *)
 let rollup_reorg state ~old_head ~new_head =
   let open Lwt_syntax in
+  let get_pred b =
+    match b.L2block.header.predecessor with
+    | None -> Lwt.return_none
+    | Some b -> get_block state b
+  in
   let rec loop old_chain new_chain old_head new_head =
     match (old_head, new_head) with
     | (None, _) | (_, None) ->
@@ -233,26 +234,18 @@ let rollup_reorg state ~old_head ~new_head =
               (* Heads at same level *)
               let new_chain = new_head :: new_chain in
               let old_chain = old_head :: old_chain in
-              let* new_head =
-                get_block state new_head.L2block.header.predecessor
-              in
-              let+ old_head =
-                get_block state old_head.L2block.header.predecessor
-              in
+              let* new_head = get_pred new_head in
+              let+ old_head = get_pred old_head in
               (old_chain, new_chain, old_head, new_head)
             else if diff > 0l then
               (* New chain is longer *)
               let new_chain = new_head :: new_chain in
-              let+ new_head =
-                get_block state new_head.L2block.header.predecessor
-              in
+              let+ new_head = get_pred new_head in
               (old_chain, new_chain, Some old_head, new_head)
             else
               (* Old chain was longer *)
               let old_chain = old_head :: old_chain in
-              let+ old_head =
-                get_block state old_head.L2block.header.predecessor
-              in
+              let+ old_head = get_pred old_head in
               (old_chain, new_chain, old_head, Some new_head)
           in
           loop old_chain new_chain old new_
@@ -273,7 +266,7 @@ let patch_l2_levels state (reorg : L2block.t reorg) =
 
 let set_head state head =
   let open Lwt_result_syntax in
-  state.head <- head ;
+  state.head <- Some head ;
   let*! old_head = Stores.Head_store.read state.stores.head in
   let hash = head.L2block.hash in
   let* () = Stores.Head_store.write state.stores.head hash in
@@ -324,19 +317,12 @@ let delete_finalized_level state =
 
 let get_block_metadata state (header : L2block.header) =
   let open Lwt_syntax in
-  let* commitment_included =
-    match header.commitment with
-    | None -> return_none
-    | Some c -> get_included_commitment state c
-  in
+  let* commitment_included = get_included_commitment state header.commitment in
   let+ finalized_level = get_finalized_level state in
   let finalized =
     match finalized_level with
     | None -> false
-    | Some l -> (
-        match header.level with
-        | Genesis -> false
-        | Rollup_level level -> Tx_rollup_level.(level >= l))
+    | Some l -> Tx_rollup_level.(header.level >= l)
   in
   L2block.{commitment_included; finalized}
 
@@ -432,19 +418,12 @@ let init_context ~data_dir =
   let*! index = Context.init (Node_data.context_dir data_dir) in
   return index
 
-let init_head (stores : Stores.t) context_index rollup rollup_info =
+let read_head (stores : Stores.t) =
   let open Lwt_syntax in
   let* hash = Stores.Head_store.read stores.head in
-  let* head =
-    match hash with
-    | None -> return_none
-    | Some hash -> get_block_store stores hash
-  in
-  match head with
-  | Some head -> return head
-  | None ->
-      let* ctxt = Context.init_context context_index in
-      L2block.genesis_block ctxt rollup rollup_info.origination_block
+  match hash with
+  | None -> return_none
+  | Some hash -> get_block_store stores hash
 
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
@@ -472,7 +451,7 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
       (init_context ~data_dir)
     |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in
-  let*! head = init_head stores context_index rollup_id rollup_info in
+  let*! head = read_head stores in
   let* constants = retrieve_constants cctxt in
   (* L1 blocks are cached to handle reorganizations efficiently *)
   let tezos_blocks_cache = Tezos_blocks_cache.create 32 in

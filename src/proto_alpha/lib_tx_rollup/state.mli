@@ -46,7 +46,7 @@ type t = private {
   stores : Stores.t;
   cctxt : Protocol_client_context.full;
   context_index : Context.index;
-  mutable head : L2block.t;
+  mutable head : L2block.t option;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
@@ -71,7 +71,7 @@ val init :
 
 (** Retrieve the current head of the rollup. Note that the current head can go
     in the past or change in case of reorganisations at the L1 layer.  *)
-val get_head : t -> L2block.t
+val get_head : t -> L2block.t option
 
 (** Retrieve an L2 block by its hash *)
 val get_block : t -> L2block.hash -> L2block.t option Lwt.t

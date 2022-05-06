@@ -71,47 +71,43 @@ let withdawals_reveals_of_message_result ctxt msg =
 
 let dispatch_operations_of_block (state : State.t) (block : L2block.t) =
   let open Lwt_result_syntax in
-  match block.header.level with
-  | L2block.Genesis -> return_nil
-  | Rollup_level level ->
-      let* ctxt = Context.checkout state.context_index block.header.context in
-      let tx_rollup = state.rollup_info.rollup_id in
-      let commitment =
-        WithExceptions.Option.get ~loc:__LOC__ block.commitment
-      in
-      let+ (rev_ops, _) =
-        List.fold_left_es
-          (fun (acc, message_index) msg ->
-            let context_hash = msg.Inbox.l2_context_hash.tree_hash in
-            let* tickets_info = withdawals_reveals_of_message_result ctxt msg in
-            let+ acc =
-              match tickets_info with
-              | [] ->
-                  (* No withdrawals for this message *)
-                  return acc
-              | _ ->
-                  let*? message_result_path =
-                    let open Tx_rollup_commitment.Merkle in
-                    let tree = List.fold_left snoc nil commitment.messages in
-                    Environment.wrap_tzresult @@ compute_path tree message_index
-                  in
-                  return
-                    (Tx_rollup_dispatch_tickets
-                       {
-                         tx_rollup;
-                         level;
-                         context_hash;
-                         message_index;
-                         message_result_path;
-                         tickets_info;
-                       }
-                     :: acc)
-            in
-            (acc, message_index + 1))
-          ([], 0)
-          block.inbox
-      in
-      List.rev rev_ops
+  let level = block.header.level in
+  let* ctxt = Context.checkout state.context_index block.header.context in
+  let tx_rollup = state.rollup_info.rollup_id in
+  let commitment = block.commitment in
+  let+ (rev_ops, _) =
+    List.fold_left_es
+      (fun (acc, message_index) msg ->
+        let context_hash = msg.Inbox.l2_context_hash.tree_hash in
+        let* tickets_info = withdawals_reveals_of_message_result ctxt msg in
+        let+ acc =
+          match tickets_info with
+          | [] ->
+              (* No withdrawals for this message *)
+              return acc
+          | _ ->
+              let*? message_result_path =
+                let open Tx_rollup_commitment.Merkle in
+                let tree = List.fold_left snoc nil commitment.messages in
+                Environment.wrap_tzresult @@ compute_path tree message_index
+              in
+              return
+                (Tx_rollup_dispatch_tickets
+                   {
+                     tx_rollup;
+                     level;
+                     context_hash;
+                     message_index;
+                     message_result_path;
+                     tickets_info;
+                   }
+                 :: acc)
+        in
+        (acc, message_index + 1))
+      ([], 0)
+      block.inbox
+  in
+  List.rev rev_ops
 
 let dispatch_withdrawals ~source state block =
   let open Lwt_result_syntax in

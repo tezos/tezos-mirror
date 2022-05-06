@@ -2146,13 +2146,6 @@ let test_tickets_context =
       Check.(ticket = expected_ticket)
         check_json
         ~error_msg:"Ticket is %L but expected %R" ;
-      Log.info "Ticket is not available in genesis context" ;
-      let* ticket_g =
-        Rollup_node.Client.get_ticket ~tx_node ~block:"genesis" ~ticket_id
-      in
-      Check.(ticket_g = JSON.annotate ~origin:"expected" `Null)
-        check_json
-        ~error_msg:"Ticket is %L but expected %R" ;
       unit)
 
 let test_withdrawals =
