@@ -187,9 +187,13 @@ let on_batch state =
 let on_register state ~apply (tr : L2_transaction.t) =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
+  let*? aggregated_signature =
+    match Bls.aggregate_signature_opt tr.signatures with
+    | Some s -> ok s
+    | None -> error_with "could not aggregate signatures of transaction"
+  in
   let batch =
-    Tx_rollup_l2_batch.V1.
-      {contents = [tr.transaction]; aggregated_signature = tr.signature}
+    Tx_rollup_l2_batch.V1.{contents = [tr.transaction]; aggregated_signature}
   in
   let batch_string =
     Data_encoding.Binary.to_string_exn Tx_rollup_l2_batch.encoding (V1 batch)

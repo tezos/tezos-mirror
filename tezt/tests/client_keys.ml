@@ -91,8 +91,7 @@ let test_bls_gen_keys () =
     ~title:"Generates new tz4 keys"
     (fun () ->
       let* client = Client.init () in
-      let alias = "test_key" in
-      let* () = Client.bls_gen_keys ~alias client in
+      let* alias = Client.bls_gen_keys client in
       let* _account = Client.bls_show_address ~alias client in
       return ())
 

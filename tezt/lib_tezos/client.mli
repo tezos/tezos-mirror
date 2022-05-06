@@ -496,7 +496,7 @@ val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
 
 (** Run [tezos-client bls gen keys <alias>]. *)
 val bls_gen_keys :
-  ?hooks:Process.hooks -> ?force:bool -> alias:string -> t -> unit Lwt.t
+  ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
 
 (** Run [tezos-client bls list keys].
 
@@ -526,6 +526,10 @@ v}
 ]} *)
 val bls_show_address :
   ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
+
+(** A helper to run [tezos-client bls gen keys] followed by
+    [tezos-client bls show address] to get the generated key. *)
+val bls_gen_and_show_keys : ?alias:string -> t -> Account.aggregate_key Lwt.t
 
 (** Run [tezos-client bls import secret key <account.aggregate_alias>
     <account.aggregate_secret_key>]. *)

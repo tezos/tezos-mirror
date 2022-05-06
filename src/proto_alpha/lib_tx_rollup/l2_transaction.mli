@@ -30,7 +30,7 @@ open Protocol
 type t = {
   transaction :
     (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.V1.transaction;
-  signature : Tx_rollup_l2_batch.V1.signature;
+  signatures : Tx_rollup_l2_batch.V1.signature list;
 }
 
 (** Hash with b58check encoding txL2(54), for hashes of L2 transactions *)

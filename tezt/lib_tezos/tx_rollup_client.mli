@@ -34,6 +34,7 @@ val create :
   ?name:string ->
   ?path:string ->
   ?base_dir:string ->
+  ?wallet_dir:string ->
   ?color:Log.Color.t ->
   Tx_rollup_node.t ->
   t
@@ -50,9 +51,9 @@ val craft_tx_transaction :
   signer:string ->
   ?counter:int64 ->
   Rollup.Tx_rollup.transfer_content ->
-  string Lwt.t
+  JSON.t Lwt.t
 
-val craft_tx_transfers : t -> Rollup.Tx_rollup.transfer -> string Lwt.t
+val craft_tx_transfers : t -> Rollup.Tx_rollup.transfer -> JSON.t Lwt.t
 
 val craft_tx_withdraw :
   ?counter:Int64.t ->
@@ -61,13 +62,28 @@ val craft_tx_withdraw :
   signer:string ->
   dest:string ->
   ticket:string ->
-  string Lwt.t
+  JSON.t Lwt.t
 
-val craft_tx_batch : t -> batch:string -> signatures:string -> string Lwt.t
+val craft_tx_batch :
+  ?show_hex:bool ->
+  t ->
+  transactions_and_sig:JSON.t ->
+  [`Hex of string | `Json of JSON.t] Lwt.t
+
+val sign_transaction :
+  ?aggregate:bool ->
+  ?aggregated_signature:string ->
+  t ->
+  transaction:JSON.t ->
+  signers:string list ->
+  string Lwt.t
 
 val get_batcher_queue : t -> string Lwt.t
 
 val get_batcher_transaction : t -> transaction_hash:string -> string Lwt.t
 
 val inject_batcher_transaction :
-  t -> ?expect_failure:bool -> string -> (string * string) Lwt.t
+  ?expect_failure:bool ->
+  t ->
+  transactions_and_sig:JSON.t ->
+  (string * string) Lwt.t

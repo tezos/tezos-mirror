@@ -140,11 +140,14 @@ val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Clic.parameter
 
-val file_or_text_parameter :
+val file_or_text :
   from_text:(string -> 'a tzresult Lwt.t) ->
-  ?from_path:(full -> path:string -> 'a tzresult Lwt.t) ->
-  unit ->
-  ('a, full) Clic.parameter
+  read_file:(string -> string tzresult Lwt.t) ->
+  string ->
+  'a tzresult Lwt.t
+
+val file_or_text_parameter :
+  from_text:(string -> 'a tzresult Lwt.t) -> unit -> ('a, full) Clic.parameter
 
 val json_parameter : (Data_encoding.Json.t, full) Clic.parameter
 

@@ -376,6 +376,12 @@ val alias_aggregate_keys :
   tzresult
   Lwt.t
 
+val aggregate_sign :
+  #Client_context.wallet ->
+  aggregate_sk_uri ->
+  Bytes.t ->
+  Aggregate_signature.t tzresult Lwt.t
+
 (**/**)
 
 val make_pk_uri : Uri.t -> pk_uri tzresult

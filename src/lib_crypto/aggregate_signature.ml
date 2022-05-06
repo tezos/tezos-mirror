@@ -362,7 +362,9 @@ module Secret_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 end
 
-type t = Bls12_381 of Bls.t | Unknown of Bytes.t
+type signature = Bls12_381 of Bls.t | Unknown of Bytes.t
+
+type t = signature
 
 let name = "Aggregate signature"
 

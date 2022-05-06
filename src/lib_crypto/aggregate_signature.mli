@@ -28,10 +28,13 @@ type public_key = Bls12_381 of Bls.Public_key.t
 
 type secret_key = Bls12_381 of Bls.Secret_key.t
 
+type signature = Bls12_381 of Bls.t | Unknown of Bytes.t
+
 include
   S.AGGREGATE_SIGNATURE
     with type Public_key_hash.t = public_key_hash
      and type Public_key.t = public_key
      and type Secret_key.t = secret_key
+     and type t = signature
 
 include S.RAW_DATA with type t := t
