@@ -157,7 +157,6 @@ let check_uninitialised_is_unusable =
     ]
   in
   QCheck.Test.make
-    ~count:1
     ~name:"an uninitialised cache is unusable"
     QCheck.(make Gen.(pair (oneofl cache_funs) (pure uninitialised)))
     (fun (cache_fun, cache) ->
@@ -723,7 +722,6 @@ let load_cache_correctly_restores_cache_in_memory_fatal_error_case =
 
 let check_load_cache_fails_if_builder_fails mode_label mode =
   QCheck.Test.make
-    ~count:1
     ~name:("load_cache fails if builder fails " ^ mode_label)
     (QCheck.make (gen_cache ~high_init_entries:low_init_entries ()))
     (fun x ->
