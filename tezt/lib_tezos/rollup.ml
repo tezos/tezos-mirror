@@ -86,19 +86,54 @@ module Tx_rollup = struct
     finalized_at : int option;
   }
 
-  type transfer_content = {qty : Int64.t; destination : string; ticket : string}
+  type operation_content_payload = {
+    qty : Int64.t;
+    destination : string;
+    ticket : string;
+  }
 
-  let transfer_content_encoding : transfer_content Data_encoding.t =
+  type l2_transfer = [`Transfer of operation_content_payload]
+
+  type l2_withdraw = [`Withdraw of operation_content_payload]
+
+  type operation_content = [l2_transfer | l2_withdraw]
+
+  let operation_content_encoding : operation_content Data_encoding.t =
     let open Data_encoding in
-    conv
-      (fun {qty; destination; ticket} -> (qty, destination, ticket))
-      (fun (qty, destination, ticket) -> {qty; destination; ticket})
-      (obj3 (req "qty" int64) (req "destination" string) (req "ticket" string))
+    let payload_encoding =
+      obj3
+        (req "qty" int64)
+        (req "destination" string)
+        (req "ticket_hash" string)
+    in
+    union
+      [
+        case
+          ~title:"transfer"
+          (Tag 0)
+          payload_encoding
+          (function
+            | `Transfer {qty; destination; ticket} ->
+                Some (qty, destination, ticket)
+            | _ -> None)
+          (fun (qty, destination, ticket) ->
+            `Transfer {qty; destination; ticket});
+        case
+          ~title:"withdraw"
+          (Tag 1)
+          payload_encoding
+          (function
+            | `Withdraw {qty; destination; ticket} ->
+                Some (qty, destination, ticket)
+            | _ -> None)
+          (fun (qty, destination, ticket) ->
+            `Withdraw {qty; destination; ticket});
+      ]
 
-  type transfer = {
+  type operation = {
     signer : string;
     counter : int64 option;
-    contents : transfer_content list;
+    contents : operation_content list;
   }
 
   type deposit_content = {

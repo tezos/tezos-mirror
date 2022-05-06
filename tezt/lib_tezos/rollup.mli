@@ -62,14 +62,24 @@ module Tx_rollup : sig
     finalized_at : int option;
   }
 
-  type transfer_content = {qty : Int64.t; destination : string; ticket : string}
+  type operation_content_payload = {
+    qty : Int64.t;
+    destination : string;
+    ticket : string;
+  }
 
-  val transfer_content_encoding : transfer_content Data_encoding.t
+  type l2_transfer = [`Transfer of operation_content_payload]
 
-  type transfer = {
+  type l2_withdraw = [`Withdraw of operation_content_payload]
+
+  type operation_content = [l2_transfer | l2_withdraw]
+
+  val operation_content_encoding : operation_content Data_encoding.t
+
+  type operation = {
     signer : string;
     counter : int64 option;
-    contents : transfer_content list;
+    contents : operation_content list;
   }
 
   type deposit_content = {

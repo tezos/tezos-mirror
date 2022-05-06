@@ -50,10 +50,15 @@ val craft_tx_transaction :
   t ->
   signer:string ->
   ?counter:int64 ->
-  Rollup.Tx_rollup.transfer_content ->
+  Rollup.Tx_rollup.l2_transfer ->
   JSON.t Lwt.t
 
-val craft_tx_transfers : t -> Rollup.Tx_rollup.transfer -> JSON.t Lwt.t
+val craft_tx_transfers :
+  t ->
+  signer:string ->
+  ?counter:int64 ->
+  Rollup.Tx_rollup.l2_transfer list ->
+  JSON.t Lwt.t
 
 val craft_tx_withdraw :
   ?counter:Int64.t ->
@@ -76,6 +81,20 @@ val sign_transaction :
   t ->
   transaction:JSON.t ->
   signers:string list ->
+  string Lwt.t
+
+val transfer :
+  ?counter:int64 ->
+  t ->
+  source:string ->
+  Rollup.Tx_rollup.l2_transfer ->
+  string Lwt.t
+
+val withdraw :
+  ?counter:int64 ->
+  t ->
+  source:string ->
+  Rollup.Tx_rollup.l2_withdraw ->
   string Lwt.t
 
 val get_batcher_queue : t -> string Lwt.t

@@ -688,17 +688,15 @@ let json_of_transactions_and_sig ~origin transaction signatures =
 let craft_tx_transfers_and_sign ?counter tx_client ~signer transfers =
   let* transaction =
     Tx_rollup_client.craft_tx_transfers
+      ~signer:signer.Account.aggregate_public_key
+      ?counter
       tx_client
-      {
-        signer = signer.Account.aggregate_public_key;
-        counter;
-        contents = transfers;
-      }
+      transfers
   in
   let* signature =
     Tx_rollup_client.sign_transaction
       ~transaction
-      ~signers:[signer.Account.aggregate_alias]
+      ~signers:[signer.aggregate_alias]
       tx_client
   in
   return (transaction, signature)
@@ -708,11 +706,14 @@ let craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket =
     Tx_rollup_client.craft_tx_transaction
       tx_client
       ?counter
-      {qty; destination = dest; ticket}
-      ~signer
+      (`Transfer {qty; destination = dest; ticket})
+      ~signer:signer.Account.aggregate_public_key
   in
   let* signature =
-    Tx_rollup_client.sign_transaction ~transaction ~signers:[signer] tx_client
+    Tx_rollup_client.sign_transaction
+      ~transaction
+      ~signers:[signer.aggregate_alias]
+      tx_client
   in
   return (transaction, signature)
 
@@ -753,6 +754,17 @@ let craft_batch_for_one_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
   match batch with
   | `Json _j -> assert false
   | `Hex _hex as batch -> return batch
+
+let inject_transfer ?counter tx_client ~source ~qty ~dest ~ticket =
+  Tx_rollup_client.transfer ?counter tx_client ~source
+  @@ `Transfer {qty; destination = dest; ticket}
+
+let inject_withdraw ?counter tx_client ~source ~qty ~dest ~ticket =
+  Tx_rollup_client.withdraw
+    ?counter
+    tx_client
+    ~source
+    (`Withdraw {qty; destination = dest; ticket})
 
 let tx_client_get_block ~tx_client ~block =
   Tx_rollup_client.get_block ~block tx_client
@@ -865,7 +877,7 @@ let test_l2_to_l2_transaction =
         craft_batch_for_one_tx
           tx_client
           ~qty:1L
-          ~signer:bls_keys_1.aggregate_alias
+          ~signer:bls_keys_1
           ~dest:bls_keys_2.aggregate_public_key_hash
           ~ticket:ticket_id
       in
@@ -1096,7 +1108,7 @@ let test_batcher =
         craft_tx_and_inject
           tx_client
           ~qty:1L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
@@ -1109,7 +1121,7 @@ let test_batcher =
         craft_tx_and_inject
           tx_client
           ~qty:5L
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
       in
@@ -1121,7 +1133,7 @@ let test_batcher =
           ~failswith:"proto.alpha.tx_rollup_operation_counter_mismatch"
           ~qty:5L
           ~counter:5L
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_key_1.aggregate_public_key_hash
           ~ticket:ticket_id
       in
@@ -1133,7 +1145,7 @@ let test_batcher =
           craft_tx_and_sign
             tx_client
             ~qty:1L
-            ~signer:bls_key_1.aggregate_alias
+            ~signer:bls_key_1
             ~dest:bls_key_2.aggregate_public_key_hash
             ~ticket:ticket_id
         in
@@ -1142,7 +1154,7 @@ let test_batcher =
           craft_tx_and_sign
             tx_client
             ~qty:2L
-            ~signer:bls_key_1.aggregate_alias
+            ~signer:bls_key_1
             ~dest:bls_key_2.aggregate_public_key_hash
             ~ticket:ticket_id
         in
@@ -1159,7 +1171,7 @@ let test_batcher =
         craft_tx_and_inject
           tx_client
           ~qty:1_000_000L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_key_2.aggregate_public_key_hash
           ~ticket:ticket_id
           ~counter:2L
@@ -1198,7 +1210,7 @@ let test_batcher =
           tx_client
           ~qty:amount
           ~counter
-          ~signer:from.Account.aggregate_alias
+          ~signer:from
           ~dest
           ~ticket:ticket_id
       in
@@ -1319,7 +1331,7 @@ let test_reorganization =
         craft_batch_for_one_tx
           tx_client
           ~qty:10L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
@@ -1439,7 +1451,7 @@ let test_l2_proof_rpc_position =
         craft_batch_for_one_tx
           tx_client
           ~counter:1L
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:5L
@@ -1448,7 +1460,7 @@ let test_l2_proof_rpc_position =
         craft_batch_for_one_tx
           tx_client
           ~counter:1L
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:10L
@@ -1713,7 +1725,7 @@ let test_committer =
           tx_client
           ~qty:amount
           ?counter
-          ~signer:from.Account.aggregate_alias
+          ~signer:from
           ~dest
           ~ticket:ticket_id
       in
@@ -1860,7 +1872,7 @@ let test_tickets_context =
       let* _txh1 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
@@ -1868,7 +1880,7 @@ let test_tickets_context =
       let* _txh2 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L
@@ -1966,7 +1978,7 @@ let test_withdrawals =
       let* _txh1 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_1.aggregate_alias
+          ~signer:bls_key_1
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
@@ -1974,7 +1986,7 @@ let test_withdrawals =
       let* _txh2 =
         craft_tx_and_inject
           tx_client
-          ~signer:bls_key_2.aggregate_alias
+          ~signer:bls_key_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L
@@ -2183,15 +2195,15 @@ let test_batcher_large_message =
       in
       let* bls_key = Client.bls_gen_and_show_keys client in
       let pkh1_str = bls_key.aggregate_public_key_hash in
-      let contents : Rollup.transfer_content list =
-        let transfer_content : Rollup.transfer_content =
+      let contents : Rollup.l2_transfer list =
+        let transfer_content : Rollup.l2_transfer =
           let destination = pkh1_str in
           let ticket =
             Tezos_protocol_alpha.Protocol.Alpha_context.Ticket_hash.(
               to_b58check zero)
           in
           let qty = 1L in
-          {destination; ticket; qty}
+          `Transfer {destination; ticket; qty}
         in
         List.init 200 (fun _ -> transfer_content)
       in
@@ -2211,6 +2223,133 @@ let test_batcher_large_message =
       in
       unit)
 
+let test_transfer_command =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: inject transaction with transfer command"
+    ~tags:["tx_rollup"; "client"; "transfer"]
+    (fun protocol ->
+      let* parameter_file = Parameters.parameter_file protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node
+          ~originator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          node
+          client
+      in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
+      (* Generating some identities *)
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client in
+      let* (_level, _contract_id) =
+        make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
+          ~tx_rollup_hash
+          ~tx_node
+          ~client
+          ~tickets_amount:10
+          bls_key_1.aggregate_public_key_hash
+      in
+      let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit_json inbox in
+      let* _ =
+        inject_transfer
+          tx_client
+          ~source:bls_key_1.aggregate_alias
+          ~qty:1L
+          ~dest:bls_key_2.aggregate_alias
+          ~ticket:ticket_id
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* () = Client.bake_for_and_wait client in
+      let* level = Client.level client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+      let* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_key_1.aggregate_public_key_hash
+          ~expected_balance:9
+      and* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_key_2.aggregate_public_key_hash
+          ~expected_balance:1
+      in
+      unit)
+
+let test_withdraw_command =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: inject transaction with withdraw command"
+    ~tags:["tx_rollup"; "client"; "withdraw"]
+    (fun protocol ->
+      let* parameter_file = Parameters.parameter_file protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node
+          ~originator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          node
+          client
+      in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
+      (* Generating some identities *)
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
+      let* (_level, _contract_id) =
+        make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
+          ~tx_rollup_hash
+          ~tx_node
+          ~client
+          ~tickets_amount:10
+          bls_key_1.aggregate_public_key_hash
+      in
+      let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit_json inbox in
+      let* _ =
+        inject_withdraw
+          ~counter:1L
+          tx_client
+          ~source:bls_key_1.aggregate_alias
+          ~qty:1L
+          ~dest:Constant.bootstrap2.public_key_hash
+          ~ticket:ticket_id
+      in
+      let* _ =
+        inject_withdraw
+          ~counter:2L
+          tx_client
+          ~source:bls_key_1.aggregate_alias
+          ~qty:1L
+          ~dest:Constant.bootstrap2.public_key_hash
+          ~ticket:ticket_id
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* () = Client.bake_for_and_wait client in
+      let* level = Client.level client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+      check_tz4_balance
+        ~tx_client
+        ~block:"head"
+        ~ticket_id
+        ~tz4_address:bls_key_1.aggregate_public_key_hash
+        ~expected_balance:8)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -2225,4 +2364,6 @@ let register ~protocols =
   test_tickets_context protocols ;
   test_withdrawals protocols ;
   test_accuser protocols ;
-  test_batcher_large_message protocols
+  test_batcher_large_message protocols ;
+  test_transfer_command protocols ;
+  test_withdraw_command protocols
