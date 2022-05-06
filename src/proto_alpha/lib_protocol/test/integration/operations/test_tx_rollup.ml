@@ -288,9 +288,15 @@ let inbox_testable = Alcotest.testable Tx_rollup_inbox.pp Tx_rollup_inbox.( = )
 
 let rng_state = Random.State.make_self_init ()
 
-let gen_l2_account () =
+let gen_l2_account ?rng_state () =
   (* TODO: when add bls into env6 we could use directly the pkh *)
-  let (_pkh, public_key, secret_key) = Bls.generate_key () in
+  let seed =
+    Option.map
+      (fun rng_state ->
+        Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255))
+      rng_state
+  in
+  let (_pkh, public_key, secret_key) = Bls.generate_key ?seed () in
   (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
@@ -3408,6 +3414,7 @@ module Rejection = struct
       Tezos operation even in the worst cases.
   *)
   let test_rejection_size_limit () =
+    let rng_state = Random.State.make [|42|] in
     context_init1 () >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
     Context.get_constants (B b) >>=? fun constant ->
@@ -3420,7 +3427,8 @@ module Rejection = struct
        we add in the context, bigger the proofs becomes. It needs to be adjusted
        so the following [message2] in this context produces a proof that
        is larger to 30Kb. *)
-    List.init ~when_negative_length:[] 200 (fun _ -> gen_l2_account ())
+    List.init ~when_negative_length:[] 200 (fun _ ->
+        gen_l2_account ~rng_state ())
     >>?= fun l2_accounts ->
     (* The context is filled with the generated l2 accounts. *)
     fill_store store l2_accounts >>= fun store ->
@@ -3436,7 +3444,7 @@ module Rejection = struct
     in
     (* Then, we build a real message which is close to the maximum message size
        limit and produces a proof also close to the maximum proof size limit. *)
-    let (_sk, _pk, addr) = gen_l2_account () in
+    let (_sk, _pk, addr) = gen_l2_account ~rng_state () in
     let (signers, transfers) =
       List.map
         (fun (sk, pk, _) ->
