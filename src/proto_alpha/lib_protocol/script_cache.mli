@@ -81,5 +81,6 @@ val size : context -> int
 val size_limit : context -> int
 
 (** [insert] is a variant of [update] which identifies the contract to update
-    by its address (of type [Contract.t]) instead of its cache identifier. *)
-val insert : context -> Contract.t -> cached_contract -> int -> context tzresult
+    by its address (of type [Contract_hash.t]) instead of its cache identifier. *)
+val insert :
+  context -> Contract_hash.t -> cached_contract -> int -> context tzresult

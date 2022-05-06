@@ -143,7 +143,8 @@ module Ticket_token_map = struct
 end
 
 let parse_and_cache_script ctxt ~destination ~get_non_cached_script =
-  Script_cache.find ctxt destination >>=? fun (ctxt, _cache_key, cached) ->
+  Script_cache.find ctxt (Contract.Originated destination)
+  >>=? fun (ctxt, _cache_key, cached) ->
   match cached with
   | Some (_script, ex_script) -> return (ex_script, ctxt)
   | None ->
@@ -178,7 +179,7 @@ let tickets_of_transaction ctxt ~(destination : Contract.t) ~entrypoint
     ~location ~parameters_ty ~parameters =
   match destination with
   | Implicit _ -> return (None, ctxt)
-  | Originated _ ->
+  | Originated contract_hash ->
       (* TODO: #2653
          Avoid having to load the script from the cache.
          This is currently in place to avoid regressions for type-checking
@@ -186,7 +187,7 @@ let tickets_of_transaction ctxt ~(destination : Contract.t) ~entrypoint
       *)
       parse_and_cache_script
         ctxt
-        ~destination
+        ~destination:contract_hash
         ~get_non_cached_script:(fun ctxt ->
           (* Look up the script from the context. *)
           Contract.get_script ctxt destination >>=? fun (ctxt, script_opt) ->
