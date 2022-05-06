@@ -27,7 +27,7 @@ open Alpha_context
 
 type identifier = string
 
-let identifier_of_contract addr = Contract.to_b58check addr
+let identifier_of_contract addr = Contract_hash.to_b58check addr
 
 let contract_of_identifier identifier = Contract.of_b58check identifier
 
@@ -79,12 +79,12 @@ end
 module Cache = (val Cache.register_exn (module Client))
 
 let find ctxt addr =
-  let addr = Contract.Originated addr in
   let identifier = identifier_of_contract addr in
   Cache.find ctxt identifier >>=? function
   | Some (unparsed_script, ex_script) ->
       return (ctxt, identifier, Some (unparsed_script, ex_script))
   | None -> (
+      let addr = Contract.Originated addr in
       load_and_elaborate ctxt addr >>=? function
       | ctxt, None -> return (ctxt, identifier, None)
       | ctxt, Some (unparsed_script, script_ir, size) ->
@@ -103,7 +103,6 @@ let entries ctxt =
      contract_of_identifier identifier >|? fun contract -> (contract, age)
 
 let contract_rank ctxt addr =
-  let addr = Contract.Originated addr in
   Cache.identifier_rank ctxt (identifier_of_contract addr)
 
 let size = Cache.size
@@ -111,6 +110,5 @@ let size = Cache.size
 let size_limit = Cache.size_limit
 
 let insert ctxt addr updated_script approx_size =
-  let addr = Contract.Originated addr in
   let identifier = identifier_of_contract addr in
   Cache.update ctxt identifier (Some (updated_script, approx_size))
