@@ -2043,6 +2043,7 @@ let octez_store =
         "block_key";
         "block_level";
         "block_repr";
+        "block_repr_unix";
         "block_store";
         "cemented_block_store";
         "consistency";

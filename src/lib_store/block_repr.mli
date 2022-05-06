@@ -73,6 +73,28 @@ type block = {
 
 type t = block
 
+(**/**)
+
+type legacy_metadata = {
+  legacy_message : string option;
+  legacy_max_operations_ttl : int;
+  legacy_last_allowed_fork_level : Int32.t;
+  legacy_block_metadata : Bytes.t;
+  legacy_operations_metadata : Bytes.t list list;
+}
+
+type legacy_block = {
+  legacy_hash : Block_hash.t;
+  legacy_contents : contents;
+  mutable legacy_metadata : legacy_metadata option;
+}
+
+val legacy_metadata_encoding : legacy_metadata Data_encoding.t
+
+val legacy_encoding : legacy_block Data_encoding.t
+
+(**/**)
+
 (** {1 Genesis} *)
 
 (** [create_genesis_block ~genesis context_hash] creates a default
@@ -167,29 +189,6 @@ val operations_metadata :
       operations hashes? *)
 val check_block_consistency :
   ?genesis_hash:Block_hash.t -> ?pred_block:t -> t -> unit tzresult Lwt.t
-
-(** [read_next_block_exn fd] reads from [fd] and decode the next block
-   found in the descriptor. The [fd]'s offset is moved as a side
-   effect. This returns the decoded block along with the block length
-   (number of bytes) of the encoded block. This function updates the
-   given [fd] state and may raise Unix.error errors, see Unix.read. *)
-val read_next_block_exn : Lwt_unix.file_descr -> (t * int) Lwt.t
-
-(** Same as [read_next_block fd] but returns [None] if there was an
-    error. *)
-val read_next_block : Lwt_unix.file_descr -> (t * int) option Lwt.t
-
-(** [pread_block_exn fd ~file_offset] reads from [fd] and decode the
-   block at offset [file_offset] in the descriptor. This returns the
-   decoded block along with the block length (number of bytes) of the
-   encoded block. This function may raise Unix.error errors, see
-   Unix.read. *)
-val pread_block_exn : Lwt_unix.file_descr -> file_offset:int -> (t * int) Lwt.t
-
-(** Same as [pread_block fd ~file_offset] but returns [None] if there
-    was an error. *)
-val pread_block :
-  Lwt_unix.file_descr -> file_offset:int -> (t * int) option Lwt.t
 
 (** [decode_metadata data] decodes metadata from [data] encoded either
     with the new encoding or the legacy one. *)

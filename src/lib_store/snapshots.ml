@@ -1925,11 +1925,11 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let stream, bpush = Lwt_stream.create_bounded 1000 in
     (* Retrieve first floating block *)
     let* first_block =
-      let*! o = Block_repr.read_next_block floating_ro_fd in
+      let*! o = Block_repr_unix.read_next_block floating_ro_fd in
       match o with
       | Some (block, _length) -> return block
       | None -> (
-          let*! o = Block_repr.read_next_block floating_rw_fd in
+          let*! o = Block_repr_unix.read_next_block floating_rw_fd in
           match o with
           | Some (block, _length) -> return block
           | None ->
@@ -2999,7 +2999,7 @@ module Raw_importer : IMPORTER = struct
         if nb_bytes_left < 0 then tzfail Corrupted_floating_store
         else if nb_bytes_left = 0 then return_unit
         else
-          let*! block, len_read = Block_repr.read_next_block_exn fd in
+          let*! block, len_read = Block_repr_unix.read_next_block_exn fd in
           let* () =
             Block_repr.check_block_consistency ~genesis_hash ?pred_block block
           in
@@ -3285,7 +3285,7 @@ module Tar_importer : IMPORTER = struct
           else if nb_bytes_left = 0L then return_unit
           else
             let*! block, len_read =
-              Block_repr.read_next_block_exn floating_blocks_file_fd
+              Block_repr_unix.read_next_block_exn floating_blocks_file_fd
             in
             let* () =
               Block_repr.check_block_consistency ~genesis_hash ?pred_block block
