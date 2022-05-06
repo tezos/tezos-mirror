@@ -127,6 +127,11 @@ let number_of_messages (commitment : Sc_rollup_client.commitment) =
 let number_of_ticks (commitment : Sc_rollup_client.commitment) =
   commitment.number_of_ticks
 
+let last_cemented_commitment_hash_with_level json =
+  let hash = JSON.(json |-> "hash" |> as_string) in
+  let level = JSON.(json |-> "level" |> as_int) in
+  (hash, level)
+
 (*
 
    Tests
@@ -318,6 +323,55 @@ let test_rollup_get_initial_level =
         Check.(
           (JSON.as_int initial_level
           = JSON.as_int (JSON.get "level" current_level) + 1)
+            int
+            ~error_msg:"expected value %L, got %R") ;
+        return () )
+        node
+        client
+        bootstrap)
+
+(* Fetching the last cemented commitment info for a sc rollup
+   ----------------------------------------------------------
+
+  We can fetch the hash and level of the last cemented commitment. Initially, 
+  this corresponds to `(Sc_rollup.Commitment_hash.zero, origination_level)`.
+*)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2944
+   Revisit this test once the rollup node can cement commitments. *)
+let test_rollup_get_last_cemented_commitment_hash_with_level =
+  let output_file _ = "sc_rollup_get_lcc_hash_with_level" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["lcc_hash_with_level"]
+    "get last cemented commitment hash and inbox level of a sc rollup"
+    (fun protocol ->
+      setup ~protocol @@ fun node client bootstrap ->
+      ( with_fresh_rollup @@ fun sc_rollup_address _sc_rollup_node _filename ->
+        let* origination_level = RPC.get_current_level client in
+
+        (* Bake 10 blocks to be sure that the origination_level of rollup is different
+           from the level of the head node. *)
+        let* () = repeat 10 (fun () -> Client.bake_for_and_wait client) in
+        let* lcc_info_json =
+          RPC.Sc_rollup.get_last_cemented_commitment_hash_with_level
+            ~sc_rollup_address
+            client
+        in
+        let (hash, level) =
+          last_cemented_commitment_hash_with_level lcc_info_json
+        in
+        (* The hardcoded value of `Sc_rollup.Commitment.zero` is
+           "scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG". *)
+        Check.(
+          (hash = "scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG")
+            string
+            ~error_msg:"expected value %L, got %R") ;
+        (* The level of the last cemented commitment should correspond to the
+           rollup origination level. *)
+        Check.(
+          (level = JSON.(origination_level |-> "level" |> as_int))
             int
             ~error_msg:"expected value %L, got %R") ;
         return () )
@@ -1384,6 +1438,7 @@ let register ~protocols =
   test_rollup_client_gets_address protocols ;
   test_rollup_list protocols ;
   test_rollup_get_initial_level protocols ;
+  test_rollup_get_last_cemented_commitment_hash_with_level protocols ;
   test_rollup_inbox_size protocols ;
   test_rollup_inbox_current_messages_hash protocols ;
   test_rollup_inbox_of_rollup_node "basic" basic_scenario protocols ;
