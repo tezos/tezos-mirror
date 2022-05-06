@@ -374,8 +374,8 @@ let craft_tx_transfers () =
          ~desc:
            "List of transfers from the signer in JSON format (from a file or \
             directly inlined). The input JSON must be an array of objects of \
-            the form '[ {\"destination\": dst, \"qty\" : val, \"ticket\" : \
-            ticket_hash} ]'"
+            the form '[ {\"destination\": dst, \"qty\" : val, \"ticket_hash\" \
+            : ticket_hash} ]'"
          json_file_or_text_parameter
     @@ stop)
     (fun counter
@@ -389,7 +389,7 @@ let craft_tx_transfers () =
           obj3
             (req "qty" string)
             (req "destination" string)
-            (req "ticket" string)
+            (req "ticket_hash" string)
         in
         list transfer_encoding
       in

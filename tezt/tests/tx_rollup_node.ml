@@ -688,17 +688,15 @@ let json_of_transactions_and_sig ~origin transaction signatures =
 let craft_tx_transfers_and_sign ?counter tx_client ~signer transfers =
   let* transaction =
     Tx_rollup_client.craft_tx_transfers
+      ~signer:signer.Account.aggregate_public_key
+      ?counter
       tx_client
-      {
-        signer = signer.Account.aggregate_public_key;
-        counter;
-        contents = transfers;
-      }
+      transfers
   in
   let* signature =
     Tx_rollup_client.sign_transaction
       ~transaction
-      ~signers:[signer.Account.aggregate_alias]
+      ~signers:[signer.aggregate_alias]
       tx_client
   in
   return (transaction, signature)
@@ -708,7 +706,7 @@ let craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket =
     Tx_rollup_client.craft_tx_transaction
       tx_client
       ?counter
-      {qty; destination = dest; ticket}
+      (`Transfer {qty; destination = dest; ticket})
       ~signer:signer.Account.aggregate_public_key
   in
   let* signature =
@@ -758,11 +756,8 @@ let craft_batch_for_one_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
   | `Hex _hex as batch -> return batch
 
 let inject_transfer ?counter tx_client ~source ~qty ~dest ~ticket =
-  Tx_rollup_client.transfer
-    ?counter
-    tx_client
-    ~source
-    {qty; destination = dest; ticket}
+  Tx_rollup_client.transfer ?counter tx_client ~source
+  @@ `Transfer {qty; destination = dest; ticket}
 
 let tx_client_get_block ~tx_client ~block =
   Tx_rollup_client.get_block ~block tx_client
@@ -2193,15 +2188,15 @@ let test_batcher_large_message =
       in
       let* bls_key = Client.bls_gen_and_show_keys client in
       let pkh1_str = bls_key.aggregate_public_key_hash in
-      let contents : Rollup.transfer_content list =
-        let transfer_content : Rollup.transfer_content =
+      let contents : Rollup.l2_transfer list =
+        let transfer_content : Rollup.l2_transfer =
           let destination = pkh1_str in
           let ticket =
             Tezos_protocol_alpha.Protocol.Alpha_context.Ticket_hash.(
               to_b58check zero)
           in
           let qty = 1L in
-          {destination; ticket; qty}
+          `Transfer {destination; ticket; qty}
         in
         List.init 200 (fun _ -> transfer_content)
       in
