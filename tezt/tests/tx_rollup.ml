@@ -468,9 +468,17 @@ module Regressions = struct
 
   module Limits = struct
     (* The constant comes from the default parameters of the protocol. *)
-    let batch_limit = 5_000
+    type limits = {batch_limit : int; inbox_limit : int}
 
-    let inbox_limit = 100_000
+    let get_limits client =
+      let* json = RPC.get_constants client in
+      let batch_limit =
+        JSON.(json |-> "tx_rollup_hard_size_limit_per_message" |> as_int)
+      in
+      let inbox_limit =
+        JSON.(json |-> "tx_rollup_hard_size_limit_per_inbox" |> as_int)
+      in
+      return {batch_limit; inbox_limit}
 
     let submit_empty_batch =
       Protocol.register_regression_test
@@ -492,6 +500,7 @@ module Regressions = struct
         ~tags:["tx_rollup"; "batch"; "client"]
       @@ fun protocol ->
       let* state = init_with_tx_rollup ~protocol () in
+      let* {batch_limit; _} = get_limits state.client in
       let batch = Rollup.make_batch (String.make batch_limit 'b') in
       let* () = submit_batch ~batch state in
       let (`Batch content) =
@@ -518,6 +527,18 @@ module Regressions = struct
         ~title:"Submit maximum size inbox"
         ~tags:["tx_rollup"; "inbox"; "client"]
       @@ fun protocol ->
+      (* We need a first client to fetch the protocol constants *)
+      let* old_parameter_file =
+        Parameters.(parameter_file ~parameters:default protocol)
+      in
+      let* (_, old_client) =
+        Client.init_with_protocol
+          ~parameter_file:old_parameter_file
+          `Client
+          ~protocol
+          ()
+      in
+      let* {inbox_limit; batch_limit} = get_limits old_client in
       (* The test assumes inbox_limit % batch_limit = 0 *)
       let max_batch_number_per_inbox = inbox_limit / batch_limit in
       let additional_bootstrap_account_count = max_batch_number_per_inbox - 5 in
