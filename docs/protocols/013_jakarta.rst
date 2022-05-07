@@ -1,6 +1,10 @@
 Protocol Jakarta
 ==================
 
+**Important**: revision `PtJakarta...nGw` of protocol Jakarta contains
+`two critical bugs <https://research-development.nomadic-labs.com/we-found-two-bugs-in-torus-jakarta.html>`_
+that have been corrected in the latest version `PtJakart2...SqY`.
+
 This page contains all the relevant information for protocol Jakarta
 (see :ref:`naming_convention`).
 

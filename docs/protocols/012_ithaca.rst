@@ -1,6 +1,10 @@
 Protocol Ithaca
 ===============
 
+**Important**: revision `PsiThaCaT...jVP` of protocol Ithaca contains
+`bugs <https://research-development.nomadic-labs.com/announcing-ithaca-2.html>`_
+that have been corrected in the latest version `Psithaca2...z6A`.
+
 This page contains all the relevant information for protocol Ithaca
 (see :ref:`naming_convention`).
 
