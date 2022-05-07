@@ -34,7 +34,7 @@ val expected_slots_for_given_active_stake :
   Raw_context.t ->
   total_active_stake:Tez_repr.t ->
   active_stake:Tez_repr.t ->
-  int tzresult
+  int
 
 type level_participation = Participated | Didn't_participate
 

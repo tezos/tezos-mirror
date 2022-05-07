@@ -36,13 +36,12 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake ~active_stake
   let number_of_endorsements_per_cycle =
     blocks_per_cycle * consensus_committee_size
   in
-  Result.return
-    (Z.to_int
-       (Z.div
-          (Z.mul
-             (Z.of_int64 (Tez_repr.to_mutez active_stake))
-             (Z.of_int number_of_endorsements_per_cycle))
-          (Z.of_int64 (Tez_repr.to_mutez total_active_stake))))
+  Z.to_int
+    (Z.div
+       (Z.mul
+          (Z.of_int64 (Tez_repr.to_mutez active_stake))
+          (Z.of_int number_of_endorsements_per_cycle))
+       (Z.of_int64 (Tez_repr.to_mutez total_active_stake)))
 
 type level_participation = Participated | Didn't_participate
 
@@ -79,11 +78,12 @@ let record_endorsing_participation ctxt ~delegate ~participation
           | Some active_stake ->
               Stake_storage.get_total_active_stake ctxt level.cycle
               >>=? fun total_active_stake ->
-              expected_slots_for_given_active_stake
-                ctxt
-                ~total_active_stake
-                ~active_stake
-              >>?= fun expected_slots ->
+              let expected_slots =
+                expected_slots_for_given_active_stake
+                  ctxt
+                  ~total_active_stake
+                  ~active_stake
+              in
               let Ratio_repr.{numerator; denominator} =
                 Constants_storage.minimal_participation_ratio ctxt
               in
@@ -166,11 +166,12 @@ let participation_info ctxt delegate =
   | Some active_stake ->
       Stake_storage.get_total_active_stake ctxt level.cycle
       >>=? fun total_active_stake ->
-      expected_slots_for_given_active_stake
-        ctxt
-        ~total_active_stake
-        ~active_stake
-      >>?= fun expected_cycle_activity ->
+      let expected_cycle_activity =
+        expected_slots_for_given_active_stake
+          ctxt
+          ~total_active_stake
+          ~active_stake
+      in
       let Ratio_repr.{numerator; denominator} =
         Constants_storage.minimal_participation_ratio ctxt
       in

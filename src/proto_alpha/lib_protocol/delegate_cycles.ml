@@ -217,11 +217,13 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
       let has_revealed_nonces =
         delegate_has_revealed_nonces delegate unrevealed_nonces_set
       in
-      Delegate_missed_endorsements_storage.expected_slots_for_given_active_stake
-        ctxt
-        ~total_active_stake
-        ~active_stake
-      >>?= fun expected_slots ->
+      let expected_slots =
+        Delegate_missed_endorsements_storage
+        .expected_slots_for_given_active_stake
+          ctxt
+          ~total_active_stake
+          ~active_stake
+      in
       let rewards = Tez_repr.mul_exn endorsing_reward_per_slot expected_slots in
       if sufficient_participation && has_revealed_nonces then
         (* Sufficient participation: we pay the rewards *)
