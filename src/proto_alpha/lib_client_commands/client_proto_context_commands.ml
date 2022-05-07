@@ -1622,7 +1622,11 @@ let commands_rw () =
         in
         match r with
         | Ok _ -> return_unit
-        | Error [Environment.Ecoproto_error Delegate_storage.Active_delegate] ->
+        | Error
+            [
+              Environment.Ecoproto_error
+                Delegate_storage.Contract.Active_delegate;
+            ] ->
             let*! () = cctxt#message "Delegate already activated." in
             return_unit
         | Error el -> Lwt.return_error el);

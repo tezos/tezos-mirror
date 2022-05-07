@@ -26,64 +26,9 @@
 (*****************************************************************************)
 
 type error +=
-  | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
-  | (* `Temporary *) Active_delegate
-  | (* `Temporary *) Current_delegate
-  | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"delegate.no_deletion"
-    ~title:"Forbidden delegate deletion"
-    ~description:"Tried to unregister a delegate"
-    ~pp:(fun ppf delegate ->
-      Format.fprintf
-        ppf
-        "Delegate deletion is forbidden (%a)"
-        Signature.Public_key_hash.pp
-        delegate)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function No_deletion c -> Some c | _ -> None)
-    (fun c -> No_deletion c) ;
-  register_error_kind
-    `Temporary
-    ~id:"delegate.already_active"
-    ~title:"Delegate already active"
-    ~description:"Useless delegate reactivation"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "The delegate is still active, no need to refresh it")
-    Data_encoding.empty
-    (function Active_delegate -> Some () | _ -> None)
-    (fun () -> Active_delegate) ;
-  register_error_kind
-    `Temporary
-    ~id:"delegate.unchanged"
-    ~title:"Unchanged delegated"
-    ~description:"Contract already delegated to the given delegate"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The contract is already delegated to the same delegate")
-    Data_encoding.empty
-    (function Current_delegate -> Some () | _ -> None)
-    (fun () -> Current_delegate) ;
-  register_error_kind
-    `Permanent
-    ~id:"delegate.empty_delegate_account"
-    ~title:"Empty delegate account"
-    ~description:"Cannot register a delegate when its implicit account is empty"
-    ~pp:(fun ppf delegate ->
-      Format.fprintf
-        ppf
-        "Delegate registration is forbidden when the delegate\n\
-        \           implicit account is empty (%a)"
-        Signature.Public_key_hash.pp
-        delegate)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function Empty_delegate_account c -> Some c | _ -> None)
-    (fun c -> Empty_delegate_account c) ;
   (* Unregistered delegate *)
   register_error_kind
     `Permanent
@@ -114,6 +59,38 @@ module Contract = struct
     Contract_storage.get_balance_and_frozen_bonds ctxt contract
     >>=? fun balance_and_frozen_bonds ->
     Stake_storage.add_stake ctxt delegate balance_and_frozen_bonds
+
+  type error +=
+    | (* `Temporary *) Active_delegate
+    | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"delegate.already_active"
+      ~title:"Delegate already active"
+      ~description:"Useless delegate reactivation"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The delegate is still active, no need to refresh it")
+      Data_encoding.empty
+      (function Active_delegate -> Some () | _ -> None)
+      (fun () -> Active_delegate) ;
+    register_error_kind
+      `Permanent
+      ~id:"delegate.empty_delegate_account"
+      ~title:"Empty delegate account"
+      ~description:
+        "Cannot register a delegate when its implicit account is empty"
+      ~pp:(fun ppf delegate ->
+        Format.fprintf
+          ppf
+          "Delegate registration is forbidden when the delegate\n\
+          \           implicit account is empty (%a)"
+          Signature.Public_key_hash.pp
+          delegate)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function Empty_delegate_account c -> Some c | _ -> None)
+      (fun c -> Empty_delegate_account c)
 
   let set_self_delegate c delegate =
     let open Lwt_tzresult_syntax in
@@ -147,6 +124,38 @@ module Contract = struct
       let*! c = Storage.Delegates.add c delegate in
       let* c = Stake_storage.set_active c delegate in
       return c
+
+  type error +=
+    | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
+    | (* `Temporary *) Current_delegate
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"delegate.no_deletion"
+      ~title:"Forbidden delegate deletion"
+      ~description:"Tried to unregister a delegate"
+      ~pp:(fun ppf delegate ->
+        Format.fprintf
+          ppf
+          "Delegate deletion is forbidden (%a)"
+          Signature.Public_key_hash.pp
+          delegate)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function No_deletion c -> Some c | _ -> None)
+      (fun c -> No_deletion c) ;
+    register_error_kind
+      `Temporary
+      ~id:"delegate.unchanged"
+      ~title:"Unchanged delegated"
+      ~description:"Contract already delegated to the given delegate"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "The contract is already delegated to the same delegate")
+      Data_encoding.empty
+      (function Current_delegate -> Some () | _ -> None)
+      (fun () -> Current_delegate)
 
   let set_delegate c contract delegate =
     let open Lwt_tzresult_syntax in

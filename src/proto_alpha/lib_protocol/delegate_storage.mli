@@ -32,16 +32,18 @@
     It is responsible for maintaining the following tables:
     - {!Storage.Contract.Frozen_deposits_limit}
     - {!Storage.Delegates}
-*)
+ *)
 
 type error +=
-  | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
-  | (* `Temporary *) Active_delegate
-  | (* `Temporary *) Current_delegate
-  | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
 module Contract : sig
+  type error +=
+    | (* `Temporary *) Active_delegate
+    | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
+    | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
+    | (* `Temporary *) Current_delegate
+
   (** Allow to register a delegate when creating an account. *)
   val init :
     Raw_context.t ->
