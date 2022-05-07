@@ -40,12 +40,6 @@ type error +=
   | (* `Temporary *) Current_delegate
   | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
-  | (* `Permanent *) Unassigned_validation_slot_for_level of Level_repr.t * int
-  | (* `Permanent *)
-      Cannot_find_active_stake of {
-      cycle : Cycle_repr.t;
-      delegate : Signature.Public_key_hash.t;
-    }
   | (* `Temporary *) Not_registered of Signature.Public_key_hash.t
 
 val set_active :

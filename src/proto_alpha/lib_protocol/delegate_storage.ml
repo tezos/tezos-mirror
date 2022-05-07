@@ -31,12 +31,6 @@ type error +=
   | (* `Temporary *) Current_delegate
   | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
-  | (* `Permanent *) Unassigned_validation_slot_for_level of Level_repr.t * int
-  | (* `Permanent *)
-      Cannot_find_active_stake of {
-      cycle : Cycle_repr.t;
-      delegate : Signature.Public_key_hash.t;
-    }
   | (* `Temporary *) Not_registered of Signature.Public_key_hash.t
 
 let () =
@@ -107,50 +101,6 @@ let () =
     Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
     (function Unregistered_delegate k -> Some k | _ -> None)
     (fun k -> Unregistered_delegate k) ;
-  (* Unassigned_validation_slot_for_level *)
-  register_error_kind
-    `Permanent
-    ~id:"delegate.unassigned_validation_slot_for_level"
-    ~title:"Unassigned validation slot for level"
-    ~description:
-      "The validation slot for the given level is not assigned. Nobody payed \
-       for that slot, or the level is either in the past or too far in the \
-       future (further than the validatiors_selection_offset constant)"
-    ~pp:(fun ppf (l, slot) ->
-      Format.fprintf
-        ppf
-        "The validation slot %i for the level %a is not assigned. Nobody payed \
-         for that slot, or the level is either in the past or too far in the \
-         future (further than the validatiors_selection_offset constant)"
-        slot
-        Level_repr.pp
-        l)
-    Data_encoding.(obj2 (req "level" Level_repr.encoding) (req "slot" int31))
-    (function
-      | Unassigned_validation_slot_for_level (l, s) -> Some (l, s) | _ -> None)
-    (fun (l, s) -> Unassigned_validation_slot_for_level (l, s)) ;
-  register_error_kind
-    `Permanent
-    ~id:"delegate.cannot_find_active_stake"
-    ~title:"Cannot find active stake"
-    ~description:
-      "The active stake of a delegate cannot be found for the given cycle."
-    ~pp:(fun ppf (cycle, delegate) ->
-      Format.fprintf
-        ppf
-        "The active stake of the delegate %a cannot be found for the cycle %a."
-        Cycle_repr.pp
-        cycle
-        Signature.Public_key_hash.pp
-        delegate)
-    Data_encoding.(
-      obj2
-        (req "cycle" Cycle_repr.encoding)
-        (req "delegate" Signature.Public_key_hash.encoding))
-    (function
-      | Cannot_find_active_stake {cycle; delegate} -> Some (cycle, delegate)
-      | _ -> None)
-    (fun (cycle, delegate) -> Cannot_find_active_stake {cycle; delegate}) ;
   register_error_kind
     `Temporary
     ~id:"delegate.not_registered"
