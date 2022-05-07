@@ -273,7 +273,7 @@ let update_script_storage_and_ticket_balances ctxt ~self storage
   Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
 
 let apply_delegation ~ctxt ~source ~delegate ~before_operation =
-  Delegate.set ctxt source delegate >|=? fun ctxt ->
+  Contract.Delegate.set ctxt source delegate >|=? fun ctxt ->
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
 
 type 'loc execution_arg =
@@ -522,7 +522,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   let contract = Contract.Originated contract_hash in
   (match delegate with
   | None -> return ctxt
-  | Some delegate -> Delegate.init ctxt contract delegate)
+  | Some delegate -> Contract.Delegate.init ctxt contract delegate)
   >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source) (`Contract contract) credit
   >>=? fun (ctxt, balance_updates) ->

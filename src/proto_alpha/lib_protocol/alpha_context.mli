@@ -1804,6 +1804,23 @@ module Contract : sig
     script:Script.t * Lazy_storage.diffs option ->
     context tzresult Lwt.t
 
+  (** Functions for handling the delegate of a contract.*)
+  module Delegate : sig
+    (** See {!Contract_delegate_storage.find}. *)
+    val find : context -> t -> Signature.Public_key_hash.t option tzresult Lwt.t
+
+    (** See {!Delegate_storage.init}. *)
+    val init :
+      context -> t -> Signature.Public_key_hash.t -> context tzresult Lwt.t
+
+    (** See {!Delegate_storage.set}. *)
+    val set :
+      context ->
+      t ->
+      Signature.Public_key_hash.t option ->
+      context tzresult Lwt.t
+  end
+
   (** This module discloses definitions that are only useful for tests and must
       not be used otherwise. *)
   module Internal_for_tests : sig
@@ -2518,18 +2535,6 @@ end
    {!Delegate_missed_endorsements_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
 module Delegate : sig
-  val init :
-    context ->
-    Contract.t ->
-    Signature.Public_key_hash.t ->
-    context tzresult Lwt.t
-
-  (** See {!Contract_delegate_storage.find}. *)
-  val find : context -> Contract.t -> public_key_hash option tzresult Lwt.t
-
-  val set :
-    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
-
   val frozen_deposits_limit :
     context -> Signature.Public_key_hash.t -> Tez.t option tzresult Lwt.t
 

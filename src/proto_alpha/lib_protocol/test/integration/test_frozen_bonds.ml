@@ -93,7 +93,7 @@ let init_test ~user_is_delegate =
   (* Configure delegate, as a delegate by self-delegation, for which
      revealing its manager key is a prerequisite. *)
   Contract.reveal_manager_key ctxt delegate delegate_pk >>>=? fun ctxt ->
-  Delegate.set ctxt delegate_contract (Some delegate) >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt delegate_contract (Some delegate) >>>=? fun ctxt ->
   return (ctxt, user_contract, user_account, delegate)
 
 (** Tested scenario :
@@ -111,7 +111,7 @@ let test_delegate_then_freeze_deposit () =
   (* Fetch user's initial balance before freeze. *)
   Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
   (* Let user delegate to "delegate". *)
-  Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
   (* Fetch staking balance after delegation and before freeze. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
   (* Freeze a tx-rollup deposit. *)
@@ -126,7 +126,7 @@ let test_delegate_then_freeze_deposit () =
   (* Ensure staking balance did not change. *)
   Assert.equal_tez ~loc:__LOC__ staking_balance' staking_balance >>=? fun () ->
   (* Remove delegation. *)
-  Delegate.set ctxt user_contract None >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt user_contract None >>>=? fun ctxt ->
   (* Fetch staking balance after delegation removal. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance'' ->
   (* Ensure staking balance decreased by user's initial balance. *)
@@ -173,7 +173,7 @@ let test_freeze_deposit_then_delegate () =
      Now, fetch staking balance before delegation and after freeze. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
   (* Let user delegate to "delegate". *)
-  Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
   (* Fetch staking balance after delegation. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance' ->
   (* ensure staking balance increased by the user's balance. *)
@@ -191,7 +191,7 @@ let test_freeze_deposit_then_delegate () =
   Assert.equal_tez ~loc:__LOC__ staking_balance'' staking_balance'
   >>=? fun () ->
   (* Remove delegation. *)
-  Delegate.set ctxt user_contract None >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt user_contract None >>>=? fun ctxt ->
   (* Fetch staking balance. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance''' ->
   (* Check that staking balance has decreased by the user's initial balance. *)
@@ -341,7 +341,7 @@ let test_delegated_balance () =
   (* Check that the delegated balance of [delegate] is null. *)
   check_delegated_balance_is ctxt ~loc:__LOC__ delegate Tez.zero >>=? fun () ->
   (* Let user delegate to "delegate". *)
-  Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
   (* Fetch staking balance after delegation. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance' ->
   (* ensure staking balance increased by the user's balance. *)
@@ -365,7 +365,7 @@ let test_delegated_balance () =
   check_delegated_balance_is ctxt ~loc:__LOC__ delegate user_balance
   >>=? fun () ->
   (* Remove delegation. *)
-  Delegate.set ctxt user_contract None >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt user_contract None >>>=? fun ctxt ->
   (* Fetch staking balance. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance''' ->
   (* Check that staking balance has decreased by the user's initial balance. *)
@@ -407,7 +407,8 @@ let test_scenario scenario =
   (* Configure delegate, as a delegate by self-delegation, for which
      revealing its manager key is a prerequisite. *)
   Contract.reveal_manager_key ctxt delegate2 delegate_pk2 >>>=? fun ctxt ->
-  Delegate.set ctxt delegate_contract2 (Some delegate2) >>>=? fun ctxt ->
+  Contract.Delegate.set ctxt delegate_contract2 (Some delegate2)
+  >>>=? fun ctxt ->
   let tx_rollup1, nonce = mk_tx_rollup () in
   let tx_rollup2, _ = mk_tx_rollup ~nonce () in
   let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in
@@ -422,7 +423,7 @@ let test_scenario scenario =
     Contract.get_balance_and_frozen_bonds ctxt user_contract
     >>>=? fun user_balance ->
     (* Let user delegate to "delegate". *)
-    Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
+    Contract.Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
     (* Fetch staking balance after delegation  *)
     Delegate.staking_balance ctxt delegate >>>=? fun staking_balance' ->
     Assert.equal_tez
@@ -496,7 +497,7 @@ let test_scenario scenario =
     (* Fetch user's initial balance before undelegate. *)
     Token.balance ctxt user_account >>>=? fun (_, user_balance) ->
     (* Remove delegation. *)
-    Delegate.set ctxt user_contract None >>>=? fun ctxt ->
+    Contract.Delegate.set ctxt user_contract None >>>=? fun ctxt ->
     (* Fetch staking balance after delegation removal. *)
     Delegate.staking_balance ctxt delegate >>>=? fun staking_balance' ->
     (* Ensure staking balance decreased by delegation amount *)
