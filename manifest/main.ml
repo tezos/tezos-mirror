@@ -1543,7 +1543,9 @@ let _tezos_context_tests =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
-        tezos_context_disk |> open_;
+        tezos_context_sigs;
+        tezos_context_disk;
+        tezos_context_memory;
         tezos_stdlib_unix |> open_;
         tezos_test_helpers;
         tezos_test_helpers_extra;
