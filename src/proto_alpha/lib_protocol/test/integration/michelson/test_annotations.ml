@@ -65,10 +65,12 @@ let init_and_originate contract_code_string =
   Incremental.begin_construction b >>=? fun inc ->
   let code = Expr.toplevel_from_string contract_code_string in
   let script = Script.{code = lazy_expr code; storage = lazy_none} in
-  Op.contract_origination (I inc) source ~script >>=? fun (operation, addr) ->
+  Op.contract_origination_hash (I inc) source ~script
+  >>=? fun (operation, addr) ->
   Incremental.add_operation inc operation >|=? fun inc -> (inc, source, addr)
 
 let assert_stored_script_equal inc addr expected_code_string =
+  let addr = Contract.Originated addr in
   Context.Contract.script (I inc) addr >>=? fun stored_script ->
   Assert.equal_string
     ~loc:__LOC__
@@ -76,6 +78,7 @@ let assert_stored_script_equal inc addr expected_code_string =
     (Expr.to_string stored_script)
 
 let get_address_from_storage inc factory_addr =
+  let factory_addr = Contract.Originated factory_addr in
   Context.Contract.storage (I inc) factory_addr >>=? fun factory_storage ->
   let ctxt = Incremental.alpha_ctxt inc in
   Environment.wrap_tzresult Script_typed_ir.(option_t 0 address_t)
@@ -113,11 +116,15 @@ let test_external_origination () =
 let test_internal_origination () =
   init_and_originate contract_factory_with_annotations
   >>=? fun (inc, source, factory) ->
-  Op.transaction (I inc) source factory ~parameters:lazy_none Tez.zero
+  Op.transaction
+    (I inc)
+    source
+    (Contract.Originated factory)
+    ~parameters:lazy_none
+    Tez.zero
   >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
   get_address_from_storage inc factory >>=? fun addr ->
-  let addr = Contract.Originated addr in
   assert_stored_script_equal inc addr contract_with_annotations
 
 let tests =
