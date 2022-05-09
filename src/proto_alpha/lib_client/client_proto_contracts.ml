@@ -80,6 +80,18 @@ module OriginatedContractAlias = struct
         ]
     in
     Clic.param ~name ~desc (destination_parameter ()) next
+
+  let destination_arg ?(name = "dst") ?(doc = "destination contract") () =
+    let doc =
+      String.concat
+        "\n"
+        [
+          doc;
+          "Can be a literal or an alias (autodetected in order).\n\
+           Use 'text:literal' or 'alias:name' to force.";
+        ]
+    in
+    Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 end
 
 module ContractAlias = struct

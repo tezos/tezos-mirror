@@ -36,6 +36,12 @@ module OriginatedContractAlias : sig
     ?desc:string ->
     ('a, (#Client_context.wallet as 'wallet)) params ->
     (Contract_hash.t -> 'a, 'wallet) params
+
+  val destination_arg :
+    ?name:string ->
+    ?doc:string ->
+    unit ->
+    (Contract_hash.t option, #Client_context.wallet) Clic.arg
 end
 
 module ContractAlias : sig
