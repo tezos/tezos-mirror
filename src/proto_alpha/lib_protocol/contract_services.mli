@@ -82,12 +82,15 @@ val counter :
   counter shell_tzresult Lwt.t
 
 val script :
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.t shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Contract_hash.t ->
+  Script.t shell_tzresult Lwt.t
 
 val script_opt :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.t option shell_tzresult Lwt.t
 
 val storage :

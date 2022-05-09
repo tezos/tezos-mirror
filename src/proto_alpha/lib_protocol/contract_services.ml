@@ -325,6 +325,15 @@ let[@coq_axiom_with_reason "gadt"] register () =
       ~wrap_result:(fun res -> res)
       s
   in
+  let register_originated_opt_field s =
+    register_field_gen
+      ~filter_contract:(fun c k ->
+        match (c : Contract.t) with
+        | Implicit _ -> return_none
+        | Originated _ -> k ())
+      ~wrap_result:(fun res -> res)
+      s
+  in
   let do_big_map_get ctxt id key =
     let open Script_ir_translator in
     let ctxt = Gas.set_unlimited ctxt in
@@ -395,7 +404,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | Originated _ -> return_none
       | Implicit mgr ->
           Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
-  register_opt_field ~chunked:true S.script (fun c v ->
+  register_originated_opt_field ~chunked:true S.script (fun c v ->
       Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_opt_field ~chunked:true S.storage (fun ctxt contract ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
@@ -585,9 +594,11 @@ let counter ctxt block mgr =
   RPC_context.make_call1 S.counter ctxt block (Contract.Implicit mgr) () ()
 
 let script ctxt block contract =
+  let contract = Contract.Originated contract in
   RPC_context.make_call1 S.script ctxt block contract () ()
 
 let script_opt ctxt block contract =
+  let contract = Contract.Originated contract in
   RPC_context.make_opt_call1 S.script ctxt block contract () ()
 
 let storage ctxt block contract =

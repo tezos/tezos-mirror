@@ -950,7 +950,6 @@ module Interpreter_tests = struct
     let is_root_in block dst root =
       Incremental.begin_construction block >>=? fun incr ->
       let ctx_2 = Incremental.alpha_ctxt incr in
-      let dst = Contract.Originated dst in
       Alpha_services.Contract.script Block.rpc_ctxt block dst >>=? fun script ->
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
       Script_ir_translator.parse_script
