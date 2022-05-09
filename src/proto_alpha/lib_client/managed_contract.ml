@@ -41,7 +41,7 @@ let get_contract_manager (cctxt : #full) contract =
     ~chain:cctxt#chain
     ~block:cctxt#block
     ~unparsing_mode:Optimized
-    contract
+    (Contract.Originated contract)
   >>=? function
   | None -> cctxt#error "This is not a smart contract."
   | Some storage -> (
@@ -103,6 +103,7 @@ let entrypoint_remove_delegate = Entrypoint.remove_delegate
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
+  let contract = Contract.Originated contract in
   let entrypoint = entrypoint_do in
   (Michelson_v1_entrypoints.contract_entrypoint_type
      cctxt
@@ -198,7 +199,7 @@ let build_lambda_for_transfer_to_implicit ~destination ~amount =
 let build_lambda_for_transfer_to_originated ~destination ~entrypoint ~amount
     ~parameter_type ~parameter =
   let destination =
-    Data_encoding.Binary.to_bytes_exn Contract.encoding destination
+    Data_encoding.Binary.to_bytes_exn Contract.originated_encoding destination
   in
   let amount = Tez.to_mutez amount in
   let (`Hex destination) = Hex.of_bytes destination in
@@ -240,19 +241,19 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
         entrypoint
         Contract.pp
         destination
-  | Originated _ ->
+  | Originated destination ->
       (Michelson_v1_entrypoints.contract_entrypoint_type
          cctxt
          ~chain
          ~block
-         ~contract:destination
+         ~contract:(Contract.Originated destination)
          ~entrypoint
          ~normalize_types:true
        >>=? function
        | None ->
            cctxt#error
              "Contract %a has no entrypoint named %a"
-             Contract.pp
+             Contract_hash.pp
              destination
              Entrypoint.pp
              entrypoint

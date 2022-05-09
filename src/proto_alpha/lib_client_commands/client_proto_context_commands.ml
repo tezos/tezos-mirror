@@ -715,9 +715,10 @@ let transfer_command amount (source : Contract.t) destination
   else Lwt.return_unit)
   >>= fun () ->
   (match source with
-  | Originated _ ->
+  | Originated contract_hash ->
       let contract = source in
-      Managed_contract.get_contract_manager cctxt source >>=? fun source ->
+      Managed_contract.get_contract_manager cctxt contract_hash
+      >>=? fun source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       Managed_contract.transfer
         cctxt
@@ -918,7 +919,7 @@ let commands_rw () =
            delegate
            (cctxt : Protocol_client_context.full) ->
         match contract with
-        | Originated _ ->
+        | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -972,7 +973,7 @@ let commands_rw () =
            contract
            (cctxt : Protocol_client_context.full) ->
         match contract with
-        | Originated _ ->
+        | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -1169,8 +1170,8 @@ let commands_rw () =
         | [] -> failwith "Empty operation list"
         | operations ->
             (match source with
-            | Originated _ ->
-                Managed_contract.get_contract_manager cctxt source
+            | Originated contract ->
+                Managed_contract.get_contract_manager cctxt contract
                 >>=? fun source ->
                 Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
                 return (source, src_pk, src_sk)

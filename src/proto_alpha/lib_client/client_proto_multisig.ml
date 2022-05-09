@@ -621,7 +621,7 @@ let action_to_expr_generic ~loc = function
                ~destination
                ~amount
           >|? left ~loc
-      | Originated _ ->
+      | Originated destination ->
           lambda_from_string
           @@ Managed_contract.build_lambda_for_transfer_to_originated
                ~destination
