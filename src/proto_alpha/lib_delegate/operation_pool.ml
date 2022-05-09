@@ -47,19 +47,20 @@ let compare_op op1 op2 =
 
 module Prioritized_operation = struct
   (* Higher priority operations will be included first *)
-  type t = High of packed_operation | Low of packed_operation
+  type t = Prioritized of int * packed_operation | Low of packed_operation
 
-  let extern op = High op
+  let extern ?(priority = 1) op = Prioritized (priority, op)
 
   let node op = Low op
 
-  let packed = function High op | Low op -> op
+  let packed = function Prioritized (_, op) | Low op -> op
 
   let compare_priority t1 t2 =
     match (t1, t2) with
-    | High _, Low _ -> 1
-    | Low _, High _ -> -1
-    | Low _, Low _ | High _, High _ -> 0
+    | Prioritized _, Low _ -> 1
+    | Low _, Prioritized _ -> -1
+    | Low _, Low _ -> 0
+    | Prioritized (p0, _), Prioritized (p1, _) -> Compare.Int.compare p0 p1
 
   let compare a b =
     let c = compare_priority a b in

@@ -125,8 +125,10 @@ val extract_operations_of_list_list :
 module Prioritized_operation : sig
   type t
 
-  (** prioritize operations coming from an external source (file, uri, ...)*)
-  val extern : packed_operation -> t
+  (** prioritize operations coming from an external source (file, uri, ...). 
+      An operation with higher [priority] (aka a bigger integer) will be
+      included before others with lower [priority]. *)
+  val extern : ?priority:int -> packed_operation -> t
 
   (** prioritize operations coming from a node *)
   val node : packed_operation -> t
