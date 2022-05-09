@@ -1913,7 +1913,10 @@ module RPC = struct
 
       let run_operation =
         RPC_service.post_service
-          ~description:"Run an operation without signature checks"
+          ~description:
+            "Run an operation with the context of the given block and without \
+             signature checks. Return the operation application result, \
+             including the consumed gas."
           ~query:RPC_query.empty
           ~input:
             (obj2
@@ -1938,7 +1941,14 @@ module RPC = struct
 
       let simulate_operation =
         RPC_service.post_service
-          ~description:"Simulate an operation"
+          ~description:
+            "Simulate running an operation at some future moment (based on the \
+             number of blocks given in the `latency` argument), and return the \
+             operation application result. The result is the same as \
+             run_operation except for the consumed gas, which depends on the \
+             contents of the cache at that future moment. This RPC estimates \
+             future gas consumption by trying to predict the state of the \
+             cache using some heuristics."
           ~query:simulate_query
           ~input:
             (obj4
