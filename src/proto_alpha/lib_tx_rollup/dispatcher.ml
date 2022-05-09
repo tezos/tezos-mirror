@@ -109,7 +109,7 @@ let dispatch_operations_of_block (state : State.t) (block : L2block.t) =
             in
             (acc, message_index + 1))
           ([], 0)
-          block.inbox.contents
+          block.inbox
       in
       List.rev rev_ops
 

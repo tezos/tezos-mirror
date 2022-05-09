@@ -273,7 +273,7 @@ module Block = struct
               if message_pos = 0 then
                 (* We must take the block predecessor context *)
                 let*? message =
-                  match List.nth_opt inbox.contents message_pos with
+                  match List.nth_opt inbox message_pos with
                   | Some x -> ok x
                   | None ->
                       error
@@ -302,7 +302,7 @@ module Block = struct
                           hash)
               else
                 let*? (pred_message, message) =
-                  match List.drop_n (message_pos - 1) inbox.contents with
+                  match List.drop_n (message_pos - 1) inbox with
                   | pred_message :: message :: _ -> ok (pred_message, message)
                   | _ ->
                       error

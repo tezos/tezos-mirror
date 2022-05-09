@@ -171,8 +171,7 @@ let reject_bad_commitment ~source (state : State.t)
                     predecessor
                     ~error:[Tx_rollup_missing_block block.header.predecessor]
                 in
-                return
-                  (predecessor.inbox, List.length predecessor.inbox.contents - 1)
+                return (predecessor.inbox, List.length predecessor.inbox - 1)
             | _ -> return (block.inbox, position - 1)
           in
           let previous_message_results =
@@ -197,9 +196,7 @@ let reject_bad_commitment ~source (state : State.t)
           in
           let previous_message =
             WithExceptions.Option.get ~loc:__LOC__
-            @@ List.nth
-                 inbox_of_previous_message.contents
-                 previous_message_position
+            @@ List.nth inbox_of_previous_message previous_message_position
           in
           let+ previous_context =
             Context.checkout
@@ -211,15 +208,14 @@ let reject_bad_commitment ~source (state : State.t)
             previous_context )
       in
       let inbox_message =
-        WithExceptions.Option.get ~loc:__LOC__
-        @@ List.nth block.inbox.contents position
+        WithExceptions.Option.get ~loc:__LOC__ @@ List.nth block.inbox position
       in
       let message = inbox_message.message in
       let message_hashes =
         List.map
           (fun Inbox.{message; _} ->
             Tx_rollup_message_hash.hash_uncarbonated message)
-          block.inbox.contents
+          block.inbox
       in
       let*? message_path =
         Environment.wrap_tzresult

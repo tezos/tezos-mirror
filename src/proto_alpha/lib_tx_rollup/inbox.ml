@@ -43,7 +43,7 @@ type message = {
   l2_context_hash : l2_context_hash;
 }
 
-type t = {contents : message list; cumulated_size : int}
+type t = message list
 
 let message_result_encoding =
   let open Data_encoding in
@@ -87,24 +87,27 @@ let message_encoding =
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {contents; cumulated_size} -> (contents, cumulated_size))
-    (fun (contents, cumulated_size) -> {contents; cumulated_size})
-    (obj2
-       (req "contents" @@ list message_encoding)
-       (req "cumulated_size" int31))
+  list message_encoding
 
 let merkle_root inbox =
   let message_hashes =
     List.map
       (fun msg -> Tx_rollup_message_hash.hash_uncarbonated msg.message)
-      inbox.contents
+      inbox
   in
   Tx_rollup_inbox.Merkle.merklize_list message_hashes
 
 let to_proto inbox =
-  let inbox_length = List.length inbox.contents in
-  let cumulated_size = inbox.cumulated_size in
+  let inbox_length = List.length inbox in
+  let cumulated_size =
+    List.fold_left
+      (fun acc {message; _} ->
+        (* TORU/FIXME: https://gitlab.com/tezos/tezos/-/issues/2957
+           We need to expose [Alpha_context.Tx_rollup_message.size]. *)
+        acc + Tx_rollup_message_repr.size (Obj.magic message))
+      0
+      inbox
+  in
   let merkle_root = merkle_root inbox in
   Tx_rollup_inbox.{inbox_length; cumulated_size; merkle_root}
 
@@ -122,4 +125,4 @@ let proto_message_results inbox =
           withdraw_list_hash =
             Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals;
         })
-    inbox.contents
+    inbox

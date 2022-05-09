@@ -56,7 +56,7 @@ type message = {
 
 (** The type representing an inbox whose contents are the messages and not the
     hashed messages. *)
-type t = {contents : message list; cumulated_size : int}
+type t = message list
 
 (** Encoding for inbox messages *)
 val message_encoding : message Data_encoding.t
