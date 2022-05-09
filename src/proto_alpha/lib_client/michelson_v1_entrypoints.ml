@@ -66,7 +66,7 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
   Alpha_services.Contract.entrypoint_type
     cctxt
     (chain, block)
-    contract
+    (Contract.Originated contract)
     entrypoint
     ~normalize_types
   >>= function
@@ -99,7 +99,7 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
         Entrypoint.pp
         entrypoint
         (Format.pp_print_option (fun ppf ->
-             Format.fprintf ppf " for contract %a" Contract.pp))
+             Format.fprintf ppf " for contract %a" Contract_hash.pp))
         contract
         (Format.pp_print_option (fun ppf -> Format.fprintf ppf " for script %s"))
         script_name
@@ -140,7 +140,7 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract ~normalize_types =
       cctxt
       ~chain
       ~block
-      ~contract:(Contract.Originated contract)
+      ~contract
       ~entrypoint:Entrypoint.default
       ~normalize_types
     >>= function

@@ -39,7 +39,7 @@ val contract_entrypoint_type :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
-  contract:Alpha_context.Contract.t ->
+  contract:Contract_hash.t ->
   entrypoint:Alpha_context.Entrypoint.t ->
   normalize_types:bool ->
   Alpha_context.Script.expr option tzresult Lwt.t
@@ -48,7 +48,7 @@ val print_entrypoint_type :
   #Client_context.printer ->
   ?on_errors:(error list -> unit tzresult Lwt.t) ->
   emacs:bool ->
-  ?contract:Alpha_context.Contract.t ->
+  ?contract:Contract_hash.t ->
   ?script_name:string ->
   entrypoint:Alpha_context.Entrypoint.t ->
   Alpha_context.Script.expr option tzresult ->

@@ -136,20 +136,20 @@ let get_parameter_type (cctxt : #Protocol_client_context.full)
   | Implicit _ ->
       let open Micheline in
       return @@ strip_locations @@ Prim (0, Script.T_unit, [], [])
-  | Originated _ -> (
+  | Originated contract -> (
       Michelson_v1_entrypoints.contract_entrypoint_type
         cctxt
         ~chain:cctxt#chain
         ~block:cctxt#block
-        ~contract:destination
+        ~contract
         ~entrypoint
         ~normalize_types:true
       >>=? function
       | None ->
           cctxt#error
             "Contract %a has no entrypoint named %a"
-            Contract.pp
-            destination
+            Contract_hash.pp
+            contract
             Entrypoint.pp
             entrypoint
       | Some parameter_type -> return parameter_type)

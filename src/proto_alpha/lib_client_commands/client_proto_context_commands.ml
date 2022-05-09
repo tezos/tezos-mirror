@@ -372,7 +372,9 @@ let commands_ro () =
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
       @@ prefixes ["for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun normalize_types
            entrypoint

@@ -103,7 +103,6 @@ let entrypoint_remove_delegate = Entrypoint.remove_delegate
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
-  let contract = Contract.Originated contract in
   let entrypoint = entrypoint_do in
   (Michelson_v1_entrypoints.contract_entrypoint_type
      cctxt
@@ -154,7 +153,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
        ~parameters
        ~entrypoint
        ?fee
-       (Contract contract))
+       (Contract (Originated contract)))
 
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~fee_parameter ?fee ~source ~src_pk
@@ -246,7 +245,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
          cctxt
          ~chain
          ~block
-         ~contract:(Contract.Originated destination)
+         ~contract:destination
          ~entrypoint
          ~normalize_types:true
        >>=? function
