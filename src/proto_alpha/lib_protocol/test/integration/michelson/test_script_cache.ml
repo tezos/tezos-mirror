@@ -184,9 +184,8 @@ let test_find_correctly_looks_up () =
       Contract is absent.
     *)
     >>=? fun () ->
-    Contract.of_b58check "tz1fakefakefakefakefakefakefakcphLA5"
-    |> Environment.wrap_tzresult
-    >>?= fun addr ->
+    let addr = Contract_helpers.fake_KT1 in
+    let addr = Contract.Originated addr in
     Script_cache.find ctxt addr >|= Environment.wrap_tzresult
     >>=? fun (_, _, cached_contract) ->
     fail_unless

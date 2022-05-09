@@ -586,7 +586,7 @@ let test_bad_parameter () =
            ~equal:( = )
            (Environment.Ecoproto_error
               (Script_interpreter.Bad_contract_parameter
-                 (Contract.Implicit Signature.Public_key_hash.zero)))
+                 Contract_helpers.default_self))
            lst ->
       return ()
   | Error errs ->

@@ -64,6 +64,11 @@ let originate_contract file storage src b baker =
   originate_contract_hash file storage src b baker >|=? fun (dst, b) ->
   (Contract.Originated dst, b)
 
+let fake_KT1 =
+  Contract_hash.of_b58check_exn "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+
+let default_self = Contract.Originated fake_KT1
+
 let default_source = Contract.Implicit Signature.Public_key_hash.zero
 
 let default_step_constants =
@@ -71,7 +76,7 @@ let default_step_constants =
     {
       source = default_source;
       payer = default_source;
-      self = default_source;
+      self = default_self;
       amount = Tez.zero;
       balance = Tez.zero;
       chain_id = Chain_id.zero;
