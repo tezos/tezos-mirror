@@ -1582,7 +1582,7 @@ module Contract : sig
   val raw_originate :
     context ->
     prepaid_bootstrap_storage:bool ->
-    t ->
+    Contract_hash.t ->
     script:Script.t * Lazy_storage.diffs option ->
     context tzresult Lwt.t
 

@@ -112,13 +112,13 @@ let test_fa12_init_storage manager =
             [] )))
 
 let originate ctxt address_hash ~balance script =
-  let address = Contract_repr.Originated address_hash in
   Contract_storage.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:true
-    address
+    address_hash
     ~script
   >>=? fun ctxt ->
+  let address = Contract_repr.Originated address_hash in
   Contract_storage.used_storage_space ctxt address >>=? fun size ->
   Fees_storage.burn_origination_fees
     ~origin:Protocol_migration

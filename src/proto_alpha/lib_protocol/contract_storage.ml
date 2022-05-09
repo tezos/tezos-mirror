@@ -405,6 +405,7 @@ let update_script_lazy_storage c = function
 
 let raw_originate c ~prepaid_bootstrap_storage
     (* Free space for bootstrap contracts *) contract ~script =
+  let contract = Contract_repr.Originated contract in
   Storage.Contract.Spendable_balance.init c contract Tez_repr.zero >>=? fun c ->
   let {Script_repr.code; storage}, lazy_storage_diff = script in
   Storage.Contract.Code.init c contract code >>=? fun (c, code_size) ->

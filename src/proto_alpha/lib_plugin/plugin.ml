@@ -2452,13 +2452,13 @@ module RPC = struct
         let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
         Contract.fresh_contract_from_current_nonce ctxt
         >>?= fun (ctxt, dummy_contract_hash) ->
-        let dummy_contract = Contract.Originated dummy_contract_hash in
         Contract.raw_originate
           ctxt
           ~prepaid_bootstrap_storage:false
-          dummy_contract
+          dummy_contract_hash
           ~script:(script, None)
         >>=? fun ctxt ->
+        let dummy_contract = Contract.Originated dummy_contract_hash in
         Token.transfer
           ~origin:Simulation
           ctxt

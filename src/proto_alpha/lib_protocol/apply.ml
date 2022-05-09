@@ -1065,13 +1065,13 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
   Gas.consume ctxt (Script.strip_locations_cost code) >>?= fun ctxt ->
   let code = Script.lazy_expr (Micheline.strip_locations code) in
   let script = {Script.code; storage} in
-  let contract = Contract.Originated contract in
   Contract.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:false
     contract
     ~script:(script, lazy_storage_diff)
   >>=? fun ctxt ->
+  let contract = Contract.Originated contract in
   (match delegate with
   | None -> return ctxt
   | Some delegate -> Delegate.init ctxt contract delegate)
