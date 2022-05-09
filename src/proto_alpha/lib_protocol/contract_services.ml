@@ -295,33 +295,33 @@ let[@coq_axiom_with_reason "gadt"] register () =
   register0 ~chunked:true S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
   let register_field_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract () () ->
-        filter_contract contract @@ fun () ->
+        filter_contract contract @@ fun filtered_contract ->
         Contract.exists ctxt contract >>= function
-        | true -> f ctxt contract |> wrap_result
+        | true -> f ctxt filtered_contract |> wrap_result
         | false -> return_none)
   in
   let register_field_with_query_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract query () ->
-        filter_contract contract @@ fun () ->
+        filter_contract contract @@ fun filtered_contract ->
         Contract.exists ctxt contract >>= function
-        | true -> f ctxt contract query |> wrap_result
+        | true -> f ctxt filtered_contract query |> wrap_result
         | false -> return_none)
   in
   let register_field s =
     register_field_gen
-      ~filter_contract:(fun _c k -> k ())
+      ~filter_contract:(fun c k -> k c)
       ~wrap_result:(fun res -> res >|=? Option.some)
       s
   in
   let register_field_with_query s =
     register_field_with_query_gen
-      ~filter_contract:(fun _c k -> k ())
+      ~filter_contract:(fun c k -> k c)
       ~wrap_result:(fun res -> res >|=? Option.some)
       s
   in
   let register_opt_field s =
     register_field_gen
-      ~filter_contract:(fun _c k -> k ())
+      ~filter_contract:(fun c k -> k c)
       ~wrap_result:(fun res -> res)
       s
   in
@@ -330,7 +330,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
       ~filter_contract:(fun c k ->
         match (c : Contract.t) with
         | Implicit _ -> return_none
-        | Originated _ -> k ())
+        | Originated c -> k c)
       ~wrap_result:(fun res -> res)
       s
   in
@@ -405,28 +405,18 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | Implicit mgr ->
           Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
   register_originated_opt_field ~chunked:true S.script (fun c v ->
-      match v with
-      | Implicit _ -> return_none
-      | Originated v -> Contract.get_script c v >|=? fun (_, v) -> v) ;
+      Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
-      match contract with
-      | Implicit _ -> return_none
-      | Originated contract -> (
-          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-          match script with
-          | None -> return_none
-          | Some script ->
-              let ctxt = Gas.set_unlimited ctxt in
-              let open Script_ir_translator in
-              parse_script
-                ctxt
-                ~legacy:true
-                ~allow_forged_in_storage:true
-                script
-              >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
-              unparse_data ctxt Readable storage_type storage
-              >|=? fun (storage, _ctxt) ->
-              Some (Micheline.strip_locations storage))) ;
+      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+      match script with
+      | None -> return_none
+      | Some script ->
+          let ctxt = Gas.set_unlimited ctxt in
+          let open Script_ir_translator in
+          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
+          >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+          unparse_data ctxt Readable storage_type storage
+          >|=? fun (storage, _ctxt) -> Some (Micheline.strip_locations storage)) ;
   opt_register2
     ~chunked:true
     S.entrypoint_type
