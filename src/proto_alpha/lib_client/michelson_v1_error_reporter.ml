@@ -136,7 +136,7 @@ let fetch_script (cctxt : #Protocol_client_context.rpc_context) ~chain ~block
       Lwt.return @@ Environment.wrap_tzresult @@ Script_repr.force_decode code
 
 type error +=
-  | Rich_runtime_contract_error of Contract.t * Michelson_v1_parser.parsed
+  | Rich_runtime_contract_error of Contract_hash.t * Michelson_v1_parser.parsed
 
 let enrich_runtime_errors cctxt ~chain ~block ~parsed =
   List.map_s (function
@@ -146,7 +146,8 @@ let enrich_runtime_errors cctxt ~chain ~block ~parsed =
           | Some parsed ->
               Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
           | None -> (
-              fetch_script cctxt ~chain ~block contract >|= function
+              fetch_script cctxt ~chain ~block (Originated contract)
+              >|= function
               | Ok script ->
                   let parsed = Michelson_v1_printer.unparse_toplevel script in
                   Rich_runtime_contract_error (contract, parsed)
@@ -385,7 +386,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Format.fprintf
           ppf
           "@[<v 2>Runtime error in unknown contract %a@]"
-          Contract.pp
+          Contract_hash.pp
           contract ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
@@ -394,7 +395,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Format.fprintf
           ppf
           "@[<v 2>Runtime error in contract %a:@ %a@]"
-          Contract.pp
+          Contract_hash.pp
           contract
           print_source
           (parsed, hilights) ;
