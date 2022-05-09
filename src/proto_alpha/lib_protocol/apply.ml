@@ -878,7 +878,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
         {
           source;
           payer = Contract.Implicit payer;
-          self = contract;
+          self = contract_hash;
           amount;
           chain_id;
           balance;
@@ -3161,7 +3161,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
              {
                source = liquidity_baking_cpmm_contract;
                payer = liquidity_baking_cpmm_contract;
-               self = liquidity_baking_cpmm_contract;
+               self = liquidity_baking_cpmm_contract_hash;
                amount = liquidity_baking_subsidy;
                balance;
                chain_id = Chain_id.zero;

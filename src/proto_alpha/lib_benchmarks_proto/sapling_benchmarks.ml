@@ -102,7 +102,7 @@ module Apply_diff_bench : Benchmark.S = struct
         Format.eprintf
           "tx hash: %d@."
           (Hashtbl.hash sapling_transition.sapling_tx) ;
-        let address = Alpha_context.Contract.to_b58check step_constants.self in
+        let address = Contract_hash.to_b58check step_constants.self in
         let chain_id =
           Environment.Chain_id.to_b58check step_constants.chain_id
         in

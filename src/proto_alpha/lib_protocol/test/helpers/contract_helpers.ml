@@ -67,7 +67,7 @@ let originate_contract file storage src b baker =
 let fake_KT1 =
   Contract_hash.of_b58check_exn "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
 
-let default_self = Contract.Originated fake_KT1
+let default_self = fake_KT1
 
 let default_source = Contract.Implicit Signature.Public_key_hash.zero
 

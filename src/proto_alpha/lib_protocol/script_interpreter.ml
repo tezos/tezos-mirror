@@ -92,7 +92,7 @@ module S = Saturation_repr
 type step_constants = Script_typed_ir.step_constants = {
   source : Contract.t;
   payer : Contract.t;
-  self : Contract.t;
+  self : Contract_hash.t;
   amount : Tez.t;
   balance : Tez.t;
   chain_id : Chain_id.t;
@@ -1040,7 +1040,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           match c with
           | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ ->
               (return_none [@ocaml.tailcall]) ctxt
-          | Contract (Originated _contract_hash as c) -> (
+          | Contract (Originated contract_hash as c) -> (
               Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
               match script_opt with
               | None -> (return_none [@ocaml.tailcall]) ctxt
@@ -1106,8 +1106,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                               (step [@ocaml.tailcall])
                                 ( ctxt,
                                   {
-                                    source = sc.self;
-                                    self = c;
+                                    source = Contract.Originated sc.self;
+                                    self = contract_hash;
                                     amount = Tez.zero;
                                     balance;
                                     (* The following remain unchanged, but let's
@@ -1137,7 +1137,10 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let operation = Delegation delegate in
           let ctxt = update_context gas ctxt in
           fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-          let piop = Internal_operation {source = sc.self; operation; nonce} in
+          let piop =
+            Internal_operation
+              {source = Contract.Originated sc.self; operation; nonce}
+          in
           let res = {piop; lazy_storage_diff = None} in
           let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
@@ -1188,12 +1191,12 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = {destination; entrypoint = Entrypoint.default} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf (_, ty, entrypoint, k) ->
-          let destination : Destination.t = Contract sc.self in
+          let destination : Destination.t = Contract (Originated sc.self) in
           let address = {destination; entrypoint} in
           let res = Typed_contract {arg_ty = ty; address} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf_address (_, k) ->
-          let destination : Destination.t = Contract sc.self in
+          let destination : Destination.t = Contract (Originated sc.self) in
           let res = {destination; entrypoint = Entrypoint.default} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | IAmount (_, k) ->
@@ -1249,7 +1252,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | ISapling_verify_update (_, k) -> (
           let transaction = accu in
           let state, stack = stack in
-          let address = Contract.to_b58check sc.self in
+          let address = Contract_hash.to_b58check sc.self in
           let sc_chain_id = Script_chain_id.make sc.chain_id in
           let chain_id = Script_chain_id.to_b58check sc_chain_id in
           let anti_replay = address ^ chain_id in
@@ -1269,7 +1272,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | ISapling_verify_update_deprecated (_, k) -> (
           let transaction = accu in
           let state, stack = stack in
-          let address = Contract.to_b58check sc.self in
+          let address = Contract_hash.to_b58check sc.self in
           let sc_chain_id = Script_chain_id.make sc.chain_id in
           let chain_id = Script_chain_id.to_b58check sc_chain_id in
           let anti_replay = address ^ chain_id in
@@ -1433,7 +1436,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* Tickets *)
       | ITicket (_, k) ->
           let contents = accu and amount, stack = stack in
-          let ticketer = sc.self in
+          let ticketer = Contract.Originated sc.self in
           let accu = {ticketer; contents; amount} in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IRead_ticket (_, k) ->
@@ -1729,11 +1732,12 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
        entrypoints
        entrypoint)
   >>?= fun (r, ctxt) ->
-  record_trace (Bad_contract_parameter step_constants.self) r
+  let self_contract = Contract.Originated step_constants.self in
+  record_trace (Bad_contract_parameter self_contract) r
   >>?= fun (Ex_ty_cstr {ty = entrypoint_ty; construct; original_type_expr = _})
     ->
   trace
-    (Bad_contract_parameter step_constants.self)
+    (Bad_contract_parameter self_contract)
     (lift_execution_arg ctxt ~internal entrypoint_ty construct arg)
   >>=? fun (arg, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
@@ -1741,7 +1745,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
   >>?= fun (to_update, ctxt) ->
   trace
-    (Runtime_contract_error step_constants.self)
+    (Runtime_contract_error self_contract)
     (interp logger (ctxt, step_constants) code (arg, old_storage))
   >>=? fun ((ops, new_storage), ctxt) ->
   Script_ir_translator.extract_lazy_storage_diff

@@ -2867,7 +2867,7 @@ module Registration_section = struct
             {
               source = zero;
               payer = zero;
-              self = zero;
+              self = Contract_hash.zero;
               amount = Tez.zero;
               balance = Tez.zero;
               chain_id = Chain_id.zero;

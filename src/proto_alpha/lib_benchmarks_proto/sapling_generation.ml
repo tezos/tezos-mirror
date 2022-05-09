@@ -504,7 +504,7 @@ let generate (save_to : string) (tx_count : int)
          @@ Option.fold ~none:shared_seed ~some:(fun seed -> [|seed|]) seed
        in
        Execution_context.make ~rng_state >>=? fun (ctxt, step_constants) ->
-       let address = Alpha_context.Contract.to_b58check step_constants.self in
+       let address = Contract_hash.to_b58check step_constants.self in
        let chain_id =
          Environment.Chain_id.to_b58check step_constants.chain_id
        in
