@@ -1155,18 +1155,17 @@ let apply_internal_manager_operation_content :
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
-    gas_consumed_in_precheck:Gas.cost option ->
     kind Script_typed_ir.manager_operation ->
     (context
     * kind successful_manager_operation_result
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id ~gas_consumed_in_precheck operation ->
+ fun ctxt mode ~payer ~source ~chain_id operation ->
   prepare_apply_manager_operation_content
     ~ctxt
     ~source
-    ~gas_consumed_in_precheck
+    ~gas_consumed_in_precheck:None
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
   | Transaction_to_contract
@@ -1792,7 +1791,6 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             ~source
             ~payer
             ~chain_id
-            ~gas_consumed_in_precheck:None
             operation)
         >>= function
         | Error errors ->
