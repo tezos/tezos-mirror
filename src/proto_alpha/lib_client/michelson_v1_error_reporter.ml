@@ -117,7 +117,7 @@ let string_of_context_desc = function
   | Script_tc_errors.View -> "view"
 
 (* Error raised while fetching the script of a contract for error reporting when the script is not found. *)
-type error += Fetch_script_not_found_meta_error of Contract.t
+type error += Fetch_script_not_found_meta_error of Contract_hash.t
 
 (* Errors raised while fetching the script of a contract for error reporting. *)
 type error += Fetch_script_meta_error of error trace
@@ -146,8 +146,7 @@ let enrich_runtime_errors cctxt ~chain ~block ~parsed =
           | Some parsed ->
               Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
           | None -> (
-              fetch_script cctxt ~chain ~block (Originated contract)
-              >|= function
+              fetch_script cctxt ~chain ~block contract >|= function
               | Ok script ->
                   let parsed = Michelson_v1_printer.unparse_toplevel script in
                   Rich_runtime_contract_error (contract, parsed)

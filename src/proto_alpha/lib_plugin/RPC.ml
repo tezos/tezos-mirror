@@ -1241,7 +1241,7 @@ module Scripts = struct
           script_opt
         >>?= fun script ->
         Script_repr.(force_decode script.code) >>?= fun decoded_script ->
-        script_view_type ctxt contract decoded_script view
+        script_view_type ctxt contract_hash decoded_script view
         >>=? fun (input_ty, output_ty) ->
         Contract.get_balance ctxt contract >>=? fun balance ->
         let source, payer =
@@ -1684,19 +1684,22 @@ module Contract = struct
       ~chunked:true
       S.get_script_normalized
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-        match script with
-        | None -> return_none
-        | Some script ->
-            let ctxt = Gas.set_unlimited ctxt in
-            Script_ir_translator.parse_and_unparse_script_unaccounted
-              ctxt
-              ~legacy:true
-              ~allow_forged_in_storage:true
-              unparsing_mode
-              ~normalize_types
-              script
-            >>=? fun (script, _ctxt) -> return_some script)
+        match contract with
+        | Implicit _ -> return_none
+        | Originated _ -> (
+            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+            match script with
+            | None -> return_none
+            | Some script ->
+                let ctxt = Gas.set_unlimited ctxt in
+                Script_ir_translator.parse_and_unparse_script_unaccounted
+                  ctxt
+                  ~legacy:true
+                  ~allow_forged_in_storage:true
+                  unparsing_mode
+                  ~normalize_types
+                  script
+                >>=? fun (script, _ctxt) -> return_some script))
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
@@ -1713,7 +1716,7 @@ module Contract = struct
       S.get_script_normalized
       ctxt
       block
-      contract
+      (Contract.Originated contract)
       ()
       (unparsing_mode, normalize_types)
 end

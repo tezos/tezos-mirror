@@ -42,7 +42,7 @@ type Environment.Error_monad.error +=
 type Environment.Error_monad.error +=
   | View_unexpected_return of Entrypoint.t * Contract.t
 
-type Environment.Error_monad.error += View_not_found of Contract.t * string
+type Environment.Error_monad.error += View_not_found of Contract_hash.t * string
 
 type Environment.Error_monad.error += Viewer_unexpected_storage
 
@@ -140,10 +140,11 @@ let () =
       Format.fprintf
         ppf
         "The contract %a does not have a view named `%s`."
-        Contract.pp
+        Contract_hash.pp
         contract
         name)
-    Data_encoding.(obj2 (req "contract" Contract.encoding) (req "view" string))
+    Data_encoding.(
+      obj2 (req "contract" Contract.originated_encoding) (req "view" string))
     (function View_not_found (k, n) -> Some (k, n) | _ -> None)
     (fun (k, n) -> View_not_found (k, n)) ;
   Environment.Error_monad.register_error_kind
