@@ -235,7 +235,7 @@ let () =
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_unknown_commitment"
-    ~title:"Rollup does not exist"
+    ~title:"Unknown commitment"
     ~description
     ~pp:(fun ppf x ->
       Format.fprintf
@@ -251,7 +251,7 @@ let () =
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_bad_inbox_level"
-    ~title:"Committed too soon"
+    ~title:"Committing to a bad inbox level"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
