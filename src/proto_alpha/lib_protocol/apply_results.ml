@@ -97,7 +97,8 @@ let contents_of_internal_operation (type kind)
             entrypoint = Tx_rollup.deposit_entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
-    | Origination {origination; _} -> Origination origination
+    | Origination {delegate; script; credit; _} ->
+        Origination {delegate; script; credit}
     | Delegation delegate -> Delegation delegate
   in
   {source; operation; nonce}

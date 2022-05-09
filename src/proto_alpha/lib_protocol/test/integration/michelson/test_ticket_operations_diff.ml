@@ -275,7 +275,9 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
         operation =
           Origination
             {
-              origination = {delegate = None; script; credit = Tez.one};
+              delegate = None;
+              script;
+              credit = Tez.one;
               preorigination = orig_contract;
               storage_type;
               storage;

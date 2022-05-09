@@ -1191,12 +1191,7 @@ let apply_internal_manager_operation_content :
         ~dst_rollup:destination
         ~since:ctxt_before_op
   | Origination
-      {
-        origination = {delegate; script; credit};
-        preorigination;
-        storage_type;
-        storage;
-      } ->
+      {delegate; script; credit; preorigination; storage_type; storage} ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt

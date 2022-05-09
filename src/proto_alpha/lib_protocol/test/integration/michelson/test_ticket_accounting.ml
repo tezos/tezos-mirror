@@ -352,7 +352,9 @@ let origination_operation ctxt ~src ~script:(code, storage) ~orig_contract =
         operation =
           Origination
             {
-              origination = {delegate = None; script; credit = Tez.one};
+              delegate = None;
+              script;
+              credit = Tez.one;
               preorigination = orig_contract;
               storage_type;
               storage;

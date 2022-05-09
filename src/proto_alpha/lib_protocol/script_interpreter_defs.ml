@@ -652,16 +652,12 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
   let storage = Micheline.strip_locations storage in
   Contract.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, preorigination) ->
-  let origination =
-    {
-      credit;
-      delegate;
-      script =
-        {code = Script.lazy_expr code; storage = Script.lazy_expr storage};
-    }
+  let script =
+    {code = Script.lazy_expr code; storage = Script.lazy_expr storage}
   in
   let operation =
-    Origination {origination; preorigination; storage_type; storage = init}
+    Origination
+      {credit; delegate; script; preorigination; storage_type; storage = init}
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let source = Contract.Originated sc.self in
