@@ -102,7 +102,13 @@ let contents_of_internal_operation (type kind)
             entrypoint = Tx_rollup.deposit_entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
-    | Origination {delegate; script; credit; _} ->
+    | Origination {delegate; code; unparsed_storage; credit; _} ->
+        let script =
+          {
+            Script.code = Script.lazy_expr code;
+            storage = Script.lazy_expr unparsed_storage;
+          }
+        in
         Origination {delegate; script; credit}
     | Delegation delegate -> Delegation delegate
   in

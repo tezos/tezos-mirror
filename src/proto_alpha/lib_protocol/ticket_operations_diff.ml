@@ -206,7 +206,8 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
   | Origination
       {
         delegate = _;
-        script = _;
+        code = _;
+        unparsed_storage = _;
         credit = _;
         preorigination;
         storage_type;

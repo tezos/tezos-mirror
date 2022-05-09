@@ -1133,7 +1133,6 @@ let apply_internal_manager_operation_content :
      gas consumption and originations for the operation result (by
      comparing it with the [ctxt] we will have at the end of the
      application). *)
-  let consume_deserialization_gas = Script.When_needed in
   match operation with
   | Transaction_to_contract
       {
@@ -1191,12 +1190,15 @@ let apply_internal_manager_operation_content :
         ~dst_rollup:destination
         ~since:ctxt_before_op
   | Origination
-      {delegate; script; credit; preorigination; storage_type; storage} ->
-      Script.force_decode_in_context
-        ~consume_deserialization_gas
-        ctxt
-        script.Script.code
-      >>?= fun (unparsed_code, ctxt) ->
+      {
+        delegate;
+        code = unparsed_code;
+        unparsed_storage = _;
+        credit;
+        preorigination;
+        storage_type;
+        storage;
+      } ->
       apply_origination
         ~ctxt
         ~storage_type
