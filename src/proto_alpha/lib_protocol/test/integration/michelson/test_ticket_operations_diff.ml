@@ -192,7 +192,7 @@ let originate block ~script ~storage ~src ~baker ~forges_tickets =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
   let* operation, destination =
-    Op.contract_origination (B block) src ~fee:(Test_tez.of_int 10) ~script
+    Op.contract_origination_hash (B block) src ~fee:(Test_tez.of_int 10) ~script
   in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
@@ -252,7 +252,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
           Origination
             {
               origination = {delegate = None; script; credit = Tez.one};
-              preorigination = orig_contract;
+              preorigination = Contract.Originated orig_contract;
               storage_type;
               storage;
             };
@@ -260,7 +260,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
       }
   in
   let incr = Incremental.set_alpha_ctxt incr ctxt in
-  return (orig_contract, operation, incr)
+  return (Contract.Originated orig_contract, operation, incr)
 
 let delegation_operation ~src =
   Script_typed_ir.Internal_operation
@@ -273,7 +273,7 @@ let originate block ~src ~baker ~script ~storage ~forges_tickets =
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
-  return (orig_contract, incr)
+  return (Contract.Originated orig_contract, incr)
 
 let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
   let open Lwt_result_syntax in
