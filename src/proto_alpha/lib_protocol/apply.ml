@@ -1077,6 +1077,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
   Gas.consume ctxt (Script.strip_locations_cost code) >>?= fun ctxt ->
   let code = Script.lazy_expr (Micheline.strip_locations code) in
   let script = {Script.code; storage} in
+  let contract = Contract.Originated contract in
   Contract.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:false
@@ -1221,7 +1222,7 @@ let apply_internal_manager_operation_content :
         ~storage_type
         ~storage
         ~unparsed_code
-        ~contract:(Contract.Originated preorigination)
+        ~contract:preorigination
         ~delegate
         ~source
         ~credit
@@ -1432,8 +1433,7 @@ let apply_external_manager_operation_content :
          so that the script can use it immediately.
          The address of external originations is generated here. *)
       Contract.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, contract_hash) ->
-      let contract = Contract.Originated contract_hash in
+      >>?= fun (ctxt, contract) ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
