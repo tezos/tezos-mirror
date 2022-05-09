@@ -550,7 +550,14 @@ module Regressions = struct
         fold max_batch_number_per_inbox () (fun i () ->
             let src = Account.Bootstrap.alias (i + 1) in
             let*! () =
-              Client.Tx_rollup.submit_batch ~hooks ~content ~rollup ~src client
+              Client.Tx_rollup.submit_batch
+                ~hooks
+                ~log_output:false
+                ~log_command:false
+                ~content
+                ~rollup
+                ~src
+                client
             in
             unit)
       in

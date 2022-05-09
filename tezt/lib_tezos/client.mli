@@ -1061,6 +1061,8 @@ module Tx_rollup : sig
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->
     ?hooks:Process.hooks ->
+    ?log_output:bool ->
+    ?log_command:bool ->
     content:Hex.t ->
     rollup:string ->
     src:string ->
