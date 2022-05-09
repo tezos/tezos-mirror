@@ -253,7 +253,9 @@ let commands_ro () =
       ~desc:"Get the storage of a contract."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "contract"; "storage"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun unparsing_mode contract (cctxt : Protocol_client_context.full) ->
         get_storage
@@ -354,7 +356,9 @@ let commands_ro () =
       ~desc:"Get the `BLAKE2B` script hash of a contract."
       no_options
       (prefixes ["get"; "contract"; "script"; "hash"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         get_script_hash cctxt ~chain:cctxt#chain ~block:cctxt#block contract

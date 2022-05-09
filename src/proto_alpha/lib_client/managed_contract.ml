@@ -41,7 +41,7 @@ let get_contract_manager (cctxt : #full) contract =
     ~chain:cctxt#chain
     ~block:cctxt#block
     ~unparsing_mode:Optimized
-    (Contract.Originated contract)
+    contract
   >>=? function
   | None -> cctxt#error "This is not a smart contract."
   | Some storage -> (

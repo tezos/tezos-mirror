@@ -93,7 +93,7 @@ val prepare_multisig_transaction :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  multisig_contract:Contract.t ->
+  multisig_contract:Contract_hash.t ->
   action:multisig_action ->
   unit ->
   multisig_prepared_action tzresult Lwt.t
@@ -110,7 +110,7 @@ val call_multisig :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  multisig_contract:Contract.t ->
+  multisig_contract:Contract_hash.t ->
   action:multisig_action ->
   signatures:Signature.t list ->
   amount:Tez.t ->
@@ -136,7 +136,7 @@ val call_multisig_on_bytes :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  multisig_contract:Contract.t ->
+  multisig_contract:Contract_hash.t ->
   bytes:Bytes.t ->
   signatures:Signature.t list ->
   amount:Tez.t ->

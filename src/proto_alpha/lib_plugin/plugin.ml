@@ -3232,7 +3232,7 @@ module RPC = struct
         S.get_storage_normalized
         ctxt
         block
-        contract
+        (Contract.Originated contract)
         ()
         unparsing_mode
 
