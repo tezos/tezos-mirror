@@ -278,7 +278,9 @@ let commands_ro () =
       @@ prefixes ["of"; "type"]
       @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun () key key_type contract (cctxt : Protocol_client_context.full) ->
         get_contract_big_map_value

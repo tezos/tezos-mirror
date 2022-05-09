@@ -53,7 +53,7 @@ let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key =
   Alpha_services.Contract.contract_big_map_get_opt
     rpc
     (chain, block)
-    contract
+    (Contract.Originated contract)
     key
 
 let get_script (rpc : #rpc_context) ~chain ~block ~unparsing_mode
