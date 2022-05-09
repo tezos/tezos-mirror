@@ -409,16 +409,24 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | Implicit _ -> return_none
       | Originated _ -> Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
-      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-      match script with
-      | None -> return_none
-      | Some script ->
-          let ctxt = Gas.set_unlimited ctxt in
-          let open Script_ir_translator in
-          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
-          unparse_data ctxt Readable storage_type storage
-          >|=? fun (storage, _ctxt) -> Some (Micheline.strip_locations storage)) ;
+      match contract with
+      | Implicit _ -> return_none
+      | Originated _ -> (
+          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+          match script with
+          | None -> return_none
+          | Some script ->
+              let ctxt = Gas.set_unlimited ctxt in
+              let open Script_ir_translator in
+              parse_script
+                ctxt
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                script
+              >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+              unparse_data ctxt Readable storage_type storage
+              >|=? fun (storage, _ctxt) ->
+              Some (Micheline.strip_locations storage))) ;
   opt_register2
     ~chunked:true
     S.entrypoint_type
