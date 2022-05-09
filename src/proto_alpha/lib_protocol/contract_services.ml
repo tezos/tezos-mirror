@@ -269,8 +269,13 @@ module S = struct
       let service = RPC_service.get_service ~description ~query ~output path in
       ( service,
         fun ctxt contract_id q () ->
-          single_sapling_get_id ctxt contract_id >>=? fun (sapling_id, ctxt) ->
-          Option.map_es (fun sapling_id -> f ctxt sapling_id q) sapling_id )
+          match (contract_id : Contract.t) with
+          | Implicit _ -> return_none
+          | Originated _ ->
+              single_sapling_get_id ctxt contract_id
+              >>=? fun (sapling_id, ctxt) ->
+              Option.map_es (fun sapling_id -> f ctxt sapling_id q) sapling_id
+      )
 
     let get_diff = make_service Sapling_services.S.Args.get_diff
 
@@ -600,5 +605,5 @@ let single_sapling_get_diff ctxt block id ?offset_commitment ?offset_nullifier
   S.Sapling.(mk_call1 get_diff)
     ctxt
     block
-    id
+    (Contract.Originated id)
     Sapling_services.{offset_commitment; offset_nullifier}

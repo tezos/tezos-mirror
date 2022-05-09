@@ -903,7 +903,7 @@ module Interpreter_tests = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_1
-      (Contract.Originated dst)
+      dst
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()
@@ -940,7 +940,7 @@ module Interpreter_tests = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_2
-      (Contract.Originated dst)
+      dst
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()

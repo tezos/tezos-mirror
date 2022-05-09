@@ -410,7 +410,7 @@ module Interpreter_helpers = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block
-      (Alpha_context.Contract.Originated dst)
+      dst
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()

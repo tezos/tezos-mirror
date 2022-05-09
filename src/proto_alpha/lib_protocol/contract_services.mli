@@ -133,7 +133,7 @@ val contract_big_map_get_opt :
 val single_sapling_get_diff :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   ?offset_commitment:int64 ->
   ?offset_nullifier:int64 ->
   unit ->
