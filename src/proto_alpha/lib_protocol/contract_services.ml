@@ -405,7 +405,9 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | Implicit mgr ->
           Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
   register_originated_opt_field ~chunked:true S.script (fun c v ->
-      Contract.get_script c v >|=? fun (_, v) -> v) ;
+      match v with
+      | Implicit _ -> return_none
+      | Originated _ -> Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
       match script with
