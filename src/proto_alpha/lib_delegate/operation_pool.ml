@@ -372,15 +372,22 @@ module Prioritized = struct
     add_operation_to_pool Prioritized_operation_set.add (fun op ->
         classify (Prioritized_operation.packed op))
 
-  let add_external_operation pool operation =
-    add_operation pool (Prioritized_operation.extern operation)
+  let add_external_operation pool priority operation =
+    add_operation pool (Prioritized_operation.extern ~priority operation)
 
   let add_operations prioritized_pool operations =
     List.fold_left add_operation prioritized_pool operations
 
+  (* [merge_external_operations] considers that the list of operation
+     represents an ordererd list of operation with the head having the highest
+     prioritiy.
+  *)
   let merge_external_operations pool
       (external_operations : packed_operation list) =
-    List.fold_left add_external_operation pool external_operations
+    List.fold_left_i
+      (fun i pool op -> add_external_operation pool (-i) op)
+      pool
+      external_operations
 
   let filter p {consensus; votes; anonymous; managers} =
     let filter =
