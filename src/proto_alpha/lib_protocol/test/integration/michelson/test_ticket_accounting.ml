@@ -308,7 +308,7 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
   let* operation, destination =
-    Op.contract_origination (B block) src ~fee:(Test_tez.of_int 10) ~script
+    Op.contract_origination_hash (B block) src ~fee:(Test_tez.of_int 10) ~script
   in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
@@ -351,7 +351,7 @@ let origination_operation ctxt ~src ~script ~orig_contract =
           Origination
             {
               origination = {delegate = None; script; credit = Tez.one};
-              preorigination = orig_contract;
+              preorigination = Contract.Originated orig_contract;
               storage_type;
               storage;
             };
@@ -892,6 +892,7 @@ let test_update_invalid_transfer () =
       ~storage:"{}"
       ~forges_tickets:false
   in
+  let destination = Contract.Originated destination in
   let ctxt = Incremental.alpha_ctxt incr in
   let arg_type = ticket_string_list_type in
   let arg =
@@ -926,7 +927,8 @@ let test_update_ticket_self_diff () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let ticketer = Contract.to_b58check self in
+  let ticketer = Contract_hash.to_b58check self in
+  let self = Contract.Originated self in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* ticket_diffs, ctxt =
@@ -962,6 +964,7 @@ let test_update_self_ticket_transfer () =
       ~storage:"{}"
       ~forges_tickets:false
   in
+  let ticket_receiver = Contract.Originated ticket_receiver in
   (* Ticket is self. That means we can transfer an unlimited amounts of such
      ticket-tokens. *)
   let ticketer = Contract.to_b58check self in
@@ -1021,6 +1024,7 @@ let test_update_valid_transfer () =
       ~storage:"{}"
       ~forges_tickets:false
   in
+  let destination = Contract.Originated destination in
   let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
   assert (ticketer <> Contract.to_b58check self) ;
   let ctxt = Incremental.alpha_ctxt incr in
@@ -1084,7 +1088,8 @@ let test_update_transfer_tickets_to_self () =
       ~forges_tickets:false
   in
   let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
-  assert (ticketer <> Contract.to_b58check self) ;
+  assert (ticketer <> Contract_hash.to_b58check self) ;
+  let self = Contract.Originated self in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* red_self_token_hash, ctxt =
@@ -1219,7 +1224,7 @@ let test_update_valid_origination () =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
-         ~owner:(Destination.Contract originated)
+         ~owner:(Destination.Contract (Originated originated))
          red_token
   in
   assert_balance ~loc:__LOC__ ctxt red_originated_token_hash (Some 1)
@@ -1244,7 +1249,7 @@ let test_update_self_origination () =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
-         ~owner:(Destination.Contract originated)
+         ~owner:(Destination.Contract (Originated originated))
          red_token
   in
   let* operation, ctxt =
@@ -1275,7 +1280,8 @@ let test_ticket_token_map_of_list_with_duplicates () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let ticketer = Contract.to_b58check self in
+  let ticketer = Contract_hash.to_b58check self in
+  let self = Contract.Originated self in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* ticket_diffs, ctxt =
