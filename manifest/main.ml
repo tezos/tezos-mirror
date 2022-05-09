@@ -1800,7 +1800,7 @@ let tezos_context_ops =
   public_lib
     "tezos-context-ops"
     ~path:"src/lib_protocol_environment"
-    ~synopsis:"Tezos: backend-agnostic operations on constexts"
+    ~synopsis:"Tezos: backend-agnostic operations on contexts"
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
