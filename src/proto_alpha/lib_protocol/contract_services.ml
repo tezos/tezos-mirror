@@ -406,7 +406,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
           Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
   register_originated_opt_field ~chunked:true S.script (fun c v ->
       Contract.get_script c v >|=? fun (_, v) -> v) ;
-  register_opt_field ~chunked:true S.storage (fun ctxt contract ->
+  register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
       match script with
       | None -> return_none
@@ -602,6 +602,7 @@ let script_opt ctxt block contract =
   RPC_context.make_opt_call1 S.script ctxt block contract () ()
 
 let storage ctxt block contract =
+  let contract = Contract.Originated contract in
   RPC_context.make_call1 S.storage ctxt block contract () ()
 
 let entrypoint_type ctxt block contract entrypoint ~normalize_types =
@@ -624,6 +625,7 @@ let list_entrypoints ctxt block contract ~normalize_types =
     ()
 
 let storage_opt ctxt block contract =
+  let contract = Contract.Originated contract in
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()
 
 let big_map_get ctxt block id key =

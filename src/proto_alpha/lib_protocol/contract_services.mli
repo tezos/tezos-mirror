@@ -94,7 +94,10 @@ val script_opt :
   Script.t option shell_tzresult Lwt.t
 
 val storage :
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Contract_hash.t ->
+  Script.expr shell_tzresult Lwt.t
 
 val entrypoint_type :
   'a #RPC_context.simple ->
@@ -116,7 +119,7 @@ val list_entrypoints :
 val storage_opt :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.expr option shell_tzresult Lwt.t
 
 val big_map_get :

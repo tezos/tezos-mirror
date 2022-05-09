@@ -1053,13 +1053,13 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
     let fee = Test_tez.of_int 10 in
-    let dst = Contract.Originated dst in
+    let cdst = Contract.Originated dst in
     Op.transaction
       ~gas_limit:Max
       ~fee
       (B b)
       src
-      dst
+      cdst
       Tez.zero
       ~parameters:parameters_1
     >>=? fun operation ->
@@ -1069,7 +1069,7 @@ module Interpreter_tests = struct
       ~fee
       (B b)
       src
-      dst
+      cdst
       Tez.zero
       ~parameters:parameters_2
     >>=? fun operation ->
