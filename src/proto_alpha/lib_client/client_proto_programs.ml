@@ -138,7 +138,7 @@ type run_view_params = {
 
 type run_script_view_params = {
   shared_params : simulation_params;
-  contract : Contract.t;
+  contract : Contract_hash.t;
   view : string;
   unlimited_gas : bool;
 }

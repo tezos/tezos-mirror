@@ -1756,7 +1756,7 @@ module RPC = struct
         let open Data_encoding in
         merge_objs
           (obj10
-             (req "contract" Contract.encoding)
+             (req "contract" Contract.originated_encoding)
              (req "view" string)
              (req "input" Script.expr_encoding)
              (dft "unlimited_gas" bool false)
@@ -2758,6 +2758,7 @@ module RPC = struct
               now ),
             level )
         ->
+          let contract = Contract.Originated contract in
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
             ~some:ok

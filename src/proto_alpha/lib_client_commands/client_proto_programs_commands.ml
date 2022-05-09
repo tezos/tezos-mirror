@@ -986,7 +986,7 @@ let commands () =
       (prefixes ["run"; "view"]
       @@ param ~name:"view" ~desc:"the name of the view" string_parameter
       @@ prefixes ["on"; "contract"]
-      @@ ContractAlias.destination_param
+      @@ OriginatedContractAlias.destination_param
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ stop)
@@ -1023,7 +1023,7 @@ let commands () =
       (prefixes ["run"; "view"]
       @@ param ~name:"view" ~desc:"the name of the view" string_parameter
       @@ prefixes ["on"; "contract"]
-      @@ ContractAlias.destination_param
+      @@ OriginatedContractAlias.destination_param
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ prefixes ["with"; "input"]
