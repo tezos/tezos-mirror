@@ -316,9 +316,6 @@ variables:
   # underlying tests have been fixed.
   retry: 2
   script:
-    # dune and opam do not agree on the semantic of vendored libraries, we simplify the picture for the opam jobs
-    - rm -rf vendors
-    - git commit -am "Remove vendors"
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}
     - opam install --yes ${package}

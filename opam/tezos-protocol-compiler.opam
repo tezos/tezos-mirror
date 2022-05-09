@@ -20,6 +20,7 @@ depends: [
   "re" { >= "1.7.2" }
 ]
 build: [
+  ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

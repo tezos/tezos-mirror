@@ -1795,6 +1795,7 @@ let as_opam_monorepo_opam_provided = function
 
 let generate_opam ?release for_package (internals : Target.internal list) :
     Opam.t =
+  let for_release = release <> None in
   let map l f = List.map f l in
   let (depends, x_opam_monorepo_opam_provided) =
     List.split @@ map internals
@@ -1808,18 +1809,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     in
     let deps =
       List.filter_map
-        (as_opam_dependency
-           ~fix_version:(release <> None)
-           ~for_package
-           ~with_test)
+        (as_opam_dependency ~fix_version:for_release ~for_package ~with_test)
         deps
     in
     let get_preprocess_dep (Target.PPS (target, _)) =
-      as_opam_dependency
-        ~fix_version:(release <> None)
-        ~for_package
-        ~with_test
-        target
+      as_opam_dependency ~fix_version:for_release ~for_package ~with_test target
     in
     ( List.filter_map get_preprocess_dep internal.preprocess @ deps,
       x_opam_monorepo_opam_provided )
@@ -1903,14 +1897,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
         with_test = true;
       }
     in
-    match release with
-    | None -> [build; runtest]
-    | Some _ ->
-        [
-          {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = false};
-          build;
-          runtest;
-        ]
+    [
+      {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = false};
+      build;
+      runtest;
+    ]
   in
   {
     maintainer = "contact@tezos.com";
