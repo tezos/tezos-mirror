@@ -74,7 +74,7 @@ let bytes_param ~name ~desc =
   Clic.param ~name ~desc Client_proto_args.bytes_parameter
 
 let transfer_options =
-  Clic.args15
+  Clic.args10
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
     Client_proto_context_commands.verbose_signing_switch
@@ -83,16 +83,11 @@ let transfer_options =
     Client_proto_args.counter_arg
     Client_proto_args.arg_arg
     Client_proto_args.no_print_source_flag
-    Client_proto_args.minimal_fees_arg
-    Client_proto_args.minimal_nanotez_per_byte_arg
-    Client_proto_args.minimal_nanotez_per_gas_unit_arg
-    Client_proto_args.force_low_fee_arg
-    Client_proto_args.fee_cap_arg
-    Client_proto_args.burn_cap_arg
+    Client_proto_args.fee_parameter_args
     Client_proto_args.entrypoint_arg
 
 let non_transfer_options =
-  Clic.args13
+  Clic.args8
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
     Client_proto_context_commands.verbose_signing_switch
@@ -100,12 +95,7 @@ let non_transfer_options =
     Client_proto_args.storage_limit_arg
     Client_proto_args.counter_arg
     Client_proto_args.no_print_source_flag
-    Client_proto_args.minimal_fees_arg
-    Client_proto_args.minimal_nanotez_per_byte_arg
-    Client_proto_args.minimal_nanotez_per_gas_unit_arg
-    Client_proto_args.force_low_fee_arg
-    Client_proto_args.fee_cap_arg
-    Client_proto_args.burn_cap_arg
+    Client_proto_args.fee_parameter_args
 
 let prepare_command_display prepared_command bytes_only =
   if bytes_only then
@@ -198,7 +188,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
       command
         ~group
         ~desc:"Originate a new multisig contract."
-        (args14
+        (args9
            Client_proto_args.fee_arg
            Client_proto_context_commands.dry_run_switch
            Client_proto_args.gas_limit_arg
@@ -206,13 +196,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
            Client_proto_args.delegate_arg
            (Client_keys.force_switch ())
            Client_proto_args.no_print_source_flag
-           Client_proto_args.minimal_fees_arg
-           Client_proto_args.minimal_nanotez_per_byte_arg
-           Client_proto_args.minimal_nanotez_per_gas_unit_arg
-           Client_proto_args.force_low_fee_arg
-           Client_proto_args.fee_cap_arg
-           Client_proto_context_commands.verbose_signing_switch
-           Client_proto_args.burn_cap_arg)
+           Client_proto_args.fee_parameter_args
+           Client_proto_context_commands.verbose_signing_switch)
         (prefixes ["deploy"; "multisig"]
         @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
              ~name:"new_multisig"
@@ -236,13 +221,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                delegate,
                force,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               verbose_signing,
-               burn_cap )
+               fee_parameter,
+               verbose_signing )
              alias_name
              balance
              (_, source)
@@ -260,16 +240,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 "only implicit accounts can be the source of an origination"
           | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-              let fee_parameter =
-                {
-                  Injection.minimal_fees;
-                  minimal_nanotez_per_byte;
-                  minimal_nanotez_per_gas_unit;
-                  force_low_fee;
-                  fee_cap;
-                  burn_cap;
-                }
-              in
               List.map_es
                 (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
                 keys
@@ -505,12 +475,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                counter,
                parameter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap,
+               fee_parameter,
                entrypoint )
              (_, multisig_contract)
              amount
@@ -533,16 +498,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-              let fee_parameter =
-                {
-                  Injection.minimal_fees;
-                  minimal_nanotez_per_byte;
-                  minimal_nanotez_per_gas_unit;
-                  force_low_fee;
-                  fee_cap;
-                  burn_cap;
-                }
-              in
               Client_proto_multisig.call_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -601,12 +556,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, multisig_contract)
              lambda
              (_, source)
@@ -618,16 +568,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-              let fee_parameter =
-                {
-                  Injection.minimal_fees;
-                  minimal_nanotez_per_byte;
-                  minimal_nanotez_per_gas_unit;
-                  force_low_fee;
-                  fee_cap;
-                  burn_cap;
-                }
-              in
               Lwt.return @@ Micheline_parser.no_parsing_error
               @@ Michelson_v1_parser.parse_expression lambda
               >>=? fun {expanded = lambda; _} ->
@@ -683,12 +623,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, multisig_contract)
              delegate
              (_, source)
@@ -700,16 +635,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-              let fee_parameter =
-                {
-                  Injection.minimal_fees;
-                  minimal_nanotez_per_byte;
-                  minimal_nanotez_per_gas_unit;
-                  force_low_fee;
-                  fee_cap;
-                  burn_cap;
-                }
-              in
               Client_proto_multisig.call_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -758,12 +683,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, multisig_contract)
              (_, source)
              signatures
@@ -774,16 +694,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-              let fee_parameter =
-                {
-                  Injection.minimal_fees;
-                  minimal_nanotez_per_byte;
-                  minimal_nanotez_per_gas_unit;
-                  force_low_fee;
-                  fee_cap;
-                  burn_cap;
-                }
-              in
               Client_proto_multisig.call_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -835,12 +745,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, multisig_contract)
              new_threshold
              new_keys
@@ -857,16 +762,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
                 new_keys
               >>=? fun keys ->
-              let fee_parameter =
-                {
-                  Injection.minimal_fees;
-                  minimal_nanotez_per_byte;
-                  minimal_nanotez_per_gas_unit;
-                  force_low_fee;
-                  fee_cap;
-                  burn_cap;
-                }
-              in
               Client_proto_multisig.call_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -928,12 +823,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              bytes
              (_, multisig_contract)
              (_, source)
@@ -945,16 +835,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 "only implicit accounts can be the source of a contract call"
           | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-              let fee_parameter =
-                {
-                  Injection.minimal_fees;
-                  minimal_nanotez_per_byte;
-                  minimal_nanotez_per_gas_unit;
-                  force_low_fee;
-                  fee_cap;
-                  burn_cap;
-                }
-              in
               Client_proto_multisig.call_multisig_on_bytes
                 cctxt
                 ~chain:cctxt#chain

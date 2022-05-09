@@ -79,7 +79,7 @@ let callback_entrypoint_arg =
     string_parameter
 
 let contract_call_options =
-  Clic.args14
+  Clic.args9
     tez_amount_arg
     fee_arg
     Client_proto_context_commands.dry_run_switch
@@ -88,15 +88,10 @@ let contract_call_options =
     storage_limit_arg
     counter_arg
     no_print_source_flag
-    minimal_fees_arg
-    minimal_nanotez_per_byte_arg
-    minimal_nanotez_per_gas_unit_arg
-    force_low_fee_arg
-    fee_cap_arg
-    burn_cap_arg
+    fee_parameter_args
 
 let contract_view_options =
-  Clic.args15
+  Clic.args10
     callback_entrypoint_arg
     tez_amount_arg
     fee_arg
@@ -106,12 +101,7 @@ let contract_view_options =
     storage_limit_arg
     counter_arg
     no_print_source_flag
-    minimal_fees_arg
-    minimal_nanotez_per_byte_arg
-    minimal_nanotez_per_gas_unit_arg
-    force_low_fee_arg
-    fee_cap_arg
-    burn_cap_arg
+    fee_parameter_args
 
 let view_options =
   Clic.args3
@@ -275,12 +265,7 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, contract)
              (_, addr)
              (_, callback)
@@ -289,16 +274,6 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           >>=? fun (source, src_pk, src_sk) ->
           let action =
             Client_proto_fa12.Get_balance (addr, (callback, callback_entrypoint))
-          in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
           in
           Client_proto_fa12.call_contract
             cctxt
@@ -352,12 +327,7 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, contract)
              (_, src)
              (_, dst)
@@ -368,16 +338,6 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           let action =
             Client_proto_fa12.Get_allowance
               (src, dst, (callback, callback_entrypoint))
-          in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
           in
           Client_proto_fa12.call_contract
             cctxt
@@ -428,12 +388,7 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, contract)
              (_, addr)
              (_, callback)
@@ -442,16 +397,6 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           >>=? fun (source, src_pk, src_sk) ->
           let action =
             Client_proto_fa12.Get_total_supply (callback, callback_entrypoint)
-          in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
           in
           Client_proto_fa12.call_contract
             cctxt
@@ -486,7 +431,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
       command
         ~group
         ~desc:"Transfer tokens between two given accounts"
-        (Clic.args15
+        (Clic.args10
            as_arg
            tez_amount_arg
            fee_arg
@@ -496,12 +441,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
            storage_limit_arg
            counter_arg
            no_print_source_flag
-           minimal_fees_arg
-           minimal_nanotez_per_byte_arg
-           minimal_nanotez_per_gas_unit_arg
-           force_low_fee_arg
-           fee_cap_arg
-           burn_cap_arg)
+           fee_parameter_args)
         (prefixes ["from"; "fa1.2"; "contract"]
         @@ token_contract_param () @@ prefix "transfer" @@ amount_param ()
         @@ prefix "from" @@ from_param () @@ prefix "to" @@ to_param () @@ stop
@@ -515,12 +455,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, contract)
              amount
              src
@@ -530,16 +465,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           get_contract_caller_keys cctxt caller
           >>=? fun (source, caller_pk, caller_sk) ->
           let action = Client_proto_fa12.Transfer (snd src, dst, amount) in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
           Client_proto_fa12.call_contract
             cctxt
             ~chain:cctxt#chain
@@ -584,12 +509,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              (_, contract)
              (_, source)
              amount
@@ -598,16 +518,6 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           get_contract_caller_keys cctxt source
           >>=? fun (source, src_pk, src_sk) ->
           let action = Client_proto_fa12.Approve (dst, amount) in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
           Client_proto_fa12.call_contract
             cctxt
             ~chain:cctxt#chain
@@ -637,7 +547,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         ~desc:
           "Execute multiple token transfers from a single source account. If \
            one of the token transfers fails, none of them are executed."
-        (args14
+        (args9
            default_fee_arg
            as_arg
            Client_proto_context_commands.dry_run_switch
@@ -646,12 +556,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
            default_storage_limit_arg
            counter_arg
            no_print_source_flag
-           minimal_fees_arg
-           minimal_nanotez_per_byte_arg
-           minimal_nanotez_per_gas_unit_arg
-           force_low_fee_arg
-           fee_cap_arg
-           burn_cap_arg)
+           fee_parameter_args)
         (prefixes ["multiple"; "fa1.2"; "transfers"; "from"]
         @@ alias_param
              ~name:"src"
@@ -681,26 +586,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                counter,
                no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
+               fee_parameter )
              src
              operations_json
              cctxt ->
           let (_, caller) = Option.value ~default:src as_address in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
           match
             Data_encoding.Json.destruct
               (Data_encoding.list Client_proto_fa12.token_transfer_encoding)

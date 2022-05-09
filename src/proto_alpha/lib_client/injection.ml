@@ -86,16 +86,6 @@ type fee_parameter = {
   burn_cap : Tez.t;
 }
 
-let dummy_fee_parameter =
-  {
-    minimal_fees = Tez.zero;
-    minimal_nanotez_per_byte = Q.zero;
-    minimal_nanotez_per_gas_unit = Q.zero;
-    force_low_fee = false;
-    fee_cap = Tez.one;
-    burn_cap = Tez.zero;
-  }
-
 (* Rounding up (see Z.cdiv) *)
 let z_mutez_of_q_nanotez (ntz : Q.t) =
   let q_mutez = Q.div ntz (Q.of_int 1000) in
@@ -117,10 +107,10 @@ let check_fees :
           "The proposed fee (%s%a) are higher than the configured fee cap \
            (%s%a).@\n\
           \ Use `--fee-cap %a` to emit this operation anyway."
-          Client_proto_args.tez_sym
+          Operation_result.tez_sym
           Tez.pp
           fee
-          Client_proto_args.tez_sym
+          Operation_result.tez_sym
           Tez.pp
           config.fee_cap
           Tez.pp
@@ -164,10 +154,10 @@ let check_fees :
             "The proposed fee (%s%a) are lower than the fee that baker expect \
              by default (%s%a).@\n\
             \ Use `--force-low-fee` to emit this operation anyway."
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             fee
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             estimated_fees
           >>= fun () -> exit 1
@@ -914,10 +904,10 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             "The operation will burn %s%a which is higher than the configured \
              burn cap (%s%a).@\n\
             \ Use `--burn-cap %a` to emit this operation."
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             burn
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             fee_parameter.burn_cap
             Tez.pp
@@ -953,7 +943,7 @@ let tenderbake_adjust_confirmations (cctxt : #Client_context.full) = function
  *)
 let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?(force = false) ?successor_level
-    ?branch ?src_sk ?verbose_signing ~fee_parameter
+    ?branch ?src_sk ?verbose_signing ?fee_parameter
     (contents : kind contents_list) =
   (if simulation then
    simulate cctxt ~chain ~block ?successor_level ?branch contents
@@ -962,7 +952,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       cctxt
       ~chain
       ~block
-      ~fee_parameter
+      ?fee_parameter
       ?verbose_signing
       ?branch
       ?src_sk
@@ -1083,7 +1073,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
 
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?successor_level ?branch ?src_sk
-    ?verbose_signing ~fee_parameter (contents : kind contents_list) =
+    ?verbose_signing ?fee_parameter (contents : kind contents_list) =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
   >>=? fun () ->
   inject_operation_internal
@@ -1097,7 +1087,7 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?branch
     ?src_sk
     ?verbose_signing
-    ~fee_parameter
+    ?fee_parameter
     (contents : kind contents_list)
 
 let prepare_manager_operation ~fee ~gas_limit ~storage_limit operation =

@@ -137,8 +137,6 @@ let () =
     (function Forbidden_Negative_int str -> Some str | _ -> None)
     (fun str -> Forbidden_Negative_int str)
 
-let tez_sym = "\xEA\x9C\xA9"
-
 let string_parameter = parameter (fun _ x -> return x)
 
 let int_parameter =
@@ -485,34 +483,6 @@ let minimal_nanotez_per_byte_arg =
        nanotez)"
     (parameter (fun _ s ->
          try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
-
-let force_low_fee_arg =
-  switch
-    ~long:"force-low-fee"
-    ~doc:"Don't check that the fee is lower than the estimated default value"
-    ()
-
-let fee_cap_arg =
-  default_arg
-    ~long:"fee-cap"
-    ~placeholder:"amount"
-    ~default:"1.0"
-    ~doc:"Set the fee cap"
-    (parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad fee cap"))
-
-let burn_cap_arg =
-  default_arg
-    ~long:"burn-cap"
-    ~placeholder:"amount"
-    ~default:"0"
-    ~doc:"Set the burn cap"
-    (parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad burn cap"))
 
 let replace_by_fees_arg =
   switch
@@ -901,3 +871,60 @@ module Tx_rollup = struct
       inbox_root_hash_parameter
       next
 end
+
+let fee_parameter_args =
+  let open Clic in
+  let force_low_fee_arg =
+    switch
+      ~long:"force-low-fee"
+      ~doc:"Don't check that the fee is lower than the estimated default value"
+      ()
+  in
+  let fee_cap_arg =
+    default_arg
+      ~long:"fee-cap"
+      ~placeholder:"amount"
+      ~default:"1.0"
+      ~doc:"Set the fee cap"
+      (parameter (fun _ s ->
+           match Tez.of_string s with
+           | Some t -> return t
+           | None -> failwith "Bad fee cap"))
+  in
+  let burn_cap_arg =
+    default_arg
+      ~long:"burn-cap"
+      ~placeholder:"amount"
+      ~default:"0"
+      ~doc:"Set the burn cap"
+      (parameter (fun _ s ->
+           match Tez.of_string s with
+           | Some t -> return t
+           | None -> failwith "Bad burn cap"))
+  in
+  Clic.map_arg
+    ~f:
+      (fun _cctxt
+           ( minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             force_low_fee,
+             fee_cap,
+             burn_cap ) ->
+      return
+        {
+          Injection.minimal_fees;
+          minimal_nanotez_per_byte;
+          minimal_nanotez_per_gas_unit;
+          force_low_fee;
+          fee_cap;
+          burn_cap;
+        })
+    (Clic.aggregate
+       (Clic.args6
+          minimal_fees_arg
+          minimal_nanotez_per_byte_arg
+          minimal_nanotez_per_gas_unit_arg
+          force_low_fee_arg
+          fee_cap_arg
+          burn_cap_arg))

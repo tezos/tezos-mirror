@@ -145,7 +145,7 @@ let shield_cmd =
   command
     ~group
     ~desc:"Shield tokens from an implicit account to a Sapling address."
-    (args14
+    (args9
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -153,12 +153,7 @@ let shield_cmd =
        storage_limit_arg
        counter_arg
        no_print_source_flag
-       minimal_fees_arg
-       minimal_nanotez_per_byte_arg
-       minimal_nanotez_per_gas_unit_arg
-       force_low_fee_arg
-       fee_cap_arg
-       burn_cap_arg
+       fee_parameter_args
        message_arg)
     (prefixes ["sapling"; "shield"]
     @@ tez_param
@@ -182,12 +177,7 @@ let shield_cmd =
            storage_limit,
            counter,
            no_print_source,
-           minimal_fees,
-           minimal_nanotez_per_byte,
-           minimal_nanotez_per_gas_unit,
-           force_low_fee,
-           fee_cap,
-           burn_cap,
+           fee_parameter,
            message )
          amount
          (_, source)
@@ -207,16 +197,6 @@ let shield_cmd =
       do_shield cctxt ?message contract_dst amount sapling_dst
       >>=? fun sapling_input ->
       let arg = sapling_transaction_as_arg sapling_input in
-      let fee_parameter =
-        {
-          Injection.minimal_fees;
-          minimal_nanotez_per_byte;
-          minimal_nanotez_per_gas_unit;
-          force_low_fee;
-          fee_cap;
-          burn_cap;
-        }
-      in
       Client_proto_context.transfer
         cctxt
         ~chain:cctxt#chain
@@ -254,7 +234,7 @@ let unshield_cmd =
   command
     ~group
     ~desc:"Unshield tokens from a Sapling address to an implicit account."
-    (args13
+    (args8
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -262,12 +242,7 @@ let unshield_cmd =
        storage_limit_arg
        counter_arg
        no_print_source_flag
-       minimal_fees_arg
-       minimal_nanotez_per_byte_arg
-       minimal_nanotez_per_gas_unit_arg
-       force_low_fee_arg
-       fee_cap_arg
-       burn_cap_arg)
+       fee_parameter_args)
     (prefixes ["sapling"; "unshield"]
     @@ tez_param
          ~name:"qty"
@@ -292,12 +267,7 @@ let unshield_cmd =
            storage_limit,
            counter,
            no_print_source,
-           minimal_fees,
-           minimal_nanotez_per_byte,
-           minimal_nanotez_per_gas_unit,
-           force_low_fee,
-           fee_cap,
-           burn_cap )
+           fee_parameter )
          amount
          (name, _sapling_uri)
          (_, tz_dst)
@@ -316,24 +286,14 @@ let unshield_cmd =
       keys_of_implicit_account cctxt tz_dst >>=? fun (source, src_pk, src_sk) ->
       do_unshield cctxt contract_dst name stez source >>=? fun sapling_input ->
       let arg = sapling_transaction_as_arg sapling_input in
-      let fee_parameter =
-        {
-          Injection.minimal_fees;
-          minimal_nanotez_per_byte;
-          minimal_nanotez_per_gas_unit;
-          force_low_fee;
-          fee_cap;
-          burn_cap;
-        }
-      in
       Client_proto_context.transfer
         cctxt
         ~chain:cctxt#chain
         ~block:cctxt#block
         ~fee_parameter
         ~amount:Tez.zero
-        ~src_pk
         ~src_sk
+        ~src_pk
         ~destination:(Contract contract_dst)
         ~source
         ~arg
@@ -375,7 +335,7 @@ let forge_shielded_cmd =
   command
     ~group
     ~desc:"Forge a sapling transaction and save it to a file."
-    (args16
+    (args11
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -383,12 +343,7 @@ let forge_shielded_cmd =
        storage_limit_arg
        counter_arg
        no_print_source_flag
-       minimal_fees_arg
-       minimal_nanotez_per_byte_arg
-       minimal_nanotez_per_gas_unit_arg
-       force_low_fee_arg
-       fee_cap_arg
-       burn_cap_arg
+       fee_parameter_args
        message_arg
        (file_arg sapling_transaction_file)
        json_switch)
@@ -414,12 +369,7 @@ let forge_shielded_cmd =
            _storage_limit,
            _counter,
            _no_print_source,
-           _minimal_fees,
-           _minimal_nanotez_per_byte,
-           _minimal_nanotez_per_gas_unit,
-           _force_low_fee,
-           _fee_cap,
-           _burn_cap,
+           _fee_parameter,
            message,
            file,
            use_json_format )
@@ -457,7 +407,7 @@ let submit_shielded_cmd =
   command
     ~group
     ~desc:"Submit a forged sapling transaction."
-    (args14
+    (args9
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -465,12 +415,7 @@ let submit_shielded_cmd =
        storage_limit_arg
        counter_arg
        no_print_source_flag
-       minimal_fees_arg
-       minimal_nanotez_per_byte_arg
-       minimal_nanotez_per_gas_unit_arg
-       force_low_fee_arg
-       fee_cap_arg
-       burn_cap_arg
+       fee_parameter_args
        json_switch)
     (prefixes ["sapling"; "submit"]
     (* TODO: Add a dedicated abstracted Clic element to parse filenames,
@@ -492,12 +437,7 @@ let submit_shielded_cmd =
            storage_limit,
            counter,
            no_print_source,
-           minimal_fees,
-           minimal_nanotez_per_byte,
-           minimal_nanotez_per_gas_unit,
-           force_low_fee,
-           fee_cap,
-           burn_cap,
+           fee_parameter,
            use_json_format )
          filename
          (_, source)
@@ -527,16 +467,6 @@ let submit_shielded_cmd =
       let chain = cctxt#chain and block = cctxt#block in
       keys_of_implicit_account cctxt source >>=? fun (source, src_pk, src_sk) ->
       let open Protocol.Alpha_context in
-      let fee_parameter =
-        {
-          Injection.minimal_fees;
-          minimal_nanotez_per_byte;
-          minimal_nanotez_per_gas_unit;
-          force_low_fee;
-          fee_cap;
-          burn_cap;
-        }
-      in
       Client_proto_context.transfer
         cctxt
         ~chain
@@ -796,7 +726,7 @@ let commands () =
                   "Total Sapling funds %a%s"
                   Context.Shielded_tez.pp
                   (Context.Account.balance account)
-                  Client_proto_args.tez_sym
+                  Operation_result.tez_sym
                 >>= fun () -> return_unit));
     command
       ~group

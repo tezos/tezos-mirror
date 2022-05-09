@@ -39,8 +39,6 @@ type fee_parameter = {
   burn_cap : Tez.t;
 }
 
-val dummy_fee_parameter : fee_parameter
-
 val preapply :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -81,7 +79,7 @@ val inject_operation :
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
   ?verbose_signing:bool ->
-  fee_parameter:fee_parameter ->
+  ?fee_parameter:fee_parameter ->
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 
