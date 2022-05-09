@@ -304,10 +304,10 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
   let open Lwt_result_syntax in
   let code = Expr.toplevel_from_string script in
   let storage = Expr.from_string storage in
-  let script =
-    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
-  in
   let* operation, destination =
+    let script =
+      Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+    in
     Op.contract_origination_hash (B block) src ~fee:(Test_tez.of_int 10) ~script
   in
   let* incr =
@@ -320,10 +320,12 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
       incr
       operation
   in
+  let script = (code, storage) in
   Incremental.finalize_block incr >|=? fun block -> (destination, script, block)
 
-let origination_operation ctxt ~src ~script ~orig_contract =
+let origination_operation ctxt ~src ~script:(code, storage) ~orig_contract =
   let open Lwt_result_syntax in
+  let script = Script.{code = lazy_expr code; storage = lazy_expr storage} in
   let* ( Script_ir_translator.Ex_script
            (Script
              {
