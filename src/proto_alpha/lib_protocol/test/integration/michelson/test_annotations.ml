@@ -77,7 +77,6 @@ let assert_stored_script_equal inc addr expected_code_string =
     (Expr.to_string stored_script)
 
 let get_address_from_storage inc factory_addr =
-  let factory_addr = Contract.Originated factory_addr in
   Context.Contract.storage (I inc) factory_addr >>=? fun factory_storage ->
   let ctxt = Incremental.alpha_ctxt inc in
   Environment.wrap_tzresult Script_typed_ir.(option_t 0 address_t)

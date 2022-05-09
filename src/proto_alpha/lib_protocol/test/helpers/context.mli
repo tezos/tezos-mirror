@@ -145,7 +145,7 @@ module Contract : sig
 
   val delegate_opt : t -> Contract.t -> public_key_hash option tzresult Lwt.t
 
-  val storage : t -> Contract.t -> Script.expr tzresult Lwt.t
+  val storage : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 
   val script : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 

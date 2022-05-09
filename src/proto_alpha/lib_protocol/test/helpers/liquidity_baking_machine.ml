@@ -872,11 +872,10 @@ module ConcreteBaseMachine :
     | blk, holder :: accounts ->
         let ctxt = Context.B blk in
         Context.get_liquidity_baking_cpmm_address ctxt >>= fun cpmm_contract ->
-        let cpmm_contract = Contract.Originated cpmm_contract in
         Context.Contract.storage ctxt cpmm_contract >>= fun storage ->
         let storage = Cpmm_repr.Storage.of_expr_exn (Micheline.root storage) in
-        let tzbtc_contract = Contract.Originated storage.tokenAddress in
-        let liquidity_contract = Contract.Originated storage.lqtAddress in
+        let tzbtc_contract = storage.tokenAddress in
+        let liquidity_contract = storage.lqtAddress in
         Context.Contract.storage ctxt tzbtc_contract >>= fun storage ->
         let storage =
           Lqt_fa12_repr.Storage.of_expr_exn (Micheline.root storage)
@@ -890,10 +889,10 @@ module ConcreteBaseMachine :
         Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
         let env =
           {
-            cpmm_contract;
-            tzbtc_contract;
+            cpmm_contract = Contract.Originated cpmm_contract;
+            tzbtc_contract = Contract.Originated tzbtc_contract;
             tzbtc_admin;
-            liquidity_contract;
+            liquidity_contract = Contract.Originated liquidity_contract;
             liquidity_admin;
             implicit_accounts = accounts;
             holder;

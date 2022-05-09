@@ -288,7 +288,6 @@ let liquidity_baking_toggle_ema_threshold () =
 let liquidity_baking_storage n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
-  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
   let expected_storage =
     Expr.from_string

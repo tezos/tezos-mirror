@@ -301,6 +301,7 @@ module Contract = struct
     Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
 
   let storage ctxt contract =
+    let contract = Contract.Originated contract in
     Alpha_services.Contract.storage rpc_ctxt ctxt contract
 
   let script ctxt contract =
