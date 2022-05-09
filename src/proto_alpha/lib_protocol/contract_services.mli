@@ -104,7 +104,7 @@ val entrypoint_type :
 val list_entrypoints :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   normalize_types:bool ->
   (Michelson_v1_primitives.prim list list * (string * Script.expr) list)
   shell_tzresult

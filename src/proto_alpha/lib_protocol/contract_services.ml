@@ -433,40 +433,44 @@ let[@coq_axiom_with_reason "gadt"] register () =
     ~chunked:true
     S.list_entrypoints
     (fun ctxt v {normalize_types} () ->
-      Contract.get_script_code ctxt v >>=? fun (_, expr) ->
-      match expr with
-      | None -> return_none
-      | Some expr ->
-          let ctxt = Gas.set_unlimited ctxt in
-          let legacy = true in
-          let open Script_ir_translator in
-          Script.force_decode_in_context
-            ~consume_deserialization_gas:When_needed
-            ctxt
-            expr
-          >>?= fun (expr, _) ->
-          parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
-          Lwt.return
-            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
-              ->
-              let unreachable_entrypoint, map =
-                Script_ir_translator.list_entrypoints_uncarbonated
-                  arg_type
-                  entrypoints
-              in
-              Entrypoint.Map.fold_e
-                (fun entry (Ex_ty ty, original_type_expr) (acc, ctxt) ->
-                  (if normalize_types then
-                   unparse_ty ~loc:() ctxt ty >|? fun (ty_node, ctxt) ->
-                   (Micheline.strip_locations ty_node, ctxt)
-                  else ok (Micheline.strip_locations original_type_expr, ctxt))
-                  >|? fun (ty_expr, ctxt) ->
-                  ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
-                map
-                ([], ctxt)
-              >|? fun (entrypoint_types, _ctxt) ->
-              Some (unreachable_entrypoint, entrypoint_types) )) ;
+      match (v : Contract.t) with
+      | Implicit _ -> return_none
+      | Originated _ -> (
+          Contract.get_script_code ctxt v >>=? fun (_, expr) ->
+          match expr with
+          | None -> return_none
+          | Some expr ->
+              let ctxt = Gas.set_unlimited ctxt in
+              let legacy = true in
+              let open Script_ir_translator in
+              Script.force_decode_in_context
+                ~consume_deserialization_gas:When_needed
+                ctxt
+                expr
+              >>?= fun (expr, _) ->
+              parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
+              Lwt.return
+                ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+                >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
+                          _ ) ->
+                  let unreachable_entrypoint, map =
+                    Script_ir_translator.list_entrypoints_uncarbonated
+                      arg_type
+                      entrypoints
+                  in
+                  Entrypoint.Map.fold_e
+                    (fun entry (Ex_ty ty, original_type_expr) (acc, ctxt) ->
+                      (if normalize_types then
+                       unparse_ty ~loc:() ctxt ty >|? fun (ty_node, ctxt) ->
+                       (Micheline.strip_locations ty_node, ctxt)
+                      else
+                        ok (Micheline.strip_locations original_type_expr, ctxt))
+                      >|? fun (ty_expr, ctxt) ->
+                      ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+                    map
+                    ([], ctxt)
+                  >|? fun (entrypoint_types, _ctxt) ->
+                  Some (unreachable_entrypoint, entrypoint_types) ))) ;
   opt_register1
     ~chunked:true
     S.contract_big_map_get_opt
@@ -586,7 +590,7 @@ let list_entrypoints ctxt block contract ~normalize_types =
     S.list_entrypoints
     ctxt
     block
-    contract
+    (Contract.Originated contract)
     {normalize_types}
     ()
 

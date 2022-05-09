@@ -111,7 +111,7 @@ let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
   Alpha_services.Contract.list_entrypoints
     cctxt
     (chain, block)
-    (Contract.Originated contract)
+    contract
     ~normalize_types
 
 let list_contract_unreachables cctxt ~chain ~block ~contract =
