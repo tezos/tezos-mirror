@@ -139,10 +139,13 @@ let syntactically_valid_messages =
       ("1 2+", [IPush 1; IPush 2; IAdd]);
       ("1 2 3++3+", [IPush 1; IPush 2; IPush 3; IAdd; IAdd; IPush 3; IAdd]);
       ("", []);
+      ("1 a", [IPush 1; IStore "a"]);
     ]
 
 let syntactically_invalid_messages =
-  List.map (fun s -> (s, [])) ["a"; "  a"; "  a  "; "---"; "12 +++ --"]
+  List.map
+    (fun s -> (s, []))
+    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a1"]
 
 let test_parsing_messages () =
   List.iter_es (test_parsing_message ~valid:true) syntactically_valid_messages
@@ -151,7 +154,8 @@ let test_parsing_messages () =
     (test_parsing_message ~valid:false)
     syntactically_invalid_messages
 
-let test_evaluation_message ~valid (boot_sector, source, expected_stack) =
+let test_evaluation_message ~valid
+    (boot_sector, source, expected_stack, expected_vars) =
   let open Sc_rollup_PVM_sem in
   boot boot_sector @@ fun state ->
   let input =
@@ -169,6 +173,20 @@ let test_evaluation_message ~valid (boot_sector, source, expected_stack) =
       Format.(pp_print_list (fun fmt -> fprintf fmt "%d;@;"))
       expected_stack
       stack
+    >>=? fun () ->
+    List.iter_es
+      (fun (x, v) ->
+        get_var state x >>= function
+        | None -> failwith "The variable %s cannot be found." x
+        | Some v' ->
+            Assert.equal
+              ~loc:__LOC__
+              Compare.Int.equal
+              (Printf.sprintf "The variable %s has not the right value: " x)
+              (fun fmt x -> Format.fprintf fmt "%d" x)
+              v
+              v')
+      expected_vars
   else
     get_evaluation_result state >>= function
     | Some true -> failwith "This code should lead to an evaluation error."
@@ -177,20 +195,30 @@ let test_evaluation_message ~valid (boot_sector, source, expected_stack) =
 
 let valid_messages =
   [
-    ("", "0", [0]);
-    ("", "1 2", [2; 1]);
-    ("", "1 2 +", [3]);
-    ("", "1 2 + 3 +", [6]);
-    ("", "1 2 + 3 + 1 1 + +", [8]);
-    ("0 ", "", [0]);
-    ("1 ", "2", [2; 1]);
-    ("1 2 ", "+", [3]);
-    ("1 2 + ", "3 +", [6]);
-    ("1 2 + ", "3 + 1 1 + +", [8]);
+    ("", "0", [0], []);
+    ("", "1 2", [2; 1], []);
+    ("", "1 2 +", [3], []);
+    ("", "1 2 + 3 +", [6], []);
+    ("", "1 2 + 3 + 1 1 + +", [8], []);
+    ("0 ", "", [0], []);
+    ("1 ", "2", [2; 1], []);
+    ("1 2 ", "+", [3], []);
+    ("1 2 + ", "3 +", [6], []);
+    ("1 2 + ", "3 + 1 1 + +", [8], []);
+    ("", "1 a", [1], [("a", 1)]);
+    ("", "1 a 2 + b 3 +", [6], [("a", 1); ("b", 3)]);
+    ("", "1 a 2 + b 3 + result", [6], [("a", 1); ("b", 3); ("result", 6)]);
+    ("1 a ", "2 b", [2; 1], [("a", 1); ("b", 2)]);
+    ("1 a ", "2 a", [2; 1], [("a", 2)]);
+    ("", "1 a 2 a + a", [3], [("a", 3)]);
+    ("", "1 a b", [1], [("a", 1); ("b", 1)]);
+    ("1 a", "", [1], [("a", 1)]);
   ]
 
 let invalid_messages =
-  List.map (fun s -> ("", s, [])) ["+"; "1 +"; "1 1 + +"; "1 1 + 1 1 + + +"]
+  List.map
+    (fun s -> ("", s, [], []))
+    ["+"; "1 +"; "1 1 + +"; "1 1 + 1 1 + + +"; "a"]
 
 let test_evaluation_messages () =
   List.iter_es (test_evaluation_message ~valid:true) valid_messages
