@@ -1133,8 +1133,7 @@ module Scripts = struct
           now,
           level )
       ->
-        let contract = Contract.Originated contract_hash in
-        Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
+        Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
         Option.fold
           ~some:ok
           ~none:(error View_helpers.Viewed_contract_has_no_script)
@@ -1144,6 +1143,7 @@ module Scripts = struct
         script_entrypoint_type ctxt decoded_script entrypoint
         >>=? fun view_ty ->
         View_helpers.extract_view_output_type entrypoint view_ty >>?= fun ty ->
+        let contract = Contract.Originated contract_hash in
         Contract.get_balance ctxt contract >>=? fun balance ->
         Error_monad.trace View_helpers.View_callback_origination_failed
         @@ originate_dummy_contract
@@ -1233,14 +1233,14 @@ module Scripts = struct
             now ),
           level )
       ->
-        let contract = Contract.Originated contract_hash in
-        Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
+        Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
         Option.fold
           ~some:ok
           ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
           script_opt
         >>?= fun script ->
         Script_repr.(force_decode script.code) >>?= fun decoded_script ->
+        let contract = Contract.Originated contract_hash in
         script_view_type ctxt contract_hash decoded_script view
         >>=? fun (input_ty, output_ty) ->
         Contract.get_balance ctxt contract >>=? fun balance ->
@@ -1662,7 +1662,7 @@ module Contract = struct
       (fun ctxt contract () unparsing_mode ->
         match contract with
         | Implicit _ -> return_none
-        | Originated _ -> (
+        | Originated contract -> (
             Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
             match script with
             | None -> return_none
@@ -1686,7 +1686,7 @@ module Contract = struct
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
         match contract with
         | Implicit _ -> return_none
-        | Originated _ -> (
+        | Originated contract -> (
             Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
             match script with
             | None -> return_none

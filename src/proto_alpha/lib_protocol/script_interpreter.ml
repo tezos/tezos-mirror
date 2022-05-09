@@ -1041,7 +1041,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ ->
               (return_none [@ocaml.tailcall]) ctxt
           | Contract (Originated contract_hash as c) -> (
-              Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
+              Contract.get_script ctxt contract_hash
+              >>=? fun (ctxt, script_opt) ->
               match script_opt with
               | None -> (return_none [@ocaml.tailcall]) ctxt
               | Some script -> (

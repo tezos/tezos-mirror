@@ -1561,7 +1561,8 @@ module Contract : sig
   val get_script_code :
     context -> t -> (context * Script.lazy_expr option) tzresult Lwt.t
 
-  val get_script : context -> t -> (context * Script.t option) tzresult Lwt.t
+  val get_script :
+    context -> Contract_hash.t -> (context * Script.t option) tzresult Lwt.t
 
   val get_storage :
     context -> t -> (context * Script.expr option) tzresult Lwt.t

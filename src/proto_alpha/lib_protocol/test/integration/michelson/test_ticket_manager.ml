@@ -82,39 +82,45 @@ let tokens_of_value ~include_lazy ctxt ty x =
   Lwt.return @@ Ticket_token_map.to_list ctxt bm
 
 (* Extract ticket-token balance of storage *)
-let ticket_balance_of_storage ctxt contract =
-  let* ctxt, script = wrap @@ Alpha_context.Contract.get_script ctxt contract in
-  match script with
-  | None -> return ([], ctxt)
-  | Some script ->
-      let* ( Script_ir_translator.Ex_script (Script {storage; storage_type; _}),
-             ctxt ) =
-        wrap
-          (Script_ir_translator.parse_script
-             ctxt
-             ~legacy:true
-             ~allow_forged_in_storage:true
-             script)
+let ticket_balance_of_storage ctxt (contract : Alpha_context.Contract.t) =
+  match contract with
+  | Implicit _ -> return ([], ctxt)
+  | Originated contract_hash -> (
+      let* ctxt, script =
+        wrap @@ Alpha_context.Contract.get_script ctxt contract_hash
       in
-      let* tokens, ctxt =
-        wrap (tokens_of_value ~include_lazy:true ctxt storage_type storage)
-      in
-      let* tokens, ctxt =
-        wrap
-        @@ List.fold_left_es
-             (fun (acc, ctxt) (ex_token, amount) ->
-               let* key, ctxt =
-                 Ticket_balance_key.of_ex_token
-                   ctxt
-                   ~owner:(Contract contract)
-                   ex_token
-               in
-               let acc = (key, amount) :: acc in
-               return (acc, ctxt))
-             ([], ctxt)
-             tokens
-      in
-      return (tokens, ctxt)
+      match script with
+      | None -> return ([], ctxt)
+      | Some script ->
+          let* ( Script_ir_translator.Ex_script
+                   (Script {storage; storage_type; _}),
+                 ctxt ) =
+            wrap
+              (Script_ir_translator.parse_script
+                 ctxt
+                 ~legacy:true
+                 ~allow_forged_in_storage:true
+                 script)
+          in
+          let* tokens, ctxt =
+            wrap (tokens_of_value ~include_lazy:true ctxt storage_type storage)
+          in
+          let* tokens, ctxt =
+            wrap
+            @@ List.fold_left_es
+                 (fun (acc, ctxt) (ex_token, amount) ->
+                   let* key, ctxt =
+                     Ticket_balance_key.of_ex_token
+                       ctxt
+                       ~owner:(Contract contract)
+                       ex_token
+                   in
+                   let acc = (key, amount) :: acc in
+                   return (acc, ctxt))
+                 ([], ctxt)
+                 tokens
+          in
+          return (tokens, ctxt))
 
 let transaction block ~sender ~recipient ~amount ~parameters =
   let parameters = Script.lazy_expr @@ Expr.from_string parameters in

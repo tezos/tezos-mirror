@@ -271,7 +271,7 @@ module S = struct
         fun ctxt contract_id q () ->
           match (contract_id : Contract.t) with
           | Implicit _ -> return_none
-          | Originated _ ->
+          | Originated contract_id ->
               single_sapling_get_id ctxt contract_id
               >>=? fun (sapling_id, ctxt) ->
               Option.map_es (fun sapling_id -> f ctxt sapling_id q) sapling_id
@@ -407,11 +407,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
   register_originated_opt_field ~chunked:true S.script (fun c v ->
       match v with
       | Implicit _ -> return_none
-      | Originated _ -> Contract.get_script c v >|=? fun (_, v) -> v) ;
+      | Originated v -> Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
       match contract with
       | Implicit _ -> return_none
-      | Originated _ -> (
+      | Originated contract -> (
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           match script with
           | None -> return_none
@@ -514,7 +514,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
     (fun ctxt contract () (key, key_type) ->
       match (contract : Contract.t) with
       | Implicit _ -> return_none
-      | Originated _ -> (
+      | Originated contract -> (
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           let key_type_node = Micheline.root key_type in
           Script_ir_translator.parse_comparable_ty ctxt key_type_node
@@ -559,7 +559,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | Implicit manager ->
           Contract.get_counter ctxt manager >|=? fun counter ->
           {balance; delegate; script = None; counter = Some counter}
-      | Originated _ -> (
+      | Originated contract -> (
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           match script with
           | None -> return {balance; delegate; script = None; counter = None}
