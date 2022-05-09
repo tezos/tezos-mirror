@@ -233,7 +233,7 @@ module S = struct
   let list =
     RPC_service.get_service
       ~description:
-        "All existing contracts (including non-empty default contracts)."
+        "All existing contracts (excluding empty implicit contracts)."
       ~query:RPC_query.empty
       ~output:(list Contract.encoding)
       custom_root

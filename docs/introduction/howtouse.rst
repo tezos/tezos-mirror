@@ -126,7 +126,7 @@ connect to the network::
 .. note::
 
     If the node prompts you to install the Zcash parameter file, follow
-    the :ref`corresponding instructions <setup_zcash_params>`.
+    the :ref:`corresponding instructions <setup_zcash_params>`.
 
 The identity comprises a pair of cryptographic
 keys that nodes use to encrypt messages sent to each other, and an

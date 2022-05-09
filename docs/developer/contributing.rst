@@ -29,10 +29,14 @@ Going further
 ~~~~~~~~~~~~~
 
 You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
-This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+Small tweaks like these can be contributed without creating a merge request and commits can rather be pushed directly to the ``typo-doc`` branch in the ``tezos/tezos`` repository. This branch is regularly merged into the master branch, e.g., every one or two weeks.
+(If the branch has been automatically deleted following a merge, just create it again.)
 This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
 Of course, all these commits will be reviewed before being integrated.
 The current edition of the typo train MR can be found in meta-issue :gl:`#2329`.
+
+If you don't have enough permissions to push to the branch above, you can  still make commits in your own fork of the Octez repository, and ask for them to be cherry-picked on the typo/train on the ``#documentation`` channel on the Tezos Dev Slack space.
+Alternatively, you may of course create your own MRs for submitting your changes, without using the typo train.
 
 To directly contribute to the *codebase*, expertise in a few areas is necessary.
 
@@ -119,32 +123,29 @@ While the code is still not ready to be peer reviewed, but it is
 merely a work in progress, the developer prefixes the MR with
 ``Draft:`` and assigns it to themselves.  This will tell everybody
 they can look at the code, comment, but there is still work to be done
-and the branch can change and history be rewritten. Alternatively, the
-MR title can be prefixed with ``WIP:``.  ``Draft:`` prefix is
-sometimes set automatically by GitLab, so ``WIP:`` is in a sense less
-ambiguous.
+and the branch can change and history be rewritten.
 
 Finally, when the code is ready for the :ref:`code review
-<code_review>`, the developer removes the Draft status (or ``WIP:``
-prefix) of the MR and freezes the branch. From this moment on, the
-developer will refrain from rewriting history, but he/she can add new
+<code_review>`, the developer removes the Draft status
+of the MR and freezes the branch. From this moment on, the
+developer will refrain from rewriting history, but they can add new
 commits and rebase the branch for syncing it with master (this can be
 done regularly to make sure the branch does not get stale). At this
 point the developer interacts with the reviewers to address their
 comments and suggestions.
 
 GitLab allows both to comment on the code and to add general comments
-on the MR.  Each comment should be addressed by the developer. He/she
+on the MR.  Each comment should be addressed by the developer. They
 can add additional commits to address each comment. This incremental
 approach will make it easier for the reviewer to keep interacting till
-each discussion is resolved. When the reviewer is satisfied, he/she
+each discussion is resolved. When the reviewer is satisfied, they
 will mark the discussion resolved.
 
 When all discussions are resolved, and the MR has got at least two
 approvals from Octez Merge Team members, the developer should squash
 any fix-up commits that were applied (remembering to edit the commit
 message appropriately). Then anyone can assign the MR to the `Nomadic
-Margebot <https://gitlab.com/nomadic-margebot>`__, which will
+Marge-bot <https://gitlab.com/nomadic-margebot>`__, which will
 automatically rebase the branch on top of master and finally merge it.
 
 .. _preparing_MR:
@@ -165,7 +166,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
      the branch name.
 
      + Use ``opam`` in the branch name if you want to explicitly trigger
-       the OPAM packaging pipeline. Note that any OPAM related changes
+       the opam packaging pipeline. Note that any opam related changes
        will automatically trigger it.
      + Use ``doc`` in the branch name if you change the documentation.
      + Use ``arm64`` in the branch name if you need to build ARM64 artifacts.
@@ -194,8 +195,8 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    non-obvious design choice), you should document them in this file header,
    but in a separate "History" section.
 -  If you add new functions to an interface, don’t forget to
-   document the function in the interface (in the corresponding .mli file; or,
-   if there is no .mli file, directly in the .ml file)
+   document the function in the interface (in the corresponding ``.mli`` file; or,
+   if there is no ``.mli`` file, directly in the ``.ml`` file)
 -  If you add a new RPC endpoint or modify an existing one, be sure to take
    into account the impact on :ref:`RPC security <rpc_security>`.
 -  If you modify the user API (e.g. add or change a configuration parameter or
@@ -289,7 +290,7 @@ Therefore, when creating your MR, observe the following rules:
 
     + ``ci--opam`` is for triggering the opam packaging tests pipeline.
     + ``ci--docs`` is for testing some scripts in the documentation (e.g. Octez installation scenarios).
-    + ``ci--docker`` is for publishing the docker image of the MR.
+    + ``ci--docker`` is for publishing the Docker image of the MR.
     + ``ci--arm64`` is for building on the ARM64 architecture.
 
 - *MR Options*: When opening an MR you should probably tick the following
@@ -397,7 +398,7 @@ action is required to get the merge request moving. Example actions include:
 - merge;
 - find someone else who can get the merge request moving.
 
-The assignee will thus often be one of the reviewers (if he needs to review
+The assignee will thus often be one of the reviewers (if they needs to review
 or respond to a comment) or one of the merge request authors (if they need
 to update the code or respond to a comment).
 
@@ -425,7 +426,7 @@ To find reviewers, either:
   - Look at authors of the code you are modifying using
     `git blame <https://git-scm.com/docs/git-blame>`_.
   - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
-    by asking him/her on Slack or mentioning them in a comment (see next paragraph).
+    by asking them on Slack or mentioning them in a comment (see next paragraph).
 
 Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
 you may or may not be able to use the *Reviewers* field for specifying
@@ -479,14 +480,14 @@ this additional dedicated guide:
 
    contributing-adding-a-new-opam-dependency
 
-In the special case where your MR adds a new Python, Rust, Javascript, or other
+In the special case where your MR adds a new Python, Rust, JavaScript, or other
 dependency, additional steps must also be followed.
 
 * for Python, you can refer to the related section in the :ref:`python testing documentation <python_adding_new_dependencies>`.
 * the Rust dependencies are located in the GitLab repository `tezos-rust-libs <https://gitlab.com/tezos/tezos-rust-libs>`_ and the instructions are listed there.
 
 For others, there is currently no dedicated guide. Do not hesitate to ask for
-help on the ``#devteam`` channel on the `tezos-dev` Slack.
+help on the ``#devteam`` channel on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack.
 
 .. _protocol_mr:
 
@@ -534,7 +535,7 @@ Merge Request Approvals
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Two approvals from different Octez :doc:`Octez merge team <merge_team>` members are required for merge
-requests to be merged. Both approvals must result from independent thorough
+requests to be merged. Both approvals must result from independent, thorough
 reviews. After both reviews, the second approver will also typically merge.
 
 However, for less critical parts of the code, an Octez merge team member may
@@ -567,7 +568,7 @@ painful for everybody. The reviewer is your ally, not your enemy.
   Did I leave a :ref:`TODO/FIXME comment <todo_fixme>` without an issue number?
 
 - Docstrings: Did I export a new function? Each exported
-  function should be documented in the corresponding ``mli`` (or directly in the ``ml`` file if there is no ``mli``).
+  function should be documented in the corresponding ``.mli`` (or directly in the ``.ml`` file if there is no ``.mli``).
 
 - README: Did I check whether my changes impact the corresponding README
   file(s)?
@@ -647,7 +648,7 @@ pitfalls a code reviewer should avoid.
   have a different reaction to it and impact on the quality of this work. This
   general remark is valid for any comment.
 
-When reviewing MRs involving documentation, you may check the built documentation directly within the Gitlab interface, see :ref:`build_doc_ci`.
+When reviewing MRs involving documentation, you may check the built documentation directly within the GitLab interface, see :ref:`build_doc_ci`.
 
 .. _merge_bot:
 
