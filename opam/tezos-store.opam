@@ -43,3 +43,7 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: store for `tezos-node`"
+description: "This library provides abstraction for storing and iterating over blocks.
+tezos-store is a virtual library that provides two implementations:
+- tezos-store.real is the default implementation, used in production
+- tezos-store.mocked is used for testing purposes."

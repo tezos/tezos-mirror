@@ -2115,6 +2115,11 @@ let octez_store =
     "tezos-store"
     ~path:"src/lib_store"
     ~synopsis:"Tezos: store for `tezos-node`"
+    ~description:
+      {|This library provides abstraction for storing and iterating over blocks.
+tezos-store is a virtual library that provides two implementations:
+- tezos-store.real is the default implementation, used in production
+- tezos-store.mocked is used for testing purposes.|}
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
@@ -2133,6 +2138,24 @@ let _octez_store_real =
     ~path:"src/lib_store/real"
     ~opam:"tezos-store"
     ~deps:[octez_store_unix |> open_]
+    ~implements:octez_store
+
+let _octez_store_mocked =
+  public_lib
+    "tezos-store.mocked"
+    ~path:"src/lib_store/mocked"
+    ~opam:"tezos-store"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_shell_services |> open_;
+        octez_context_memory |> open_;
+        octez_context_ops |> open_;
+        octez_validation |> open_;
+        octez_protocol_environment;
+        octez_store_shared |> open_;
+      ]
+    ~private_modules:["block_store"; "protocol_store"; "stored_data"]
     ~implements:octez_store
 
 let octez_requester =
