@@ -545,26 +545,25 @@ let[@coq_axiom_with_reason "gadt"] register () =
     (fun ctxt contract {normalize_types} ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.find ctxt contract >>=? fun delegate ->
-      (match contract with
+      match contract with
       | Implicit manager ->
-          Contract.get_counter ctxt manager >>=? fun counter ->
-          return_some counter
-      | Originated _ -> return_none)
-      >>=? fun counter ->
-      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-      (match script with
-      | None -> return (None, ctxt)
-      | Some script ->
-          let ctxt = Gas.set_unlimited ctxt in
-          Script_ir_translator.parse_and_unparse_script_unaccounted
-            ctxt
-            ~legacy:true
-            ~allow_forged_in_storage:true
-            Readable
-            ~normalize_types
-            script
-          >|=? fun (script, ctxt) -> (Some script, ctxt))
-      >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
+          Contract.get_counter ctxt manager >|=? fun counter ->
+          {balance; delegate; script = None; counter = Some counter}
+      | Originated _ -> (
+          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+          match script with
+          | None -> return {balance; delegate; script = None; counter = None}
+          | Some script ->
+              let ctxt = Gas.set_unlimited ctxt in
+              Script_ir_translator.parse_and_unparse_script_unaccounted
+                ctxt
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                Readable
+                ~normalize_types
+                script
+              >|=? fun (script, _ctxt) ->
+              {balance; delegate; script = Some script; counter = None})) ;
   S.Sapling.register ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
