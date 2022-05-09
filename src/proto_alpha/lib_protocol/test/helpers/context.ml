@@ -304,6 +304,7 @@ module Contract = struct
     Alpha_services.Contract.storage rpc_ctxt ctxt contract
 
   let script ctxt contract =
+    let contract = Contract.Originated contract in
     Alpha_services.Contract.script rpc_ctxt ctxt contract
     >>=? fun {code; storage = _} ->
     match Data_encoding.force_decode code with

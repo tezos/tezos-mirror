@@ -70,7 +70,6 @@ let init_and_originate contract_code_string =
   Incremental.add_operation inc operation >|=? fun inc -> (inc, source, addr)
 
 let assert_stored_script_equal inc addr expected_code_string =
-  let addr = Contract.Originated addr in
   Context.Contract.script (I inc) addr >>=? fun stored_script ->
   Assert.equal_string
     ~loc:__LOC__

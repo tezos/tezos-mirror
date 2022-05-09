@@ -71,11 +71,10 @@ let expected_lqt_hash =
 let liquidity_baking_origination () =
   Context.init1 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun cpmm_address ->
-  let cpmm_address = Alpha_context.Contract.Originated cpmm_address in
   Context.Contract.script_hash (B blk) cpmm_address >>=? fun cpmm_hash ->
-  Lwt.return @@ Environment.wrap_tzresult
-  @@ Alpha_context.Contract.of_b58check "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
-  >>=? fun lqt_address ->
+  let lqt_address =
+    Contract_hash.of_b58check_exn "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
+  in
   Context.Contract.script_hash (B blk) lqt_address >>=? fun lqt_hash ->
   Assert.equal
     ~loc:__LOC__

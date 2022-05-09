@@ -147,9 +147,9 @@ module Contract : sig
 
   val storage : t -> Contract.t -> Script.expr tzresult Lwt.t
 
-  val script : t -> Contract.t -> Script.expr tzresult Lwt.t
+  val script : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 
-  val script_hash : t -> Contract.t -> Script_expr_hash.t tzresult Lwt.t
+  val script_hash : t -> Contract_hash.t -> Script_expr_hash.t tzresult Lwt.t
 end
 
 module Delegate : sig
