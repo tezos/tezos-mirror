@@ -29,6 +29,7 @@ type metrics = {
   caboose_level : Prometheus.Gauge.t;
   alternate_heads_count : Prometheus.Gauge.t;
   last_written_block_size : Prometheus.Gauge.t;
+  last_store_merge_time : Prometheus.Gauge.t;
 }
 
 let namespace = Tezos_version.Node_version.namespace
@@ -55,10 +56,15 @@ let metrics =
     let help = "Size, in bytes, of the last block written in store" in
     Prometheus.Gauge.v ~help ~namespace ?subsystem "last_written_block_size"
   in
+  let last_store_merge_time =
+    let help = "Time, in seconds, for the completion of the last store merge" in
+    Prometheus.Gauge.v ~help ~namespace ?subsystem "last_merge_time"
+  in
   {
     checkpoint_level;
     savepoint_level;
     caboose_level;
     alternate_heads_count;
     last_written_block_size;
+    last_store_merge_time;
   }
