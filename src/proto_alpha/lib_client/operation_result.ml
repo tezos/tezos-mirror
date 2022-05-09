@@ -27,6 +27,8 @@ open Protocol
 open Alpha_context
 open Apply_results
 
+let tez_sym = "\xEA\x9C\xA9"
+
 let pp_manager_operation_content (type kind) source internal pp_result ppf
     ((operation, result) : kind manager_operation * _) =
   Format.fprintf ppf "@[<v 0>" ;
@@ -36,7 +38,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         ppf
         "@[<v 2>%s:@,Amount: %s%a@,From: %a@,To: %a"
         (if internal then "Internal transaction" else "Transaction")
-        Client_proto_args.tez_sym
+        tez_sym
         Tez.pp
         amount
         Contract.pp
@@ -65,7 +67,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         (if internal then "Internal origination" else "Origination")
         Contract.pp
         source
-        Client_proto_args.tez_sym
+        tez_sym
         Tez.pp
         credit ;
       let code =
@@ -395,10 +397,8 @@ let pp_balance_updates ppf = function
           balance_updates
       in
       let pp_update ppf = function
-        | Credited amount ->
-            Format.fprintf ppf "+%s%a" Client_proto_args.tez_sym Tez.pp amount
-        | Debited amount ->
-            Format.fprintf ppf "-%s%a" Client_proto_args.tez_sym Tez.pp amount
+        | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
+        | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
       in
       let pp_one ppf (balance, update) =
         let to_fill = column_size + 3 - String.length balance in
@@ -888,7 +888,7 @@ let pp_manager_operation_contents_and_result ppf
      Storage limit: %s bytes"
     Signature.Public_key_hash.pp
     source
-    Client_proto_args.tez_sym
+    tez_sym
     Tez.pp
     fee
     (Z.to_string counter)

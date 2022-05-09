@@ -578,7 +578,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
         alias
         Ed25519.Public_key_hash.pp
         pkh
-        Client_proto_args.tez_sym
+        Operation_result.tez_sym
         Tez.pp
         balance
       >>= fun () -> return_unit)

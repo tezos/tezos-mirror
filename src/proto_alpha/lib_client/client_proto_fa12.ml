@@ -860,7 +860,7 @@ let tez_of_string_exn index field s =
   | None ->
       error_with
         "Invalid %s notation at entry %i, field \"%s\": %s"
-        Client_proto_args.tez_sym
+        Operation_result.tez_sym
         index
         field
         s

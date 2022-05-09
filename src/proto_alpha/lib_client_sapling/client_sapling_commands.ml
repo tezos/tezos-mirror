@@ -796,7 +796,7 @@ let commands () =
                   "Total Sapling funds %a%s"
                   Context.Shielded_tez.pp
                   (Context.Account.balance account)
-                  Client_proto_args.tez_sym
+                  Operation_result.tez_sym
                 >>= fun () -> return_unit));
     command
       ~group

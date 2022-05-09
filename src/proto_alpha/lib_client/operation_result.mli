@@ -26,6 +26,8 @@
 open Protocol
 open Alpha_context
 
+val tez_sym : string
+
 val pp_internal_operation :
   Format.formatter -> Script_typed_ir.packed_internal_operation -> unit
 

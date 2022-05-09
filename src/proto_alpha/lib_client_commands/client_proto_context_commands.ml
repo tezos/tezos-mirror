@@ -236,7 +236,7 @@ let commands_ro () =
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun amount ->
-        cctxt#answer "%a %s" Tez.pp amount Client_proto_args.tez_sym
+        cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
         >>= fun () -> return_unit);
     command
       ~group
@@ -513,7 +513,7 @@ let commands_ro () =
                           p
                           Tez.pp
                           (Tez.of_mutez_exn w)
-                          Client_proto_args.tez_sym
+                          Operation_result.tez_sym
                           (if List.mem ~equal:Protocol_hash.equal p known_protos
                           then ""
                           else "not "))
@@ -538,21 +538,21 @@ let commands_ro () =
                  Current in favor %a %s, needed supermajority %a %s@]"
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.yay)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.nay)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.pass)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 (Int32.to_float ballots_info.participation /. 100.)
                 (Int32.to_float ballots_info.current_quorum /. 100.)
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.yay)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.supermajority)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
               >>= fun () -> return_unit
             else
               cctxt#message "The ballots have already been cleared."
@@ -609,7 +609,7 @@ let commands_ro () =
             >>=? function
             | None -> cctxt#answer "unlimited" >>= return
             | Some limit ->
-                cctxt#answer "%a %s" Tez.pp limit Client_proto_args.tez_sym
+                cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
                 >>= return));
   ]
 

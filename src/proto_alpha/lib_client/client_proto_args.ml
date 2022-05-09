@@ -137,8 +137,6 @@ let () =
     (function Forbidden_Negative_int str -> Some str | _ -> None)
     (fun str -> Forbidden_Negative_int str)
 
-let tez_sym = "\xEA\x9C\xA9"
-
 let string_parameter = parameter (fun _ x -> return x)
 
 let int_parameter =

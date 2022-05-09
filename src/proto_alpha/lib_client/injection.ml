@@ -117,10 +117,10 @@ let check_fees :
           "The proposed fee (%s%a) are higher than the configured fee cap \
            (%s%a).@\n\
           \ Use `--fee-cap %a` to emit this operation anyway."
-          Client_proto_args.tez_sym
+          Operation_result.tez_sym
           Tez.pp
           fee
-          Client_proto_args.tez_sym
+          Operation_result.tez_sym
           Tez.pp
           config.fee_cap
           Tez.pp
@@ -164,10 +164,10 @@ let check_fees :
             "The proposed fee (%s%a) are lower than the fee that baker expect \
              by default (%s%a).@\n\
             \ Use `--force-low-fee` to emit this operation anyway."
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             fee
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             estimated_fees
           >>= fun () -> exit 1
@@ -914,10 +914,10 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             "The operation will burn %s%a which is higher than the configured \
              burn cap (%s%a).@\n\
             \ Use `--burn-cap %a` to emit this operation."
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             burn
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             fee_parameter.burn_cap
             Tez.pp
