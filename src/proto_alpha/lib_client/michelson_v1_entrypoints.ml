@@ -66,7 +66,7 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
   Alpha_services.Contract.entrypoint_type
     cctxt
     (chain, block)
-    (Contract.Originated contract)
+    contract
     entrypoint
     ~normalize_types
   >>= function

@@ -398,37 +398,41 @@ let[@coq_axiom_with_reason "gadt"] register () =
     ~chunked:true
     S.entrypoint_type
     (fun ctxt v entrypoint {normalize_types} () ->
-      Contract.get_script_code ctxt v >>=? fun (_, expr) ->
-      match expr with
-      | None -> return_none
-      | Some expr ->
-          let ctxt = Gas.set_unlimited ctxt in
-          let legacy = true in
-          let open Script_ir_translator in
-          Script.force_decode_in_context
-            ~consume_deserialization_gas:When_needed
-            ctxt
-            expr
-          >>?= fun (expr, _) ->
-          parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
-          Lwt.return
-            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
-              ->
-              Gas_monad.run ctxt
-              @@ Script_ir_translator.find_entrypoint
-                   ~error_details:(Informative ())
-                   arg_type
-                   entrypoints
-                   entrypoint
-              >>? fun (r, ctxt) ->
-              r |> function
-              | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
-                  if normalize_types then
-                    unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _ctxt) ->
-                    Some (Micheline.strip_locations ty_node)
-                  else ok (Some (Micheline.strip_locations original_type_expr))
-              | Error _ -> Result.return_none )) ;
+      match (v : Contract.t) with
+      | Implicit _ -> return_none
+      | Originated _ -> (
+          Contract.get_script_code ctxt v >>=? fun (_, expr) ->
+          match expr with
+          | None -> return_none
+          | Some expr ->
+              let ctxt = Gas.set_unlimited ctxt in
+              let legacy = true in
+              let open Script_ir_translator in
+              Script.force_decode_in_context
+                ~consume_deserialization_gas:When_needed
+                ctxt
+                expr
+              >>?= fun (expr, _) ->
+              parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
+              Lwt.return
+                ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+                >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
+                          _ ) ->
+                  Gas_monad.run ctxt
+                  @@ Script_ir_translator.find_entrypoint
+                       ~error_details:(Informative ())
+                       arg_type
+                       entrypoints
+                       entrypoint
+                  >>? fun (r, ctxt) ->
+                  r |> function
+                  | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
+                      if normalize_types then
+                        unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _ctxt) ->
+                        Some (Micheline.strip_locations ty_node)
+                      else
+                        ok (Some (Micheline.strip_locations original_type_expr))
+                  | Error _ -> Result.return_none ))) ;
   opt_register1
     ~chunked:true
     S.list_entrypoints
@@ -580,7 +584,7 @@ let entrypoint_type ctxt block contract entrypoint ~normalize_types =
     S.entrypoint_type
     ctxt
     block
-    contract
+    (Contract.Originated contract)
     entrypoint
     {normalize_types}
     ()

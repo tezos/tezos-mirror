@@ -96,7 +96,7 @@ val storage :
 val entrypoint_type :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Entrypoint.t ->
   normalize_types:bool ->
   Script.expr shell_tzresult Lwt.t
