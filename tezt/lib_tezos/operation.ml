@@ -45,19 +45,6 @@ type manager_op_kind =
     }
   | Reveal of string (* public key *)
   | Origination of {code : micheline; storage : micheline; balance : int}
-  | Rejection of {
-      proof : string;
-      tx_rollup : string;
-      level : int;
-      message : Rollup.Tx_rollup.message;
-      message_position : int;
-      message_path : string list;
-      message_result_hash : string;
-      message_result_path : JSON.u;
-      previous_message_result_path : JSON.u;
-      previous_message_context_hash : string;
-      previous_message_withdraw_list_hash : string;
-    }
   | Delegation of (* public key hash *) string
   | Transfer_ticket of {
       contents : micheline;
@@ -149,27 +136,6 @@ let mk_delegation ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Delegation delegate
 
-let mk_rejection ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 1_000_000)
-    ?(storage_limit = 0) ~tx_rollup ~proof ~level ~message ~message_position
-    ~message_path ~message_result_hash ~message_result_path
-    ~previous_message_result_path ~previous_message_context_hash
-    ~previous_message_withdraw_list_hash client =
-  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
-  @@ Rejection
-       {
-         tx_rollup;
-         proof;
-         level;
-         message;
-         message_position;
-         message_path;
-         message_result_hash;
-         message_result_path;
-         previous_message_result_path;
-         previous_message_context_hash;
-         previous_message_withdraw_list_hash;
-       }
-
 let mk_transfer_ticket ~source ?counter ?(fee = 1_000_000)
     ?(gas_limit = 1_000_000) ?(storage_limit = 0) ~contents ~ty ~ticketer
     ~amount ~destination ~entrypoint client =
@@ -187,12 +153,9 @@ let manager_op_content_to_json_string
   let jz_string_of_int n = Ezjsonm.string @@ string_of_int n in
   let mk_jsonm ?(amount = `Null) ?(destination = `Null) ?(parameter = `Null)
       ?(public_key = `Null) ?(delegate = `Null) ?(balance = `Null)
-      ?(script = `Null) ?(proof = `Null) ?(rollup = `Null) ?(message = `Null)
-      ?(message_position = `Null) ?(message_path = `Null) ?(level = `Null)
-      ?(previous_message_result = `Null) ?(message_result_hash = `Null)
-      ?(message_result_path = `Null) ?(previous_message_result_path = `Null)
-      ?(ticket_contents = `Null) ?(ticket_ty = `Null) ?(ticket_ticketer = `Null)
-      ?(ticket_amount = `Null) ?(entrypoint = `Null) kind =
+      ?(script = `Null) ?(ticket_contents = `Null) ?(ticket_ty = `Null)
+      ?(ticket_ticketer = `Null) ?(ticket_amount = `Null) ?(entrypoint = `Null)
+      kind =
     let filter = List.filter (fun (_k, v) -> v <> `Null) in
     return
     @@ `O
@@ -216,17 +179,6 @@ let manager_op_content_to_json_string
               (* Smart Contract origination *)
               ("balance", balance);
               ("script", script);
-              (* Rejection *)
-              ("proof", proof);
-              ("rollup", rollup);
-              ("message", message);
-              ("message_position", message_position);
-              ("message_path", message_path);
-              ("previous_message_result", previous_message_result);
-              ("level", level);
-              ("message_result_hash", message_result_hash);
-              ("message_result_path", message_result_path);
-              ("previous_message_result_path", previous_message_result_path);
               (* Transfer ticket *)
               ("ticket_contents", ticket_contents);
               ("ticket_ty", ticket_ty);
@@ -259,46 +211,6 @@ let manager_op_content_to_json_string
       let* storage = data_to_json client storage in
       let script : Ezjsonm.value = `O [("code", code); ("storage", storage)] in
       mk_jsonm ~balance:(jz_string_of_int balance) ~script "origination"
-  | Rejection
-      {
-        proof;
-        tx_rollup;
-        level;
-        message;
-        message_position;
-        message_path;
-        previous_message_context_hash;
-        message_result_hash;
-        message_result_path;
-        previous_message_result_path;
-        previous_message_withdraw_list_hash;
-      } ->
-      let rollup = `String tx_rollup in
-      let proof = Ezjsonm.value_from_string proof in
-      let level = `Float (float_of_int level) in
-      let message = Rollup.Tx_rollup.json_of_message message in
-      let message_position = `String (string_of_int message_position) in
-      let message_path = `A (List.map (fun x -> `String x) message_path) in
-      let previous_message_result =
-        `O
-          [
-            ("context_hash", `String previous_message_context_hash);
-            ("withdraw_list_hash", `String previous_message_withdraw_list_hash);
-          ]
-      in
-      let message_result_hash = `String message_result_hash in
-      mk_jsonm
-        ~rollup
-        ~proof
-        ~level
-        ~message
-        ~message_position
-        ~message_path
-        ~previous_message_result
-        ~message_result_hash
-        ~message_result_path
-        ~previous_message_result_path
-        "tx_rollup_rejection"
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
       let* ticket_contents = data_to_json client contents in
       let* ticket_ty = data_to_json client ty in
@@ -471,41 +383,6 @@ let inject_transfer ?protocol ?async ?force ?wait_for_injection ?branch ~source
       ?storage_limit
       ~dest
       ?amount
-      client
-  in
-  forge_and_inject_operation
-    ?protocol
-    ?async
-    ?force
-    ?wait_for_injection
-    ?branch
-    ~batch:[op]
-    ~signer
-    client
-
-let inject_rejection ?protocol ?async ?force ?wait_for_injection ?branch ~source
-    ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~tx_rollup ~proof
-    ~level ~message ~message_position ~message_path ~message_result_hash
-    ~message_result_path ~previous_message_result_path
-    ~previous_message_context_hash ~previous_message_withdraw_list_hash client =
-  let* op =
-    mk_rejection
-      ~source
-      ?counter
-      ?fee
-      ?gas_limit
-      ?storage_limit
-      ~tx_rollup
-      ~proof
-      ~level
-      ~message
-      ~message_position
-      ~message_path
-      ~message_result_hash
-      ~message_result_path
-      ~previous_message_result_path
-      ~previous_message_context_hash
-      ~previous_message_withdraw_list_hash
       client
   in
   forge_and_inject_operation

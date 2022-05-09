@@ -107,33 +107,6 @@ val mk_delegation :
   Client.t ->
   manager_operation_content Lwt.t
 
-(** [mk_rejection] allows to construct a mangager operation
-   representing a tx_rollup rejection operation.
-
-    - Default [counter] is the successor of the counter of [source].
-    - Default [fee] is [1_000_000] mutez.
-    - Default [gas_limit] is [1_000_000] gas.
-    - Default [storage_limit] is [0]. *)
-val mk_rejection :
-  source:Account.key ->
-  ?counter:int ->
-  ?fee:int ->
-  ?gas_limit:int ->
-  ?storage_limit:int ->
-  tx_rollup:string ->
-  proof:string ->
-  level:int ->
-  message:Rollup.Tx_rollup.message ->
-  message_position:int ->
-  message_path:string list ->
-  message_result_hash:string ->
-  message_result_path:JSON.u ->
-  previous_message_result_path:JSON.u ->
-  previous_message_context_hash:string ->
-  previous_message_withdraw_list_hash:string ->
-  Client.t ->
-  manager_operation_content Lwt.t
-
 (** [mk_call] allows to construct a manager operation representing a call
     to a smart contract [entrypoint] with a given parameter [arg] from an
     implicit account [source].
@@ -421,34 +394,6 @@ val inject_transfers :
   number_of_operations:int ->
   Client.t ->
   [`OpHash of string] list Lwt.t
-
-(** [inject_rejection] is a high-level wrapper around the tx_rollup
-   rejection operation (see {!mk_rejection}). *)
-val inject_rejection :
-  ?protocol:Protocol.t ->
-  ?async:bool ->
-  ?force:bool ->
-  ?wait_for_injection:Node.t ->
-  ?branch:string ->
-  source:Account.key ->
-  ?signer:Account.key ->
-  ?counter:int ->
-  ?fee:int ->
-  ?gas_limit:int ->
-  ?storage_limit:int ->
-  tx_rollup:string ->
-  proof:string ->
-  level:int ->
-  message:Rollup.Tx_rollup.message ->
-  message_position:int ->
-  message_path:string list ->
-  message_result_hash:string ->
-  message_result_path:JSON.u ->
-  previous_message_result_path:JSON.u ->
-  previous_message_context_hash:string ->
-  previous_message_withdraw_list_hash:string ->
-  Client.t ->
-  [`OpHash of string] Lwt.t
 
 (** [inject_transfer_ticket] constructs and injects a mangager operation
     representing a transfer ticket operation. *)
