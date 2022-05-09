@@ -1660,17 +1660,25 @@ module Contract = struct
       ~chunked:true
       S.get_storage_normalized
       (fun ctxt contract () unparsing_mode ->
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-        match script with
-        | None -> return_none
-        | Some script ->
-            let ctxt = Gas.set_unlimited ctxt in
-            let open Script_ir_translator in
-            parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-            >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
-            unparse_data ctxt unparsing_mode storage_type storage
-            >|=? fun (storage, _ctxt) ->
-            Some (Micheline.strip_locations storage)) ;
+        match contract with
+        | Implicit _ -> return_none
+        | Originated _ -> (
+            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+            match script with
+            | None -> return_none
+            | Some script ->
+                let ctxt = Gas.set_unlimited ctxt in
+                let open Script_ir_translator in
+                parse_script
+                  ctxt
+                  ~legacy:true
+                  ~allow_forged_in_storage:true
+                  script
+                >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt)
+                  ->
+                unparse_data ctxt unparsing_mode storage_type storage
+                >|=? fun (storage, _ctxt) ->
+                Some (Micheline.strip_locations storage))) ;
     (* Patched RPC: get_script *)
     Registration.register1
       ~chunked:true
