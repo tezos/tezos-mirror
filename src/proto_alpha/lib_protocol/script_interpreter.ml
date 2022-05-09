@@ -1045,7 +1045,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
             (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack
           in
           match c with
-          | Contract c -> (
+          | Contract (Implicit _) | Tx_rollup _ ->
+              (return_none [@ocaml.tailcall]) ctxt
+          | Contract (Originated _contract_hash as c) -> (
               Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
               match script_opt with
               | None -> (return_none [@ocaml.tailcall]) ctxt
@@ -1127,8 +1129,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                 kinstr
                                 (KView_exit (sc, KReturn (stack, ks)))
                                 (input, storage)
-                                (EmptyCell, EmptyCell)))))
-          | Tx_rollup _ -> (return_none [@ocaml.tailcall]) ctxt)
+                                (EmptyCell, EmptyCell))))))
       | ICreate_contract {storage_type; code; k; kinfo = _} ->
           (* Removed the instruction's arguments manager, spendable and delegatable *)
           let delegate = accu in
