@@ -25,7 +25,7 @@
 
 type origination_result = {
   balance_updates : Receipt_repr.balance_updates;
-  originated_contracts : Contract_repr.t list;
+  originated_contracts : Contract_hash.t list;
   storage_size : Z.t;
   paid_storage_size_diff : Z.t;
 }
@@ -57,6 +57,9 @@ let origination_result_list_encoding =
             })
           (obj4
              (dft "balance_updates" Receipt_repr.balance_updates_encoding [])
-             (dft "originated_contracts" (list Contract_repr.encoding) [])
+             (dft
+                "originated_contracts"
+                (list Contract_repr.originated_encoding)
+                [])
              (dft "storage_size" z Z.zero)
              (dft "paid_storage_size_diff" z Z.zero)))

@@ -474,7 +474,7 @@ let pp_manager_operation_contents_and_result ppf
             Format.fprintf
               ppf
               "@,@[<v 2>Originated contracts:@,%a@]"
-              (Format.pp_print_list Contract.pp)
+              (Format.pp_print_list Contract_hash.pp)
               contracts) ;
         (match storage with
         | None -> ()
@@ -526,7 +526,7 @@ let pp_manager_operation_contents_and_result ppf
         Format.fprintf
           ppf
           "@,@[<v 2>Originated contracts:@,%a@]"
-          (Format.pp_print_list Contract.pp)
+          (Format.pp_print_list Contract_hash.pp)
           contracts) ;
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;

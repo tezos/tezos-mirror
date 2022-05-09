@@ -1051,7 +1051,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     Lwt.return (originated_contracts result.contents ~force)
     >>=? fun contracts ->
     List.iter_s
-      (fun c -> cctxt#message "New contract %a originated." Contract.pp c)
+      (fun c -> cctxt#message "New contract %a originated." Contract_hash.pp c)
       contracts
     >>= fun () ->
     (match confirmations with

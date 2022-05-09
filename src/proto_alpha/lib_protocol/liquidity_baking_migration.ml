@@ -146,7 +146,7 @@ let originate ctxt address_hash ~balance script =
   let result : Migration_repr.origination_result =
     {
       balance_updates;
-      originated_contracts = [address];
+      originated_contracts = [address_hash];
       storage_size = size;
       paid_storage_size_diff = size;
     }

@@ -31,7 +31,7 @@
  *)
 type origination_result = {
   balance_updates : Receipt_repr.balance_updates;
-  originated_contracts : Contract_repr.t list;
+  originated_contracts : Contract_hash.t list;
   storage_size : Z.t;
   paid_storage_size_diff : Z.t;
 }

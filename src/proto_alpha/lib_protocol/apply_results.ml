@@ -113,7 +113,7 @@ type successful_transaction_result =
       storage : Script.expr option;
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
-      originated_contracts : Contract.t list;
+      originated_contracts : Contract_hash.t list;
       consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
@@ -137,7 +137,7 @@ type _ successful_manager_operation_result =
   | Origination_result : {
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
-      originated_contracts : Contract.t list;
+      originated_contracts : Contract_hash.t list;
       consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
@@ -387,7 +387,7 @@ module Manager_result = struct
           (obj9
              (opt "storage" Script.expr_encoding)
              (dft "balance_updates" Receipt.balance_updates_encoding [])
-             (dft "originated_contracts" (list Contract.encoding) [])
+             (dft "originated_contracts" (list Contract.originated_encoding) [])
              (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
              (dft "storage_size" z Z.zero)
@@ -494,7 +494,7 @@ module Manager_result = struct
       ~encoding:
         (obj7
            (dft "balance_updates" Receipt.balance_updates_encoding [])
-           (dft "originated_contracts" (list Contract.encoding) [])
+           (dft "originated_contracts" (list Contract.originated_encoding) [])
            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)

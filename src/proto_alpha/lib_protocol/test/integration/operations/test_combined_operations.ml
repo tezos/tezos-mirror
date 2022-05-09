@@ -149,7 +149,9 @@ let test_multiple_origination_and_delegation () =
   Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   >>=? fun () ->
   List.iter_es
-    (fun c -> Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
+    (fun c ->
+      let c = Contract.Originated c in
+      Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
     new_contracts
 
 let expect_failure = function

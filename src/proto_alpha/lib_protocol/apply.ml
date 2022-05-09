@@ -929,9 +929,6 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
       >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
       Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
       >>=? fun originated_contracts ->
-      let originated_contracts =
-        List.map (fun c -> Contract.Originated c) originated_contracts
-      in
       Lwt.return
         ( Script_cache.update
             ctxt
@@ -1038,8 +1035,8 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
   in
   return (ctxt, result, [])
 
-let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
-    ~delegate ~source ~credit ~before_operation =
+let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
+    ~contract:contract_hash ~delegate ~source ~credit ~before_operation =
   Script_ir_translator.collect_lazy_storage ctxt storage_type storage
   >>?= fun (to_duplicate, ctxt) ->
   let to_update = Script_ir_translator.no_lazy_storage_id in
@@ -1068,10 +1065,10 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
   Contract.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:false
-    contract
+    contract_hash
     ~script:(script, lazy_storage_diff)
   >>=? fun ctxt ->
-  let contract = Contract.Originated contract in
+  let contract = Contract.Originated contract_hash in
   (match delegate with
   | None -> return ctxt
   | Some delegate -> Delegate.init ctxt contract delegate)
@@ -1085,7 +1082,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
       {
         lazy_storage_diff;
         balance_updates;
-        originated_contracts = [contract];
+        originated_contracts = [contract_hash];
         consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
         storage_size = size;
         paid_storage_size_diff;

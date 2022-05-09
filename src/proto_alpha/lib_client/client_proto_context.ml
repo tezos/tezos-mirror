@@ -408,7 +408,7 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result))
   >>=? fun res ->
   Lwt.return (Injection.originated_contracts ~force:false result) >>=? function
-  | [contract] -> return (res, contract)
+  | [contract] -> return (res, Contract.Originated contract)
   | contracts ->
       failwith
         "The origination introduced %d contracts instead of one."

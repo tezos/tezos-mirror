@@ -290,7 +290,8 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk
     ~src_sk ~contract ~destination ?(entrypoint = Entrypoint.default) ?arg
     ~amount ?fee ?gas_limit ?storage_limit ?counter ~fee_parameter () :
-    (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+    (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+    tzresult
     Lwt.t =
   build_transaction_operation
     cctxt

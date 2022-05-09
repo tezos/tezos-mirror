@@ -3423,7 +3423,7 @@ end
 module Migration : sig
   type origination_result = {
     balance_updates : Receipt.balance_updates;
-    originated_contracts : Contract.t list;
+    originated_contracts : Contract_hash.t list;
     storage_size : Z.t;
     paid_storage_size_diff : Z.t;
   }

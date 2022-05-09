@@ -359,7 +359,7 @@ let get_lqt_result results =
 let get_address_in_result result =
   match result with
   | Apply_results.Origination_result {originated_contracts; _} -> (
-      match originated_contracts with [Originated c] -> c | _ -> assert false)
+      match originated_contracts with [c] -> c | _ -> assert false)
 
 let get_balance_updates_in_result result =
   match result with
