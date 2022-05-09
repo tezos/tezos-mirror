@@ -61,7 +61,7 @@ val list_contract_unreachables :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
-  contract:Alpha_context.Contract.t ->
+  contract:Contract_hash.t ->
   Michelson_v1_primitives.prim list list tzresult Lwt.t
 
 val list_unreachables :
@@ -75,7 +75,7 @@ val print_unreachables :
   #Client_context.printer ->
   ?on_errors:(error list -> unit tzresult Lwt.t) ->
   emacs:bool ->
-  ?contract:Alpha_context.Contract.t ->
+  ?contract:Contract_hash.t ->
   ?script_name:string ->
   Michelson_v1_primitives.prim list list tzresult ->
   unit tzresult Lwt.t
@@ -87,7 +87,7 @@ val list_contract_entrypoints :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
-  contract:Alpha_context.Contract.t ->
+  contract:Contract_hash.t ->
   normalize_types:bool ->
   (string * Alpha_context.Script.expr) list tzresult Lwt.t
 
@@ -104,7 +104,7 @@ val print_entrypoints_list :
   #Client_context.printer ->
   ?on_errors:(error list -> unit tzresult Lwt.t) ->
   emacs:bool ->
-  ?contract:Alpha_context.Contract.t ->
+  ?contract:Contract_hash.t ->
   ?script_name:string ->
   (string * Alpha_context.Script.expr) list tzresult ->
   unit tzresult Lwt.t

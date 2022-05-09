@@ -717,7 +717,6 @@ let contract_has_fa12_interface :
     unit ->
     unit tzresult Lwt.t =
  fun cctxt ~chain ~block ~contract () ->
-  let contract = Contract.Originated contract in
   Michelson_v1_entrypoints.list_contract_entrypoints
     cctxt
     ~chain

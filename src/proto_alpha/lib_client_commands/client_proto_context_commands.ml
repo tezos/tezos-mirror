@@ -395,7 +395,9 @@ let commands_ro () =
       ~desc:"Get the entrypoint list of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun normalize_types contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_entrypoints
@@ -413,7 +415,9 @@ let commands_ro () =
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       (prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_unreachables
