@@ -872,6 +872,7 @@ module ConcreteBaseMachine :
     | blk, holder :: accounts ->
         let ctxt = Context.B blk in
         Context.get_liquidity_baking_cpmm_address ctxt >>= fun cpmm_contract ->
+        let cpmm_contract = Contract.Originated cpmm_contract in
         Context.Contract.storage ctxt cpmm_contract >>= fun storage ->
         let storage = Cpmm_repr.Storage.of_expr_exn (Micheline.root storage) in
         let tzbtc_contract = storage.tokenAddress in

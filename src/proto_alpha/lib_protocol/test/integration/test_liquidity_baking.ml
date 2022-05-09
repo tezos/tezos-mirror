@@ -71,6 +71,7 @@ let expected_lqt_hash =
 let liquidity_baking_origination () =
   Context.init1 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun cpmm_address ->
+  let cpmm_address = Alpha_context.Contract.Originated cpmm_address in
   Context.Contract.script_hash (B blk) cpmm_address >>=? fun cpmm_hash ->
   Lwt.return @@ Environment.wrap_tzresult
   @@ Alpha_context.Contract.of_b58check "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
@@ -102,7 +103,7 @@ let liquidity_baking_cpmm_address () =
     String.equal
     "CPMM address in storage is incorrect"
     Format.pp_print_string
-    (Alpha_context.Contract.to_b58check liquidity_baking)
+    (Contract_hash.to_b58check liquidity_baking)
     "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
   >>=? fun () -> return_unit
 
@@ -110,6 +111,7 @@ let liquidity_baking_cpmm_address () =
 let liquidity_baking_subsidies n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   Block.bake_n n blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
@@ -129,6 +131,7 @@ let liquidity_baking_subsidies n () =
 let liquidity_baking_sunset_level n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
@@ -152,6 +155,7 @@ let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
     bake_after () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
@@ -198,6 +202,7 @@ let liquidity_baking_toggle_60 n () =
 let liquidity_baking_toggle_50 n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
@@ -228,6 +233,7 @@ let liquidity_baking_toggle_50 n () =
 let liquidity_baking_restart n_votes n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_votes blk >>=? fun blk ->
   Context.Contract.balance (B blk) liquidity_baking
   >>=? fun balance_when_paused ->
@@ -283,6 +289,7 @@ let liquidity_baking_toggle_ema_threshold () =
 let liquidity_baking_storage n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
   Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
   let expected_storage =
     Expr.from_string
@@ -320,10 +327,10 @@ let liquidity_baking_balance_update () =
     List.filter
       (fun el ->
         match el with
-        | ( Alpha_context.Receipt.Contract contract,
+        | ( Alpha_context.Receipt.Contract (Originated contract),
             Alpha_context.Receipt.Credited _,
             Alpha_context.Receipt.Subsidy ) ->
-            Alpha_context.Contract.(contract = liquidity_baking)
+            Contract_hash.(contract = liquidity_baking)
         | _ -> false)
       balance_updates
   in
@@ -354,7 +361,7 @@ let get_lqt_result results =
 let get_address_in_result result =
   match result with
   | Apply_results.Origination_result {originated_contracts; _} -> (
-      match originated_contracts with [c] -> c | _ -> assert false)
+      match originated_contracts with [Originated c] -> c | _ -> assert false)
 
 let get_balance_updates_in_result result =
   match result with
@@ -377,9 +384,9 @@ let liquidity_baking_origination_result_cpmm_address () =
   let address = get_address_in_result result in
   Assert.equal
     ~loc:__LOC__
-    Context.Contract.equal
+    Contract_hash.equal
     "CPMM address in storage is not the same as in origination result"
-    Context.Contract.pp
+    Contract_hash.pp
     address
     cpmm_address_in_storage
   >>=? fun () -> return_unit
@@ -404,7 +411,7 @@ let liquidity_baking_origination_result_lqt_address () =
     String.equal
     "LQT address in origination result is incorrect"
     Format.pp_print_string
-    (Alpha_context.Contract.to_b58check address)
+    (Contract_hash.to_b58check address)
     "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
   >>=? fun () -> return_unit
 
