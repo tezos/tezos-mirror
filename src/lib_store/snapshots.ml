@@ -3752,7 +3752,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       Animation.display_progress
         ~every:100
         ~pp_print_step:(fun fmt i ->
-          Format.fprintf fmt "Storing floating blocks: %d blocks wrote" i)
+          Format.fprintf fmt "Storing floating blocks: %d blocks written" i)
         ~progress_display_mode
         (fun notify ->
           Store.Unsafe.restore_from_snapshot
