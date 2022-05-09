@@ -85,7 +85,7 @@ val contract_has_fa12_interface :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  contract:Alpha_context.Contract.t ->
+  contract:Contract_hash.t ->
   unit ->
   unit tzresult Lwt.t
 
@@ -100,7 +100,7 @@ val call_contract :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  contract:Contract.t ->
+  contract:Contract_hash.t ->
   action:action ->
   tez_amount:Tez.t ->
   ?fee:Tez.t ->
@@ -152,7 +152,7 @@ val run_view_action :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?source:Contract.t ->
-  contract:Contract.t ->
+  contract:Contract_hash.t ->
   action:action ->
   ?payer:Contract.t ->
   ?gas:Gas.Arith.integral ->

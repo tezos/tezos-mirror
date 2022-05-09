@@ -31,6 +31,9 @@ module RawContractAlias : Client_aliases.Alias with type t = Contract.t
 
 (** Like [ContractAlias] below but restricted to originated contracts. *)
 module OriginatedContractAlias : sig
+  val find_destination :
+    #Client_context.wallet -> string -> Contract_hash.t tzresult Lwt.t
+
   val destination_param :
     ?name:string ->
     ?desc:string ->

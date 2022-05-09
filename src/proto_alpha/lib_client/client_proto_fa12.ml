@@ -713,22 +713,19 @@ let contract_has_fa12_interface :
     #Protocol_client_context.rpc_context ->
     chain:Shell_services.chain ->
     block:Shell_services.block ->
-    contract:Alpha_context.Contract.t ->
+    contract:Contract_hash.t ->
     unit ->
     unit tzresult Lwt.t =
  fun cctxt ~chain ~block ~contract () ->
-  match contract with
-  | Implicit _ -> fail (Contract_has_no_script contract)
-  | Originated _ ->
-      Michelson_v1_entrypoints.list_contract_entrypoints
-        cctxt
-        ~chain
-        ~block
-        ~contract
-        ~normalize_types:true
-      >>=? fun entrypoints ->
-      List.iter_e (check_entrypoint entrypoints) standard_entrypoints
-      |> Lwt.return
+  let contract = Contract.Originated contract in
+  Michelson_v1_entrypoints.list_contract_entrypoints
+    cctxt
+    ~chain
+    ~block
+    ~contract
+    ~normalize_types:true
+  >>=? fun entrypoints ->
+  List.iter_e (check_entrypoint entrypoints) standard_entrypoints |> Lwt.return
 
 let translate_action_to_argument action =
   let entrypoint = action_to_entrypoint action in
@@ -782,7 +779,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ~source
     ~src_pk
     ~src_sk
-    ~destination:(Contract contract)
+    ~destination:(Contract (Originated contract))
     ~parameters
     ~amount:tez_amount
     ~entrypoint
@@ -886,7 +883,7 @@ let build_transaction_operation ?(tez_amount = Tez.zero) ?fee ?gas_limit
 
 let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
     ?default_storage_limit ~chain ~block src index transfer =
-  Client_proto_contracts.ContractAlias.find_destination
+  Client_proto_contracts.OriginatedContractAlias.find_destination
     cctxt
     transfer.token_contract
   >>=? fun token ->
@@ -911,7 +908,7 @@ let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
       ?fee
       ?gas_limit
       ?storage_limit
-      (Contract token)
+      (Contract (Originated token))
       action
   in
   return (Annotated_manager_operation.Annotated_manager_operation operation)
@@ -973,7 +970,7 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
   Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
-    ~contract
+    ~contract:(Contract.Originated contract)
     ~input
     ~chain_id
     ?source
