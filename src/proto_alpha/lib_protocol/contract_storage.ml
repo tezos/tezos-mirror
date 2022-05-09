@@ -406,12 +406,6 @@ let update_script_lazy_storage c = function
 let create_base c ~prepaid_bootstrap_storage
     (* Free space for bootstrap contracts *)
       contract ~balance ?script () =
-  (match contract with
-  | Contract_repr.Originated _ -> return c
-  | Implicit _ ->
-      Storage.Contract.Global_counter.get c >>=? fun counter ->
-      Storage.Contract.Counter.init c contract counter)
-  >>=? fun c ->
   Storage.Contract.Spendable_balance.init c contract balance >>=? fun c ->
   match script with
   | Some ({Script_repr.code; storage}, lazy_storage_diff) ->
@@ -448,6 +442,8 @@ let raw_originate c ~prepaid_bootstrap_storage contract ~script =
 
 let create_implicit c manager ~balance =
   let contract = Contract_repr.Implicit manager in
+  Storage.Contract.Global_counter.get c >>=? fun counter ->
+  Storage.Contract.Counter.init c contract counter >>=? fun c ->
   create_base
     c
     ~prepaid_bootstrap_storage:false
