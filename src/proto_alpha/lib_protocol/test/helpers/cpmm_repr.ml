@@ -36,8 +36,8 @@ module Storage = struct
     tokenPool : Z.t;
     xtzPool : Tez.t;
     lqtTotal : Z.t;
-    tokenAddress : Contract.t;
-    lqtAddress : Contract.t;
+    tokenAddress : Contract_hash.t;
+    lqtAddress : Contract_hash.t;
   }
 
   let zero : t =
@@ -45,12 +45,8 @@ module Storage = struct
       tokenPool = Z.zero;
       xtzPool = Tez.zero;
       lqtTotal = Z.zero;
-      tokenAddress =
-        Contract.Internal_for_tests.originated_contract
-          (Origination_nonce.Internal_for_tests.initial Operation_hash.zero);
-      lqtAddress =
-        Contract.Internal_for_tests.originated_contract
-          (Origination_nonce.Internal_for_tests.initial Operation_hash.zero);
+      tokenAddress = Contract_hash.zero;
+      lqtAddress = Contract_hash.zero;
     }
 
   let to_string {tokenPool; xtzPool; lqtTotal; tokenAddress; lqtAddress} =
@@ -62,8 +58,8 @@ module Storage = struct
       (Int64.to_string @@ Tez.to_mutez xtzPool)
       Z.pp_print
       lqtTotal
-      (Contract.to_b58check tokenAddress)
-      (Contract.to_b58check lqtAddress)
+      (Contract_hash.to_b58check tokenAddress)
+      (Contract_hash.to_b58check lqtAddress)
 
   let pp fmt s = Format.fprintf fmt "%s" (to_string s)
 
@@ -80,8 +76,8 @@ module Storage = struct
         int ~loc tokenPool;
         mutez ~loc xtzPool;
         int ~loc lqtTotal;
-        address_string ~loc tokenAddress;
-        address_string ~loc lqtAddress;
+        address_string ~loc (Contract.Originated tokenAddress);
+        address_string ~loc (Contract.Originated lqtAddress);
       ]
 
   let to_michelson_string e =
@@ -111,8 +107,8 @@ module Storage = struct
           ],
           [] ) ->
         let xtzPool = Tez.of_mutez_exn (Z.to_int64 xtzPool) in
-        let tokenAddress = address_of_string_exn tokenAddress in
-        let lqtAddress = address_of_string_exn lqtAddress in
+        let tokenAddress = originated_of_string_exn tokenAddress in
+        let lqtAddress = originated_of_string_exn lqtAddress in
         {tokenPool; xtzPool; lqtTotal; tokenAddress; lqtAddress}
     | e ->
         let canonical = Micheline.strip_locations e in

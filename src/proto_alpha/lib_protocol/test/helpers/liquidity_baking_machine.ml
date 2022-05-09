@@ -875,8 +875,8 @@ module ConcreteBaseMachine :
         let cpmm_contract = Contract.Originated cpmm_contract in
         Context.Contract.storage ctxt cpmm_contract >>= fun storage ->
         let storage = Cpmm_repr.Storage.of_expr_exn (Micheline.root storage) in
-        let tzbtc_contract = storage.tokenAddress in
-        let liquidity_contract = storage.lqtAddress in
+        let tzbtc_contract = Contract.Originated storage.tokenAddress in
+        let liquidity_contract = Contract.Originated storage.lqtAddress in
         Context.Contract.storage ctxt tzbtc_contract >>= fun storage ->
         let storage =
           Lqt_fa12_repr.Storage.of_expr_exn (Micheline.root storage)
