@@ -233,7 +233,8 @@ let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
   >>?= fun (has_tickets, ctxt) ->
   Ticket_scanner.tickets_of_value ctxt ~include_lazy:true has_tickets storage
   >|=? fun (tickets, ctxt) ->
-  (Some {tickets; destination = Destination.Contract preorigination}, ctxt)
+  let destination = Destination.Contract (Originated preorigination) in
+  (Some {tickets; destination}, ctxt)
 
 let tickets_of_operation ctxt
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =

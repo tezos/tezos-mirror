@@ -647,8 +647,7 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
   let storage = Micheline.strip_locations storage in
   Contract.fresh_contract_from_current_nonce ctxt
-  >>?= fun (ctxt, contract_hash) ->
-  let contract = Contract.Originated contract_hash in
+  >>?= fun (ctxt, preorigination) ->
   let origination =
     {
       credit;
@@ -658,14 +657,13 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
     }
   in
   let operation =
-    Origination
-      {origination; preorigination = contract; storage_type; storage = init}
+    Origination {origination; preorigination; storage_type; storage = init}
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let piop = Internal_operation {source = sc.self; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
-  return (res, contract, ctxt, gas)
+  return (res, preorigination, ctxt, gas)
 
 (* [unpack ctxt ty bytes] deserialize [bytes] into a value of type [ty]. *)
 let unpack ctxt ~ty ~bytes =

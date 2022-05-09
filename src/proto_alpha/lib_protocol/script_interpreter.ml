@@ -1136,10 +1136,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let credit, (init, stack) = stack in
           create_contract g gas storage_type code delegate credit init
           >>=? fun (res, contract, ctxt, gas) ->
-          let stack =
-            ( {destination = Contract contract; entrypoint = Entrypoint.default},
-              stack )
-          in
+          let destination = Destination.Contract (Originated contract) in
+          let stack = ({destination; entrypoint = Entrypoint.default}, stack) in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | ISet_delegate (_, k) ->
           let delegate = accu in

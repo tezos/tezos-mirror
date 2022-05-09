@@ -1207,7 +1207,7 @@ let apply_internal_manager_operation_content :
   | Origination
       {
         origination = {delegate; script; credit};
-        preorigination = contract;
+        preorigination;
         storage_type;
         storage;
       } ->
@@ -1221,7 +1221,7 @@ let apply_internal_manager_operation_content :
         ~storage_type
         ~storage
         ~unparsed_code
-        ~contract
+        ~contract:(Contract.Originated preorigination)
         ~delegate
         ~source
         ~credit
