@@ -35,7 +35,7 @@ let equal_metadata ?msg m1 m2 =
     | Some m1, Some m2 -> m1 = m2
     | _ -> false
   in
-  let pp ppf (md : Tezos_store.Store.Block.metadata option) =
+  let pp ppf (md : Tezos_store_unix.Store.Block.metadata option) =
     let none ppf () = Format.pp_print_string ppf "none" in
     Format.fprintf
       ppf
@@ -179,7 +179,7 @@ let dummy_patch_context ctxt =
         context = Context_hash.zero;
       }
   in
-  let*? {context; _} = Protocol.Environment.wrap_tzresult res in
+  let*? {context; _} = Environment.wrap_tzresult res in
   return context
 
 let wrap_store_init ?(patch_context = dummy_patch_context)

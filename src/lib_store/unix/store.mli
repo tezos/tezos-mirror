@@ -1003,4 +1003,79 @@ module Unsafe : sig
   val repr_of_block : Block.t -> Block_repr.t
 
   val block_of_repr : Block_repr.t -> Block.t
+
+  val get_block_store : chain_store -> Block_store.block_store
+
+  val load_testchain :
+    chain_store -> chain_id:Chain_id.t -> Chain.testchain option tzresult Lwt.t
+
+  (** [set_head chain_store block] sets the block as the current head
+      of [chain_store] without checks. *)
+  val set_head : chain_store -> Block.t -> unit tzresult Lwt.t
+
+  (** [set_history_mode chain_store history_mode] sets the history mode
+      for the [chain_store] without checks. *)
+  val set_history_mode : chain_store -> History_mode.t -> unit tzresult Lwt.t
+
+  (** [set_checkpoint chain_store checkpoint] sets the checkpoint for
+      the [chain_store] without checks. *)
+  val set_checkpoint : chain_store -> block_descriptor -> unit tzresult Lwt.t
+
+  (** [set_cementing_highwatermark chain_store
+      cementing_highwatermark] sets the cementing_highwatermark for the
+      [chain_store] without checks. *)
+  val set_cementing_highwatermark :
+    chain_store -> int32 option -> unit tzresult Lwt.t
+
+  (** [set_savepoint chain_store savepoint] sets the savepoint for the
+      [chain_store] without checks. *)
+  val set_savepoint : chain_store -> block_descriptor -> unit tzresult Lwt.t
+
+  (** [set_caboose chain_store caboose] sets the caboose for the
+      [chain_store] without checks. *)
+  val set_caboose : chain_store -> block_descriptor -> unit tzresult Lwt.t
+
+  (** [set_protocol_level chain_store protocol_level
+      (block, ph)] updates the protocol level for the protocol [ph] in
+      [chain_store] with the activation [block]. *)
+  val set_protocol_level :
+    chain_store ->
+    protocol_level:int ->
+    Block.block * Protocol_hash.t ->
+    unit tzresult Lwt.t
+
+  (** Snapshots utility functions *)
+
+  (** [open_for_snapshot_export ~store_dir ~context_dir genesis
+      ~locked_f] opens the store (resp. context) located in [store_dir]
+      (resp. [context_dir]) and gives the [chain_store] whose
+      [chain_id] is computed using [genesis] and gives it to
+      [locked_f]. [locked_f] starts by taking a lock (using a lockfile) on
+      the store to prevent merge from happening during this function.
+
+      {b Warning} [locked_f] must not perform long computations or
+      costly I/Os: if the store needs to perform a merge, it will be
+      locked while [locked_f] is running. *)
+  val open_for_snapshot_export :
+    store_dir:string ->
+    context_dir:string ->
+    Genesis.t ->
+    locked_f:(chain_store -> 'a tzresult Lwt.t) ->
+    'a tzresult Lwt.t
+
+  (** [restore_from_snapshot ?notify ~store_dir ~context_index
+      ~genesis ~genesis_context_hash ~floating_blocks_stream
+      ~new_head_with_metadata ~protocol_levels ~history_mode]
+      initialises a coherent store in [store_dir] with all the given
+      info retrieved from a snapshot. *)
+  val restore_from_snapshot :
+    ?notify:(unit -> unit Lwt.t) ->
+    [`Store_dir] Naming.directory ->
+    genesis:Genesis.t ->
+    genesis_context_hash:Context_hash.t ->
+    floating_blocks_stream:Block_repr.block Lwt_stream.t ->
+    new_head_with_metadata:Block_repr.block ->
+    protocol_levels:Protocol_levels.activation_block Protocol_levels.t ->
+    history_mode:History_mode.t ->
+    unit tzresult Lwt.t
 end

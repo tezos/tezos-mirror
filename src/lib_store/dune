@@ -6,97 +6,19 @@
  (public_name tezos-store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-shell-services
   tezos-base
-  tezos-version
-  index
-  irmin-pack
-  tezos-store.shared
-  tezos-protocol-environment
-  tezos-context
-  tezos-context-ops
-  tezos-shell-context
-  tezos-validation
-  tezos-protocol-updater
-  tezos-stdlib-unix
-  tezos-stdlib
   lwt-watcher
-  ringo-lwt
-  camlzip
-  tar
-  tar-unix
-  prometheus)
- (flags
-  (:standard)
-  -open Tezos_shell_services
-  -open Tezos_base
-  -open Tezos_base.TzPervasives
-  -open Tezos_store_shared
-  -open Tezos_protocol_environment
-  -open Tezos_context
-  -open Tezos_context_ops
-  -open Tezos_validation
-  -open Tezos_protocol_updater
-  -open Tezos_stdlib_unix
-  -open Tezos_stdlib)
- (modules
-  block_repr_unix
-  block_store
-  cemented_block_store
-  consistency
-  floating_block_index
-  floating_block_store
-  protocol_store
-  stored_data
-  store_metrics
-  store))
-
-(library
- (name tezos_store_reconstruction)
- (public_name tezos-store.reconstruction)
- (instrumentation (backend bisect_ppx))
- (libraries
-  tezos-base
-  tezos-stdlib-unix
   tezos-shell-services
-  tezos-protocol-updater
   tezos-validation
   tezos-context-ops
-  tezos-store.shared
-  tezos-store)
- (flags
-  (:standard)
-  -open Tezos_base
-  -open Tezos_base.TzPervasives
-  -open Tezos_stdlib_unix
-  -open Tezos_shell_services
-  -open Tezos_protocol_updater
-  -open Tezos_validation
-  -open Tezos_context_ops
-  -open Tezos_store_shared
-  -open Tezos_store)
- (modules reconstruction reconstruction_events))
-
-(library
- (name tezos_store_snapshots)
- (public_name tezos-store.snapshots)
- (instrumentation (backend bisect_ppx))
- (libraries
-  tezos-base
-  tezos-stdlib-unix
-  tezos-shell-services
-  tezos-context
-  tezos-validation
-  tezos-store
   tezos-store.shared)
  (flags
   (:standard)
   -open Tezos_base
   -open Tezos_base.TzPervasives
-  -open Tezos_stdlib_unix
   -open Tezos_shell_services
-  -open Tezos_context
   -open Tezos_validation
-  -open Tezos_store
+  -open Tezos_context_ops
   -open Tezos_store_shared)
- (modules snapshots snapshots_events))
+ (virtual_modules store)
+ (default_implementation tezos-store.real))

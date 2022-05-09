@@ -2033,11 +2033,11 @@ let octez_store_shared =
         "block_level";
       ]
 
-let octez_store =
+let octez_store_unix =
   public_lib
-    "tezos-store"
-    ~path:"src/lib_store"
-    ~synopsis:"Tezos: store for `tezos-node`"
+    "tezos-store.unix"
+    ~path:"src/lib_store/unix"
+    ~opam:"tezos-store"
     ~deps:
       [
         octez_shell_services |> open_;
@@ -2075,10 +2075,10 @@ let octez_store =
         "store";
       ]
 
-let octez_store_reconstruction =
+let octez_store_unix_reconstruction =
   public_lib
-    "tezos-store.reconstruction"
-    ~path:"src/lib_store"
+    "tezos-store.unix-reconstruction"
+    ~path:"src/lib_store/unix"
     ~opam:"tezos-store"
     ~deps:
       [
@@ -2089,14 +2089,14 @@ let octez_store_reconstruction =
         octez_validation |> open_;
         octez_context_ops |> open_;
         octez_store_shared |> open_;
-        octez_store |> open_;
+        octez_store_unix |> open_;
       ]
     ~modules:["reconstruction"; "reconstruction_events"]
 
-let octez_store_snapshots =
+let octez_store_unix_snapshots =
   public_lib
-    "tezos-store.snapshots"
-    ~path:"src/lib_store"
+    "tezos-store.unix-snapshots"
+    ~path:"src/lib_store/unix"
     ~opam:"tezos-store"
     ~deps:
       [
@@ -2105,10 +2105,35 @@ let octez_store_snapshots =
         octez_shell_services |> open_;
         octez_context |> open_;
         octez_validation |> open_;
-        octez_store |> open_;
         octez_store_shared |> open_;
+        octez_store_unix |> open_;
       ]
     ~modules:["snapshots"; "snapshots_events"]
+
+let octez_store =
+  public_lib
+    "tezos-store"
+    ~path:"src/lib_store"
+    ~synopsis:"Tezos: store for `tezos-node`"
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        lwt_watcher;
+        octez_shell_services |> open_;
+        octez_validation |> open_;
+        octez_context_ops |> open_;
+        octez_store_shared |> open_;
+      ]
+    ~virtual_modules:["store"]
+    ~default_implementation:"tezos-store.real"
+
+let _octez_store_real =
+  public_lib
+    "tezos-store.real"
+    ~path:"src/lib_store/real"
+    ~opam:"tezos-store"
+    ~deps:[octez_store_unix |> open_]
+    ~implements:octez_store
 
 let octez_requester =
   public_lib
@@ -4596,16 +4621,16 @@ let _octez_micheline_rewriting_tests =
 let _octez_store_tests =
   tests
     ["test"; "test_locator"]
-    ~path:"src/lib_store/test"
+    ~path:"src/lib_store/unix/test"
     ~opam:"tezos-store"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_context_ops |> open_;
-        octez_store |> open_;
         octez_store_shared |> open_;
-        octez_store_reconstruction |> open_;
-        octez_store_snapshots |> open_;
+        octez_store_unix |> open_;
+        octez_store_unix_reconstruction |> open_;
+        octez_store_unix_snapshots |> open_;
         octez_shell_services |> open_;
         octez_stdlib_unix |> open_;
         octez_validation |> open_;
@@ -4833,8 +4858,8 @@ let _octez_node =
          octez_p2p |> open_;
          octez_shell |> open_;
          octez_store |> open_;
-         octez_store_reconstruction |> open_;
-         octez_store_snapshots |> open_;
+         octez_store_unix_reconstruction |> open_;
+         octez_store_unix_snapshots |> open_;
          octez_context |> open_;
          octez_validator_lib |> open_;
          octez_validation |> open_;
