@@ -366,6 +366,14 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
+let metric =
+  Prometheus.Summary.v_labels
+    ~label_names:["endpoint"; "method"]
+    ~help:"RPC endpoint call counts and sum of execution times."
+    ~namespace:Tezos_version.Node_version.namespace
+    ~subsystem:"rpc"
+    "calls"
+
 let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
     node (addr, port) =
   let open Lwt_result_syntax in
@@ -396,6 +404,37 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
+  let metric_middleware =
+    let transform_callback callback connection request body =
+      let do_call () = callback connection request body in
+      let cohttp_meth = Cohttp.Request.meth request in
+      let uri = Cohttp.Request.uri request in
+      let path = Uri.path uri in
+      let decoded = Resto.Utils.decode_split_path path in
+      let*! description =
+        let* resto_meth =
+          match cohttp_meth with
+          | #Resto.meth as meth -> Lwt.return_ok meth
+          | _ -> Lwt.return_error @@ `Method_not_allowed []
+        in
+        let* uri_desc =
+          RPC_directory.lookup_uri_desc dir () resto_meth decoded
+        in
+        Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
+      in
+      match description with
+      | Ok (uri, meth) ->
+          (* We update the metric only if the URI can succesfully
+             be matched in the directory tree. *)
+          Prometheus.Summary.(time (labels metric [uri; meth]) Sys.time do_call)
+      | Error _ ->
+          (* Otherwise, the call must be done anyway. *)
+          do_call ()
+    in
+    let is_metric_collection_enable = List.is_empty config.metrics_addr in
+    if is_metric_collection_enable then None
+    else Some Resto_cohttp_server.Server.{transform_callback}
+  in
   Lwt.catch
     (fun () ->
       let*! server =
@@ -404,6 +443,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
           mode
           dir
           ~acl
+          ?middleware:metric_middleware
           ~media_types:(Media_type.Command_line.of_command_line media_types)
           ~cors:
             {
