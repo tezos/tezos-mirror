@@ -42,8 +42,11 @@ type 'kind internal_manager_operation =
       destination : Destination.t;
     }
       -> Kind.transaction internal_manager_operation
-  | Origination :
-      Alpha_context.origination
+  | Origination : {
+      delegate : Signature.Public_key_hash.t option;
+      script : Script.t;
+      credit : Tez.tez;
+    }
       -> Kind.origination internal_manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
