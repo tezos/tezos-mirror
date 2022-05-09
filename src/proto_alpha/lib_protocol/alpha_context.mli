@@ -821,6 +821,10 @@ module Constants : sig
 
   val parametric : context -> Parametric.t
 
+  val tx_rollup : context -> Parametric.tx_rollup
+
+  val sc_rollup : context -> Parametric.sc_rollup
+
   val preserved_cycles : context -> int
 
   val blocks_per_cycle : context -> int32

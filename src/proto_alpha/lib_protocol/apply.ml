@@ -1964,11 +1964,8 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.Parametric.
-            {
-              tx_rollup = {max_messages_per_inbox; max_withdrawals_per_batch; _};
-              _;
-            } =
-        Constants.parametric ctxt
+            {max_messages_per_inbox; max_withdrawals_per_batch; _} =
+        Constants.tx_rollup ctxt
       in
       Tx_rollup_errors.check_path_depth
         `Commitment
@@ -2000,8 +1997,8 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_rejection
       {message_path; message_result_path; previous_message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      let Constants.Parametric.{tx_rollup = {max_messages_per_inbox; _}; _} =
-        Constants.parametric ctxt
+      let Constants.Parametric.{max_messages_per_inbox; _} =
+        Constants.tx_rollup ctxt
       in
       Tx_rollup_errors.check_path_depth
         `Inbox

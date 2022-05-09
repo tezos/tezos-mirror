@@ -76,6 +76,10 @@ val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 
 val parametric : Raw_context.t -> Constants_parametric_repr.t
 
+val tx_rollup : Raw_context.t -> Constants_parametric_repr.tx_rollup
+
+val sc_rollup : Raw_context.t -> Constants_parametric_repr.sc_rollup
+
 val consensus_committee_size : Raw_context.t -> int
 
 val consensus_threshold : Raw_context.t -> int

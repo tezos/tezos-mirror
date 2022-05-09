@@ -298,6 +298,10 @@ let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
 let[@inline] constants ctxt = ctxt.back.constants
 
+let[@inline] tx_rollup ctxt = ctxt.back.constants.tx_rollup
+
+let[@inline] sc_rollup ctxt = ctxt.back.constants.sc_rollup
+
 let[@inline] recover ctxt = ctxt.back.context
 
 let[@inline] fees ctxt = ctxt.back.fees
