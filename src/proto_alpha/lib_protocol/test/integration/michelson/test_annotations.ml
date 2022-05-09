@@ -93,7 +93,10 @@ let get_address_from_storage inc factory_addr =
       failwith "Did not expect non-default entrypoint"
   | Some {destination = Tx_rollup _; _} ->
       failwith "Did not expect non-contract address"
-  | Some {destination = Contract addr; entrypoint = _it_is_default} ->
+  | Some {destination = Contract (Implicit _); _} ->
+      failwith "Did not expect implict account"
+  | Some {destination = Contract (Originated addr); entrypoint = _it_is_default}
+    ->
       return addr
   | _ ->
       failwith
@@ -114,6 +117,7 @@ let test_internal_origination () =
   >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
   get_address_from_storage inc factory >>=? fun addr ->
+  let addr = Contract.Originated addr in
   assert_stored_script_equal inc addr contract_with_annotations
 
 let tests =
