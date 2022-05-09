@@ -57,7 +57,7 @@ val originated_contract : Origination_nonce.t -> t
     must be the same or it will fail with an [assert]. [since] < [until] or the
     returned list is empty *)
 val originated_contracts :
-  since:Origination_nonce.t -> until:Origination_nonce.t -> t list
+  since:Origination_nonce.t -> until:Origination_nonce.t -> Contract_hash.t list
 
 (** {2 Human readable notation} *)
 

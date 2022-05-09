@@ -194,7 +194,7 @@ let originated_contracts
     if Compare.Int32.(origination_index < first) then acc
     else
       let origination_nonce = {origination_nonce with origination_index} in
-      let acc = originated_contract origination_nonce :: acc in
+      let acc = Contract_hash.of_nonce origination_nonce :: acc in
       contracts acc (Int32.pred origination_index)
   in
   contracts [] (Int32.pred last)

@@ -941,6 +941,9 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
       >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
       Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
       >>=? fun originated_contracts ->
+      let originated_contracts =
+        List.map (fun c -> Contract.Originated c) originated_contracts
+      in
       Lwt.return
         ( Script_cache.update
             ctxt
