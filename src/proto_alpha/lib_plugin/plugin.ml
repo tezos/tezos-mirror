@@ -1741,7 +1741,7 @@ module RPC = struct
       let run_tzip4_view_encoding =
         let open Data_encoding in
         obj10
-          (req "contract" Contract.encoding)
+          (req "contract" Contract.originated_encoding)
           (req "entrypoint" Entrypoint.simple_encoding)
           (req "input" Script.expr_encoding)
           (req "chain_id" Chain_id.encoding)
@@ -2657,6 +2657,7 @@ module RPC = struct
             now,
             level )
         ->
+          let contract = Contract.Originated contract in
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
             ~some:ok

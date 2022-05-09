@@ -969,7 +969,7 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
   Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
-    ~contract:(Contract.Originated contract)
+    ~contract
     ~input
     ~chain_id
     ?source

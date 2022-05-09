@@ -46,7 +46,7 @@ type simulation_params = {
 (* Parameters specific to simulations of TZIP4 views *)
 type run_view_params = {
   shared_params : simulation_params;
-  contract : Contract.t;
+  contract : Contract_hash.t;
   entrypoint : Entrypoint.t;
 }
 
