@@ -126,7 +126,7 @@ val big_map_get :
 val contract_big_map_get_opt :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.expr * Script.expr ->
   Script.expr option shell_tzresult Lwt.t
 

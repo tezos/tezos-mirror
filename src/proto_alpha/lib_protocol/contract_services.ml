@@ -466,32 +466,39 @@ let[@coq_axiom_with_reason "gadt"] register () =
     ~chunked:true
     S.contract_big_map_get_opt
     (fun ctxt contract () (key, key_type) ->
-      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-      let key_type_node = Micheline.root key_type in
-      Script_ir_translator.parse_comparable_ty ctxt key_type_node
-      >>?= fun (Ex_comparable_ty key_type, ctxt) ->
-      Script_ir_translator.parse_comparable_data
-        ctxt
-        key_type
-        (Micheline.root key)
-      >>=? fun (key, ctxt) ->
-      Script_ir_translator.hash_comparable_data ctxt key_type key
-      >>=? fun (key, ctxt) ->
-      match script with
-      | None -> return_none
-      | Some script -> (
-          let ctxt = Gas.set_unlimited ctxt in
-          let open Script_ir_translator in
-          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script (Script script), ctxt) ->
-          Script_ir_translator.collect_lazy_storage
+      match (contract : Contract.t) with
+      | Implicit _ -> return_none
+      | Originated _ -> (
+          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+          let key_type_node = Micheline.root key_type in
+          Script_ir_translator.parse_comparable_ty ctxt key_type_node
+          >>?= fun (Ex_comparable_ty key_type, ctxt) ->
+          Script_ir_translator.parse_comparable_data
             ctxt
-            script.storage_type
-            script.storage
-          >>?= fun (ids, _ctxt) ->
-          match Script_ir_translator.list_of_big_map_ids ids with
-          | [] | _ :: _ :: _ -> return_some None
-          | [id] -> do_big_map_get ctxt id key >|=? Option.some)) ;
+            key_type
+            (Micheline.root key)
+          >>=? fun (key, ctxt) ->
+          Script_ir_translator.hash_comparable_data ctxt key_type key
+          >>=? fun (key, ctxt) ->
+          match script with
+          | None -> return_none
+          | Some script -> (
+              let ctxt = Gas.set_unlimited ctxt in
+              let open Script_ir_translator in
+              parse_script
+                ctxt
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                script
+              >>=? fun (Ex_script (Script script), ctxt) ->
+              Script_ir_translator.collect_lazy_storage
+                ctxt
+                script.storage_type
+                script.storage
+              >>?= fun (ids, _ctxt) ->
+              match Script_ir_translator.list_of_big_map_ids ids with
+              | [] | _ :: _ :: _ -> return_some None
+              | [id] -> do_big_map_get ctxt id key >|=? Option.some))) ;
   opt_register2 ~chunked:true S.big_map_get (fun ctxt id key () () ->
       do_big_map_get ctxt id key) ;
   register1 ~chunked:true S.big_map_get_all (fun ctxt id {offset; length} () ->
@@ -585,6 +592,7 @@ let big_map_get ctxt block id key =
   RPC_context.make_call2 S.big_map_get ctxt block id key () ()
 
 let contract_big_map_get_opt ctxt block contract key =
+  let contract = Contract.Originated contract in
   RPC_context.make_call1 S.contract_big_map_get_opt ctxt block contract () key
 
 let single_sapling_get_diff ctxt block id ?offset_commitment ?offset_nullifier
