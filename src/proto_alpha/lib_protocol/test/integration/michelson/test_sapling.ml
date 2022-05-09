@@ -604,7 +604,12 @@ module Interpreter_tests = struct
   let test_shielded_tez () =
     init () >>=? fun (genesis, baker, src0, src1) ->
     let memo_size = 8 in
-    originate_contract "contracts/sapling_contract.tz" "{ }" src0 genesis baker
+    originate_contract_hash
+      "contracts/sapling_contract.tz"
+      "{ }"
+      src0
+      genesis
+      baker
     >>=? fun (dst, b1, anti_replay) ->
     let wa = wallet_gen () in
     let list_transac, total =
@@ -720,6 +725,7 @@ module Interpreter_tests = struct
     (* Here we fail by doing the same transaction again*)
     Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.of_int 10 in
+    let dst = Alpha_context.Contract.Originated dst in
     Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
@@ -768,10 +774,15 @@ module Interpreter_tests = struct
     (* Originating a contract to get a sapling_state with ID 0, used in the next contract *)
     >>=?
     fun (block, baker, src, _) ->
-    originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
+    originate_contract_hash
+      "contracts/sapling_contract.tz"
+      "{ }"
+      src
+      block
+      baker
     >>=? fun _ ->
     (* Originating the next contract should fail *)
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_push_sapling_state.tz"
       "{ }"
       src
@@ -796,7 +807,7 @@ module Interpreter_tests = struct
     (* originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
        >>=? fun (_shielded_pool_contract_address, block, _anti_replay_shielded_pool)
                 -> *)
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_use_existing_state.tz"
       "{ }"
       src
@@ -850,7 +861,7 @@ module Interpreter_tests = struct
   let test_transac_and_block () =
     init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
-    originate_contract "contracts/sapling_contract.tz" "{ }" src b baker
+    originate_contract_hash "contracts/sapling_contract.tz" "{ }" src b baker
     >>=? fun (dst, block_start, anti_replay) ->
     let {sk; vk} = wallet_gen () in
     let hex_transac_1 = hex_shield ~memo_size {sk; vk} anti_replay in
@@ -892,7 +903,7 @@ module Interpreter_tests = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_1
-      dst
+      (Contract.Originated dst)
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()
@@ -903,7 +914,7 @@ module Interpreter_tests = struct
       ~fee
       (B block_start)
       src
-      dst
+      (Contract.Originated dst)
       amount_tez
       ~parameters:parameters_1
     >>=? fun operation ->
@@ -918,7 +929,7 @@ module Interpreter_tests = struct
       ~fee
       (B block_start)
       src
-      dst
+      (Contract.Originated dst)
       Tez.zero
       ~parameters:parameters_2
     >>=? fun operation ->
@@ -927,7 +938,7 @@ module Interpreter_tests = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_2
-      dst
+      (Contract.Originated dst)
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()
@@ -937,6 +948,7 @@ module Interpreter_tests = struct
     let is_root_in block dst root =
       Incremental.begin_construction block >>=? fun incr ->
       let ctx_2 = Incremental.alpha_ctxt incr in
+      let dst = Contract.Originated dst in
       Alpha_services.Contract.script Block.rpc_ctxt block dst >>=? fun script ->
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
       Script_ir_translator.parse_script
@@ -981,13 +993,19 @@ module Interpreter_tests = struct
      is drop). *)
   let test_drop () =
     init () >>=? fun (b, baker, src, _) ->
-    originate_contract "contracts/sapling_contract_drop.tz" "Unit" src b baker
+    originate_contract_hash
+      "contracts/sapling_contract_drop.tz"
+      "Unit"
+      src
+      b
+      baker
     >>=? fun (dst, b, anti_replay) ->
     let {sk; vk} = wallet_gen () in
     let list_transac, _total =
       shield ~memo_size:8 sk 4 vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
+    let dst = Contract.Originated dst in
     Op.transaction ~fee:(Test_tez.of_int 10) (B b) src dst Tez.zero ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit
@@ -1001,7 +1019,7 @@ module Interpreter_tests = struct
   let test_double () =
     init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_contract_double.tz"
       "(Pair { } { })"
       src
@@ -1027,6 +1045,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
     let fee = Test_tez.of_int 10 in
+    let dst = Contract.Originated dst in
     Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_1
     >>=? fun operation ->
     next_block b operation >>=? fun b ->
@@ -1077,14 +1096,19 @@ module Interpreter_tests = struct
 
   let test_state_as_arg () =
     init () >>=? fun (b, baker, src, _) ->
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_contract_state_as_arg.tz"
       "None"
       src
       b
       baker
     >>=? fun (dst, b, anti_replay) ->
-    originate_contract "contracts/sapling_contract_send.tz" "Unit" src b baker
+    originate_contract_hash
+      "contracts/sapling_contract_send.tz"
+      "Unit"
+      src
+      b
+      baker
     >>=? fun (dst_2, b, anti_replay_2) ->
     let w = wallet_gen () in
     let hex_transac_1 = hex_shield ~memo_size:8 w anti_replay in
@@ -1093,6 +1117,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     let fee = Test_tez.of_int 10 in
+    let dst = Contract.Originated dst in
     Op.transaction ~fee (B b) src dst Tez.zero ~parameters >>=? fun operation ->
     next_block b operation >>=? fun b ->
     let contract = "0x" ^ to_hex dst Alpha_context.Contract.encoding in
@@ -1101,6 +1126,7 @@ module Interpreter_tests = struct
     let parameters =
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
+    let dst_2 = Contract.Originated dst_2 in
     Op.transaction ~fee (B b) src dst_2 Tez.zero ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit

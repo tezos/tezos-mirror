@@ -350,15 +350,10 @@ module Interpreter_helpers = struct
 
   (** Returns a block in which the contract is originated.
       Also returns the associated anti-replay string and KT1 address. *)
-  let originate_contract file storage src b baker =
-    originate_contract file storage src b baker >|=? fun (dst, b) ->
+  let originate_contract_hash file storage src b baker =
+    originate_contract_hash file storage src b baker >|=? fun (dst, b) ->
     let anti_replay =
-      Format.asprintf
-        "%a%a"
-        Alpha_context.Contract.pp
-        dst
-        Chain_id.pp
-        Chain_id.zero
+      Format.asprintf "%a%a" Contract_hash.pp dst Chain_id.pp Chain_id.zero
     in
     (dst, b, anti_replay)
 
@@ -399,7 +394,13 @@ module Interpreter_helpers = struct
       Test_tez.(Alpha_context.Tez.one_mutez *! Int64.of_int amount)
     in
     let fee = Test_tez.of_int 10 in
-    Op.transaction ~fee (B block) src dst amount_tez ~parameters
+    Op.transaction
+      ~fee
+      (B block)
+      src
+      (Alpha_context.Contract.Originated dst)
+      amount_tez
+      ~parameters
     >>=? fun operation ->
     Incremental.begin_construction ~policy:Block.(By_account baker) block
     >>=? fun incr ->
@@ -408,7 +409,7 @@ module Interpreter_helpers = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block
-      dst
+      (Alpha_context.Contract.Originated dst)
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()
