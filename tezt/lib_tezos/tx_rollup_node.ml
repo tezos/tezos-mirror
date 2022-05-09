@@ -71,7 +71,7 @@ let spawn_command node =
 let add_option flag str_opt command =
   command @ match str_opt with None -> [] | Some o -> [flag; o]
 
-let spawn_config_init node rollup_id rollup_genesis =
+let spawn_config_init node =
   spawn_command
     node
     ([
@@ -81,9 +81,9 @@ let spawn_config_init node rollup_id rollup_genesis =
        "--data-dir";
        data_dir node;
        "--rollup-id";
-       rollup_id;
+       node.persistent_state.rollup_id;
        "--rollup-genesis";
-       rollup_genesis;
+       node.persistent_state.rollup_genesis;
        "--rpc-addr";
        rpc_addr node;
      ]
@@ -100,8 +100,8 @@ let spawn_config_init node rollup_id rollup_genesis =
          node.persistent_state.dispatch_withdrawals_signer
     |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
 
-let config_init node rollup_id rollup_genesis =
-  let process = spawn_config_init node rollup_id rollup_genesis in
+let config_init node =
+  let process = spawn_config_init node in
   let* output = Process.check_and_read_stdout process in
   match output =~* rex "Configuration written in ([^\n]*)" with
   | None -> failwith "Configuration initialization failed"
@@ -277,6 +277,53 @@ let run node =
       "--data-dir";
       node.persistent_state.data_dir;
     ]
+
+let change_signers ?operator ?batch_signer ?finalize_commitment_signer
+    ?remove_commitment_signer ?dispatch_withdrawals_signer ?rejection_signer
+    (tx_node : t) =
+  let operator =
+    Option.value operator ~default:tx_node.persistent_state.operator
+  in
+  let batch_signer =
+    Option.value batch_signer ~default:tx_node.persistent_state.batch_signer
+  in
+  let finalize_commitment_signer =
+    Option.value
+      finalize_commitment_signer
+      ~default:tx_node.persistent_state.finalize_commitment_signer
+  in
+  let remove_commitment_signer =
+    Option.value
+      remove_commitment_signer
+      ~default:tx_node.persistent_state.remove_commitment_signer
+  in
+  let dispatch_withdrawals_signer =
+    Option.value
+      dispatch_withdrawals_signer
+      ~default:tx_node.persistent_state.dispatch_withdrawals_signer
+  in
+  let rejection_signer =
+    Option.value
+      rejection_signer
+      ~default:tx_node.persistent_state.rejection_signer
+  in
+  let tmp_tx_node =
+    {
+      tx_node with
+      persistent_state =
+        {
+          tx_node.persistent_state with
+          operator;
+          batch_signer;
+          finalize_commitment_signer;
+          remove_commitment_signer;
+          dispatch_withdrawals_signer;
+          rejection_signer;
+        };
+    }
+  in
+  let* _ = config_init tmp_tx_node in
+  unit
 
 module Inbox = struct
   type l2_context_hash = {irmin_hash : string; tree_hash : string}

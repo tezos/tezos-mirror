@@ -134,7 +134,7 @@ val get_block_and_metadata :
     reorganized. *)
 val set_head : t -> L2block.t -> L2block.t reorg tzresult Lwt.t
 
-(** Set the Tezos head. Returns the reorganization of L1 blocks (if any). *)
+(** Set the Tezos head and returns the reorganization of L1 blocks. *)
 val set_tezos_head :
   t -> Block_hash.t -> Alpha_block_services.block_info reorg tzresult Lwt.t
 

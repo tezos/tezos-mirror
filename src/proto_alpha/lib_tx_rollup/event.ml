@@ -96,6 +96,14 @@ let connection_lost =
     ~level:Warning
     ()
 
+let catch_up_commitments =
+  declare_0
+    ~section
+    ~name:"tx_rollup_node_catch_up_commitments"
+    ~msg:"Catching up on commitments"
+    ~level:Notice
+    ()
+
 let new_block =
   declare_1
     ~section
