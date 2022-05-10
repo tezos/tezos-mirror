@@ -76,7 +76,7 @@ let preformat root =
     | Prim (loc, name, items, annots) ->
         let cml, csz = preformat_loc loc in
         let asz = preformat_annots annots in
-        let items = List.map preformat_expr items in
+        let items = List.rev @@ List.rev_map preformat_expr items in
         let ml, sz =
           List.fold_left
             (fun (tml, tsz) e ->
@@ -88,7 +88,7 @@ let preformat root =
         Prim ((ml, sz, loc), name, items, annots)
     | Seq (loc, items) ->
         let cml, csz = preformat_loc loc in
-        let items = List.map preformat_expr items in
+        let items = List.rev @@ List.rev_map preformat_expr items in
         let ml, sz =
           List.fold_left
             (fun (tml, tsz) e ->
