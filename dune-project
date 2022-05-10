@@ -1,4 +1,4 @@
-(lang dune 2.9)
+(lang dune 3.0)
 (formatting (enabled_for ocaml))
 (cram enable)
 (package (name internal-devtools))

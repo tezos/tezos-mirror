@@ -2075,7 +2075,7 @@ let generate_opam_files_for_release packages_dir release =
 
 (* Bumping the dune lang version can result in different dune stanza
    semantic and could require changes to the generation logic. *)
-let dune_lang_version = "2.9"
+let dune_lang_version = "3.0"
 
 let generate_dune_project_files () =
   let t = Hashtbl.create 17 in
