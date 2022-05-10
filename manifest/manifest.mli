@@ -624,6 +624,7 @@ type 'a maker =
   ?wrapped:bool ->
   ?cram:bool ->
   ?license:string ->
+  ?extra_authors:string list ->
   path:string ->
   'a ->
   target
