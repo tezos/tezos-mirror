@@ -170,7 +170,7 @@ module Encodings = struct
   let block =
     let open Data_encoding in
     merge_objs
-      L2block.encoding
+      Fancy_l2block.encoding
       (obj1 (req "metadata" L2block.metadata_encoding))
 end
 
@@ -237,9 +237,17 @@ module Block = struct
     let*! block = block_of_id state block_id in
     match block with
     | None -> return_none
-    | Some block ->
-        let*! metadata = State.get_block_metadata state block.header in
-        return_some (block, metadata)
+    | Some block -> (
+        let hash = block.hash in
+        let*! ctxt_hash_opt = context_of_l2_block state hash in
+        match ctxt_hash_opt with
+        | Some ctxt_hash ->
+            let*! ctxt = Context.checkout_exn state.context_index ctxt_hash in
+            let*! fancy_block = Fancy_l2block.of_l2block ctxt block in
+            let*! metadata = State.get_block_metadata state block.header in
+            return_some (fancy_block, metadata)
+        | None ->
+            failwith "The block %a can not be retrieved" L2block.Hash.pp hash)
 
   let () =
     register0 header @@ fun (state, block_id) () () ->

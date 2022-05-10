@@ -58,6 +58,9 @@ type message = {
     hashed messages. *)
 type t = message list
 
+(** Encoding for l2 context hashes *)
+val l2_context_hash_encoding : l2_context_hash Data_encoding.t
+
 (** Encoding for inbox messages *)
 val message_encoding : message Data_encoding.t
 

@@ -53,12 +53,14 @@ type header = {
   commitment : Tx_rollup_commitment_hash.t;
 }
 
-type t = {
+type 'inbox block = {
   hash : hash;
   header : header;
-  inbox : Inbox.t;
+  inbox : 'inbox;
   commitment : Tx_rollup_commitment.Full.t;
 }
+
+type t = Inbox.t block
 
 type commitment_included_info = {
   block : Block_hash.t;
@@ -88,7 +90,7 @@ let header_encoding =
        (req "context" Tx_rollup_l2_context_hash.encoding)
        (req "commitment" Tx_rollup_commitment_hash.encoding))
 
-let encoding =
+let block_encoding inbox_encoding : 'inbox block Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {hash; header; inbox; commitment} -> (hash, header, inbox, commitment))
@@ -96,8 +98,10 @@ let encoding =
     (obj4
        (req "hash" Hash.encoding)
        (req "header" header_encoding)
-       (req "inbox" Inbox.encoding)
+       (req "inbox" inbox_encoding)
        (req "commitment" Tx_rollup_commitment.Full.encoding))
+
+let encoding : t Data_encoding.t = block_encoding Inbox.encoding
 
 let commitment_included_info_encoding =
   let open Data_encoding in

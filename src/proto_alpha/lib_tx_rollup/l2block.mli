@@ -53,12 +53,14 @@ type header = {
 (** L2 blocks are composed of a header and an inbox. The inbox contains the
     actual messages. The hash in the block structure corresponds the hash of the
     header. *)
-type t = {
+type 'inbox block = {
   hash : hash;
   header : header;
-  inbox : Inbox.t;
+  inbox : 'inbox;
   commitment : Tx_rollup_commitment.Full.t;
 }
+
+type t = Inbox.t block
 
 type commitment_included_info = {
   block : Block_hash.t;
@@ -80,6 +82,8 @@ val level_encoding : level Data_encoding.t
 val level_to_string : level -> string
 
 val header_encoding : header Data_encoding.t
+
+val block_encoding : 'inbox Data_encoding.t -> 'inbox block Data_encoding.t
 
 val encoding : t Data_encoding.t
 
