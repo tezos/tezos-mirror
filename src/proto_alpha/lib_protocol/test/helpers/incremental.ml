@@ -157,7 +157,7 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let add_operation ?expect_apply_failure ?expect_failure ?(check_size = false) st
+let add_operation ?expect_apply_failure ?expect_failure ?(check_size = true) st
     op =
   let open Apply_results in
   (if check_size then

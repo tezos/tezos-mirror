@@ -3492,7 +3492,7 @@ module Rejection = struct
     let ops = List.repeat message_count op1 in
     Op.combine_operations ~source:account (I i) ([op1; op2] @ ops)
     >>=? fun op ->
-    Incremental.add_operation i op >>=? fun i ->
+    Incremental.add_operation ~check_size:false i op >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     (* Prepare a commitment for the tx_level 0, only the very first message
        result hash will be a real value (in order to start the proof verification
@@ -3559,7 +3559,7 @@ module Rejection = struct
     Incremental.begin_construction b >>=? fun i ->
     (* Finally, we reject the commitment and check that the size fits in
        a Tezos operation. *)
-    Incremental.add_operation ~check_size:true i op >>=? fun _i -> return_unit
+    Incremental.add_operation i op >>=? fun _i -> return_unit
 
   let tests =
     [
