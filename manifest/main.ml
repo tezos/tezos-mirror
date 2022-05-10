@@ -176,7 +176,7 @@ let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 
 let ocaml_migrate_parsetree = external_lib "ocaml-migrate-parsetree" V.True
 
-let ocamlformat = opam_only "ocamlformat" V.(exactly "0.18.0")
+let ocamlformat = opam_only "ocamlformat" V.(exactly "0.21.0")
 
 let ocamlgraph = external_lib "ocamlgraph" V.True
 

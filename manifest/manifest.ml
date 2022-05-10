@@ -1881,7 +1881,9 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let depends =
     {
       Opam.package = "dune";
-      version = Version.at_least "2.9";
+      (* We artificially constrain the version of dune to split the tooling
+         upgrade. This is temporary. *)
+      version = Version.(and_list [ at_least "2.9"; less_than "3.0"]);
       with_test = false;
       optional = false;
     }
