@@ -623,6 +623,7 @@ type 'a maker =
   ?warn_error:string ->
   ?wrapped:bool ->
   ?cram:bool ->
+  ?license:string ->
   path:string ->
   'a ->
   target

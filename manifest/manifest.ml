@@ -865,6 +865,7 @@ module Target = struct
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
+    license : string option;
   }
 
   and preprocessor = PPS of t * string list
@@ -1015,6 +1016,7 @@ module Target = struct
     ?warn_error:string ->
     ?wrapped:bool ->
     ?cram:bool ->
+    ?license:string ->
     path:string ->
     'a ->
     t option
@@ -1061,7 +1063,8 @@ module Target = struct
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
       ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
-      ?warnings ?warn_error ?(wrapped = true) ?(cram = false) ~path names =
+      ?warnings ?warn_error ?(wrapped = true) ?(cram = false) ?license ~path
+      names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1272,6 +1275,7 @@ module Target = struct
         warn_error;
         wrapped;
         cram;
+        license;
       }
 
   let public_lib ?internal_name =
@@ -1932,13 +1936,20 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       runtest;
     ]
   in
+  let license =
+    match
+      List.filter_map (fun internal -> internal.Target.license) internals
+    with
+    | license :: _ -> license
+    | [] -> "MIT"
+  in
   {
     maintainer = "contact@tezos.com";
     authors = ["Tezos devteam"];
     homepage = "https://www.tezos.com/";
     bug_reports = "https://gitlab.com/tezos/tezos/issues";
     dev_repo = "git+https://gitlab.com/tezos/tezos.git";
-    license = "MIT";
+    license;
     depends;
     conflicts;
     build;
