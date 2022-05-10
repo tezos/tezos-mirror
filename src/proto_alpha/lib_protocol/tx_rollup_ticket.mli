@@ -48,7 +48,7 @@ val parse_ticket_and_operation :
   contents:Script.lazy_expr ->
   ty:Script.lazy_expr ->
   source:Contract.t ->
-  destination:Destination.t ->
+  destination:Contract.t ->
   entrypoint:Entrypoint.t ->
   amount:Z.t ->
   context ->

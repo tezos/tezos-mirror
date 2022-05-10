@@ -292,13 +292,12 @@ let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
         {
           source = src;
           operation =
-            Transaction
+            Transaction_to_contract
               {
                 amount = Tez.zero;
-                unparsed_parameters =
-                  Script.lazy_expr @@ Micheline.strip_locations params_node;
+                unparsed_parameters = Micheline.strip_locations params_node;
                 entrypoint = Entrypoint.default;
-                destination = Destination.Contract destination;
+                destination;
                 location = Micheline.dummy_location;
                 parameters_ty;
                 parameters;
@@ -325,14 +324,10 @@ let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
         {
           source = src;
           operation =
-            Transaction
+            Transaction_to_tx_rollup
               {
-                amount = Tez.zero;
-                unparsed_parameters =
-                  Script.lazy_expr @@ Micheline.strip_locations params_node;
-                entrypoint = Tx_rollup.deposit_entrypoint;
-                destination = Destination.Tx_rollup tx_rollup;
-                location = Micheline.dummy_location;
+                unparsed_parameters = Micheline.strip_locations params_node;
+                destination = tx_rollup;
                 parameters_ty;
                 parameters;
               };

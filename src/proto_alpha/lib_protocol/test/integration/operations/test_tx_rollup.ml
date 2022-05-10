@@ -56,6 +56,16 @@ let check_proto_error_f f t =
     equals [e]. *)
 let check_proto_error e t = check_proto_error_f (( = ) e) t
 
+(** [check_runtime_error e t] checks that the first error of [t] is the
+    Michelson runtime error and the second one equals [e]. *)
+let check_runtime_error e = function
+  | Environment.Ecoproto_error (Script_interpreter.Runtime_contract_error _)
+    :: Environment.Ecoproto_error second :: _
+    when second = e ->
+      Assert.test_error_encodings e ;
+      return_unit
+  | t -> failwith "Expected runtime error, got: %a" Error_monad.pp_print_trace t
+
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
@@ -1398,7 +1408,8 @@ let test_valid_deposit_invalid_amount () =
     i
     op
     ~expect_failure:
-      (check_proto_error Apply.Tx_rollup_invalid_transaction_amount)
+      (check_runtime_error
+         Script_interpreter_defs.Tx_rollup_invalid_transaction_amount)
   >>=? fun _ -> return_unit
 
 (** [test_deposit_too_many_tickets] checks that a deposit of
@@ -1420,7 +1431,7 @@ let test_deposit_too_many_tickets () =
     i
     operation
     ~expect_failure:
-      (check_proto_error Apply.Tx_rollup_invalid_transaction_amount)
+      (check_proto_error Apply.Tx_rollup_invalid_transaction_ticket_amount)
   >>=? fun i ->
   ignore i ;
   return_unit

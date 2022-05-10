@@ -95,7 +95,7 @@ type error +=
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
-  | Tx_rollup_invalid_transaction_amount
+  | Tx_rollup_invalid_transaction_ticket_amount
   | Tx_rollup_non_internal_transaction
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
@@ -502,19 +502,17 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"operation.tx_rollup_invalid_transaction_amount"
-    ~title:"Transaction amount to a transaction rollup must be zero"
+    ~id:"operation.tx_rollup_invalid_transaction_ticket_amount"
+    ~title:"Amount of transferred ticket is too high"
     ~description:
-      "Because transaction rollups are outside of the delegation mechanism of \
-       Tezos, they cannot own Tez, and therefore transactions targeting a \
-       transaction rollup must have its amount field set to zero."
+      "The ticket amount of a rollup transaction must fit in a signed 64-bit \
+       integer."
     ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Transaction amount to a transaction rollup must be zero.")
+      Format.fprintf ppf "Amount of transferred ticket is too high.")
     Data_encoding.unit
-    (function Tx_rollup_invalid_transaction_amount -> Some () | _ -> None)
-    (fun () -> Tx_rollup_invalid_transaction_amount) ;
+    (function
+      | Tx_rollup_invalid_transaction_ticket_amount -> Some () | _ -> None)
+    (fun () -> Tx_rollup_invalid_transaction_ticket_amount) ;
 
   register_error_kind
     `Permanent
@@ -1010,69 +1008,64 @@ let ex_ticket_size :
   (* gas *)
   return (ctxt, ty_size + val_size)
 
-let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
-    ~entrypoint ~payer ~dst_rollup ~since =
+let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
+    ~dst_rollup ~since =
   assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-  fail_unless Tez.(amount = zero) Tx_rollup_invalid_transaction_amount
+  (* If the ticket deposit fails on L2 for some reason
+     (e.g. [Balance_overflow] in the recipient), then it is
+     returned to [payer]. As [payer] is implicit, it cannot own
+     tickets directly. Therefore, erroneous deposits are
+     returned using the L2 withdrawal mechanism: a failing
+     deposit emits a withdrawal that can be executed by
+     [payer]. *)
+  Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
+  >>?= fun {ex_ticket; l2_destination} ->
+  ex_ticket_size ctxt ex_ticket >>=? fun (ctxt, ticket_size) ->
+  let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
+  fail_when
+    Compare.Int.(ticket_size > limit)
+    (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
+       {payload_size = ticket_size; limit})
   >>=? fun () ->
-  if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
-    (* If the ticket deposit fails on L2 for some reason
-       (e.g. [Balance_overflow] in the recipient), then it is
-       returned to [payer]. As [payer] is implicit, it cannot own
-       tickets directly. Therefore, erroneous deposits are
-       returned using the L2 withdrawal mechanism: a failing
-       deposit emits a withdrawal that can be executed by
-       [payer]. *)
-    Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
-    >>?= fun {ex_ticket; l2_destination} ->
-    ex_ticket_size ctxt ex_ticket >>=? fun (ctxt, ticket_size) ->
-    let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
-    fail_when
-      Compare.Int.(ticket_size > limit)
-      (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
-         {payload_size = ticket_size; limit})
-    >>=? fun () ->
-    let (ex_token, ticket_amount) =
-      Ticket_token.token_and_amount_of_ex_ticket ex_ticket
-    in
-    Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
-    >>=? fun (ticket_hash, ctxt) ->
-    Option.value_e
-      ~error:(Error_monad.trace_of_error Tx_rollup_invalid_transaction_amount)
-      (Option.bind
-         (Script_int.to_int64 ticket_amount)
-         Tx_rollup_l2_qty.of_int64)
-    >>?= fun ticket_amount ->
-    error_when
-      Tx_rollup_l2_qty.(ticket_amount <= zero)
-      Forbidden_zero_ticket_quantity
-    >>?= fun () ->
-    let (deposit, message_size) =
-      Tx_rollup_message.make_deposit
-        payer
-        l2_destination
-        ticket_hash
-        ticket_amount
-    in
-    Tx_rollup_state.get ctxt dst_rollup >>=? fun (ctxt, state) ->
-    Tx_rollup_state.burn_cost ~limit:None state message_size >>?= fun cost ->
-    Token.transfer ctxt (`Contract (Contract.Implicit payer)) `Burned cost
-    >>=? fun (ctxt, balance_updates) ->
-    Tx_rollup_inbox.append_message ctxt dst_rollup state deposit
-    >>=? fun (ctxt, state, paid_storage_size_diff) ->
-    Tx_rollup_state.update ctxt dst_rollup state >>=? fun ctxt ->
-    let result =
-      Transaction_result
-        (Transaction_to_tx_rollup_result
-           {
-             balance_updates;
-             consumed_gas = Gas.consumed ~since ~until:ctxt;
-             ticket_hash;
-             paid_storage_size_diff;
-           })
-    in
-    return (ctxt, result, [])
-  else fail (Script_tc_errors.No_such_entrypoint entrypoint)
+  let (ex_token, ticket_amount) =
+    Ticket_token.token_and_amount_of_ex_ticket ex_ticket
+  in
+  Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
+  >>=? fun (ticket_hash, ctxt) ->
+  Option.value_e
+    ~error:
+      (Error_monad.trace_of_error Tx_rollup_invalid_transaction_ticket_amount)
+    (Option.bind (Script_int.to_int64 ticket_amount) Tx_rollup_l2_qty.of_int64)
+  >>?= fun ticket_amount ->
+  error_when
+    Tx_rollup_l2_qty.(ticket_amount <= zero)
+    Forbidden_zero_ticket_quantity
+  >>?= fun () ->
+  let (deposit, message_size) =
+    Tx_rollup_message.make_deposit
+      payer
+      l2_destination
+      ticket_hash
+      ticket_amount
+  in
+  Tx_rollup_state.get ctxt dst_rollup >>=? fun (ctxt, state) ->
+  Tx_rollup_state.burn_cost ~limit:None state message_size >>?= fun cost ->
+  Token.transfer ctxt (`Contract (Contract.Implicit payer)) `Burned cost
+  >>=? fun (ctxt, balance_updates) ->
+  Tx_rollup_inbox.append_message ctxt dst_rollup state deposit
+  >>=? fun (ctxt, state, paid_storage_size_diff) ->
+  Tx_rollup_state.update ctxt dst_rollup state >>=? fun ctxt ->
+  let result =
+    Transaction_result
+      (Transaction_to_tx_rollup_result
+         {
+           balance_updates;
+           consumed_gas = Gas.consumed ~since ~until:ctxt;
+           ticket_hash;
+           paid_storage_size_diff;
+         })
+  in
+  return (ctxt, result, [])
 
 let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
     ~delegate ~source ~credit ~before_operation =
@@ -1179,11 +1172,11 @@ let apply_internal_manager_operation_content :
     ~gas_consumed_in_precheck
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
-  | Transaction
+  | Transaction_to_contract
       {
+        destination;
         amount;
         unparsed_parameters = _;
-        destination = Contract contract;
         entrypoint;
         location;
         parameters_ty;
@@ -1193,7 +1186,7 @@ let apply_internal_manager_operation_content :
         ~ctxt
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
         ~source
-        ~contract
+        ~contract:destination
         ~amount
         ~entrypoint
         ~before_operation
@@ -1205,24 +1198,14 @@ let apply_internal_manager_operation_content :
       ( ctxt,
         (manager_result : kind successful_manager_operation_result),
         operations )
-  | Transaction
-      {
-        amount;
-        destination = Tx_rollup dst;
-        entrypoint;
-        unparsed_parameters = _;
-        location = _;
-        parameters_ty;
-        parameters;
-      } ->
+  | Transaction_to_tx_rollup
+      {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       apply_transaction_to_tx_rollup
         ~ctxt
         ~parameters_ty
         ~parameters
-        ~amount
-        ~entrypoint
         ~payer
-        ~dst_rollup:dst
+        ~dst_rollup:destination
         ~since:before_operation
   | Origination
       {
@@ -1406,7 +1389,7 @@ let apply_external_manager_operation_content :
         ~contents
         ~ty
         ~source:source_contract
-        ~destination:(Contract destination)
+        ~destination
         ~entrypoint
         ~amount
         ctxt
@@ -1786,8 +1769,8 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
     | [] -> Lwt.return (Success ctxt, List.rev applied)
     | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
       :: rest -> (
-        let op_res = Apply_results.contents_of_internal_operation op in
         (if internal_nonce_already_recorded ctxt nonce then
+         let op_res = Apply_results.contents_of_internal_operation op in
          fail (Internal_operation_replay (Internal_contents op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in

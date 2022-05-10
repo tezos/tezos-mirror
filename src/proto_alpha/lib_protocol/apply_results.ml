@@ -87,9 +87,24 @@ let contents_of_internal_operation (type kind)
     kind internal_contents =
   let operation : kind internal_manager_operation =
     match operation with
-    | Transaction {destination; amount; entrypoint; unparsed_parameters; _} ->
+    | Transaction_to_contract
+        {destination; amount; entrypoint; unparsed_parameters; _} ->
         Transaction
-          {destination; amount; entrypoint; parameters = unparsed_parameters}
+          {
+            destination = Contract destination;
+            amount;
+            entrypoint;
+            parameters = Script.lazy_expr unparsed_parameters;
+          }
+    | Transaction_to_tx_rollup {destination; unparsed_parameters; _} ->
+        Transaction
+          {
+            destination = Tx_rollup destination;
+            (* Dummy amount used for the external untyped view of internal transactions *)
+            amount = Tez.zero;
+            entrypoint = Tx_rollup.deposit_entrypoint;
+            parameters = Script.lazy_expr unparsed_parameters;
+          }
     | Origination {origination; _} -> Origination origination
     | Delegation delegate -> Delegation delegate
   in
