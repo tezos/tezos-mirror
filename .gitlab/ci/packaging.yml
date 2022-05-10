@@ -1,0 +1,17 @@
+opam:prepare:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_prebuild_dependencies_template
+    - .rules_template__trigger_opam_pipeline
+  stage: packaging
+  script:
+      # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - git init _opam-repo-for-release
+    - git archive --format=tar.gz HEAD -o _opam-repo-for-release/archive.tar.gz
+    - ./scripts/opam-prepare-repo.sh dev ./_opam-repo-for-release/archive.tar.gz ./_opam-repo-for-release
+    - (cd _opam-repo-for-release && git add packages && git commit -m "tezos packages")
+  needs: []
+  artifacts:
+    paths:
+      - _opam-repo-for-release/
