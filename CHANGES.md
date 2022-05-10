@@ -32,3 +32,9 @@ v0.6/v0.6.1:
 * Allow to specify agent-string
 * More tests and better documentation
 * More logging with better level settings
+
+v0.7:
+
+* Remove Ezresto (and other Ez libraries)
+* Packaging, build, tests and CI improvements
+* Add the `middleware` feature (contributed by Swann Moreau)
