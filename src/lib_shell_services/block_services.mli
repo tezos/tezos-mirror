@@ -214,6 +214,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   val info :
     #simple ->
     ?force_metadata:bool ->
+    ?metadata:[`Always | `Never] ->
     ?chain:chain ->
     ?block:block ->
     unit ->
@@ -273,6 +274,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val operations :
       #simple ->
       ?force_metadata:bool ->
+      ?metadata:[`Always | `Never] ->
       ?chain:chain ->
       ?block:block ->
       unit ->
@@ -281,6 +283,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val operations_in_pass :
       #simple ->
       ?force_metadata:bool ->
+      ?metadata:[`Always | `Never] ->
       ?chain:chain ->
       ?block:block ->
       int ->
@@ -289,6 +292,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val operation :
       #simple ->
       ?force_metadata:bool ->
+      ?metadata:[`Always | `Never] ->
       ?chain:chain ->
       ?block:block ->
       int ->
@@ -503,7 +507,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ( [`GET],
         prefix,
         prefix,
-        < force_metadata : bool >,
+        < force_metadata : bool ; metadata : [`Always | `Never] option >,
         unit,
         block_info )
       RPC_service.t
@@ -550,7 +554,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           prefix,
           prefix,
-          < force_metadata : bool >,
+          < force_metadata : bool ; metadata : [`Always | `Never] option >,
           unit,
           operation list list )
         RPC_service.t
@@ -559,7 +563,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           prefix,
           prefix * int,
-          < force_metadata : bool >,
+          < force_metadata : bool ; metadata : [`Always | `Never] option >,
           unit,
           operation list )
         RPC_service.t
@@ -568,7 +572,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           prefix,
           (prefix * int) * int,
-          < force_metadata : bool >,
+          < force_metadata : bool ; metadata : [`Always | `Never] option >,
           unit,
           operation )
         RPC_service.t

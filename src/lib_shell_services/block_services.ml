@@ -28,6 +28,22 @@ open Data_encoding
 
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
+let metadata_rpc_arg =
+  let construct = function `Always -> "always" | `Never -> "never" in
+  let destruct arg =
+    Result.catch_f
+      (fun () ->
+        match arg with
+        | "always" -> `Always
+        | "never" -> `Never
+        | s -> invalid_arg (Format.sprintf "unrecognize parameter %s" s))
+      (fun exn ->
+        Format.sprintf "Invalid argument: %s" (Printexc.to_string exn))
+  in
+  let description = "defines the way metadata are queried" in
+  let name = "metadata_rpc_arg" in
+  RPC_arg.make ~descr:description ~name ~construct ~destruct ()
+
 let parse_chain s =
   try
     match s with
@@ -656,16 +672,28 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let force_operation_metadata_query =
       let open RPC_query in
-      query (fun force_metadata ->
+      query (fun force_metadata metadata ->
           object
             method force_metadata = force_metadata
+
+            method metadata = metadata
           end)
       |+ flag
            "force_metadata"
            ~descr:
-             "Forces to recompute the operations metadata if it was considered \
-              as too large."
+             "DEPRECATED: Forces to recompute the operations metadata if it \
+              was considered as too large."
            (fun x -> x#force_metadata)
+      |+ opt_field
+           "metadata"
+           ~descr:
+             "Specifies whether or not if the operations metadata should be \
+              returned. To get the metadata, even if it is needed to recompute \
+              them, use \"always\". To avoid getting the metadata, use \
+              \"never\". By default, the metadata will be returned depending \
+              on the node's metadata size limit policy."
+           metadata_rpc_arg
+           (fun x -> x#metadata)
       |> seal
 
     module Operations = struct
@@ -1420,7 +1448,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   module Operations = struct
     module S = S.Operations
 
-    let operations ctxt ?(force_metadata = false) =
+    let operations ctxt ?(force_metadata = false) ?metadata =
       let f = make_call0 S.operations ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) () ->
         f
@@ -1428,10 +1456,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           block
           (object
              method force_metadata = force_metadata
+
+             method metadata = metadata
           end)
           ()
 
-    let operations_in_pass ctxt ?(force_metadata = false) =
+    let operations_in_pass ctxt ?(force_metadata = false) ?metadata =
       let f = make_call1 S.operations_in_pass ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) n ->
         f
@@ -1440,10 +1470,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           n
           (object
              method force_metadata = force_metadata
+
+             method metadata = metadata
           end)
           ()
 
-    let operation ctxt ?(force_metadata = false) =
+    let operation ctxt ?(force_metadata = false) ?metadata =
       let f = make_call2 S.operation ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) n m ->
         f
@@ -1453,6 +1485,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           m
           (object
              method force_metadata = force_metadata
+
+             method metadata = metadata
           end)
           ()
   end
@@ -1565,7 +1599,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       fun ?(chain = `Main) ?(block = `Head 0) s -> f chain block s () ()
   end
 
-  let info ctxt ?(force_metadata = false) =
+  let info ctxt ?(force_metadata = false) ?metadata =
     let f = make_call0 S.info ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () ->
       f
@@ -1573,6 +1607,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         block
         (object
            method force_metadata = force_metadata
+
+           method metadata = metadata
         end)
         ()
 
