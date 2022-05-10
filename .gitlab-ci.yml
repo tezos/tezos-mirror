@@ -57,7 +57,7 @@ include:
 
 # Actual jobs are defined in these included files
 
-  - .gitlab/ci/packaging.yml
+  - .gitlab/ci/opam-ci.yml
   - .gitlab/ci/sanity.yml
   - .gitlab/ci/build.yml
   - .gitlab/ci/test/templates.yml

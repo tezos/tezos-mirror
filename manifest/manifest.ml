@@ -2078,9 +2078,8 @@ let generate_workspace env dune =
   Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
-let check_for_non_generated_files ~remove_extra_files
-    ?(exclude = fun _ -> false) () =
-  let rec find_opam_and_dune_files prefix acc dir =
+let find_opam_and_dune_files dir =
+  let rec loop prefix acc dir =
     let dir_contents = Sys.readdir (prefix // dir) in
     let add_item acc filename =
       let full_filename = dir // filename in
@@ -2094,12 +2093,16 @@ let check_for_non_generated_files ~remove_extra_files
       else if
         try Sys.is_directory (prefix // dir // filename)
         with Sys_error _ -> false
-      then find_opam_and_dune_files prefix acc full_filename
+      then loop prefix acc full_filename
       else acc
     in
     Array.fold_left add_item acc dir_contents
   in
-  let all_files = find_opam_and_dune_files ".." String_set.empty "" in
+  loop ".." String_set.empty dir
+
+let check_for_non_generated_files ~remove_extra_files
+    ?(exclude = fun _ -> false) () =
+  let all_files = find_opam_and_dune_files "" in
 
   let all_non_excluded_files =
     String_set.filter (fun x -> not (exclude x)) all_files
@@ -2289,6 +2292,58 @@ let (packages_dir, release, remove_extra_files) =
   in
   (!packages_dir, release, !remove_extra_files)
 
+let generate_opam_ci () =
+  let opam_packages =
+    (* Find all .opam files.
+       Do not just generate for packages registered in the manifest:
+       there are a few other .opam files that we want to test in the CI.
+       FIXME: https://gitlab.com/tezos/tezos/-/merge_requests/5157
+       Once all targets worth testing are declared in manifest/main.ml,
+       we can take the list of registered packages instead of
+       listing files. *)
+    List.map find_opam_and_dune_files ["src"; "tezt"; "opam"]
+    |> List.fold_left String_set.union String_set.empty
+    |> String_set.filter (fun f -> Filename.extension f = ".opam")
+    |> String_set.map (fun f -> Filename.remove_extension (Filename.basename f))
+  in
+  (* We filter out a few packages because they have dependencies on
+     libraries in vendors that are not releases officially.  In
+     particular, pyml-plot is used by tezos-benchmark and dependant.
+  *)
+  let opam_packages =
+    String_set.filter
+      (fun x ->
+        match String.split_on_char '-' x with
+        | ["tezos"; "snoop"] -> false
+        | ["tezos"; "shell"; "benchmarks"] -> false
+        | "tezos" :: "benchmark" :: _ -> false
+        | "tezos" :: "benchmarks" :: _ -> false
+        | ["tezos"; "protocol"; "plugin"; "alpha"; "tests"]
+        | ["tezos"; "protocol"; "alpha"; "tests"] ->
+            false
+        | ["tezos"; "protocol"; "plugin"; _num; _name; "tests"]
+        | ["tezos"; "protocol"; _num; _name; "tests"] ->
+            false
+        | _ -> true)
+      opam_packages
+  in
+  write ".gitlab/ci/opam-ci.yml" @@ fun fmt ->
+  Format.fprintf fmt "# This file was automatically generated, do not edit.@." ;
+  Format.fprintf fmt "# Edit file manifest/manifest.ml instead.@." ;
+  String_set.iter
+    (fun package_name ->
+      Format.fprintf fmt "@." ;
+      Format.fprintf
+        fmt
+        {|opam:%s:
+  extends: .opam_template
+  variables:
+    package: %s
+|}
+        package_name
+        package_name)
+    opam_packages
+
 let generate () =
   Printexc.record_backtrace true ;
   try
@@ -2297,6 +2352,7 @@ let generate () =
     generate_dune_project_files () ;
     generate_package_json_file () ;
     generate_static_packages () ;
+    generate_opam_ci () ;
     Option.iter (generate_opam_files_for_release packages_dir) release
   with exn ->
     Printexc.print_backtrace stderr ;

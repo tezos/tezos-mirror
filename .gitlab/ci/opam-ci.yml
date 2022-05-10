@@ -1,0 +1,1107 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/manifest.ml instead.
+
+opam:internal-devtools:
+  extends: .opam_template
+  variables:
+    package: internal-devtools
+
+opam:tezos-012-Psithaca-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-012-Psithaca-test-helpers
+
+opam:tezos-013-PtJakart-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-013-PtJakart-test-helpers
+
+opam:tezos-accuser-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-012-Psithaca
+
+opam:tezos-accuser-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-013-PtJakart
+
+opam:tezos-accuser-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-alpha
+
+opam:tezos-alpha-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-alpha-test-helpers
+
+opam:tezos-baker-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-baker-012-Psithaca
+
+opam:tezos-baker-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-baker-013-PtJakart
+
+opam:tezos-baker-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-baker-alpha
+
+opam:tezos-baking-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-012-Psithaca
+
+opam:tezos-baking-012-Psithaca-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-012-Psithaca-commands
+
+opam:tezos-baking-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-013-PtJakart
+
+opam:tezos-baking-013-PtJakart-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-013-PtJakart-commands
+
+opam:tezos-baking-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-alpha
+
+opam:tezos-baking-alpha-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-alpha-commands
+
+opam:tezos-base:
+  extends: .opam_template
+  variables:
+    package: tezos-base
+
+opam:tezos-base-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-base-test-helpers
+
+opam:tezos-clic:
+  extends: .opam_template
+  variables:
+    package: tezos-clic
+
+opam:tezos-client:
+  extends: .opam_template
+  variables:
+    package: tezos-client
+
+opam:tezos-client-000-Ps9mPmXa:
+  extends: .opam_template
+  variables:
+    package: tezos-client-000-Ps9mPmXa
+
+opam:tezos-client-001-PtCJ7pwo:
+  extends: .opam_template
+  variables:
+    package: tezos-client-001-PtCJ7pwo
+
+opam:tezos-client-001-PtCJ7pwo-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-001-PtCJ7pwo-commands
+
+opam:tezos-client-002-PsYLVpVv:
+  extends: .opam_template
+  variables:
+    package: tezos-client-002-PsYLVpVv
+
+opam:tezos-client-002-PsYLVpVv-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-002-PsYLVpVv-commands
+
+opam:tezos-client-003-PsddFKi3:
+  extends: .opam_template
+  variables:
+    package: tezos-client-003-PsddFKi3
+
+opam:tezos-client-003-PsddFKi3-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-003-PsddFKi3-commands
+
+opam:tezos-client-004-Pt24m4xi:
+  extends: .opam_template
+  variables:
+    package: tezos-client-004-Pt24m4xi
+
+opam:tezos-client-004-Pt24m4xi-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-004-Pt24m4xi-commands
+
+opam:tezos-client-005-PsBabyM1:
+  extends: .opam_template
+  variables:
+    package: tezos-client-005-PsBabyM1
+
+opam:tezos-client-005-PsBabyM1-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-005-PsBabyM1-commands
+
+opam:tezos-client-006-PsCARTHA:
+  extends: .opam_template
+  variables:
+    package: tezos-client-006-PsCARTHA
+
+opam:tezos-client-006-PsCARTHA-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-006-PsCARTHA-commands
+
+opam:tezos-client-007-PsDELPH1:
+  extends: .opam_template
+  variables:
+    package: tezos-client-007-PsDELPH1
+
+opam:tezos-client-007-PsDELPH1-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-007-PsDELPH1-commands
+
+opam:tezos-client-007-PsDELPH1-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-007-PsDELPH1-commands-registration
+
+opam:tezos-client-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-client-008-PtEdo2Zk
+
+opam:tezos-client-008-PtEdo2Zk-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-008-PtEdo2Zk-commands
+
+opam:tezos-client-008-PtEdo2Zk-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-008-PtEdo2Zk-commands-registration
+
+opam:tezos-client-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-client-009-PsFLoren
+
+opam:tezos-client-009-PsFLoren-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-009-PsFLoren-commands
+
+opam:tezos-client-009-PsFLoren-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-009-PsFLoren-commands-registration
+
+opam:tezos-client-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-client-010-PtGRANAD
+
+opam:tezos-client-010-PtGRANAD-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-010-PtGRANAD-commands
+
+opam:tezos-client-010-PtGRANAD-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-010-PtGRANAD-commands-registration
+
+opam:tezos-client-011-PtHangz2:
+  extends: .opam_template
+  variables:
+    package: tezos-client-011-PtHangz2
+
+opam:tezos-client-011-PtHangz2-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-011-PtHangz2-commands
+
+opam:tezos-client-011-PtHangz2-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-011-PtHangz2-commands-registration
+
+opam:tezos-client-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-client-012-Psithaca
+
+opam:tezos-client-012-Psithaca-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-012-Psithaca-commands
+
+opam:tezos-client-012-Psithaca-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-012-Psithaca-commands-registration
+
+opam:tezos-client-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-client-013-PtJakart
+
+opam:tezos-client-013-PtJakart-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-013-PtJakart-commands
+
+opam:tezos-client-013-PtJakart-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-013-PtJakart-commands-registration
+
+opam:tezos-client-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-client-alpha
+
+opam:tezos-client-alpha-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-alpha-commands
+
+opam:tezos-client-alpha-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-alpha-commands-registration
+
+opam:tezos-client-base:
+  extends: .opam_template
+  variables:
+    package: tezos-client-base
+
+opam:tezos-client-base-unix:
+  extends: .opam_template
+  variables:
+    package: tezos-client-base-unix
+
+opam:tezos-client-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-commands
+
+opam:tezos-client-demo-counter:
+  extends: .opam_template
+  variables:
+    package: tezos-client-demo-counter
+
+opam:tezos-client-genesis:
+  extends: .opam_template
+  variables:
+    package: tezos-client-genesis
+
+opam:tezos-client-sapling-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-008-PtEdo2Zk
+
+opam:tezos-client-sapling-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-009-PsFLoren
+
+opam:tezos-client-sapling-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-010-PtGRANAD
+
+opam:tezos-client-sapling-011-PtHangz2:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-011-PtHangz2
+
+opam:tezos-client-sapling-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-012-Psithaca
+
+opam:tezos-client-sapling-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-013-PtJakart
+
+opam:tezos-client-sapling-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-alpha
+
+opam:tezos-codec:
+  extends: .opam_template
+  variables:
+    package: tezos-codec
+
+opam:tezos-context:
+  extends: .opam_template
+  variables:
+    package: tezos-context
+
+opam:tezos-crypto:
+  extends: .opam_template
+  variables:
+    package: tezos-crypto
+
+opam:tezos-embedded-protocol-000-Ps9mPmXa:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-000-Ps9mPmXa
+
+opam:tezos-embedded-protocol-001-PtCJ7pwo:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-001-PtCJ7pwo
+
+opam:tezos-embedded-protocol-002-PsYLVpVv:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-002-PsYLVpVv
+
+opam:tezos-embedded-protocol-003-PsddFKi3:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-003-PsddFKi3
+
+opam:tezos-embedded-protocol-004-Pt24m4xi:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-004-Pt24m4xi
+
+opam:tezos-embedded-protocol-005-PsBABY5H:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-005-PsBABY5H
+
+opam:tezos-embedded-protocol-005-PsBabyM1:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-005-PsBabyM1
+
+opam:tezos-embedded-protocol-006-PsCARTHA:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-006-PsCARTHA
+
+opam:tezos-embedded-protocol-007-PsDELPH1:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-007-PsDELPH1
+
+opam:tezos-embedded-protocol-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-008-PtEdo2Zk
+
+opam:tezos-embedded-protocol-008-PtEdoTez:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-008-PtEdoTez
+
+opam:tezos-embedded-protocol-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-009-PsFLoren
+
+opam:tezos-embedded-protocol-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-010-PtGRANAD
+
+opam:tezos-embedded-protocol-011-PtHangz2:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-011-PtHangz2
+
+opam:tezos-embedded-protocol-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-012-Psithaca
+
+opam:tezos-embedded-protocol-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-013-PtJakart
+
+opam:tezos-embedded-protocol-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-alpha
+
+opam:tezos-embedded-protocol-demo-counter:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-demo-counter
+
+opam:tezos-embedded-protocol-demo-noops:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-demo-noops
+
+opam:tezos-embedded-protocol-genesis:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-genesis
+
+opam:tezos-error-monad:
+  extends: .opam_template
+  variables:
+    package: tezos-error-monad
+
+opam:tezos-event-logging:
+  extends: .opam_template
+  variables:
+    package: tezos-event-logging
+
+opam:tezos-event-logging-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-event-logging-test-helpers
+
+opam:tezos-hacl:
+  extends: .opam_template
+  variables:
+    package: tezos-hacl
+
+opam:tezos-lwt-result-stdlib:
+  extends: .opam_template
+  variables:
+    package: tezos-lwt-result-stdlib
+
+opam:tezos-micheline:
+  extends: .opam_template
+  variables:
+    package: tezos-micheline
+
+opam:tezos-micheline-rewriting:
+  extends: .opam_template
+  variables:
+    package: tezos-micheline-rewriting
+
+opam:tezos-mockup:
+  extends: .opam_template
+  variables:
+    package: tezos-mockup
+
+opam:tezos-mockup-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-mockup-commands
+
+opam:tezos-mockup-proxy:
+  extends: .opam_template
+  variables:
+    package: tezos-mockup-proxy
+
+opam:tezos-mockup-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-mockup-registration
+
+opam:tezos-node:
+  extends: .opam_template
+  variables:
+    package: tezos-node
+
+opam:tezos-openapi:
+  extends: .opam_template
+  variables:
+    package: tezos-openapi
+
+opam:tezos-p2p:
+  extends: .opam_template
+  variables:
+    package: tezos-p2p
+
+opam:tezos-p2p-services:
+  extends: .opam_template
+  variables:
+    package: tezos-p2p-services
+
+opam:tezos-protocol-000-Ps9mPmXa:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-000-Ps9mPmXa
+
+opam:tezos-protocol-001-PtCJ7pwo:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-001-PtCJ7pwo
+
+opam:tezos-protocol-002-PsYLVpVv:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-002-PsYLVpVv
+
+opam:tezos-protocol-003-PsddFKi3:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-003-PsddFKi3
+
+opam:tezos-protocol-004-Pt24m4xi:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-004-Pt24m4xi
+
+opam:tezos-protocol-005-PsBABY5H:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-005-PsBABY5H
+
+opam:tezos-protocol-005-PsBabyM1:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-005-PsBabyM1
+
+opam:tezos-protocol-006-PsCARTHA:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-006-PsCARTHA
+
+opam:tezos-protocol-007-PsDELPH1:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-007-PsDELPH1
+
+opam:tezos-protocol-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk
+
+opam:tezos-protocol-008-PtEdo2Zk-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk-parameters
+
+opam:tezos-protocol-008-PtEdoTez:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-008-PtEdoTez
+
+opam:tezos-protocol-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-009-PsFLoren
+
+opam:tezos-protocol-009-PsFLoren-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-009-PsFLoren-parameters
+
+opam:tezos-protocol-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-010-PtGRANAD
+
+opam:tezos-protocol-010-PtGRANAD-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-010-PtGRANAD-parameters
+
+opam:tezos-protocol-011-PtHangz2:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-011-PtHangz2
+
+opam:tezos-protocol-011-PtHangz2-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-011-PtHangz2-parameters
+
+opam:tezos-protocol-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-012-Psithaca
+
+opam:tezos-protocol-012-Psithaca-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-012-Psithaca-parameters
+
+opam:tezos-protocol-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-013-PtJakart
+
+opam:tezos-protocol-013-PtJakart-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-013-PtJakart-parameters
+
+opam:tezos-protocol-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-alpha
+
+opam:tezos-protocol-alpha-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-alpha-parameters
+
+opam:tezos-protocol-compiler:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-compiler
+
+opam:tezos-protocol-demo-counter:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-demo-counter
+
+opam:tezos-protocol-demo-noops:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-demo-noops
+
+opam:tezos-protocol-environment:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-environment
+
+opam:tezos-protocol-functor-000-Ps9mPmXa:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-000-Ps9mPmXa
+
+opam:tezos-protocol-functor-001-PtCJ7pwo:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-001-PtCJ7pwo
+
+opam:tezos-protocol-functor-002-PsYLVpVv:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-002-PsYLVpVv
+
+opam:tezos-protocol-functor-003-PsddFKi3:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-003-PsddFKi3
+
+opam:tezos-protocol-functor-004-Pt24m4xi:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-004-Pt24m4xi
+
+opam:tezos-protocol-functor-005-PsBABY5H:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-005-PsBABY5H
+
+opam:tezos-protocol-functor-005-PsBabyM1:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-005-PsBabyM1
+
+opam:tezos-protocol-functor-006-PsCARTHA:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-006-PsCARTHA
+
+opam:tezos-protocol-functor-007-PsDELPH1:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-007-PsDELPH1
+
+opam:tezos-protocol-functor-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-008-PtEdo2Zk
+
+opam:tezos-protocol-functor-008-PtEdoTez:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-008-PtEdoTez
+
+opam:tezos-protocol-functor-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-009-PsFLoren
+
+opam:tezos-protocol-functor-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-010-PtGRANAD
+
+opam:tezos-protocol-functor-011-PtHangz2:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-011-PtHangz2
+
+opam:tezos-protocol-functor-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-012-Psithaca
+
+opam:tezos-protocol-functor-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-013-PtJakart
+
+opam:tezos-protocol-functor-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-alpha
+
+opam:tezos-protocol-functor-demo-counter:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-demo-counter
+
+opam:tezos-protocol-functor-demo-noops:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-demo-noops
+
+opam:tezos-protocol-functor-genesis:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-genesis
+
+opam:tezos-protocol-genesis:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-genesis
+
+opam:tezos-protocol-plugin-007-PsDELPH1:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-007-PsDELPH1
+
+opam:tezos-protocol-plugin-007-PsDELPH1-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-007-PsDELPH1-registerer
+
+opam:tezos-protocol-plugin-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-008-PtEdo2Zk
+
+opam:tezos-protocol-plugin-008-PtEdo2Zk-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-008-PtEdo2Zk-registerer
+
+opam:tezos-protocol-plugin-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-009-PsFLoren
+
+opam:tezos-protocol-plugin-009-PsFLoren-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-009-PsFLoren-registerer
+
+opam:tezos-protocol-plugin-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-010-PtGRANAD
+
+opam:tezos-protocol-plugin-010-PtGRANAD-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-010-PtGRANAD-registerer
+
+opam:tezos-protocol-plugin-011-PtHangz2:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-011-PtHangz2
+
+opam:tezos-protocol-plugin-011-PtHangz2-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-011-PtHangz2-registerer
+
+opam:tezos-protocol-plugin-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-012-Psithaca
+
+opam:tezos-protocol-plugin-012-Psithaca-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-012-Psithaca-registerer
+
+opam:tezos-protocol-plugin-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-013-PtJakart
+
+opam:tezos-protocol-plugin-013-PtJakart-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-013-PtJakart-registerer
+
+opam:tezos-protocol-plugin-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-alpha
+
+opam:tezos-protocol-plugin-alpha-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-alpha-registerer
+
+opam:tezos-protocol-updater:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-updater
+
+opam:tezos-proxy:
+  extends: .opam_template
+  variables:
+    package: tezos-proxy
+
+opam:tezos-proxy-server:
+  extends: .opam_template
+  variables:
+    package: tezos-proxy-server
+
+opam:tezos-proxy-server-config:
+  extends: .opam_template
+  variables:
+    package: tezos-proxy-server-config
+
+opam:tezos-requester:
+  extends: .opam_template
+  variables:
+    package: tezos-requester
+
+opam:tezos-rpc:
+  extends: .opam_template
+  variables:
+    package: tezos-rpc
+
+opam:tezos-rpc-http:
+  extends: .opam_template
+  variables:
+    package: tezos-rpc-http
+
+opam:tezos-rpc-http-client:
+  extends: .opam_template
+  variables:
+    package: tezos-rpc-http-client
+
+opam:tezos-rpc-http-client-unix:
+  extends: .opam_template
+  variables:
+    package: tezos-rpc-http-client-unix
+
+opam:tezos-rpc-http-server:
+  extends: .opam_template
+  variables:
+    package: tezos-rpc-http-server
+
+opam:tezos-sapling:
+  extends: .opam_template
+  variables:
+    package: tezos-sapling
+
+opam:tezos-sc-rollup-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-sc-rollup-013-PtJakart
+
+opam:tezos-sc-rollup-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-sc-rollup-alpha
+
+opam:tezos-sc-rollup-client-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-sc-rollup-client-013-PtJakart
+
+opam:tezos-sc-rollup-client-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-sc-rollup-client-alpha
+
+opam:tezos-sc-rollup-node-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-sc-rollup-node-013-PtJakart
+
+opam:tezos-sc-rollup-node-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-sc-rollup-node-alpha
+
+opam:tezos-scoru-wasm:
+  extends: .opam_template
+  variables:
+    package: tezos-scoru-wasm
+
+opam:tezos-shell:
+  extends: .opam_template
+  variables:
+    package: tezos-shell
+
+opam:tezos-shell-context:
+  extends: .opam_template
+  variables:
+    package: tezos-shell-context
+
+opam:tezos-shell-context-test:
+  extends: .opam_template
+  variables:
+    package: tezos-shell-context-test
+
+opam:tezos-shell-services:
+  extends: .opam_template
+  variables:
+    package: tezos-shell-services
+
+opam:tezos-shell-services-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-shell-services-test-helpers
+
+opam:tezos-signer:
+  extends: .opam_template
+  variables:
+    package: tezos-signer
+
+opam:tezos-signer-backends:
+  extends: .opam_template
+  variables:
+    package: tezos-signer-backends
+
+opam:tezos-signer-services:
+  extends: .opam_template
+  variables:
+    package: tezos-signer-services
+
+opam:tezos-stdlib:
+  extends: .opam_template
+  variables:
+    package: tezos-stdlib
+
+opam:tezos-stdlib-unix:
+  extends: .opam_template
+  variables:
+    package: tezos-stdlib-unix
+
+opam:tezos-store:
+  extends: .opam_template
+  variables:
+    package: tezos-store
+
+opam:tezos-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-test-helpers
+
+opam:tezos-test-helpers-extra:
+  extends: .opam_template
+  variables:
+    package: tezos-test-helpers-extra
+
+opam:tezos-time-measurement:
+  extends: .opam_template
+  variables:
+    package: tezos-time-measurement
+
+opam:tezos-tooling:
+  extends: .opam_template
+  variables:
+    package: tezos-tooling
+
+opam:tezos-tps-evaluation:
+  extends: .opam_template
+  variables:
+    package: tezos-tps-evaluation
+
+opam:tezos-tx-rollup-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-tx-rollup-013-PtJakart
+
+opam:tezos-tx-rollup-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-tx-rollup-alpha
+
+opam:tezos-tx-rollup-client-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-tx-rollup-client-013-PtJakart
+
+opam:tezos-tx-rollup-client-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-tx-rollup-client-alpha
+
+opam:tezos-tx-rollup-node-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-tx-rollup-node-013-PtJakart
+
+opam:tezos-tx-rollup-node-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-tx-rollup-node-alpha
+
+opam:tezos-validation:
+  extends: .opam_template
+  variables:
+    package: tezos-validation
+
+opam:tezos-validator:
+  extends: .opam_template
+  variables:
+    package: tezos-validator
+
+opam:tezos-version:
+  extends: .opam_template
+  variables:
+    package: tezos-version
+
+opam:tezos-webassembly-interpreter:
+  extends: .opam_template
+  variables:
+    package: tezos-webassembly-interpreter
+
+opam:tezos-workers:
+  extends: .opam_template
+  variables:
+    package: tezos-workers
+
+opam:tezt:
+  extends: .opam_template
+  variables:
+    package: tezt
+
+opam:tezt-performance-regression:
+  extends: .opam_template
+  variables:
+    package: tezt-performance-regression
+
+opam:tezt-self-tests:
+  extends: .opam_template
+  variables:
+    package: tezt-self-tests
+
+opam:tezt-tezos:
+  extends: .opam_template
+  variables:
+    package: tezt-tezos
