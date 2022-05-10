@@ -44,6 +44,24 @@ Node
 
 - Added metrics to track the peer validator requests.
 
+- Added an optional query parameter ``metadata`` to the GET
+  /chains/<chain>/blocks/<block>/ and GET
+  /chains/<chain>/blocks/<block>/operations/ RPCs. Passing this
+  parameter with value ``always`` overrides the metadata size limit
+  configuration, and forces the re-computation of operation metadata
+  whose size was beyond the limit, and therefore not stored. The
+  re-computed metadata are not stored on disk after this call, but
+  rather just returned by the RPC call. Passing this parameters with
+  value ``never`` prevents the request to return metadata, to allow
+  lighter requests. If the query string is not used, the configured
+  metadata size limit policy is used.
+
+- Deprecated the ``force_metadata`` query paramater for the the GET
+  /chains/<chain>/blocks/<block>/ and GET
+  /chains/<chain>/blocks/<block>/operations/ RPCs. To get a similar
+  behaviour, use the ``metadata`` query string with the value
+  ``always``.
+
 Client
 ------
 
