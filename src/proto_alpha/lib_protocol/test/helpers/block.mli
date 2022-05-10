@@ -172,7 +172,10 @@ val apply :
 
 (**
    [bake b] returns a block [b'] which has as predecessor block [b].
-   Optional parameter [policy] allows to pick the next baker in several ways.
+   Optional parameter [policy] allows to pick the next baker in
+   several ways. If [check_size] is [true] (the default case), then
+   the function checks that the operations passed as arguments satisfy
+   the size limit of Tezos operations, as defined in the protocol.
    This function bundles together [forge_header], [sign_header] and [apply].
    These functions should be used instead of bake to craft unusual blocks for
    testing together with setters for properties of the headers.
@@ -187,6 +190,7 @@ val bake :
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
   ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+  ?check_size:bool ->
   t ->
   t tzresult Lwt.t
 
