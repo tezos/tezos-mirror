@@ -27,6 +27,8 @@
 
 type t
 
+type mode = Accuser | Batcher | Custom | Maintenance | Observer | Operator
+
 val create :
   ?path:string ->
   ?runner:Runner.t ->
@@ -36,6 +38,7 @@ val create :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?name:string ->
+  mode ->
   rollup_id:string ->
   rollup_genesis:string ->
   ?operator:string ->
@@ -72,6 +75,7 @@ val change_signers :
   ?remove_commitment_signer:string option ->
   ?dispatch_withdrawals_signer:string option ->
   ?rejection_signer:string option ->
+  ?mode:mode ->
   t ->
   unit Lwt.t
 
@@ -117,7 +121,9 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Write the configuration file for a rollup node.
     Returns the name of the configuration file. *)
-val config_init : t -> string Lwt.t
+val init_config : t -> string Lwt.t
+
+val spawn_init_config : t -> Process.t
 
 (** [run node] launches the given transaction rollup node. *)
 val run : t -> unit Lwt.t

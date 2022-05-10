@@ -25,6 +25,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type mode = Accuser | Batcher | Custom | Maintenance | Observer | Operator
+
 module Parameters = struct
   type persistent_state = {
     tezos_node : Node.t;
@@ -41,6 +43,7 @@ module Parameters = struct
     rollup_genesis : string;
     rpc_addr : string;
     dormant_mode : bool;
+    mode : mode;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
   }
@@ -71,17 +74,25 @@ let spawn_command node =
 let add_option flag str_opt command =
   command @ match str_opt with None -> [] | Some o -> [flag; o]
 
-let spawn_config_init node =
+let string_of_mode = function
+  | Observer -> "observer"
+  | Accuser -> "accuser"
+  | Batcher -> "batcher"
+  | Maintenance -> "maintenance"
+  | Operator -> "operator"
+  | Custom -> "custom"
+
+let spawn_init_config node =
   spawn_command
     node
     ([
-       "config";
        "init";
-       "on";
+       string_of_mode node.persistent_state.mode;
+       "config";
+       "for";
+       node.persistent_state.rollup_id;
        "--data-dir";
        data_dir node;
-       "--rollup-id";
-       node.persistent_state.rollup_id;
        "--rollup-genesis";
        node.persistent_state.rollup_genesis;
        "--rpc-addr";
@@ -100,8 +111,8 @@ let spawn_config_init node =
          node.persistent_state.dispatch_withdrawals_signer
     |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
 
-let config_init node =
-  let process = spawn_config_init node in
+let init_config node =
+  let process = spawn_init_config node in
   let* output = Process.check_and_read_stdout process in
   match output =~* rex "Configuration written in ([^\n]*)" with
   | None -> failwith "Configuration initialization failed"
@@ -206,7 +217,7 @@ let wait_for ?where node name filter =
   wait_for_full ?where node name (event_from_full_event_filter filter)
 
 let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
-    ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name
+    ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name mode
     ~rollup_id ~rollup_genesis ?operator ?batch_signer
     ?finalize_commitment_signer ?remove_commitment_signer
     ?dispatch_withdrawals_signer ?rejection_signer client tezos_node =
@@ -243,6 +254,7 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
         pending_ready = [];
         pending_level = [];
         dormant_mode;
+        mode;
       }
   in
   on_event tx_node (handle_event tx_node) ;
@@ -280,7 +292,7 @@ let run node =
 
 let change_signers ?operator ?batch_signer ?finalize_commitment_signer
     ?remove_commitment_signer ?dispatch_withdrawals_signer ?rejection_signer
-    (tx_node : t) =
+    ?mode (tx_node : t) =
   let operator =
     Option.value operator ~default:tx_node.persistent_state.operator
   in
@@ -307,6 +319,7 @@ let change_signers ?operator ?batch_signer ?finalize_commitment_signer
       rejection_signer
       ~default:tx_node.persistent_state.rejection_signer
   in
+  let mode = Option.value mode ~default:tx_node.persistent_state.mode in
   let tmp_tx_node =
     {
       tx_node with
@@ -319,10 +332,11 @@ let change_signers ?operator ?batch_signer ?finalize_commitment_signer
           remove_commitment_signer;
           dispatch_withdrawals_signer;
           rejection_signer;
+          mode;
         };
     }
   in
-  let* _ = config_init tmp_tx_node in
+  let* _ = init_config tmp_tx_node in
   unit
 
 module Inbox = struct
