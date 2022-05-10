@@ -1343,11 +1343,13 @@ module Tx_rollup = struct
     in
     {value = process; run = parse}
 
-  let submit_batch ?(wait = "none") ?burn_cap ?storage_limit ?hooks
-      ~content:(`Hex content) ~rollup ~src client =
+  let submit_batch ?(wait = "none") ?burn_cap ?storage_limit ?hooks ?log_output
+      ?log_command ~content:(`Hex content) ~rollup ~src client =
     let process =
       spawn_command
         ?hooks
+        ?log_output
+        ?log_command
         client
         (["--wait"; wait]
         @ [
