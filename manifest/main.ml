@@ -2492,7 +2492,7 @@ let tezt =
     ~path:"tezt/lib"
     ~synopsis:
       "Test framework for unit tests, integration tests, and regression tests"
-    ~ocaml:V.(at_least "4.08")
+    ~ocaml:V.(at_least "4.12")
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm]
 
