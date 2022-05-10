@@ -13,7 +13,6 @@ depends: [
   "ocamlformat" { = "0.21.0" }
   "ometrics" { >= "0.2.1" }
   "ppx_blob"
-  "parsexp" {with-test}
   "base-unix"
 ]
 build: [

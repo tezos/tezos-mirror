@@ -243,17 +243,7 @@ module Dune = struct
              S "inline_tests";
              [S "flags"; S "-verbose"];
              S "modes"
-             :: of_list
-                  (List.map
-                     (function
-                       | JS ->
-                           (* We don't run inline_tests in JS by default because of the issue #1947.
-                              In short, we don't want [dune runtest] to depend on node.
-                              Remove this code after we switch to dune.3.0
-                              and address https://gitlab.com/tezos/tezos/-/issues/1947 *)
-                           E
-                       | mode -> S (string_of_mode mode))
-                     modes);
+             :: of_list (List.map (fun mode -> S (string_of_mode mode)) modes);
            ]
           else E);
           (match preprocess with
