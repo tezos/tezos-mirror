@@ -151,3 +151,20 @@ val get_ticket :
   context ->
   Protocol.Tx_rollup_l2_context_sig.ticket_index ->
   Ticket.t option Lwt.t
+
+(** {2 Sub-context for address indexes } *)
+
+(** Adds a new association [address index -> address] in the context. *)
+val register_address :
+  context ->
+  Protocol.Tx_rollup_l2_context_sig.address_index ->
+  Protocol.Tx_rollup_l2_address.t ->
+  context Lwt.t
+
+(** [get_address ctxt address_index] retrieves the address associated to
+    [address_index] in the context [ctxt]. Resolves with [None] if there is no
+    address associated to [address_index]. *)
+val get_address :
+  context ->
+  Protocol.Tx_rollup_l2_context_sig.address_index ->
+  Protocol.Tx_rollup_l2_address.t option Lwt.t

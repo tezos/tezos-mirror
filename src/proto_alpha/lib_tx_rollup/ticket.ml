@@ -25,14 +25,20 @@
 
 open Protocol.Alpha_context
 
-type t = {ticketer : Contract.t; ty : Script.expr; contents : Script.expr}
+type t = {
+  ticketer : Contract.t;
+  ty : Script.expr;
+  contents : Script.expr;
+  hash : Ticket_hash.t;
+}
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {ticketer; ty; contents} -> (ticketer, ty, contents))
-    (fun (ticketer, ty, contents) -> {ticketer; ty; contents})
-  @@ obj3
+    (fun {ticketer; ty; contents; hash} -> (ticketer, ty, contents, hash))
+    (fun (ticketer, ty, contents, hash) -> {ticketer; ty; contents; hash})
+  @@ obj4
        (req "ticketer" Contract.encoding)
        (req "ty" Script.expr_encoding)
        (req "contents" Script.expr_encoding)
+       (req "hash" Ticket_hash.encoding)

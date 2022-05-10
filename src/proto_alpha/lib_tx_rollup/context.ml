@@ -33,6 +33,8 @@ module Keys = struct
   let l2_context = ["l2_context"]
 
   let tickets = ["tickets"]
+
+  let address_indexes = ["addresses"]
 end
 
 module Irmin_storage :
@@ -248,3 +250,30 @@ let get_ticket ctxt
   | None -> return_none
   | Some value ->
       return_some (Data_encoding.Binary.of_bytes_exn Ticket.encoding value)
+
+(** {2 Sub-context for address indexes } *)
+
+let register_address ctxt
+    (index : Protocol.Tx_rollup_l2_context_sig.address_index)
+    (address : Protocol.Tx_rollup_l2_address.t) =
+  let index_int32 = Protocol.Indexable.to_int32 index in
+  let key = Keys.address_indexes @ [Int32.to_string index_int32] in
+  let value =
+    Data_encoding.Binary.to_bytes_exn
+      Protocol.Tx_rollup_l2_address.encoding
+      address
+  in
+  Raw.add ctxt key value
+
+let get_address ctxt (index : Protocol.Tx_rollup_l2_context_sig.address_index) =
+  let open Lwt_syntax in
+  let index_int32 = Protocol.Indexable.to_int32 index in
+  let key = Keys.address_indexes @ [Int32.to_string index_int32] in
+  let* value = Raw.find ctxt key in
+  match value with
+  | None -> return_none
+  | Some value ->
+      return_some
+        (Data_encoding.Binary.of_bytes_exn
+           Protocol.Tx_rollup_l2_address.encoding
+           value)
