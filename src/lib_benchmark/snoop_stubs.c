@@ -14,7 +14,7 @@ CAMLprim int64_t caml_clock_gettime(value _useless)
       return ((int64_t) t);
     #else
       struct timespec ts;
-      if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+      if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
         return ((int64_t) 0);
       else {
         uint64_t t = (uint64_t)ts.tv_nsec + 1000000000 * (uint64_t)ts.tv_sec;
