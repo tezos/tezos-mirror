@@ -13,6 +13,7 @@
   test_tx_rollup_l2_encoding
   test_bitset
   test_sc_rollup_tick_repr
+   test_refutation_game
   test_carbonated_map)
  (libraries
   tezos-base

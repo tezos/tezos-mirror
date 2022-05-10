@@ -209,6 +209,11 @@ val opponent : player -> player
 
 val encoding : t Data_encoding.t
 
+val pp_dissection :
+  Format.formatter ->
+  (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
+  unit
+
 val pp : Format.formatter -> t -> unit
 
 module Index : sig
@@ -315,6 +320,16 @@ val pp_outcome : Format.formatter -> outcome -> unit
 
 val outcome_encoding : outcome Data_encoding.t
 
+val find_choice :
+  t ->
+  Sc_rollup_tick_repr.t ->
+  ( Sc_rollup_repr.State_hash.t option
+    * Sc_rollup_tick_repr.t
+    * Sc_rollup_repr.State_hash.t option
+    * Sc_rollup_tick_repr.t,
+    unit trace )
+  result
+
 (** Applies the move [refutation] to the game. Checks the move is
     valid and returns an [Invalid_move] outcome if not.
 
@@ -322,3 +337,11 @@ val outcome_encoding : outcome Data_encoding.t
     player and updates the [dissection]. In the case of a [Proof]
     being provided this returns an [outcome]. *)
 val play : t -> refutation -> (outcome, t) Either.t
+
+val check_dissection :
+  Sc_rollup_repr.State_hash.t option ->
+  Sc_rollup_tick_repr.t ->
+  Sc_rollup_repr.State_hash.t option ->
+  Sc_rollup_tick_repr.t ->
+  (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
+  (unit, unit trace) result
