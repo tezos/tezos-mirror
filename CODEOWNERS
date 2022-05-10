@@ -56,6 +56,7 @@
 #
 # @arvidnl = Arvid Jakobsson
 # @camlspotter = Jun Furuse
+# @eugenz = Eugen Zalinescu
 # @hhugo1 = Hugo Heuzard
 # @igarnier = Ilias Garnier
 # @jobjo = Joel Bjornson
@@ -81,7 +82,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @arvidnl @camlspotter @hhugo1 @igarnier @jobjo @klakplok @lthms @mbouaziz @murbard @naih @NicVolanschi @paracetamolo @pirbo @rafoo_ @raphael-proust @richard.bonichon @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vect0r @yrg
+* @arvidnl @camlspotter @eugenz @hhugo1 @igarnier @jobjo @klakplok @lthms @mbouaziz @murbard @naih @NicVolanschi @paracetamolo @pirbo @rafoo_ @raphael-proust @richard.bonichon @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vect0r @yrg
 
 # CODEOWNERS Owners
 #
