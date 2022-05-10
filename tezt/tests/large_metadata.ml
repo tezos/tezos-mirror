@@ -30,7 +30,67 @@
    Subject: Test that large operations metadata are not stored.
 *)
 
-let metadata_is_available ?(force_metadata = false) client exponent =
+(* Stands for the different values of the metadata query
+   string. Not_provided represents the fact that the argument is not
+   provided. *)
+type metadata_query_param = Always | Never | Not_provided
+
+let convert_metadata_query_param = function
+  | Always -> Some "always"
+  | Never -> Some "never"
+  | Not_provided -> None
+
+let get_metadata ?(metadata_query_string = Not_provided) client =
+  let rpc_args = ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"] in
+  match convert_metadata_query_param metadata_query_string with
+  | Some query ->
+      Client.rpc ~query_string:[("metadata", query)] Client.GET rpc_args client
+  | None -> Client.rpc Client.GET rpc_args client
+
+let metadata_is_available ?(metadata_query_string = Not_provided) client
+    exponent =
+  let* first_manager_operation = get_metadata ~metadata_query_string client in
+  let first_operation_result =
+    JSON.(
+      first_manager_operation |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result")
+  in
+  assert (JSON.(first_operation_result |-> "status" |> as_string = "failed")) ;
+  let length_of_first_error_message =
+    JSON.(
+      first_operation_result |-> "errors" |=> 1 |-> "with" |-> "string"
+      |> as_string |> String.length)
+  in
+  assert (length_of_first_error_message = 1 lsl exponent) ;
+  unit
+
+let metadata_is_pruned client =
+  let* first_manager_operation =
+    get_metadata ~metadata_query_string:Never client
+  in
+  let metadata =
+    JSON.(first_manager_operation |-> "contents" |=> 0 |-> "metadata" |> as_opt)
+  in
+  match metadata with
+  | Some _ -> Test.fail "metadata should not be returned"
+  | None -> unit
+
+let metadata_is_too_large client =
+  let* first_manager_operation =
+    get_metadata ~metadata_query_string:Not_provided client
+  in
+  let metadata =
+    JSON.(first_manager_operation |-> "metadata" |> as_string_opt)
+  in
+  match metadata with
+  | Some s ->
+      assert (s = "too large") ;
+      unit
+  | None -> Test.fail "metadata should not be stored"
+
+(* Uses the deprecated version of the query paramater to force the
+   recomputation of the operations metadata.*)
+let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
   let rpc_args = ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"] in
   let* first_manager_operation =
     if force_metadata then
@@ -59,22 +119,6 @@ let get_endorsement client =
   let rpc_args = ["chains"; "main"; "blocks"; "head"; "operations"; "0"; "0"] in
   let* _ = Client.rpc Client.GET rpc_args client in
   unit
-
-let metadata_is_not_available client =
-  let* first_manager_operation =
-    Client.rpc
-      Client.GET
-      ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"]
-      client
-  in
-  let metadata =
-    JSON.(first_manager_operation |-> "metadata" |> as_string_opt)
-  in
-  match metadata with
-  | Some s ->
-      assert (s = "too large") ;
-      unit
-  | None -> Test.fail "metadata should not be stored"
 
 let setup_node ~limit protocol =
   let limit = match limit with None -> [] | Some a -> [a] in
@@ -149,7 +193,7 @@ let check_default_limit_metadata =
   in
   let* () = Client.bake_for_and_wait client in
   (* All protocols should not store the metadata. *)
-  let* () = metadata_is_not_available client in
+  let* () = metadata_is_too_large client in
   unit
 
 let check_limit_metadata =
@@ -200,7 +244,7 @@ let check_limit_metadata =
   in
   let* () = Client.bake_for_and_wait client in
   (* The metadata shouldn't be present. *)
-  let* () = metadata_is_not_available client in
+  let* () = metadata_is_too_large client in
   unit
 
 let check_unlimited_metadata =
@@ -233,11 +277,11 @@ let check_unlimited_metadata =
   let* () = metadata_is_available client big_exponent in
   unit
 
-let check_metadata_force_recompute =
+let check_metadata_query_string =
   Protocol.register_test
     ~__FILE__
-    ~title:"Force recompute large metadata"
-    ~tags:["large_metadata"; "force"; "recompute"]
+    ~title:"Check recomputation and pruning of metadata"
+    ~tags:["large_metadata"; "query"]
   @@ fun protocol ->
   let* contract_id, client, _node =
     setup_node ~limit:(Some (Node.Metadata_size_limit (Some 10_000))) protocol
@@ -263,6 +307,8 @@ let check_metadata_force_recompute =
   let* () = Client.bake_for_and_wait client in
   (* The metadata should be present. *)
   let* () = metadata_is_available client small_exponent in
+  (* The metadata should not be returned even if stored. *)
+  let* () = metadata_is_pruned client in
   (* We now call the contract with a bigger exponent to exceed the
      10_000 limit: 2^14=16_384. *)
   let big_exponent = 14 in
@@ -281,10 +327,13 @@ let check_metadata_force_recompute =
   in
   let* () = Client.bake_for_and_wait client in
   (* The metadata shouldn't be present. *)
-  let* () = metadata_is_not_available client in
+  let* () = metadata_is_too_large client in
   (* The metadata should be available as we force the node to
      recompute it. *)
-  let* () = metadata_is_available ~force_metadata:true client 14 in
+  let* () = metadata_is_available_deprecated ~force_metadata:true client 14 in
+  let* () = metadata_is_available ~metadata_query_string:Always client 14 in
+  (* The metadata should not be returned even if stored. *)
+  let* () = metadata_is_pruned client in
   (* Check that endorsements can still be queried. *)
   let* () = get_endorsement client in
   unit
@@ -293,4 +342,4 @@ let register ~protocols =
   check_default_limit_metadata protocols ;
   check_limit_metadata protocols ;
   check_unlimited_metadata protocols ;
-  check_metadata_force_recompute protocols
+  check_metadata_query_string protocols
