@@ -32,6 +32,17 @@ let has_prefix ~prefix string =
   let prefix_len = String.length prefix in
   String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
 
+let has_error = ref false
+
+let info fmt = Format.eprintf fmt
+
+let error fmt =
+  Format.ksprintf
+    (fun s ->
+      has_error := true ;
+      Format.eprintf "Error: %s" s)
+    fmt
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -860,6 +871,15 @@ module Target = struct
     | Select of select
     | Open of t * string
 
+  let rec get_internal = function
+    | Internal i -> Some i
+    | Optional t -> get_internal t
+    | Open (t, _) -> get_internal t
+    | Select {package; _} -> get_internal package
+    | Vendored _ -> None
+    | External _ -> None
+    | Opam_only _ -> None
+
   let pps ?(args = []) = function
     | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
     | Some target -> PPS (target, args)
@@ -1062,7 +1082,14 @@ module Target = struct
     let opam =
       match opam with
       | Some "" -> None
-      | Some _ as x -> x
+      | Some opam as x -> (
+          let pkg_name = Filename.basename opam in
+          match String.index_opt pkg_name '.' with
+          | None -> x
+          | Some _ ->
+              invalid_argf
+                "%s is not a valid opam package name: '.' (dot) are not allowed"
+                pkg_name)
       | None -> (
           match kind with
           | Public_library {public_name; _}
@@ -1089,6 +1116,27 @@ module Target = struct
                 "for targets which provide test executables such as %S, you \
                  must specify ~opam (set it to \"\" for no opam file)"
                 name)
+    in
+    let () =
+      match kind with
+      | Public_library {public_name; _} -> (
+          match
+            List.filter_map
+              (function
+                | Internal {kind = Private_library name; opam = private_pkg; _}
+                  when opam <> private_pkg ->
+                    Some name
+                | _ -> None)
+              deps
+          with
+          | [] -> ()
+          | privates ->
+              error
+                "The public library %s depend on private libraries not part of \
+                 the same package: %s"
+                public_name
+                (String.concat ", " privates))
+      | _ -> ()
     in
     let release =
       match release with
@@ -1841,8 +1889,17 @@ let generate_opam ?release this_package (internals : Target.internal list) :
       internal.conflicts
   in
   let synopsis =
-    String.concat " " @@ List.flatten @@ map internals
-    @@ fun internal -> Option.to_list internal.synopsis
+    let all =
+      List.filter_map (fun (i : Target.internal) -> i.synopsis) internals
+    in
+    let () =
+      match all with
+      | [_] -> ()
+      | [] -> error "No synopsis declared for package %s\n" for_package
+      | _ :: _ :: _ ->
+          error "Too many synopsis declared for package %s\n" for_package
+    in
+    String.concat " " all
   in
   let description =
     let descriptions =
@@ -2065,7 +2122,8 @@ let generate_workspace env dune =
   Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
-let check_for_non_generated_files ?(exclude = fun _ -> false) () =
+let check_for_non_generated_files ~remove_extra_files
+    ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files prefix acc dir =
     let dir_contents = Sys.readdir (prefix // dir) in
     let add_item acc filename =
@@ -2094,23 +2152,26 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
     String_set.filter exclude !generated_files
   in
   String_set.iter
-    (Printf.eprintf "Error: %s: generated but is excluded\n%!")
+    (error "%s: generated but is excluded\n%!")
     error_generated_and_excluded ;
   let error_not_generated =
     String_set.diff all_non_excluded_files !generated_files
   in
   String_set.iter
-    (Printf.eprintf "Error: %s: exists but was not generated\n%!")
+    (fun file ->
+      if remove_extra_files then (
+        info "%s: exists but was not generated, removing it.\n%!" file ;
+        Sys.remove (Filename.concat ".." file))
+      else error "%s: exists but was not generated\n%!" file)
     error_not_generated ;
   if
     not
-      (String_set.is_empty error_not_generated
+      ((remove_extra_files || String_set.is_empty error_not_generated)
       && String_set.is_empty error_generated_and_excluded)
-  then (
-    prerr_endline
+  then
+    error
       "Please modify manifest/main.ml to either generate the above file(s)\n\
-       or declare them in the 'exclude' function (but not both)." ;
-    exit 1)
+       or declare them in the 'exclude' function (but not both)."
 
 let check_js_of_ocaml () =
   let internal_name ({kind; path; _} : Target.internal) =
@@ -2164,29 +2225,80 @@ let check_js_of_ocaml () =
   let jsoo_ok = ref true in
   if String_set.cardinal !missing_with_js_mode > 0 then (
     jsoo_ok := false ;
-    Printf.eprintf
+    error
       "The following targets use `(modes js)` and are missing \
        `~js_compatible:true`\n" ;
-    String_set.iter
-      (fun name -> Printf.eprintf "- %s\n" name)
-      !missing_with_js_mode) ;
+    String_set.iter (fun name -> info "- %s\n" name) !missing_with_js_mode) ;
   if String_map.cardinal !missing_from_target > 0 then (
     jsoo_ok := false ;
-    Printf.eprintf
+    error
       "The following targets are not `~js_compatible` but their dependant \
        expect them to be\n" ;
     String_map.iter
-      (fun k v -> List.iter (fun v -> Printf.eprintf "- %s used by %s\n" v k) v)
-      !missing_from_target) ;
-  if not !jsoo_ok then exit 1
+      (fun k v -> List.iter (fun v -> info "- %s used by %s\n" v k) v)
+      !missing_from_target)
+
+(* This check returns all circular opam deps, always reporting the
+   shortest path.
+
+   For every two targets [A0] and [Ax] in package [A], we search for
+   chains of dependencies of the form [A0 -> B0 -> -> Bn -> Ax] where
+   [B0 .. Bn] do not belong to Package A. If such paths exist, we
+   report one path with the minimum length. *)
+let check_circular_opam_deps () =
+  let list_iter l f = List.iter f l in
+  let name i = Target.name_for_errors (Internal i) in
+  let deps_of (t : Target.internal) =
+    let pp =
+      List.map (function Target.PPS (target, _) -> target) t.preprocess
+    in
+    List.concat_map
+      (List.filter_map Target.get_internal)
+      [t.deps; t.opam_only_deps; pp]
+  in
+  Target.iter_internal_by_opam @@ fun this_package internals ->
+  let error_header = ref true in
+  let report_circular_dep pkg (paths : Target.internal list) =
+    if !error_header then (
+      error "Circular opam dependency for %s:\n" this_package ;
+      error_header := false) ;
+    info "- %s\n" (String.concat " -> " (List.map name (pkg :: paths)))
+  in
+  list_iter internals @@ fun internal_from_this_package ->
+  let to_visit : Target.internal Queue.t = Queue.create () in
+  let shortest_path : (Target.kind, Target.internal list) Hashtbl.t =
+    Hashtbl.create 17
+  in
+  (* Push to the queue all direct dependencies to other
+     packages. Dependencies within the same package are ignored
+     because they will never result in a minimum paths. *)
+  let () =
+    list_iter (deps_of internal_from_this_package)
+    @@ fun (dep : Target.internal) ->
+    if dep.opam <> Some this_package then (
+      Hashtbl.add shortest_path dep.kind [dep] ;
+      Queue.push dep to_visit)
+  in
+  while not (Queue.is_empty to_visit) do
+    let elt = Queue.take to_visit in
+    let elt_path = Hashtbl.find shortest_path elt.kind in
+    list_iter (deps_of elt) (fun (dep : Target.internal) ->
+        if not (Hashtbl.mem shortest_path dep.kind) then (
+          let path = dep :: elt_path in
+          Hashtbl.add shortest_path dep.kind path ;
+          if dep.opam = Some this_package then
+            report_circular_dep internal_from_this_package (List.rev path)
+          else Queue.push dep to_visit))
+  done
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let (packages_dir, release) =
+let (packages_dir, release, remove_extra_files) =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
   let sha512 = ref "" in
+  let remove_extra_files = ref false in
   let version = ref "" in
   let anon_fun _args = () in
   let spec =
@@ -2202,6 +2314,9 @@ let (packages_dir, release) =
         ( "--release",
           Arg.Set_string version,
           "<VERSION> Generate opam files for release instead, for VERSION" );
+        ( "--remove-extra-files",
+          Arg.Set remove_extra_files,
+          " Remove files that are neither generated nor excluded" );
       ]
   in
   Arg.parse spec anon_fun usage_msg ;
@@ -2216,7 +2331,7 @@ let (packages_dir, release) =
     | (url, sha256, sha512, version) ->
         Some {version; url = {url; sha256; sha512}}
   in
-  (!packages_dir, release)
+  (!packages_dir, release, !remove_extra_files)
 
 let generate () =
   Printexc.record_backtrace true ;
@@ -2237,8 +2352,10 @@ let check ?exclude () =
   checks_done := true ;
   Printexc.record_backtrace true ;
   try
-    check_for_non_generated_files ?exclude () ;
-    check_js_of_ocaml ()
+    check_circular_opam_deps () ;
+    check_for_non_generated_files ~remove_extra_files ?exclude () ;
+    check_js_of_ocaml () ;
+    if !has_error then exit 1
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
