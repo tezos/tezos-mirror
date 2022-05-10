@@ -25,6 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module draws random values for a cycle based on the {!Seed_repr.seed}
+   associated that cycle. These random values are:
+    - delegates associated with slots
+    - snapshot indexes.
+   The selection of delegates is done by {i sampling} from a particular
+   distribution of the stake among the active delegates.
+
+   This module is responsible for maintaining the table
+   {!Storage.Delegate_sampler_state}. *)
+
 (** Participation slots potentially associated to accounts. The
    accounts that didn't place a deposit will be excluded from this
    list. This function should only be used to compute the deposits to

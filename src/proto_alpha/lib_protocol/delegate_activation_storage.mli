@@ -23,12 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides functions related to delegates' activity.
+(** This module deals with delegates' activity. Typically, the provided
+   functions can be used to deactivate a delegate that has not shown activity
+   for a certain number of cycles, and to reactivate it when appropriate.
 
-    Typically, they can be used to deactivate a delegate that has not shown
-    activity for a certain number of cycles, and to reactivate it when
-    appropriate.
-*)
+    This module is responsible for maintaining the following tables:
+    - {!Storage.Contract.Inactive_delegate}
+    - {!Storage.Contract.Delegate_last_cycle_before_deactivation} *)
 
 val is_inactive :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t

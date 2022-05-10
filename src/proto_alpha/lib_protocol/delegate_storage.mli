@@ -25,6 +25,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module groups everything related to delegate registration.
+
+    It also groups "trivial" getters/setters related to delegates.
+
+    It is responsible for maintaining the following tables:
+    - {!Storage.Contract.Frozen_deposits_limit}
+    - {!Storage.Delegates}
+*)
+
 type error +=
   | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
   | (* `Temporary *) Active_delegate
@@ -120,6 +129,8 @@ val full_balance :
 val delegated_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
+(** Returns the public key of a registered delegate. Returns the error
+   {!Contract.Unregistered_delegate} if the delegate is not registered.  *)
 val pubkey :
   Raw_context.t ->
   Signature.Public_key_hash.t ->

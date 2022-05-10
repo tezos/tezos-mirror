@@ -23,8 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This library provides basic operations (accessors and setters) on
-    staking tokens. *)
+(** This module provides basic operations (accessors and setters) on
+    staking tokens.
+
+    It is responsible for maintaining the following tables:
+    - {!Storage.Stake.Selected_distribution_for_cycle}
+    - {!Storage.Stake.Staking_balance}
+    - {!Storage.Stake.Active_delegate_with_one_roll}
+    - {!Storage.Stake.Last_snapshot}
+    - {!Storage.Stake.Total_active_stake}
+*)
 
 val remove_stake :
   Raw_context.t ->

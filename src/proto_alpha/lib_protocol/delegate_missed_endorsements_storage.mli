@@ -25,6 +25,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This modules deals with delegates' participation in consensus.
+
+    This module is responsible for maintaining the
+    {!Storage.Contract.Missed_endorsements} table.  *)
+
 val expected_slots_for_given_active_stake :
   Raw_context.t ->
   total_active_stake:Tez_repr.t ->

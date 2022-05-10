@@ -25,6 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module maintains the storage related to slashing of delegates for
+   double signing. In particular, it is responsible for maintaining the
+   {!Storage.Slashed_deposits} table.  *)
+
 (** Returns true if the given delegate has already been slashed
    for double baking for the given level. *)
 val already_slashed_for_double_baking :
