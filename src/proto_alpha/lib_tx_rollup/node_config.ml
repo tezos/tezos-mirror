@@ -58,7 +58,7 @@ type t = {
   allow_deposit : bool;
   l2_blocks_cache_size : int;
   caps : caps;
-  transaction_burn_limit : Protocol.Alpha_context.Tez.t option;
+  batch_burn_limit : Protocol.Alpha_context.Tez.t option;
 }
 
 let default_data_dir rollup_id =
@@ -276,7 +276,7 @@ let encoding =
            allow_deposit;
            l2_blocks_cache_size;
            caps;
-           transaction_burn_limit;
+           batch_burn_limit;
          } ->
       ( ( Some data_dir,
           rollup_id,
@@ -288,7 +288,7 @@ let encoding =
           allow_deposit,
           l2_blocks_cache_size,
           caps ),
-        transaction_burn_limit ))
+        batch_burn_limit ))
     (fun ( ( data_dir_opt,
              rollup_id,
              rollup_genesis,
@@ -299,7 +299,7 @@ let encoding =
              allow_deposit,
              l2_blocks_cache_size,
              caps ),
-           transaction_burn_limit ) ->
+           batch_burn_limit ) ->
       let data_dir =
         match data_dir_opt with
         | Some dir -> dir
@@ -316,7 +316,7 @@ let encoding =
         allow_deposit;
         l2_blocks_cache_size;
         caps;
-        transaction_burn_limit;
+        batch_burn_limit;
       })
   @@ merge_objs
        (obj10
@@ -372,9 +372,9 @@ let encoding =
        (obj1
           (opt
              ~description:
-               "The burn limit in for a single transaction (to be paid for the \
-                submission of messages in the protocol inbox)"
-             "transaction_burn_limit"
+               "The burn limit in for a batch (to be paid for the submission \
+                of messages in the protocol inbox)"
+             "batch_burn_limit"
              Tez.encoding))
 
 let get_configuration_filename data_dir =
