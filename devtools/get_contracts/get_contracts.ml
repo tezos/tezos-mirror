@@ -72,7 +72,7 @@ module Make (P : Sigs.PROTOCOL) = struct
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
 
-  module ExprMap = Map.Make (P.Script_expr_hash)
+  module ExprMap = Map.Make (P.Script.Hash)
 
   module File_helpers = struct
     let print_to_file ?err filename fmt =
@@ -110,19 +110,14 @@ module Make (P : Sigs.PROTOCOL) = struct
     let print_expr_file ~dirname ~ext ~hash_string expr =
       let filename = Filename.concat dirname (hash_string ^ ext) in
       let err () = Format.eprintf "Could not print expr file %s\n\n" filename in
-      print_to_file
-        ~err
-        filename
-        "%a@."
-        P.Client.Michelson_v1_printer.print_expr
-        expr
+      print_to_file ~err filename "%a@." P.Script.print_expr expr
 
     let print_expr_dir ~dirname ~ext exprs =
       if not (ExprMap.is_empty exprs) then
         let () = mkdir dirname in
         ExprMap.iter
           (fun hash expr ->
-            let hash_string = P.Script_expr_hash.to_b58check hash in
+            let hash_string = P.Script.Hash.to_b58check hash in
             print_expr_file ~dirname ~ext ~hash_string expr)
           exprs
 
@@ -131,7 +126,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         let () = mkdir dirname in
         ExprMap.iter
           (fun hash flag ->
-            let hash_string = P.Script_expr_hash.to_b58check hash in
+            let hash_string = P.Script.Hash.to_b58check hash in
             print_legacy_file ~dirname ~ext ~hash_string flag)
           exprs
   end
@@ -139,12 +134,8 @@ module Make (P : Sigs.PROTOCOL) = struct
   module Michelson_helpers = struct
     let hash_expr expr =
       let open P in
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Alpha_context.Script.expr_encoding
-          expr
-      in
-      Script_expr_hash.hash_bytes [bytes]
+      let bytes = Data_encoding.Binary.to_bytes_exn Script.expr_encoding expr in
+      Script.Hash.hash_bytes [bytes]
 
     let parse_ty ctxt type_expr =
       let hashed_ty = hash_expr type_expr in
@@ -180,9 +171,7 @@ module Make (P : Sigs.PROTOCOL) = struct
           in
           return (parse_ty ctxt storage_type_expr)
       | Error _ ->
-          P.Client.Michelson_v1_printer.print_expr
-            Format.std_formatter
-            script_expr ;
+          P.Script.print_expr Format.std_formatter script_expr ;
           assert false
 
     module BytesSet = Set.Make (Bytes)
@@ -211,9 +200,7 @@ module Make (P : Sigs.PROTOCOL) = struct
     let try_decode_expr bytes =
       let try_decode bytes =
         match
-          Data_encoding.Binary.of_bytes_opt
-            P.Alpha_context.Script.expr_encoding
-            bytes
+          Data_encoding.Binary.of_bytes_opt P.Script.expr_encoding bytes
         with
         | Some x -> [x]
         | None -> []
@@ -284,9 +271,7 @@ module Make (P : Sigs.PROTOCOL) = struct
     type ex_lambda = P.Unparse_types.ex_lambda
 
     type ex_ty_lambdas =
-      | Ex_ty_lambdas :
-          'a P.Script_typed_ir.ty * ('a -> ex_lambda list) list
-          -> ex_ty_lambdas
+      | Ex_ty_lambdas : 'a P.ty * ('a -> ex_lambda list) list -> ex_ty_lambdas
 
     let keep_lambda_types types =
       let open P.Script_ir_translator in
@@ -384,10 +369,10 @@ module Make (P : Sigs.PROTOCOL) = struct
   end
 
   let get_contract_code ctxt contract =
-    Lwt.map P.wrap_tzresult @@ P.Storage.get_contract_code ctxt contract
+    Lwt.map P.wrap_tzresult @@ P.Contract.get_code ctxt contract
 
   let get_contract_storage ctxt contract =
-    Lwt.map P.wrap_tzresult @@ P.Storage.get_contract_storage ctxt contract
+    Lwt.map P.wrap_tzresult @@ P.Contract.get_storage ctxt contract
 
   let big_map_get ctxt key = Lwt.map P.wrap_tzresult @@ P.Storage.get ctxt key
 
@@ -395,7 +380,7 @@ module Make (P : Sigs.PROTOCOL) = struct
       P.Raw_context.t * P.Storage.big_map_id ->
       init:'a ->
       f:
-        (P.Alpha_context.Script.prim Tezos_micheline.Micheline.canonical ->
+        (P.Script.prim Tezos_micheline.Micheline.canonical ->
         'a ->
         'a Error_monad.tzresult Lwt.t) ->
       'a Error_monad.tzresult Lwt.t =
@@ -441,19 +426,16 @@ module Make (P : Sigs.PROTOCOL) = struct
     >|= P.wrap_tzresult
     >>=? fun raw_ctxt ->
     print_endline "Listing addresses..." ;
-    Storage.fold_contracts
-      raw_ctxt
-      ~init:(ExprMap.empty, 0)
-      ~f:(fun contract (m, i) ->
+    Contract.fold raw_ctxt ~init:(ExprMap.empty, 0) ~f:(fun contract (m, i) ->
         let i = i + 1 in
         if i mod 5000 = 0 then Format.printf "%d@." i ;
-        match Contract_repr.is_implicit contract with
+        match Contract.is_implicit contract with
         | Some _key_hash -> Lwt.return (m, i)
         | None -> (
             Storage_helpers.get_lazy_expr
               ~what:"contract code"
               ~getter:get_contract_code
-              ~pp:P.Contract_repr.pp
+              ~pp:P.Contract.pp
               raw_ctxt
               contract
             >>= function
@@ -463,7 +445,7 @@ module Make (P : Sigs.PROTOCOL) = struct
                  Storage_helpers.get_lazy_expr
                    ~what:"contract storage"
                    ~getter:get_contract_storage
-                   ~pp:P.Contract_repr.pp
+                   ~pp:P.Contract.pp
                    raw_ctxt
                    contract
                  >|= function
@@ -557,15 +539,13 @@ module Make (P : Sigs.PROTOCOL) = struct
     print_endline "Writing contract files..." ;
     ExprMap.iter
       (fun hash (script, contracts, storages) ->
-        let hash_string = P.Script_expr_hash.to_b58check hash in
+        let hash_string = P.Script.Hash.to_b58check hash in
         File_helpers.print_expr_file ~dirname:"" ~ext:".tz" ~hash_string script ;
         let filename = hash_string ^ ".addresses" in
         File_helpers.print_to_file
           filename
           "%a"
-          (Format.pp_print_list
-             ~pp_sep:Format.pp_print_newline
-             P.Contract_repr.pp)
+          (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
           contracts ;
         if Options.collect_storage then
           let dirname = hash_string ^ ".storages" in

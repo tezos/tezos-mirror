@@ -30,6 +30,12 @@ module type PROTOCOL = sig
     type 'a tzresult
   end
 
+  type ('k, 'v) map
+
+  type ('arg, 'ret) lambda
+
+  type 'a ty
+
   module Alpha_context : sig
     type t
 
@@ -39,29 +45,9 @@ module type PROTOCOL = sig
       type t
     end
 
-    module Script : sig
-      type prim
-
-      type expr = prim Micheline.canonical
-
-      type lazy_expr = expr Data_encoding.lazy_t
-
-      type node = (Micheline.canonical_location, prim) Micheline.node
-
-      val expr_encoding : expr Data_encoding.t
-    end
-
     module Timestamp : sig
       type time
     end
-  end
-
-  module Contract_repr : sig
-    type t
-
-    val is_implicit : t -> Signature.Public_key_hash.t option
-
-    val pp : Format.formatter -> t -> unit
   end
 
   module Raw_context : sig
@@ -78,22 +64,49 @@ module type PROTOCOL = sig
     val recover : t -> Environment_context.Context.t
   end
 
-  module Script_expr_hash : sig
-    type t
+  module Script : sig
+    type prim
 
-    val compare : t -> t -> int
+    type expr = prim Micheline.canonical
 
-    val to_b58check : t -> string
+    type lazy_expr = expr Data_encoding.lazy_t
 
-    val hash_bytes : ?key:bytes -> bytes list -> t
+    type node = (Micheline.canonical_location, prim) Micheline.node
+
+    val expr_encoding : expr Data_encoding.t
+
+    val print_expr : Format.formatter -> expr -> unit
+
+    module Hash : sig
+      type t
+
+      val compare : t -> t -> int
+
+      val to_b58check : t -> string
+
+      val hash_bytes : ?key:bytes -> bytes list -> t
+    end
   end
 
-  module Script_typed_ir : sig
-    type ('k, 'v) map
+  module Contract : sig
+    type repr
 
-    type ('arg, 'ret) lambda
+    val is_implicit : repr -> Signature.Public_key_hash.t option
 
-    type 'a ty
+    val pp : Format.formatter -> repr -> unit
+
+    val get_code :
+      Raw_context.t ->
+      repr ->
+      (Raw_context.t * Script.lazy_expr) Error_monad.tzresult Lwt.t
+
+    val get_storage :
+      Raw_context.t ->
+      repr ->
+      (Raw_context.t * Script.lazy_expr) Error_monad.tzresult Lwt.t
+
+    val fold :
+      Raw_context.t -> init:'a -> f:(repr -> 'a -> 'a Lwt.t) -> 'a Lwt.t
   end
 
   module Script_ir_translator : sig
@@ -101,7 +114,7 @@ module type PROTOCOL = sig
 
     type toplevel
 
-    type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
+    type ex_ty = Ex_ty : 'a ty -> ex_ty
 
     type type_logger
 
@@ -120,26 +133,18 @@ module type PROTOCOL = sig
       context ->
       legacy:bool ->
       allow_forged:bool ->
-      'a Script_typed_ir.ty ->
+      'a ty ->
       Script.node ->
       ('a * context) Error_monad.tzresult Lwt.t
 
     val unparse_ty :
-      context ->
-      'a Script_typed_ir.ty ->
-      (Script.node * context) Error_monad.tzresult
+      context -> 'a ty -> (Script.node * context) Error_monad.tzresult
 
     val parse_toplevel :
       context ->
       legacy:bool ->
       Script.expr ->
       (toplevel * context) Error_monad.tzresult Lwt.t
-  end
-
-  module Client : sig
-    module Michelson_v1_printer : sig
-      val print_expr : Format.formatter -> Alpha_context.Script.expr -> unit
-    end
   end
 
   module Storage : sig
@@ -151,57 +156,30 @@ module type PROTOCOL = sig
       ?offset:int ->
       ?length:int ->
       Raw_context.t * big_map_id ->
-      (Raw_context.t * Alpha_context.Script.expr list) Error_monad.tzresult
-      Lwt.t
+      (Raw_context.t * Script.expr list) Error_monad.tzresult Lwt.t
 
     val get :
-      Raw_context.t ->
-      big_map_id ->
-      Alpha_context.Script.expr Error_monad.tzresult Lwt.t
+      Raw_context.t -> big_map_id -> Script.expr Error_monad.tzresult Lwt.t
 
     val fold :
       Raw_context.t -> init:'a -> f:(big_map_id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-
-    val get_contract_code :
-      Raw_context.t ->
-      Contract_repr.t ->
-      (Raw_context.t * Alpha_context.Script.lazy_expr) Error_monad.tzresult
-      Lwt.t
-
-    val get_contract_storage :
-      Raw_context.t ->
-      Contract_repr.t ->
-      (Raw_context.t * Alpha_context.Script.lazy_expr) Error_monad.tzresult
-      Lwt.t
-
-    val fold_contracts :
-      Raw_context.t ->
-      init:'a ->
-      f:(Contract_repr.t -> 'a -> 'a Lwt.t) ->
-      'a Lwt.t
   end
 
   module Unparse_types : sig
     type ex_lambda =
-      | Ex_lambda :
-          ('a, 'b) Script_typed_ir.lambda Script_typed_ir.ty
-          * ('a, 'b) Script_typed_ir.lambda
-          -> ex_lambda
+      | Ex_lambda : ('a, 'b) lambda ty * ('a, 'b) lambda -> ex_lambda
 
-    val collect_lambda_tys :
-      'a Script_typed_ir.ty -> ('a -> ex_lambda list) list
+    val collect_lambda_tys : 'a ty -> ('a -> ex_lambda list) list
 
     val collect_lambda_tys_map :
-      'tv Script_typed_ir.ty ->
-      (('tk, 'tv) Script_typed_ir.map -> ex_lambda list) list
+      'tv ty -> (('tk, 'tv) map -> ex_lambda list) list
   end
 
-  val code_storage_type :
-    Script_ir_translator.toplevel -> Alpha_context.Script.node
+  val code_storage_type : Script_ir_translator.toplevel -> Script.node
 
-  val is_unpack : Alpha_context.Script.prim -> bool
+  val is_unpack : Script.prim -> bool
 
-  val lam_node : (_, _) Script_typed_ir.lambda -> Alpha_context.Script.node
+  val lam_node : (_, _) lambda -> Script.node
 
   val wrap_tzresult : 'a Error_monad.tzresult -> 'a tzresult
 end

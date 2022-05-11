@@ -26,8 +26,35 @@
 module Main = Get_contracts.Make (struct
   include Tezos_raw_protocol_011_PtHangz2
 
+  type ('k, 'v) map = ('k, 'v) Script_typed_ir.map
+
+  type ('a, 'r) lambda = ('a, 'r) Script_typed_ir.lambda
+
+  type 'a ty = 'a Script_typed_ir.ty
+
   module Error_monad =
     Tezos_protocol_environment_011_PtHangz2.Environment.Error_monad
+
+  module Contract = struct
+    type repr = Contract_repr.t
+
+    let pp = Contract_repr.pp
+
+    let is_implicit = Contract_repr.is_implicit
+
+    let get_code = Storage.Contract.Code.get
+
+    let get_storage = Storage.Contract.Storage.get
+
+    let fold = Storage.Contract.fold
+  end
+
+  module Script = struct
+    include Alpha_context.Script
+    module Hash = Script_expr_hash
+
+    let print_expr = Tezos_client_011_PtHangz2.Michelson_v1_printer.print_expr
+  end
 
   module Storage = struct
     type big_map_id = Storage.Big_map.id
@@ -39,18 +66,10 @@ module Main = Get_contracts.Make (struct
     let get = Storage.Big_map.Value_type.get
 
     let fold = Storage.Big_map.fold
-
-    let get_contract_code = Storage.Contract.Code.get
-
-    let get_contract_storage = Storage.Contract.Storage.get
-
-    let fold_contracts = Storage.Contract.fold
   end
 
   module Unparse_types =
     Tezos_protocol_plugin_011_PtHangz2.Plugin.RPC.Scripts.Unparse_types
-
-  module Client = Tezos_client_011_PtHangz2
 
   let wrap_tzresult =
     Tezos_protocol_environment_011_PtHangz2.Environment.wrap_tzresult
