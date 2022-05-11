@@ -49,7 +49,7 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print | LC_COLLATE=C sort -u)
 
 ## Shallow clone of opam repository (requires git protocol version 2)
 export GIT_WORK_TREE="$tmp_dir"
@@ -97,7 +97,7 @@ dummy_opam=$dummy_path/opam
 mkdir -p $dummy_path
 echo 'opam-version: "2.0"' > $dummy_opam
 echo 'conflicts:[' >> $dummy_opam
-for f in $(find ./ -name opam | xargs -n1 grep "^flags: *\[ *avoid-version *\]" -l);
+grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
 do
     f=$(dirname $f)
     f=$(basename $f)
