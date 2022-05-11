@@ -3293,6 +3293,39 @@ module RPC = struct
       RPC_context.make_call1 S.boot_sector ctxt block sc_rollup_address () ()
   end
 
+  module Tx_rollup = struct
+    open Data_encoding
+
+    module S = struct
+      let path : RPC_context.t RPC_path.context =
+        RPC_path.(open_root / "context" / "tx_rollup")
+
+      let has_bond =
+        RPC_service.get_service
+          ~description:
+            "Returns true if the public key hash already deposited a bond  for \
+             the given rollup"
+          ~query:RPC_query.empty
+          ~output:bool
+          RPC_path.(
+            path /: Tx_rollup.rpc_arg / "has_bond"
+            /: Signature.Public_key_hash.rpc_arg)
+    end
+
+    let register_has_bond () =
+      Registration.register2
+        ~chunked:false
+        S.has_bond
+        (fun ctxt rollup operator () () ->
+          Tx_rollup_commitment.has_bond ctxt rollup operator
+          >>=? fun (_ctxt, has_bond) -> return has_bond)
+
+    let register () = register_has_bond ()
+
+    let has_bond ctxt block rollup operator =
+      RPC_context.make_call2 S.has_bond ctxt block rollup operator () ()
+  end
+
   module Forge = struct
     module S = struct
       open Data_encoding
@@ -4210,6 +4243,7 @@ module RPC = struct
     Endorsing_rights.register () ;
     Validators.register () ;
     Sc_rollup.register () ;
+    Tx_rollup.register () ;
     Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
         if q.offset < 0l then fail Negative_level_offset
         else

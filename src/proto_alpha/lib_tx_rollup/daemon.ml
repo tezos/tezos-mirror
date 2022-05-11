@@ -521,6 +521,42 @@ let reject_bad_commitment state commitment =
   | None -> return_unit
   | Some source -> Accuser.reject_bad_commitment ~source state commitment
 
+let fail_when_slashed (type kind) state l1_operation
+    (result : kind manager_operation_result) =
+  let open Lwt_result_syntax in
+  let open Apply_results in
+  match state.State.signers.operator with
+  | None -> return_unit
+  | Some operator -> (
+      match result with
+      | Applied result ->
+          let balance_updates =
+            match result with
+            | Tx_rollup_commit_result {balance_updates; _}
+            | Tx_rollup_rejection_result {balance_updates; _} ->
+                (* These are the only two operations which can slash a bond. *)
+                balance_updates
+            | _ -> []
+          in
+          let (frozen_debit, punish) =
+            List.fold_left
+              (fun (frozen_debit, punish) -> function
+                | Receipt.(Tx_rollup_rejection_punishments, Credited _, _) ->
+                    (* Someone was punished *)
+                    (frozen_debit, true)
+                | (Frozen_bonds (committer, _), Debited _, _)
+                  when Contract.(committer = Implicit operator) ->
+                    (* Our frozen bonds are gone *)
+                    (true, punish)
+                | _ -> (frozen_debit, punish))
+              (false, false)
+              balance_updates
+          in
+          fail_when
+            (frozen_debit && punish)
+            (Error.Tx_rollup_deposit_slashed l1_operation)
+      | _ -> return_unit)
+
 let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     (op : kind manager_operation) (result : kind manager_operation_result)
     (acc : 'acc) : 'acc tzresult Lwt.t =
@@ -528,6 +564,7 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
   let is_my_rollup tx_rollup =
     Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
   in
+  let* () = Error.trace_fatal @@ fail_when_slashed state l1_operation result in
   match (op, result) with
   | ( Tx_rollup_commit {commitment; tx_rollup},
       Applied (Tx_rollup_commit_result _) )
@@ -742,6 +779,31 @@ let catch_up state = catch_up_on_commitments state
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2958
    We may also need to catch up on finalization/removal of commitments here. *)
 
+let check_operator_deposit state config =
+  let open Lwt_result_syntax in
+  match state.State.signers.operator with
+  | None ->
+      (* No operator for this node, no commitments will be made. *)
+      return_unit
+  | Some operator ->
+      let* has_deposit =
+        Plugin.RPC.Tx_rollup.has_bond
+          state.State.cctxt
+          (state.State.cctxt#chain, `Head 0)
+          state.State.rollup_info.rollup_id
+          operator
+      in
+      if has_deposit then
+        (* The operator already has a deposit for this rollup, no other check
+           necessary. *)
+        return_unit
+      else
+        (* Operator never made a deposit for this rollup, ensure they are ready to
+           make one. *)
+        fail_unless
+          config.Node_config.allow_deposit
+          Error.Tx_rollup_deposit_not_allowed
+
 let main_exit_callback state exit_status =
   let open Lwt_syntax in
   let* () = Stores.close state.State.stores in
@@ -784,6 +846,7 @@ let run configuration cctxt =
       ?rollup_genesis
       rollup_id
   in
+  let* () = check_operator_deposit state configuration in
   let* () =
     Injector.init
       state

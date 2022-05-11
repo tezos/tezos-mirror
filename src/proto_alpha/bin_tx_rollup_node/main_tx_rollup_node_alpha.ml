@@ -151,6 +151,12 @@ let mode_param =
          (String.concat ", " possible_modes))
     mode_parameter
 
+let allow_deposit_arg =
+  Clic.switch
+    ~doc:"Allow the operator to make a first deposit for commitments"
+    ~long:"allow-deposit"
+    ()
+
 let group =
   Clic.
     {
@@ -165,7 +171,7 @@ let configuration_init_command =
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
-    (args10
+    (args11
        data_dir_arg
        operator_arg
        batch_signer_arg
@@ -175,6 +181,7 @@ let configuration_init_command =
        dispatch_withdrawals_signer_arg
        rollup_genesis_arg
        rpc_addr_arg
+       allow_deposit_arg
        reconnection_delay_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
@@ -192,6 +199,7 @@ let configuration_init_command =
            dispatch_withdrawals_signer,
            rollup_genesis,
            rpc_addr,
+           allow_deposit,
            reconnection_delay )
          mode
          rollup_id
@@ -221,6 +229,7 @@ let configuration_init_command =
             rollup_genesis;
             rpc_addr;
             reconnection_delay;
+            allow_deposit;
             l2_blocks_cache_size = default_l2_blocks_cache_size;
           }
       in
