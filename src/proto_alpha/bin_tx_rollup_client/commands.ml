@@ -730,6 +730,120 @@ let sign_transaction () =
         in
         return_unit)
 
+let display_answer (cctxt : #Configuration.tx_client_context) :
+    RPC_context.generic_call_result -> unit Lwt.t = function
+  | `Json (`Ok json) -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
+  | `Binary (`Ok binary) -> cctxt#answer "%a" Hex.pp (Hex.of_string binary)
+  | `Json (`Error (Some error)) ->
+      cctxt#error
+        "@[<v 2>Command failed: @[%a@]@]@."
+        (Format.pp_print_list Error_monad.pp)
+        (Data_encoding.Json.destruct
+           (Data_encoding.list Error_monad.error_encoding)
+           error)
+  | `Binary (`Error (Some error)) -> (
+      match Data_encoding.Binary.of_string Error_monad.trace_encoding error with
+      | Ok trace ->
+          cctxt#error
+            "@[<v 2>Command failed: @[%a@]@]@."
+            Error_monad.pp_print_trace
+            trace
+      | Error msg ->
+          cctxt#error
+            "@[<v 2>Error whilst decoding the server response: @[%a@]@]@."
+            Data_encoding.Binary.pp_read_error
+            msg)
+  | `Json (`Not_found _) | `Binary (`Not_found _) | `Other (_, `Not_found _) ->
+      cctxt#error "No service found at this URL\n%!"
+  | `Json (`Gone _) | `Binary (`Gone _) | `Other (_, `Gone _) ->
+      cctxt#error
+        "Requested data concerns a pruned block and target resource is no \
+         longer available\n\
+         %!"
+  | `Json (`Unauthorized _)
+  | `Binary (`Unauthorized _)
+  | `Other (_, `Unauthorized _) ->
+      cctxt#error "@[<v 2>[HTTP 403] Access denied to: %a@]@." Uri.pp cctxt#base
+  | _ -> cctxt#error "Unexpected server answer\n%!"
+
+let call ?body meth raw_url (cctxt : #Configuration.tx_client_context) =
+  let open Lwt_result_syntax in
+  let uri = Uri.of_string raw_url in
+  let body =
+    (* This code is similar to a piece of code in [fill_in]
+       function. An RPC is declared as POST, PATCH or PUT, but the
+       body is not given. In that case, the body should be an empty
+       JSON object. *)
+    match (meth, body) with
+    | (_, Some _) -> body
+    | (`DELETE, None) | (`GET, None) -> None
+    | (`PATCH, None) | (`PUT, None) | (`POST, None) -> Some (`O [])
+  in
+  let* answer = cctxt#generic_media_type_call ?body meth uri in
+  let*! () = display_answer cctxt answer in
+  return_unit
+
+let call_with_json meth raw_url json (cctxt : #Configuration.tx_client_context)
+    =
+  match Data_encoding.Json.from_string json with
+  | exception Assert_failure _ ->
+      (* Ref : https://github.com/mirage/ezjsonm/issues/31 *)
+      cctxt#error "Failed to parse the provided json: unwrapped JSON value.\n%!"
+  | Error err -> cctxt#error "Failed to parse the provided json: %s\n%!" err
+  | Ok body -> call meth ~body raw_url cctxt
+
+let call_with_file_or_json meth url maybe_file
+    (cctxt : #Configuration.tx_client_context) =
+  let open Lwt_result_syntax in
+  let* json =
+    match TzString.split ':' ~limit:1 maybe_file with
+    | ["file"; filename] ->
+        Lwt.catch
+          (fun () ->
+            Lwt_result.ok @@ Lwt_io.(with_file ~mode:Input filename read))
+          (fun exn -> failwith "cannot read file (%s)" (Printexc.to_string exn))
+    | _ -> return maybe_file
+  in
+  call_with_json meth url json cctxt
+
+let rpc_commands () =
+  let group =
+    {Clic.name = "rpc"; title = "Commands for the low level RPC layer"}
+  in
+  [
+    command
+      ~group
+      ~desc:"Call an RPC with the GET method."
+      no_options
+      (prefixes ["rpc"; "get"] @@ string ~name:"url" ~desc:"the RPC URL" @@ stop)
+      (fun () -> call `GET);
+    command
+      ~group
+      ~desc:"Call an RPC with the POST method."
+      no_options
+      (prefixes ["rpc"; "post"]
+      @@ string ~name:"url" ~desc:"the RPC URL"
+      @@ stop)
+      (fun () -> call `POST);
+    command
+      ~group
+      ~desc:
+        "Call an RPC with the POST method, providing input data via the \
+         command line."
+      no_options
+      (prefixes ["rpc"; "post"]
+      @@ string ~name:"url" ~desc:"the RPC URL"
+      @@ prefix "with"
+      @@ string
+           ~name:"input"
+           ~desc:
+             "the raw JSON input to the RPC\n\
+              For instance, use `{}` to send the empty document.\n\
+              Alternatively, use `file:path` to read the JSON data from a file."
+      @@ stop)
+      (fun () -> call_with_file_or_json `POST);
+  ]
+
 let all () =
   [
     get_tx_address_balance_command ();
@@ -746,3 +860,4 @@ let all () =
     transfer ();
     withdraw ();
   ]
+  @ rpc_commands ()
