@@ -32,6 +32,13 @@ let has_prefix ~prefix string =
   let prefix_len = String.length prefix in
   String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
 
+let string_for_all p s =
+  let n = String.length s in
+  let rec loop i =
+    if i = n then true else if p (String.get s i) then loop (succ i) else false
+  in
+  loop 0
+
 let has_error = ref false
 
 let info fmt = Format.eprintf fmt
@@ -1082,19 +1089,26 @@ module Target = struct
     let opam =
       match opam with
       | Some "" -> None
-      | Some opam as x -> (
-          let pkg_name = Filename.basename opam in
-          match String.index_opt pkg_name '.' with
-          | None -> x
-          | Some _ ->
-              invalid_argf
-                "%s is not a valid opam package name: '.' (dot) are not allowed"
-                pkg_name)
+      | Some opam as x ->
+          if
+            string_for_all
+              (function
+                | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' -> true
+                | _ -> false)
+              opam
+          then x
+          else
+            invalid_argf
+              "%s is not a valid opam package name: should be of the form \
+               [A-Za-Z0-9_-]+"
+              opam
       | None -> (
           match kind with
-          | Public_library {public_name; _}
-          | Public_executable ({public_name; _}, []) ->
-              Some (path // public_name)
+          | Public_library {public_name; _} -> (
+              match String.split_on_char '.' public_name with
+              | [] -> assert false
+              | first :: _ -> Some first)
+          | Public_executable ({public_name; _}, []) -> Some public_name
           | Public_executable ({public_name; _}, _ :: _) ->
               invalid_argf
                 "for targets which provide more than one public executables \
@@ -1183,21 +1197,14 @@ module Target = struct
           let runtest_js_rules =
             if run_js then
               List.map
-                (fun name ->
-                  Dune.(
-                    runtest_js
-                      ~dep_files
-                      ~package:(Filename.basename package)
-                      name))
+                (fun name -> Dune.(runtest_js ~dep_files ~package name))
                 (Ne_list.to_list names)
             else []
           in
           let runtest_rules =
             if run_native then
               List.map
-                (fun name ->
-                  Dune.(
-                    runtest ~dep_files ~package:(Filename.basename package) name))
+                (fun name -> Dune.(runtest ~dep_files ~package name))
                 (Ne_list.to_list names)
             else []
           in
@@ -1588,7 +1595,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   in
   let package =
     match (internal.kind, internal.opam) with
-    | (Public_executable _, Some opam) -> Some (Filename.basename opam)
+    | (Public_executable _, Some opam) -> Some opam
     | _ -> None
   in
   let instrumentation =
@@ -1751,7 +1758,6 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
   match target with
   | Internal {opam = None; _} | External {opam = None; _} -> None
   | Internal {opam = Some package; _} ->
-      let package = Filename.basename package in
       if package = for_package then None
       else
         let version =
@@ -1769,10 +1775,9 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
            "tezos-rust-libs" is an exception to the exception... *)
         if
           fix_version
-          && (has_prefix ~prefix:"tezos-" (Filename.basename opam)
-             || has_prefix ~prefix:"octez-" (Filename.basename opam))
-          && Filename.basename opam <> "tezos-rust-libs"
-          && Filename.basename opam <> "octez-rust-libs"
+          && (has_prefix ~prefix:"tezos-" opam
+             || has_prefix ~prefix:"octez-" opam)
+          && opam <> "tezos-rust-libs" && opam <> "octez-rust-libs"
         then Version.(Exactly Version)
         else version
       in
@@ -1790,7 +1795,7 @@ let as_opam_monorepo_opam_provided = function
 
 let generate_opam ?release this_package (internals : Target.internal list) :
     Opam.t =
-  let for_package = Filename.basename this_package in
+  let for_package = this_package in
   let map l f = List.map f l in
   let (depends, x_opam_monorepo_opam_provided) =
     List.split @@ map internals
@@ -1944,7 +1949,7 @@ let generate_opam_files () =
      but one can specify a custom .opam path too. *)
   Target.iter_internal_by_opam @@ fun package internals ->
   let opam = generate_opam package internals in
-  write ("opam/" ^ Filename.basename package ^ ".opam") @@ fun fmt ->
+  write ("opam/" ^ package ^ ".opam") @@ fun fmt ->
   Format.fprintf
     fmt
     "# This file was automatically generated, do not edit.@.# Edit file \
@@ -1954,11 +1959,8 @@ let generate_opam_files () =
 
 let generate_opam_files_for_release packages_dir release =
   Target.iter_internal_by_opam @@ fun package internal_pkgs ->
-  let package_name = Filename.basename package in
   let opam_filename =
-    packages_dir // package_name
-    // (package_name ^ "." ^ release.version)
-    // "opam"
+    packages_dir // package // (package ^ "." ^ release.version) // "opam"
   in
   let opam = generate_opam ~release package internal_pkgs in
   write opam_filename @@ fun fmt -> Opam.pp fmt opam
@@ -1984,7 +1986,7 @@ let generate_dune_project_files () =
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
   ( Target.iter_internal_by_opam @@ fun package _internals ->
-    Format.fprintf fmt "(package (name %s))@." (Filename.basename package) ) ;
+    Format.fprintf fmt "(package (name %s))@." package ) ;
   Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
