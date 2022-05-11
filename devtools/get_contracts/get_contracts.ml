@@ -179,7 +179,11 @@ module Make (P : Sigs.PROTOCOL) = struct
             Micheline.strip_locations @@ P.code_storage_type code
           in
           return (parse_ty ctxt storage_type_expr)
-      | Error _ -> assert false
+      | Error _ ->
+          P.Client.Michelson_v1_printer.print_expr
+            Format.std_formatter
+            script_expr ;
+          assert false
 
     module BytesSet = Set.Make (Bytes)
 
