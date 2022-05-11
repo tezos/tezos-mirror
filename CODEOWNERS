@@ -15,7 +15,7 @@
 # Insert code owner declarations here!
 # ************************************
 
-/docs                        @NicVolanschi @raphael-proust @Saroupille @astefano @eugenz @arvidnl @yrg @dannywillems @hai-nguyen-van @lthms @raphoo_
+/docs                        @NicVolanschi @raphael-proust @Saroupille @astefano @eugenz @arvidnl @yrg @dannywillems @hai-nguyen-van @lthms @rafoo_
 
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
@@ -75,7 +75,7 @@
 # @Saroupille = François Thiré
 # @smelc = Clément Hurlin
 # @smondet = Seb Mondet
-# @sribar = Sylvain R.
+# @sribaroud = Sylvain R.
 # @sventimir = Sventimir
 # @tomjack = Tom Jack
 # @vbotbol = vbot
@@ -83,7 +83,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @arvidnl @camlspotter @eugenz @hhugo1 @igarnier @jobjo @klakplok @lthms @mbouaziz @murbard @naih @NicVolanschi @paracetamolo @pirbo @rafoo_ @raphael-proust @richard.bonichon @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vch9 @vect0r @yrg
+* @arvidnl @camlspotter @eugenz @hhugo1 @igarnier @jobjo @klakplok @lthms @mbouaziz @murbard @naih @NicVolanschi @paracetamolo @pirbo @rafoo_ @raphael-proust @richard.bonichon @romain.nl @Saroupille @smelc @smondet @sribaroud @sventimir @tomjack @vbotbol @vch9 @vect0r @yrg
 
 # CODEOWNERS Owners
 #
