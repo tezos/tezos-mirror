@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name get_contracts)
+ (libraries
+  tezos-client-base-unix
+  tezos-store)
+ (flags
+  (:standard
+   -open Tezos_micheline
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib_unix))
+ (modules get_contracts sigs))

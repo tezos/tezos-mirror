@@ -4481,6 +4481,19 @@ let _git_gas_diff =
     ~release:false
     ~bisect_ppx:false
 
+let _get_contracts_lib =
+  private_lib
+    "get_contracts"
+    ~path:"devtools/get_contracts"
+    ~synopsis:"Generic tool to extract smart contracts from node's context."
+    ~opam:""
+    ~deps:[tezos_client_base_unix; tezos_store]
+    ~modules:["get_contracts"; "sigs"]
+    ~opens:["Tezos_micheline"; "Tezos_base__TzPervasives"; "Tezos_stdlib_unix"]
+    ~static:false
+    ~release:false
+    ~bisect_ppx:false
+
 let _s_packer =
   private_exe
     "s_packer"
