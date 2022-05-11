@@ -46,6 +46,13 @@ val of_int : int -> t option
 (** [to_int tick] converts the [tick] into an integer. *)
 val to_int : t -> int option
 
+(** [of_number_of_ticks] converts from the bounded int type defined in
+    the [Sc_rollup_repr] module. [Number_of_ticks] is used inside of
+    commitments to limit the maximum possible storage requirement. It is
+    bounded between one and [max_int] meaning that this can never return
+    a negative number so an [option] isn't required. *)
+val of_number_of_ticks : Sc_rollup_repr.Number_of_ticks.t -> t
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

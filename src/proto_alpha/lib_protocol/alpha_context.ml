@@ -56,6 +56,7 @@ module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
   module Inbox = Sc_rollup_inbox_repr
+  module Game = Sc_rollup_game_repr
   include Sc_rollup_storage
 end
 

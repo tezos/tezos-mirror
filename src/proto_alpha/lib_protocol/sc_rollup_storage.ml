@@ -42,6 +42,10 @@ type error +=
       Sc_rollup_repr.Commitment_hash.t
   | (* `Temporary *) Sc_rollup_bad_inbox_level
   | (* `Temporary *) Sc_rollup_max_number_of_available_messages_reached
+  | (* `Temporary *) Sc_rollup_wrong_turn
+  | (* `Temporary *) Sc_rollup_no_game
+  | (* `Temporary *) Sc_rollup_staker_in_game
+  | (* `Temporary *) Sc_rollup_timeout_level_not_reached
 
 let () =
   register_error_kind
@@ -54,6 +58,38 @@ let () =
       | Sc_rollup_max_number_of_available_messages_reached -> Some ()
       | _ -> None)
     (fun () -> Sc_rollup_max_number_of_available_messages_reached) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_staker_in_game"
+    ~title:"Staker is already playing a game"
+    ~description:"Attempt to start a game where one staker is already busy"
+    Data_encoding.unit
+    (function Sc_rollup_staker_in_game -> Some () | _ -> None)
+    (fun () -> Sc_rollup_staker_in_game) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_timeout_level_not_reached"
+    ~title:"Attempt to timeout game too early"
+    ~description:"Attempt to timeout game too early"
+    Data_encoding.unit
+    (function Sc_rollup_timeout_level_not_reached -> Some () | _ -> None)
+    (fun () -> Sc_rollup_timeout_level_not_reached) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_no_game"
+    ~title:"Refutation game does not exist"
+    ~description:"Refutation game does not exist"
+    Data_encoding.unit
+    (function Sc_rollup_no_game -> Some () | _ -> None)
+    (fun () -> Sc_rollup_no_game) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_wrong_turn"
+    ~title:"Attempt to play move but not staker's turn"
+    ~description:"Attempt to play move but not staker's turn"
+    Data_encoding.unit
+    (function Sc_rollup_wrong_turn -> Some () | _ -> None)
+    (fun () -> Sc_rollup_wrong_turn) ;
   let description = "Already staked." in
   register_error_kind
     `Temporary
@@ -223,15 +259,12 @@ let originate ctxt ~kind ~boot_sector =
   Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
   let level = Raw_context.current_level ctxt in
   Sc_rollup_repr.Address.from_nonce nonce >>?= fun address ->
-  Storage.Sc_rollup.PVM_kind.add ctxt address kind >>= fun ctxt ->
-  Storage.Sc_rollup.Initial_level.add
-    ctxt
-    address
-    (Level_storage.current ctxt).level
+  Store.PVM_kind.add ctxt address kind >>= fun ctxt ->
+  Store.Initial_level.add ctxt address (Level_storage.current ctxt).level
   >>= fun ctxt ->
-  Storage.Sc_rollup.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
+  Store.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
   let inbox = Sc_rollup_inbox_repr.empty address level.level in
-  Storage.Sc_rollup.Inbox.init ctxt address inbox >>=? fun (ctxt, size_diff) ->
+  Store.Inbox.init ctxt address inbox >>=? fun (ctxt, size_diff) ->
   Store.Last_cemented_commitment.init ctxt address Commitment_hash.zero
   >>=? fun (ctxt, lcc_size_diff) ->
   Store.Staker_count.init ctxt address 0l >>=? fun (ctxt, stakers_size_diff) ->
@@ -248,7 +281,7 @@ let originate ctxt ~kind ~boot_sector =
   in
   return (address, size, ctxt)
 
-let kind ctxt address = Storage.Sc_rollup.PVM_kind.find ctxt address
+let kind ctxt address = Store.PVM_kind.find ctxt address
 
 let last_cemented_commitment ctxt rollup =
   let open Lwt_tzresult_syntax in
@@ -260,17 +293,17 @@ let last_cemented_commitment ctxt rollup =
 (** Try to consume n messages. *)
 let consume_n_messages ctxt rollup n =
   let open Lwt_tzresult_syntax in
-  let* (ctxt, inbox) = Storage.Sc_rollup.Inbox.get ctxt rollup in
+  let* (ctxt, inbox) = Store.Inbox.get ctxt rollup in
   Sc_rollup_inbox_repr.consume_n_messages n inbox >>?= function
   | None -> return ctxt
   | Some inbox ->
-      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
+      let* (ctxt, size) = Store.Inbox.update ctxt rollup inbox in
       assert (Compare.Int.(size <= 0)) ;
       return ctxt
 
 let inbox ctxt rollup =
   let open Lwt_tzresult_syntax in
-  let* (ctxt, res) = Storage.Sc_rollup.Inbox.find ctxt rollup in
+  let* (ctxt, res) = Store.Inbox.find ctxt rollup in
   match res with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some inbox -> return (inbox, ctxt)
@@ -336,7 +369,7 @@ let add_messages ctxt rollup messages =
   let*? ctxt =
     Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
   in
-  Storage.Sc_rollup.Inbox.update ctxt rollup inbox >>=? fun (ctxt, size) ->
+  let* (ctxt, size) = Store.Inbox.update ctxt rollup inbox in
   return (inbox, Z.of_int size, ctxt)
 
 (* This function is called in other functions in the module only after they have
@@ -759,11 +792,11 @@ let remove_staker ctxt rollup staker =
         in
         go staked_on ctxt
 
-let list ctxt = Storage.Sc_rollup.PVM_kind.keys ctxt >|= Result.return
+let list ctxt = Store.PVM_kind.keys ctxt >|= Result.return
 
 let initial_level ctxt rollup =
   let open Lwt_tzresult_syntax in
-  let* level = Storage.Sc_rollup.Initial_level.find ctxt rollup in
+  let* level = Store.Initial_level.find ctxt rollup in
   match level with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some level -> return level
@@ -786,3 +819,95 @@ let last_cemented_commitment_hash_with_level ctxt rollup =
       get_commitment_internal ctxt rollup commitment_hash
     in
     (commitment_hash, inbox_level, ctxt)
+
+(** TODO: #2902 replace with protocol constant and consider good value. *)
+let timeout_period_in_blocks = 500
+
+let timeout_level ctxt =
+  let level = Raw_context.current_level ctxt in
+  Raw_level_repr.add level.level timeout_period_in_blocks
+
+let get_or_init_game ctxt rollup ~refuter ~defender =
+  let open Lwt_tzresult_syntax in
+  let stakers = Sc_rollup_game_repr.Index.normalize (refuter, defender) in
+  let* (ctxt, game) = Store.Game.find (ctxt, rollup) stakers in
+  match game with
+  | Some g -> return (g, ctxt)
+  | None ->
+      let* (ctxt, opp_1) = Store.Opponent.find (ctxt, rollup) refuter in
+      let* (ctxt, opp_2) = Store.Opponent.find (ctxt, rollup) defender in
+      let* _ =
+        match (opp_1, opp_2) with
+        | (None, None) -> return ()
+        | _ -> fail Sc_rollup_staker_in_game
+      in
+      let* ((_, child), ctxt) =
+        get_conflict_point ctxt rollup refuter defender
+      in
+      let* (child, ctxt) = get_commitment_internal ctxt rollup child in
+      let* (parent, ctxt) =
+        get_commitment_internal ctxt rollup child.predecessor
+      in
+      let* (ctxt, inbox) = Store.Inbox.get ctxt rollup in
+      let game =
+        Sc_rollup_game_repr.initial inbox ~parent ~child ~refuter ~defender
+      in
+      let* (ctxt, _) = Store.Game.init (ctxt, rollup) stakers game in
+      let* (ctxt, _) =
+        Store.Game_timeout.init (ctxt, rollup) stakers (timeout_level ctxt)
+      in
+      let* (ctxt, _) = Store.Opponent.init (ctxt, rollup) refuter defender in
+      let* (ctxt, _) = Store.Opponent.init (ctxt, rollup) defender refuter in
+      return (game, ctxt)
+
+(* TODO: #2926 this requires carbonation *)
+let update_game ctxt rollup ~player ~opponent refutation =
+  let open Lwt_tzresult_syntax in
+  let (alice, bob) = Sc_rollup_game_repr.Index.normalize (player, opponent) in
+  let* (game, ctxt) =
+    get_or_init_game ctxt rollup ~refuter:player ~defender:opponent
+  in
+  let* _ =
+    let turn = match game.turn with Alice -> alice | Bob -> bob in
+    if Sc_rollup_repr.Staker.equal turn player then return ()
+    else fail Sc_rollup_wrong_turn
+  in
+  match Sc_rollup_game_repr.play game refutation with
+  | Either.Left outcome -> return (Some outcome, ctxt)
+  | Either.Right new_game ->
+      let* (ctxt, _) = Store.Game.update (ctxt, rollup) (alice, bob) new_game in
+      let* (ctxt, _) =
+        Store.Game_timeout.update
+          (ctxt, rollup)
+          (alice, bob)
+          (timeout_level ctxt)
+      in
+      return (None, ctxt)
+
+(* TODO: #2926 this requires carbonation *)
+let timeout ctxt rollup stakers =
+  let open Lwt_tzresult_syntax in
+  let level = (Raw_context.current_level ctxt).level in
+  let (alice, bob) = Sc_rollup_game_repr.Index.normalize stakers in
+  let* (ctxt, game) = Store.Game.find (ctxt, rollup) (alice, bob) in
+  match game with
+  | None -> fail Sc_rollup_no_game
+  | Some game ->
+      let* (ctxt, timeout_level) =
+        Store.Game_timeout.get (ctxt, rollup) (alice, bob)
+      in
+      if Raw_level_repr.(level > timeout_level) then
+        return (Sc_rollup_game_repr.{loser = game.turn; reason = Timeout}, ctxt)
+      else fail Sc_rollup_timeout_level_not_reached
+
+(* TODO: #2926 this requires carbonation *)
+let apply_outcome ctxt rollup stakers (outcome : Sc_rollup_game_repr.outcome) =
+  let open Lwt_tzresult_syntax in
+  let (alice, bob) = Sc_rollup_game_repr.Index.normalize stakers in
+  let losing_staker = Sc_rollup_game_repr.Index.staker stakers outcome.loser in
+  let* ctxt = remove_staker ctxt rollup losing_staker in
+  let* (ctxt, _, _) = Store.Game.remove (ctxt, rollup) (alice, bob) in
+  let* (ctxt, _, _) = Store.Game_timeout.remove (ctxt, rollup) (alice, bob) in
+  let* (ctxt, _, _) = Store.Opponent.remove (ctxt, rollup) alice in
+  let* (ctxt, _, _) = Store.Opponent.remove (ctxt, rollup) bob in
+  return (Sc_rollup_game_repr.Ended (outcome.reason, losing_staker), ctxt)

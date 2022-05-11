@@ -63,6 +63,8 @@ module Manager_operation = struct
            make sc_rollup_add_messages_case;
            make sc_rollup_cement_case;
            make sc_rollup_publish_case;
+           make sc_rollup_refute_case;
+           make sc_rollup_timeout_case;
          ]
 
   let get_case :
@@ -90,6 +92,8 @@ module Manager_operation = struct
     | Sc_rollup_add_messages _ -> sc_rollup_add_messages_case
     | Sc_rollup_cement _ -> sc_rollup_cement_case
     | Sc_rollup_publish _ -> sc_rollup_publish_case
+    | Sc_rollup_refute _ -> sc_rollup_refute_case
+    | Sc_rollup_timeout _ -> sc_rollup_timeout_case
 
   let pp_kind ppf op =
     let open Operation.Encoding.Manager_operations in

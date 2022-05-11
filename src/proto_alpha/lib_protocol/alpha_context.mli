@@ -2589,6 +2589,59 @@ module Sc_rollup : sig
       MerkelizedOperations with type tree = Tree.tree
   end
 
+  module Game : sig
+    module Proof : sig
+      type t =
+        | Computation_step of {
+            valid : bool;
+            start : State_hash.t;
+            stop : State_hash.t;
+          }
+        | Input_step of {
+            valid : bool;
+            start : State_hash.t;
+            stop : State_hash.t;
+          }
+        | Blocked_step of {valid : bool; start : State_hash.t}
+    end
+
+    type player = Alice | Bob
+
+    type t = {
+      turn : player;
+      inbox_snapshot : Inbox.t;
+      dissection : (State_hash.t option * Tick.t) list;
+    }
+
+    val opponent : player -> player
+
+    type step =
+      | Dissection of (State_hash.t option * Tick.t) list
+      | Proof of Proof.t
+
+    type refutation = {choice : Tick.t; step : step}
+
+    val pp_refutation : Format.formatter -> refutation -> unit
+
+    type reason = Conflict_resolved | Invalid_move | Timeout
+
+    val pp_reason : Format.formatter -> reason -> unit
+
+    val reason_encoding : reason Data_encoding.t
+
+    type status = Ongoing | Ended of (reason * Staker.t)
+
+    val pp_status : Format.formatter -> status -> unit
+
+    val status_encoding : status Data_encoding.t
+
+    type outcome = {loser : player; reason : reason}
+
+    val pp_outcome : Format.formatter -> outcome -> unit
+
+    val outcome_encoding : outcome Data_encoding.t
+  end
+
   val rpc_arg : t RPC_arg.t
 
   val add_messages :
@@ -2639,6 +2692,34 @@ module Sc_rollup : sig
 
   val last_cemented_commitment_hash_with_level :
     context -> t -> (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
+
+  val get_or_init_game :
+    context ->
+    t ->
+    refuter:Staker.t ->
+    defender:Staker.t ->
+    (Game.t * context) tzresult Lwt.t
+
+  val update_game :
+    context ->
+    t ->
+    player:Staker.t ->
+    opponent:Staker.t ->
+    Game.refutation ->
+    (Game.outcome option * context) tzresult Lwt.t
+
+  val timeout :
+    context ->
+    t ->
+    Staker.t * Staker.t ->
+    (Game.outcome * context) tzresult Lwt.t
+
+  val apply_outcome :
+    context ->
+    t ->
+    Staker.t * Staker.t ->
+    Game.outcome ->
+    (Game.status * context) tzresult Lwt.t
 
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
@@ -2827,6 +2908,10 @@ module Kind : sig
 
   type sc_rollup_publish = Sc_rollup_publish_kind
 
+  type sc_rollup_refute = Sc_rollup_refute_kind
+
+  type sc_rollup_timeout = Sc_rollup_timeout_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -2850,6 +2935,8 @@ module Kind : sig
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
+    | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
+    | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
 end
 
 type 'a consensus_operation_type =
@@ -3042,6 +3129,17 @@ and _ manager_operation =
       commitment : Sc_rollup.Commitment.t;
     }
       -> Kind.sc_rollup_publish manager_operation
+  | Sc_rollup_refute : {
+      rollup : Sc_rollup.t;
+      opponent : Sc_rollup.Staker.t;
+      refutation : Sc_rollup.Game.refutation;
+    }
+      -> Kind.sc_rollup_refute manager_operation
+  | Sc_rollup_timeout : {
+      rollup : Sc_rollup.t;
+      stakers : Sc_rollup.Staker.t * Sc_rollup.Staker.t;
+    }
+      -> Kind.sc_rollup_timeout manager_operation
 
 and counter = Z.t
 
@@ -3203,6 +3301,10 @@ module Operation : sig
 
     val sc_rollup_publish_case : Kind.sc_rollup_publish Kind.manager case
 
+    val sc_rollup_refute_case : Kind.sc_rollup_refute Kind.manager case
+
+    val sc_rollup_timeout_case : Kind.sc_rollup_timeout Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -3260,6 +3362,10 @@ module Operation : sig
       val sc_rollup_cement_case : Kind.sc_rollup_cement case
 
       val sc_rollup_publish_case : Kind.sc_rollup_publish case
+
+      val sc_rollup_refute_case : Kind.sc_rollup_refute case
+
+      val sc_rollup_timeout_case : Kind.sc_rollup_timeout case
     end
   end
 

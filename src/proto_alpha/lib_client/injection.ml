@@ -335,6 +335,8 @@ let estimated_gas_single (type kind)
         Ok consumed_gas
     | Applied (Sc_rollup_cement_result {consumed_gas; _}) -> Ok consumed_gas
     | Applied (Sc_rollup_publish_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_refute_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_timeout_result {consumed_gas; _}) -> Ok consumed_gas
     | Skipped _ ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Backtracked (_, None) ->
@@ -397,6 +399,8 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
     *)
     | Applied (Sc_rollup_cement_result _) -> Ok Z.zero
     | Applied (Sc_rollup_publish_result _) -> Ok Z.zero
+    | Applied (Sc_rollup_refute_result _) -> Ok Z.zero
+    | Applied (Sc_rollup_timeout_result _) -> Ok Z.zero
     | Skipped _ ->
         Ok Z.zero (* there must be another error for this to happen *)
     | Backtracked (_, None) ->
@@ -460,6 +464,8 @@ let originated_contracts_single (type kind)
     | Applied (Sc_rollup_add_messages_result _) -> Ok []
     | Applied (Sc_rollup_cement_result _) -> Ok []
     | Applied (Sc_rollup_publish_result _) -> Ok []
+    | Applied (Sc_rollup_refute_result _) -> Ok []
+    | Applied (Sc_rollup_timeout_result _) -> Ok []
     | Skipped _ -> Ok [] (* there must be another error for this to happen *)
     | Backtracked (_, None) ->
         Ok [] (* there must be another error for this to happen *)

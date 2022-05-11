@@ -3194,6 +3194,196 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "kind"
                             ],
                             "additionalProperties": false
+                          },
+                          {
+                            "title": "Sc_rollup_refute",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "sc_rollup_refute"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "rollup": {
+                                "$ref": "#/definitions/alpha.rollup_address"
+                              },
+                              "opponent": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "refutation": {
+                                "type": "object",
+                                "properties": {
+                                  "choice": {
+                                    "$ref": "#/definitions/positive_bignum"
+                                  },
+                                  "step": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Dissection",
+                                        "type": "array",
+                                        "items": {
+                                          "type": "array",
+                                          "items": [
+                                            {
+                                              "oneOf": [
+                                                {
+                                                  "title": "Some",
+                                                  "$ref": "#/definitions/state_hash"
+                                                },
+                                                {
+                                                  "title": "None",
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "$ref": "#/definitions/positive_bignum"
+                                            }
+                                          ],
+                                          "additionalItems": false
+                                        }
+                                      },
+                                      {
+                                        "title": "Proof",
+                                        "oneOf": [
+                                          {
+                                            "title": "Proof of a normal computation step",
+                                            "type": "array",
+                                            "items": [
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              }
+                                            ],
+                                            "additionalItems": false
+                                          },
+                                          {
+                                            "title": "Proof of an input step",
+                                            "type": "array",
+                                            "items": [
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              }
+                                            ],
+                                            "additionalItems": false
+                                          },
+                                          {
+                                            "title": "Proof that the PVM is blocked",
+                                            "type": "array",
+                                            "items": [
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              }
+                                            ],
+                                            "additionalItems": false
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "step",
+                                  "choice"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "refutation",
+                              "opponent",
+                              "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Sc_rollup_timeout",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "sc_rollup_timeout"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "rollup": {
+                                "$ref": "#/definitions/alpha.rollup_address"
+                              },
+                              "stakers": {
+                                "type": "array",
+                                "items": [
+                                  {
+                                    "$ref": "#/definitions/Signature.Public_key_hash"
+                                  },
+                                  {
+                                    "$ref": "#/definitions/Signature.Public_key_hash"
+                                  }
+                                ],
+                                "additionalItems": false
+                              }
+                            },
+                            "required": [
+                              "stakers",
+                              "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
                           }
                         ]
                       },
@@ -4357,7 +4547,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_137",
+                                    "name": "X_143",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5022,7 +5212,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_135",
+                                    "name": "X_141",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5385,7 +5575,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "message",
                                   "layout": {
-                                    "name": "X_8",
+                                    "name": "X_14",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5454,7 +5644,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "previous_message_result",
                                   "layout": {
-                                    "name": "X_9",
+                                    "name": "X_15",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5484,7 +5674,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "proof",
                                   "layout": {
-                                    "name": "X_134",
+                                    "name": "X_140",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5640,7 +5830,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "name": "tickets_info",
                                   "layout": {
                                     "layout": {
-                                      "name": "X_4",
+                                      "name": "X_10",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -5881,7 +6071,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "kind",
                                   "layout": {
-                                    "name": "X_3",
+                                    "name": "X_9",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -6004,7 +6194,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "name": "message",
                                   "layout": {
                                     "layout": {
-                                      "name": "X_2",
+                                      "name": "X_8",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -6208,7 +6398,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_1",
+                                    "name": "X_7",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -6219,6 +6409,221 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Sc_rollup_publish"
+                            },
+                            {
+                              "tag": 204,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "source",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "fee",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "counter",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "gas_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "storage_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "name": "alpha.rollup_address",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "rollup",
+                                  "layout": {
+                                    "kind": "String"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "opponent",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "refutation",
+                                  "layout": {
+                                    "name": "X_2",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Sc_rollup_refute"
+                            },
+                            {
+                              "tag": 205,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "source",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "fee",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "counter",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "gas_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "storage_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "name": "alpha.rollup_address",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "rollup",
+                                  "layout": {
+                                    "kind": "String"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "stakers",
+                                  "layout": {
+                                    "name": "X_1",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 42,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Sc_rollup_timeout"
                             }
                           ]
                         }
@@ -6893,7 +7298,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_137"
+                          "title": "X_143"
                         },
                         "encoding": {
                           "fields": [
@@ -7276,7 +7681,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_135"
+                          "title": "X_141"
                         },
                         "encoding": {
                           "fields": [
@@ -7313,7 +7718,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "predecessor",
                               "layout": {
-                                "name": "X_136",
+                                "name": "X_142",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -7337,7 +7742,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_136"
+                          "title": "X_142"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -7407,7 +7812,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_134"
+                          "title": "X_140"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -7463,7 +7868,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_10",
+                                    "name": "X_16",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7522,7 +7927,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_10",
+                                    "name": "X_16",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7581,7 +7986,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_10",
+                                    "name": "X_16",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7640,7 +8045,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_10",
+                                    "name": "X_16",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7656,7 +8061,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_133"
+                          "title": "X_139"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -7692,7 +8097,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_132",
+                                    "name": "X_138",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7732,7 +8137,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_132",
+                                    "name": "X_138",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7772,7 +8177,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_132",
+                                    "name": "X_138",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7812,7 +8217,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_132",
+                                    "name": "X_138",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7852,7 +8257,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7892,7 +8297,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7932,7 +8337,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7972,7 +8377,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8012,7 +8417,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8052,7 +8457,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8092,7 +8497,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8132,7 +8537,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_128",
+                                    "name": "X_134",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8172,7 +8577,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_120",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8212,7 +8617,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_120",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8252,7 +8657,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_120",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8292,7 +8697,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_120",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8350,7 +8755,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_15",
+                                      "name": "X_21",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq",
@@ -8385,7 +8790,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_15",
+                                      "name": "X_21",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq",
@@ -8425,7 +8830,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_15",
+                                      "name": "X_21",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -8562,7 +8967,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_115",
+                                    "name": "X_121",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8611,7 +9016,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_115",
+                                    "name": "X_121",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8660,7 +9065,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_115",
+                                    "name": "X_121",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8709,7 +9114,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_115",
+                                    "name": "X_121",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8735,7 +9140,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_132"
+                          "title": "X_138"
                         },
                         "encoding": {
                           "fields": []
@@ -8743,7 +9148,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_128"
+                          "title": "X_134"
                         },
                         "encoding": {
                           "fields": [
@@ -8762,7 +9167,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_120"
+                          "title": "X_126"
                         },
                         "encoding": {
                           "fields": [
@@ -8791,7 +9196,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_116"
+                          "title": "X_122"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -8863,7 +9268,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_115"
+                          "title": "X_121"
                         },
                         "encoding": {
                           "fields": [
@@ -8886,7 +9291,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_10"
+                          "title": "X_16"
                         },
                         "encoding": {
                           "fields": [
@@ -8898,7 +9303,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "layout": {
                                 "layout": {
-                                  "name": "X_133",
+                                  "name": "X_139",
                                   "kind": "Ref"
                                 },
                                 "kind": "Seq"
@@ -8913,13 +9318,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_15"
+                          "title": "X_21"
                         },
                         "encoding": {
                           "fields": [
                             {
                               "layout": {
-                                "name": "X_115",
+                                "name": "X_121",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -8929,7 +9334,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "layout": {
-                                "name": "X_116",
+                                "name": "X_122",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -8943,7 +9348,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_9"
+                          "title": "X_15"
                         },
                         "encoding": {
                           "fields": [
@@ -8974,7 +9379,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_8"
+                          "title": "X_14"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -9033,7 +9438,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "deposit",
                                   "layout": {
-                                    "name": "X_6",
+                                    "name": "X_12",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -9049,7 +9454,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_6"
+                          "title": "X_12"
                         },
                         "encoding": {
                           "fields": [
@@ -9090,7 +9495,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "amount",
                               "layout": {
-                                "name": "X_7",
+                                "name": "X_13",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -9103,7 +9508,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_7"
+                          "title": "X_13"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -9232,7 +9637,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_4"
+                          "title": "X_10"
                         },
                         "encoding": {
                           "fields": [
@@ -9281,7 +9686,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "amount",
                               "layout": {
-                                "name": "X_7",
+                                "name": "X_13",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -9390,7 +9795,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_3"
+                          "title": "X_9"
                         },
                         "encoding": {
                           "tag_size": "Uint16",
@@ -9432,7 +9837,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_2"
+                          "title": "X_8"
                         },
                         "encoding": {
                           "fields": [
@@ -9455,7 +9860,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1"
+                          "title": "X_7"
                         },
                         "encoding": {
                           "fields": [
@@ -9516,6 +9921,391 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "kind": "Float"
                               },
                               "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_2"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "choice",
+                              "layout": {
+                                "name": "N.t",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "step",
+                              "layout": {
+                                "name": "X_6",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_6"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "layout": {
+                                    "layout": {
+                                      "name": "X_4",
+                                      "kind": "Ref"
+                                    },
+                                    "kind": "Seq"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "Dissection"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_3",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                }
+                              ],
+                              "name": "Proof"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_4"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "layout": {
+                                "name": "X_5",
+                                "kind": "Ref"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              }
+                            },
+                            {
+                              "layout": {
+                                "name": "N.t",
+                                "kind": "Ref"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_5"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "None"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "state_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Some"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_3"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bool"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "Proof of a normal computation step"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bool"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "Proof of an input step"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bool"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "Proof that the PVM is blocked"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_1"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "layout": {
+                                "name": "public_key_hash",
+                                "kind": "Ref"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "size": 21,
+                                "kind": "Float"
+                              }
+                            },
+                            {
+                              "layout": {
+                                "name": "public_key_hash",
+                                "kind": "Ref"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "size": 21,
+                                "kind": "Float"
+                              }
                             }
                           ]
                         }
@@ -12678,6 +13468,196 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             "required": [
                               "commitment",
+                              "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Sc_rollup_refute",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "sc_rollup_refute"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "rollup": {
+                                "$ref": "#/definitions/alpha.rollup_address"
+                              },
+                              "opponent": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "refutation": {
+                                "type": "object",
+                                "properties": {
+                                  "choice": {
+                                    "$ref": "#/definitions/positive_bignum"
+                                  },
+                                  "step": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Dissection",
+                                        "type": "array",
+                                        "items": {
+                                          "type": "array",
+                                          "items": [
+                                            {
+                                              "oneOf": [
+                                                {
+                                                  "title": "Some",
+                                                  "$ref": "#/definitions/state_hash"
+                                                },
+                                                {
+                                                  "title": "None",
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "$ref": "#/definitions/positive_bignum"
+                                            }
+                                          ],
+                                          "additionalItems": false
+                                        }
+                                      },
+                                      {
+                                        "title": "Proof",
+                                        "oneOf": [
+                                          {
+                                            "title": "Proof of a normal computation step",
+                                            "type": "array",
+                                            "items": [
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              }
+                                            ],
+                                            "additionalItems": false
+                                          },
+                                          {
+                                            "title": "Proof of an input step",
+                                            "type": "array",
+                                            "items": [
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              }
+                                            ],
+                                            "additionalItems": false
+                                          },
+                                          {
+                                            "title": "Proof that the PVM is blocked",
+                                            "type": "array",
+                                            "items": [
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "$ref": "#/definitions/state_hash"
+                                              }
+                                            ],
+                                            "additionalItems": false
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "step",
+                                  "choice"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "refutation",
+                              "opponent",
+                              "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Sc_rollup_timeout",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "sc_rollup_timeout"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "rollup": {
+                                "$ref": "#/definitions/alpha.rollup_address"
+                              },
+                              "stakers": {
+                                "type": "array",
+                                "items": [
+                                  {
+                                    "$ref": "#/definitions/Signature.Public_key_hash"
+                                  },
+                                  {
+                                    "$ref": "#/definitions/Signature.Public_key_hash"
+                                  }
+                                ],
+                                "additionalItems": false
+                              }
+                            },
+                            "required": [
+                              "stakers",
                               "rollup",
                               "storage_limit",
                               "gas_limit",

@@ -1760,6 +1760,23 @@ let apply_external_manager_operation_content :
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_publish_result {staked_hash; consumed_gas} in
       return (ctxt, result, [])
+  | Sc_rollup_refute {rollup; opponent; refutation} ->
+      Sc_rollup.update_game ctxt rollup ~player:source ~opponent refutation
+      >>=? fun (outcome, ctxt) ->
+      (match outcome with
+      | None -> return (Sc_rollup.Game.Ongoing, ctxt)
+      | Some o -> Sc_rollup.apply_outcome ctxt rollup (source, opponent) o)
+      >>=? fun (status, ctxt) ->
+      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let result = Sc_rollup_refute_result {status; consumed_gas} in
+      return (ctxt, result, [])
+  | Sc_rollup_timeout {rollup; stakers} ->
+      Sc_rollup.timeout ctxt rollup stakers >>=? fun (outcome, ctxt) ->
+      Sc_rollup.apply_outcome ctxt rollup stakers outcome
+      >>=? fun (status, ctxt) ->
+      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let result = Sc_rollup_timeout_result {status; consumed_gas} in
+      return (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 
@@ -1966,7 +1983,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         ~count_limit:tx_rollup_max_messages_per_inbox
       >>?= fun () -> return ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
-  | Sc_rollup_publish _ ->
+  | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
@@ -2116,6 +2133,8 @@ let burn_storage_fees :
   | Sc_rollup_add_messages_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_cement_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_publish_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_refute_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_timeout_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
