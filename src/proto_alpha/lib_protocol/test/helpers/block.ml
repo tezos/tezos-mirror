@@ -619,8 +619,8 @@ let get_construction_vstate ?(policy = By_round 0) ?timestamp
     ()
   >|= Environment.wrap_tzresult
 
-let apply_with_metadata ?(policy = By_round 0) ~baking_mode header
-    ?(operations = []) pred =
+let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
+    header ?(operations = []) pred =
   let open Environment.Error_monad in
   ( (match baking_mode with
     | Application ->
@@ -639,6 +639,18 @@ let apply_with_metadata ?(policy = By_round 0) ~baking_mode header
   >>=? fun vstate ->
     List.fold_left_es
       (fun vstate op ->
+        (if check_size then
+         let operation_size =
+           Data_encoding.Binary.length Operation.encoding op
+         in
+         if operation_size > Constants_repr.max_operation_data_length then
+           raise
+             (invalid_arg
+                (Format.sprintf
+                   "The operation size is %d, it exceeds the constant maximum \
+                    size %d"
+                   operation_size
+                   Constants_repr.max_operation_data_length))) ;
         apply_operation vstate op >|= Environment.wrap_tzresult
         >|=? fun (state, _result) -> state)
       vstate
@@ -655,7 +667,7 @@ let apply header ?(operations = []) pred =
   >>=? fun (t, _metadata) -> return t
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
-    ?payload_round ~baking_mode ?liquidity_baking_toggle_vote pred =
+    ?payload_round ?check_size ~baking_mode ?liquidity_baking_toggle_vote pred =
   let operations =
     match (operation, operations) with
     | (Some op, Some ops) -> Some (op :: ops)
@@ -673,10 +685,11 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
-  apply_with_metadata ?policy ~baking_mode header ?operations pred
+  apply_with_metadata ?policy ?check_size ~baking_mode header ?operations pred
 
 let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
-    ?timestamp ?operation ?operations ?liquidity_baking_toggle_vote pred =
+    ?timestamp ?operation ?operations ?liquidity_baking_toggle_vote ?check_size
+    pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
@@ -686,6 +699,7 @@ let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
     ?operation
     ?operations
     ?liquidity_baking_toggle_vote
+    ?check_size
     pred
   >>=? fun (t, (_metadata : block_header_metadata)) -> return t
 
