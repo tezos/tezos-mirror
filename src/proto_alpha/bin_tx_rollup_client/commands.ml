@@ -203,6 +203,12 @@ let ticket_hash_parameter =
       | Some tkh -> return tkh
       | None -> failwith "cannot parse %s to get a valid ticket_hash" s)
 
+let non_negative_param =
+  Clic.parameter (fun _ s ->
+      match int_of_string_opt s with
+      | Some i when i >= 0 -> return i
+      | _ -> failwith "Parameter should be a non-negative integer literal")
+
 let get_tx_address_balance_command () =
   command
     ~desc:"returns the balance associated to a given tz4 address and ticket"
@@ -844,6 +850,33 @@ let rpc_commands () =
       (fun () -> call_with_file_or_json `POST);
   ]
 
+let get_message_proof () =
+  let open Lwt_result_syntax in
+  command
+    ~desc:
+      "returns the proof for a given block identifier and a message position \
+       for the according inbox"
+    no_options
+    (prefixes ["get"; "proof"; "for"; "message"; "at"; "position"]
+    @@ param
+         ~name:"position"
+         ~desc:"message position in the inbox"
+         non_negative_param
+    @@ prefixes ["in"; "block"]
+    @@ param
+         ~name:"block"
+         ~desc:"block from which the message's proof is requested"
+         block_id_param
+    @@ stop)
+    (fun () message_position block (cctxt : #Configuration.tx_client_context) ->
+      RPC.get_message_proof cctxt block ~message_position >>=? fun proof ->
+      let json =
+        Data_encoding.(
+          Json.construct (option Tx_rollup_l2_proof.encoding) proof)
+      in
+      cctxt#message "@[%s@]" (Data_encoding.Json.to_string json) >>= fun () ->
+      return_unit)
+
 let all () =
   [
     get_tx_address_balance_command ();
@@ -859,5 +892,6 @@ let all () =
     inject_batcher_transaction ();
     transfer ();
     withdraw ();
+    get_message_proof ();
   ]
   @ rpc_commands ()

@@ -418,7 +418,6 @@ let test_tx_node_store_inbox =
       let operator = Constant.bootstrap1.public_key_hash in
       let*! rollup = Client.Tx_rollup.originate ~src:operator client in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 2 in
       let* block_hash = RPC.get_block_hash client in
       let tx_node =
         Rollup_node.create
@@ -444,7 +443,6 @@ let test_tx_node_store_inbox =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 3 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 3 in
       let* tx_node_inbox_1 =
         tx_client_get_inbox ~tx_client ~tezos_client:client ~block:"0"
@@ -474,7 +472,6 @@ let test_tx_node_store_inbox =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       let* tx_node_inbox_2 =
         tx_client_get_inbox ~tx_client ~tezos_client:client ~block:"1"
@@ -784,7 +781,6 @@ let test_ticket_deposit_from_l1_to_l2 =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 3 in
       Log.info
         "The tx_rollup_deposit %s contract was successfully originated"
         contract_id ;
@@ -949,7 +945,6 @@ let test_l2_to_l2_transaction =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 3 in
       Log.info
         "The tx_rollup_deposit %s contract was successfully originated"
         contract_id ;
@@ -978,7 +973,6 @@ let test_l2_to_l2_transaction =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit_json inbox in
@@ -1013,7 +1007,6 @@ let test_l2_to_l2_transaction =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 5 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
       let* () =
         check_tz4_balance
@@ -1042,7 +1035,6 @@ let test_l2_to_l2_transaction =
       in
       Log.info "Baking the batch" ;
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 6 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
       (* The decoding fails because of the buggy JSON encoding. This
          line can be uncommented once it is fixed.*)
@@ -1633,7 +1625,6 @@ let test_l2_proof_rpc_position =
       in
       Log.info "Baking the batches" ;
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 5 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
       Log.info "Commitment for rollup level: 1" ;
       let* ({
@@ -1655,7 +1646,6 @@ let test_l2_proof_rpc_position =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Node.wait_for_level node 6 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
       Log.info "Try to reject a good commitment at level 1, message 0" ;
       let last_prev_pos = List.length context_hashes_level0 - 1 in

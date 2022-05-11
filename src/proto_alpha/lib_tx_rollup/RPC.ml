@@ -727,3 +727,12 @@ let inject_transaction ctxt ?(eager_batch = false) transaction =
        method eager_batch = eager_batch
     end)
     transaction
+
+let get_message_proof ctxt block ~message_position =
+  RPC_context.make_call2
+    Block.(export_service proof)
+    ctxt
+    block
+    message_position
+    ()
+    ()

@@ -107,6 +107,9 @@ val inject_batcher_transaction :
   transactions_and_sig:JSON.t ->
   (string * string) Lwt.t
 
+val get_message_proof :
+  ?block:string -> t -> message_position:int -> string Lwt.t
+
 module RPC : sig
   val get : t -> string -> string Lwt.t
 
