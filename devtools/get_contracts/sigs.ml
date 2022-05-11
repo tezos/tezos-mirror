@@ -64,16 +64,6 @@ module type PROTOCOL = sig
     val pp : Format.formatter -> t -> unit
   end
 
-  module Lazy_storage_kind : sig
-    module Big_map : sig
-      module Id : sig
-        type t
-
-        val unparse_to_z : t -> Z.t
-      end
-    end
-  end
-
   module Raw_context : sig
     type t
 
@@ -153,52 +143,42 @@ module type PROTOCOL = sig
   end
 
   module Storage : sig
-    module Big_map : sig
-      type id = Lazy_storage_kind.Big_map.Id.t
+    type big_map_id
 
-      module Contents : sig
-        val list_values :
-          ?offset:int ->
-          ?length:int ->
-          Raw_context.t * id ->
-          (Raw_context.t * Alpha_context.Script.expr list) Error_monad.tzresult
-          Lwt.t
-      end
+    val id_to_z : big_map_id -> Z.t
 
-      module Value_type : sig
-        val get :
-          Raw_context.t ->
-          id ->
-          Alpha_context.Script.expr Error_monad.tzresult Lwt.t
-      end
+    val list_values :
+      ?offset:int ->
+      ?length:int ->
+      Raw_context.t * big_map_id ->
+      (Raw_context.t * Alpha_context.Script.expr list) Error_monad.tzresult
+      Lwt.t
 
-      val fold :
-        Raw_context.t -> init:'a -> f:(id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-    end
+    val get :
+      Raw_context.t ->
+      big_map_id ->
+      Alpha_context.Script.expr Error_monad.tzresult Lwt.t
 
-    module Contract : sig
-      module Code : sig
-        val get :
-          Raw_context.t ->
-          Contract_repr.t ->
-          (Raw_context.t * Alpha_context.Script.lazy_expr) Error_monad.tzresult
-          Lwt.t
-      end
+    val fold :
+      Raw_context.t -> init:'a -> f:(big_map_id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
-      module Storage : sig
-        val get :
-          Raw_context.t ->
-          Contract_repr.t ->
-          (Raw_context.t * Alpha_context.Script.lazy_expr) Error_monad.tzresult
-          Lwt.t
-      end
+    val get_contract_code :
+      Raw_context.t ->
+      Contract_repr.t ->
+      (Raw_context.t * Alpha_context.Script.lazy_expr) Error_monad.tzresult
+      Lwt.t
 
-      val fold :
-        Raw_context.t ->
-        init:'a ->
-        f:(Contract_repr.t -> 'a -> 'a Lwt.t) ->
-        'a Lwt.t
-    end
+    val get_contract_storage :
+      Raw_context.t ->
+      Contract_repr.t ->
+      (Raw_context.t * Alpha_context.Script.lazy_expr) Error_monad.tzresult
+      Lwt.t
+
+    val fold_contracts :
+      Raw_context.t ->
+      init:'a ->
+      f:(Contract_repr.t -> 'a -> 'a Lwt.t) ->
+      'a Lwt.t
   end
 
   module Unparse_types : sig

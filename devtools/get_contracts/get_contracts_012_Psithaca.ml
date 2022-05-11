@@ -48,17 +48,23 @@ module Main = Get_contracts.Make (struct
   end
 
   module Storage = struct
-    module Contract = struct
-      include Storage.Contract
+    type big_map_id = Storage.Big_map.id
 
-      let fold ctxt ~init ~f = fold ctxt ~order:`Undefined ~init ~f
-    end
+    let id_to_z = Lazy_storage_kind.Big_map.Id.unparse_to_z
 
-    module Big_map = struct
-      include Storage.Big_map
+    let list_values = Storage.Big_map.Contents.list_values
 
-      let fold ctxt ~init ~f = fold ctxt ~order:`Undefined ~init ~f
-    end
+    let get = Storage.Big_map.Value_type.get
+
+    let fold ctxt ~init ~f =
+      Storage.Big_map.fold ctxt ~order:`Undefined ~init ~f
+
+    let get_contract_code = Storage.Contract.Code.get
+
+    let get_contract_storage = Storage.Contract.Storage.get
+
+    let fold_contracts ctxt ~init ~f =
+      Storage.Contract.fold ctxt ~order:`Undefined ~init ~f
   end
 
   let wrap_tzresult =

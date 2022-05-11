@@ -384,16 +384,15 @@ module Make (P : Sigs.PROTOCOL) = struct
   end
 
   let get_contract_code ctxt contract =
-    Lwt.map P.wrap_tzresult @@ P.Storage.Contract.Code.get ctxt contract
+    Lwt.map P.wrap_tzresult @@ P.Storage.get_contract_code ctxt contract
 
   let get_contract_storage ctxt contract =
-    Lwt.map P.wrap_tzresult @@ P.Storage.Contract.Storage.get ctxt contract
+    Lwt.map P.wrap_tzresult @@ P.Storage.get_contract_storage ctxt contract
 
-  let big_map_get ctxt key =
-    Lwt.map P.wrap_tzresult @@ P.Storage.Big_map.Value_type.get ctxt key
+  let big_map_get ctxt key = Lwt.map P.wrap_tzresult @@ P.Storage.get ctxt key
 
   let big_map_fold :
-      P.Raw_context.t * P.Storage.Big_map.id ->
+      P.Raw_context.t * P.Storage.big_map_id ->
       init:'a ->
       f:
         (P.Alpha_context.Script.prim Tezos_micheline.Micheline.canonical ->
@@ -401,7 +400,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         'a Error_monad.tzresult Lwt.t) ->
       'a Error_monad.tzresult Lwt.t =
    fun ctxt_i ~init ~f ->
-    Lwt.map P.wrap_tzresult @@ P.Storage.Big_map.Contents.list_values ctxt_i
+    Lwt.map P.wrap_tzresult @@ P.Storage.list_values ctxt_i
     >>=? fun (_ctxt, values) ->
     List.fold_left_es (fun acc v -> f v acc) init values
 
@@ -442,7 +441,7 @@ module Make (P : Sigs.PROTOCOL) = struct
     >|= P.wrap_tzresult
     >>=? fun raw_ctxt ->
     print_endline "Listing addresses..." ;
-    Storage.Contract.fold
+    Storage.fold_contracts
       raw_ctxt
       ~init:(ExprMap.empty, 0)
       ~f:(fun contract (m, i) ->
@@ -519,7 +518,7 @@ module Make (P : Sigs.PROTOCOL) = struct
        ExprMap.empty
      >>=? fun exprs ->
      print_endline "Listing big maps..." ;
-     Storage.Big_map.fold
+     Storage.fold
        raw_ctxt
        ~init:(ok (exprs, 0))
        ~f:(fun id exprs_i ->
@@ -529,8 +528,7 @@ module Make (P : Sigs.PROTOCOL) = struct
          Storage_helpers.get_value
            ~what:"big map value type"
            ~getter:big_map_get
-           ~pp:(fun fmt id ->
-             Z.pp_print fmt (Lazy_storage_kind.Big_map.Id.unparse_to_z id))
+           ~pp:(fun fmt id -> Z.pp_print fmt (Storage.id_to_z id))
            raw_ctxt
            id
          >>= function

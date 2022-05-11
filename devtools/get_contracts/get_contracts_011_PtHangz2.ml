@@ -29,6 +29,24 @@ module Main = Get_contracts.Make (struct
   module Error_monad =
     Tezos_protocol_environment_011_PtHangz2.Environment.Error_monad
 
+  module Storage = struct
+    type big_map_id = Storage.Big_map.id
+
+    let id_to_z = Lazy_storage_kind.Big_map.Id.unparse_to_z
+
+    let list_values = Storage.Big_map.Contents.list_values
+
+    let get = Storage.Big_map.Value_type.get
+
+    let fold = Storage.Big_map.fold
+
+    let get_contract_code = Storage.Contract.Code.get
+
+    let get_contract_storage = Storage.Contract.Storage.get
+
+    let fold_contracts = Storage.Contract.fold
+  end
+
   module Unparse_types =
     Tezos_protocol_plugin_011_PtHangz2.Plugin.RPC.Scripts.Unparse_types
 
