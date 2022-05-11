@@ -55,7 +55,7 @@ stages:
 include:
   - .gitlab/ci/templates.yml
 
-# Actual jobs are defined in these included files
+  # Actual jobs are defined in these included files
 
   - .gitlab/ci/packaging.yml
   - .gitlab/ci/sanity.yml
@@ -70,4 +70,16 @@ include:
   - .gitlab/ci/doc/test-scripts.yml
   - .gitlab/ci/build_release.yml
   - .gitlab/ci/publish_release.yml
-  - .gitlab/ci/test_coverage.yml
+
+  # The job `unified_coverage` must have the same name on merge requests and the default branch
+  # /!\ Limitations of using rules with include:
+  # https://docs.gitlab.com/ee/ci/yaml/includes.html#use-variables-with-include
+  # Only run on merge requests
+  - local: .gitlab/ci/test_coverage.yml
+    rules:
+      - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  # Only run on default branch
+  - local: .gitlab/ci/test_coverage_default.yml
+    rules:
+      # Cannot use TEZOS_DEFAULT_NAMESPACE here, see limitations above
+      - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
