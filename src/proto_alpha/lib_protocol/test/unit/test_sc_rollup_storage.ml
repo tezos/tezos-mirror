@@ -232,6 +232,15 @@ let number_of_ticks_exn n =
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
+let valid_inbox_level ctxt =
+  let root_level = Raw_level_repr.to_int32 Level_storage.(current ctxt).level in
+  let commitment_freq =
+    Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+  in
+  fun i ->
+    Raw_level_repr.of_int32_exn
+      (Int32.add root_level (Int32.mul (Int32.of_int commitment_freq) i))
+
 let test_deposit_then_refine () =
   let* ctxt = new_context () in
   lift
@@ -245,7 +254,7 @@ let test_deposit_then_refine () =
        Sc_rollup_repr.Commitment.
          {
            predecessor = Sc_rollup_repr.Commitment_hash.zero;
-           inbox_level = Raw_level_repr.of_int32_exn 21l;
+           inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -290,7 +299,7 @@ let test_publish () =
        Sc_rollup_repr.Commitment.
          {
            predecessor = Sc_rollup_repr.Commitment_hash.zero;
-           inbox_level = Raw_level_repr.of_int32_exn 21l;
+           inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 5l;
            number_of_ticks = number_of_ticks_exn 152231l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -312,7 +321,7 @@ let test_withdraw_and_cement () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -339,7 +348,7 @@ let test_deposit_then_publish () =
        Sc_rollup_repr.Commitment.
          {
            predecessor = Sc_rollup_repr.Commitment_hash.zero;
-           inbox_level = Raw_level_repr.of_int32_exn 21l;
+           inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 5l;
            number_of_ticks = number_of_ticks_exn 152231l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -354,18 +363,18 @@ let test_publish_missing_rollup () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let commitment =
+  let commitment ctxt =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
-      Sc_rollup_storage.publish_commitment ctxt rollup staker commitment)
+      Sc_rollup_storage.publish_commitment ctxt rollup staker (commitment ctxt))
 
 let test_cement () =
   let* ctxt = new_context () in
@@ -383,7 +392,7 @@ let test_cement () =
        Sc_rollup_repr.Commitment.
          {
            predecessor = Sc_rollup_repr.Commitment_hash.zero;
-           inbox_level = Raw_level_repr.of_int32_exn 21l;
+           inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -409,6 +418,7 @@ let test_cement_three_commitments () =
   let* (ctxt, rollup, staker) =
     originate_rollup_and_deposit_with_one_staker ()
   in
+  let level = valid_inbox_level ctxt in
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
@@ -418,7 +428,7 @@ let test_cement_three_commitments () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -431,7 +441,7 @@ let test_cement_three_commitments () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -444,7 +454,7 @@ let test_cement_three_commitments () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c2;
-        inbox_level = Raw_level_repr.of_int32_exn 61l;
+        inbox_level = level 3l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -473,7 +483,7 @@ let test_cement_then_remove () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -509,7 +519,7 @@ let test_cement_consumes_available_messages () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 1l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -570,7 +580,7 @@ let test_cement_with_zero_stakers_fails () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -589,6 +599,7 @@ let test_cement_with_zero_stakers_fails () =
 
 let test_cement_fail_too_recent () =
   let* ctxt = new_context () in
+  let level = valid_inbox_level ctxt in
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
@@ -601,7 +612,7 @@ let test_cement_fail_too_recent () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -635,7 +646,7 @@ let test_cement_deadline_uses_oldest_add_time () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -664,7 +675,7 @@ let test_last_cemented_commitment_hash_with_level () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let inbox_level = Raw_level_repr.of_int32_exn 21l in
+  let inbox_level = valid_inbox_level ctxt 1l in
   let* ctxt = lift @@ Sc_rollup_storage.deposit_stake ctxt rollup staker in
   let commitment =
     Sc_rollup_repr.Commitment.
@@ -702,7 +713,7 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -735,7 +746,7 @@ let test_stake_on_existing_node () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -754,11 +765,12 @@ let test_cement_with_two_stakers () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -772,7 +784,7 @@ let test_cement_with_two_stakers () =
        Sc_rollup_repr.Commitment.
          {
            predecessor = c1;
-           inbox_level = Raw_level_repr.of_int32_exn 41l;
+           inbox_level = level 2l;
            number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -795,11 +807,12 @@ let test_can_remove_staker () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -813,7 +826,7 @@ let test_can_remove_staker () =
        Sc_rollup_repr.Commitment.
          {
            predecessor = c1;
-           inbox_level = Raw_level_repr.of_int32_exn 41l;
+           inbox_level = level 2l;
            number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -836,11 +849,12 @@ let test_can_remove_staker2 () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -854,7 +868,7 @@ let test_can_remove_staker2 () =
        Sc_rollup_repr.Commitment.
          {
            predecessor = c1;
-           inbox_level = Raw_level_repr.of_int32_exn 41l;
+           inbox_level = level 2l;
            number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -878,11 +892,12 @@ let test_removed_staker_can_not_withdraw () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -895,7 +910,7 @@ let test_removed_staker_can_not_withdraw () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -914,11 +929,12 @@ let test_no_cement_on_conflict () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -931,7 +947,7 @@ let test_no_cement_on_conflict () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 44l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -960,7 +976,7 @@ let test_no_cement_with_one_staker_at_zero_commitment () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -982,11 +998,12 @@ let test_non_cemented_parent () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -999,7 +1016,7 @@ let test_non_cemented_parent () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1021,11 +1038,12 @@ let test_finds_conflict_point_at_lcc () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1038,7 +1056,7 @@ let test_finds_conflict_point_at_lcc () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 55l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1056,11 +1074,12 @@ let test_finds_conflict_point_beneath_lcc () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1073,7 +1092,7 @@ let test_finds_conflict_point_beneath_lcc () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1086,7 +1105,7 @@ let test_finds_conflict_point_beneath_lcc () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 4l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1105,11 +1124,12 @@ let test_conflict_point_is_first_point_of_disagreement () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1122,7 +1142,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1135,7 +1155,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 4l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1148,7 +1168,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c2;
-        inbox_level = Raw_level_repr.of_int32_exn 61l;
+        inbox_level = level 3l;
         number_of_messages = number_of_messages_exn 4l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1163,6 +1183,80 @@ let test_conflict_point_is_first_point_of_disagreement () =
   let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left c2 in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt right c3
 
+let test_conflict_point_computation_fits_in_gas_limit () =
+  (* Worst case of conflict point computation: two branches of maximum
+     length rooted just after the LCC. *)
+  let* (ctxt, rollup, staker1, staker2) =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let level = valid_inbox_level ctxt in
+  let max_commits =
+    let commitment_freq =
+      Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+    in
+    Int32.div
+      (Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt)
+      (Int32.of_int commitment_freq)
+  in
+  let root_commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        inbox_level = level 1l;
+        number_of_messages = number_of_messages_exn 1l;
+        number_of_ticks = number_of_ticks_exn 1l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* (root_commitment_hash, ctxt) =
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 root_commitment
+  in
+  let* (_, ctxt) =
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 root_commitment
+  in
+  let rec branch ctxt staker_id staker predecessor i max acc =
+    let commitment =
+      Sc_rollup_repr.Commitment.
+        {
+          predecessor;
+          inbox_level = level i;
+          number_of_messages = number_of_messages_exn staker_id;
+          number_of_ticks = number_of_ticks_exn 1l;
+          compressed_state = Sc_rollup_repr.State_hash.zero;
+        }
+    in
+    let* (commitment_hash, ctxt) =
+      lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
+    in
+    if i = max then
+      return (Array.of_list (List.rev (commitment_hash :: acc)), ctxt)
+    else
+      branch
+        ctxt
+        staker_id
+        staker
+        commitment_hash
+        (Int32.succ i)
+        max
+        (commitment_hash :: acc)
+  in
+  let* (branch_1, ctxt) =
+    branch ctxt 1l staker1 root_commitment_hash 2l max_commits []
+  in
+  let* (branch_2, ctxt) =
+    branch ctxt 2l staker2 root_commitment_hash 2l max_commits []
+  in
+  let ctxt =
+    Raw_context.set_gas_limit
+      ctxt
+      (Constants_storage.hard_gas_limit_per_operation ctxt)
+  in
+  let* ((left, right), ctxt) =
+    lift @@ Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+  in
+  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left branch_1.(0) in
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt right branch_2.(0)
+
 let test_no_conflict_point_one_staker_at_lcc_preboot () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
@@ -1171,7 +1265,7 @@ let test_no_conflict_point_one_staker_at_lcc_preboot () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1198,11 +1292,12 @@ let test_no_conflict_point_one_staker_at_lcc () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1215,7 +1310,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1242,7 +1337,7 @@ let test_no_conflict_point_both_stakers_at_lcc () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1271,11 +1366,12 @@ let test_staker_cannot_backtrack () =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let* ctxt = lift @@ Sc_rollup_storage.deposit_stake ctxt rollup staker in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1288,7 +1384,7 @@ let test_staker_cannot_backtrack () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1306,11 +1402,12 @@ let test_staker_cannot_change_branch () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1323,7 +1420,7 @@ let test_staker_cannot_change_branch () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1336,7 +1433,7 @@ let test_staker_cannot_change_branch () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c1;
-        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        inbox_level = level 2l;
         number_of_messages = number_of_messages_exn 4l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1350,7 +1447,7 @@ let test_staker_cannot_change_branch () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = c2;
-        inbox_level = Raw_level_repr.of_int32_exn 61l;
+        inbox_level = level 3l;
         number_of_messages = number_of_messages_exn 4l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1386,7 +1483,7 @@ let test_refine_stake_of_missing_rollup () =
         Sc_rollup_repr.Commitment.
           {
             predecessor = Sc_rollup_repr.Commitment_hash.zero;
-            inbox_level = Raw_level_repr.of_int32_exn 21l;
+            inbox_level = valid_inbox_level ctxt 1l;
             number_of_messages = number_of_messages_exn 3l;
             number_of_ticks = number_of_ticks_exn 1232909l;
             compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1445,11 +1542,12 @@ let test_concurrent_refinement_point_of_conflict () =
   let* (before_ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
   in
+  let level = valid_inbox_level before_ctxt in
   let commitment1 =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1459,7 +1557,7 @@ let test_concurrent_refinement_point_of_conflict () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 10l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1496,7 +1594,7 @@ let test_concurrent_refinement_cement () =
     Sc_rollup_repr.Commitment.
       {
         predecessor = Sc_rollup_repr.Commitment_hash.zero;
-        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        inbox_level = valid_inbox_level before_ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
@@ -1717,6 +1815,10 @@ let tests =
       "finds no conflict point when both stakers commit to LCC"
       `Quick
       test_no_conflict_point_both_stakers_at_lcc;
+    Tztest.tztest
+      "test_conflict_point_computation_fits_in_gas_limit"
+      `Quick
+      test_conflict_point_computation_fits_in_gas_limit;
     Tztest.tztest "staker cannot backtrack" `Quick test_staker_cannot_backtrack;
     Tztest.tztest
       "staker cannot change branch"

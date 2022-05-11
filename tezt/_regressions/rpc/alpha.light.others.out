@@ -46,7 +46,7 @@ rpc/alpha.light.others.out
   "sc_rollup_challenge_window_in_blocks": 20160,
   "sc_rollup_max_available_messages": 1000000,
   "sc_rollup_stake_amount_in_mutez": 32000000,
-  "sc_rollup_commitment_frequency_in_blocks": 20,
+  "sc_rollup_commitment_frequency_in_blocks": 30,
   "sc_rollup_commitment_storage_size_in_bytes": 84,
   "sc_rollup_max_lookahead_in_blocks": 30000 }
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

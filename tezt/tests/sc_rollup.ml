@@ -64,6 +64,12 @@ let setup f ~protocol =
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f node client bootstrap1_key
 
+let get_sc_rollup_commitment_frequency_in_blocks client =
+  let* constants = RPC.get_constants ~hooks client in
+  constants
+  |> JSON.get "sc_rollup_commitment_frequency_in_blocks"
+  |> JSON.as_int |> return
+
 let sc_rollup_node_rpc sc_node service =
   let* curl = RPC.Curl.get () in
   match curl with
@@ -995,7 +1001,9 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
   in
 
   let init_level = init_level |> JSON.as_int in
-  let levels_to_commitment = 20 in
+  let* levels_to_commitment =
+    get_sc_rollup_commitment_frequency_in_blocks client
+  in
   let levels_to_finalize = 2 in
   let store_commitment_level =
     init_level + levels_to_commitment + levels_to_finalize
@@ -1066,7 +1074,9 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node
   in
 
   let init_level = init_level |> JSON.as_int in
-  let levels_to_commitment = 20 in
+  let* levels_to_commitment =
+    get_sc_rollup_commitment_frequency_in_blocks client
+  in
   let levels_to_finalize = 1 in
   let store_commitment_level = init_level + levels_to_commitment in
   let* () = Sc_rollup_node.run sc_rollup_node in
@@ -1118,7 +1128,9 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup_address _node
   in
 
   let init_level = init_level |> JSON.as_int in
-  let levels_to_commitment = 20 in
+  let* levels_to_commitment =
+    get_sc_rollup_commitment_frequency_in_blocks client
+  in
   let levels_to_finalize = 2 in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
@@ -1189,7 +1201,9 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
   in
 
   let init_level = init_level |> JSON.as_int in
-  let levels_to_commitment = 20 in
+  let* levels_to_commitment =
+    get_sc_rollup_commitment_frequency_in_blocks client
+  in
   let num_empty_blocks = 2 in
   let num_messages = 1 in
   let levels_to_finalize = 2 in

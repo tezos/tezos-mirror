@@ -132,30 +132,44 @@ let rec bake_until i top =
     Incremental.finalize_block i >>=? fun b ->
     Incremental.begin_construction b >>=? fun i -> bake_until i top
 
-let dummy_commitment =
-  Sc_rollup.Commitment.
-    {
-      predecessor = Sc_rollup.Commitment_hash.zero;
-      inbox_level = Raw_level.of_int32_exn 21l;
-      number_of_messages = number_of_messages_exn 3l;
-      number_of_ticks = number_of_ticks_exn 3000l;
-      compressed_state = Sc_rollup.State_hash.zero;
-    }
+let dummy_commitment ctxt rollup =
+  let ctxt = Incremental.alpha_ctxt ctxt in
+  let*! root_level = Sc_rollup.initial_level ctxt rollup in
+  let root_level =
+    match root_level with Ok v -> v | Error _ -> assert false
+  in
+  let inbox_level =
+    let commitment_freq =
+      Constants_storage.sc_rollup_commitment_frequency_in_blocks
+        (Alpha_context.Internal_for_tests.to_raw ctxt)
+    in
+
+    Raw_level.of_int32_exn
+      (Int32.add (Raw_level.to_int32 root_level) (Int32.of_int commitment_freq))
+  in
+  return
+    Sc_rollup.Commitment.
+      {
+        predecessor = Sc_rollup.Commitment_hash.zero;
+        inbox_level;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 3000l;
+        compressed_state = Sc_rollup.State_hash.zero;
+      }
 
 (** [test_publish_and_cement] creates a rollup, publishes a
-    commitment and then 20 blocks later cements that commitment *)
+    commitment and then [commitment_freq] blocks later cements that commitment *)
 let test_publish_and_cement () =
   let* (ctxt, contracts, rollup) = init_and_originate Context.T2 in
   let (_, contract) = contracts in
-  let* operation =
-    Op.sc_rollup_publish (B ctxt) contract rollup dummy_commitment
-  in
   let* i = Incremental.begin_construction ctxt in
+  let* c = dummy_commitment i rollup in
+  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
   let* i = Incremental.begin_construction b in
   let* i = bake_until i 20l in
-  let hash = Sc_rollup.Commitment.hash dummy_commitment in
+  let hash = Sc_rollup.Commitment.hash c in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* _ = Incremental.add_operation i cement_op in
   return_unit
@@ -167,14 +181,13 @@ let test_publish_and_cement () =
 let test_cement_fails_if_premature () =
   let* (ctxt, contracts, rollup) = init_and_originate Context.T2 in
   let (_, contract) = contracts in
-  let* operation =
-    Op.sc_rollup_publish (B ctxt) contract rollup dummy_commitment
-  in
   let* i = Incremental.begin_construction ctxt in
+  let* c = dummy_commitment i rollup in
+  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
   let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash dummy_commitment in
+  let hash = Sc_rollup.Commitment.hash c in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let expect_failure = function
     | Environment.Ecoproto_error (Sc_rollup_storage.Sc_rollup_too_recent as e)
@@ -193,12 +206,12 @@ let test_cement_fails_if_premature () =
 let test_publish_fails_on_backtrack () =
   let* (ctxt, contracts, rollup) = init_and_originate Context.T2 in
   let (_, contract) = contracts in
-  let commitment1 = dummy_commitment in
+  let* i = Incremental.begin_construction ctxt in
+  let* commitment1 = dummy_commitment i rollup in
   let commitment2 =
-    {dummy_commitment with number_of_ticks = number_of_ticks_exn 3001l}
+    {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
   in
   let* operation1 = Op.sc_rollup_publish (B ctxt) contract rollup commitment1 in
-  let* i = Incremental.begin_construction ctxt in
   let* i = Incremental.add_operation i operation1 in
   let* b = Incremental.finalize_block i in
   let* operation2 = Op.sc_rollup_publish (B b) contract rollup commitment2 in
@@ -221,14 +234,14 @@ let test_publish_fails_on_backtrack () =
 let test_cement_fails_on_conflict () =
   let* (ctxt, contracts, rollup) = init_and_originate Context.T3 in
   let (_, contract1, contract2) = contracts in
-  let commitment1 = dummy_commitment in
+  let* i = Incremental.begin_construction ctxt in
+  let* commitment1 = dummy_commitment i rollup in
   let commitment2 =
-    {dummy_commitment with number_of_ticks = number_of_ticks_exn 3001l}
+    {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
   in
   let* operation1 =
     Op.sc_rollup_publish (B ctxt) contract1 rollup commitment1
   in
-  let* i = Incremental.begin_construction ctxt in
   let* i = Incremental.add_operation i operation1 in
   let* b = Incremental.finalize_block i in
   let* operation2 = Op.sc_rollup_publish (B b) contract2 rollup commitment2 in
