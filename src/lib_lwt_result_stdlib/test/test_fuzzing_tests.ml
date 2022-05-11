@@ -898,8 +898,9 @@ end) : Test = struct
   let exists =
     Test.make
       ~name:(Format.asprintf "%s.exists, Stdlib.List.exists" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq
           (M.exists (CondOf.fn fn const) (M.of_list input))
           (with_stdlib_exists (fn, const, input)))
@@ -907,8 +908,9 @@ end) : Test = struct
   let exists_e =
     Test.make
       ~name:(Format.asprintf "%s.exists_e, Stdlib.List.exists" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_e
           (M.exists_e (CondEOf.fn fn const) (M.of_list input))
           (Ok (with_stdlib_exists (fn, const, input))))
@@ -916,8 +918,9 @@ end) : Test = struct
   let exists_s =
     Test.make
       ~name:(Format.asprintf "%s.exists_s, Stdlib.List.exists" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_s
           (M.exists_s (CondSOf.fn fn const) (M.of_list input))
           (Lwt.return @@ with_stdlib_exists (fn, const, input)))
@@ -925,8 +928,9 @@ end) : Test = struct
   let exists_es =
     Test.make
       ~name:(Format.asprintf "%s.exists_es, Stdlib.List.exists" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_es
           (M.exists_es (CondESOf.fn fn const) (M.of_list input))
           (Lwt.return_ok @@ with_stdlib_exists (fn, const, input)))
@@ -934,8 +938,9 @@ end) : Test = struct
   let exists_p =
     Test.make
       ~name:(Format.asprintf "%s.exists_p, Stdlib.List.exists" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_s
           (M.exists_p (CondSOf.fn fn const) (M.of_list input))
           (Lwt.return @@ with_stdlib_exists (fn, const, input)))
@@ -943,8 +948,9 @@ end) : Test = struct
   let exists_ep =
     Test.make
       ~name:(Format.asprintf "%s.exists_ep, Stdlib.List.exists" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_es
           (M.exists_ep (CondESOf.fn fn const) (M.of_list input))
           (Lwt.return_ok @@ with_stdlib_exists (fn, const, input)))
@@ -958,8 +964,9 @@ end) : Test = struct
   let for_all =
     Test.make
       ~name:(Format.asprintf "%s.for_all, Stdlib.List.for_all" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq
           (M.for_all (CondOf.fn fn const) (M.of_list input))
           (with_stdlib_for_all (fn, const, input)))
@@ -967,8 +974,9 @@ end) : Test = struct
   let for_all_e =
     Test.make
       ~name:(Format.asprintf "%s.for_all_e, Stdlib.List.for_all" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_e
           (M.for_all_e (CondEOf.fn fn const) (M.of_list input))
           (Ok (with_stdlib_for_all (fn, const, input))))
@@ -976,8 +984,9 @@ end) : Test = struct
   let for_all_s =
     Test.make
       ~name:(Format.asprintf "%s.for_all_s, Stdlib.List.for_all" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_s
           (M.for_all_s (CondSOf.fn fn const) (M.of_list input))
           (Lwt.return @@ with_stdlib_for_all (fn, const, input)))
@@ -985,8 +994,9 @@ end) : Test = struct
   let for_all_es =
     Test.make
       ~name:(Format.asprintf "%s.for_all_es, Stdlib.List.for_all" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_es
           (M.for_all_es (CondESOf.fn fn const) (M.of_list input))
           (Lwt.return_ok @@ with_stdlib_for_all (fn, const, input)))
@@ -994,8 +1004,9 @@ end) : Test = struct
   let for_all_p =
     Test.make
       ~name:(Format.asprintf "%s.for_all_p, Stdlib.List.for_all" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_s
           (M.for_all_p (CondSOf.fn fn const) (M.of_list input))
           (Lwt.return @@ with_stdlib_for_all (fn, const, input)))
@@ -1003,8 +1014,9 @@ end) : Test = struct
   let for_all_ep =
     Test.make
       ~name:(Format.asprintf "%s.for_all_ep, Stdlib.List.for_all" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq_es
           (M.for_all_ep (CondESOf.fn fn const) (M.of_list input))
           (Lwt.return_ok @@ with_stdlib_for_all (fn, const, input)))
@@ -1028,8 +1040,9 @@ end) : Test = struct
   let filter =
     Test.make
       ~name:(Format.asprintf "%s.filter, Stdlib.List.filter" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         eq
           (let r = M.filter (CondOf.fn fn const) (M.of_list input) in
            M.to_list r)
@@ -1038,8 +1051,9 @@ end) : Test = struct
   let filter_e =
     Test.make
       ~name:(Format.asprintf "%s.filter_e, Stdlib.List.filter" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         let open Result_syntax in
         eq_e
           (let+ r = M.filter_e (CondEOf.fn fn const) (M.of_list input) in
@@ -1049,8 +1063,9 @@ end) : Test = struct
   let filter_s =
     Test.make
       ~name:(Format.asprintf "%s.filter_s, Stdlib.List.filter" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r = M.filter_s (CondSOf.fn fn const) (M.of_list input) in
@@ -1060,8 +1075,9 @@ end) : Test = struct
   let filter_es =
     Test.make
       ~name:(Format.asprintf "%s.filter_es, Stdlib.List.filter" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         let open Lwt_result_syntax in
         eq_es
           (let+ r = M.filter_es (CondESOf.fn fn const) (M.of_list input) in
@@ -1084,8 +1100,9 @@ end) : Test = struct
   let filter_p =
     Test.make
       ~name:(Format.asprintf "%s.filter_p, Stdlib.List.filter" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r = M.filter_p (CondSOf.fn fn const) (M.of_list input) in
@@ -1095,8 +1112,9 @@ end) : Test = struct
   let filter_ep =
     Test.make
       ~name:(Format.asprintf "%s.filter_ep, Stdlib.List.filter" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (fn, const, input) ->
+      (fun ((_, fn), const, input) ->
         let open Lwt_result_syntax in
         eq_es
           (let+ r = M.filter_ep (CondESOf.fn fn const) (M.of_list input) in
@@ -1118,8 +1136,9 @@ end) : Test = struct
   let filteri =
     Test.make
       ~name:(Format.asprintf "%s.filteri, Stdlib.List.filteri" M.name)
+      ~print:PredPrint.print2_many
       (Gen.pair Test_fuzzing_helpers.Fn.pred many)
-      (fun (fn, input) ->
+      (fun ((_, fn), input) ->
         eq
           (let r = M.filteri (CondOf.fn fn) (M.of_list input) in
            M.to_list r)
@@ -1128,8 +1147,9 @@ end) : Test = struct
   let filteri_e =
     Test.make
       ~name:(Format.asprintf "%s.filteri_e, Stdlib.List.filteri" M.name)
+      ~print:PredPrint.print2_many
       (Gen.pair Test_fuzzing_helpers.Fn.pred many)
-      (fun (fn, input) ->
+      (fun ((_, fn), input) ->
         let open Result_syntax in
         eq_e
           (let+ r = M.filteri_e (CondEOf.fn fn) (M.of_list input) in
@@ -1139,8 +1159,9 @@ end) : Test = struct
   let filteri_s =
     Test.make
       ~name:(Format.asprintf "%s.filteri_s, Stdlib.List.filteri" M.name)
+      ~print:PredPrint.print2_many
       (Gen.pair Test_fuzzing_helpers.Fn.pred many)
-      (fun (fn, input) ->
+      (fun ((_, fn), input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r = M.filteri_s (CondSOf.fn fn) (M.of_list input) in
@@ -1150,8 +1171,9 @@ end) : Test = struct
   let filteri_es =
     Test.make
       ~name:(Format.asprintf "%s.filteri_es, Stdlib.List.filteri" M.name)
+      ~print:PredPrint.print2_many
       (Gen.pair Test_fuzzing_helpers.Fn.pred many)
-      (fun (fn, input) ->
+      (fun ((_, fn), input) ->
         let open Lwt_result_syntax in
         eq_es
           (let+ r = M.filteri_es (CondESOf.fn fn) (M.of_list input) in
@@ -1173,8 +1195,9 @@ end) : Test = struct
   let filteri_p =
     Test.make
       ~name:(Format.asprintf "%s.filteri_p, Stdlib.List.filteri" M.name)
+      ~print:PredPrint.print2_many
       (Gen.pair Test_fuzzing_helpers.Fn.pred many)
-      (fun (fn, input) ->
+      (fun ((_, fn), input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r = M.filteri_p (CondSOf.fn fn) (M.of_list input) in
@@ -1184,8 +1207,9 @@ end) : Test = struct
   let filteri_ep =
     Test.make
       ~name:(Format.asprintf "%s.filteri_ep, Stdlib.List.filteri" M.name)
+      ~print:PredPrint.print2_many
       (Gen.pair Test_fuzzing_helpers.Fn.pred many)
-      (fun (fn, input) ->
+      (fun ((_, fn), input) ->
         let open Lwt_result_syntax in
         eq_es
           (let+ r = M.filteri_ep (CondESOf.fn fn) (M.of_list input) in
@@ -1208,12 +1232,13 @@ end) : Test = struct
   let filter_map =
     Test.make
       ~name:(Format.asprintf "%s.filter_map, Stdlib.List.filter_map" M.name)
+      ~print:PredPrint.print4_arith_one_many
       (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
          many)
-      (fun (pred, Fun (_, arith), const, input) ->
+      (fun ((_, pred), Fun (_, arith), const, input) ->
         eq
           (let r =
              M.filter_map (FilterMapOf.fns pred arith const) (M.of_list input)
@@ -1224,12 +1249,13 @@ end) : Test = struct
   let filter_map_e =
     Test.make
       ~name:(Format.asprintf "%s.filter_map_e, Stdlib.List.filter_map" M.name)
+      ~print:PredPrint.print4_arith_one_many
       (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
          many)
-      (fun (pred, Fun (_, arith), const, input) ->
+      (fun ((_, pred), Fun (_, arith), const, input) ->
         let open Result_syntax in
         eq_e
           (let+ r =
@@ -1243,12 +1269,13 @@ end) : Test = struct
   let filter_map_s =
     Test.make
       ~name:(Format.asprintf "%s.filter_map_s, Stdlib.List.filter_map" M.name)
+      ~print:PredPrint.print4_arith_one_many
       (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
          many)
-      (fun (pred, Fun (_, arith), const, input) ->
+      (fun ((_, pred), Fun (_, arith), const, input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r =
@@ -1262,12 +1289,13 @@ end) : Test = struct
   let filter_map_es =
     Test.make
       ~name:(Format.asprintf "%s.filter_map_es, Stdlib.List.filter_map" M.name)
+      ~print:PredPrint.print4_arith_one_many
       (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
          many)
-      (fun (pred, Fun (_, arith), const, input) ->
+      (fun ((_, pred), Fun (_, arith), const, input) ->
         let open Lwt_result_syntax in
         eq_es
           (let+ r =
@@ -1294,12 +1322,13 @@ end) : Test = struct
   let filter_map_p =
     Test.make
       ~name:(Format.asprintf "%s.filter_map_p, Stdlib.List.filter_map" M.name)
+      ~print:PredPrint.print4_arith_one_many
       (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
          many)
-      (fun (pred, Fun (_, arith), const, input) ->
+      (fun ((_, pred), Fun (_, arith), const, input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r =
@@ -1313,12 +1342,13 @@ end) : Test = struct
   let filter_map_ep =
     Test.make
       ~name:(Format.asprintf "%s.filter_map_ep, Stdlib.List.filter_map" M.name)
+      ~print:PredPrint.print4_arith_one_many
       (Gen.quad
          Test_fuzzing_helpers.Fn.pred
          Test_fuzzing_helpers.Fn.arith
          one
          many)
-      (fun (pred, Fun (_, arith), const, input) ->
+      (fun ((_, pred), Fun (_, arith), const, input) ->
         let open Lwt_result_syntax in
         eq_es
           (let+ r =
@@ -1462,8 +1492,9 @@ end) : Test = struct
   let find =
     Test.make
       ~name:(Format.asprintf "%s.find, Stdlib.List.find_opt" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         eq
           (M.find (CondOf.fn pred const) (M.of_list input))
           (with_stdlib_find (pred, const, input)))
@@ -1471,8 +1502,9 @@ end) : Test = struct
   let find_e =
     Test.make
       ~name:(Format.asprintf "%s.find_e, Stdlib.List.find_opt" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         eq
           (M.find_e (CondEOf.fn pred const) (M.of_list input))
           (Ok (with_stdlib_find (pred, const, input))))
@@ -1480,8 +1512,9 @@ end) : Test = struct
   let find_s =
     Test.make
       ~name:(Format.asprintf "%s.find_s, Stdlib.List.find_opt" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         eq_s
           (M.find_s (CondSOf.fn pred const) (M.of_list input))
           (Lwt.return @@ with_stdlib_find (pred, const, input)))
@@ -1489,8 +1522,9 @@ end) : Test = struct
   let find_es =
     Test.make
       ~name:(Format.asprintf "%s.find_es, Stdlib.List.find_opt" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         eq_s
           (M.find_es (CondESOf.fn pred const) (M.of_list input))
           (Lwt.return_ok @@ with_stdlib_find (pred, const, input)))
@@ -1559,8 +1593,9 @@ end) : Test = struct
   let partition_either =
     Test.make
       ~name:(Format.asprintf "%s.partition, %s.partition_either" M.name M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let cond = CondOf.fn pred const in
         eq
           (M.partition cond (M.of_list input))
@@ -1572,8 +1607,9 @@ end) : Test = struct
   let partition_result =
     Test.make
       ~name:(Format.asprintf "%s.partition, %s.partition_result" M.name M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let cond = CondOf.fn pred const in
         eq
           (M.partition cond (M.of_list input))
@@ -1607,8 +1643,9 @@ end) : Test = struct
   let partition_map =
     Test.make
       ~name:(Format.asprintf "%s.partition_map, %s.partition+map" M.name M.name)
+      ~print:PredPrint.print4_arith_one_many
       g
-      (fun (pred, Fun (_, arith), const, input) ->
+      (fun ((_, pred), Fun (_, arith), const, input) ->
         let mapper = mapper_of_fns pred arith const in
         eq
           (M.partition_map mapper (M.of_list input))
@@ -1632,8 +1669,9 @@ end) : Test = struct
   let partition =
     Test.make
       ~name:(Format.asprintf "%s.partition, Stdlib.List.partition" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         eq
           (let r = M.partition (CondOf.fn pred const) (M.of_list input) in
            to_list_pair r)
@@ -1642,8 +1680,9 @@ end) : Test = struct
   let partition_e =
     Test.make
       ~name:(Format.asprintf "%s.partition_e, Stdlib.List.partition" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let open Result_syntax in
         eq
           (let+ r = M.partition_e (CondEOf.fn pred const) (M.of_list input) in
@@ -1653,8 +1692,9 @@ end) : Test = struct
   let partition_s =
     Test.make
       ~name:(Format.asprintf "%s.partition_s, Stdlib.List.partition" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r = M.partition_s (CondSOf.fn pred const) (M.of_list input) in
@@ -1664,8 +1704,9 @@ end) : Test = struct
   let partition_es =
     Test.make
       ~name:(Format.asprintf "%s.partition_es, Stdlib.List.partition" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let open Lwt_result_syntax in
         eq_s
           (let+ r = M.partition_es (CondESOf.fn pred const) (M.of_list input) in
@@ -1675,8 +1716,9 @@ end) : Test = struct
   let partition_p =
     Test.make
       ~name:(Format.asprintf "%s.partition_p, Stdlib.List.partition" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let open Lwt_syntax in
         eq_s
           (let+ r = M.partition_p (CondSOf.fn pred const) (M.of_list input) in
@@ -1686,8 +1728,9 @@ end) : Test = struct
   let partition_ep =
     Test.make
       ~name:(Format.asprintf "%s.partition_ep, Stdlib.List.partition" M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let open Lwt_result_syntax in
         eq_s
           (let+ r = M.partition_ep (CondESOf.fn pred const) (M.of_list input) in
@@ -1717,8 +1760,9 @@ end) : Test = struct
   let filter_left =
     Test.make
       ~name:(Format.asprintf "%s.filter, %s.filter_left" M.name M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let cond = CondOf.fn pred const in
         eq
           (M.filter cond (M.of_list input))
@@ -1730,8 +1774,9 @@ end) : Test = struct
   let filter_right =
     Test.make
       ~name:(Format.asprintf "%s.filter, %s.filter_right" M.name M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let cond = CondOf.fn pred const in
         eq
           (M.filter cond (M.of_list input))
@@ -1743,8 +1788,9 @@ end) : Test = struct
   let filter_ok =
     Test.make
       ~name:(Format.asprintf "%s.filter, %s.filter_ok" M.name M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let cond = CondOf.fn pred const in
         eq
           (M.filter cond (M.of_list input))
@@ -1756,8 +1802,9 @@ end) : Test = struct
   let filter_error =
     Test.make
       ~name:(Format.asprintf "%s.filter, %s.filter_error" M.name M.name)
+      ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
-      (fun (pred, const, input) ->
+      (fun ((_, pred), const, input) ->
         let cond = CondOf.fn pred const in
         eq
           (M.filter cond (M.of_list input))
@@ -2227,8 +2274,9 @@ end) : Test = struct
   let for_all =
     Test.make
       ~name:(Format.asprintf "%s.for_all{2,}" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         eq_e
           ~pp:PP.(res bool int)
           (M.for_all2
@@ -2248,8 +2296,9 @@ end) : Test = struct
   let for_all_e =
     Test.make
       ~name:(Format.asprintf "%s.for_all{2,}_e" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         let open Result_syntax in
         eq_e
           ~pp:PP.(res bool int)
@@ -2270,8 +2319,9 @@ end) : Test = struct
   let for_all_s =
     Test.make
       ~name:(Format.asprintf "%s.for_all{2,}_s" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         let open Lwt_syntax in
         eq_s
           ~pp:PP.(res bool int)
@@ -2292,8 +2342,9 @@ end) : Test = struct
   let for_all_es =
     Test.make
       ~name:(Format.asprintf "%s.for_all{2,}_es" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         let open Lwt_result_syntax in
         eq_es
           (M.for_all2_es
@@ -2315,8 +2366,9 @@ end) : Test = struct
   let exists =
     Test.make
       ~name:(Format.asprintf "%s.exists{2,}" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         eq_e
           ~pp:PP.(res bool int)
           (M.exists2
@@ -2336,8 +2388,9 @@ end) : Test = struct
   let exists_e =
     Test.make
       ~name:(Format.asprintf "%s.exists{2,}_e" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         let open Result_syntax in
         eq_e
           ~pp:PP.(res bool int)
@@ -2358,8 +2411,9 @@ end) : Test = struct
   let exists_s =
     Test.make
       ~name:(Format.asprintf "%s.exists{2,}_s" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         let open Lwt_syntax in
         eq_s
           ~pp:PP.(res bool int)
@@ -2380,8 +2434,9 @@ end) : Test = struct
   let exists_es =
     Test.make
       ~name:(Format.asprintf "%s.exists{2,}_es" M.name)
+      ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
-      (fun (pred, (left, right)) ->
+      (fun ((_, pred), (left, right)) ->
         let open Lwt_result_syntax in
         eq_es
           (M.exists2_es

@@ -42,11 +42,11 @@ module Fn = struct
   let pred =
     oneof
       [
-        return (fun x _ -> x > 0);
-        return (fun _ y -> y < 0);
-        return (fun _ _ -> false);
-        return (fun _ _ -> true);
-        return (fun x y -> x < y);
+        return ("(fun x _ -> x > 0)", fun x _ -> x > 0);
+        return ("(fun _ y -> y < 0)", fun _ y -> y < 0);
+        return ("(fun _ _ -> false)", fun _ _ -> false);
+        return ("(fun _ _ -> true)", fun _ _ -> true);
+        return ("(fun x y -> x < y)", fun x y -> x < y);
       ]
 
   let basic_int = oneof [int; return 0; return 1]
@@ -60,7 +60,7 @@ module Fn = struct
     fun2 Observable.int Observable.int (opt int)
 
   (* combinators *)
-  let e (cond, QCheck2.Fun (_, ok), QCheck2.Fun (_, error)) x y =
+  let e ((_, cond), QCheck2.Fun (_, ok), QCheck2.Fun (_, error)) x y =
     if cond x y then Ok (ok x y) else Error (error x y)
 
   let arith_e = map e (triple pred arith arith)
@@ -72,7 +72,7 @@ module Fn = struct
 
   let arith_s = map s (pair arith arith)
 
-  let es QCheck2.(cond, Fun (_, pauses), Fun (_, ok), Fun (_, error)) x y =
+  let es QCheck2.((_, cond), Fun (_, pauses), Fun (_, ok), Fun (_, error)) x y =
     let open Lwt_syntax in
     let+ () = log_pause (pauses x y) in
     if cond x y then Ok (ok x y) else Error (error x y)
@@ -631,4 +631,35 @@ module PP = struct
   let bool = Format.pp_print_bool
 
   let trace = Support.Test_trace.pp
+end
+
+module PredPrint = struct
+  (* This module contains helpers to print tuples containing Fn.pred values *)
+  let print_pred (s, (_ : int -> int -> bool)) = QCheck2.Print.string s
+
+  let print_arith (f : (int -> int -> int) QCheck2.fun_) = QCheck2.Fn.print f
+
+  let print2_many =
+    let open QCheck2.Print in
+    pair print_pred (list int)
+
+  let print2_manymany =
+    let open QCheck2.Print in
+    pair print_pred (pair (list int) (list int))
+
+  let print3_one_many =
+    let open QCheck2.Print in
+    triple print_pred int (list int)
+
+  let print3_one_maybe =
+    let open QCheck2.Print in
+    triple print_pred int (option int)
+
+  let print4_arith_one_many =
+    let open QCheck2.Print in
+    quad print_pred print_arith int (list int)
+
+  let print4_arith_one_maybe =
+    let open QCheck2.Print in
+    quad print_pred print_arith int (option int)
 end
