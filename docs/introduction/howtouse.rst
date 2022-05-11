@@ -232,7 +232,7 @@ Putting together all the above instructions, you may want to run a node as follo
     # Configure the node for running on <test-net>:
     tezos-node config init --data-dir ~/.tezos-node-<test-net> --network <test-net>
     # Import the snapshot into the node data directory:
-    tezos-node snapshot --data-dir ~/.tezos-node-<test-net> import --block <block-hash> <snapshot-file>
+    tezos-node snapshot import --data-dir ~/.tezos-node-<test-net> --block <block-hash> <snapshot-file>
     # Run the node:
     tezos-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
 
