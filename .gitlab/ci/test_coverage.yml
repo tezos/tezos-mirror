@@ -1,31 +1,64 @@
-# This job fetchs coverage files by precedent test stage. It creates the html,
+---
+# This job fetches coverage files by precedent test stage. It creates the html,
 # summary and cobertura reports. It also provide a coverage % for the merge request.
 
 unified_coverage:
   extends:
     - .default_settings_template
-    - .rules_template__development_unified_coverage
     - .image_template__runtime_build_test_dependencies_template
-    - .template__coverage
-  stage: test_coverage
-  # This job requires all artifacts from the stage test, so we override
-  # the `dependencies: []` in `.default_settings` by setting `dependencies` 
-  # to `null`.
+    - .template__coverage_report
+  # This job requires all bisect_ppx artifacts from the stage test, so we override
+  # the `dependencies: []` in `.default_settings` with a list of jobs.
+  # Each new job in the stage test needs to be manually added to this list.
   dependencies:
-  before_script:
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . "$HOME"/.venv/bin/activate
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__1]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__2]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__3]"
+    - "unit:012_Psithaca: [proto_012_Psithaca]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__1]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__2]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__3]"
+    - "unit:013_PtJakart: [proto_013_PtJakart]"
+    - "unit:alpha: [proto_alpha__lib_protocol__1]"
+    - "unit:alpha: [proto_alpha__lib_protocol__2]"
+    - "unit:alpha: [proto_alpha__lib_protocol__3]"
+    - "unit:alpha: [proto_alpha]"
+    - "unit:non-proto-x86_64"
+    - "integration:sandboxes:acc-endorsement"
+    - "integration:pytest 1/25"
+    - "integration:pytest 2/25"
+    - "integration:pytest 3/25"
+    - "integration:pytest 4/25"
+    - "integration:pytest 5/25"
+    - "integration:pytest 6/25"
+    - "integration:pytest 7/25"
+    - "integration:pytest 8/25"
+    - "integration:pytest 9/25"
+    - "integration:pytest 10/25"
+    - "integration:pytest 11/25"
+    - "integration:pytest 12/25"
+    - "integration:pytest 13/25"
+    - "integration:pytest 14/25"
+    - "integration:pytest 15/25"
+    - "integration:pytest 16/25"
+    - "integration:pytest 17/25"
+    - "integration:pytest 18/25"
+    - "integration:pytest 19/25"
+    - "integration:pytest 20/25"
+    - "integration:pytest 21/25"
+    - "integration:pytest 22/25"
+    - "integration:pytest 23/25"
+    - "integration:pytest 24/25"
+    - "integration:pytest 25/25"
+    - "tezt 1/9"
+    - "tezt 2/9"
+    - "tezt 3/9"
+    - "tezt 4/9"
+    - "tezt 5/9"
+    - "tezt 6/9"
+    - "tezt 7/9"
+    - "tezt 8/9"
+    - "tezt 9/9"
   script:
+    # On the development branches, we compute coverage
     - ./scripts/ci/report_coverage.sh
-  coverage: '/Coverage: ([^%]+%)/'
-  artifacts:
-    expose_as: 'Coverage report'
-    when: always
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: _coverage_report/cobertura.xml
-    paths:
-      - _coverage_report/
-    expire_in: 15 days
