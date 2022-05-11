@@ -34,6 +34,8 @@
 
 module Assert = Lib_test.Assert
 
+(** Basic blocks *)
+
 let genesis_hash =
   Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
@@ -43,11 +45,46 @@ let genesis_protocol =
     "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let proto =
-  match Registered_protocol.get genesis_protocol with
+  match Tezos_protocol_updater.Registered_protocol.get genesis_protocol with
   | None -> assert false
   | Some proto -> proto
 
 module Proto = (val proto)
+
+let genesis_time = Time.Protocol.of_seconds 0L
+
+let state_genesis_block =
+  {
+    Genesis.time = genesis_time;
+    block = genesis_hash;
+    protocol = genesis_protocol;
+  }
+
+let patch_context ctxt =
+  let open Lwt_syntax in
+  let* v = Context_ops.add ctxt ["version"] (Bytes.of_string "demo_noops") in
+  return_ok v
+
+(** [init_chain base_dir] with working directory [base_dir] returns a new state
+    with a single genesis block *)
+let init_chain ?(history_mode = History_mode.Archive) base_dir =
+  let open Filename.Infix in
+  let open Lwt_syntax in
+  let store_dir = base_dir // "store" in
+  let context_dir = base_dir // "context" in
+  let* r =
+    Store.init
+      ~store_dir
+      ~context_dir
+      ~history_mode
+      ~allow_testchains:true
+      ~patch_context
+      state_genesis_block
+  in
+  match r with
+  | Error err ->
+      Format.kasprintf Lwt.fail_with "init error: %a" pp_print_trace err
+  | Ok store -> Lwt.return store
 
 let zero = Bytes.create 0
 
@@ -262,7 +299,7 @@ let linear_predecessor_n chain_store (bh : Block_hash.t) (distance : int) :
 let test_pred (base_dir : string) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let size_chain = 1000 in
-  let*! store = Shell_test_helpers.init_chain base_dir in
+  let*! store = init_chain base_dir in
   let chain_store = Store.main_chain_store store in
   let*! head = make_empty_chain chain_store size_chain in
   let test_once distance =
@@ -353,7 +390,7 @@ let bench_locator base_dir =
   (* size after which locator always reaches genesis *)
   let locator_limit = compute_size_locator size_chain in
   let _ = Printf.printf "#locator_limit %i\n" locator_limit in
-  let*! store = Shell_test_helpers.init_chain base_dir in
+  let*! store = init_chain base_dir in
   let chain_store = Store.main_chain_store store in
   time1 (fun () -> make_empty_chain chain_store size_chain)
   |> fun (res, t_chain) ->
@@ -396,7 +433,7 @@ let bench_locator base_dir =
 
 let test_protocol_locator base_dir =
   let open Lwt_result_syntax in
-  let*! store = Shell_test_helpers.init_chain base_dir in
+  let*! store = init_chain base_dir in
   let chain_store = Store.main_chain_store store in
   let chain_length = 200 in
   let fork_points = [1; 10; 50; 66; 150] in
@@ -502,7 +539,7 @@ let test_protocol_locator base_dir =
       genesis
       ~new_history_mode:(Rolling (Some {offset = 0}))
   in
-  let*! store = Shell_test_helpers.init_chain ~history_mode base_dir in
+  let*! store = init_chain ~history_mode base_dir in
   let chain_store = Store.main_chain_store store in
   let*! caboose_hash, _ = Store.Chain.caboose chain_store in
   let* () =
@@ -588,6 +625,13 @@ let tests =
     match Sys.argv.(1) with "--bench" -> bench | _ -> []
   else []
 
+let tests =
+  tests
+  @
+  if Array.length Sys.argv > 1 then
+    match Sys.argv.(1) with "--bench" -> bench | _ -> []
+  else []
+
 let () =
-  Alcotest_lwt.run ~argv:[|""|] "tezos-shell" [("locator", tests)]
+  Alcotest_lwt.run ~argv:[|""|] "tezos-store" [("locator", tests)]
   |> Lwt_main.run

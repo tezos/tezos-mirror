@@ -4,7 +4,6 @@
 (executables
  (names
   test_shell
-  test_locator
   test_synchronisation_heuristic_fuzzy
   test_prevalidation
   test_prevalidation_t
@@ -58,11 +57,6 @@
 (rule
  (alias runtest)
  (package tezos-shell)
- (action (run %{dep:./test_locator.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
  (action (run %{dep:./test_synchronisation_heuristic_fuzzy.exe})))
 
 (rule
@@ -94,8 +88,3 @@
  (alias runtest)
  (package tezos-shell)
  (action (run %{dep:./test_peer_validator.exe})))
-
-(rule
- (alias runtest_locator_bench)
- (package tezos-shell)
- (action (run %{exe:test_locator.exe} --bench)))

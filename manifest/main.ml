@@ -4594,8 +4594,8 @@ let _octez_micheline_rewriting_tests =
       ]
 
 let _octez_store_tests =
-  test
-    "test"
+  tests
+    ["test"; "test_locator"]
     ~path:"src/lib_store/test"
     ~opam:"tezos-store"
     ~deps:
@@ -4635,13 +4635,16 @@ let _octez_store_tests =
           alias_rule
             "test_slow_manual"
             ~action:(setenv "SLOW_TEST" "true" @@ run_exe "test" []);
+          alias_rule
+            "runtest_locator_bench"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_locator" ["--bench"]);
         ]
 
 let _octez_shell_tests =
   tests
     [
       "test_shell";
-      "test_locator";
       "test_synchronisation_heuristic_fuzzy";
       "test_prevalidation";
       "test_prevalidation_t";
@@ -4674,14 +4677,6 @@ let _octez_shell_tests =
         octez_test_helpers;
         alcotest_lwt;
       ]
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest_locator_bench"
-            ~package:"tezos-shell"
-            ~action:(run_exe "test_locator" ["--bench"]);
-        ]
 
 (* INTERNAL EXES *)
 

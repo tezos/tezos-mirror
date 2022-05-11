@@ -1,8 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test)
+(executables
+ (names test test_locator)
  (libraries
   tezos-base
   tezos-context-ops
@@ -43,3 +43,8 @@
 (rule
  (alias test_slow_manual)
  (action (setenv SLOW_TEST true (run %{exe:test.exe}))))
+
+(rule
+ (alias runtest_locator_bench)
+ (package tezos-store)
+ (action (run %{exe:test_locator.exe} --bench)))
