@@ -16,13 +16,17 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 # GitLab constraints on images:
 # https://docs.gitlab.com/ee/user/packages/container_registry/#image-naming-convention
 
+# /!\ CI_REGISTRY is overriden to use AWS ECR in `nomadic-labs` and `tezos` GitLab namespaces
+
 # Create directory for Docker JSON configuration (if does not exist)
 mkdir -pv ~/.docker
 
 echo '### Input variables'
+echo "CI_COMMIT_REF_NAME=${CI_COMMIT_REF_NAME}"
 echo "CI_DOCKER_HUB=${CI_DOCKER_HUB:-}"
-echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
+echo "CI_PROJECT_NAME=${CI_PROJECT_NAME}"
 echo "CI_PROJECT_NAMESPACE=${CI_PROJECT_NAMESPACE}"
+echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
 echo "TEZOS_DEFAULT_NAMESPACE=${TEZOS_DEFAULT_NAMESPACE}"
 
 # CI_DOCKER_HUB is used to switch to Docker Hub if credentials are available with CI_DOCKER_AUTH
@@ -34,8 +38,8 @@ then
   echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
 else
   # GitLab container registry
-  docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
-  docker_image_name="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
+  docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" registry.gitlab.com
+  docker_image_name="registry.gitlab.com/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
 fi
 
 # /!\ IMAGE_ARCH_PREFIX can be unset
