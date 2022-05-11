@@ -51,7 +51,7 @@ _`Metadata`
 
     A block's metadata is the collections of operations metadata for all the operations included in the block (if the validation was successful).
 
-    For a detailed metadata content check the :ref:`rpc_index` under
+    For a detailed metadata content check the :doc:`./rpc` under
     the prefix ``../<block_id>/metadata``.
 
 _`Node`

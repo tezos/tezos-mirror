@@ -13,20 +13,22 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-JAKARTA_LONG  = PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
-ITHACA_LONG   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
-ACTIVE_LONG   = $(ITHACA_LONG)
+PROTOCOLS     = ithaca jakarta alpha
 
-ALPHA_SHORT    = alpha
-ITHACA_SHORT   = 012-Psithaca
-JAKARTA_SHORT  = 013-PtJakart
-ACTIVE_SHORT   = $(ITHACA_SHORT)
+# The following variables names are lowercase, so their names can be computed
+# from the names of the corresponding protocol directories
+ithaca_long   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+jakarta_long  = PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
+alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-SCRIPTSDIR     = scripts
-CHECKXREFS     = $(SCRIPTSDIR)/check_proto_xrefs.py
+ithaca_short  = 012-Psithaca
+jakarta_short = 013-PtJakart
+alpha_short   = alpha
 
-# Build all documentation (with CLI manuals and odoc) but without old protocols
+SCRIPTSDIR    = scripts
+CHECKXREFS    = $(SCRIPTSDIR)/check_proto_xrefs.py
+
+# Build all documentation (with CLI manuals and odoc) but without old PROTOCOLS
 all: manuals odoc-lite
 	${MAKE} html
 
@@ -36,20 +38,19 @@ full: manuals odoc html
 main:
 	${MAKE} -C .. all
 
-manuals: main
-    # alpha protocol
-	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client.html
-	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
-	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
-    # Jakarta protocol
-	@../tezos-client -protocol $(JAKARTA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-client.html
-	@../tezos-baker-$(JAKARTA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-baker.html
-	@../tezos-accuser-$(JAKARTA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-accuser.html
-    # Ithaca protocol
-	@../tezos-client -protocol $(ITHACA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-client.html
-	@../tezos-baker-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-baker.html
-	@../tezos-accuser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-accuser.html
-    # generic
+# Build the manuals for a given protocol
+%/tezos-client.html: main
+	@../tezos-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/tezos-baker.html: main
+	@../tezos-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/tezos-accuser.html: main
+	@../tezos-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+
+manuals: \
+	 $(PROTOCOLS:%=%/tezos-client.html) \
+	 $(PROTOCOLS:%=%/tezos-baker.html) \
+	 $(PROTOCOLS:%=%/tezos-accuser.html)
+	# generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
 	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
@@ -122,9 +123,6 @@ $(P2PDOCEXE): docexes
 api/errors.rst: $(ERRDOCEXE)
 	$(ERRDOCEXE) > api/errors.rst
 
-active/rpc.rst: $(RPCDOCEXE)
-	$(RPCDOCEXE) index "" > $@
-
 %/rpc.rst: $(RPCDOCEXE)
 	$(RPCDOCEXE) index $(@D) > $@
 
@@ -132,7 +130,7 @@ user/default-acl.json: $(RPCDOCEXE)
 	$(RPCDOCEXE) acl > $@
 
 rpc: user/default-acl.json shell/rpc.rst \
-			active/rpc.rst jakarta/rpc.rst alpha/rpc.rst
+			$(PROTOCOLS:%=%/rpc.rst)
 
 p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
 	@$(P2PDOCEXE) < shell/p2p_usage.rst.inc > shell/p2p_api.rst
