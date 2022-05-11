@@ -486,7 +486,7 @@ module Opam = struct
     homepage : string;
     bug_reports : string;
     dev_repo : string;
-    license : string;
+    licenses : string list;
     depends : dependency list;
     conflicts : dependency list;
     build : build_instruction list;
@@ -503,7 +503,7 @@ module Opam = struct
         homepage;
         bug_reports;
         dev_repo;
-        license;
+        licenses;
         depends;
         conflicts;
         build;
@@ -682,7 +682,9 @@ module Opam = struct
     pp_line "homepage: %a" pp_string homepage ;
     pp_line "bug-reports: %a" pp_string bug_reports ;
     pp_line "dev-repo: %a" pp_string dev_repo ;
-    pp_line "license: %a" pp_string license ;
+    (match licenses with
+    | [license] -> pp_line "license: %a" pp_string license
+    | _ -> pp_line "license: %a" (pp_list pp_string) licenses) ;
     pp_line "%a" (pp_list ~v:true ~prefix:"depends: " pp_dependency) depends ;
     if depopts <> [] then
       pp_line "%a" (pp_list ~v:true ~prefix:"depopts: " pp_dependency) depopts ;
@@ -1939,12 +1941,13 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       runtest;
     ]
   in
-  let license =
+  let licenses =
     match
       List.filter_map (fun internal -> internal.Target.license) internals
+      |> List.sort_uniq String.compare
     with
-    | license :: _ -> license
-    | [] -> "MIT"
+    | [] -> ["MIT"]
+    | licenses -> licenses
   in
   let extra_authors =
     List.concat_map (fun internal -> internal.Target.extra_authors) internals
@@ -1955,7 +1958,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     homepage = "https://www.tezos.com/";
     bug_reports = "https://gitlab.com/tezos/tezos/issues";
     dev_repo = "git+https://gitlab.com/tezos/tezos.git";
-    license;
+    licenses;
     depends;
     conflicts;
     build;
