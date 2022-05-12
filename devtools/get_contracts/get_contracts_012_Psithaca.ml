@@ -39,6 +39,30 @@ module Proto = struct
 
   type context = Context.t
 
+  module Contract = struct
+    type repr = Contract_repr.t
+
+    let pp = Contract_repr.pp
+
+    let is_implicit = Contract_repr.is_implicit
+
+    let get_code ctxt contract =
+      Lwt.map wrap_tzresult @@ Storage.Contract.Code.get ctxt contract
+
+    let get_storage ctxt contract =
+      Lwt.map wrap_tzresult @@ Storage.Contract.Storage.get ctxt contract
+
+    let fold ctxt ~init ~f =
+      Storage.Contract.fold ctxt ~order:`Undefined ~init ~f
+  end
+
+  module Script = struct
+    include Alpha_context.Script
+    module Hash = Script_expr_hash
+
+    let print_expr = Tezos_client_012_Psithaca.Michelson_v1_printer.print_expr
+  end
+
   module Translator = struct
     type toplevel = Script_ir_translator.toplevel
 
@@ -92,30 +116,6 @@ module Proto = struct
         @@ Script_ir_translator.parse_toplevel (Obj.magic ctxt) ~legacy expr
       in
       toplevel
-  end
-
-  module Contract = struct
-    type repr = Contract_repr.t
-
-    let pp = Contract_repr.pp
-
-    let is_implicit = Contract_repr.is_implicit
-
-    let get_code ctxt contract =
-      Lwt.map wrap_tzresult @@ Storage.Contract.Code.get ctxt contract
-
-    let get_storage ctxt contract =
-      Lwt.map wrap_tzresult @@ Storage.Contract.Storage.get ctxt contract
-
-    let fold ctxt ~init ~f =
-      Storage.Contract.fold ctxt ~order:`Undefined ~init ~f
-  end
-
-  module Script = struct
-    include Alpha_context.Script
-    module Hash = Script_expr_hash
-
-    let print_expr = Tezos_client_012_Psithaca.Michelson_v1_printer.print_expr
   end
 
   module Storage = struct
