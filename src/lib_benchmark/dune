@@ -16,9 +16,9 @@
   prbnmcn-dagger-stats
   prbnmcn-stats
   pringo
-  benchmark-utils
   pyml-plot
   ocaml-migrate-parsetree)
  (flags (:standard
          -open Tezos_base.TzPervasives
-         -open Tezos_stdlib_unix)))
+         -open Tezos_stdlib_unix))
+ (foreign_stubs (language c) (flags (:standard)) (names snoop_stubs)))

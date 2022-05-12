@@ -20,7 +20,6 @@ depends: [
   "tezos-crypto"
   "tezos-protocol-012-Psithaca-parameters"
   "hashcons"
-  "benchmark-utils"
   "tezos-012-Psithaca-test-helpers"
   "prbnmcn-stats" { = "0.0.4" }
   "alcotest-lwt" { with-test & >= "1.5.0" }

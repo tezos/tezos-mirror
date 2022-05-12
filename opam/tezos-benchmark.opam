@@ -19,7 +19,6 @@ depends: [
   "prbnmcn-dagger-stats" { = "0.0.2" }
   "prbnmcn-stats" { = "0.0.4" }
   "pringo" { >= "1.3" & < "1.4" }
-  "benchmark-utils"
   "pyml-plot"
   "ocaml-migrate-parsetree"
   "hashcons"
