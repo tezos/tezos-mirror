@@ -1308,6 +1308,9 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
               let merge_end = Time.System.now () in
               let merging_time = Ptime.diff merge_end merge_start in
               let*! () = Store_events.(emit end_merging_stores) merging_time in
+              Prometheus.Gauge.set
+                Store_metrics.metrics.last_store_merge_time
+                (Ptime.Span.to_float_s merging_time) ;
               return_unit
             in
             block_store.merging_thread <- Some (new_head_lafl, merging_thread) ;

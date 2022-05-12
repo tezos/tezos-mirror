@@ -25,10 +25,11 @@ be documented here either.
 Node
 ----
 
-- Added a store metric to expose the amount of data written.
+- Added store metrics to expose the amount of data written while
+  storing the last block and the completion time of the last merge.
 
 - Added a block validator metric to expose the number of operation per
-  pass for each new block validated
+  pass for each new block validated.
 
 - Added a protocol specific metrics, head_cycle and head_consumed_gas.
 
