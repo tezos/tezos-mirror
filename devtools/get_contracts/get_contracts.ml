@@ -23,16 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Options = struct
+module Config = struct
   let collect_storage = true
 
   let collect_lambdas = true
-end
-
-module Make (P : Sigs.PROTOCOL) = struct
-  let return = Lwt_result_syntax.return
-
-  let ok x = Ok x
 
   let mainnet_genesis =
     {
@@ -55,7 +49,9 @@ module Make (P : Sigs.PROTOCOL) = struct
         Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
+end
 
+module Make (P : Sigs.PROTOCOL) = struct
   module ExprMap = Map.Make (P.Script.Hash)
 
   module File_helpers = struct
@@ -248,7 +244,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         exprs
         ExprMap.empty
 
-    type ex_lambda = P.Unparse_types.ex_lambda
+    type ex_lambda = P.Lambda.ex_lambda
 
     type ex_ty_lambdas =
       | Ex_ty_lambdas : 'a P.ty * ('a -> ex_lambda list) list -> ex_ty_lambdas
@@ -257,7 +253,7 @@ module Make (P : Sigs.PROTOCOL) = struct
       let open P.Translator in
       ExprMap.fold
         (fun hash (Ex_ty ty) types ->
-          match P.Unparse_types.collect_lambda_tys ty with
+          match P.Lambda.collect_lambda_tys ty with
           | [] -> types
           | g -> ExprMap.add hash (Ex_ty_lambdas (ty, g)) types)
         types
@@ -293,13 +289,13 @@ module Make (P : Sigs.PROTOCOL) = struct
                     (fun acc getter ->
                       let lam_nodes = getter v in
                       List.fold_left
-                        (fun (acc_lambdas, acc_ty, acc_legacy)
-                             (P.Unparse_types.Ex_lambda (ty, lam)) ->
+                        (fun (acc_lambdas, acc_ty, acc_legacy) lambda ->
                           let ty_expr =
                             Micheline.strip_locations (unparse_ty ctxt ty)
                           in
                           let lam_expr =
-                            Micheline.strip_locations @@ P.lam_node lam
+                            Micheline.strip_locations
+                            @@ P.Lambda.lam_node lambda
                           in
                           let lam_hash = hash_expr lam_expr in
                           let acc_lambdas =
@@ -338,7 +334,7 @@ module Make (P : Sigs.PROTOCOL) = struct
           | None -> Lwt.return (m, i) (* Should not happen *)
           | Some code ->
               let+ add_storage =
-                if Options.(collect_lambdas || collect_storage) then
+                if Config.(collect_lambdas || collect_storage) then
                   let+ storage_opt =
                     Storage_helpers.get_lazy_expr
                       ~what:"contract storage"
@@ -394,7 +390,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         ~context_dir:(Filename.concat data_dir "context")
         ~allow_testchains:true
         ~readonly:true
-        mainnet_genesis
+        Config.mainnet_genesis
     in
     Printf.printf "Getting main chain storage and head...\n%!" ;
     let chain_store = Tezos_store.Store.main_chain_store store in
@@ -430,7 +426,7 @@ module Make (P : Sigs.PROTOCOL) = struct
     in
     print_endline "Listing addresses done." ;
     let* contract_map, (lambda_map, lambda_ty_map, lambda_legacy_map) =
-      if Options.collect_lambdas then (
+      if Config.collect_lambdas then (
         let add_typed_expr hash expr ty_hash ty exprs =
           ExprMap.update
             hash
@@ -466,7 +462,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         let* exprs, _ =
           Storage.fold
             ctxt
-            ~init:(ok (exprs, 0))
+            ~init:(Ok (exprs, 0))
             ~f:(fun id exprs_i ->
               let* exprs, i = Lwt.return exprs_i in
               let i = i + 1 in
@@ -517,7 +513,7 @@ module Make (P : Sigs.PROTOCOL) = struct
           "%a"
           (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
           contracts ;
-        if Options.collect_storage then
+        if Config.collect_storage then
           let dirname = hash_string ^ ".storages" in
           File_helpers.print_expr_dir ~dirname ~ext:".storage" storages
         else ())

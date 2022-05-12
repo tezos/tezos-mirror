@@ -135,9 +135,10 @@ module type PROTOCOL = sig
       context -> init:'a -> f:(big_map_id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
   end
 
-  module Unparse_types : sig
-    type ex_lambda =
-      | Ex_lambda : ('a, 'b) lambda ty * ('a, 'b) lambda -> ex_lambda
+  module Lambda : sig
+    type ex_lambda
+
+    val lam_node : ex_lambda -> Script.node
 
     val collect_lambda_tys : 'a ty -> ('a -> ex_lambda list) list
 
@@ -148,6 +149,4 @@ module type PROTOCOL = sig
   val code_storage_type : Translator.toplevel -> Script.node
 
   val is_unpack : Script.prim -> bool
-
-  val lam_node : (_, _) lambda -> Script.node
 end
