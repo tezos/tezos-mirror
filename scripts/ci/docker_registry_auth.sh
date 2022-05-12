@@ -42,6 +42,16 @@ else
   docker_image_name="registry.gitlab.com/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
 fi
 
+# Allow to pull from private AWS ECR if used as CI_REGISTRY
+if echo "${CI_REGISTRY}" | grep -q '\.dkr\.ecr\.'
+then
+  # Make sure Amazon ECR Docker Credential Helper is installed
+  docker-credential-ecr-login version > /dev/null
+  # Merge with existing Docker client configuration
+  jq ". + {\"credHelpers\": { \"${CI_REGISTRY}\": \"ecr-login\"}}" ~/.docker/config.json | sponge ~/.docker/config.json
+  echo "### Amazon ECR Docker Credential Helper enabled for ${CI_REGISTRY}"
+fi
+
 # /!\ IMAGE_ARCH_PREFIX can be unset
 docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
 
