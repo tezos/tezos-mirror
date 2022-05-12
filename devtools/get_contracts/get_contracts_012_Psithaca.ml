@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Proto = struct
-  include Tezos_raw_protocol_012_Psithaca
+  open Tezos_raw_protocol_012_Psithaca
 
   let wrap_tzresult =
     Tezos_protocol_environment_012_Psithaca.Environment.wrap_tzresult
@@ -37,14 +37,12 @@ module Proto = struct
       @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
   end
 
-  type 'a ty = 'a Script_typed_ir.ty
-
   type context = Context.t
 
   module Translator = struct
     type toplevel = Script_ir_translator.toplevel
 
-    type ex_ty = Script_ir_translator.ex_ty = Ex_ty : 'a ty -> ex_ty
+    type ex_ty = Script_ir_translator.ex_ty
 
     type type_logger = Script_ir_translator.type_logger
 
@@ -79,7 +77,7 @@ module Proto = struct
       in
       data
 
-    let unparse_ty (ctxt : Raw_context.t) ty =
+    let unparse_ty (ctxt : Raw_context.t) (Script_ir_translator.Ex_ty ty) =
       let open Result_syntax in
       let+ expr, _ =
         wrap_tzresult
@@ -144,7 +142,9 @@ module Proto = struct
           -> ex_lambda
 
     type ex_ty_lambdas =
-      | Ex_ty_lambdas : 'a ty * ('a -> ex_lambda list) list -> ex_ty_lambdas
+      | Ex_ty_lambdas :
+          'a Script_typed_ir.ty * ('a -> ex_lambda list) list
+          -> ex_ty_lambdas
 
     let lam_node (Ex_lambda (_, Lam (_, node))) = node
 
@@ -193,7 +193,7 @@ module Proto = struct
           Box.OPS.fold (fun _k v acc -> g v @ acc) Box.boxed [])
       @@ find_lambda_tys tv
 
-    let collect_lambda_tys ty =
+    let collect_lambda_tys (Script_ir_translator.Ex_ty ty) =
       match find_lambda_tys ty with
       | [] -> None
       | lams -> Some (Ex_ty_lambdas (ty, lams))
@@ -208,9 +208,9 @@ module Proto = struct
       match parse_result with
       | Error _ -> acc
       | Ok data -> (
-          match Translator.unparse_ty ctxt ty with
+          match Script_ir_translator.unparse_ty ~loc:0 (Obj.magic ctxt) ty with
           | Error _ -> assert false
-          | Ok ty_expr ->
+          | Ok (ty_expr, _) ->
               List.fold_left (fun acc g -> f acc ty_expr @@ g data) acc getters)
   end
 

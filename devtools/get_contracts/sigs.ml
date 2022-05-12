@@ -26,8 +26,6 @@
 module Time = Time.Protocol
 
 module type PROTOCOL = sig
-  type 'a ty
-
   module Context : sig
     type t
 
@@ -85,7 +83,7 @@ module type PROTOCOL = sig
   module Translator : sig
     type toplevel
 
-    type ex_ty = Ex_ty : 'a ty -> ex_ty
+    type ex_ty
 
     type type_logger
 
@@ -99,7 +97,7 @@ module type PROTOCOL = sig
       Script.node ->
       ex_ty tzresult
 
-    val unparse_ty : context -> 'a ty -> Script.node tzresult
+    val unparse_ty : context -> ex_ty -> Script.node tzresult
 
     val parse_toplevel :
       context -> legacy:bool -> Script.expr -> toplevel tzresult Lwt.t
@@ -129,7 +127,7 @@ module type PROTOCOL = sig
 
     val lam_node : ex_lambda -> Script.node
 
-    val collect_lambda_tys : 'a ty -> ex_ty_lambdas option
+    val collect_lambda_tys : Translator.ex_ty -> ex_ty_lambdas option
 
     val fold_ex_ty_lambdas :
       ctxt:context ->

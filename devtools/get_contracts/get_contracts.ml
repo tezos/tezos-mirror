@@ -242,9 +242,8 @@ end = struct
         ExprMap.empty
 
     let keep_lambda_types types =
-      let open P.Translator in
       ExprMap.fold
-        (fun hash (Ex_ty ty) types ->
+        (fun hash ty types ->
           match P.Lambda.collect_lambda_tys ty with
           | None -> types
           | Some ex_ty_lambdas -> ExprMap.add hash ex_ty_lambdas types)
