@@ -140,28 +140,25 @@ module Make (P : Sigs.PROTOCOL) = struct
     let parse_ty ctxt type_expr =
       let hashed_ty = hash_expr type_expr in
       match
-        P.wrap_tzresult
-        @@ P.Translator.parse_ty
-             ctxt
-             ~legacy:true
-             ~allow_lazy_storage:true
-             ~allow_operation:true
-             ~allow_contract:true
-             ~allow_ticket:true
-             (Micheline.root type_expr)
+        P.Translator.parse_ty
+          ctxt
+          ~legacy:true
+          ~allow_lazy_storage:true
+          ~allow_operation:true
+          ~allow_contract:true
+          ~allow_ticket:true
+          (Micheline.root type_expr)
       with
       | Ok ex_ty -> (hashed_ty, ex_ty)
       | Error _ -> assert false
 
     let unparse_ty ctxt ty =
-      match P.wrap_tzresult @@ P.Translator.unparse_ty ctxt ty with
+      match P.Translator.unparse_ty ctxt ty with
       | Ok node -> node
       | Error _ -> assert false
 
     let get_script_storage_type ctxt script_expr =
-      Lwt.map P.wrap_tzresult
-      @@ P.Translator.parse_toplevel ctxt ~legacy:true script_expr
-      >>= function
+      P.Translator.parse_toplevel ctxt ~legacy:true script_expr >>= function
       | Ok code ->
           let storage_type_expr =
             Micheline.strip_locations @@ P.code_storage_type code
@@ -281,8 +278,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         ExprMap.empty
 
     let try_parse_data ctxt ty node =
-      Lwt.map P.wrap_tzresult
-      @@ P.Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty node
+      P.Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty node
       >|= function
       | Error _ -> None
       | Ok v -> Some v
@@ -360,14 +356,6 @@ module Make (P : Sigs.PROTOCOL) = struct
     let collect_lambdas = true
   end
 
-  let get_contract_code ctxt contract =
-    Lwt.map P.wrap_tzresult @@ P.Contract.get_code ctxt contract
-
-  let get_contract_storage ctxt contract =
-    Lwt.map P.wrap_tzresult @@ P.Contract.get_storage ctxt contract
-
-  let big_map_get ctxt key = Lwt.map P.wrap_tzresult @@ P.Storage.get ctxt key
-
   let big_map_fold :
       P.context * P.Storage.big_map_id ->
       init:'a ->
@@ -377,8 +365,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         'a Error_monad.tzresult Lwt.t) ->
       'a Error_monad.tzresult Lwt.t =
    fun ctxt_i ~init ~f ->
-    Lwt.map P.wrap_tzresult @@ P.Storage.list_values ctxt_i
-    >>=? fun (_ctxt, values) ->
+    P.Storage.list_values ctxt_i >>=? fun (_ctxt, values) ->
     List.fold_left_es (fun acc v -> f v acc) init values
 
   let main () : unit tzresult Lwt.t =
@@ -415,7 +402,6 @@ module Make (P : Sigs.PROTOCOL) = struct
       ~timestamp
       ~fitness
       ctxt
-    >|= P.wrap_tzresult
     >>=? fun ctxt ->
     print_endline "Listing addresses..." ;
     Contract.fold ctxt ~init:(ExprMap.empty, 0) ~f:(fun contract (m, i) ->
@@ -426,7 +412,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         | None -> (
             Storage_helpers.get_lazy_expr
               ~what:"contract code"
-              ~getter:get_contract_code
+              ~getter:P.Contract.get_code
               ~pp:P.Contract.pp
               ctxt
               contract
@@ -436,7 +422,7 @@ module Make (P : Sigs.PROTOCOL) = struct
                 (if Options.(collect_lambdas || collect_storage) then
                  Storage_helpers.get_lazy_expr
                    ~what:"contract storage"
-                   ~getter:get_contract_storage
+                   ~getter:P.Contract.get_storage
                    ~pp:P.Contract.pp
                    ctxt
                    contract
@@ -501,7 +487,7 @@ module Make (P : Sigs.PROTOCOL) = struct
          if i mod 100 = 0 then Format.printf "%d@." i ;
          Storage_helpers.get_value
            ~what:"big map value type"
-           ~getter:big_map_get
+           ~getter:P.Storage.get
            ~pp:(fun fmt id -> Z.pp_print fmt (Storage.id_to_z id))
            ctxt
            id

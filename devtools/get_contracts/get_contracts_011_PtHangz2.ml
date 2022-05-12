@@ -25,7 +25,22 @@
 
 module Main = Get_contracts.Make (struct
   include Tezos_raw_protocol_011_PtHangz2
-  module Context = Raw_context
+
+  let wrap_tzresult =
+    Tezos_protocol_environment_011_PtHangz2.Environment.wrap_tzresult
+
+  module Context = struct
+    type t = Raw_context.t
+
+    let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
+      Lwt.map wrap_tzresult
+      @@ Raw_context.prepare
+           ~level
+           ~predecessor_timestamp
+           ~timestamp
+           ~fitness
+           ctxt
+  end
 
   type ('k, 'v) map = ('k, 'v) Script_typed_ir.map
 
@@ -35,9 +50,6 @@ module Main = Get_contracts.Make (struct
 
   type context = Context.t
 
-  module Error_monad =
-    Tezos_protocol_environment_011_PtHangz2.Environment.Error_monad
-
   module Contract = struct
     type repr = Contract_repr.t
 
@@ -45,9 +57,11 @@ module Main = Get_contracts.Make (struct
 
     let is_implicit = Contract_repr.is_implicit
 
-    let get_code = Storage.Contract.Code.get
+    let get_code ctxt contract =
+      Lwt.map wrap_tzresult @@ Storage.Contract.Code.get ctxt contract
 
-    let get_storage = Storage.Contract.Storage.get
+    let get_storage ctxt contract =
+      Lwt.map wrap_tzresult @@ Storage.Contract.Storage.get ctxt contract
 
     let fold = Storage.Contract.fold
   end
@@ -70,14 +84,15 @@ module Main = Get_contracts.Make (struct
         ~allow_operation ~allow_contract ~allow_ticket script =
       let open Result_syntax in
       let+ ty, _ =
-        Script_ir_translator.parse_ty
-          (Obj.magic ctxt)
-          ~legacy
-          ~allow_lazy_storage
-          ~allow_operation
-          ~allow_contract
-          ~allow_ticket
-          script
+        wrap_tzresult
+        @@ Script_ir_translator.parse_ty
+             (Obj.magic ctxt)
+             ~legacy
+             ~allow_lazy_storage
+             ~allow_operation
+             ~allow_contract
+             ~allow_ticket
+             script
       in
       ty
 
@@ -85,25 +100,29 @@ module Main = Get_contracts.Make (struct
         expr =
       let open Lwt_result_syntax in
       let+ data, _ =
-        Script_ir_translator.parse_data
-          ?type_logger
-          (Obj.magic ctxt)
-          ~legacy
-          ~allow_forged
-          ty
-          expr
+        Lwt.map wrap_tzresult
+        @@ Script_ir_translator.parse_data
+             ?type_logger
+             (Obj.magic ctxt)
+             ~legacy
+             ~allow_forged
+             ty
+             expr
       in
       data
 
     let unparse_ty (ctxt : Raw_context.t) ty =
       let open Result_syntax in
-      let+ expr, _ = Script_ir_translator.unparse_ty (Obj.magic ctxt) ty in
+      let+ expr, _ =
+        wrap_tzresult @@ Script_ir_translator.unparse_ty (Obj.magic ctxt) ty
+      in
       expr
 
     let parse_toplevel (ctxt : Raw_context.t) ~legacy expr =
       let open Lwt_result_syntax in
       let+ toplevel, _ =
-        Script_ir_translator.parse_toplevel (Obj.magic ctxt) ~legacy expr
+        Lwt.map wrap_tzresult
+        @@ Script_ir_translator.parse_toplevel (Obj.magic ctxt) ~legacy expr
       in
       toplevel
   end
@@ -113,18 +132,18 @@ module Main = Get_contracts.Make (struct
 
     let id_to_z = Lazy_storage_kind.Big_map.Id.unparse_to_z
 
-    let list_values = Storage.Big_map.Contents.list_values
+    let list_values ?offset ?length (ctxt, id) =
+      Lwt.map wrap_tzresult
+      @@ Storage.Big_map.Contents.list_values ?offset ?length (ctxt, id)
 
-    let get = Storage.Big_map.Value_type.get
+    let get ctxt id =
+      Lwt.map wrap_tzresult @@ Storage.Big_map.Value_type.get ctxt id
 
     let fold = Storage.Big_map.fold
   end
 
   module Unparse_types =
     Tezos_protocol_plugin_011_PtHangz2.Plugin.RPC.Scripts.Unparse_types
-
-  let wrap_tzresult =
-    Tezos_protocol_environment_011_PtHangz2.Environment.wrap_tzresult
 
   let is_unpack = function
     | Michelson_v1_primitives.I_UNPACK -> true

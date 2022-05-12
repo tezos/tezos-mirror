@@ -26,10 +26,6 @@
 module Time = Time.Protocol
 
 module type PROTOCOL = sig
-  module Error_monad : sig
-    type 'a tzresult
-  end
-
   type ('k, 'v) map
 
   type ('arg, 'ret) lambda
@@ -45,7 +41,7 @@ module type PROTOCOL = sig
       timestamp:Time.t ->
       fitness:bytes list ->
       Environment_context.Context.t ->
-      t Error_monad.tzresult Lwt.t
+      t tzresult Lwt.t
   end
 
   type context = Context.t
@@ -82,10 +78,10 @@ module type PROTOCOL = sig
     val pp : Format.formatter -> repr -> unit
 
     val get_code :
-      context -> repr -> (context * Script.lazy_expr) Error_monad.tzresult Lwt.t
+      context -> repr -> (context * Script.lazy_expr) tzresult Lwt.t
 
     val get_storage :
-      context -> repr -> (context * Script.lazy_expr) Error_monad.tzresult Lwt.t
+      context -> repr -> (context * Script.lazy_expr) tzresult Lwt.t
 
     val fold : context -> init:'a -> f:(repr -> 'a -> 'a Lwt.t) -> 'a Lwt.t
   end
@@ -105,7 +101,7 @@ module type PROTOCOL = sig
       allow_contract:bool ->
       allow_ticket:bool ->
       Script.node ->
-      ex_ty Error_monad.tzresult
+      ex_ty tzresult
 
     val parse_data :
       ?type_logger:type_logger ->
@@ -114,15 +110,12 @@ module type PROTOCOL = sig
       allow_forged:bool ->
       'a ty ->
       Script.node ->
-      'a Error_monad.tzresult Lwt.t
+      'a tzresult Lwt.t
 
-    val unparse_ty : context -> 'a ty -> Script.node Error_monad.tzresult
+    val unparse_ty : context -> 'a ty -> Script.node tzresult
 
     val parse_toplevel :
-      context ->
-      legacy:bool ->
-      Script.expr ->
-      toplevel Error_monad.tzresult Lwt.t
+      context -> legacy:bool -> Script.expr -> toplevel tzresult Lwt.t
   end
 
   module Storage : sig
@@ -134,9 +127,9 @@ module type PROTOCOL = sig
       ?offset:int ->
       ?length:int ->
       context * big_map_id ->
-      (context * Script.expr list) Error_monad.tzresult Lwt.t
+      (context * Script.expr list) tzresult Lwt.t
 
-    val get : context -> big_map_id -> Script.expr Error_monad.tzresult Lwt.t
+    val get : context -> big_map_id -> Script.expr tzresult Lwt.t
 
     val fold :
       context -> init:'a -> f:(big_map_id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
@@ -157,6 +150,4 @@ module type PROTOCOL = sig
   val is_unpack : Script.prim -> bool
 
   val lam_node : (_, _) lambda -> Script.node
-
-  val wrap_tzresult : 'a Error_monad.tzresult -> 'a tzresult
 end
