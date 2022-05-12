@@ -70,6 +70,7 @@
  (modules Native))
 
 (install
+ (package tezos-protocol-compiler)
  (section libexec)
  (files
   dune_protocol.v0

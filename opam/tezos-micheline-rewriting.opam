@@ -1,0 +1,26 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "zarith" { >= "1.12" & < "1.13" }
+  "zarith_stubs_js"
+  "tezos-stdlib"
+  "tezos-error-monad"
+  "tezos-micheline"
+  "tezos-protocol-alpha" {with-test}
+  "tezos-client-alpha" {with-test}
+  "alcotest-lwt" { with-test & >= "1.5.0" }
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos: library for rewriting Micheline expressions"

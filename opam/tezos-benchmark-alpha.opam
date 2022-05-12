@@ -1,0 +1,33 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "tezos-stdlib"
+  "tezos-base"
+  "tezos-error-monad"
+  "tezos-micheline"
+  "tezos-micheline-rewriting"
+  "tezos-benchmark"
+  "tezos-benchmark-type-inference-alpha"
+  "tezos-protocol-alpha"
+  "tezos-crypto"
+  "tezos-protocol-alpha-parameters"
+  "hashcons"
+  "benchmark-utils"
+  "tezos-alpha-test-helpers"
+  "prbnmcn-stats" { = "0.0.4" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"

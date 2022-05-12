@@ -1,0 +1,34 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "tezos-base"
+  "tezos-rpc-http"
+  "tezos-rpc-http-client-unix"
+  "tezos-shell-services"
+  "tezos-stdlib-unix"
+  "tezos-client-base"
+  "tezos-client-commands"
+  "tezos-mockup"
+  "tezos-mockup-registration"
+  "tezos-mockup-commands"
+  "tezos-proxy"
+  "tezos-signer-backends"
+  "lwt-exit"
+  "tezos-base-test-helpers" {with-test}
+  "alcotest" { with-test & >= "1.5.0" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos: common helpers for `tezos-client` (unix-specific fragment)"

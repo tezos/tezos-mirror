@@ -1,0 +1,57 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "tezos-base"
+  "tezos-stdlib-unix"
+  "cmdliner" { >= "1.1.0" }
+  "lwt-exit"
+  "lwt" { >= "5.4.0" }
+  "tezos-proxy"
+  "tezos-proxy-server-config"
+  "tezos-rpc-http-client-unix"
+  "tezos-rpc-http-server"
+  "tezos-shell-services"
+  "tezos-shell-context"
+  "tezos-version"
+]
+depopts: [
+  "tezos-client-genesis"
+  "tezos-client-demo-counter"
+  "tezos-client-000-Ps9mPmXa"
+  "tezos-client-001-PtCJ7pwo"
+  "tezos-client-002-PsYLVpVv"
+  "tezos-client-003-PsddFKi3"
+  "tezos-client-004-Pt24m4xi"
+  "tezos-client-005-PsBabyM1"
+  "tezos-client-006-PsCARTHA"
+  "tezos-client-007-PsDELPH1"
+  "tezos-protocol-plugin-007-PsDELPH1"
+  "tezos-client-008-PtEdo2Zk"
+  "tezos-protocol-plugin-008-PtEdo2Zk"
+  "tezos-client-009-PsFLoren"
+  "tezos-protocol-plugin-009-PsFLoren"
+  "tezos-client-010-PtGRANAD"
+  "tezos-protocol-plugin-010-PtGRANAD"
+  "tezos-client-011-PtHangz2"
+  "tezos-protocol-plugin-011-PtHangz2"
+  "tezos-client-012-Psithaca"
+  "tezos-protocol-plugin-012-Psithaca"
+  "tezos-client-013-PtJakart"
+  "tezos-protocol-plugin-013-PtJakart"
+  "tezos-client-alpha"
+  "tezos-protocol-plugin-alpha"
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos: `tezos-proxy-server` binary"

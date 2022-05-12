@@ -49,7 +49,7 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print | LC_COLLATE=C sort -u)
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -print | LC_COLLATE=C sort -u)
 
 ## Shallow clone of opam repository (requires git protocol version 2)
 export GIT_WORK_TREE="$tmp_dir"
@@ -63,7 +63,6 @@ git fetch --depth 1 origin "$full_opam_repository_tag"
 packages=
 for opam in $opams; do
 
-    dir=$(dirname $opam)
     file=$(basename $opam)
     package=${file%.opam}
     packages=$packages,$package.dev

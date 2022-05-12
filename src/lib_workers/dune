@@ -15,4 +15,4 @@
    -open Tezos_base
    -open Tezos_stdlib_unix)))
 
-(documentation)
+(documentation (package tezos-workers))

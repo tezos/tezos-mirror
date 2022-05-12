@@ -19,9 +19,6 @@ trap cleanup EXIT INT
 
 # shellcheck disable=SC2046
 dune build   --profile static $(xargs -I {} echo {}.install < static-packages)
-
-while IFS= read -r p
-do
-    (cd "$(dirname "$p")" && dune install --profile static --prefix "$tmp_dir" "$(basename "$p")")
-done < static-packages
+# shellcheck disable=SC2046
+dune install --profile static --prefix "$tmp_dir" $(cat static-packages)
 mv "$tmp_dir/bin" "$1"

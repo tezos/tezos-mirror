@@ -1,0 +1,29 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "tezos-base"
+  "tezos-stdlib-unix"
+  "tezos-clic"
+  "tezos-benchmark"
+  "tezos-benchmark-examples"
+  "tezos-shell-benchmarks"
+  "tezos-benchmarks-proto-alpha"
+  "ocamlgraph"
+  "pyml"
+  "pyml-plot"
+  "prbnmcn-stats" { = "0.0.4" }
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos: `tezos-snoop` binary"

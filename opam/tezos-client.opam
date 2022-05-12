@@ -1,0 +1,58 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "tezos-base"
+  "tezos-rpc-http-client"
+  "tezos-stdlib-unix"
+  "tezos-shell-services"
+  "tezos-client-base"
+  "tezos-client-commands"
+  "tezos-mockup-commands"
+  "tezos-proxy"
+  "tezos-client-base-unix"
+  "tezos-signer-backends"
+  "tezos-client-012-Psithaca-commands-registration"
+  "tezos-baking-012-Psithaca-commands"
+  "tezos-protocol-plugin-012-Psithaca"
+  "tezos-client-013-PtJakart-commands-registration"
+  "tezos-baking-013-PtJakart-commands"
+  "tezos-protocol-plugin-013-PtJakart"
+]
+depopts: [
+  "tezos-client-genesis"
+  "tezos-client-demo-counter"
+  "tezos-client-000-Ps9mPmXa"
+  "tezos-client-001-PtCJ7pwo-commands"
+  "tezos-client-002-PsYLVpVv-commands"
+  "tezos-client-003-PsddFKi3-commands"
+  "tezos-client-004-Pt24m4xi-commands"
+  "tezos-client-005-PsBabyM1-commands"
+  "tezos-client-006-PsCARTHA-commands"
+  "tezos-client-007-PsDELPH1-commands-registration"
+  "tezos-protocol-plugin-007-PsDELPH1"
+  "tezos-client-008-PtEdo2Zk-commands-registration"
+  "tezos-protocol-plugin-008-PtEdo2Zk"
+  "tezos-client-009-PsFLoren-commands-registration"
+  "tezos-protocol-plugin-009-PsFLoren"
+  "tezos-client-010-PtGRANAD-commands-registration"
+  "tezos-protocol-plugin-010-PtGRANAD"
+  "tezos-client-011-PtHangz2-commands-registration"
+  "tezos-protocol-plugin-011-PtHangz2"
+  "tezos-client-alpha-commands-registration"
+  "tezos-baking-alpha-commands"
+  "tezos-protocol-plugin-alpha"
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos: `tezos-client` binary"

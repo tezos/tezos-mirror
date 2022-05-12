@@ -7,11 +7,11 @@ src_dir="$(dirname "$script_dir")"
 . "$script_dir"/version.sh
 
 if [ "$1" = "--tps" ]; then
-    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
+    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -print)
 else
     # The TPS evaluation tool requires some extra dependencies that we want to hide from the end user that
     # builds Octez. As such we're not building it by default.
-    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -not -path "$src_dir/src/bin_tps_evaluation/*" -print)
+    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -not -path "$src_dir/src/bin_tps_evaluation/*" -print)
 fi
 
 
