@@ -23,6 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Options = struct
+  let collect_storage = true
+
+  let collect_lambdas = true
+end
+
+module Storage_helpers = struct
+  let get_value ~what ~getter ~pp ctxt x =
+    let open Lwt_syntax in
+    let+ value = getter ctxt x in
+    match value with
+    | Ok x -> Some x
+    | Error _ ->
+        (* Should not happen *)
+        Format.eprintf "Failed getting %s for %a\n" what pp x ;
+        None
+
+  let get_lazy_expr ~what ~getter ~pp ctxt x =
+    let open Lwt_syntax in
+    let+ expr_opt = get_value ~what ~getter ~pp ctxt x in
+    Option.map
+      (fun (_, expr) ->
+        match Data_encoding.force_decode expr with
+        | Some expr -> expr
+        | None -> assert false)
+      expr_opt
+end
+
 module Make (P : Sigs.PROTOCOL) = struct
   let ( >>= ) x f =
     let open Lwt_syntax in
@@ -329,31 +357,51 @@ module Make (P : Sigs.PROTOCOL) = struct
             (Lwt.return lambdas))
         exprs
         (Lwt.return (ExprMap.empty, ExprMap.empty, ExprMap.empty))
-  end
 
-  module Storage_helpers = struct
-    let get_value ~what ~getter ~pp ctxt x =
-      getter ctxt x >|= function
-      | Ok x -> Some x
-      | Error _ ->
-          (* Should not happen *)
-          Format.eprintf "Failed getting %s for %a\n" what pp x ;
-          None
-
-    let get_lazy_expr ~what ~getter ~pp ctxt x =
-      get_value ~what ~getter ~pp ctxt x >|= fun expr_opt ->
-      Option.map
-        (fun (_, expr) ->
-          match Data_encoding.force_decode expr with
-          | Some expr -> expr
-          | None -> assert false)
-        expr_opt
-  end
-
-  module Options = struct
-    let collect_storage = true
-
-    let collect_lambdas = true
+    let add_expr_to_map ctxt contract (m, i) =
+      let i = i + 1 in
+      if i mod 5000 = 0 then Format.printf "%d@." i ;
+      match P.Contract.is_implicit contract with
+      | Some _key_hash -> Lwt.return (m, i)
+      | None -> (
+          Storage_helpers.get_lazy_expr
+            ~what:"contract code"
+            ~getter:P.Contract.get_code
+            ~pp:P.Contract.pp
+            ctxt
+            contract
+          >>= function
+          | None -> Lwt.return (m, i) (* Should not happen *)
+          | Some code ->
+              (if Options.(collect_lambdas || collect_storage) then
+               Storage_helpers.get_lazy_expr
+                 ~what:"contract storage"
+                 ~getter:P.Contract.get_storage
+                 ~pp:P.Contract.pp
+                 ctxt
+                 contract
+               >|= function
+               | None -> fun x -> x
+               | Some storage ->
+                   let key = hash_expr storage in
+                   fun storages -> ExprMap.add key storage storages
+              else Lwt.return (fun x -> x))
+              >|= fun add_storage ->
+              let key = hash_expr code in
+              ( ExprMap.update
+                  key
+                  (fun existing ->
+                    let contracts, storages =
+                      match existing with
+                      | Some (_code, contracts, storages) ->
+                          (contracts, storages)
+                      | None -> ([], ExprMap.empty)
+                    in
+                    let contracts = contract :: contracts in
+                    let storages = add_storage storages in
+                    Some (code, contracts, storages))
+                  m,
+                i ))
   end
 
   let big_map_fold :
@@ -369,26 +417,27 @@ module Make (P : Sigs.PROTOCOL) = struct
     List.fold_left_es (fun acc v -> f v acc) init values
 
   let main () : unit tzresult Lwt.t =
+    let open Lwt_result_syntax in
     let data_dir = Sys.argv.(1) in
     Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
-    Tezos_store.Store.init
-      ~store_dir:(Filename.concat data_dir "store")
-      ~context_dir:(Filename.concat data_dir "context")
-      ~allow_testchains:true
-      ~readonly:true
-      mainnet_genesis
-    >>=? fun store ->
+    let* store =
+      Tezos_store.Store.init
+        ~store_dir:(Filename.concat data_dir "store")
+        ~context_dir:(Filename.concat data_dir "context")
+        ~allow_testchains:true
+        ~readonly:true
+        mainnet_genesis
+    in
     Printf.printf "Getting main chain storage and head...\n%!" ;
     let chain_store = Tezos_store.Store.main_chain_store store in
     let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
     Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
-    Tezos_store.Store.Chain.current_head chain_store >>= fun head ->
+    let*! head = Tezos_store.Store.Chain.current_head chain_store in
     let head_hash, head_level = Tezos_store.Store.Block.descriptor head in
     Format.printf "Head is %a, level %ld\n%!" Block_hash.pp head_hash head_level ;
-    Tezos_store.Store.Block.protocol_hash chain_store head
-    >>=? fun proto_hash ->
+    let* proto_hash = Tezos_store.Store.Block.protocol_hash chain_store head in
     Format.printf "Protocol is %a\n%!" Protocol_hash.pp proto_hash ;
-    Tezos_store.Store.Block.context_exn chain_store head >>= fun ctxt ->
+    let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
     print_endline "Pre-preparing raw context..." ;
     let ctxt = Tezos_shell_context.Shell_context.wrap_disk_context ctxt in
     let open P in
@@ -396,124 +445,99 @@ module Make (P : Sigs.PROTOCOL) = struct
     let fitness = Tezos_store.Store.Block.fitness head in
     let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
     print_endline "Preparing raw context..." ;
-    Context.prepare
-      ~level:head_level
-      ~predecessor_timestamp
-      ~timestamp
-      ~fitness
-      ctxt
-    >>=? fun ctxt ->
+    let* ctxt =
+      Context.prepare
+        ~level:head_level
+        ~predecessor_timestamp
+        ~timestamp
+        ~fitness
+        ctxt
+    in
     print_endline "Listing addresses..." ;
-    Contract.fold ctxt ~init:(ExprMap.empty, 0) ~f:(fun contract (m, i) ->
-        let i = i + 1 in
-        if i mod 5000 = 0 then Format.printf "%d@." i ;
-        match Contract.is_implicit contract with
-        | Some _key_hash -> Lwt.return (m, i)
-        | None -> (
-            Storage_helpers.get_lazy_expr
-              ~what:"contract code"
-              ~getter:P.Contract.get_code
-              ~pp:P.Contract.pp
-              ctxt
-              contract
-            >>= function
-            | None -> Lwt.return (m, i) (* Should not happen *)
-            | Some code ->
-                (if Options.(collect_lambdas || collect_storage) then
-                 Storage_helpers.get_lazy_expr
-                   ~what:"contract storage"
-                   ~getter:P.Contract.get_storage
-                   ~pp:P.Contract.pp
-                   ctxt
-                   contract
-                 >|= function
-                 | None -> fun x -> x
-                 | Some storage ->
-                     let key = Michelson_helpers.hash_expr storage in
-                     fun storages -> ExprMap.add key storage storages
-                else Lwt.return (fun x -> x))
-                >|= fun add_storage ->
-                let key = Michelson_helpers.hash_expr code in
-                ( ExprMap.update
-                    key
-                    (fun existing ->
-                      let contracts, storages =
-                        match existing with
-                        | Some (_code, contracts, storages) ->
-                            (contracts, storages)
-                        | None -> ([], ExprMap.empty)
-                      in
-                      let contracts = contract :: contracts in
-                      let storages = add_storage storages in
-                      Some (code, contracts, storages))
-                    m,
-                  i )))
-    >>= fun (contract_map, _) ->
+    let*! contract_map, _ =
+      Contract.fold
+        ctxt
+        ~init:(ExprMap.empty, 0)
+        ~f:Michelson_helpers.(add_expr_to_map ctxt)
+    in
     print_endline "Listing addresses done." ;
-    (if Options.collect_lambdas then (
-     let add_typed_expr hash expr ty_hash ty exprs =
-       ExprMap.update
-         hash
-         (fun existing ->
-           let type_map =
-             match existing with
-             | None -> ExprMap.empty
-             | Some (_expr, _from_unpack, type_map) -> type_map
-           in
-           Some (expr, false, ExprMap.add ty_hash ty type_map))
-         exprs
-     in
-     print_endline "Getting expressions from contracts..." ;
-     ExprMap.fold_es
-       (fun hash (script, _contracts, storages) exprs ->
-         let exprs = ExprMap.add hash (script, false, ExprMap.empty) exprs in
-         Michelson_helpers.get_script_storage_type ctxt script
-         >>=? fun (ty_hash, ty) ->
-         ExprMap.fold_es
-           (fun storage_hash storage_expr exprs ->
-             return @@ add_typed_expr storage_hash storage_expr ty_hash ty exprs)
-           storages
-           exprs)
-       contract_map
-       ExprMap.empty
-     >>=? fun exprs ->
-     print_endline "Listing big maps..." ;
-     Storage.fold
-       ctxt
-       ~init:(ok (exprs, 0))
-       ~f:(fun id exprs_i ->
-         exprs_i >>?= fun (exprs, i) ->
-         let i = i + 1 in
-         if i mod 100 = 0 then Format.printf "%d@." i ;
-         Storage_helpers.get_value
-           ~what:"big map value type"
-           ~getter:P.Storage.get
-           ~pp:(fun fmt id -> Z.pp_print fmt (Storage.id_to_z id))
-           ctxt
-           id
-         >>= function
-         | None -> return (exprs, i) (* should not happen *)
-         | Some value_type_expr ->
-             let ty_hash, ty =
-               Michelson_helpers.parse_ty ctxt value_type_expr
-             in
-             big_map_fold (ctxt, id) ~init:exprs ~f:(fun v exprs ->
-                 let v_hash = Michelson_helpers.hash_expr v in
-                 return @@ add_typed_expr v_hash v ty_hash ty exprs)
-             >>=? fun exprs -> return (exprs, i))
-     >>=? fun (exprs, _) ->
-     print_endline "Computing unpack transitive closure of expressions..." ;
-     let exprs = Michelson_helpers.unpack_transitive_closure exprs in
-     print_endline "Collecting unpack types..." ;
-     let unpack_types =
-       let parse_ty = Michelson_helpers.parse_ty ctxt in
-       Michelson_helpers.collect_unpack_types ~parse_ty exprs
-     in
-     print_endline "Collecting all lambdas..." ;
-     Michelson_helpers.collect_lambdas_in_exprs ctxt exprs unpack_types
-     >|= fun lambda_map -> Ok (contract_map, lambda_map))
-    else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty)))
-    >|=? fun (contract_map, (lambda_map, lambda_ty_map, lambda_legacy_map)) ->
+    let* contract_map, (lambda_map, lambda_ty_map, lambda_legacy_map) =
+      if Options.collect_lambdas then (
+        let add_typed_expr hash expr ty_hash ty exprs =
+          ExprMap.update
+            hash
+            (fun existing ->
+              let type_map =
+                match existing with
+                | None -> ExprMap.empty
+                | Some (_expr, _from_unpack, type_map) -> type_map
+              in
+              Some (expr, false, ExprMap.add ty_hash ty type_map))
+            exprs
+        in
+        print_endline "Getting expressions from contracts..." ;
+        let* exprs =
+          ExprMap.fold_es
+            (fun hash (script, _contracts, storages) exprs ->
+              let exprs =
+                ExprMap.add hash (script, false, ExprMap.empty) exprs
+              in
+              let* ty_hash, ty =
+                Michelson_helpers.get_script_storage_type ctxt script
+              in
+              ExprMap.fold_es
+                (fun storage_hash storage_expr exprs ->
+                  return
+                  @@ add_typed_expr storage_hash storage_expr ty_hash ty exprs)
+                storages
+                exprs)
+            contract_map
+            ExprMap.empty
+        in
+        print_endline "Listing big maps..." ;
+        let* exprs, _ =
+          Storage.fold
+            ctxt
+            ~init:(ok (exprs, 0))
+            ~f:(fun id exprs_i ->
+              let* exprs, i = Lwt.return exprs_i in
+              let i = i + 1 in
+              if i mod 100 = 0 then Format.printf "%d@." i ;
+              let*! value_opt =
+                Storage_helpers.get_value
+                  ~what:"big map value type"
+                  ~getter:P.Storage.get
+                  ~pp:(fun fmt id -> Z.pp_print fmt (Storage.id_to_z id))
+                  ctxt
+                  id
+              in
+              match value_opt with
+              | None -> return (exprs, i) (* should not happen *)
+              | Some value_type_expr ->
+                  let ty_hash, ty =
+                    Michelson_helpers.parse_ty ctxt value_type_expr
+                  in
+                  let+ exprs =
+                    big_map_fold (ctxt, id) ~init:exprs ~f:(fun v exprs ->
+                        let v_hash = Michelson_helpers.hash_expr v in
+                        return @@ add_typed_expr v_hash v ty_hash ty exprs)
+                  in
+                  (exprs, i))
+        in
+        print_endline "Computing unpack transitive closure of expressions..." ;
+        let exprs = Michelson_helpers.unpack_transitive_closure exprs in
+        print_endline "Collecting unpack types..." ;
+        let unpack_types =
+          let parse_ty = Michelson_helpers.parse_ty ctxt in
+          Michelson_helpers.collect_unpack_types ~parse_ty exprs
+        in
+        print_endline "Collecting all lambdas..." ;
+        let*! lambda_map =
+          Michelson_helpers.collect_lambdas_in_exprs ctxt exprs unpack_types
+        in
+        return (contract_map, lambda_map))
+      else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty))
+    in
     print_endline "Writing contract files..." ;
     ExprMap.iter
       (fun hash (script, contracts, storages) ->
@@ -543,7 +567,7 @@ module Make (P : Sigs.PROTOCOL) = struct
         print_endline "Done writing lambda files.")
       else ()
     in
-    ()
+    return ()
 
   let main () =
     match Lwt_main.run (main ()) with
