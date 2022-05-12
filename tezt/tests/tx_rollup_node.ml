@@ -105,7 +105,7 @@ let check_inbox_success (inbox : Rollup_node.Inbox.t) =
                 "Deposit at position %d failed: %s"
                 i
                 (JSON.encode result)))
-    inbox.contents
+    inbox
 
 (** Helper function to check if the tx_node does an injection with
     after executing [f].  *)
@@ -397,8 +397,7 @@ let tx_client_get_inbox ~tx_client ~tezos_client ~block =
   in
   let messages =
     JSON.(
-      json |-> "contents" |> as_list
-      |> List.map (fun x -> x |-> "message" |> parse_message))
+      json |> as_list |> List.map (fun x -> x |-> "message" |> parse_message))
   in
   Rollup.compute_inbox_from_messages messages tezos_client
 
@@ -535,7 +534,7 @@ let build_commitment_info ~tx_level ~tx_rollup_hash ~tx_node ~client =
   let context_hashes =
     List.map
       (fun x -> x.Rollup_node.Inbox.l2_context_hash.tree_hash)
-      rollup_inbox.contents
+      rollup_inbox
   in
   let* roots =
     Lwt_list.map_p
@@ -655,10 +654,10 @@ let build_rejection ~tx_level ~tx_node ~message_pos ~client ?agreed_context_hash
         in
         let*! message_hash = Rollup.message_hash ~message client in
         return message_hash)
-      rollup_inbox.contents
+      rollup_inbox
   in
   let message =
-    List.nth rollup_inbox.contents message_pos |> fun content ->
+    List.nth rollup_inbox message_pos |> fun content ->
     JSON.encode content.message
   in
   let* message_path =
@@ -748,9 +747,7 @@ let get_ticket_hash_from_deposit (d : Rollup_node.Inbox.message) : string =
   JSON.(d.message |-> "deposit" |-> "ticket_hash" |> as_string)
 
 let get_ticket_hash_from_deposit_json inbox =
-  JSON.(
-    inbox |-> "contents" |=> 0 |-> "message" |-> "deposit" |-> "ticket_hash"
-    |> as_string)
+  JSON.(inbox |=> 0 |-> "message" |-> "deposit" |-> "ticket_hash" |> as_string)
 
 (* Checks that the a ticket can be transfered from the L1 to the rollup. *)
 let test_ticket_deposit_from_l1_to_l2 =
@@ -1567,7 +1564,7 @@ let test_l2_proof_rpc_position =
           bls_pkh_1
       in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
-      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
+      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
 
       Log.info "Commitment for rollup level: 0" ;
@@ -1874,7 +1871,7 @@ let test_committer =
           bls_pkh_1
       in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
-      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
+      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox) in
       let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
         craft_tx_and_inject
           tx_client

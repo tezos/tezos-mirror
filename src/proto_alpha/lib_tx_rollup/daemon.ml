@@ -122,13 +122,9 @@ let extract_messages_from_block block_info rollup_id =
       kind manager_operation ->
       kind manager_operation_result ->
       packed_internal_manager_operation_result list ->
-      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t ->
-      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t =
-   fun ~source
-       op
-       result
-       internal_operation_results
-       (messages, cumulated_size, tickets) ->
+      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t ->
+      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t =
+   fun ~source op result internal_operation_results (messages, tickets) ->
     let message_size_ticket =
       match (op, result) with
       | ( Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _},
@@ -161,15 +157,15 @@ let extract_messages_from_block block_info rollup_id =
     in
     let acc =
       match message_size_ticket with
-      | None -> (messages, cumulated_size, tickets)
-      | Some ((msg, size), new_ticket) ->
+      | None -> (messages, tickets)
+      | Some ((msg, _size), new_ticket) ->
           let tickets =
             match new_ticket with
             | None -> tickets
             | Some (ticket_hash, ticket) ->
                 Ticket_hash_map.add ticket_hash ticket tickets
           in
-          (msg :: messages, cumulated_size + size, tickets)
+          (msg :: messages, tickets)
     in
     (* Add messages from internal operations *)
     List.fold_left
@@ -181,9 +177,9 @@ let extract_messages_from_block block_info rollup_id =
   in
   let rec get_related_messages :
       type kind.
-      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t ->
+      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t ->
       kind contents_and_result_list ->
-      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t =
+      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t =
    fun acc -> function
     | Single_and_result
         ( Manager_operation {operation; source; _},
@@ -228,16 +224,16 @@ let extract_messages_from_block block_info rollup_id =
         error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with
-  | None -> ok ([], 0, Ticket_hash_map.empty)
+  | None -> ok ([], Ticket_hash_map.empty)
   | Some managed_operations ->
       let open Result_syntax in
-      let+ (rev_messages, cumulated_size, new_tickets) =
+      let+ (rev_messages, new_tickets) =
         List.fold_left_e
           finalize_receipt
-          ([], 0, Ticket_hash_map.empty)
+          ([], Ticket_hash_map.empty)
           managed_operations
       in
-      (List.rev rev_messages, cumulated_size, new_tickets)
+      (List.rev rev_messages, new_tickets)
 
 let create_genesis_block state tezos_block =
   let open Lwt_syntax in
@@ -279,7 +275,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     ?predecessor_context block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
-  let*? (messages, cumulated_size, new_tickets) =
+  let*? (messages, new_tickets) =
     extract_messages_from_block block_info rollup_id
   in
   let*! () = Event.(emit messages_application) (List.length messages) in
@@ -325,8 +321,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
   | None ->
       (* No inbox at this block *)
       return (`Old, predecessor, predecessor_context)
-  | Some contents ->
-      let inbox = Inbox.{contents; cumulated_size} in
+  | Some inbox ->
       let*! context_hash = Context.commit context in
       let level =
         match predecessor.header.level with

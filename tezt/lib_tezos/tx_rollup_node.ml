@@ -361,7 +361,7 @@ module Inbox = struct
     l2_context_hash : l2_context_hash;
   }
 
-  type t = {contents : message list; cumulated_size : int}
+  type t = message list
 end
 
 module Client = struct
@@ -387,13 +387,7 @@ module Client = struct
       in
       Inbox.{message; result; l2_context_hash}
     in
-    let parse_json json =
-      let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
-      let contents =
-        JSON.(json |-> "contents" |> as_list) |> List.map parse_message
-      in
-      Inbox.{cumulated_size; contents}
-    in
+    let parse_json json = JSON.(json |> as_list) |> List.map parse_message in
     let* json = raw_tx_node_rpc tx_node ~url:("block/" ^ block ^ "/inbox") in
     return (parse_json json)
 

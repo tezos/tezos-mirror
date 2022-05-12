@@ -176,5 +176,5 @@ let genesis_block ctxt rollup tezos_block =
       commitment = None;
     }
   in
-  let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
+  let inbox : Inbox.t = [] in
   return {hash; header; inbox; commitment = None}

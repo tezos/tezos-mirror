@@ -149,7 +149,7 @@ module Inbox : sig
     l2_context_hash : l2_context_hash;
   }
 
-  type t = {contents : message list; cumulated_size : int}
+  type t = message list
 end
 
 (* FIXME/TORU: This is a temporary way of querying the node without
