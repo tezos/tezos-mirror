@@ -99,15 +99,6 @@ module type PROTOCOL = sig
       Script.node ->
       ex_ty tzresult
 
-    val parse_data :
-      ?type_logger:type_logger ->
-      context ->
-      legacy:bool ->
-      allow_forged:bool ->
-      'a ty ->
-      Script.node ->
-      'a tzresult Lwt.t
-
     val unparse_ty : context -> 'a ty -> Script.node tzresult
 
     val parse_toplevel :

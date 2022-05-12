@@ -37,10 +37,6 @@ module Proto = struct
       @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
   end
 
-  type ('k, 'v) map = ('k, 'v) Script_typed_ir.map
-
-  type ('a, 'r) lambda = ('a, 'r) Script_typed_ir.lambda
-
   type 'a ty = 'a Script_typed_ir.ty
 
   type context = Context.t

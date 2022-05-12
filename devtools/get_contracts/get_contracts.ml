@@ -51,7 +51,9 @@ module Config = struct
     }
 end
 
-module Make (P : Sigs.PROTOCOL) = struct
+module Make (P : Sigs.PROTOCOL) : sig
+  val main : unit -> unit
+end = struct
   module ExprMap = Map.Make (P.Script.Hash)
 
   module File_helpers = struct
@@ -130,11 +132,6 @@ module Make (P : Sigs.PROTOCOL) = struct
           (Micheline.root type_expr)
       with
       | Ok ex_ty -> (hashed_ty, ex_ty)
-      | Error _ -> assert false
-
-    let unparse_ty ctxt ty =
-      match P.Translator.unparse_ty ctxt ty with
-      | Ok node -> node
       | Error _ -> assert false
 
     let get_script_storage_type ctxt script_expr =
@@ -244,8 +241,6 @@ module Make (P : Sigs.PROTOCOL) = struct
         exprs
         ExprMap.empty
 
-    type ex_lambda = P.Lambda.ex_lambda
-
     let keep_lambda_types types =
       let open P.Translator in
       ExprMap.fold
@@ -255,13 +250,6 @@ module Make (P : Sigs.PROTOCOL) = struct
           | Some ex_ty_lambdas -> ExprMap.add hash ex_ty_lambdas types)
         types
         ExprMap.empty
-
-    let try_parse_data ctxt ty node =
-      let open Lwt_syntax in
-      let+ result =
-        P.Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty node
-      in
-      match result with Error _ -> None | Ok v -> Some v
 
     let collect_lambdas_in_exprs ctxt exprs unpack_types =
       let open Lwt_syntax in
