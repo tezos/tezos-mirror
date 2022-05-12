@@ -29,11 +29,11 @@ SCRIPTSDIR    = scripts
 CHECKXREFS    = $(SCRIPTSDIR)/check_proto_xrefs.py
 
 # Build all documentation (with CLI manuals and odoc) but without old PROTOCOLS
-all: manuals odoc-lite
+all: odoc-lite
 	${MAKE} html
 
 # Build the full documentation including archived protocols; for publishing only
-full: manuals odoc html
+full: odoc html
 
 main:
 	${MAKE} -C .. all
@@ -145,7 +145,7 @@ install-dependencies:
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: api/errors.rst developer/metrics.csv rpc p2p install-dependencies
+html: api/errors.rst developer/metrics.csv rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/ithaca" || true
