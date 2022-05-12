@@ -52,31 +52,9 @@ module Storage_helpers = struct
 end
 
 module Make (P : Sigs.PROTOCOL) = struct
-  let ( >>= ) x f =
-    let open Lwt_syntax in
-    let* r = x in
-    f r
-
-  let ( >>=? ) x f =
-    let open Lwt_result_syntax in
-    let* r = x in
-    f r
-
-  let ( >|= ) x f =
-    let open Lwt_syntax in
-    let+ r = x in
-    f r
-
-  let ( >|=? ) x f =
-    let open Lwt_result_syntax in
-    let+ r = x in
-    f r
-
   let return = Lwt_result_syntax.return
 
   let ok x = Ok x
-
-  let ( >>?= ) x f = Lwt.return x >>=? f
 
   let mainnet_genesis =
     {
@@ -186,12 +164,14 @@ module Make (P : Sigs.PROTOCOL) = struct
       | Error _ -> assert false
 
     let get_script_storage_type ctxt script_expr =
-      P.Translator.parse_toplevel ctxt ~legacy:true script_expr >>= function
+      let open Lwt_syntax in
+      let+ result = P.Translator.parse_toplevel ctxt ~legacy:true script_expr in
+      match result with
       | Ok code ->
           let storage_type_expr =
             Micheline.strip_locations @@ P.code_storage_type code
           in
-          return (parse_ty ctxt storage_type_expr)
+          parse_ty ctxt storage_type_expr
       | Error _ ->
           P.Script.print_expr Format.std_formatter script_expr ;
           assert false
@@ -306,16 +286,18 @@ module Make (P : Sigs.PROTOCOL) = struct
         ExprMap.empty
 
     let try_parse_data ctxt ty node =
-      P.Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty node
-      >|= function
-      | Error _ -> None
-      | Ok v -> Some v
+      let open Lwt_syntax in
+      let+ result =
+        P.Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty node
+      in
+      match result with Error _ -> None | Ok v -> Some v
 
     let collect_lambdas_in_exprs ctxt exprs unpack_types =
+      let open Lwt_syntax in
       let unpack_types = keep_lambda_types unpack_types in
       ExprMap.fold
         (fun _hash (expr, from_unpack, types) lambdas_lwt ->
-          lambdas_lwt >>= fun lambdas ->
+          let* lambdas = lambdas_lwt in
           let types = keep_lambda_types types in
           let types =
             if from_unpack then
@@ -324,8 +306,9 @@ module Make (P : Sigs.PROTOCOL) = struct
           in
           ExprMap.fold
             (fun _ty_hash (Ex_ty_lambdas (ty, getters)) lambdas_lwt ->
-              lambdas_lwt >>= fun lambdas ->
-              try_parse_data ctxt ty (Micheline.root expr) >|= function
+              let* lambdas = lambdas_lwt in
+              let+ v_opt = try_parse_data ctxt ty (Micheline.root expr) in
+              match v_opt with
               | None -> lambdas
               | Some v ->
                   List.fold_left
@@ -359,34 +342,40 @@ module Make (P : Sigs.PROTOCOL) = struct
         (Lwt.return (ExprMap.empty, ExprMap.empty, ExprMap.empty))
 
     let add_expr_to_map ctxt contract (m, i) =
+      let open Lwt_syntax in
       let i = i + 1 in
       if i mod 5000 = 0 then Format.printf "%d@." i ;
       match P.Contract.is_implicit contract with
       | Some _key_hash -> Lwt.return (m, i)
       | None -> (
-          Storage_helpers.get_lazy_expr
-            ~what:"contract code"
-            ~getter:P.Contract.get_code
-            ~pp:P.Contract.pp
-            ctxt
-            contract
-          >>= function
+          let* code_opt =
+            Storage_helpers.get_lazy_expr
+              ~what:"contract code"
+              ~getter:P.Contract.get_code
+              ~pp:P.Contract.pp
+              ctxt
+              contract
+          in
+          match code_opt with
           | None -> Lwt.return (m, i) (* Should not happen *)
           | Some code ->
-              (if Options.(collect_lambdas || collect_storage) then
-               Storage_helpers.get_lazy_expr
-                 ~what:"contract storage"
-                 ~getter:P.Contract.get_storage
-                 ~pp:P.Contract.pp
-                 ctxt
-                 contract
-               >|= function
-               | None -> fun x -> x
-               | Some storage ->
-                   let key = hash_expr storage in
-                   fun storages -> ExprMap.add key storage storages
-              else Lwt.return (fun x -> x))
-              >|= fun add_storage ->
+              let+ add_storage =
+                if Options.(collect_lambdas || collect_storage) then
+                  let+ storage_opt =
+                    Storage_helpers.get_lazy_expr
+                      ~what:"contract storage"
+                      ~getter:P.Contract.get_storage
+                      ~pp:P.Contract.pp
+                      ctxt
+                      contract
+                  in
+                  match storage_opt with
+                  | None -> fun x -> x
+                  | Some storage ->
+                      let key = hash_expr storage in
+                      fun storages -> ExprMap.add key storage storages
+                else Lwt.return (fun x -> x)
+              in
               let key = hash_expr code in
               ( ExprMap.update
                   key
@@ -413,7 +402,8 @@ module Make (P : Sigs.PROTOCOL) = struct
         'a Error_monad.tzresult Lwt.t) ->
       'a Error_monad.tzresult Lwt.t =
    fun ctxt_i ~init ~f ->
-    P.Storage.list_values ctxt_i >>=? fun (_ctxt, values) ->
+    let open Lwt_result_syntax in
+    let* _ctxt, values = P.Storage.list_values ctxt_i in
     List.fold_left_es (fun acc v -> f v acc) init values
 
   let main () : unit tzresult Lwt.t =
@@ -482,7 +472,7 @@ module Make (P : Sigs.PROTOCOL) = struct
               let exprs =
                 ExprMap.add hash (script, false, ExprMap.empty) exprs
               in
-              let* ty_hash, ty =
+              let*! ty_hash, ty =
                 Michelson_helpers.get_script_storage_type ctxt script
               in
               ExprMap.fold_es
