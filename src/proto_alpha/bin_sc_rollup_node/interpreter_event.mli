@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context.Sc_rollup
+(** This module defines functions that emit the events used when running a PVM
+    transition (see {!Interpreter}). *)
 
-module Simple = struct
-  include Internal_event.Simple
-
-  let section = ["sc_rollup_node"; "interpreter"]
-
-  let transitioned_pvm =
-    declare_3
-      ~section
-      ~name:"sc_rollup_node_interpreter_transitioned_pvm"
-      ~msg:
-        "Transitioned PVM to {state_hash} at tick {ticks} with {num_messages} \
-         messages"
-      ~level:Notice
-      ("state_hash", State_hash.encoding)
-      ("ticks", Tick.encoding)
-      ("num_messages", Data_encoding.z)
-end
-
-let transitioned_pvm state num_messages =
-  let open Lwt_syntax in
-  let* hash = Arith_pvm.state_hash state in
-  let* ticks = Arith_pvm.get_tick state in
-  Simple.(emit transitioned_pvm (hash, ticks, num_messages))
+(** [transition_pvm hash n] emits the event that a PVM transition is leading to
+    the state of the given [hash] by processing [n] messages. *)
+val transitioned_pvm : Arith_pvm.state -> Z.t -> unit Lwt.t
