@@ -255,7 +255,7 @@ module type S = sig
       size:int -> Script_ir_translator.ex_comparable_ty sampler
   end
 
-  module rec Random_value : sig
+  module Random_value : sig
     val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
@@ -488,7 +488,7 @@ end)
   end
 
   (* Type-directed generation of random values. *)
-  module rec Random_value : sig
+  module Random_value : sig
     val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
