@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,55 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Simple = struct
-  include Internal_event.Simple
+(** This module defines functions that emit the events used when the smart
+    contract rollup node is running (see {!Daemon}). *)
 
-  let section = ["sc_rollup_node"]
+open Protocol.Alpha_context
 
-  let starting_node =
-    declare_0
-      ~section
-      ~name:"starting_sc_rollup_node"
-      ~msg:"Starting the smart contract rollup node"
-      ~level:Notice
-      ()
+val starting_node : unit -> unit Lwt.t
 
-  let shutdown_node =
-    declare_1
-      ~section
-      ~name:"stopping_sc_rollup_node"
-      ~msg:"Stopping the smart contract rollup node"
-      ~level:Notice
-      ("exit_status", Data_encoding.int8)
+val node_is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
 
-  let node_is_ready =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_is_ready"
-      ~msg:"The smart contract rollup node is listening to {addr}:{port}"
-      ~level:Notice
-      ("addr", Data_encoding.string)
-      ("port", Data_encoding.uint16)
+(** [rollup_exists addr kind] emits the event that the smart contract rollup
+    node is interacting with the rollup at address [addr] and of the given
+    [kind]. *)
+val rollup_exists : addr:Sc_rollup.t -> kind:Sc_rollup.Kind.t -> unit Lwt.t
 
-  let rollup_exists =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_knows_its_rollup"
-      ~msg:
-        "The smart contract rollup node is interacting with rollup {addr} of \
-         kind {kind}"
-      ~level:Notice
-      ("addr", Protocol.Alpha_context.Sc_rollup.Address.encoding)
-      ("kind", Data_encoding.string)
-end
-
-let starting_node = Simple.(emit starting_node)
-
-let shutdown_node exit_status = Simple.(emit shutdown_node exit_status)
-
-let node_is_ready ~rpc_addr ~rpc_port =
-  Simple.(emit node_is_ready (rpc_addr, rpc_port))
-
-let rollup_exists ~addr ~kind =
-  let kind = Protocol.Sc_rollups.string_of_kind kind in
-  Simple.(emit rollup_exists (addr, kind))
+(** [shutdown_node exit_status] emits the event that the smart contract rollup
+    node is stopping with exit status [exit_status]. *)
+val shutdown_node : int -> unit Lwt.t
