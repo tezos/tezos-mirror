@@ -42,7 +42,8 @@ variables:
 # - DOCKER_VERSION
 # https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding
 .image_template__docker:
-  image: docker:20.10.12
+  # https://gitlab.com/tezos/docker-images/ci-docker
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.6.0"
 
 .image_template__alpine:
   image: alpine:3.15
