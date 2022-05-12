@@ -11,4 +11,4 @@
    -open Tezos_micheline
    -open Tezos_base__TzPervasives
    -open Tezos_stdlib_unix))
- (modules get_contracts sigs))
+ (modules get_contracts sigs storage_helpers))

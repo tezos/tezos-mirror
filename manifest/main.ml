@@ -4488,7 +4488,7 @@ let _get_contracts_lib =
     ~synopsis:"Generic tool to extract smart contracts from node's context."
     ~opam:""
     ~deps:[tezos_client_base_unix; tezos_store]
-    ~modules:["get_contracts"; "sigs"]
+    ~modules:["get_contracts"; "sigs"; "storage_helpers"]
     ~opens:["Tezos_micheline"; "Tezos_base__TzPervasives"; "Tezos_stdlib_unix"]
     ~static:false
     ~release:false

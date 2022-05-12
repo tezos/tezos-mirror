@@ -29,28 +29,6 @@ module Options = struct
   let collect_lambdas = true
 end
 
-module Storage_helpers = struct
-  let get_value ~what ~getter ~pp ctxt x =
-    let open Lwt_syntax in
-    let+ value = getter ctxt x in
-    match value with
-    | Ok x -> Some x
-    | Error _ ->
-        (* Should not happen *)
-        Format.eprintf "Failed getting %s for %a\n" what pp x ;
-        None
-
-  let get_lazy_expr ~what ~getter ~pp ctxt x =
-    let open Lwt_syntax in
-    let+ expr_opt = get_value ~what ~getter ~pp ctxt x in
-    Option.map
-      (fun (_, expr) ->
-        match Data_encoding.force_decode expr with
-        | Some expr -> expr
-        | None -> assert false)
-      expr_opt
-end
-
 module Make (P : Sigs.PROTOCOL) = struct
   let return = Lwt_result_syntax.return
 
