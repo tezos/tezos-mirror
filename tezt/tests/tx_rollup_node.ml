@@ -41,6 +41,14 @@ let check_json =
 
 let get_block_hash block_json = JSON.(block_json |-> "hash" |> as_string)
 
+let wait_tezos_node_level tx_node node =
+  let level = Node.get_level node in
+  Rollup_node.wait_for_tezos_level tx_node level
+
+(* Wait for the rollup node to be notified of a new tezos block *)
+let wait_for_notified_block node =
+  Rollup_node.wait_for node "tx_rollup_node_new_block.v0" (fun _ -> Some ())
+
 (* Wait for the [batch_success] event from the rollup node batcher. *)
 let wait_for_batch_success_event node =
   Rollup_node.wait_for node "batch_success.v0" (fun _ -> Some ())
@@ -494,6 +502,91 @@ let test_tx_node_store_inbox =
           "Unexpected inbox computed from the rollup node. Expected %R. \
            Computed %L" ;
       unit)
+
+let test_node_cannot_connect =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "TX_rollup: test that the rollup node exits when it cannot connect to a \
+       Tezos node on startup"
+    ~tags:["tx_rollup"; "node"; "connect"]
+  @@ fun protocol ->
+  let* parameter_file = Parameters.parameter_file protocol in
+  let* (node, client) =
+    Client.init_with_protocol ~parameter_file `Client ~protocol ()
+  in
+  let originator = Constant.bootstrap1.public_key_hash in
+  Log.info "Originate rollup" ;
+  let*! rollup_id = Client.Tx_rollup.originate ~src:originator client in
+  let* () = Client.bake_for_and_wait client in
+  let* block_hash = RPC.get_block_hash client in
+  Log.info "Stopping Tezos node" ;
+  let* () = Node.terminate node in
+  let tx_node =
+    Rollup_node.create
+      Custom
+      ~rollup_id
+      ~rollup_genesis:block_hash
+      ~allow_deposit:false
+      client
+      node
+  in
+  let* _ = Rollup_node.init_config tx_node in
+  let* () = Rollup_node.run tx_node in
+  let ready =
+    let* () = Rollup_node.wait_for_ready tx_node in
+    Test.fail
+      "Rollup node shouldn't start when it cannot connect to a Tezos node"
+  in
+  let dies =
+    let node_process = Option.get @@ Rollup_node.process tx_node in
+    Process.check_error
+      ~exit_code:1
+      ~msg:(rex "Unable to connect to the node")
+      node_process
+  in
+  let* () = Lwt.choose [ready; dies] in
+  unit
+
+let test_node_disconnect =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "TX_rollup: test that the we recover when disconnecting from Tezos node"
+    ~tags:["tx_rollup"; "node"; "disconnect"]
+  @@ fun protocol ->
+  let* parameter_file = Parameters.parameter_file protocol in
+  let* (node, client) =
+    Client.init_with_protocol ~parameter_file `Client ~protocol ()
+  in
+  let originator = Constant.bootstrap1.public_key_hash in
+  let* (rollup, tx_node) = init_and_run_rollup_node ~originator node client in
+  (* Submit a batch *)
+  let (`Batch content) = Rollup.make_batch "tezos_l2_batch_1" in
+  let*! () =
+    Client.Tx_rollup.submit_batch
+      ~content
+      ~rollup
+      ~src:Constant.bootstrap2.public_key_hash
+      client
+  in
+  let block_notify_promise = wait_for_notified_block tx_node in
+  let* () = Client.bake_for client in
+  let* () = block_notify_promise in
+  Log.info "Brutally killing Tezos node" ;
+  let* () = Node.terminate ~kill:true node in
+  let* () = Lwt_unix.sleep 2. in
+  let* () = Node.run node Node.[Connections 0; Synchronisation_threshold 0] in
+  let* () = Node.wait_for_ready node in
+  let* () = Client.bake_for_and_wait client in
+  Log.info "Rollup node should reconnect and see the new L1 block" ;
+  let () =
+    match Rollup_node.process tx_node with
+    | None -> Test.fail "Rollup node stopped"
+    | Some _ -> ()
+  in
+  let* _ = wait_tezos_node_level tx_node node in
+  unit
 
 (* The contract is expecting a parameter of the form:
    (Pair string amount tx_rollup_tz4_address tx_rollup_txr1_address) *)
@@ -1744,7 +1837,7 @@ let test_reject_bad_commitment =
   Protocol.register_test
     ~__FILE__
     ~title:"TX_rollup: reject bad commitment"
-    ~tags:["tx_rollup"; "node"; "proofs"; "rejection"]
+    ~tags:["tx_rollup"; "node"; "proofs"; "rejection"; "slashed"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
@@ -2593,6 +2686,8 @@ let register ~protocols =
   test_allow_deposit protocols ;
   test_tx_node_origination protocols ;
   test_tx_node_store_inbox protocols ;
+  test_node_cannot_connect protocols ;
+  test_node_disconnect protocols ;
   test_ticket_deposit_from_l1_to_l2 protocols ;
   test_l2_to_l2_transaction protocols ;
   test_batcher protocols ;
