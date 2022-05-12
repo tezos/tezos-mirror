@@ -25,13 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The node encountered a fatal error which prevents it from working \
-    properly. *)
-type error += Tx_rollup_fatal
-
-(** Add the [Tx_rollup_fatal] error to any error occurring in the promise. *)
-val trace_fatal : 'a tzresult Lwt.t -> 'a tzresult Lwt.t
-
 (** Internal error in rollup node *)
 type error += Tx_rollup_internal of string
 
@@ -119,6 +112,10 @@ type error +=
       reconstructed_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
       protocol_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
     }
+
+(** Error when the cannot check the inbox with L1 *)
+type error +=
+  | Tx_rollup_cannot_check_inbox of Protocol.Alpha_context.Tx_rollup_level.t
 
 (** Error when the transaction submitted to the batcher produces a too large
     message regarding the layer1 limit. *)

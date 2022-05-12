@@ -246,7 +246,7 @@ let create_genesis_block state tezos_block =
 
 let check_inbox state tezos_block level inbox =
   let open Lwt_result_syntax in
-  Error.trace_fatal
+  trace (Error.Tx_rollup_cannot_check_inbox level)
   @@ let* proto_inbox =
        Protocol.Tx_rollup_services.inbox
          state.State.cctxt
@@ -379,10 +379,9 @@ let rec process_block state current_hash rollup_id =
         let predecessor_hash = block_info.header.shell.predecessor in
         let block_level = block_info.header.shell.level in
         let* () =
-          Error.trace_fatal
-          @@ fail_when
-               (block_level < state.State.rollup_info.origination_level)
-               Tx_rollup_originated_in_fork
+          fail_when
+            (block_level < state.State.rollup_info.origination_level)
+            Tx_rollup_originated_in_fork
         in
         (* Handle predecessor Tezos block first *)
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
@@ -559,7 +558,7 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
   let is_my_rollup tx_rollup =
     Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
   in
-  let* () = Error.trace_fatal @@ fail_when_slashed state l1_operation result in
+  let* () = fail_when_slashed state l1_operation result in
   match (op, result) with
   | ( Tx_rollup_commit {commitment; tx_rollup},
       Applied (Tx_rollup_commit_result _) )
@@ -878,13 +877,9 @@ let run configuration cctxt =
                 let*! r = process_head state head rollup_id in
                 match r with
                 | Ok _ -> Lwt.return ()
-                | Error (Tx_rollup_fatal :: _ as e) ->
-                    Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
-                    Lwt_exit.exit_and_raise 1
                 | Error e ->
-                    Format.eprintf "%a@." pp_print_trace e ;
-                    let () = interupt () in
-                    Lwt.return ())
+                    Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
+                    Lwt_exit.exit_and_raise 1)
               block_stream
           in
           let*! () = Event.(emit connection_lost) () in

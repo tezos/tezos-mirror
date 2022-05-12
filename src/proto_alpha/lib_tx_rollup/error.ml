@@ -25,23 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Tx_rollup_fatal
-
-let () =
-  register_error_kind
-    ~id:"tx_rollup.node.fatal"
-    ~title:"Fatal error in rollup node"
-    ~description:
-      "The node encountered a fatal error which prevents it from working \
-       properly."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Fatal error in rollup node.")
-    `Permanent
-    Data_encoding.unit
-    (function Tx_rollup_fatal -> Some () | _ -> None)
-    (fun () -> Tx_rollup_fatal)
-
-let trace_fatal p = trace Tx_rollup_fatal p
-
 type error += Tx_rollup_internal of string
 
 let () =
@@ -477,6 +460,26 @@ let () =
       | _ -> None)
     (fun (level, reconstructed_inbox, protocol_inbox) ->
       Tx_rollup_inbox_mismatch {level; reconstructed_inbox; protocol_inbox})
+
+type error +=
+  | Tx_rollup_cannot_check_inbox of Protocol.Alpha_context.Tx_rollup_level.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_check_inbox"
+    ~title:"Cannot check the inbox with the L1 node"
+    ~description:"Reconstructed inbox cannot be checked."
+    ~pp:(fun ppf l ->
+      Format.fprintf
+        ppf
+        "Cannot check the reconstructed inbox at level %a with the L1 node"
+        Protocol.Alpha_context.Tx_rollup_level.pp
+        l)
+    `Permanent
+    Data_encoding.(
+      obj1 (req "level" Protocol.Alpha_context.Tx_rollup_level.encoding))
+    (function Tx_rollup_cannot_check_inbox l -> Some l | _ -> None)
+    (fun l -> Tx_rollup_cannot_check_inbox l)
 
 type error += Transaction_too_large of {actual : int; limit : int}
 
