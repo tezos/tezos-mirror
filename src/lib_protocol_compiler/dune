@@ -72,9 +72,4 @@
 (install
  (package tezos-protocol-compiler)
  (section libexec)
- (files
-  dune_protocol.v0
-  dune_protocol.v1
-  dune_protocol.template.v0
-  dune_protocol.template.v1
-  final_protocol_versions))
+ (files final_protocol_versions))

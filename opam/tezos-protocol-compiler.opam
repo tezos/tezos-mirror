@@ -17,7 +17,6 @@ depends: [
   "lwt" { >= "5.4.0" }
   "ocp-ocamlres" { >= "0.4" }
   "base-unix"
-  "re" { >= "1.7.2" }
 ]
 build: [
   ["rm" "-r" "vendors"]

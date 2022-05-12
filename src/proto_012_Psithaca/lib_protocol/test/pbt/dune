@@ -1,26 +1,64 @@
-(tests
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names
+  liquidity_baking_pbt
+  saturation_fuzzing
+  test_gas_properties
+  test_sampler
+  test_script_comparison
+  test_tez_repr)
+ (libraries
+  tezos-base
+  tezos-micheline
+  tezos-client-012-Psithaca
+  tezos-protocol-012-Psithaca
+  tezos-test-helpers
+  tezos-012-Psithaca-test-helpers
+  alcotest
+  qcheck-alcotest
+  tezos-client-base
+  tezos-benchmark
+  tezos-benchmark-012-Psithaca
+  tezos-benchmark-type-inference-012-Psithaca)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_micheline
+   -open Tezos_client_012_Psithaca
+   -open Tezos_protocol_012_Psithaca
+   -open Tezos_012_Psithaca_test_helpers
+   -open Tezos_benchmark_012_Psithaca
+   -open Tezos_benchmark_type_inference_012_Psithaca)))
+
+(rule
+ (alias runtest)
  (package tezos-protocol-012-Psithaca-tests)
- (names liquidity_baking_pbt
-        saturation_fuzzing
-        test_gas_properties
-        test_sampler
-        test_script_comparison
-        test_tez_repr)
- (libraries tezos-base
-            tezos-micheline
-            tezos-client-base
-            tezos-test-helpers
-            tezos-012-Psithaca-test-helpers
-            alcotest
-            qcheck-alcotest
-            tezos-benchmark
-            tezos-benchmark-012-Psithaca)
- (flags (:standard
-          -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-          -open Tezos_micheline
-          -open Tezos_client_012_Psithaca
-          -open Tezos_protocol_012_Psithaca
-          -open Tezos_012_Psithaca_test_helpers
-          -open Tezos_benchmark_012_Psithaca
-          -open Tezos_benchmark_type_inference_012_Psithaca)))
+ (action (run %{dep:./liquidity_baking_pbt.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-012-Psithaca-tests)
+ (action (run %{dep:./saturation_fuzzing.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-012-Psithaca-tests)
+ (action (run %{dep:./test_gas_properties.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-012-Psithaca-tests)
+ (action (run %{dep:./test_sampler.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-012-Psithaca-tests)
+ (action (run %{dep:./test_script_comparison.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-012-Psithaca-tests)
+ (action (run %{dep:./test_tez_repr.exe})))

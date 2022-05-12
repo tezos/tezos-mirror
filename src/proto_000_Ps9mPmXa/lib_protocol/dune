@@ -1,154 +1,80 @@
-;; -*- mode: dune; -*-
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
-
-
-;
-;        /!\ /!\ Do not modify this file /!\ /!\
-;
-; but the original template in `tezos-protocol-compiler`
-;
-
-; generated from src/lib_protocol_compiler/dune_protocol.template.v0
-;
-; This template is intended for protocols written when the Tezos
-; project was using OCaml 4.10 or earlier.
-;
-; Protocols that have already been activated on-chain cannot be
-; changed. Additionally, protocols written when the tezos project was
-; using OCaml 4.10 or earlier may trigger warnings when compiled with a more
-; recent version of the OCaml compiler. Consequently, this template
-; sets some specific warning-related options so that protocols written
-; on OCaml 4.10 or earlier can be compiled with the more recent compiler version
-; currently used in the tezos project.
+(library
+ (name tezos_protocol_environment_000_Ps9mPmXa)
+ (public_name tezos-protocol-000-Ps9mPmXa.environment)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (modules Environment))
 
 (rule
  (targets environment.ml)
  (action
-  (write-file %{targets}
-              "module Name = struct let name = \"000-Ps9mPmXa\" end
-include Tezos_protocol_environment.MakeV0(Name)()
-module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
-")))
-
-(rule
- (targets registerer.ml)
- (deps
-   data.ml
-   services.ml
-   main.mli main.ml
-   (:src_dir TEZOS_PROTOCOL))
- (action
-  (with-stdout-to %{targets}
-                  (chdir %{workspace_root} (run %{bin:tezos-embedded-protocol-packer} "%{src_dir}" "000_Ps9mPmXa")))))
-
-(rule
- (targets functor.ml)
- (deps
-   data.ml
-   services.ml
-   main.mli main.ml
-   (:src_dir TEZOS_PROTOCOL))
- (action (with-stdout-to %{targets}
-                         (chdir %{workspace_root}
-                                (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
-
-(rule
- (targets protocol.ml)
- (deps
-   data.ml
-   services.ml
-   main.mli main.ml)
- (action
-  (write-file %{targets}
-    "module Environment = Tezos_protocol_environment_000_Ps9mPmXa.Environment
-let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P\"
-let name = Environment.Name.name
-include Tezos_raw_protocol_000_Ps9mPmXa
-include Tezos_raw_protocol_000_Ps9mPmXa.Main
-")))
-
-(library
- (name tezos_protocol_environment_000_Ps9mPmXa)
- (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-000-Ps9mPmXa.environment)
- (library_flags (:standard -linkall))
- (libraries tezos-protocol-environment)
- (modules Environment))
+  (write-file
+   %{targets}
+   "module Name = struct let name = \"000-Ps9mPmXa\" end\ninclude Tezos_protocol_environment.MakeV0(Name)()\nmodule CamlinternalFormatBasics = struct include CamlinternalFormatBasics end\n")))
 
 (library
  (name tezos_raw_protocol_000_Ps9mPmXa)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-000-Ps9mPmXa.raw)
- (libraries tezos_protocol_environment_000_Ps9mPmXa)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-000-Ps9mPmXa.environment)
  (library_flags (:standard -linkall))
- (flags (:standard -nopervasives -nostdlib
-                   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
-                   -warn-error +a
-                   -open Tezos_protocol_environment_000_Ps9mPmXa__Environment
-                   -open Pervasives
-                   -open Error_monad))
- (modules
-   Data
-   Services
-   Main))
-
-(install
- (section lib)
- (package tezos-protocol-000-Ps9mPmXa)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (flags
+  (:standard
+   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
+   -warn-error +a
+   -nostdlib
+   -nopervasives
+   -open Tezos_protocol_environment_000_Ps9mPmXa.Environment
+   -open Pervasives
+   -open Error_monad))
+ (modules Data Services Main))
 
 (library
  (name tezos_protocol_000_Ps9mPmXa)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-000-Ps9mPmXa)
+ (instrumentation (backend bisect_ppx))
  (libraries
-      tezos-protocol-environment
-      tezos-protocol-environment.sigs
-      tezos_raw_protocol_000_Ps9mPmXa)
- (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
-        -warn-error "-A"
-        -nopervasives)
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-000-Ps9mPmXa.raw)
+ (flags
+  (-w +a-4-6-7-9-16-29-40..42-44-45-48-60-67-68
+   -warn-error -A
+   -nopervasives))
  (modules Protocol))
 
-(library
- (name tezos_protocol_000_Ps9mPmXa_functor)
- ; The instrumentation is removed as it can lead to a stack overflow
- ; https://gitlab.com/tezos/tezos/-/issues/1927
- ; (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-functor-000-Ps9mPmXa)
- (libraries
-      tezos-protocol-environment
-      tezos-protocol-environment.sigs
-      tezos-protocol-000-Ps9mPmXa.raw)
- (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
-        -warn-error "-A"
-        -nopervasives)
- (modules Functor))
+(install
+ (package tezos-protocol-000-Ps9mPmXa)
+ (section lib)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
 
-(library
- (name tezos_embedded_protocol_000_Ps9mPmXa)
- (instrumentation (backend bisect_ppx))
- (public_name tezos-embedded-protocol-000-Ps9mPmXa)
- (library_flags (:standard -linkall))
- (libraries tezos-protocol-000-Ps9mPmXa
-            tezos-protocol-updater
-            tezos-protocol-environment)
- (flags (:standard -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67
-                   -warn-error +a))
- (modules Registerer))
+(rule
+ (targets protocol.ml)
+ (deps data.ml
+       services.ml
+       main.ml main.mli)
+ (action
+  (write-file
+   %{targets}
+   "module Environment = Tezos_protocol_environment_000_Ps9mPmXa.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_000_Ps9mPmXa\ninclude Tezos_raw_protocol_000_Ps9mPmXa.Main\n")))
 
 (rule
  (alias runtest_compile_protocol)
- (deps
-   data.ml
-   services.ml
-   main.mli main.ml
-  (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:tezos-protocol-compiler}  .)))
+ (deps data.ml
+       services.ml
+       main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action (run %{bin:tezos-protocol-compiler} .)))
 
 (rule
  (alias runtest_sandbox)
- (deps .tezos_protocol_000_Ps9mPmXa.objs/native/tezos_protocol_000_Ps9mPmXa.cmx)
+ (deps
+  .tezos_protocol_000_Ps9mPmXa.objs/native/tezos_protocol_000_Ps9mPmXa.cmx)
  (action (progn)))
 
 (rule
@@ -156,16 +82,55 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
  (package tezos-protocol-000-Ps9mPmXa)
  (deps (alias runtest_sandbox))
  (action (progn)))
-(rule
- (targets "dune.inc.gen")
- (deps TEZOS_PROTOCOL (glob_files *.ml) (glob_files *.mli))
- (action
-  (run
-    %{libexec:tezos-protocol-compiler:replace}
-    %{libexec:tezos-protocol-compiler:dune_protocol.template.v0}
-    "dune.inc.gen"
-    %{libexec:tezos-protocol-compiler:final_protocol_versions})))
+
+(library
+ (name tezos_protocol_000_Ps9mPmXa_functor)
+ (public_name tezos-protocol-functor-000-Ps9mPmXa)
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-000-Ps9mPmXa.raw)
+ (flags
+  (-w +a-4-6-7-9-16-29-40..42-44-45-48-60-67-68
+   -warn-error -A
+   -nopervasives))
+ (modules Functor))
 
 (rule
- (alias   runtest_dune_template)
- (action (diff dune.inc dune.inc.gen)))
+ (targets functor.ml)
+ (deps data.ml
+       services.ml
+       main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+
+(library
+ (name tezos_embedded_protocol_000_Ps9mPmXa)
+ (public_name tezos-embedded-protocol-000-Ps9mPmXa)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-000-Ps9mPmXa
+  tezos-protocol-updater
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67
+   -warn-error +a))
+ (modules Registerer))
+
+(rule
+ (targets registerer.ml)
+ (deps data.ml
+       services.ml
+       main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-embedded-protocol-packer} %{src_dir} 000_Ps9mPmXa)))))

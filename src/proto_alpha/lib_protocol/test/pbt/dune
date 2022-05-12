@@ -1,31 +1,93 @@
-(tests
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names
+  liquidity_baking_pbt
+  saturation_fuzzing
+  test_merkle_list
+  test_gas_properties
+  test_sampler
+  test_script_comparison
+  test_tez_repr
+  test_tx_rollup_l2_encoding
+  test_bitset
+  test_sc_rollup_tick_repr
+  test_carbonated_map)
+ (libraries
+  tezos-base
+  tezos-micheline
+  tezos-client-alpha
+  tezos-protocol-alpha
+  tezos-test-helpers
+  tezos-alpha-test-helpers
+  alcotest
+  qcheck-alcotest
+  tezos-benchmark
+  tezos-benchmark-alpha
+  tezos-benchmark-type-inference-alpha)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_micheline
+   -open Tezos_client_alpha
+   -open Tezos_protocol_alpha
+   -open Tezos_alpha_test_helpers
+   -open Tezos_benchmark_alpha
+   -open Tezos_benchmark_type_inference_alpha)))
+
+(rule
+ (alias runtest)
  (package tezos-protocol-alpha-tests)
- (names liquidity_baking_pbt
-        saturation_fuzzing
-        test_merkle_list
-        test_gas_properties
-        test_sampler
-        test_script_comparison
-        test_tez_repr
-        test_tx_rollup_l2_encoding
-        test_bitset
-        test_sc_rollup_tick_repr
-        test_carbonated_map)
- (libraries tezos-base
-            tezos-micheline
-            tezos-client-alpha
-            tezos-test-helpers
-            tezos-alpha-test-helpers
-            alcotest
-            qcheck-alcotest
-            tezos-benchmark
-            tezos-benchmark-alpha)
- (flags (:standard
-          -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-          -open Tezos_micheline
-          -open Tezos_client_alpha
-          -open Tezos_protocol_alpha
-          -open Tezos_alpha_test_helpers
-          -open Tezos_benchmark_alpha
-          -open Tezos_benchmark_type_inference_alpha)))
+ (action (run %{dep:./liquidity_baking_pbt.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./saturation_fuzzing.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_merkle_list.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_gas_properties.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_sampler.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_script_comparison.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_tez_repr.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_tx_rollup_l2_encoding.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_bitset.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_sc_rollup_tick_repr.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_carbonated_map.exe})))
