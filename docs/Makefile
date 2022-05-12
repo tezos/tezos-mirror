@@ -33,7 +33,8 @@ all: odoc-lite
 	${MAKE} html
 
 # Build the full documentation including archived protocols; for publishing only
-full: odoc html
+full: odoc
+	${MAKE} html
 
 main:
 	${MAKE} -C .. all
