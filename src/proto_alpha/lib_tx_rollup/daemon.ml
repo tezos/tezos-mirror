@@ -424,6 +424,7 @@ let rec process_block state current_hash =
       let* () = set_head state l2_block in
       return (Some l2_block, None, [])
   | None ->
+      state.State.sync.synchronized <- false ;
       let* block_info = State.fetch_tezos_block state current_hash in
       let predecessor_hash = block_info.header.shell.predecessor in
       let block_level = block_info.header.shell.level in
@@ -479,6 +480,7 @@ let rec process_block state current_hash =
             let* () = set_head state l2_block in
             return_some l2_block
       in
+      State.notify_processed_tezos_level state block_info.header.shell.level ;
       let*! () =
         Event.(emit tezos_block_processed) (current_hash, block_level)
       in
@@ -760,11 +762,20 @@ let handle_l1_reorg state acc reorg =
   in
   return acc
 
-let process_head state (current_hash, current_header) =
+let notify_synchronized state =
+  let old_value = state.State.sync.synchronized in
+  state.State.sync.synchronized <- true ;
+  if old_value = false then
+    Lwt_condition.broadcast state.State.sync.on_synchronized ()
+
+let process_head state
+    (current_hash, (current_header : Tezos_base.Block_header.t)) =
   let open Lwt_result_syntax in
+  State.set_known_tezos_level state current_header.shell.level ;
   let*! () = Event.(emit new_block) current_hash in
   let* _, _, blocks_to_commit = process_block state current_hash in
   let* l1_reorg = State.set_tezos_head state current_hash in
+  notify_synchronized state ;
   let* () = handle_l1_reorg state () l1_reorg in
   let* () = List.iter_es (commit_block_on_l1 state) blocks_to_commit in
   let* () = batch () in

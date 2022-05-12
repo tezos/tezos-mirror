@@ -41,6 +41,15 @@ type rollup_info = Stores.rollup_info = {
   origination_level : int32 option;
 }
 
+type sync_levels = {processed_tezos_level : int32; known_tezos_level : int32}
+
+type sync_info = {
+  mutable synchronized : bool;
+  on_synchronized : unit Lwt_condition.t;
+  mutable current_levels : sync_levels;
+  sync_level_input : sync_levels Lwt_watcher.input;
+}
+
 type t = private {
   stores : Stores.t;
   cctxt : Protocol_client_context.full;
@@ -51,6 +60,7 @@ type t = private {
   constants : Constants.t;
   signers : Node_config.signers;
   caps : Node_config.caps;
+  sync : sync_info;
 }
 
 (** [init cctxt config] creates a new state for the rollup node with a new store
@@ -187,3 +197,14 @@ val fetch_tezos_block :
     [old_head_hash] and the chain whose head [new_head_hash]. *)
 val rollup_reorg :
   t -> old_head:L2block.t -> new_head:L2block.t -> L2block.t reorg Lwt.t
+
+(** [synchronized state] is a promise that resolves when the rollup node whose
+    state is [state] is synchronized with L1. If the node is already
+    synchronized, it resolves immediately. *)
+val synchronized : t -> unit Lwt.t
+
+(** Notify the processed Tezos level to watchers on the sync_levels input. *)
+val notify_processed_tezos_level : t -> int32 -> unit
+
+(** Set the latest known Tezos level but do not notify sync levels input. *)
+val set_known_tezos_level : t -> int32 -> unit

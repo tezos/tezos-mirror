@@ -107,3 +107,11 @@ val get_message_proof :
   block_id ->
   message_position:int ->
   Tx_rollup_l2_proof.t option Error_monad.tzresult Lwt.t
+
+(** Monitors the synchronized progress of the rollup node with respect to L1. *)
+val monitor_synchronized :
+  #RPC_context.streamed ->
+  ([`Synchronizing of State.sync_levels | `Synchronized] Lwt_stream.t
+  * RPC_context.stopper)
+  tzresult
+  Lwt.t

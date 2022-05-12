@@ -163,20 +163,19 @@ module Arg = struct
 end
 
 module Encodings = struct
+  open Data_encoding
+
   let header =
-    let open Data_encoding in
     merge_objs (obj1 (req "hash" L2block.Hash.encoding)) L2block.header_encoding
 
   type any_block = Raw of L2block.t | Fancy of Fancy_l2block.t
 
   let block block_encoding =
-    let open Data_encoding in
     merge_objs block_encoding (obj1 (req "metadata" L2block.metadata_encoding))
 
   let raw_block = block L2block.encoding
 
   let any_block =
-    let open Data_encoding in
     block
     @@ union
          [
@@ -195,6 +194,31 @@ module Encodings = struct
          ]
 
   let block = block Fancy_l2block.encoding
+
+  let synchroniztion_level =
+    conv
+      (fun State.{processed_tezos_level; known_tezos_level} ->
+        (processed_tezos_level, known_tezos_level))
+      (fun (processed_tezos_level, known_tezos_level) ->
+        State.{processed_tezos_level; known_tezos_level})
+    @@ obj2 (req "processed_tezos_level" int32) (req "known_tezos_level" int32)
+
+  let synchronization_result =
+    union
+      [
+        case
+          ~title:"synchronized"
+          (Tag 0)
+          (constant "synchronized")
+          (function `Synchronized -> Some () | _ -> None)
+          (fun () -> `Synchronized);
+        case
+          ~title:"synchronizing"
+          (Tag 1)
+          (obj1 (req "synchronizing" synchroniztion_level))
+          (function `Synchronizing levels -> Some levels | _ -> None)
+          (fun levels -> `Synchronizing levels);
+      ]
 end
 
 module Block = struct
@@ -668,6 +692,66 @@ module Injection = struct
         return q)
 end
 
+module Monitor = struct
+  let path : unit RPC_path.context = RPC_path.open_root
+
+  let prefix = RPC_path.(open_root / "monitor")
+
+  let directory : State.t RPC_directory.t ref = ref RPC_directory.empty
+
+  let gen_register service f =
+    directory := RPC_directory.gen_register !directory service f
+
+  let gen_register0 service f = gen_register (RPC_service.subst0 service) f
+
+  let export_service s =
+    let p = RPC_path.prefix prefix path in
+    RPC_service.prefix p s
+
+  let build_directory state =
+    !directory
+    |> RPC_directory.map (fun () -> Lwt.return state)
+    |> RPC_directory.prefix prefix
+
+  let synchronized =
+    RPC_service.get_service
+      ~description:
+        "Wait for the node to have synchronized its L2 chain with the L1 \
+         chain, streaming its progress."
+      ~query:RPC_query.empty
+      ~output:Encodings.synchronization_result
+      RPC_path.(path / "synchronized")
+
+  let () =
+    gen_register0 synchronized (fun state () () ->
+        let open Lwt_syntax in
+        let levels_stream, stopper =
+          Lwt_watcher.create_stream state.sync.sync_level_input
+        in
+        let synced = ref false in
+        let next () =
+          if !synced then Lwt.return_none
+          else
+            let levels =
+              let+ levels = Lwt_stream.get levels_stream in
+              match levels with
+              | None ->
+                  synced := true ;
+                  `Synchronized
+              | Some levels -> `Synchronizing levels
+            in
+            let synchronized =
+              let+ () = State.synchronized state in
+              synced := true ;
+              `Synchronized
+            in
+            let+ result = Lwt.pick [levels; synchronized] in
+            Some result
+        in
+        let shutdown () = Lwt_watcher.shutdown stopper in
+        RPC_answer.return_stream {next; shutdown})
+end
+
 let register state =
   List.fold_left
     (fun dir f -> RPC_directory.merge dir (f state))
@@ -676,6 +760,7 @@ let register state =
       Block.build_directory;
       Context_RPC.build_directory;
       Injection.build_directory;
+      Monitor.build_directory;
     ]
 
 let launch ~host ~acl ~node ~dir () =
@@ -777,5 +862,13 @@ let get_message_proof ctxt block ~message_position =
     ctxt
     block
     message_position
+    ()
+    ()
+
+let monitor_synchronized ctxt =
+  RPC_context.make_streamed_call
+    Monitor.(export_service synchronized)
+    ctxt
+    ()
     ()
     ()
