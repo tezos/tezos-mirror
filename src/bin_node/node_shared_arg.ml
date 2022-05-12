@@ -753,10 +753,10 @@ module Event = struct
       ()
 end
 
-let read_and_patch_config_file ?(may_override_network = false)
-    ?(ignore_bootstrap_peers = false) args =
+let patch_config ?(may_override_network = false)
+    ?(ignore_bootstrap_peers = false) ?(cfg = Node_config_file.default_config)
+    args =
   let open Lwt_result_syntax in
-  let* cfg = read_config_file args in
   let {
     data_dir;
     disable_config_validation;
@@ -937,3 +937,9 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?network:network_data
     ?latency
     cfg
+
+let read_and_patch_config_file ?may_override_network ?ignore_bootstrap_peers
+    args =
+  let open Lwt_result_syntax in
+  let* cfg = read_config_file args in
+  patch_config ?may_override_network ?ignore_bootstrap_peers ~cfg args
