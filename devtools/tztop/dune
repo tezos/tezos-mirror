@@ -4,7 +4,7 @@
 (executable
  (name tztop_main)
  (public_name tztop)
- (package tezos-tooling)
+ (package internal-devtools)
  (modes byte)
  (libraries
   tezos-protocol-compiler
