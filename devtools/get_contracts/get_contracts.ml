@@ -141,7 +141,7 @@ module Make (P : Sigs.PROTOCOL) = struct
       let hashed_ty = hash_expr type_expr in
       match
         P.wrap_tzresult
-        @@ P.Script_ir_translator.parse_ty
+        @@ P.Translator.parse_ty
              ctxt
              ~legacy:true
              ~allow_lazy_storage:true
@@ -150,22 +150,19 @@ module Make (P : Sigs.PROTOCOL) = struct
              ~allow_ticket:true
              (Micheline.root type_expr)
       with
-      | Ok (ex_ty, _ctxt) -> (hashed_ty, ex_ty)
+      | Ok ex_ty -> (hashed_ty, ex_ty)
       | Error _ -> assert false
 
-    let unparse_ty raw_ctxt ty =
-      match
-        P.wrap_tzresult
-        @@ P.Script_ir_translator.unparse_ty (Obj.magic raw_ctxt) ty
-      with
-      | Ok (node, _ctxt) -> node
+    let unparse_ty ctxt ty =
+      match P.wrap_tzresult @@ P.Translator.unparse_ty ctxt ty with
+      | Ok node -> node
       | Error _ -> assert false
 
     let get_script_storage_type ctxt script_expr =
       Lwt.map P.wrap_tzresult
-      @@ P.Script_ir_translator.parse_toplevel ctxt ~legacy:true script_expr
+      @@ P.Translator.parse_toplevel ctxt ~legacy:true script_expr
       >>= function
-      | Ok (code, _ctxt) ->
+      | Ok code ->
           let storage_type_expr =
             Micheline.strip_locations @@ P.code_storage_type code
           in
@@ -274,7 +271,7 @@ module Make (P : Sigs.PROTOCOL) = struct
       | Ex_ty_lambdas : 'a P.ty * ('a -> ex_lambda list) list -> ex_ty_lambdas
 
     let keep_lambda_types types =
-      let open P.Script_ir_translator in
+      let open P.Translator in
       ExprMap.fold
         (fun hash (Ex_ty ty) types ->
           match P.Unparse_types.collect_lambda_tys ty with
@@ -283,19 +280,14 @@ module Make (P : Sigs.PROTOCOL) = struct
         types
         ExprMap.empty
 
-    let try_parse_data raw_ctxt ty node =
+    let try_parse_data ctxt ty node =
       Lwt.map P.wrap_tzresult
-      @@ P.Script_ir_translator.parse_data
-           (Obj.magic raw_ctxt)
-           ~legacy:true
-           ~allow_forged:true
-           ty
-           node
+      @@ P.Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty node
       >|= function
       | Error _ -> None
-      | Ok (v, _) -> Some v
+      | Ok v -> Some v
 
-    let collect_lambdas_in_exprs raw_ctxt exprs unpack_types =
+    let collect_lambdas_in_exprs ctxt exprs unpack_types =
       let unpack_types = keep_lambda_types unpack_types in
       ExprMap.fold
         (fun _hash (expr, from_unpack, types) lambdas_lwt ->
@@ -309,7 +301,7 @@ module Make (P : Sigs.PROTOCOL) = struct
           ExprMap.fold
             (fun _ty_hash (Ex_ty_lambdas (ty, getters)) lambdas_lwt ->
               lambdas_lwt >>= fun lambdas ->
-              try_parse_data raw_ctxt ty (Micheline.root expr) >|= function
+              try_parse_data ctxt ty (Micheline.root expr) >|= function
               | None -> lambdas
               | Some v ->
                   List.fold_left
@@ -319,7 +311,7 @@ module Make (P : Sigs.PROTOCOL) = struct
                         (fun (acc_lambdas, acc_ty, acc_legacy)
                              (P.Unparse_types.Ex_lambda (ty, lam)) ->
                           let ty_expr =
-                            Micheline.strip_locations (unparse_ty raw_ctxt ty)
+                            Micheline.strip_locations (unparse_ty ctxt ty)
                           in
                           let lam_expr =
                             Micheline.strip_locations @@ P.lam_node lam
@@ -344,16 +336,16 @@ module Make (P : Sigs.PROTOCOL) = struct
   end
 
   module Storage_helpers = struct
-    let get_value ~what ~getter ~pp raw_ctxt x =
-      getter raw_ctxt x >|= function
+    let get_value ~what ~getter ~pp ctxt x =
+      getter ctxt x >|= function
       | Ok x -> Some x
       | Error _ ->
           (* Should not happen *)
           Format.eprintf "Failed getting %s for %a\n" what pp x ;
           None
 
-    let get_lazy_expr ~what ~getter ~pp raw_ctxt x =
-      get_value ~what ~getter ~pp raw_ctxt x >|= fun expr_opt ->
+    let get_lazy_expr ~what ~getter ~pp ctxt x =
+      get_value ~what ~getter ~pp ctxt x >|= fun expr_opt ->
       Option.map
         (fun (_, expr) ->
           match Data_encoding.force_decode expr with
@@ -377,7 +369,7 @@ module Make (P : Sigs.PROTOCOL) = struct
   let big_map_get ctxt key = Lwt.map P.wrap_tzresult @@ P.Storage.get ctxt key
 
   let big_map_fold :
-      P.Raw_context.t * P.Storage.big_map_id ->
+      P.context * P.Storage.big_map_id ->
       init:'a ->
       f:
         (P.Script.prim Tezos_micheline.Micheline.canonical ->
@@ -417,16 +409,16 @@ module Make (P : Sigs.PROTOCOL) = struct
     let fitness = Tezos_store.Store.Block.fitness head in
     let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
     print_endline "Preparing raw context..." ;
-    Raw_context.prepare
+    Context.prepare
       ~level:head_level
       ~predecessor_timestamp
       ~timestamp
       ~fitness
       ctxt
     >|= P.wrap_tzresult
-    >>=? fun raw_ctxt ->
+    >>=? fun ctxt ->
     print_endline "Listing addresses..." ;
-    Contract.fold raw_ctxt ~init:(ExprMap.empty, 0) ~f:(fun contract (m, i) ->
+    Contract.fold ctxt ~init:(ExprMap.empty, 0) ~f:(fun contract (m, i) ->
         let i = i + 1 in
         if i mod 5000 = 0 then Format.printf "%d@." i ;
         match Contract.is_implicit contract with
@@ -436,7 +428,7 @@ module Make (P : Sigs.PROTOCOL) = struct
               ~what:"contract code"
               ~getter:get_contract_code
               ~pp:P.Contract.pp
-              raw_ctxt
+              ctxt
               contract
             >>= function
             | None -> Lwt.return (m, i) (* Should not happen *)
@@ -446,7 +438,7 @@ module Make (P : Sigs.PROTOCOL) = struct
                    ~what:"contract storage"
                    ~getter:get_contract_storage
                    ~pp:P.Contract.pp
-                   raw_ctxt
+                   ctxt
                    contract
                  >|= function
                  | None -> fun x -> x
@@ -489,7 +481,7 @@ module Make (P : Sigs.PROTOCOL) = struct
      ExprMap.fold_es
        (fun hash (script, _contracts, storages) exprs ->
          let exprs = ExprMap.add hash (script, false, ExprMap.empty) exprs in
-         Michelson_helpers.get_script_storage_type (Obj.magic raw_ctxt) script
+         Michelson_helpers.get_script_storage_type ctxt script
          >>=? fun (ty_hash, ty) ->
          ExprMap.fold_es
            (fun storage_hash storage_expr exprs ->
@@ -501,7 +493,7 @@ module Make (P : Sigs.PROTOCOL) = struct
      >>=? fun exprs ->
      print_endline "Listing big maps..." ;
      Storage.fold
-       raw_ctxt
+       ctxt
        ~init:(ok (exprs, 0))
        ~f:(fun id exprs_i ->
          exprs_i >>?= fun (exprs, i) ->
@@ -511,15 +503,15 @@ module Make (P : Sigs.PROTOCOL) = struct
            ~what:"big map value type"
            ~getter:big_map_get
            ~pp:(fun fmt id -> Z.pp_print fmt (Storage.id_to_z id))
-           raw_ctxt
+           ctxt
            id
          >>= function
          | None -> return (exprs, i) (* should not happen *)
          | Some value_type_expr ->
              let ty_hash, ty =
-               Michelson_helpers.parse_ty (Obj.magic raw_ctxt) value_type_expr
+               Michelson_helpers.parse_ty ctxt value_type_expr
              in
-             big_map_fold (raw_ctxt, id) ~init:exprs ~f:(fun v exprs ->
+             big_map_fold (ctxt, id) ~init:exprs ~f:(fun v exprs ->
                  let v_hash = Michelson_helpers.hash_expr v in
                  return @@ add_typed_expr v_hash v ty_hash ty exprs)
              >>=? fun exprs -> return (exprs, i))
@@ -528,11 +520,11 @@ module Make (P : Sigs.PROTOCOL) = struct
      let exprs = Michelson_helpers.unpack_transitive_closure exprs in
      print_endline "Collecting unpack types..." ;
      let unpack_types =
-       let parse_ty = Michelson_helpers.parse_ty (Obj.magic raw_ctxt) in
+       let parse_ty = Michelson_helpers.parse_ty ctxt in
        Michelson_helpers.collect_unpack_types ~parse_ty exprs
      in
      print_endline "Collecting all lambdas..." ;
-     Michelson_helpers.collect_lambdas_in_exprs raw_ctxt exprs unpack_types
+     Michelson_helpers.collect_lambdas_in_exprs ctxt exprs unpack_types
      >|= fun lambda_map -> Ok (contract_map, lambda_map))
     else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty)))
     >|=? fun (contract_map, (lambda_map, lambda_ty_map, lambda_legacy_map)) ->

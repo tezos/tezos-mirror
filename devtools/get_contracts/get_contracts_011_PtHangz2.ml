@@ -25,12 +25,15 @@
 
 module Main = Get_contracts.Make (struct
   include Tezos_raw_protocol_011_PtHangz2
+  module Context = Raw_context
 
   type ('k, 'v) map = ('k, 'v) Script_typed_ir.map
 
   type ('a, 'r) lambda = ('a, 'r) Script_typed_ir.lambda
 
   type 'a ty = 'a Script_typed_ir.ty
+
+  type context = Context.t
 
   module Error_monad =
     Tezos_protocol_environment_011_PtHangz2.Environment.Error_monad
@@ -54,6 +57,55 @@ module Main = Get_contracts.Make (struct
     module Hash = Script_expr_hash
 
     let print_expr = Tezos_client_011_PtHangz2.Michelson_v1_printer.print_expr
+  end
+
+  module Translator = struct
+    type toplevel = Script_ir_translator.toplevel
+
+    type ex_ty = Script_ir_translator.ex_ty = Ex_ty : 'a ty -> ex_ty
+
+    type type_logger = Script_ir_translator.type_logger
+
+    let parse_ty (ctxt : Raw_context.t) ~legacy ~allow_lazy_storage
+        ~allow_operation ~allow_contract ~allow_ticket script =
+      let open Result_syntax in
+      let+ ty, _ =
+        Script_ir_translator.parse_ty
+          (Obj.magic ctxt)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          script
+      in
+      ty
+
+    let parse_data ?type_logger (ctxt : Raw_context.t) ~legacy ~allow_forged ty
+        expr =
+      let open Lwt_result_syntax in
+      let+ data, _ =
+        Script_ir_translator.parse_data
+          ?type_logger
+          (Obj.magic ctxt)
+          ~legacy
+          ~allow_forged
+          ty
+          expr
+      in
+      data
+
+    let unparse_ty (ctxt : Raw_context.t) ty =
+      let open Result_syntax in
+      let+ expr, _ = Script_ir_translator.unparse_ty (Obj.magic ctxt) ty in
+      expr
+
+    let parse_toplevel (ctxt : Raw_context.t) ~legacy expr =
+      let open Lwt_result_syntax in
+      let+ toplevel, _ =
+        Script_ir_translator.parse_toplevel (Obj.magic ctxt) ~legacy expr
+      in
+      toplevel
   end
 
   module Storage = struct
