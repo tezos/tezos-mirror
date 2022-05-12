@@ -246,16 +246,13 @@ module Make (P : Sigs.PROTOCOL) = struct
 
     type ex_lambda = P.Lambda.ex_lambda
 
-    type ex_ty_lambdas =
-      | Ex_ty_lambdas : 'a P.ty * ('a -> ex_lambda list) list -> ex_ty_lambdas
-
     let keep_lambda_types types =
       let open P.Translator in
       ExprMap.fold
         (fun hash (Ex_ty ty) types ->
           match P.Lambda.collect_lambda_tys ty with
-          | [] -> types
-          | g -> ExprMap.add hash (Ex_ty_lambdas (ty, g)) types)
+          | None -> types
+          | Some ex_ty_lambdas -> ExprMap.add hash ex_ty_lambdas types)
         types
         ExprMap.empty
 
@@ -279,37 +276,31 @@ module Make (P : Sigs.PROTOCOL) = struct
             else types
           in
           ExprMap.fold
-            (fun _ty_hash (Ex_ty_lambdas (ty, getters)) lambdas_lwt ->
+            (fun _ty_hash ex_ty_lambdas lambdas_lwt ->
               let* lambdas = lambdas_lwt in
-              let+ v_opt = try_parse_data ctxt ty (Micheline.root expr) in
-              match v_opt with
-              | None -> lambdas
-              | Some v ->
+              P.Lambda.fold_ex_ty_lambdas
+                ~ctxt
+                ~expr:(Micheline.root expr)
+                ~acc:lambdas
+                ~f:(fun acc ty_node lam_nodes ->
                   List.fold_left
-                    (fun acc getter ->
-                      let lam_nodes = getter v in
-                      List.fold_left
-                        (fun (acc_lambdas, acc_ty, acc_legacy) lambda ->
-                          let ty_expr =
-                            Micheline.strip_locations (unparse_ty ctxt ty)
-                          in
-                          let lam_expr =
-                            Micheline.strip_locations
-                            @@ P.Lambda.lam_node lambda
-                          in
-                          let lam_hash = hash_expr lam_expr in
-                          let acc_lambdas =
-                            ExprMap.add lam_hash lam_expr acc_lambdas
-                          in
-                          let acc_ty = ExprMap.add lam_hash ty_expr acc_ty in
-                          let acc_legacy =
-                            ExprMap.add lam_hash (not from_unpack) acc_legacy
-                          in
-                          (acc_lambdas, acc_ty, acc_legacy))
-                        acc
-                        lam_nodes)
-                    lambdas
-                    getters)
+                    (fun (acc_lambdas, acc_ty, acc_legacy) lambda ->
+                      let ty_expr = Micheline.strip_locations ty_node in
+                      let lam_expr =
+                        Micheline.strip_locations @@ P.Lambda.lam_node lambda
+                      in
+                      let lam_hash = hash_expr lam_expr in
+                      let acc_lambdas =
+                        ExprMap.add lam_hash lam_expr acc_lambdas
+                      in
+                      let acc_ty = ExprMap.add lam_hash ty_expr acc_ty in
+                      let acc_legacy =
+                        ExprMap.add lam_hash (not from_unpack) acc_legacy
+                      in
+                      (acc_lambdas, acc_ty, acc_legacy))
+                    acc
+                    lam_nodes)
+                ex_ty_lambdas)
             types
             (Lwt.return lambdas))
         exprs

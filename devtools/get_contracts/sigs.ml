@@ -26,10 +26,6 @@
 module Time = Time.Protocol
 
 module type PROTOCOL = sig
-  type ('k, 'v) map
-
-  type ('arg, 'ret) lambda
-
   type 'a ty
 
   module Context : sig
@@ -138,12 +134,19 @@ module type PROTOCOL = sig
   module Lambda : sig
     type ex_lambda
 
+    type ex_ty_lambdas
+
     val lam_node : ex_lambda -> Script.node
 
-    val collect_lambda_tys : 'a ty -> ('a -> ex_lambda list) list
+    val collect_lambda_tys : 'a ty -> ex_ty_lambdas option
 
-    val collect_lambda_tys_map :
-      'tv ty -> (('tk, 'tv) map -> ex_lambda list) list
+    val fold_ex_ty_lambdas :
+      ctxt:context ->
+      expr:Script.node ->
+      f:('a -> Script.node -> ex_lambda list -> 'a) ->
+      acc:'a ->
+      ex_ty_lambdas ->
+      'a Lwt.t
   end
 
   val code_storage_type : Translator.toplevel -> Script.node

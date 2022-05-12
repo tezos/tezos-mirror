@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Main = Get_contracts.Make (struct
+module Proto = struct
   include Tezos_raw_protocol_012_Psithaca
 
   let wrap_tzresult =
@@ -147,9 +147,12 @@ module Main = Get_contracts.Make (struct
           * ('a, 'b) Script_typed_ir.lambda
           -> ex_lambda
 
+    type ex_ty_lambdas =
+      | Ex_ty_lambdas : 'a ty * ('a -> ex_lambda list) list -> ex_ty_lambdas
+
     let lam_node (Ex_lambda (_, Lam (_, node))) = node
 
-    let rec collect_lambda_tys :
+    let rec find_lambda_tys :
         type a. a Script_typed_ir.ty -> (a -> ex_lambda list) list =
      fun ty ->
       let open Script_typed_ir in
@@ -162,29 +165,29 @@ module Main = Get_contracts.Make (struct
       | Chain_id_t _ | Chest_key_t _ | Chest_t _ ->
           []
       | Pair_t ((t1, _, _), (t2, _, _), _) ->
-          let g1 = List.map (fun g (v, _) -> g v) @@ collect_lambda_tys t1 in
-          let g2 = List.map (fun g (_, v) -> g v) @@ collect_lambda_tys t2 in
+          let g1 = List.map (fun g (v, _) -> g v) @@ find_lambda_tys t1 in
+          let g2 = List.map (fun g (_, v) -> g v) @@ find_lambda_tys t2 in
           g1 @ g2
       | Union_t ((t1, _), (t2, _), _) ->
           let g1 =
             List.map (fun g -> function L v -> g v | R _ -> [])
-            @@ collect_lambda_tys t1
+            @@ find_lambda_tys t1
           in
           let g2 =
             List.map (fun g -> function L _ -> [] | R v -> g v)
-            @@ collect_lambda_tys t2
+            @@ find_lambda_tys t2
           in
           g1 @ g2
       | Lambda_t _ -> [(fun g -> [Ex_lambda (ty, g)])]
       | Option_t (t, _) ->
           List.map (fun g -> function None -> [] | Some v -> g v)
-          @@ collect_lambda_tys t
+          @@ find_lambda_tys t
       | List_t (t, _) ->
           List.map (fun g l -> List.flatten @@ List.map g l.elements)
-          @@ collect_lambda_tys t
-      | Map_t (_, tv, _) -> collect_lambda_tys_map tv
+          @@ find_lambda_tys t
+      | Map_t (_, tv, _) -> find_lambda_tys_map tv
 
-    and collect_lambda_tys_map :
+    and find_lambda_tys_map :
         type tk tv.
         tv Script_typed_ir.ty ->
         ((tk, tv) Script_typed_ir.map -> ex_lambda list) list =
@@ -192,7 +195,27 @@ module Main = Get_contracts.Make (struct
       let open Script_typed_ir in
       List.map (fun g ((module Box) : (tk, tv) map) ->
           Box.OPS.fold (fun _k v acc -> g v @ acc) Box.boxed [])
-      @@ collect_lambda_tys tv
+      @@ find_lambda_tys tv
+
+    let collect_lambda_tys ty =
+      match find_lambda_tys ty with
+      | [] -> None
+      | lams -> Some (Ex_ty_lambdas (ty, lams))
+
+    let fold_ex_ty_lambdas (type a) ~(ctxt : Context.t) ~(expr : Script.node)
+        ~(f : a -> Script.node -> ex_lambda list -> a) ~(acc : a)
+        (Ex_ty_lambdas (ty, getters)) =
+      let open Lwt_syntax in
+      let+ parse_result =
+        Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty expr
+      in
+      match parse_result with
+      | Error _ -> acc
+      | Ok data -> (
+          match Translator.unparse_ty ctxt ty with
+          | Error _ -> assert false
+          | Ok ty_expr ->
+              List.fold_left (fun acc g -> f acc ty_expr @@ g data) acc getters)
   end
 
   let is_unpack = function
@@ -200,6 +223,8 @@ module Main = Get_contracts.Make (struct
     | _ -> false
 
   let code_storage_type ({storage_type; _} : Translator.toplevel) = storage_type
-end)
+end
+
+module Main = Get_contracts.Make (Proto)
 
 let () = Main.main ()
