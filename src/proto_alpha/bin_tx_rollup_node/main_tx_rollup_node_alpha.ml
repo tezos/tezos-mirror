@@ -231,6 +231,8 @@ let configuration_init_command =
             reconnection_delay;
             allow_deposit;
             l2_blocks_cache_size = default_l2_blocks_cache_size;
+            caps = default_caps;
+            batch_burn_limit = None;
           }
       in
       let* file = Node_config.save config in

@@ -260,6 +260,72 @@ let remove_included_operation state block =
         []
         mophs
 
+let tag_operation (type kind) (op : kind manager_operation) =
+  match op with
+  | Tx_rollup_submit_batch _ -> `Submit_batch
+  | Tx_rollup_commit _ -> `Commitment
+  | Tx_rollup_finalize_commitment _ -> `Finalize_commitment
+  | Tx_rollup_remove_commitment _ -> `Remove_commitment
+  | Tx_rollup_rejection _ -> `Rejection
+  | Tx_rollup_dispatch_tickets _ -> `Dispatch_withdrawals
+  | _ -> `Other
+
+let fee_parameter (rollup_node_state : State.t) op =
+  let tag = tag_operation op in
+  let Node_config.{fee_cap; burn_cap} =
+    match tag with
+    | `Commitment -> rollup_node_state.caps.operator
+    | `Submit_batch -> rollup_node_state.caps.submit_batch
+    | `Finalize_commitment -> rollup_node_state.caps.finalize_commitment
+    | `Remove_commitment -> rollup_node_state.caps.remove_commitment
+    | `Rejection -> rollup_node_state.caps.rejection
+    | `Dispatch_withdrawals -> rollup_node_state.caps.dispatch_withdrawals
+    | `Other -> Node_config.default_cost_caps
+  in
+  Injection.
+    {
+      minimal_fees = Tez.of_mutez_exn 100L;
+      minimal_nanotez_per_byte = Q.of_int 1000;
+      minimal_nanotez_per_gas_unit = Q.of_int 100;
+      force_low_fee = false;
+      fee_cap;
+      burn_cap;
+    }
+
+let fee_parameter_of_operations state ops =
+  List.fold_left
+    (fun acc {L1_operation.manager_operation = Manager op; _} ->
+      let param = fee_parameter state.rollup_node_state op in
+      Injection.
+        {
+          minimal_fees = Tez.max acc.minimal_fees param.minimal_fees;
+          minimal_nanotez_per_byte =
+            Q.max acc.minimal_nanotez_per_byte param.minimal_nanotez_per_byte;
+          minimal_nanotez_per_gas_unit =
+            Q.max
+              acc.minimal_nanotez_per_gas_unit
+              param.minimal_nanotez_per_gas_unit;
+          force_low_fee = acc.force_low_fee || param.force_low_fee;
+          fee_cap =
+            WithExceptions.Result.get_ok
+              ~loc:__LOC__
+              Tez.(acc.fee_cap +? param.fee_cap);
+          burn_cap =
+            WithExceptions.Result.get_ok
+              ~loc:__LOC__
+              Tez.(acc.burn_cap +? param.burn_cap);
+        })
+    Injection.
+      {
+        minimal_fees = Tez.zero;
+        minimal_nanotez_per_byte = Q.zero;
+        minimal_nanotez_per_gas_unit = Q.zero;
+        force_low_fee = false;
+        fee_cap = Tez.zero;
+        burn_cap = Tez.zero;
+      }
+    ops
+
 (** Simulate the injection of [operations]. See {!inject_operations} for the
     specification of [must_succeed]. *)
 let simulate_operations ~must_succeed state signer
@@ -280,6 +346,7 @@ let simulate_operations ~must_succeed state signer
   let*! () =
     Event.(emit2 Injector.simulating_operations) state operations force
   in
+  let fee_parameter = fee_parameter_of_operations state operations in
   let operations =
     List.map
       (fun {L1_operation.manager_operation = Manager operation; _} ->
@@ -309,17 +376,7 @@ let simulate_operations ~must_succeed state signer
       ~fee:Limit.unknown
       ~gas_limit:Limit.unknown
       ~storage_limit:Limit.unknown
-      ~fee_parameter:
-        {
-          minimal_fees = Tez.of_mutez_exn 100L;
-          minimal_nanotez_per_byte = Q.of_int 1000;
-          minimal_nanotez_per_gas_unit = Q.of_int 100;
-          force_low_fee = false;
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/2811
-             Use acceptable values wrt operations to inject *)
-          fee_cap = Tez.one;
-          burn_cap = Tez.one;
-        }
+      ~fee_parameter
       annot_op
   in
   return (oph, Contents_list op, Apply_results.Contents_result_list result)

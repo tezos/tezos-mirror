@@ -31,6 +31,7 @@ module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 type state = {
   rollup : Tx_rollup.t;
   constants : Constants.t;
+  batch_burn_limit : Tez.t option;
   index : Context.index;
   signer : Signature.public_key_hash;
   transactions : Tx_queue.t;
@@ -58,7 +59,7 @@ let inject_batches state batches =
                {
                  tx_rollup = state.rollup;
                  content = batch_content;
-                 burn_limit = None;
+                 burn_limit = state.batch_burn_limit;
                })
         in
         {
@@ -253,7 +254,7 @@ let on_new_head state head =
      Flush and reapply queue *)
   state.incr_context <- context
 
-let init_batcher_state ~rollup ~signer index constants =
+let init_batcher_state ~rollup ~signer ~batch_burn_limit index constants =
   let open Lwt_syntax in
   let+ incr_context = Context.init_context index in
   {
@@ -261,6 +262,7 @@ let init_batcher_state ~rollup ~signer index constants =
     index;
     signer;
     constants;
+    batch_burn_limit;
     transactions = Tx_queue.create 500_000;
     incr_context;
     lock = Lwt_mutex.create ();
@@ -273,6 +275,7 @@ module Types = struct
     signer : Signature.public_key_hash;
     index : Context.index;
     constants : Constants.t;
+    batch_burn_limit : Tez.t option;
   }
 end
 
@@ -296,9 +299,11 @@ module Handlers = struct
 
   let on_request w r = protect @@ fun () -> on_request w r
 
-  let on_launch _w rollup Types.{signer; index; constants} =
+  let on_launch _w rollup Types.{signer; index; constants; batch_burn_limit} =
     let open Lwt_result_syntax in
-    let*! state = init_batcher_state ~rollup ~signer index constants in
+    let*! state =
+      init_batcher_state ~rollup ~signer ~batch_burn_limit index constants
+    in
     return state
 
   let on_error _w r st errs =
@@ -322,10 +327,14 @@ let table = Worker.create_table Queue
 
 let (worker_promise, worker_waker) = Lwt.task ()
 
-let init ~rollup ~signer index constants =
+let init ~rollup ~signer ~batch_burn_limit index constants =
   let open Lwt_result_syntax in
   let+ worker =
-    Worker.launch table rollup {signer; index; constants} (module Handlers)
+    Worker.launch
+      table
+      rollup
+      {signer; index; constants; batch_burn_limit}
+      (module Handlers)
   in
   Lwt.wakeup worker_waker worker
 

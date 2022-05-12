@@ -51,24 +51,20 @@ type t = private {
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
   signers : Node_config.signers;
+  caps : Node_config.caps;
 }
 
-(** [init cctxt ~data_dir ~rollup_genesis rollup] creates a new state
-   for the rollup node with a new store and context.  If the [rollup_genesis]
-   block hash is provided, checks that the rollup [rollup_id] is created inside
-   the block identified by the hash. Otherwise, the genesis information is read
-   from the disk. Note that if a [rollup_genesis] is provided, it must also
-   match the one on disk. L2 block are cached (controlled by
-   l2_blocks_cache_size) for performance improvements
-   w.r.t. access to the store. *)
+(** [init cctxt config] creates a new state for the rollup node with a new store
+   and context.  If the [rollup_genesis] block hash is provided in [config],
+   checks that the rollup [rollup_id] is created inside the block identified by
+   the hash. Otherwise, the genesis information is read from the disk. Note that
+   if a [rollup_genesis] is provided, it must also match the one on disk. L2
+   block are cached (controlled by l2_blocks_cache_size) for performance
+   improvements w.r.t. access to the store. *)
 val init :
   #Protocol_client_context.full ->
-  data_dir:string ->
   ?readonly:bool ->
-  ?rollup_genesis:Block_hash.t ->
-  l2_blocks_cache_size:int ->
-  signers:Node_config.signers ->
-  Tx_rollup.t ->
+  Node_config.t ->
   t tzresult Lwt.t
 
 (** {2 Reading the state from disk}  *)

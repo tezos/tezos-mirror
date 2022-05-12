@@ -25,16 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol.Alpha_context
+
 type mode = Observer | Accuser | Batcher | Maintenance | Operator | Custom
 
-type signers = {
-  operator : Signature.public_key_hash option;
-  submit_batch : Signature.public_key_hash option;
-  finalize_commitment : Signature.public_key_hash option;
-  remove_commitment : Signature.public_key_hash option;
-  rejection : Signature.public_key_hash option;
-  dispatch_withdrawals : Signature.public_key_hash option;
+type 'a purposed = {
+  operator : 'a;
+  submit_batch : 'a;
+  finalize_commitment : 'a;
+  remove_commitment : 'a;
+  rejection : 'a;
+  dispatch_withdrawals : 'a;
 }
+
+type signers = Signature.public_key_hash option purposed
+
+type cost_caps = {
+  fee_cap : Protocol.Alpha_context.Tez.t;
+  burn_cap : Protocol.Alpha_context.Tez.t;
+}
+
+type caps = cost_caps purposed
 
 type t = {
   data_dir : string;
@@ -46,6 +57,8 @@ type t = {
   signers : signers;
   allow_deposit : bool;
   l2_blocks_cache_size : int;
+  caps : caps;
+  batch_burn_limit : Protocol.Alpha_context.Tez.t option;
 }
 
 let default_data_dir rollup_id =
@@ -91,6 +104,32 @@ let mode_encoding =
       ("operator", Operator);
       ("custom", Custom);
     ]
+
+let tez t = Tez.of_mutez_exn Int64.(mul (of_int t) 1_000_000L)
+
+let default_cost_caps = {fee_cap = Tez.one; burn_cap = tez 2}
+
+let default_commitment_caps = {fee_cap = tez 2; burn_cap = tez 3}
+
+let default_submit_batch_caps = {fee_cap = tez 5; burn_cap = tez 5}
+
+let default_finalize_commitment_caps = default_cost_caps
+
+let default_remove_commitment_caps = default_cost_caps
+
+let default_rejection_caps = {fee_cap = tez 10; burn_cap = tez 10}
+
+let default_dispatch_withdrawals_caps = {fee_cap = tez 2; burn_cap = tez 3}
+
+let default_caps =
+  {
+    operator = default_commitment_caps;
+    submit_batch = default_submit_batch_caps;
+    finalize_commitment = default_finalize_commitment_caps;
+    remove_commitment = default_remove_commitment_caps;
+    rejection = default_rejection_caps;
+    dispatch_withdrawals = default_dispatch_withdrawals_caps;
+  }
 
 let signers_encoding =
   let open Data_encoding in
@@ -152,6 +191,77 @@ let signers_encoding =
           ~description:
             "The public key hash of the signer for the dispatch of withdrawals")
 
+let cost_caps_encoding =
+  let open Data_encoding in
+  conv
+    (fun {fee_cap; burn_cap} -> (fee_cap, burn_cap))
+    (fun (fee_cap, burn_cap) -> {fee_cap; burn_cap})
+  @@ obj2 (req "fee_cap" Tez.encoding) (req "burn_cap" Tez.encoding)
+
+let caps_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           operator;
+           submit_batch;
+           finalize_commitment;
+           remove_commitment;
+           rejection;
+           dispatch_withdrawals;
+         } ->
+      ( operator,
+        submit_batch,
+        finalize_commitment,
+        remove_commitment,
+        rejection,
+        dispatch_withdrawals ))
+    (fun ( operator,
+           submit_batch,
+           finalize_commitment,
+           remove_commitment,
+           rejection,
+           dispatch_withdrawals ) ->
+      {
+        operator;
+        submit_batch;
+        finalize_commitment;
+        remove_commitment;
+        rejection;
+        dispatch_withdrawals;
+      })
+  @@ obj6
+       (dft
+          ~description:"The caps for the cost of commitment operations"
+          "commitment"
+          cost_caps_encoding
+          default_commitment_caps)
+       (dft
+          ~description:"The caps for the cost of submit batch operations"
+          "submit_batch"
+          cost_caps_encoding
+          default_submit_batch_caps)
+       (dft
+          ~description:"The caps for the cost of finalize commitment operations"
+          "finalized_commitment"
+          cost_caps_encoding
+          default_finalize_commitment_caps)
+       (dft
+          ~description:"The caps for the cost of remove commitment operations"
+          "remove_commitment"
+          cost_caps_encoding
+          default_remove_commitment_caps)
+       (dft
+          ~description:"The caps for the cost of rejection operations"
+          "rejection"
+          cost_caps_encoding
+          default_rejection_caps)
+       (dft
+          ~description:
+            "The caps for the cost of dispatch withdrawals operations"
+          "dispatch_withdrawals"
+          cost_caps_encoding
+          default_dispatch_withdrawals_caps)
+
 let encoding =
   let open Data_encoding in
   conv
@@ -165,25 +275,31 @@ let encoding =
            signers;
            allow_deposit;
            l2_blocks_cache_size;
+           caps;
+           batch_burn_limit;
          } ->
-      ( Some data_dir,
-        rollup_id,
-        rollup_genesis,
-        rpc_addr,
-        reconnection_delay,
-        mode,
-        signers,
-        allow_deposit,
-        l2_blocks_cache_size ))
-    (fun ( data_dir_opt,
-           rollup_id,
-           rollup_genesis,
-           rpc_addr,
-           reconnection_delay,
-           mode,
-           signers,
-           allow_deposit,
-           l2_blocks_cache_size ) ->
+      ( ( Some data_dir,
+          rollup_id,
+          rollup_genesis,
+          rpc_addr,
+          reconnection_delay,
+          mode,
+          signers,
+          allow_deposit,
+          l2_blocks_cache_size,
+          caps ),
+        batch_burn_limit ))
+    (fun ( ( data_dir_opt,
+             rollup_id,
+             rollup_genesis,
+             rpc_addr,
+             reconnection_delay,
+             mode,
+             signers,
+             allow_deposit,
+             l2_blocks_cache_size,
+             caps ),
+           batch_burn_limit ) ->
       let data_dir =
         match data_dir_opt with
         | Some dir -> dir
@@ -199,48 +315,67 @@ let encoding =
         signers;
         allow_deposit;
         l2_blocks_cache_size;
+        caps;
+        batch_burn_limit;
       })
-  @@ obj9
-       (opt
-          ~description:
-            "Location where the rollup node data (store, context, etc.) is \
-             stored"
-          "data_dir"
-          string)
-       (req
-          ~description:"Rollup id of the rollup to target"
-          "rollup_id"
-          Protocol.Alpha_context.Tx_rollup.encoding)
-       (opt
-          ~description:"Hash of the block where the rollup was created"
-          "origination_block"
-          Block_hash.encoding)
-       (dft
-          ~description:"RPC address on which the rollup node listens"
-          "rpc_addr"
-          P2p_point.Id.encoding
-          default_rpc_addr)
-       (dft
-          ~description:"The reconnection (to the tezos node) delay in seconds"
-          "reconnection_delay"
-          float
-          default_reconnection_delay)
-       (req ~description:"The mode for this rollup node" "mode" mode_encoding)
-       (req
-          ~description:"The signers for the various tx rollup operations"
-          "signers"
-          signers_encoding)
-       (dft
-          ~description:
-            "Allow the operator to make a first deposit for commitments"
-          "allow_deposit"
-          bool
-          false)
-       (dft
-          ~description:"The size of the L2 block cache in number of blocks"
-          "l2_blocks_cache_size"
-          int31
-          default_l2_blocks_cache_size)
+  @@ merge_objs
+       (obj10
+          (opt
+             ~description:
+               "Location where the rollup node data (store, context, etc.) is \
+                stored"
+             "data_dir"
+             string)
+          (req
+             ~description:"Rollup id of the rollup to target"
+             "rollup_id"
+             Protocol.Alpha_context.Tx_rollup.encoding)
+          (opt
+             ~description:"Hash of the block where the rollup was created"
+             "origination_block"
+             Block_hash.encoding)
+          (dft
+             ~description:"RPC address on which the rollup node listens"
+             "rpc_addr"
+             P2p_point.Id.encoding
+             default_rpc_addr)
+          (dft
+             ~description:
+               "The reconnection (to the tezos node) delay in seconds"
+             "reconnection_delay"
+             float
+             default_reconnection_delay)
+          (req
+             ~description:"The mode for this rollup node"
+             "mode"
+             mode_encoding)
+          (req
+             ~description:"The signers for the various tx rollup operations"
+             "signers"
+             signers_encoding)
+          (dft
+             ~description:
+               "Allow the operator to make a first deposit for commitments"
+             "allow_deposit"
+             bool
+             false)
+          (dft
+             ~description:"The size of the L2 block cache in number of blocks"
+             "l2_blocks_cache_size"
+             int31
+             default_l2_blocks_cache_size)
+          (dft
+             ~description:"The cost caps for the injection of operations"
+             "caps"
+             caps_encoding
+             default_caps))
+       (obj1
+          (opt
+             ~description:
+               "The burn limit in for a batch (to be paid for the submission \
+                of messages in the protocol inbox)"
+             "batch_burn_limit"
+             Tez.encoding))
 
 let get_configuration_filename data_dir =
   let filename = "config.json" in
