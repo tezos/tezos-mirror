@@ -815,6 +815,14 @@ let rec connect ~delay cctxt =
       let* () = Lwt_unix.sleep delay in
       connect ~delay cctxt
 
+let is_connection_error trace =
+  List.exists
+    (function
+      | RPC_client_errors.(Request_failed {error = Connection_failed _; _}) ->
+          true
+      | _ -> false)
+    trace
+
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/1845
    Clean exit *)
 let run configuration cctxt =
@@ -877,6 +885,13 @@ let run configuration cctxt =
                 let*! r = process_head state head rollup_id in
                 match r with
                 | Ok _ -> Lwt.return ()
+                | Error trace when is_connection_error trace ->
+                    Format.eprintf
+                      "@[<v 2>Connection error:@ %a@]@."
+                      pp_print_trace
+                      trace ;
+                    interupt () ;
+                    Lwt.return ()
                 | Error e ->
                     Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
                     Lwt_exit.exit_and_raise 1)
