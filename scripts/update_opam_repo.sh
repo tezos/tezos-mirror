@@ -95,6 +95,12 @@ dummy_path=packages/$dummy_pkg/$dummy_pkg.dev
 dummy_opam=$dummy_path/opam
 mkdir -p $dummy_path
 echo 'opam-version: "2.0"' > $dummy_opam
+# Opam doesn't seem to be deterministic when resolving constraints from mirage-crypto-pk
+# (("mirage-no-solo5" & "mirage-no-xen") | "zarith-freestanding" | "mirage-runtime" {>= "4.0"})
+# - Sometime installing mirage-no-xen + mirage-no-solo5
+# - Sometime installing mirage-runtime
+# According to mirage devs, mirage-runtime is the correct dependency to install.
+echo 'depends: [ "mirage-runtime" { >= "4.0.0" } ]' >> $dummy_opam
 echo 'conflicts:[' >> $dummy_opam
 grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
 do
