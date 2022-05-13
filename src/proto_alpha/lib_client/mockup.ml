@@ -69,12 +69,14 @@ module Protocol_constants_overrides = struct
     preserved_cycles : int option;
     blocks_per_cycle : int32 option;
     blocks_per_commitment : int32 option;
+    nonce_revelation_threshold : int32 option;
     blocks_per_stake_snapshot : int32 option;
     cycles_per_voting_period : int32 option;
     hard_gas_limit_per_operation : Gas.Arith.integral option;
     hard_gas_limit_per_block : Gas.Arith.integral option;
     proof_of_work_threshold : int64 option;
     tokens_per_roll : Tez.t option;
+    vdf_difficulty : int64 option;
     seed_nonce_revelation_tip : Tez.t option;
     origination_size : int option;
     baking_reward_fixed_portion : Tez.t option;
@@ -233,13 +235,15 @@ module Protocol_constants_overrides = struct
         ( ( c.preserved_cycles,
             c.blocks_per_cycle,
             c.blocks_per_commitment,
+            c.nonce_revelation_threshold,
             c.blocks_per_stake_snapshot,
             c.cycles_per_voting_period,
             c.hard_gas_limit_per_operation,
             c.hard_gas_limit_per_block,
             c.proof_of_work_threshold,
             c.tokens_per_roll ),
-          ( ( c.seed_nonce_revelation_tip,
+          ( ( c.vdf_difficulty,
+              c.seed_nonce_revelation_tip,
               c.origination_size,
               c.baking_reward_fixed_portion,
               c.baking_reward_bonus_per_slot,
@@ -272,13 +276,15 @@ module Protocol_constants_overrides = struct
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
+               nonce_revelation_threshold,
                blocks_per_stake_snapshot,
                cycles_per_voting_period,
                hard_gas_limit_per_operation,
                hard_gas_limit_per_block,
                proof_of_work_threshold,
                tokens_per_roll ),
-             ( ( seed_nonce_revelation_tip,
+             ( ( vdf_difficulty,
+                 seed_nonce_revelation_tip,
                  origination_size,
                  baking_reward_fixed_portion,
                  baking_reward_bonus_per_slot,
@@ -312,12 +318,14 @@ module Protocol_constants_overrides = struct
           preserved_cycles;
           blocks_per_cycle;
           blocks_per_commitment;
+          nonce_revelation_threshold;
           blocks_per_stake_snapshot;
           cycles_per_voting_period;
           hard_gas_limit_per_operation;
           hard_gas_limit_per_block;
           proof_of_work_threshold;
           tokens_per_roll;
+          vdf_difficulty;
           seed_nonce_revelation_tip;
           origination_size;
           baking_reward_fixed_portion;
@@ -352,10 +360,11 @@ module Protocol_constants_overrides = struct
           initial_seed;
         })
       (merge_objs
-         (obj9
+         (obj10
             (opt "preserved_cycles" uint8)
             (opt "blocks_per_cycle" int32)
             (opt "blocks_per_commitment" int32)
+            (opt "nonce_revelation_threshold" int32)
             (opt "blocks_per_stake_snapshot" int32)
             (opt "cycles_per_voting_period" int32)
             (opt "hard_gas_limit_per_operation" Gas.Arith.z_integral_encoding)
@@ -363,7 +372,8 @@ module Protocol_constants_overrides = struct
             (opt "proof_of_work_threshold" int64)
             (opt "tokens_per_roll" Tez.encoding))
          (merge_objs
-            (obj8
+            (obj9
+               (opt "vdf_difficulty" int64)
                (opt "seed_nonce_revelation_tip" Tez.encoding)
                (opt "origination_size" int31)
                (opt "baking_reward_fixed_portion" Tez.encoding)
@@ -427,6 +437,7 @@ module Protocol_constants_overrides = struct
         preserved_cycles = Some parametric.preserved_cycles;
         blocks_per_cycle = Some parametric.blocks_per_cycle;
         blocks_per_commitment = Some parametric.blocks_per_commitment;
+        nonce_revelation_threshold = Some parametric.nonce_revelation_threshold;
         blocks_per_stake_snapshot = Some parametric.blocks_per_stake_snapshot;
         cycles_per_voting_period = Some parametric.cycles_per_voting_period;
         hard_gas_limit_per_operation =
@@ -434,6 +445,7 @@ module Protocol_constants_overrides = struct
         hard_gas_limit_per_block = Some parametric.hard_gas_limit_per_block;
         proof_of_work_threshold = Some parametric.proof_of_work_threshold;
         tokens_per_roll = Some parametric.tokens_per_roll;
+        vdf_difficulty = Some parametric.vdf_difficulty;
         seed_nonce_revelation_tip = Some parametric.seed_nonce_revelation_tip;
         origination_size = Some parametric.origination_size;
         baking_reward_fixed_portion =
@@ -527,12 +539,14 @@ module Protocol_constants_overrides = struct
       preserved_cycles = None;
       blocks_per_cycle = None;
       blocks_per_commitment = None;
+      nonce_revelation_threshold = None;
       blocks_per_stake_snapshot = None;
       cycles_per_voting_period = None;
       hard_gas_limit_per_operation = None;
       hard_gas_limit_per_block = None;
       proof_of_work_threshold = None;
       tokens_per_roll = None;
+      vdf_difficulty = None;
       seed_nonce_revelation_tip = None;
       origination_size = None;
       baking_reward_fixed_portion = None;
@@ -638,6 +652,12 @@ module Protocol_constants_overrides = struct
           };
         O
           {
+            name = "nonce_revelation_threshold";
+            override_value = o.nonce_revelation_threshold;
+            pp = pp_print_int32;
+          };
+        O
+          {
             name = "blocks_per_stake_snapshot";
             override_value = o.blocks_per_stake_snapshot;
             pp = pp_print_int32;
@@ -671,6 +691,12 @@ module Protocol_constants_overrides = struct
             name = "tokens_per_roll";
             override_value = o.tokens_per_roll;
             pp = Tez.pp;
+          };
+        O
+          {
+            name = "vdf_difficulty";
+            override_value = o.vdf_difficulty;
+            pp = pp_print_int64;
           };
         O
           {
@@ -913,6 +939,10 @@ module Protocol_constants_overrides = struct
            Option.value ~default:c.blocks_per_cycle o.blocks_per_cycle;
          blocks_per_commitment =
            Option.value ~default:c.blocks_per_commitment o.blocks_per_commitment;
+         nonce_revelation_threshold =
+           Option.value
+             ~default:c.nonce_revelation_threshold
+             o.nonce_revelation_threshold;
          blocks_per_stake_snapshot =
            Option.value
              ~default:c.blocks_per_stake_snapshot
@@ -935,6 +965,8 @@ module Protocol_constants_overrides = struct
              o.proof_of_work_threshold;
          tokens_per_roll =
            Option.value ~default:c.tokens_per_roll o.tokens_per_roll;
+         vdf_difficulty =
+           Option.value ~default:c.vdf_difficulty o.vdf_difficulty;
          seed_nonce_revelation_tip =
            Option.value
              ~default:c.seed_nonce_revelation_tip

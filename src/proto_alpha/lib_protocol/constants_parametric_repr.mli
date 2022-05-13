@@ -106,12 +106,14 @@ type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
+  nonce_revelation_threshold : int32;
   blocks_per_stake_snapshot : int32;
   cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
+  vdf_difficulty : int64;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
   baking_reward_fixed_portion : Tez_repr.t;

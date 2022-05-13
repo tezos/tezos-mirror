@@ -399,7 +399,7 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
     ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
-    ?hard_gas_limit_per_block () =
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let n = tup_n tup in
   let accounts =
     Account.generate_accounts
@@ -433,6 +433,7 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?sc_rollup_enable
     ?dal_enable
     ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold
     accounts
   >|=? fun blk -> (blk, tup_get tup contracts)
 

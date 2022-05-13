@@ -812,12 +812,14 @@ module Constants : sig
       preserved_cycles : int;
       blocks_per_cycle : int32;
       blocks_per_commitment : int32;
+      nonce_revelation_threshold : int32;
       blocks_per_stake_snapshot : int32;
       cycles_per_voting_period : int32;
       hard_gas_limit_per_operation : Gas.Arith.integral;
       hard_gas_limit_per_block : Gas.Arith.integral;
       proof_of_work_threshold : int64;
       tokens_per_roll : Tez.t;
+      vdf_difficulty : int64;
       seed_nonce_revelation_tip : Tez.t;
       origination_size : int;
       baking_reward_fixed_portion : Tez.t;
@@ -877,6 +879,8 @@ module Constants : sig
 
   val blocks_per_commitment : context -> int32
 
+  val nonce_revelation_threshold : context -> int32
+
   val blocks_per_stake_snapshot : context -> int32
 
   val cycles_per_voting_period : context -> int32
@@ -892,6 +896,8 @@ module Constants : sig
   val proof_of_work_threshold : context -> int64
 
   val tokens_per_roll : context -> Tez.t
+
+  val vdf_difficulty : context -> int64
 
   val seed_nonce_revelation_tip : context -> Tez.t
 

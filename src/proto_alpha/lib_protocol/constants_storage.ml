@@ -36,6 +36,10 @@ let blocks_per_commitment c =
   let constants = Raw_context.constants c in
   constants.blocks_per_commitment
 
+let nonce_revelation_threshold c =
+  let constants = Raw_context.constants c in
+  constants.nonce_revelation_threshold
+
 let blocks_per_stake_snapshot c =
   let constants = Raw_context.constants c in
   constants.blocks_per_stake_snapshot
@@ -67,6 +71,10 @@ let proof_of_work_threshold c =
 let tokens_per_roll c =
   let constants = Raw_context.constants c in
   constants.tokens_per_roll
+
+let vdf_difficulty c =
+  let constants = Raw_context.constants c in
+  constants.vdf_difficulty
 
 let seed_nonce_revelation_tip c =
   let constants = Raw_context.constants c in

@@ -243,6 +243,7 @@ type 'accounts init :=
   ?sc_rollup_enable:bool ->
   ?dal_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
+  ?nonce_revelation_threshold:int32 ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 
