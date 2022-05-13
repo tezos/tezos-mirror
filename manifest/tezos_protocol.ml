@@ -35,11 +35,7 @@ let of_string_exn ?filename s =
   match JSON_parser.json JSON_lexer.token (Lexing.from_string s) with
   | `O assoc ->
       let lookup key type_ =
-        assoc
-        |> List.find_map (fun (k, v) ->
-               if String.equal k key then Some v else None)
-        |> type_
-        |> function
+        assoc |> List.assoc_opt key |> type_ |> function
         | Ok x -> x
         | Error es ->
             failwith
