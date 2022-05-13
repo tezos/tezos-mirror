@@ -797,7 +797,20 @@ module Sc_rollup : sig
        and type value = Sc_rollup_repr.Staker.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** A carbonated storage for keeping track of applied outbox messages. *)
+  (** A carbonated storage for keeping track of applied outbox messages for a
+      a SCORU.
+
+      The [key] is an [int32] value that represents the index of a SCORU's
+      outbox level. An outbox level is mapped to the index through:
+
+      [index = outbox_level % sc_rollup_max_active_outbox_levels]
+
+      The rationale is to keep a limited number of entries. The current value of
+      an entry contains the most recently added level that maps to the index.
+
+      The [value] is a pair of the actual outbox level and a bitset containing
+      the set of applied messages.
+    *)
   module Applied_outbox_messages :
     Non_iterable_indexed_carbonated_data_storage
       with type t = Raw_context.t * Sc_rollup_repr.t

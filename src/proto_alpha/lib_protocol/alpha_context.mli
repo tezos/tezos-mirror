@@ -2734,6 +2734,15 @@ module Sc_rollup : sig
     Game.outcome ->
     (Game.status * context) tzresult Lwt.t
 
+  module Outbox : sig
+    val record_applied_message :
+      context ->
+      t ->
+      Raw_level.t ->
+      message_index:int ->
+      (Z.t * context) tzresult Lwt.t
+  end
+
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
