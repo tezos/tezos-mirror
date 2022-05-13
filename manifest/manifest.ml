@@ -333,11 +333,20 @@ module Dune = struct
       ~deps:dep_files
       ~action:[S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")]
 
-  let runtest ~package ~dep_files name =
+  let file name = [S "file"; S name]
+
+  let glob_files expr = [S "glob_files"; S expr]
+
+  let runtest ~package ~dep_files ~dep_globs name =
+    let deps_dune =
+      let files = List.map (fun s -> S s) dep_files in
+      let globs = List.map glob_files dep_globs in
+      match files @ globs with [] -> None | deps -> Some (of_list deps)
+    in
     alias_rule
       "runtest"
       ~package
-      ~deps:dep_files
+      ?deps_dune
       ~action:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")]
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
@@ -352,8 +361,6 @@ module Dune = struct
   let pps ?(args = Stdlib.List.[]) name = S "pps" :: S name :: of_atom_list args
 
   let include_ name = [S "include"; S name]
-
-  let file name = [S "file"; S name]
 
   let targets_rule ?deps targets ~action =
     [
@@ -826,6 +833,7 @@ module Target = struct
     conflicts : t list;
     deps : t list;
     dune : Dune.s_expr;
+    flags_nostandard : bool;
     foreign_stubs : Dune.foreign_stubs option;
     inline_tests : bool;
     js_compatible : bool;
@@ -853,6 +861,7 @@ module Target = struct
     synopsis : string option;
     description : string option;
     warnings : string option;
+    warn_error : string option;
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
@@ -975,6 +984,7 @@ module Target = struct
     ?conflicts:t option list ->
     ?deps:t option list ->
     ?dune:Dune.s_expr ->
+    ?flags_nostandard:bool ->
     ?foreign_stubs:Dune.foreign_stubs ->
     ?inline_tests:inline_tests ->
     ?js_compatible:bool ->
@@ -1002,6 +1012,7 @@ module Target = struct
     ?description:string ->
     ?time_measurement_ppx:bool ->
     ?warnings:string ->
+    ?warn_error:string ->
     ?wrapped:bool ->
     ?cram:bool ->
     path:string ->
@@ -1042,15 +1053,15 @@ module Target = struct
     snd (collect deps)
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
-      ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
-      ?foreign_stubs ?inline_tests ?js_compatible ?js_of_ocaml ?documentation
-      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
-      ?(npm_deps = []) ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam
-      ?(opaque = false) ?(opens = []) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?release ?static ?static_cclibs ?synopsis ?description
-      ?(time_measurement_ppx = false) ?warnings ?(wrapped = true)
-      ?(cram = false) ~path names =
+      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
+      ?(dune = Dune.[]) ?(flags_nostandard = false) ?foreign_stubs ?inline_tests
+      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
+      ?modules ?(modules_without_implementation = []) ?(npm_deps = [])
+      ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
+      ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
+      ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
+      ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
+      ?warnings ?warn_error ?(wrapped = true) ?(cram = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1204,7 +1215,7 @@ module Target = struct
           let runtest_rules =
             if run_native then
               List.map
-                (fun name -> Dune.(runtest ~dep_files ~package name))
+                (fun name -> Dune.(runtest ~dep_files ~dep_globs ~package name))
                 (Ne_list.to_list names)
             else []
           in
@@ -1229,6 +1240,7 @@ module Target = struct
         conflicts;
         deps;
         dune;
+        flags_nostandard;
         foreign_stubs;
         inline_tests;
         js_compatible;
@@ -1257,28 +1269,30 @@ module Target = struct
         description;
         npm_deps;
         warnings;
+        warn_error;
         wrapped;
         cram;
       }
 
   let public_lib ?internal_name =
-    internal ?dep_files:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_library {internal_name; public_name}
 
-  let private_lib = internal ?dep_files:None @@ fun name -> Private_library name
+  let private_lib =
+    internal ?dep_files:None ?dep_globs:None @@ fun name -> Private_library name
 
   let public_exe ?internal_name =
-    internal ?dep_files:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_executable ({internal_name; public_name}, [])
 
   let public_exes ?internal_names =
-    internal ?dep_files:None @@ fun public_names ->
+    internal ?dep_files:None ?dep_globs:None @@ fun public_names ->
     let names =
       match internal_names with
       | None ->
@@ -1302,21 +1316,21 @@ module Target = struct
     | head :: tail -> Public_executable (head, tail)
 
   let private_exe =
-    internal ?dep_files:None @@ fun internal_name ->
+    internal ?dep_files:None ?dep_globs:None @@ fun internal_name ->
     Private_executable (internal_name, [])
 
   let private_exes =
-    internal ?dep_files:None @@ fun internal_names ->
+    internal ?dep_files:None ?dep_globs:None @@ fun internal_names ->
     match internal_names with
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?dep_files ?(runtest = true) =
-    internal ?dep_files @@ fun test_name ->
+  let test ?dep_files ?dep_globs ?(runtest = true) =
+    internal ?dep_files ?dep_globs @@ fun test_name ->
     Test_executable {names = (test_name, []); run = runtest}
 
-  let tests ?dep_files ?(runtest = true) =
-    internal ?dep_files @@ fun test_names ->
+  let tests ?dep_files ?dep_globs ?(runtest = true) =
+    internal ?dep_files ?dep_globs @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail -> Test_executable {names = (head, tail); run = runtest}
@@ -1542,6 +1556,11 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     else flags
   in
   let flags =
+    match internal.warn_error with
+    | None -> flags
+    | Some w -> Dune.[H [S "-warn-error"; S w]] @ flags
+  in
+  let flags =
     match internal.warnings with
     | None -> flags
     | Some w -> Dune.[H [S "-w"; S w]] @ flags
@@ -1549,8 +1568,18 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   let flags =
     match flags with
     | [] -> None
-    | _ :: _ -> Some Dune.[V (Dune.S ":standard" :: Dune.of_list flags)]
+    | _ :: _ ->
+        Some
+          Dune.
+            [
+              V
+                (of_list
+                   ((if internal.flags_nostandard then []
+                    else [Dune.S ":standard"])
+                   @ flags));
+            ]
   in
+
   let preprocess =
     let make_pp (PPS (target, args) : Target.preprocessor) =
       match Target.names_for_dune target with

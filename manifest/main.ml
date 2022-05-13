@@ -2535,6 +2535,47 @@ let _tezos_scoru_wasm =
       "Protocol environment dependency providing WASM functionality for SCORU"
     ~deps:[external_lib "tezos-webassembly-interpreter" V.True]
 
+let _tezos_protocol_compiler_bin =
+  public_exe
+    "tezos-protocol-compiler"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"tezos-protocol-compiler"
+    ~internal_name:"main_native"
+    ~modes:[Native]
+    ~deps:[tezos_protocol_compiler_native]
+    ~linkall:true
+    ~modules:["Main_native"]
+
+let _tezos_protocol_compiler_tezos_protocol_packer =
+  public_exe
+    "tezos-protocol-compiler.tezos-protocol-packer"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"tezos-protocol-compiler"
+    ~internal_name:"main_packer"
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_stdlib_unix |> open_;
+        tezos_protocol_compiler_lib |> open_;
+      ]
+    ~modules:["Main_packer"]
+
+let _tezos_embedded_protocol_packer =
+  public_exe
+    "tezos-embedded-protocol-packer"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"tezos-protocol-compiler"
+    ~internal_name:"main_embedded_packer"
+    ~modes:[Native]
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_base_unix |> open_;
+        tezos_stdlib_unix |> open_;
+      ]
+    ~linkall:true
+    ~modules:["Main_embedded_packer"]
+
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig
@@ -2710,6 +2751,35 @@ end = struct
   let todo ?opam ?main_module x =
     Printf.ksprintf (fun name -> external_lib ?opam ?main_module name V.True) x
 
+  (* N as in "protocol number in the Alpha family". *)
+  module N = struct
+    (* This function is asymmetrical on purpose: we don't want to compare
+       numbers with [Alpha] because such comparisons would break when snapshotting.
+       So the left-hand side is the number of the protocol being built,
+       but the right-hand side is an integer.
+
+       We could instead have defined functions with one argument [number_le], [number_ge],
+       [version_ne] and [version_eq] in [register_alpha_family] directly.
+       We chose to use a module instead because [number_le 013] is not as readable as
+       [N.(number <= 013)]. Indeed, is [number_le 013] equivalent to [(<=) 013],
+       meaning "greater than 013", or is [number_le 013] equivalent to [fun x -> x <= 013],
+       meaning the opposite? *)
+    let compare_asymmetric a b =
+      match a with
+      | Alpha -> 1
+      | V a -> Int.compare a b
+      | Other ->
+          invalid_arg "cannot use N.compare_asymmetric on Other protocols"
+
+    let ( <= ) a b = compare_asymmetric a b <= 0
+
+    let ( >= ) a b = compare_asymmetric a b >= 0
+
+    let ( <> ) a b = compare_asymmetric a b <> 0
+
+    let ( == ) a b = compare_asymmetric a b == 0
+  end
+
   let genesis =
     let name_dash = "genesis" in
     let name_underscore = "genesis" in
@@ -2790,34 +2860,6 @@ end = struct
          ~embedded:(todo "tezos-embedded-protocol-demo-counter")
          ~client
          ()
-
-  (* N as in "protocol number in the Alpha family". *)
-  module N = struct
-    (* This function is asymmetrical on purpose: we don't want to compare
-       numbers with [Alpha] because such comparisons would break when snapshotting.
-       So the left-hand side is the number of the protocol being built,
-       but the right-hand side is an integer.
-
-       We could instead have defined functions with one argument [number_le], [number_ge],
-       [version_ne] and [version_eq] in [register_alpha_family] directly.
-       We chose to use a module instead because [number_le 013] is not as readable as
-       [N.(number <= 013)]. Indeed, is [number_le 013] equivalent to [(<=) 013],
-       meaning "greater than 013", or is [number_le 013] equivalent to [fun x -> x <= 013],
-       meaning the opposite? *)
-    let compare_asymmetric a b =
-      match a with
-      | Alpha -> 1
-      | V a -> Int.compare a b
-      | Other -> invalid_arg "cannot use N.compare on Other protocols"
-
-    let ( <= ) a b = compare_asymmetric a b <= 0
-
-    let ( >= ) a b = compare_asymmetric a b >= 0
-
-    let ( <> ) a b = compare_asymmetric a b <> 0
-
-    let ( == ) a b = compare_asymmetric a b == 0
-  end
 
   let register_alpha_family status number name =
     let make_full_name sep =
@@ -3823,47 +3865,6 @@ let _git_gas_diff =
     ~static:false
     ~release:false
     ~bisect_ppx:false
-
-let _tezos_protocol_compiler_bin =
-  public_exe
-    "tezos-protocol-compiler"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~internal_name:"main_native"
-    ~modes:[Native]
-    ~deps:[tezos_protocol_compiler_native]
-    ~linkall:true
-    ~modules:["Main_native"]
-
-let _tezos_protocol_compiler_tezos_protocol_packer =
-  public_exe
-    "tezos-protocol-compiler.tezos-protocol-packer"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~internal_name:"main_packer"
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_stdlib_unix |> open_;
-        tezos_protocol_compiler_lib |> open_;
-      ]
-    ~modules:["Main_packer"]
-
-let _tezos_embedded_protocol_packer =
-  public_exe
-    "tezos-embedded-protocol-packer"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~internal_name:"main_embedded_packer"
-    ~modes:[Native]
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_base_unix |> open_;
-        tezos_stdlib_unix |> open_;
-      ]
-    ~linkall:true
-    ~modules:["Main_embedded_packer"]
 
 let _s_packer =
   private_exe

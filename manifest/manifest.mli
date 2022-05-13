@@ -485,6 +485,9 @@ val inline_tests_backend : target -> inline_tests
     - [dune]: added to the [dune] file after this target.
       A typical use is to add [rule] or [install] stanzas.
 
+    - [flags_nostandard]: if true, then omits the :standard flags in a [(flags ...)].
+      Default value is [false].
+
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
     - [inline_tests]: specifies an inline_tests backend. Can only be used when constructing a library.
@@ -575,6 +578,8 @@ val inline_tests_backend : target -> inline_tests
 
     - [warnings]: the argument passed to the -w flag when building.
 
+    - [warn_error]: the argument passed to the -warn-error flag when building.
+
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -587,6 +592,7 @@ type 'a maker =
   ?conflicts:target list ->
   ?deps:target list ->
   ?dune:Dune.s_expr ->
+  ?flags_nostandard:bool ->
   ?foreign_stubs:Dune.foreign_stubs ->
   ?inline_tests:inline_tests ->
   ?js_compatible:bool ->
@@ -614,6 +620,7 @@ type 'a maker =
   ?description:string ->
   ?time_measurement_ppx:bool ->
   ?warnings:string ->
+  ?warn_error:string ->
   ?wrapped:bool ->
   ?cram:bool ->
   path:string ->
@@ -707,12 +714,23 @@ val private_exes : string list maker
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.
 
+    - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
+      in the [dune] file.
+
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
-val test : ?dep_files:string list -> ?runtest:bool -> string maker
+val test :
+  ?dep_files:string list ->
+  ?dep_globs:string list ->
+  ?runtest:bool ->
+  string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
-val tests : ?dep_files:string list -> ?runtest:bool -> string list maker
+val tests :
+  ?dep_files:string list ->
+  ?dep_globs:string list ->
+  ?runtest:bool ->
+  string list maker
 
 (** Make an external vendored library, for use in internal target dependencies.
 
