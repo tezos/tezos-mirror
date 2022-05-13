@@ -40,6 +40,13 @@
     expire_in: 1 day
     when: on_success
 
+build_x86_64:
+  extends:
+    - .build
+    - .rules_template__development
+  variables:
+    ARCH: "x86_64"
+
 build_arm64:
   extends:
     - .build
@@ -51,60 +58,47 @@ build_arm64:
   tags:
     - arm64
 
-build_x86_64:
-  extends:
-    - .build
-    - .rules_template__development
-  variables:
-    ARCH: "x86_64"
-
 # similar to the build template above, this template
 # compiles all binaries using the static profile.
 .build_static_binaries_template:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies_template
+  stage: build
+  needs: []
   variables:
     ARCH: ""
-  before_script:
+  script:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
-    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
-    - mkdir -p tezos-binaries
-    - bash ./scripts/build_and_install_static_binaries.sh "tezos-binaries/$ARCH"
-    # Strip debug symbols in binaries
-    - find "tezos-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+    # Create destination directory
+    - mkdir -pv tezos-binaries
+    # Build and install static binaries
+    - ./scripts/build_and_install_static_binaries.sh "tezos-binaries/$ARCH"
+    # Strip debug symbols and compress binaries (parallelized)
+    - find "tezos-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" | xargs -n1 -P$(nproc) -i sh -c 'strip --strip-debug {}; upx -6q {};'
+
   artifacts:
     paths:
       - "tezos-binaries/$ARCH/*"
 
-# Static binaries for x86_64 are necessary for development branches, as we want to make
+# x86_64 static binaries are necessary for development branches, as we want to make
 # sure the build does not break. We also need it for release tags, to as its artifacts
-# are published in the stage `publish_release`. For this reason, we build it in all pipelines.
-
-# arm64 static binaries are built in the stage `build_release` and only for master and releases.
+# are published in the stage `publish_release`. For this reason, we build it in all pipelines,
+# except on latest release branches.
 build:static-x86_64-linux-binaries:
   extends:
     - .build_static_binaries_template
     - .rules_template__not_on_latest_release
-  script:
-    - sudo apk --no-cache --virtual add upx
-    # Compress resulting binaries
-    - find tezos-binaries/x86_64 -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
   variables:
     ARCH: "x86_64"
-  stage: build
-  needs: []
 
+# arm64 static binaries are only built for master and releases.
 build:static-arm64-linux-binaries:
   extends:
-      - .build_static_binaries_template
-      - .rules_template__master_and_releases
+    - .build_static_binaries_template
+    - .rules_template__master_and_releases
   variables:
     ARCH: "arm64"
-  stage: build
-  script:
-    - echo "No compression for now"
   tags:
     - arm64
-  needs: []

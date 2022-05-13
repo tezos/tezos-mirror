@@ -3,7 +3,7 @@ gitlab:release:
   extends:
     - .rules_template__release_tag
   # https://gitlab.com/tezos/docker-images/ci-release
-  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.0.0"
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
   stage: publish_release
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false
@@ -28,7 +28,6 @@ docker:merge_manifests:
     - .rules_template__master_and_releases
     - .image_template__docker
     - .docker_registry_auth # Sets up a before_script
-  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
   stage: publish_release
   script:
     # Environment variables from before_script
@@ -40,7 +39,6 @@ docker:promote_to_latest:
     - .rules_template__latest_release
     - .image_template__docker
     - .docker_registry_auth # Sets up a before_script
-  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
   stage: publish_release
   script:
     # Environment variables from before_script
