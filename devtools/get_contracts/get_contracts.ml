@@ -356,9 +356,26 @@ end = struct
     let* _ctxt, values = P.Storage.list_values ctxt_i in
     List.fold_left_es (fun acc v -> f v acc) init values
 
+  let ensure_target_dir_exists () =
+    let dir = try Sys.argv.(2) with Invalid_argument _ -> "." in
+    try
+      if Sys.is_directory dir then dir
+      else (
+        Printf.printf "Given path: %s points to a file; directory expected!" dir ;
+        exit 1)
+    with Sys_error _ -> (
+      Printf.printf "Directory %s does not exists. Create? [Y/n] " dir ;
+      let response = read_line () in
+      match response with
+      | "" | "y" | "Y" ->
+          File_helpers.mkdir dir ;
+          dir
+      | _ -> exit 0)
+
   let main () : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
     let data_dir = Sys.argv.(1) in
+    let target_dir = ensure_target_dir_exists () in
     Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
     let* store =
       Tezos_store.Store.init
@@ -482,15 +499,27 @@ end = struct
     ExprMap.iter
       (fun hash (script, contracts, storages) ->
         let hash_string = P.Script.Hash.to_b58check hash in
-        File_helpers.print_expr_file ~dirname:"" ~ext:".tz" ~hash_string script ;
-        let filename = hash_string ^ ".addresses" in
+        File_helpers.print_expr_file
+          ~dirname:target_dir
+          ~ext:".tz"
+          ~hash_string
+          script ;
+        let filename =
+          Printf.sprintf
+            "%s%s%s.addresses"
+            target_dir
+            Filename.dir_sep
+            hash_string
+        in
         File_helpers.print_to_file
           filename
           "%a"
           (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
           contracts ;
         if Config.collect_storage then
-          let dirname = hash_string ^ ".storages" in
+          let dirname =
+            Printf.sprintf "%s/%s.storages" target_dir hash_string
+          in
           File_helpers.print_expr_dir ~dirname ~ext:".storage" storages
         else ())
       contract_map ;
@@ -498,10 +527,11 @@ end = struct
     let () =
       if not (ExprMap.is_empty lambda_map) then (
         print_endline "Writing lambda files..." ;
-        File_helpers.print_expr_dir ~dirname:"lambdas" ~ext:".tz" lambda_map ;
-        File_helpers.print_expr_dir ~dirname:"lambdas" ~ext:".ty" lambda_ty_map ;
+        let dirname = Printf.sprintf "%s/lambdas" target_dir in
+        File_helpers.print_expr_dir ~dirname ~ext:".tz" lambda_map ;
+        File_helpers.print_expr_dir ~dirname ~ext:".ty" lambda_ty_map ;
         File_helpers.print_legacy_dir
-          ~dirname:"lambdas"
+          ~dirname
           ~ext:".legacy_flag"
           lambda_legacy_map ;
         print_endline "Done writing lambda files.")
