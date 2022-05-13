@@ -65,15 +65,17 @@ let of_file_exn filename =
   let contents =
     let ch = open_in filename in
     let buffer = Buffer.create 512 in
-    let bytes = Bytes.create 512 in
-    let rec loop () =
-      let len = input ch bytes 0 512 in
-      if len > 0 then (
-        Buffer.add_subbytes buffer bytes 0 len ;
-        loop ())
-      else close_in ch
-    in
-    loop () ;
+    Fun.protect
+      ~finally:(fun () -> close_in ch)
+      (fun () ->
+        let bytes = Bytes.create 512 in
+        let rec loop () =
+          let len = input ch bytes 0 512 in
+          if len > 0 then (
+            Buffer.add_subbytes buffer bytes 0 len ;
+            loop ())
+        in
+        loop ()) ;
     Buffer.contents buffer
   in
   of_string_exn ~filename contents
