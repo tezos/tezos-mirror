@@ -58,24 +58,30 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Data_encoding.uint16
       (Data_encoding.Binary.to_bytes_exn Protocol.Alpha_context.Slot.encoding x)
 
+  let same_slot slot right =
+    Int.equal slot (slot_to_int right.Plugin.RPC.Endorsing_rights.first_slot)
+
   let couple_ops_to_rights ops rights =
     let (items, missing) =
       List.fold_left
-        (fun (acc, rights) (errors, delay, round, slot) ->
+        (fun (acc, remaining_rights) (errors, delay, round, slot) ->
           match
-            List.partition
-              (fun right ->
-                Int.equal
-                  slot
-                  (slot_to_int right.Plugin.RPC.Endorsing_rights.first_slot))
-              rights
+            List.partition (fun right -> same_slot slot right) remaining_rights
           with
-          | (([] | _ :: _ :: _), _) -> assert false
+          | (_ :: _ :: _, _) -> assert false
           | ([right], rights') ->
               ( ( right.Plugin.RPC.Endorsing_rights.delegate,
                   [(round, errors, delay)] )
                 :: acc,
-                rights' ))
+                rights' )
+          | ([], _) -> (
+              match List.find (fun right -> same_slot slot right) rights with
+              | None -> assert false
+              | Some right ->
+                  ( ( right.Plugin.RPC.Endorsing_rights.delegate,
+                      [(round, errors, delay)] )
+                    :: acc,
+                    remaining_rights )))
         ([], rights)
         ops
     in

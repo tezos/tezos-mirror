@@ -1,1 +1,2 @@
 (lang dune 2.7)
+(package (name teztale))
