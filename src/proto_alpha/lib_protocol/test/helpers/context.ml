@@ -181,6 +181,9 @@ let get_seed_nonce_hash ctxt =
 
 let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 
+let get_seed_computation ctxt =
+  Alpha_services.Seed_computation.get rpc_ctxt ctxt
+
 let get_constants ctxt = Alpha_services.Constants.all rpc_ctxt ctxt
 
 let default_test_constants =

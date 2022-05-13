@@ -266,6 +266,9 @@ val batch_operations :
 val seed_nonce_revelation :
   Context.t -> Raw_level.t -> Nonce.t -> Operation.packed
 
+(** Reveals a VDF with a proof of correctness *)
+val vdf_revelation : Context.t -> Seed.vdf_solution -> Operation.packed
+
 (** Propose a list of protocol hashes during the approval voting *)
 val proposals :
   Context.t ->

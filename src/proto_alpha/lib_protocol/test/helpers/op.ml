@@ -527,6 +527,14 @@ let seed_nonce_revelation ctxt level nonce =
         };
   }
 
+let vdf_revelation ctxt solution =
+  {
+    shell = {branch = Context.branch ctxt};
+    protocol_data =
+      Operation_data
+        {contents = Single (Vdf_revelation {solution}); signature = None};
+  }
+
 let proposals ctxt (pkh : Contract.t) proposals =
   let source = Context.Contract.pkh pkh in
   Context.Vote.get_current_period ctxt
