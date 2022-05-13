@@ -584,6 +584,11 @@ val inline_tests_backend : target -> inline_tests
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
 
+    - [license]: specific license to use for that target. If omitted it will
+      default to MIT.
+
+    - [extra_authors]: list of authors in addition to the Tezos Dev Team.
+
     - [path]: the path to the directory of the [dune] file that will define this target. *)
 type 'a maker =
   ?all_modules_except:string list ->
@@ -623,6 +628,8 @@ type 'a maker =
   ?warn_error:string ->
   ?wrapped:bool ->
   ?cram:bool ->
+  ?license:string ->
+  ?extra_authors:string list ->
   path:string ->
   'a ->
   target

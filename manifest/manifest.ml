@@ -486,7 +486,7 @@ module Opam = struct
     homepage : string;
     bug_reports : string;
     dev_repo : string;
-    license : string;
+    licenses : string list;
     depends : dependency list;
     conflicts : dependency list;
     build : build_instruction list;
@@ -503,7 +503,7 @@ module Opam = struct
         homepage;
         bug_reports;
         dev_repo;
-        license;
+        licenses;
         depends;
         conflicts;
         build;
@@ -682,7 +682,9 @@ module Opam = struct
     pp_line "homepage: %a" pp_string homepage ;
     pp_line "bug-reports: %a" pp_string bug_reports ;
     pp_line "dev-repo: %a" pp_string dev_repo ;
-    pp_line "license: %a" pp_string license ;
+    (match licenses with
+    | [license] -> pp_line "license: %a" pp_string license
+    | _ -> pp_line "license: %a" (pp_list pp_string) licenses) ;
     pp_line "%a" (pp_list ~v:true ~prefix:"depends: " pp_dependency) depends ;
     if depopts <> [] then
       pp_line "%a" (pp_list ~v:true ~prefix:"depopts: " pp_dependency) depopts ;
@@ -865,6 +867,8 @@ module Target = struct
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
+    license : string option;
+    extra_authors : string list;
   }
 
   and preprocessor = PPS of t * string list
@@ -1015,6 +1019,8 @@ module Target = struct
     ?warn_error:string ->
     ?wrapped:bool ->
     ?cram:bool ->
+    ?license:string ->
+    ?extra_authors:string list ->
     path:string ->
     'a ->
     t option
@@ -1061,7 +1067,8 @@ module Target = struct
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
       ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
-      ?warnings ?warn_error ?(wrapped = true) ?(cram = false) ~path names =
+      ?warnings ?warn_error ?(wrapped = true) ?(cram = false) ?license
+      ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1272,6 +1279,8 @@ module Target = struct
         warn_error;
         wrapped;
         cram;
+        license;
+        extra_authors;
       }
 
   let public_lib ?internal_name =
@@ -1932,13 +1941,24 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       runtest;
     ]
   in
+  let licenses =
+    match
+      List.filter_map (fun internal -> internal.Target.license) internals
+      |> List.sort_uniq String.compare
+    with
+    | [] -> ["MIT"]
+    | licenses -> licenses
+  in
+  let extra_authors =
+    List.concat_map (fun internal -> internal.Target.extra_authors) internals
+  in
   {
     maintainer = "contact@tezos.com";
-    authors = ["Tezos devteam"];
+    authors = "Tezos devteam" :: extra_authors;
     homepage = "https://www.tezos.com/";
     bug_reports = "https://gitlab.com/tezos/tezos/issues";
     dev_repo = "git+https://gitlab.com/tezos/tezos.git";
-    license = "MIT";
+    licenses;
     depends;
     conflicts;
     build;
