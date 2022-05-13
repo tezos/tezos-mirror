@@ -2357,8 +2357,21 @@ let check_circular_opam_deps () =
         if not (Hashtbl.mem shortest_path dep.kind) then (
           let path = dep :: elt_path in
           Hashtbl.add shortest_path dep.kind path ;
-          if dep.opam = Some this_package then
-            report_circular_dep internal_from_this_package (List.rev path)
+          if
+            dep.opam = Some this_package
+            && List.exists
+                 (fun (i : Target.internal) ->
+                   match (i.opam : string option) with
+                   | None ->
+                       (* Targets that do not have a package are private and act
+                          as if they belonged to all packages.
+                          If the shortest path from package A to package A only goes
+                          through package A or private packages, it thus only goes
+                          through package A and is not a circular dependency. *)
+                       false
+                   | Some p -> p <> this_package)
+                 path
+          then report_circular_dep internal_from_this_package (List.rev path)
           else Queue.push dep to_visit))
   done
 
