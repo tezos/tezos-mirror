@@ -268,14 +268,6 @@ variables:
       when: always
     - when: never
 
-# this template makes sure that the child pipelines ( triggered ) is always run
-.rules_template__opam:
-  rules:
-    # Run on child pipelines
-    - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
-      when: on_success
-    - when: never # default
-
 .rules_template__trigger_opam_pipeline:
   rules:
     # Run on scheduled builds.
@@ -319,15 +311,12 @@ variables:
 
 # Job templates
 
-# This template is used by the opam test jobs in the child pipeline
-# triggered by `packaging.yml`.
-# We extend the rules_template__opam to ensure that this pipeline is
-# always run whenever is triggered
+# This template is used by the opam test jobs defined in opam-ci.yml
 .opam_template:
   extends:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies_template
-    - .rules_template__opam
+    - .rules_template__trigger_opam_pipeline
   stage: packaging
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
