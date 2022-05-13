@@ -90,7 +90,7 @@ let assert_fails_with ~loc k msg =
   k >>= function
   | Ok _ -> Stdlib.failwith "Expected failure"
   | Error err ->
-      let actual_error_msg : string =
+      let actual_error_msg =
         Format.asprintf "%a" Environment.Error_monad.pp_trace err
       in
       Assert.equal_string ~loc expected_error_msg actual_error_msg
@@ -1774,6 +1774,131 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
         true
     | _ -> false
 
+let record ctxt rollup level message_index =
+  Sc_rollup_storage.Outbox.record_applied_message
+    ctxt
+    rollup
+    (Raw_level_repr.of_int32_exn @@ Int32.of_int level)
+    ~message_index
+
+let assert_is_already_applied ~loc ctxt rollup level message_index =
+  let res =
+    Sc_rollup_storage.Outbox.record_applied_message
+      ctxt
+      rollup
+      (Raw_level_repr.of_int32_exn @@ Int32.of_int level)
+      ~message_index
+  in
+  assert_fails_with ~loc res "Outbox message already applied"
+
+(** Test outbox for applied messages. *)
+let test_storage_outbox () =
+  let* ctxt = new_context () in
+  let* rollup1, ctxt = lift @@ new_sc_rollup ctxt in
+  let level1 = 100 in
+  (* Test that is-applied is false for non-recorded messages. *)
+  let* _size_diff, ctxt = lift @@ record ctxt rollup1 level1 1 in
+  let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 1 in
+  (* Record the same level and message twice should fail. *)
+  let* () =
+    assert_fails_with
+      ~loc:__LOC__
+      (record ctxt rollup1 level1 1)
+      "Outbox message already applied"
+  in
+  let* _size_diff, ctxt = lift @@ record ctxt rollup1 level1 2 in
+  let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 2 in
+  (* Record messages for new level. *)
+  let level2 = level1 + 3 in
+  let* _size_diff, ctxt = lift @@ record ctxt rollup1 level2 47 in
+  let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level2 47 in
+  let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 1 in
+  (* Record for a new rollup *)
+  let* rollup2, ctxt = lift @@ new_sc_rollup ctxt in
+  let* _size_diff, ctxt = lift @@ record ctxt rollup2 level1 1 in
+  let* _size_diff, ctxt = lift @@ record ctxt rollup2 level1 3 in
+  let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup2 level1 1 in
+  let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup2 level1 3 in
+  assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 1
+
+(** Test limits for applied outbox messages. *)
+let test_storage_outbox_exceed_limits () =
+  let level = 1234 in
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  (* Assert that recording a message index that exceeds max outbox messages per
+     level fails. *)
+  let* () =
+    let max_message_index =
+      Constants_storage.sc_rollup_max_outbox_messages_per_level ctxt
+    in
+    assert_fails_with
+      ~loc:__LOC__
+      (record ctxt rollup level max_message_index)
+      "Invalid rollup outbox message index"
+  in
+  let* () =
+    assert_fails_with
+      ~loc:__LOC__
+      (record ctxt rollup level (-1))
+      "Invalid rollup outbox message index"
+  in
+  let max_active_levels =
+    Int32.to_int @@ Constants_storage.sc_rollup_max_active_outbox_levels ctxt
+  in
+  (* Record message 42 at level 15 *)
+  let* _size_diff, ctxt = lift @@ record ctxt rollup 15 42 in
+  let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup 15 42 in
+  (* Record message 42 at level [max_active_levels + 15] *)
+  let* _size_diff, ctxt =
+    lift @@ record ctxt rollup (max_active_levels + 15) 42
+  in
+  (* Record message 42 at level 15 again should fail as it's expired. *)
+  let* () =
+    assert_fails_with
+      ~loc:__LOC__
+      (record ctxt rollup 15 42)
+      "Outbox level expired"
+  in
+  return ()
+
+(** Test storage outbox size diff. *)
+let test_storage_outbox_size_diff () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let level = 15 in
+  let max_message_index =
+    Constants_storage.sc_rollup_max_outbox_messages_per_level ctxt - 1
+  in
+  let max_active_levels =
+    Int32.to_int @@ Constants_storage.sc_rollup_max_active_outbox_levels ctxt
+  in
+  (* Record a new message. *)
+  let* size_diff, ctxt = lift @@ record ctxt rollup level 1 in
+  (* Size diff is 11 bytes. 4 bytes for level and 7 bytes for a new Z.t *)
+  let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 5 in
+  let* size_diff, ctxt = lift @@ record ctxt rollup level 2 in
+  (* Recording a new message in the bitset at a lower index does not occupy
+     any additional space. *)
+  let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 0 in
+  (* Record a new message at the highest index at an existing level. This
+     expands the bitset but does not charge for the level. *)
+  let* size_diff, ctxt = lift @@ record ctxt rollup level max_message_index in
+  let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 14 in
+  (* Record a new message at the highest index at a new level. This charges for
+     space for level and maximum bitset. *)
+  let* size_diff, ctxt =
+    lift @@ record ctxt rollup (level + 1) max_message_index
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 19 in
+  (* Record a new message for a level that resets an index. This replaces the
+     bitset with a smaller one. Hence we get a negative size diff. *)
+  let* size_diff, _ctxt =
+    lift @@ record ctxt rollup (level + max_active_levels) 0
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) (-14) in
+  return ()
+
 let tests =
   [
     Tztest.tztest
@@ -1986,6 +2111,15 @@ let tests =
        limit (with gap)"
       `Quick
       (test_limit_on_number_of_messages_during_commitment_period true);
+    Tztest.tztest "Record messages in storage outbox" `Quick test_storage_outbox;
+    Tztest.tztest
+      "Record messages in storage outbox limits"
+      `Quick
+      test_storage_outbox_exceed_limits;
+    Tztest.tztest
+      "Record messages size diffs"
+      `Quick
+      test_storage_outbox_size_diff;
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460
