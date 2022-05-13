@@ -564,10 +564,10 @@ module Term = struct
 
   let enable_testchain =
     let doc =
-      "If set to [true], the node will spawn a testchain during the protocol's \
-       testing voting period. Default value is [false]. It will increase the \
-       node storage usage and computation by additionally validating the test \
-       network blocks."
+      "DEPRECATED. If set to [true], the node will spawn a testchain during \
+       the protocol's testing voting period. Default value is [false]. It will \
+       increase the node storage usage and computation by additionally \
+       validating the test network blocks."
     in
     Arg.(value & flag & info ~docs ~doc ["enable-testchain"])
 
@@ -751,9 +751,17 @@ module Event = struct
       ~name:"disabled_bootstrap_peers"
       ~msg:"disabled bootstrap peers"
       ()
+
+  let testchain_is_deprecated =
+    Internal_event.Simple.declare_0
+      ~section:["node"; "main"]
+      ~level:Warning
+      ~name:"enable_testchain_is_deprecated"
+      ~msg:"The command-line option `--enable-testchain` is deprecated."
+      ()
 end
 
-let patch_config ?(may_override_network = false)
+let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?(ignore_bootstrap_peers = false) ?(cfg = Node_config_file.default_config)
     args =
   let open Lwt_result_syntax in
@@ -839,7 +847,7 @@ let patch_config ?(may_override_network = false)
      with the [--network] argument, so we cannot use [Node_config_file]. *)
   let* bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers then
-      let*! () = Event.(emit disabled_bootstrap_peers) () in
+      let*! () = emit Event.disabled_bootstrap_peers () in
       return peers
     else
       let cfg_peers =
@@ -904,6 +912,10 @@ let patch_config ?(may_override_network = false)
               Some (3 * x / 2),
               peer_table_size ))
   in
+  let*! () =
+    if enable_testchain then emit Event.testchain_is_deprecated ()
+    else Lwt.return_unit
+  in
   Node_config_file.update
     ~disable_config_validation
     ?data_dir
@@ -938,8 +950,8 @@ let patch_config ?(may_override_network = false)
     ?latency
     cfg
 
-let read_and_patch_config_file ?may_override_network ?ignore_bootstrap_peers
-    args =
+let read_and_patch_config_file ?may_override_network ?emit
+    ?ignore_bootstrap_peers args =
   let open Lwt_result_syntax in
   let* cfg = read_config_file args in
-  patch_config ?may_override_network ?ignore_bootstrap_peers ~cfg args
+  patch_config ?may_override_network ?emit ?ignore_bootstrap_peers ~cfg args

@@ -468,26 +468,24 @@ let warn_deprecated_fields (config : Node_config_file.t) =
 
 (* Main validation passes. *)
 
-let validation_passes =
-  [
-    validate_expected_pow;
-    validate_addresses;
-    validate_connections;
-    warn_deprecated_fields;
-  ]
+let validation_passes ignore_testchain_warning =
+  [validate_expected_pow; validate_addresses; validate_connections]
+  @ if ignore_testchain_warning then [] else [warn_deprecated_fields]
 
-let validate_passes config =
-  List.concat_map_es (fun f -> f config) validation_passes
+let validate_passes ?(ignore_testchain_warning = false) config =
+  List.concat_map_es
+    (fun f -> f config)
+    (validation_passes ignore_testchain_warning)
 
 (* Main validation functions. *)
 
-let check config =
+let check ?ignore_testchain_warning config =
   let open Lwt_result_syntax in
   if config.Node_config_file.disable_config_validation then
     let*! () = Event.(emit disabled_event ()) in
     return_unit
   else
-    let* t = validate_passes config in
+    let* t = validate_passes ?ignore_testchain_warning config in
     if has_error t then
       let*! () = Event.report t in
       tzfail Invalid_node_configuration
