@@ -262,9 +262,11 @@ let test_node_configuration =
 let init_and_run_rollup_node ~originator ?operator ?batch_signer
     ?finalize_commitment_signer ?remove_commitment_signer
     ?dispatch_withdrawals_signer ?rejection_signer
-    ?(allow_deposit = operator <> None) node client =
+    ?(allow_deposit = operator <> None) ?(bake_origination = true) node client =
   let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:originator client in
-  let* () = Client.bake_for_and_wait client in
+  let* () =
+    if bake_origination then Client.bake_for_and_wait client else unit
+  in
   Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
   let tx_node =
     Rollup_node.create
@@ -2653,6 +2655,111 @@ let test_catch_up =
   in
   unit
 
+let test_origination_deposit_same_block =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: origination and first deposit in same block"
+    ~tags:["tx_rollup"; "origination"; "genesis"; "deposit"]
+    (fun protocol ->
+      let* parameter_file = Parameters.parameter_file protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let* contract_id =
+        Client.originate_contract
+          ~alias:"rollup_deposit"
+          ~amount:Tez.zero
+          ~src:"bootstrap1"
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~init:"Unit"
+          ~burn_cap:Tez.(of_int 1)
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      Log.info
+        "The tx_rollup_deposit %s contract was successfully originated"
+        contract_id ;
+      let originator = Constant.bootstrap1.public_key_hash in
+      Log.info "Originating rollup" ;
+      let*! tx_rollup_hash =
+        Client.Tx_rollup.originate
+          ~fee:
+            (Tez.of_int 100)
+            (* High fee to ensure the origination appears in the block before the
+               deposit *)
+          ~src:originator
+          client
+      in
+      (* Do not bake after origination, we will also inject deposit *)
+      let tx_node =
+        Rollup_node.create
+          Observer
+          ~rollup_id:tx_rollup_hash
+          ~allow_deposit:false
+          client
+          node
+      in
+      let* _ = Rollup_node.init_config tx_node in
+      let* bls_key = Client.bls_gen_and_show_keys client in
+      let tickets_content = "toru" in
+      let tickets_amount = 10 in
+      Log.info "Making deposit" ;
+      let arg =
+        make_tx_rollup_deposit_argument
+          tickets_content
+          tickets_amount
+          bls_key.aggregate_public_key_hash
+          tx_rollup_hash
+      in
+      (* This smart contract call will transfer 10 tickets to the given
+         address. *)
+      let* () =
+        Client.transfer
+          ~gas_limit:100_000
+          ~fee:Tez.one
+          ~amount:Tez.zero
+          ~burn_cap:Tez.one
+          ~storage_limit:10_000
+          ~giver:Constant.bootstrap2.alias
+          ~receiver:contract_id
+          ~arg
+          client (* Must not simulate because rollup does not yet exist on L1 *)
+          ~simulation:false
+          ~force:true
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* block = RPC.get_block client in
+      Log.info
+        "Checking that block contains both the rollup origination and the \
+         deposit" ;
+      check_l1_block_contains
+        block
+        ~kind:"tx_rollup_origination"
+        ~what:"Origination of rollup" ;
+      check_l1_block_contains
+        block
+        ~kind:"transaction"
+        ~what:"Ticket deposit to L2" ;
+      Log.info "Starting Rollup node" ;
+      let* () = Rollup_node.run tx_node in
+      let* () = Rollup_node.wait_for_ready tx_node in
+      Log.info "Tx_rollup node is now ready" ;
+      let* _ = wait_tezos_node_level tx_node node in
+      (* Get the operation containing the ticket transfer. We assume
+         that only one operation is issued in this block. *)
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
+      let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit_json inbox in
+      Log.info "Ticket %s was successfully deposited" ticket_id ;
+      check_tz4_balance
+        ~tx_client
+        ~block:"head"
+        ~ticket_id
+        ~tz4_address:bls_key.aggregate_public_key_hash
+        ~expected_balance:10)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_not_allow_deposit protocols ;
@@ -2674,4 +2781,5 @@ let register ~protocols =
   test_batcher_large_message protocols ;
   test_transfer_command protocols ;
   test_withdraw_command protocols ;
-  test_catch_up protocols
+  test_catch_up protocols ;
+  test_origination_deposit_same_block protocols

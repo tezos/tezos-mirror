@@ -1050,6 +1050,7 @@ module Tx_rollup : sig
     ?wait:string ->
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->
+    ?fee:Tez.t ->
     ?hooks:Process.hooks ->
     src:string ->
     t ->
