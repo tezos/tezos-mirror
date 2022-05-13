@@ -24,6 +24,11 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   randomness_generation
+
+.. toctree::
+   :maxdepth: 2
+
    consensus
 
 .. toctree::
