@@ -317,11 +317,11 @@ let may_validate_new_branch w locator =
           locator
       in
       match v with
-      | (Known_valid, prefix_locator) ->
+      | Known_valid, prefix_locator ->
           if prefix_locator.Block_locator.history <> [] then
             bootstrap_new_branch w prefix_locator
           else return_unit
-      | (Unknown, _) ->
+      | Unknown, _ ->
           (* May happen when:
              - A locator from another chain is received;
              - A rolling peer is too far ahead;
@@ -332,7 +332,7 @@ let may_validate_new_branch w locator =
               (Ignoring_branch_without_common_ancestor block_received)
           in
           tzfail Validation_errors.Unknown_ancestor
-      | (Known_invalid, _) ->
+      | Known_invalid, _ ->
           let*! () =
             Worker.log_event
               w

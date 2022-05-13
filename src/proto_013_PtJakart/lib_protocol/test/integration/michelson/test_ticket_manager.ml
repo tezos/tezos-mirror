@@ -51,24 +51,24 @@ type init_env = {
 }
 
 let init_env () =
-  let* (block, baker, contract, _src2) = Contract_helpers.init () in
+  let* block, baker, contract, _src2 = Contract_helpers.init () in
   return {block; baker; contract}
 
 let collect_token_amounts ctxt tickets =
   let accum (tokens, ctxt) ticket =
-    let (token, amount) = Ticket_token.token_and_amount_of_ex_ticket ticket in
+    let token, amount = Ticket_token.token_and_amount_of_ex_ticket ticket in
     let tokens = (token, Script_int.to_zint amount) :: tokens in
     return (tokens, ctxt)
   in
   List.fold_left_es accum ([], ctxt) tickets
 
 let tokens_of_value ~include_lazy ctxt ty x =
-  let*? (has_tickets, ctxt) = Ticket_scanner.type_has_tickets ctxt ty in
-  let* (tickets, ctxt) =
+  let*? has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
+  let* tickets, ctxt =
     Ticket_scanner.tickets_of_value ~include_lazy ctxt has_tickets x
   in
-  let* (tas, ctxt) = collect_token_amounts ctxt tickets in
-  let* (bm, ctxt) =
+  let* tas, ctxt = collect_token_amounts ctxt tickets in
+  let* bm, ctxt =
     Ticket_token_map.of_list
       ctxt
       ~merge_overlap:(fun ctxt v1 v2 -> ok (Z.add v1 v2, ctxt))
@@ -78,9 +78,7 @@ let tokens_of_value ~include_lazy ctxt ty x =
 
 (* Extract ticket-token balance of storage *)
 let ticket_balance_of_storage ctxt contract =
-  let* (ctxt, script) =
-    wrap @@ Alpha_context.Contract.get_script ctxt contract
-  in
+  let* ctxt, script = wrap @@ Alpha_context.Contract.get_script ctxt contract in
   match script with
   | None -> return ([], ctxt)
   | Some script ->
@@ -93,14 +91,14 @@ let ticket_balance_of_storage ctxt contract =
              ~allow_forged_in_storage:true
              script)
       in
-      let* (tokens, ctxt) =
+      let* tokens, ctxt =
         wrap (tokens_of_value ~include_lazy:true ctxt storage_type storage)
       in
-      let* (tokens, ctxt) =
+      let* tokens, ctxt =
         wrap
         @@ List.fold_left_es
              (fun (acc, ctxt) (ex_token, amount) ->
-               let* (key, ctxt) =
+               let* key, ctxt =
                  Ticket_balance_key.of_ex_token
                    ctxt
                    ~owner:(Contract contract)
@@ -208,19 +206,19 @@ let validate_ticket_balances block =
   let* contracts = all_contracts block in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* (kvs_storage, ctxt) =
+  let* kvs_storage, ctxt =
     List.fold_left_es
       (fun (acc, ctxt) contract ->
-        let* (lists, ctxt) = ticket_balance_of_storage ctxt contract in
+        let* lists, ctxt = ticket_balance_of_storage ctxt contract in
         return (lists @ acc, ctxt))
       ([], ctxt)
       contracts
   in
-  let* (kvs_balance, _ctxt) =
+  let* kvs_balance, _ctxt =
     wrap
     @@ List.fold_left_es
          (fun (acc, ctxt) (key, _) ->
-           let* (balance, ctxt) = Ticket_balance.get_balance ctxt key in
+           let* balance, ctxt = Ticket_balance.get_balance ctxt key in
            let acc =
              match balance with None -> acc | Some b -> (key, b) :: acc
            in
@@ -652,9 +650,7 @@ end
 let setup_test () =
   let module TM = Ticket_manager in
   let* {block; baker; contract = originator} = init_env () in
-  let* (ticket_manager, _script, block) =
-    TM.originate block ~originator baker
-  in
+  let* ticket_manager, _script, block = TM.originate block ~originator baker in
   let test block parameters =
     let* b =
       TM.transaction block ~sender:originator ~ticket_manager ~parameters
@@ -667,7 +663,7 @@ let setup_test () =
 (** Test create new contracts and send tickets to them. *)
 let test_create_contract_and_send_tickets () =
   let module TM = Ticket_manager in
-  let* (test, originator, b) = setup_test () in
+  let* test, originator, b = setup_test () in
 
   (* Call the `create` endpoint that creates two new ticket receiver contracts:
      - Both contracts accepts a single ticket as an argument.
@@ -675,7 +671,7 @@ let test_create_contract_and_send_tickets () =
      - The second holds a ticket in its storage and only accepts "green" tickets.
      - The second contract joins all received tickets.
   *)
-  let* (ticket_receiver_green_1, ticket_receiver_green_2, b) =
+  let* ticket_receiver_green_1, ticket_receiver_green_2, b =
     get_first_two_new_contracts b @@ fun b ->
     test b @@ TM.create ~content:"Green" ~amount:1 ~originator
   in
@@ -709,7 +705,7 @@ let test_create_contract_and_send_tickets () =
 (** Tets add and remove tickets from lazy storage. *)
 let test_add_remove_from_lazy_storage () =
   let module TM = Ticket_manager in
-  let* (tm, _, b) = setup_test () in
+  let* tm, _, b = setup_test () in
   let* b = tm b @@ TM.add_lazy ~index:1 ~content:"Red" ~amount:10 in
   let* b = tm b @@ TM.add_lazy ~index:2 ~content:"Green" ~amount:10 in
   let* b = tm b @@ TM.add_lazy ~index:3 ~content:"Blue" ~amount:10 in
@@ -727,7 +723,7 @@ let test_add_remove_from_lazy_storage () =
 (** Test send to self and replace big-map. *)
 let test_send_self_replace_big_map () =
   let module TM = Ticket_manager in
-  let* (tm, _, b) = setup_test () in
+  let* tm, _, b = setup_test () in
   (* Send self replace bigmap *)
   let* b = tm b @@ TM.add_lazy ~index:1 ~content:"Red" ~amount:1 in
   let* b = tm b @@ TM.add_lazy ~index:2 ~content:"Green" ~amount:1 in
@@ -740,7 +736,7 @@ let test_send_self_replace_big_map () =
 (** Test add to and remove from strict storage. *)
 let test_add_remove_strict () =
   let module TM = Ticket_manager in
-  let* (tm, _, b) = setup_test () in
+  let* tm, _, b = setup_test () in
   (* Add some more strict tickets *)
   let* b = tm b @@ TM.add_strict ~content:"Red" ~amount:1 in
   let* b = tm b @@ TM.add_strict ~content:"Red" ~amount:2 in
@@ -756,7 +752,7 @@ let test_add_remove_strict () =
 (** Test mixed operations. *)
 let test_mixed_operations () =
   let module TM = Ticket_manager in
-  let* (tm, _, b) = setup_test () in
+  let* tm, _, b = setup_test () in
   (* Add some more strict tickets *)
   let* b = tm b @@ TM.add_strict ~content:"Red" ~amount:1 in
   let* b = tm b @@ TM.add_strict ~content:"Green" ~amount:1 in

@@ -50,7 +50,7 @@ let parse_config_args argv =
   (* The context used during argument parsing. We switch to a real context
      that is created based on some of the parsed arguments. *)
   let ctxt = Client_context.null_printer in
-  let* (base_dir, argv) = Clic.parse_global_options global_options ctxt argv in
+  let* base_dir, argv = Clic.parse_global_options global_options ctxt argv in
   let* base_dir =
     match base_dir with
     | None ->
@@ -76,7 +76,7 @@ let main commands =
   let open Lwt_result_syntax in
   let executable_name = Filename.basename Sys.executable_name in
   let run () =
-    let (argv, autocomplete) =
+    let argv, autocomplete =
       (* for shell aliases *)
       let rec move_autocomplete_token_upfront acc = function
         | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
@@ -103,7 +103,7 @@ let main commands =
           (if Unix.isatty Unix.stderr then Ansi else Plain)
           Short) ;
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
-    let* (base_dir, argv) = parse_config_args argv in
+    let* base_dir, argv = parse_config_args argv in
     let ctxt = new Client_context_unix.unix_logger ~base_dir in
     let commands =
       Clic.add_manual

@@ -154,8 +154,7 @@ let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
       let blocks =
         List.drop_n (length - Int32.to_int (Raw_level.diff last first)) head
       in
-      if Int32.equal level (Raw_level.to_int32 last) then
-        return (hash :: blocks)
+      if Int32.equal level (Raw_level.to_int32 last) then return (hash :: blocks)
       else return blocks
 
 let get_unrevealed_nonces ({cctxt; chain; _} as state) nonces =

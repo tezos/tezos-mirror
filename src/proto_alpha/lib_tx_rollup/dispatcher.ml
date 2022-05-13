@@ -75,7 +75,7 @@ let dispatch_operations_of_block (state : State.t) (block : L2block.t) =
   let* ctxt = Context.checkout state.context_index block.header.context in
   let tx_rollup = state.rollup_info.rollup_id in
   let commitment = block.commitment in
-  let+ (rev_ops, _) =
+  let+ rev_ops, _ =
     List.fold_left_es
       (fun (acc, message_index) msg ->
         let context_hash = msg.Inbox.l2_context_hash.tree_hash in
@@ -101,7 +101,7 @@ let dispatch_operations_of_block (state : State.t) (block : L2block.t) =
                      message_result_path;
                      tickets_info;
                    }
-                 :: acc)
+                :: acc)
         in
         (acc, message_index + 1))
       ([], 0)

@@ -59,7 +59,7 @@ let check_peek_poke_args fname bytes ofs bits =
    The function proceeds by iteratively blitting the bytes overlapping the sought
    bit interval into [v]. The superfluous bits at the beginning and at the end
    are then removed from [v], yielding the returned value.
- *)
+*)
 let peek_unsafe bytes ofs bits =
   let first = ofs / 8 in
   let last = first + (((ofs mod 8) + bits + 7) / 8) in
@@ -407,7 +407,7 @@ let%test_unit "false_positive_rate" =
             (fun i -> Char.chr (Hashtbl.hash (v, i) mod 256))
         in
         let bloomer = create ~hash ~index_bits ~hashes ~countdown_bits in
-        let (add, cur) =
+        let add, cur =
           let cur = ref 0 in
           ( (fun n ->
               for _ = 1 to n do
@@ -454,7 +454,7 @@ let%test_unit "false_positive_rate" =
   match Sys.getenv_opt "BLOOMER_TEST_GNUPLOT_PATH" with
   | Some path ->
       for run = 0 to Array.length runs - 1 do
-        let (kb, index_bits, hashes, values) = data.(run) in
+        let kb, index_bits, hashes, values = data.(run) in
         (let fp = open_out (Format.asprintf "%s/run_%02d.plot" path run) in
          Printf.fprintf
            fp

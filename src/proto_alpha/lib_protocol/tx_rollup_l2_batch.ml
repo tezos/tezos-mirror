@@ -50,13 +50,13 @@ module Signer_indexable = Indexable.Make (struct
 
   let compare x y =
     match (x, y) with
-    | (Bls_pk pk1, Bls_pk pk2) ->
+    | Bls_pk pk1, Bls_pk pk2 ->
         Bytes.compare
           (Bls_signature.pk_to_bytes pk1)
           (Bls_signature.pk_to_bytes pk2)
-    | (L2_addr addr1, L2_addr addr2) -> Tx_rollup_l2_address.compare addr1 addr2
-    | (L2_addr _, Bls_pk _) -> -1
-    | (Bls_pk _, L2_addr _) -> 1
+    | L2_addr addr1, L2_addr addr2 -> Tx_rollup_l2_address.compare addr1 addr2
+    | L2_addr _, Bls_pk _ -> -1
+    | Bls_pk _, L2_addr _ -> 1
 
   let encoding =
     let open Data_encoding in

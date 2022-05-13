@@ -58,7 +58,7 @@ let test_b58check_roundtrip :
     for pkh, pk and sk in Ed25519
 *)
 let test_b58check_roundtrips () =
-  let (pubkey_hash, pubkey, seckey) = Ed25519.generate_key () in
+  let pubkey_hash, pubkey, seckey = Ed25519.generate_key () in
   test_b58check_roundtrip
     (module Ed25519.Public_key_hash)
     "pubkey_hash"
@@ -103,7 +103,7 @@ let test_pkh_encodings () =
 let test_key_encodings () =
   let test_encoded_key (seed, pkh_b58, pk_b58, sk_b58) =
     let seed = of_hex seed in
-    let (pkh_test, pk_test, sk_test) = Ed25519.generate_key ~seed () in
+    let pkh_test, pk_test, sk_test = Ed25519.generate_key ~seed () in
     let pkh_test =
       Base58.simple_encode Ed25519.Public_key_hash.b58check_encoding pkh_test
     in

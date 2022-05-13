@@ -32,7 +32,7 @@ let test_cycles store =
   let* blocks =
     List.fold_left_es
       (fun acc _ ->
-        let* (blocks, _head) = append_cycle ~should_set_head:true chain_store in
+        let* blocks, _head = append_cycle ~should_set_head:true chain_store in
         return (blocks @ acc))
       []
       (1 -- 10)
@@ -49,8 +49,8 @@ open Example_tree
 
 let rec compare_path is_eq p1 p2 =
   match (p1, p2) with
-  | ([], []) -> true
-  | (h1 :: p1, h2 :: p2) -> is_eq h1 h2 && compare_path is_eq p1 p2
+  | [], [] -> true
+  | h1 :: p1, h2 :: p2 -> is_eq h1 h2 && compare_path is_eq p1 p2
   | _ -> false
 
 let vblock tbl k =
@@ -309,7 +309,7 @@ let test_new_blocks chain_store tbl =
   let open Lwt_syntax in
   let test head h expected_ancestor expected =
     let to_block = vblock tbl head and from_block = vblock tbl h in
-    let* (ancestor, blocks) =
+    let* ancestor, blocks =
       Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
     in
     if
@@ -374,7 +374,7 @@ let test_basic_checkpoint chain_store table =
       chain_store
       (Store.Block.hash block, Store.Block.level block)
   in
-  let*! (c_block, c_level) = Store.Chain.checkpoint chain_store in
+  let*! c_block, c_level = Store.Chain.checkpoint chain_store in
   (* Target should not be set, only the checkpoint. *)
   let* () =
     let*! o = Store.Chain.target chain_store in
@@ -456,14 +456,14 @@ let test_best_know_head_for_checkpoint chain_store table =
 
    Storing a block at the same level with a different hash is not
    allowed.
- *)
+*)
 
 let test_future_target chain_store _ =
   let open Lwt_result_syntax in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
   let genesis_descr = Store.Block.descriptor genesis_block in
-  let*! (bad_chain, bad_head) = make_raw_block_list genesis_descr 5 in
-  let*! (good_chain, good_head) = make_raw_block_list genesis_descr 5 in
+  let*! bad_chain, bad_head = make_raw_block_list genesis_descr 5 in
+  let*! good_chain, good_head = make_raw_block_list genesis_descr 5 in
   let* () = Store.Chain.set_target chain_store (raw_descriptor good_head) in
   let* () =
     List.iter_es
@@ -497,7 +497,6 @@ let test_future_target chain_store _ =
    Genesis - A1 (cp) - A2 (head) - A3 - A4 - A5
                         \
                         B1 - B2 - B3 - B4 - B5
-
 *)
 
 let test_reach_target chain_store table =
@@ -524,7 +523,7 @@ let test_reach_target chain_store table =
   let* () =
     Store.Chain.set_target chain_store (checkpoint_hash, checkpoint_level)
   in
-  let*! (c_hash, _c_level) = Store.Chain.checkpoint chain_store in
+  let*! c_hash, _c_level = Store.Chain.checkpoint chain_store in
   let time_now = Time.System.to_protocol (Time.System.now ()) in
   if
     Time.Protocol.compare

@@ -31,7 +31,7 @@
 *)
 
 (* Migration to Tenderbake is only supported after the first cycle,
-   therefore at [migration_level >= blocks_per_cycle].  *)
+   therefore at [migration_level >= blocks_per_cycle]. *)
 let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
     ~migrate_to =
   Test.register
@@ -274,9 +274,7 @@ let test_migration_with_bakers ?(migration_level = 4)
         "to_" ^ Protocol.tag migrate_to;
       ]
   @@ fun () ->
-  let* (client, node) =
-    user_migratable_node_init ~migration_level ~migrate_to
-  in
+  let* client, node = user_migratable_node_init ~migration_level ~migrate_to in
   let* () =
     start_protocol
       ~expected_bake_for_blocks:migration_level

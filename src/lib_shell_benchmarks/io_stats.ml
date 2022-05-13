@@ -46,7 +46,7 @@ let min_max (l : int list) =
   loop l max_int ~-1
 
 let pp fmtr {total; keys; dirs; degrees = _; depths = _; sizes} =
-  let (min_size, max_size) = min_max sizes in
+  let min_size, max_size = min_max sizes in
   Format.fprintf
     fmtr
     "{ total = %d; keys = %d ; dirs = %d; sizes in [%d; %d] degrees = ...; \
@@ -82,7 +82,7 @@ let tree_statistics key_map =
           map
           (degrees, depths, sizes)
   in
-  let (degrees, depths, sizes) = loop key_map 0 [] [] [] in
+  let degrees, depths, sizes = loop key_map 0 [] [] [] in
   {total = !nodes; keys = !keys; dirs = !dirs; degrees; depths; sizes}
 
 let load_tree context key =
@@ -102,7 +102,7 @@ let load_tree context key =
 
 let context_statistics base_dir context_hash =
   let open Lwt_syntax in
-  let (context, index) =
+  let context, index =
     Io_helpers.load_context_from_disk base_dir context_hash
   in
   let* tree = load_tree context [] in

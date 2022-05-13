@@ -35,7 +35,7 @@ let transaction_encoding = Sapling.UTXO.transaction_encoding
    contracts to keep a temporary state that may be discarded.
    Diffs are also returned by an RPC to allow a client to synchronize its own
    state with the chain.
- *)
+*)
 type diff = {
   commitments_and_ciphertexts :
     (Sapling.Commitment.t * Sapling.Ciphertext.t) list;

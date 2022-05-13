@@ -174,7 +174,7 @@ let folder f floating_store =
   let open Lwt_syntax in
   Lwt_idle_waiter.task floating_store.scheduler (fun () ->
       (* We open a new fd *)
-      let (flags, perms) = ([Unix.O_CREAT; O_RDONLY; O_CLOEXEC], 0o444) in
+      let flags, perms = ([Unix.O_CREAT; O_RDONLY; O_CLOEXEC], 0o444) in
       let path =
         Naming.floating_blocks_file floating_store.floating_blocks_dir
         |> Naming.file_path
@@ -227,7 +227,7 @@ let iter_with_pred_s f floating_store =
 
 let init chain_dir ~readonly kind =
   let open Lwt_syntax in
-  let (flag, perms) =
+  let flag, perms =
     (* Only RO is readonly: when we open RO_TMP, we actually write in it. *)
     if kind = Naming.RO && readonly then (Unix.O_RDONLY, 0o444)
     else (Unix.O_RDWR, 0o644)
@@ -324,7 +324,7 @@ let full_integrity_check chain_dir kind =
                     loop index fd (nb_bytes_left - length) (succ count)
                   else Lwt.return_false
           in
-          let (flag, perms) = (Unix.O_RDWR, 0o644) in
+          let flag, perms = (Unix.O_RDWR, 0o644) in
           let floating_blocks_dir = Naming.floating_blocks_dir chain_dir kind in
           let floating_blocks_file_path =
             Naming.floating_blocks_file floating_blocks_dir |> Naming.file_path

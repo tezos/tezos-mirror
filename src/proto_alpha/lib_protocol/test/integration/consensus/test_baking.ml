@@ -262,7 +262,7 @@ let test_rewards_block_and_payload_producer () =
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker_b2')
-    ~operations:(tx :: preendos @ endos)
+    ~operations:((tx :: preendos) @ endos)
     b1
   >>=? fun b2' ->
   (* [baker_b2], as payload producer, gets the block reward and the fees *)
@@ -336,7 +336,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
 
 let test_committee_sampling () =
   let test_distribution max_round distribution =
-    let (initial_balances, bounds) = List.split distribution in
+    let initial_balances, bounds = List.split distribution in
     let accounts =
       Account.generate_accounts ~initial_balances (List.length initial_balances)
     in
@@ -374,7 +374,7 @@ let test_committee_sampling () =
       bounds ;
     List.iter
       (fun {Plugin.RPC.Baking_rights.delegate = pkh; _} ->
-        let (bounds, n) = Stdlib.Hashtbl.find stats pkh in
+        let bounds, n = Stdlib.Hashtbl.find stats pkh in
         Stdlib.Hashtbl.replace stats pkh (bounds, n + 1))
       bakers ;
     let one_failed = ref false in

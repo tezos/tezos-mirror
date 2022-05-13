@@ -321,10 +321,10 @@ module Make_s
     (Filter : Prevalidator_filters.FILTER)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
-                               Filter.Proto.validation_state
+                           Filter.Proto.validation_state
                           and type protocol_operation = Filter.Proto.operation
                           and type operation_receipt =
-                               Filter.Proto.operation_receipt) :
+                           Filter.Proto.operation_receipt) :
   S
     with type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
@@ -622,7 +622,7 @@ module Make_s
               (acc_filter_state, acc_validation_state, acc_mempool)
           else (
             shell.pending <- Pending_ops.remove oph shell.pending ;
-            let+ (new_filter_state, new_validation_state, new_mempool, to_handle)
+            let+ new_filter_state, new_validation_state, new_mempool, to_handle
                 =
               classify_operation
                 shell
@@ -694,7 +694,7 @@ module Make_s
         if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
         else
           let* () = Event.(emit processing_operations) () in
-          let* (filter_state, validation_state, delta_mempool) =
+          let* filter_state, validation_state, delta_mempool =
             classify_pending_operations
               ~notifier
               pv.shell
@@ -852,7 +852,7 @@ module Make_s
             else
               let*? validation_state = pv.validation_state in
               let notifier = mk_notifier pv.operation_stream in
-              let*! (filter_state, validation_state, delta_mempool, to_handle) =
+              let*! filter_state, validation_state, delta_mempool, to_handle =
                 classify_operation
                   pv.shell
                   ~filter_config:pv.filter_config
@@ -868,7 +868,7 @@ module Make_s
                    retrieve the classification of our operation. *)
                 List.find_opt
                   (function
-                    | (({hash; _} : protocol_operation operation), _) ->
+                    | ({hash; _} : protocol_operation operation), _ ->
                         Operation_hash.equal hash oph)
                   to_handle
               in
@@ -969,7 +969,7 @@ module Make_s
       in
       (* Could be implemented as Operation_hash.Map.filter_s which
          does not exist for the moment. *)
-      let*! (new_pending_operations, nb_pending) =
+      let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
           (fun _oph op (pending, nb_pending) ->
             let*! v =
@@ -1027,7 +1027,7 @@ module Make_s
           return_unit
       | Some (_op, classification) -> (
           match (classification, flush_if_prechecked) with
-          | (`Prechecked, true) | (`Applied, _) ->
+          | `Prechecked, true | `Applied, _ ->
               (* Modifying the list of operations classified as [Applied]
                  might change the classification of all the operations in
                  the mempool. Hence if the removed operation has been
@@ -1043,11 +1043,11 @@ module Make_s
                   pv.shell.live_operations
               in
               pv.shell.pending <- Pending_ops.remove oph pv.shell.pending
-          | (`Branch_delayed _, _)
-          | (`Branch_refused _, _)
-          | (`Refused _, _)
-          | (`Outdated _, _)
-          | (`Prechecked, false) ->
+          | `Branch_delayed _, _
+          | `Branch_refused _, _
+          | `Refused _, _
+          | `Outdated _, _
+          | `Prechecked, false ->
               pv.filter_state <-
                 Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
               return_unit)
@@ -1081,10 +1081,10 @@ module Make
     (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
-                               Filter.Proto.validation_state
+                           Filter.Proto.validation_state
                           and type protocol_operation = Filter.Proto.operation
                           and type operation_receipt =
-                               Filter.Proto.operation_receipt
+                           Filter.Proto.operation_receipt
                           and type chain_store = Store.chain_store) :
   T with type prevalidation_t = Prevalidation_t.t = struct
   include Make_s (Filter) (Prevalidation_t)
@@ -1282,7 +1282,7 @@ module Make
           (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
           (fun pv params () ->
             Lwt_mutex.with_lock pv.lock @@ fun () ->
-            let (op_stream, stopper) =
+            let op_stream, stopper =
               Lwt_watcher.create_stream pv.operation_stream
             in
             (* Convert ops *)
@@ -1345,8 +1345,8 @@ module Make
             let current_mempool =
               List.concat_map
                 (List.map (function
-                    | (hash, op, []) -> ((hash, op), None)
-                    | (hash, op, errors) -> ((hash, op), Some errors)))
+                    | hash, op, [] -> ((hash, op), None)
+                    | hash, op, errors -> ((hash, op), Some errors)))
                 [
                   applied;
                   prechecked;
@@ -1494,7 +1494,7 @@ module Make
       let*! predecessor = Store.Chain.current_head chain_store in
       let predecessor_header = Store.Block.header predecessor in
       let*! mempool = Store.Chain.mempool chain_store in
-      let*! (live_blocks, live_operations) =
+      let*! live_blocks, live_operations =
         Store.Chain.live_blocks chain_store
       in
       let timestamp_system = Tezos_base.Time.System.now () in
@@ -1814,10 +1814,10 @@ module Internal_for_tests = struct
       (Filter : Prevalidator_filters.FILTER)
       (Prevalidation_t : Prevalidation.T
                            with type validation_state =
-                                 Filter.Proto.validation_state
+                             Filter.Proto.validation_state
                             and type protocol_operation = Filter.Proto.operation
                             and type operation_receipt =
-                                 Filter.Proto.operation_receipt) =
+                             Filter.Proto.operation_receipt) =
   struct
     module Internal = Make_s (Filter) (Prevalidation_t)
 

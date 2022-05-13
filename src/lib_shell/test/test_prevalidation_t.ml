@@ -255,7 +255,7 @@ let test_apply_operation_live_operations ctxt =
   in
   let apply_op pv (op : _ Prevalidation.operation) =
     let*! application_result = P.apply_operation pv op in
-    let (next_pv, result_is_outdated) =
+    let next_pv, result_is_outdated =
       match application_result with
       | Applied (next_pv, _receipt) -> (next_pv, false)
       | Outdated _ -> (pv, true)
@@ -301,7 +301,7 @@ let test_apply_operation_applied ctxt =
   let apply_op pv (op : _ Prevalidation.operation) =
     let applied_before = to_applied pv in
     let*! application_result = P.apply_operation pv op in
-    let (next_pv, result_is_applied) =
+    let next_pv, result_is_applied =
       match application_result with
       | Applied (next_pv, _receipt) -> (next_pv, true)
       | Branch_delayed _ ->

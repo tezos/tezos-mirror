@@ -146,7 +146,7 @@ end = struct
        situation. In case baker <> endorser, bal_bad of the baker gets half of
        burnt deposit of d1, so it's higher
     *)
-    let (high, low) =
+    let high, low =
       if Signature.Public_key_hash.equal baker d1 then (bal_good, bal_bad)
       else (bal_bad, bal_good)
     in
@@ -188,7 +188,7 @@ end = struct
     >>=? fun op1 ->
     Op.preendorsement ~delegate:d2 ~endorsed_block:head_B (B blk) ()
     >>=? fun op2 ->
-    let (op1, op2) = order_preendorsements ~correct_order:true op1 op2 in
+    let op1, op2 = order_preendorsements ~correct_order:true op1 op2 in
     (* bake `nb_blocks_before_denunciation` before double preend. denunciation *)
     bake_n nb_blocks_before_denunciation blk >>=? fun blk ->
     let op : Operation.packed = Op.double_preendorsement (B blk) op1 op2 in

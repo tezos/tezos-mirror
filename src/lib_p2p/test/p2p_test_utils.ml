@@ -168,7 +168,7 @@ let sync_nodes nodes =
 
 let run_nodes client server =
   let open Lwt_result_syntax in
-  let*! (main_socket, port) = listen !addr in
+  let*! main_socket, port = listen !addr in
   let* server_node =
     Process.detach ~prefix:"server: " (fun channel ->
         let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
@@ -197,7 +197,7 @@ let run_nodes client server =
 
 let raw_accept sched main_socket =
   let open Lwt_syntax in
-  let* (fd, sockaddr) = P2p_fd.accept main_socket in
+  let* fd, sockaddr = P2p_fd.accept main_socket in
   let fd = P2p_io_scheduler.register sched fd in
   let point =
     match sockaddr with
@@ -213,7 +213,7 @@ let raw_accept sched main_socket =
 let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
     main_socket =
   let open Lwt_syntax in
-  let* (fd, point) = raw_accept sched main_socket in
+  let* fd, point = raw_accept sched main_socket in
   let* id1 = id in
   P2p_socket.authenticate
     ~canceler

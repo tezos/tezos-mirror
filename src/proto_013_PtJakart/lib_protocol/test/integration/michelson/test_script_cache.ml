@@ -172,12 +172,11 @@ let test_find_correctly_looks_up () =
     Contract.get_script ctxt addr >|= Environment.wrap_tzresult
     >>=? fun (ctxt, script) ->
     (match (result, script) with
-    | (None, _) -> ok false
-    | (Some _, None) ->
+    | None, _ -> ok false
+    | Some _, None ->
         (* because we assume that get_script correctly behaves. *)
         assert false
-    | (Some (cached_script, _), Some script) ->
-        equal_scripts script cached_script)
+    | Some (cached_script, _), Some script -> equal_scripts script cached_script)
     >>?= fun cond ->
     fail_unless
       cond
@@ -357,7 +356,7 @@ let test_entries_shows_lru () =
         (List.length rev_entries)
         (List.length rev_contracts) ;
       match (rev_entries, rev_contracts) with
-      | ([], _) ->
+      | [], _ ->
           (* We do not count liquidity baking contract. *)
           let removed_contracts = List.length rev_contracts - 1 in
           fail_unless
@@ -368,7 +367,7 @@ let test_entries_shows_lru () =
                    is full, %d remaining while expecting %d"
                   removed_contracts
                   (ncontracts / 2)))
-      | ((contract, size) :: rev_entries, (_, contract') :: rev_contracts) ->
+      | (contract, size) :: rev_entries, (_, contract') :: rev_contracts ->
           fail_unless
             (size = new_size || contract = liquidity_baking_contract)
             (err
@@ -384,7 +383,7 @@ let test_entries_shows_lru () =
                (Printf.sprintf
                   "entries do not return cached contracts in right order"))
           >>=? fun () -> aux rev_entries rev_contracts
-      | (_, []) ->
+      | _, [] ->
           (* There cannot be more entries than contracts. *)
           assert false
     in

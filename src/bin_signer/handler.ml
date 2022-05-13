@@ -85,7 +85,7 @@ module High_watermark = struct
     let open Lwt_result_syntax in
     let round = Option.value ~default:0l round_opt in
     match (previous_round_opt, previous_signature_opt) with
-    | (None, None) ->
+    | None, None ->
         if previous_level >= level then
           failwith
             "%s level %ld not above high watermark %ld"
@@ -93,7 +93,7 @@ module High_watermark = struct
             level
             previous_level
         else return_none
-    | (None, Some signature) ->
+    | None, Some signature ->
         if previous_level > level then
           failwith
             "%s level %ld below high watermark %ld"
@@ -108,7 +108,7 @@ module High_watermark = struct
               level
           else return_some signature
         else return_none
-    | (Some previous_round, None) ->
+    | Some previous_round, None ->
         if previous_level > level then
           failwith
             "%s level %ld not above high watermark %ld"
@@ -124,7 +124,7 @@ module High_watermark = struct
             previous_level
             previous_round
         else return_none
-    | (Some previous_round, Some signature) ->
+    | Some previous_round, Some signature ->
         if previous_level > level then
           failwith
             "%s level %ld below high watermark %ld"
@@ -163,7 +163,7 @@ module High_watermark = struct
       else
         let hash = Blake2B.hash_bytes [bytes] in
         let chain_id = Chain_id.of_bytes_exn (Bytes.sub bytes 1 4) in
-        let* (level, round_opt) = get_level_and_round () in
+        let* level, round_opt = get_level_and_round () in
         let* o =
           match
             Option.bind
@@ -242,9 +242,9 @@ let check_magic_byte magic_bytes data =
 let check_authorization cctxt pkh data require_auth signature =
   let open Lwt_result_syntax in
   match (require_auth, signature) with
-  | (false, _) -> return_unit
-  | (true, None) -> failwith "missing authentication signature field"
-  | (true, Some signature) ->
+  | false, _ -> return_unit
+  | true, None -> failwith "missing authentication signature field"
+  | true, Some signature ->
       let to_sign = Signer_messages.Sign.Request.to_sign ~pkh ~data in
       let* keys = Authorized_key.load cctxt in
       if
@@ -262,7 +262,7 @@ let sign ?magic_bytes ~check_high_watermark ~require_auth
   in
   let* () = check_magic_byte magic_bytes data in
   let* () = check_authorization cctxt pkh data require_auth signature in
-  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let* name, _pkh, sk_uri = Client_keys.get_key cctxt pkh in
   let*! () = Events.(emit signing_data) name in
   let sign = Client_keys.sign cctxt sk_uri in
   if check_high_watermark then
@@ -277,7 +277,7 @@ let deterministic_nonce (cctxt : #Client_context.wallet)
     Events.(emit request_for_deterministic_nonce) (Bytes.length data, pkh)
   in
   let* () = check_authorization cctxt pkh data require_auth signature in
-  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let* name, _pkh, sk_uri = Client_keys.get_key cctxt pkh in
   let*! () = Events.(emit creating_nonce) name in
   Client_keys.deterministic_nonce sk_uri data
 
@@ -289,14 +289,14 @@ let deterministic_nonce_hash (cctxt : #Client_context.wallet)
     Events.(emit request_for_deterministic_nonce_hash) (Bytes.length data, pkh)
   in
   let* () = check_authorization cctxt pkh data require_auth signature in
-  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let* name, _pkh, sk_uri = Client_keys.get_key cctxt pkh in
   let*! () = Events.(emit creating_nonce_hash) name in
   Client_keys.deterministic_nonce_hash sk_uri data
 
 let supports_deterministic_nonces (cctxt : #Client_context.wallet) pkh =
   let open Lwt_result_syntax in
   let*! () = Events.(emit request_for_supports_deterministic_nonces) pkh in
-  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let* name, _pkh, sk_uri = Client_keys.get_key cctxt pkh in
   let*! () = Events.(emit supports_deterministic_nonces) name in
   Client_keys.supports_deterministic_nonces sk_uri
 

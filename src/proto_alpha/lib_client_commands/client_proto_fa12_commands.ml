@@ -461,7 +461,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              src
              (_, dst)
              (cctxt : #Protocol_client_context.full) ->
-          let (_, caller) = Option.value ~default:src as_address in
+          let _, caller = Option.value ~default:src as_address in
           get_contract_caller_keys cctxt caller
           >>=? fun (source, caller_pk, caller_sk) ->
           let action = Client_proto_fa12.Transfer (snd src, dst, amount) in
@@ -590,7 +590,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              src
              operations_json
              cctxt ->
-          let (_, caller) = Option.value ~default:src as_address in
+          let _, caller = Option.value ~default:src as_address in
           match
             Data_encoding.Json.destruct
               (Data_encoding.list Client_proto_fa12.token_transfer_encoding)
@@ -626,7 +626,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
             -> (
               match (path, operations_json) with
-              | ([`Index n], `A lj) -> (
+              | [`Index n], `A lj -> (
                   match List.nth_opt lj n with
                   | Some j ->
                       failwith

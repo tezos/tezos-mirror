@@ -278,7 +278,7 @@ module Internal_validator_process = struct
     let operation_metadata_size_limit =
       validator.operation_metadata_size_limit
     in
-    let* (result, apply_result) =
+    let* result, apply_result =
       Block_validation.preapply
         ~chain_id
         ~user_activated_upgrades
@@ -561,7 +561,7 @@ module External_validator_process = struct
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           clean_process_fd socket_path)
     in
-    let* (process_socket, _) =
+    let* process_socket, _ =
       Lwt.finalize
         (fun () ->
           let* process_socket =
@@ -637,7 +637,7 @@ module External_validator_process = struct
 
   let send_request vp request result_encoding =
     let open Lwt_result_syntax in
-    let* (process, process_stdin, process_stdout) =
+    let* process, process_stdin, process_stdout =
       match vp.validator_process with
       | Running
           {
@@ -911,7 +911,7 @@ let apply_block (E {validator_process = (module VP); validator}) chain_store
   let open Lwt_result_syntax in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
-  let* (live_blocks, live_operations) =
+  let* live_blocks, live_operations =
     Store.Chain.compute_live_blocks chain_store ~block:predecessor
   in
   let block_hash = Block_header.hash header in
@@ -945,7 +945,7 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
     chain_store ~predecessor ~protocol_data ~timestamp operations =
   let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
-  let* (live_blocks, live_operations) =
+  let* live_blocks, live_operations =
     Store.Chain.compute_live_blocks chain_store ~block:predecessor
   in
   let predecessor_shell_header = Store.Block.shell_header predecessor in

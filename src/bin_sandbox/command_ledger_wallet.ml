@@ -4,7 +4,7 @@ open Internal_pervasives
 (********************* TEST UTILS **********************)
 
 let client_async_cmd state ~client args ~f =
-  let* (status, res) =
+  let* status, res =
     Running_processes.Async.run_cmdf
       ~id_base:"client_async_cmd"
       state
@@ -45,7 +45,7 @@ let find_and_print_signature_hash ?(display_expectation = true) state process =
       | Some matches -> Some (Group.get matches 1))
   in
   (* Dbg.e EF.(wf "find_and_print_signature_hash") ; *)
-  let* (output, error, _) =
+  let* output, error, _ =
     Running_processes.Async.fold_process
       process
       ~init:("", "", not display_expectation)
@@ -175,9 +175,9 @@ let expect_from_output ~expectation ~message (proc_res : Process_result.t) =
       in
       let all_output = String.concat ~sep:"\n" (proc_res#out @ proc_res#err) in
       match (success, String.substr_index all_output ~pattern) with
-      | (false, Some _) -> return ()
-      | (false, None) -> nope "cannot find the right error message"
-      | (true, _) -> nope "command succeeded??")
+      | false, Some _ -> return ()
+      | false, None -> nope "cannot find the right error message"
+      | true, _ -> nope "command succeeded??")
 
 (********************* TEST SECTIONS ***************************)
 
@@ -300,7 +300,7 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
               (fun ppf () -> wf ppf "Period: `%i`" 1);
             ]
         (fun () ->
-          let* (_, proc) =
+          let* _, proc =
             Tezos_client.client_cmd
               state
               ~client:(client 0)
@@ -448,7 +448,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
           ~protocol_kind
           ~ledger_account)
   in
-  let* (_, proc_result) =
+  let* _, proc_result =
     Tezos_client.client_cmd
       state
       ~client
@@ -1184,7 +1184,7 @@ module Wallet_scenario = struct
     | _other ->
         no
           (List.find_map_exn enum_assoc ~f:(function
-              | (k, this) when Poly.(v = this) -> Some k
+              | k, this when Poly.(v = this) -> Some k
               | _ -> None))
 
   let if_voting t = run_if `Voting t
@@ -1241,7 +1241,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
   let* _ledger_account =
     Tezos_client.Ledger.show_ledger state ~client:ledger_client ~uri
   in
-  let (protocol, baker_0_account, _baker_0_balance) =
+  let protocol, baker_0_account, _baker_0_balance =
     let open Tezos_protocol in
     let d = protocol in
     let baker = List.nth_exn d.bootstrap_accounts 0 in
@@ -1257,7 +1257,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
       fst baker,
       snd baker )
   in
-  let* (nodes, protocol) =
+  let* nodes, protocol =
     Test_scenario.network_with_protocol
       ~protocol
       ~size
@@ -1339,7 +1339,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
                 (Tezos_protocol.Account.pubkey_hash ledger_account));
           ]
       (fun ~user_answer ->
-        let* (_, proc) =
+        let* _, proc =
           Tezos_client.client_cmd
             state
             ~client:client_0
@@ -1481,7 +1481,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
             pp_warning_ledger_takes_a_while ~adjective:"big";
           ]
       (fun ~user_answer ->
-        let* (_, proc) =
+        let* _, proc =
           sign state ~client:signer ~bytes:batch_transaction_bytes
         in
         expect_from_output
@@ -1517,7 +1517,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
       ~parameter:"unit"
       ~init_storage:"Unit"
   in
-  let* (_, proc_result) =
+  let* _, proc_result =
     Tezos_client.client_cmd
       state
       ~client:client_0

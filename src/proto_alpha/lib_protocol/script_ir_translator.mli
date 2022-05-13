@@ -27,37 +27,37 @@
 
 (* Overview:
 
-This mli is organized into roughly three parts:
+   This mli is organized into roughly three parts:
 
-1. A set of new types prefixed with "ex_"
-Michelson is encoded in a GADT that preserves certain properties about its
-type system. If you haven't read about GADT's, check out the relevant section
-in the Tezos docs:
-https://tezos.gitlab.io/developer/gadt.html#generalized-algebraic-data-types-gadts 
+   1. A set of new types prefixed with "ex_"
+   Michelson is encoded in a GADT that preserves certain properties about its
+   type system. If you haven't read about GADT's, check out the relevant section
+   in the Tezos docs:
+   https://tezos.gitlab.io/developer/gadt.html#generalized-algebraic-data-types-gadts
 
-The idea is that type representing a Michelson type, ['a ty], is parameterized
-by a type 'a. But that 'a can't be just _any_ type; it must be valid according
-to the definition of ['a ty]. Thus, if I give you a value of type ['a ty],
-all you know is that "there exists some 'a such that 'a ty exists". You must be
-careful not to accidentally quantify 'a universally, that is "for all 'a,
-'a ty exists", otherwise you'll get an annoying error about 'a trying to escape
-it's scope. We do this by hiding 'a in an existential type. This is what
-ex_comparable_ty, ex_ty, ex_stack_ty, etc. do.
+   The idea is that type representing a Michelson type, ['a ty], is parameterized
+   by a type 'a. But that 'a can't be just _any_ type; it must be valid according
+   to the definition of ['a ty]. Thus, if I give you a value of type ['a ty],
+   all you know is that "there exists some 'a such that 'a ty exists". You must be
+   careful not to accidentally quantify 'a universally, that is "for all 'a,
+   'a ty exists", otherwise you'll get an annoying error about 'a trying to escape
+   it's scope. We do this by hiding 'a in an existential type. This is what
+   ex_comparable_ty, ex_ty, ex_stack_ty, etc. do.
 
-2. A set of functions dealing with high-level Michelson types: 
-This module also provides functions for interacting with the list, map,
-set, and big_map Michelson types. 
+   2. A set of functions dealing with high-level Michelson types:
+   This module also provides functions for interacting with the list, map,
+   set, and big_map Michelson types.
 
-3. A set of functions for parsing and typechecking Michelson.
-Finally, and what you likely came for, the module provides many functions prefixed
-with "parse_" that convert untyped Micheline (which is essentially S-expressions
-with a few primitive atom types) into the GADT encoding well-typed Michelson. Likewise
-there is a number of functions prefixed "unparse_" that do the reverse. These functions
-consume gas, and thus are parameterized by an [Alpha_context.t].
+   3. A set of functions for parsing and typechecking Michelson.
+   Finally, and what you likely came for, the module provides many functions prefixed
+   with "parse_" that convert untyped Micheline (which is essentially S-expressions
+   with a few primitive atom types) into the GADT encoding well-typed Michelson. Likewise
+   there is a number of functions prefixed "unparse_" that do the reverse. These functions
+   consume gas, and thus are parameterized by an [Alpha_context.t].
 
-The variety of functions reflects the variety of things one might want to parse,
-from [parse_data] for arbitrary Micheline expressions to [parse_contract] for
-well-formed Michelson contracts.
+   The variety of functions reflects the variety of things one might want to parse,
+   from [parse_data] for arbitrary Micheline expressions to [parse_contract] for
+   well-formed Michelson contracts.
 *)
 
 (** {1 Michelson Existential Witness types} *)

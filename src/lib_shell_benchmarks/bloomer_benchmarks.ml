@@ -78,7 +78,7 @@ let () =
          Bloomer.add bloomer string ;
          (bloomer, string))
        (fun generator () ->
-         let (bloomer, string) = generator () in
+         let bloomer, string = generator () in
          let closure () = ignore (Bloomer.mem bloomer string) in
          Generator.Plain {workload = (); closure})
 

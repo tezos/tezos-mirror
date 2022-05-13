@@ -55,7 +55,7 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
   let open Lwt_result_syntax in
   let accum (xs, ctxt)
       (Ticket_token.Ex_token {ticketer; contents_type; contents}, amount) =
-    let* (x, ctxt) =
+    let* x, ctxt =
       wrap
       @@ Script_ir_translator.unparse_comparable_data
            ~loc:()
@@ -76,18 +76,18 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
     in
     return (str :: xs, ctxt)
   in
-  let* (xs, ctxt) = List.fold_left_es accum ([], ctxt) token_diffs in
+  let* xs, ctxt = List.fold_left_es accum ([], ctxt) token_diffs in
   return (List.rev xs, ctxt)
 
 let make_ex_token ctxt ~ticketer ~type_exp ~content_exp =
   let open Lwt_result_syntax in
   wrap
-  @@ let*? (Script_ir_translator.Ex_comparable_ty contents_type, ctxt) =
+  @@ let*? Script_ir_translator.Ex_comparable_ty contents_type, ctxt =
        let node = Micheline.root @@ Expr.from_string type_exp in
        Script_ir_translator.parse_comparable_ty ctxt node
      in
      let*? ticketer = Contract.of_b58check ticketer in
-     let* (contents, ctxt) =
+     let* contents, ctxt =
        let node = Micheline.root @@ Expr.from_string content_exp in
        Script_ir_translator.parse_comparable_data ctxt contents_type node
      in
@@ -95,7 +95,7 @@ let make_ex_token ctxt ~ticketer ~type_exp ~content_exp =
 
 let assert_equal_ticket_diffs ~loc ctxt given expected =
   let open Lwt_result_syntax in
-  let* (ctxt, tbs1) =
+  let* ctxt, tbs1 =
     List.fold_left_map_es
       (fun ctxt ((ticketer, content), delta) ->
         make_ex_token
@@ -107,8 +107,8 @@ let assert_equal_ticket_diffs ~loc ctxt given expected =
       ctxt
       expected
   in
-  let* (tbs1, ctxt) = string_list_of_ex_token_diffs ctxt tbs1 in
-  let* (tbs2, _ctxt) = string_list_of_ex_token_diffs ctxt given in
+  let* tbs1, ctxt = string_list_of_ex_token_diffs ctxt tbs1 in
+  let* tbs2, _ctxt = string_list_of_ex_token_diffs ctxt given in
   assert_equal_string_list
     ~loc
     "Compare token balances"
@@ -119,10 +119,10 @@ let updates_of_key_values ctxt ~key_type ~value_type key_values =
   let open Lwt_result_syntax in
   List.fold_right_es
     (fun (key, value) (kvs, ctxt) ->
-      let* (key_hash, ctxt) =
+      let* key_hash, ctxt =
         wrap (Script_ir_translator.hash_comparable_data ctxt key_type key)
       in
-      let* (key_node, ctxt) =
+      let* key_node, ctxt =
         wrap
           (Script_ir_translator.unparse_comparable_data
              ~loc:Micheline.dummy_location
@@ -131,11 +131,11 @@ let updates_of_key_values ctxt ~key_type ~value_type key_values =
              key_type
              key)
       in
-      let* (value, ctxt) =
+      let* value, ctxt =
         match value with
         | None -> return (None, ctxt)
         | Some value ->
-            let* (value_node, ctxt) =
+            let* value_node, ctxt =
               wrap
                 (Script_ir_translator.unparse_data
                    ctxt
@@ -159,8 +159,8 @@ let make_alloc big_map_id alloc updates =
 
 let init () =
   let open Lwt_result_syntax in
-  let* (block, source) = Context.init1 () in
-  let* (operation, originated) =
+  let* block, source = Context.init1 () in
+  let* operation, originated =
     Op.contract_origination (B block) source ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
@@ -190,22 +190,22 @@ let ticket_list_script =
 
 let setup ctxt ~key_type ~value_type entries =
   let open Lwt_result_syntax in
-  let* (ctxt, big_map_id) = wrap @@ Big_map.fresh ~temporary:false ctxt in
-  let* (updates, ctxt) =
+  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let* updates, ctxt =
     updates_of_key_values
       ctxt
       ~key_type
       ~value_type
       (List.map (fun (k, v) -> (k, Some v)) entries)
   in
-  let*? (key_type_node, ctxt) =
+  let*? key_type_node, ctxt =
     Environment.wrap_tzresult
     @@ Script_ir_translator.unparse_ty
          ~loc:Micheline.dummy_location
          ctxt
          key_type
   in
-  let*? (value_type_node, ctxt) =
+  let*? value_type_node, ctxt =
     Environment.wrap_tzresult
     @@ Script_ir_translator.unparse_ty
          ~loc:Micheline.dummy_location
@@ -219,7 +219,7 @@ let setup ctxt ~key_type ~value_type entries =
 
 let new_big_map ctxt contract ~key_type ~value_type entries =
   let open Lwt_result_syntax in
-  let* (alloc, big_map_id, ctxt) = setup ctxt ~key_type ~value_type entries in
+  let* alloc, big_map_id, ctxt = setup ctxt ~key_type ~value_type entries in
   let storage = Expr.from_string "{}" in
   let* ctxt =
     wrap @@ Contract.update_script_storage ctxt contract storage (Some [alloc])
@@ -228,25 +228,25 @@ let new_big_map ctxt contract ~key_type ~value_type entries =
 
 let alloc_diff ctxt ~key_type ~value_type entries =
   let open Lwt_result_syntax in
-  let* (allocations, _, ctxt) = setup ctxt ~key_type ~value_type entries in
+  let* allocations, _, ctxt = setup ctxt ~key_type ~value_type entries in
   return (allocations, ctxt)
 
 let remove_diff ctxt contract ~key_type ~value_type ~existing_entries =
   let open Lwt_result_syntax in
-  let* (big_map_id, ctxt) =
+  let* big_map_id, ctxt =
     new_big_map ctxt contract ~key_type ~value_type existing_entries
   in
   return (Lazy_storage.make Lazy_storage.Kind.Big_map big_map_id Remove, ctxt)
 
 let copy_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates =
   let open Lwt_result_syntax in
-  let* (big_map_id, ctxt) =
+  let* big_map_id, ctxt =
     new_big_map ctxt contract ~key_type ~value_type existing_entries
   in
-  let* (updates, ctxt) =
+  let* updates, ctxt =
     updates_of_key_values ctxt ~key_type ~value_type updates
   in
-  let* (ctxt, new_big_map_id) = wrap @@ Big_map.fresh ctxt ~temporary:false in
+  let* ctxt, new_big_map_id = wrap @@ Big_map.fresh ctxt ~temporary:false in
   return
     ( Lazy_storage.make
         Lazy_storage.Kind.Big_map
@@ -257,10 +257,10 @@ let copy_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates =
 let existing_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates
     =
   let open Lwt_result_syntax in
-  let* (big_map_id, ctxt) =
+  let* big_map_id, ctxt =
     new_big_map ctxt contract ~key_type ~value_type existing_entries
   in
-  let* (updates, ctxt) =
+  let* updates, ctxt =
     updates_of_key_values ctxt ~key_type ~value_type updates
   in
   return
@@ -273,7 +273,7 @@ let existing_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates
 let empty_big_map ctxt ~key_type ~value_type =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (ctxt, big_map_id) = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
   return
     ( Big_map
         {
@@ -287,7 +287,7 @@ let empty_big_map ctxt ~key_type ~value_type =
 let make_big_map ctxt contract ~key_type ~value_type entries =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (big_map_id, ctxt) =
+  let* big_map_id, ctxt =
     new_big_map ctxt contract ~key_type ~value_type entries
   in
   return
@@ -307,7 +307,7 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
-  let* (operation, destination) =
+  let* operation, destination =
     Op.contract_origination (B block) src ~fee:(Test_tez.of_int 10) ~script
   in
   let* incr =
@@ -362,7 +362,7 @@ let origination_operation ctxt ~src ~script ~orig_contract =
 
 let originate block ~src ~baker ~script ~storage ~forges_tickets =
   let open Lwt_result_syntax in
-  let* (orig_contract, script, block) =
+  let* orig_contract, script, block =
     originate_script block ~script ~storage ~src ~baker ~forges_tickets
   in
   let* incr =
@@ -372,7 +372,7 @@ let originate block ~src ~baker ~script ~storage ~forges_tickets =
 
 let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
   let open Lwt_result_syntax in
-  let* (params_node, ctxt) =
+  let* params_node, ctxt =
     wrap
       (Script_ir_translator.unparse_data
          ctxt
@@ -421,9 +421,9 @@ let type_has_tickets ctxt ty =
 let assert_ticket_diffs ctxt ~loc ~arg_type ~storage_type ~arg ~old_storage
     ~new_storage ~lazy_storage_diff expected =
   let open Lwt_result_syntax in
-  let*? (arg_type_has_tickets, ctxt) = type_has_tickets ctxt arg_type in
-  let*? (storage_type_has_tickets, ctxt) = type_has_tickets ctxt storage_type in
-  let* (ticket_diff, ctxt) =
+  let*? arg_type_has_tickets, ctxt = type_has_tickets ctxt arg_type in
+  let*? storage_type_has_tickets, ctxt = type_has_tickets ctxt storage_type in
+  let* ticket_diff, ctxt =
     wrap
       (Ticket_accounting.ticket_diffs
          ctxt
@@ -434,19 +434,19 @@ let assert_ticket_diffs ctxt ~loc ~arg_type ~storage_type ~arg ~old_storage
          ~new_storage
          ~lazy_storage_diff)
   in
-  let*? (ticket_diffs, ctxt) =
+  let*? ticket_diffs, ctxt =
     Environment.wrap_tzresult @@ Ticket_token_map.to_list ctxt ticket_diff
   in
   assert_equal_ticket_diffs ~loc ctxt ticket_diffs expected
 
 let assert_balance ctxt ~loc key expected =
   let open Lwt_result_syntax in
-  let* (balance, _) = wrap @@ Ticket_balance.get_balance ctxt key in
+  let* balance, _ = wrap @@ Ticket_balance.get_balance ctxt key in
   match (balance, expected) with
-  | (Some b, Some eb) -> Assert.equal_int ~loc (Z.to_int b) eb
-  | (None, Some eb) -> failwith "Expected balance %d" eb
-  | (Some eb, None) -> failwith "Expected None but got %d" (Z.to_int eb)
-  | (None, None) -> return ()
+  | Some b, Some eb -> Assert.equal_int ~loc (Z.to_int b) eb
+  | None, Some eb -> failwith "Expected balance %d" eb
+  | Some eb, None -> failwith "Expected None but got %d" (Z.to_int eb)
+  | None, None -> return ()
 
 let string_ticket ticketer contents amount =
   let amount = Script_int.abs @@ Script_int.of_int amount in
@@ -474,12 +474,12 @@ let string_ticket_token ticketer content =
 let test_diffs_empty () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (_contract, ctxt) = init () in
+  let* _contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
-  let* (empty_big_map, ctxt) =
+  let* empty_big_map, ctxt =
     empty_big_map ctxt ~key_type:int_t ~value_type:ticket_string_type
   in
   assert_ticket_diffs
@@ -498,7 +498,7 @@ let test_diffs_empty () =
 let test_diffs_tickets_in_args () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (_contract, ctxt) = init () in
+  let* _contract, ctxt = init () in
   let arg = string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 in
   assert_ticket_diffs
     ctxt
@@ -515,7 +515,7 @@ let test_diffs_tickets_in_args () =
       storage, results in an empty diff. *)
 let test_diffs_tickets_in_args_and_storage () =
   let open Lwt_result_syntax in
-  let* (_contract, ctxt) = init () in
+  let* _contract, ctxt = init () in
   let arg = string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 in
   assert_ticket_diffs
     ctxt
@@ -532,7 +532,7 @@ let test_diffs_tickets_in_args_and_storage () =
       storage results in a negative diff. *)
 let test_diffs_drop_one_ticket () =
   let open Lwt_result_syntax in
-  let* (_contract, ctxt) = init () in
+  let* _contract, ctxt = init () in
   let arg =
     boxed_list
       [
@@ -561,7 +561,7 @@ let test_diffs_drop_one_ticket () =
     balance. *)
 let test_diffs_adding_new_ticket_to_storage () =
   let open Lwt_result_syntax in
-  let* (_contract, ctxt) = init () in
+  let* _contract, ctxt = init () in
   let new_storage =
     boxed_list [string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1]
   in
@@ -580,7 +580,7 @@ let test_diffs_adding_new_ticket_to_storage () =
     diff. *)
 let test_diffs_remove_from_storage () =
   let open Lwt_result_syntax in
-  let* (_contract, ctxt) = init () in
+  let* _contract, ctxt = init () in
   let old_storage =
     boxed_list
       [
@@ -609,16 +609,16 @@ let test_diffs_remove_from_storage () =
 let test_diffs_lazy_storage_alloc () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (_contract, ctxt) = init () in
+  let* _contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
-  let* (empty_big_map, ctxt) =
+  let* empty_big_map, ctxt =
     empty_big_map ctxt ~key_type:int_t ~value_type:ticket_string_type
   in
   (* We add one ticket to the storage. *)
-  let* (lazy_storage_diff, ctxt) =
+  let* lazy_storage_diff, ctxt =
     alloc_diff
       ctxt
       ~key_type:int_t
@@ -643,16 +643,16 @@ let test_diffs_lazy_storage_alloc () =
 let test_diffs_remove_from_big_map () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (contract, ctxt) = init () in
+  let* contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
-  let* (empty_big_map, ctxt) =
+  let* empty_big_map, ctxt =
     empty_big_map ctxt ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Remove one ticket from the lazy storage. *)
-  let* (lazy_storage_diff, ctxt) =
+  let* lazy_storage_diff, ctxt =
     remove_diff
       ctxt
       contract
@@ -679,16 +679,16 @@ let test_diffs_remove_from_big_map () =
 let test_diffs_copy_big_map () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (contract, ctxt) = init () in
+  let* contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
   (* Start with an empty big-map *)
-  let* (empty_big_map, ctxt) =
+  let* empty_big_map, ctxt =
     empty_big_map ctxt ~key_type:int_t ~value_type:ticket_string_type
   in
   (* We add one ticket to the storage. *)
-  let* (lazy_storage_diff, ctxt) =
+  let* lazy_storage_diff, ctxt =
     copy_diff
       ctxt
       contract
@@ -728,11 +728,11 @@ let test_diffs_copy_big_map () =
 let test_diffs_add_to_existing_big_map () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (contract, ctxt) = init () in
+  let* contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
-  let* (old_storage, ctxt) =
+  let* old_storage, ctxt =
     make_big_map
       ctxt
       contract
@@ -749,7 +749,7 @@ let test_diffs_add_to_existing_big_map () =
       ]
   in
   (* We add one ticket to the storage. *)
-  let* (lazy_storage_diff, ctxt) =
+  let* lazy_storage_diff, ctxt =
     existing_diff
       ctxt
       contract
@@ -792,7 +792,7 @@ let test_diffs_add_to_existing_big_map () =
 let test_diffs_args_storage_and_lazy_diffs () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* (contract, ctxt) = init () in
+  let* contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
@@ -800,7 +800,7 @@ let test_diffs_args_storage_and_lazy_diffs () =
     Environment.wrap_tzresult
     @@ pair_t (-1) ticket_string_list_type int_ticket_big_map_ty
   in
-  let* (empty_big_map, ctxt) =
+  let* empty_big_map, ctxt =
     empty_big_map ctxt ~key_type:int_t ~value_type:ticket_string_type
   in
   (* We send two tickets in the args. *)
@@ -812,7 +812,7 @@ let test_diffs_args_storage_and_lazy_diffs () =
       ]
   in
   (* We add three tickets to the storage. *)
-  let* (lazy_storage_diff, ctxt) =
+  let* lazy_storage_diff, ctxt =
     existing_diff
       ctxt
       contract
@@ -882,8 +882,8 @@ let test_diffs_args_storage_and_lazy_diffs () =
 (** Test that attempting to transfer a ticket that exceeds the budget fails. *)
 let test_update_invalid_transfer () =
   let open Lwt_result_syntax in
-  let* (baker, src, block) = init_for_operation () in
-  let* (destination, _script, incr) =
+  let* baker, src, block = init_for_operation () in
+  let* destination, _script, incr =
     originate
       block
       ~src
@@ -897,7 +897,7 @@ let test_update_invalid_transfer () =
   let arg =
     boxed_list [string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1]
   in
-  let* (operation, ctxt) =
+  let* operation, ctxt =
     transfer_operation ctxt ~src ~destination ~arg_type ~arg
   in
   assert_fail_with
@@ -916,8 +916,8 @@ let test_update_invalid_transfer () =
     results in a balance update. *)
 let test_update_ticket_self_diff () =
   let open Lwt_result_syntax in
-  let* (baker, src, block) = init_for_operation () in
-  let* (self, _script, incr) =
+  let* baker, src, block = init_for_operation () in
+  let* self, _script, incr =
     originate
       block
       ~src
@@ -929,18 +929,18 @@ let test_update_ticket_self_diff () =
   let ticketer = Contract.to_b58check self in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
-  let* (ticket_diffs, ctxt) =
+  let* ticket_diffs, ctxt =
     wrap
       (Ticket_token_map.of_list
          ctxt
          ~merge_overlap:(fun _ -> assert false)
          [(red_token, Z.of_int 10)])
   in
-  let* (_, ctxt) =
+  let* _, ctxt =
     wrap (Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs [])
   in
   (* After update, we should have 10 added red tokens. *)
-  let* (red_self_token_hash, ctxt) =
+  let* red_self_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
@@ -952,8 +952,8 @@ let test_update_ticket_self_diff () =
 (* Test that sending tickets to self succeed (there are no budget constraints). *)
 let test_update_self_ticket_transfer () =
   let open Lwt_result_syntax in
-  let* (baker, self, block) = init_for_operation () in
-  let* (ticket_receiver, _script, incr) =
+  let* baker, self, block = init_for_operation () in
+  let* ticket_receiver, _script, incr =
     originate
       block
       ~src:self
@@ -967,7 +967,7 @@ let test_update_self_ticket_transfer () =
   let ticketer = Contract.to_b58check self in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
-  let* (operation, ctxt) =
+  let* operation, ctxt =
     let arg_type = ticket_string_list_type in
     let arg =
       boxed_list
@@ -986,7 +986,7 @@ let test_update_self_ticket_transfer () =
       ~arg_type
       ~arg
   in
-  let* (_, ctxt) =
+  let* _, ctxt =
     wrap
       (Ticket_accounting.update_ticket_balances
          ctxt
@@ -997,7 +997,7 @@ let test_update_self_ticket_transfer () =
   (* Once we're done with the update, we expect ticket-receiver to have been
      credited with 10 units of ticket-tokens. *)
   let* () =
-    let* (red_receiver_token_hash, ctxt) =
+    let* red_receiver_token_hash, ctxt =
       wrap
       @@ Ticket_balance_key.of_ex_token
            ctxt
@@ -1011,8 +1011,8 @@ let test_update_self_ticket_transfer () =
 (** Test that transferring a ticket that does not exceed the budget succeeds. *)
 let test_update_valid_transfer () =
   let open Lwt_result_syntax in
-  let* (baker, self, block) = init_for_operation () in
-  let* (destination, _script, incr) =
+  let* baker, self, block = init_for_operation () in
+  let* destination, _script, incr =
     originate
       block
       ~src:self
@@ -1025,14 +1025,14 @@ let test_update_valid_transfer () =
   assert (ticketer <> Contract.to_b58check self) ;
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
-  let* (red_self_token_hash, ctxt) =
+  let* red_self_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
          ~owner:(Destination.Contract self)
          red_token
   in
-  let* (red_receiver_token_hash, ctxt) =
+  let* red_receiver_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
@@ -1040,16 +1040,16 @@ let test_update_valid_transfer () =
          red_token
   in
   (* Set up the balance so that the self contract owns one ticket. *)
-  let* (_, ctxt) =
+  let* _, ctxt =
     wrap @@ Ticket_balance.adjust_balance ctxt red_self_token_hash ~delta:Z.one
   in
-  let* (operation, ctxt) =
+  let* operation, ctxt =
     let arg_type = ticket_string_list_type in
     let arg = boxed_list [string_ticket ticketer "red" 1] in
     transfer_operation ctxt ~src:self ~destination ~arg_type ~arg
   in
-  let* (_, ctxt) =
-    let* (ticket_diffs, ctxt) =
+  let* _, ctxt =
+    let* ticket_diffs, ctxt =
       wrap
         (Ticket_token_map.of_list
            ctxt
@@ -1073,8 +1073,8 @@ let test_update_valid_transfer () =
     the balance. *)
 let test_update_transfer_tickets_to_self () =
   let open Lwt_result_syntax in
-  let* (baker, src, block) = init_for_operation () in
-  let* (self, _script, incr) =
+  let* baker, src, block = init_for_operation () in
+  let* self, _script, incr =
     originate
       block
       ~src
@@ -1087,7 +1087,7 @@ let test_update_transfer_tickets_to_self () =
   assert (ticketer <> Contract.to_b58check self) ;
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
-  let* (red_self_token_hash, ctxt) =
+  let* red_self_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
@@ -1095,21 +1095,21 @@ let test_update_transfer_tickets_to_self () =
          red_token
   in
   (* Set up the balance so that the self contract owns ten tickets. *)
-  let* (_, ctxt) =
+  let* _, ctxt =
     wrap
     @@ Ticket_balance.adjust_balance
          ctxt
          red_self_token_hash
          ~delta:(Z.of_int 10)
   in
-  let* (operation, ctxt) =
+  let* operation, ctxt =
     let arg_type = ticket_string_list_type in
     let arg = boxed_list [string_ticket ticketer "red" 1] in
     transfer_operation ctxt ~src:self ~destination:self ~arg_type ~arg
   in
-  let* (_, ctxt) =
+  let* _, ctxt =
     (* Ticket diff removes 5 tickets. *)
-    let* (ticket_diffs, ctxt) =
+    let* ticket_diffs, ctxt =
       wrap
         (Ticket_token_map.of_list
            ctxt
@@ -1132,8 +1132,8 @@ let test_update_transfer_tickets_to_self () =
     budget fails. *)
 let test_update_invalid_origination () =
   let open Lwt_result_syntax in
-  let* (baker, src, block) = init_for_operation () in
-  let* (destination, script, incr) =
+  let* baker, src, block = init_for_operation () in
+  let* destination, script, incr =
     let storage =
       let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
       Printf.sprintf
@@ -1151,7 +1151,7 @@ let test_update_invalid_origination () =
       ~forges_tickets:true
   in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* (operation, ctxt) =
+  let* operation, ctxt =
     origination_operation ctxt ~src ~orig_contract:destination ~script
   in
   assert_fail_with
@@ -1169,10 +1169,10 @@ let test_update_invalid_origination () =
 (** Test update valid origination. *)
 let test_update_valid_origination () =
   let open Lwt_result_syntax in
-  let* (baker, self, block) = init_for_operation () in
+  let* baker, self, block = init_for_operation () in
   let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
   assert (ticketer <> Contract.to_b58check self) ;
-  let* (originated, script, incr) =
+  let* originated, script, incr =
     let storage = Printf.sprintf {|{ Pair %S "red" 1; }|} ticketer in
     originate
       block
@@ -1184,7 +1184,7 @@ let test_update_valid_origination () =
   in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
-  let* (red_self_token_hash, ctxt) =
+  let* red_self_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
@@ -1192,14 +1192,14 @@ let test_update_valid_origination () =
          red_token
   in
   (* Set up the balance so that the self contract owns one ticket. *)
-  let* (_, ctxt) =
+  let* _, ctxt =
     wrap @@ Ticket_balance.adjust_balance ctxt red_self_token_hash ~delta:Z.one
   in
-  let* (operation, ctxt) =
+  let* operation, ctxt =
     origination_operation ctxt ~src:self ~orig_contract:originated ~script
   in
-  let* (_, ctxt) =
-    let* (ticket_diffs, ctxt) =
+  let* _, ctxt =
+    let* ticket_diffs, ctxt =
       wrap
         (Ticket_token_map.of_list
            ctxt
@@ -1215,7 +1215,7 @@ let test_update_valid_origination () =
   in
   (* Once we're done with the update, we expect the balance to have been moved
      from [self] to [destination]. *)
-  let* (red_originated_token_hash, ctxt) =
+  let* red_originated_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
@@ -1226,9 +1226,9 @@ let test_update_valid_origination () =
 
 let test_update_self_origination () =
   let open Lwt_result_syntax in
-  let* (baker, self, block) = init_for_operation () in
+  let* baker, self, block = init_for_operation () in
   let ticketer = Contract.to_b58check self in
-  let* (originated, script, incr) =
+  let* originated, script, incr =
     let storage = Printf.sprintf {|{ Pair %S "red" 1; }|} ticketer in
     originate
       block
@@ -1240,17 +1240,17 @@ let test_update_self_origination () =
   in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
-  let* (red_originated_token_hash, ctxt) =
+  let* red_originated_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
          ~owner:(Destination.Contract originated)
          red_token
   in
-  let* (operation, ctxt) =
+  let* operation, ctxt =
     origination_operation ctxt ~src:self ~orig_contract:originated ~script
   in
-  let* (_, ctxt) =
+  let* _, ctxt =
     wrap
       (Ticket_accounting.update_ticket_balances
          ctxt
@@ -1265,8 +1265,8 @@ let test_update_self_origination () =
 (** Test ticket-token map of list with duplicates.  *)
 let test_ticket_token_map_of_list_with_duplicates () =
   let open Lwt_result_syntax in
-  let* (baker, src, block) = init_for_operation () in
-  let* (self, _script, incr) =
+  let* baker, src, block = init_for_operation () in
+  let* self, _script, incr =
     originate
       block
       ~src
@@ -1278,18 +1278,18 @@ let test_ticket_token_map_of_list_with_duplicates () =
   let ticketer = Contract.to_b58check self in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
-  let* (ticket_diffs, ctxt) =
+  let* ticket_diffs, ctxt =
     wrap
       (Ticket_token_map.of_list
          ctxt
          ~merge_overlap:(fun ctxt v1 v2 -> ok (Z.add v1 v2, ctxt))
          [(red_token, Z.of_int 10); (red_token, Z.of_int 5)])
   in
-  let* (_, ctxt) =
+  let* _, ctxt =
     wrap (Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs [])
   in
   (* After update, we should have 10 + 5 added red tokens. *)
-  let* (red_self_token_hash, ctxt) =
+  let* red_self_token_hash, ctxt =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt

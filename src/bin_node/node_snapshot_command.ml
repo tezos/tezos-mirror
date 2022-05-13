@@ -200,10 +200,10 @@ module Term = struct
         match
           (node_config.blockchain_network.genesis_parameters, sandbox_file)
         with
-        | (None, None) -> return_none
-        | (Some parameters, None) ->
+        | None, None -> return_none
+        | Some parameters, None ->
             return_some (parameters.context_key, parameters.values)
-        | (_, Some filename) -> (
+        | _, Some filename -> (
             let*! r = Lwt_utils_unix.Json.read_file filename in
             match r with
             | Error _err ->

@@ -50,10 +50,10 @@ let field_opt name l = List.assoc_opt name (Ezjsonm.get_dict l)
 let parse_size = function
   | `String name -> (
       match (String.split_on_char '+' name, String.split_on_char '-' name) with
-      | ([name; plus], [_]) -> `Relative (name, int_of_string plus)
-      | ([_], [name; minus]) -> `Relative (name, int_of_string minus)
-      | ([_], [_]) -> `Relative (name, 0)
-      | ([], _) | (_, []) | ([_], _) | (_, [_]) -> assert false
+      | [name; plus], [_] -> `Relative (name, int_of_string plus)
+      | [_], [name; minus] -> `Relative (name, int_of_string minus)
+      | [_], [_] -> `Relative (name, 0)
+      | [], _ | _, [] | [_], _ | _, [_] -> assert false
       | _ -> assert false)
   | `Float f -> `Absolute (int_of_float f)
   | _ -> assert false

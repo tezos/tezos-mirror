@@ -304,7 +304,7 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
         let max_incoming_connections =
           Option.map (fun f -> f n) max_incoming_connections
         in
-        let ((addr, port), other_points) = select_nth_point n points in
+        let (addr, port), other_points = select_nth_point n points in
         detach_node
           ?prefix
           ?p2p_versions

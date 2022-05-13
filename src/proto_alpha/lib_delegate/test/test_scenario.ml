@@ -95,7 +95,7 @@ let test_scenario_t1 () =
     let check_block_before_processing ~level ~round ~block_hash ~block_header
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
       (match (!b_endorsed, level, round) with
-      | (false, 1l, 0l) ->
+      | false, 1l, 0l ->
           (* If any of the checks fails the whole scenario will fail. *)
           check_block_signature
             ~block_hash
@@ -103,7 +103,7 @@ let test_scenario_t1 () =
             ~public_key:Mockup_simulator.bootstrap1
           >>=? fun () ->
           save_proposal_payload ~protocol_data ~var:original_proposal
-      | (true, 1l, 1l) ->
+      | true, 1l, 1l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -171,7 +171,7 @@ let test_scenario_t2 () =
       (* Here we test that the only block that B observes is its own
          proposal for level 1 at round 1. *)
       match (level, round) with
-      | (1l, 1l) ->
+      | 1l, 1l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -244,7 +244,7 @@ let test_scenario_t3 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
       match (level, round) with
-      | (1l, 2l) ->
+      | 1l, 2l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -292,7 +292,7 @@ let test_scenario_t3 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
       match (level, round) with
-      | (1l, 0l) ->
+      | 1l, 0l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -325,7 +325,7 @@ let test_scenario_t3 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       match (level, round) with
-      | (1l, 1l) ->
+      | 1l, 1l ->
           return
             (block_hash, block_header, operations, [Block; Pass; Pass; Pass])
       | _ ->
@@ -407,7 +407,7 @@ let test_scenario_f1 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1, level, round) with
-      | (true, true, 2l, 0l) ->
+      | true, true, 2l, 0l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -425,7 +425,7 @@ let test_scenario_f1 () =
 
     let on_inject_operation ~op_hash ~op =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1) with
-      | (true, false) -> return (op_hash, op, [Pass; Block; Block; Block])
+      | true, false -> return (op_hash, op, [Pass; Block; Block; Block])
       | _ -> return (op_hash, op, [Pass; Pass; Pass; Pass])
 
     let stop_on_event = stop_on_event0
@@ -435,7 +435,7 @@ let test_scenario_f1 () =
 
     let on_inject_operation ~op_hash ~op =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1) with
-      | (true, false) -> return (op_hash, op, [Pass; Pass; Block; Block])
+      | true, false -> return (op_hash, op, [Pass; Pass; Block; Block])
       | _ -> return (op_hash, op, [Pass; Pass; Pass; Pass])
 
     let stop_on_event = stop_on_event0
@@ -446,7 +446,7 @@ let test_scenario_f1 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1, level, round) with
-      | (false, false, 1l, 0l) ->
+      | false, false, 1l, 0l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -464,7 +464,7 @@ let test_scenario_f1 () =
 
     let on_inject_operation ~op_hash ~op =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1) with
-      | (true, false) -> return (op_hash, op, [Pass; Block; Pass; Block])
+      | true, false -> return (op_hash, op, [Pass; Block; Pass; Block])
       | _ -> return (op_hash, op, [Pass; Pass; Pass; Pass])
 
     let stop_on_event = stop_on_event0
@@ -475,7 +475,7 @@ let test_scenario_f1 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       match (!d_proposed_l1_r1, level, round) with
-      | (false, 1l, 1l) ->
+      | false, 1l, 1l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -493,7 +493,7 @@ let test_scenario_f1 () =
 
     let on_inject_operation ~op_hash ~op =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1) with
-      | (true, false) -> return (op_hash, op, [Pass; Block; Block; Pass])
+      | true, false -> return (op_hash, op, [Pass; Block; Block; Pass])
       | _ -> return (op_hash, op, [Pass; Pass; Pass; Pass])
 
     let stop_on_event = stop_on_event0
@@ -553,9 +553,9 @@ let test_scenario_f2 () =
         ~protocol_data:_ =
       let propagation_vector =
         match (level, round) with
-        | (1l, 0l) -> [Pass; Pass; Pass; Pass]
-        | (2l, 0l) -> [Pass; Block; Block; Block]
-        | (2l, 4l) ->
+        | 1l, 0l -> [Pass; Pass; Pass; Pass]
+        | 2l, 0l -> [Pass; Block; Block; Block]
+        | 2l, 4l ->
             proposal_2_4_observed := true ;
             [Pass; Pass; Pass; Pass]
         | _ -> [Block; Block; Block; Block]
@@ -814,7 +814,7 @@ let test_scenario_m4 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       match (level, round) with
-      | (1l, 0l) ->
+      | 1l, 0l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -918,7 +918,7 @@ let test_scenario_m5 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       match (level, round) with
-      | (1l, 0l) ->
+      | 1l, 0l ->
           check_block_signature
             ~block_hash
             ~block_header
@@ -1006,7 +1006,7 @@ let test_scenario_m6 () =
         ~protocol_data:_ =
       let propagation_vector =
         match (level, round) with
-        | (2l, 0l) -> [Pass; Block; Block; Block]
+        | 2l, 0l -> [Pass; Block; Block; Block]
         | _ -> [Pass; Pass; Pass; Pass]
       in
       return (block_hash, block_header, operations, propagation_vector)
@@ -1037,8 +1037,8 @@ let test_scenario_m6 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data =
       (match (level, round) with
-      | (1l, 1l) -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
-      | (2l, 1l) ->
+      | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
+      | 2l, 1l ->
           save_proposal_payload ~protocol_data ~var:b_proposal_2_1
           >>=? fun () -> return [Pass; Pass; Pass; Pass]
       | _ -> return [Pass; Pass; Pass; Pass])
@@ -1147,7 +1147,7 @@ let test_scenario_m7 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data =
       (match (level, round) with
-      | (2l, 1l) -> save_proposal_payload ~protocol_data ~var:a_proposal_2_1
+      | 2l, 1l -> save_proposal_payload ~protocol_data ~var:a_proposal_2_1
       | _ -> return_unit)
       >>=? fun () ->
       return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
@@ -1171,8 +1171,8 @@ let test_scenario_m7 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       (match (level, round) with
-      | (1l, 1l) -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
-      | (2l, 0l) -> return [Block; Pass; Pass; Pass]
+      | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
+      | 2l, 0l -> return [Block; Pass; Pass; Pass]
       | _ -> return [Pass; Pass; Pass; Pass])
       >>=? fun propagation_vector ->
       return (block_hash, block_header, operations, propagation_vector)
@@ -1187,9 +1187,9 @@ let test_scenario_m7 () =
         match
           (is_a10_endorsement, level2_preendorsement, level2_endorsement)
         with
-        | (true, _, _) -> [Pass; Block; Block; Block]
-        | (_, true, _) | (_, _, true) -> [Block; Block; Block; Block]
-        | (_, _, _) -> [Pass; Pass; Pass; Pass]
+        | true, _, _ -> [Pass; Block; Block; Block]
+        | _, true, _ | _, _, true -> [Block; Block; Block; Block]
+        | _, _, _ -> [Pass; Pass; Pass; Pass]
       in
       return (op_hash, op, propagation_vector)
 
@@ -1210,7 +1210,7 @@ let test_scenario_m7 () =
 
     let check_chain_after_processing ~level ~round ~chain:_ =
       match (level, round) with
-      | (2l, 1l) ->
+      | 2l, 1l ->
           c_received_2_1 := true ;
           return_unit
       | _ -> return_unit
@@ -1228,10 +1228,9 @@ let test_scenario_m7 () =
             level2_preendorsement,
             level2_endorsement )
         with
-        | (true, _, _, _) -> [Pass; Block; Block; Block]
-        | (_, false, true, _) | (_, false, _, true) ->
-            [Block; Block; Block; Block]
-        | (_, _, _, _) -> [Pass; Pass; Pass; Pass]
+        | true, _, _, _ -> [Pass; Block; Block; Block]
+        | _, false, true, _ | _, false, _, true -> [Block; Block; Block; Block]
+        | _, _, _, _ -> [Pass; Pass; Pass; Pass]
       in
       return (op_hash, op, propagation_vector)
 
@@ -1252,7 +1251,7 @@ let test_scenario_m7 () =
 
     let check_chain_after_processing ~level ~round ~chain:_ =
       match (level, round) with
-      | (2l, 1l) ->
+      | 2l, 1l ->
           d_received_2_1 := true ;
           return_unit
       | _ -> return_unit
@@ -1270,10 +1269,9 @@ let test_scenario_m7 () =
             level2_preendorsement,
             level2_endorsement )
         with
-        | (true, _, _, _) -> [Pass; Block; Block; Block]
-        | (_, false, true, _) | (_, false, _, true) ->
-            [Block; Block; Block; Block]
-        | (_, _, _, _) -> [Pass; Pass; Pass; Pass]
+        | true, _, _, _ -> [Pass; Block; Block; Block]
+        | _, false, true, _ | _, false, _, true -> [Block; Block; Block; Block]
+        | _, _, _, _ -> [Pass; Pass; Pass; Pass]
       in
       return (op_hash, op, propagation_vector)
 
@@ -1381,8 +1379,8 @@ let test_scenario_m8 () =
     let on_inject_block ~level ~round ~block_hash ~block_header ~operations
         ~protocol_data =
       (match (level, round) with
-      | (1l, 1l) -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
-      | (2l, 0l) ->
+      | 1l, 1l -> return [Block; Delay 0.1; Delay 0.1; Delay 0.1]
+      | 2l, 0l ->
           save_proposal_payload ~protocol_data ~var:b_proposal_2_0
           >>=? fun () -> return [Block; Pass; Pass; Pass]
       | _ -> return [Pass; Pass; Pass; Pass])
@@ -1402,7 +1400,7 @@ let test_scenario_m8 () =
         ~protocol_data:_ =
       let propagation_vector =
         match (level, round) with
-        | (2l, 1l) -> [Block; Pass; Pass; Pass]
+        | 2l, 1l -> [Block; Pass; Pass; Pass]
         | _ -> [Pass; Pass; Pass; Pass]
       in
       return (block_hash, block_header, operations, propagation_vector)

@@ -54,7 +54,7 @@ let port_opt = QCheck.option port
 
 (* could not craft a [p2p_identity QCheck.gen], we use instead a
    constant [unit -> p2p_identity] which will be applied at each
-   testing points.  *)
+   testing points. *)
 
 let peer_id =
   QCheck.option QCheck.(map P2p_identity.generate_with_pow_target_0 unit)

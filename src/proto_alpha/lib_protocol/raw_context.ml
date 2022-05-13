@@ -36,8 +36,8 @@ module Sc_rollup_address_comparable = struct
   let compare_cost _rollup = Saturation_repr.safe_int 15
 end
 
-(* This will not create the map yet, as functions to consume gas have not 
-   been defined yet. However, it will make the type of the carbonated map 
+(* This will not create the map yet, as functions to consume gas have not
+   been defined yet. However, it will make the type of the carbonated map
    available to be used in the definition of type back.
 *)
 module Sc_rollup_address_map_builder =
@@ -536,14 +536,14 @@ let check_enough_gas ctxt cost =
 
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
-  | (Limited {remaining = before}, Limited {remaining = after}) ->
+  | Limited {remaining = before}, Limited {remaining = after} ->
       Gas_limit_repr.Arith.sub before after
-  | (_, _) -> Gas_limit_repr.Arith.zero
+  | _, _ -> Gas_limit_repr.Arith.zero
 
-(* Once gas consuming functions have been defined, 
-   we can instantiate the carbonated map. 
+(* Once gas consuming functions have been defined,
+   we can instantiate the carbonated map.
    See [Sc_rollup_carbonated_map_maker] above.
- *)
+*)
 
 module Gas = struct
   type context = t
@@ -1402,7 +1402,7 @@ end
 module Sc_rollup_in_memory_inbox = struct
   let current_messages ctxt rollup =
     let open Tzresult_syntax in
-    let+ (messages, ctxt) =
+    let+ messages, ctxt =
       Sc_rollup_carbonated_map.find
         ctxt
         rollup
@@ -1414,7 +1414,7 @@ module Sc_rollup_in_memory_inbox = struct
 
   let set_current_messages ctxt rollup tree =
     let open Tzresult_syntax in
-    let+ (sc_rollup_current_messages, ctxt) =
+    let+ sc_rollup_current_messages, ctxt =
       Sc_rollup_carbonated_map.update
         ctxt
         rollup

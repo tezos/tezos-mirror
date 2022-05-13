@@ -62,7 +62,7 @@ let path_gen =
 (** A generator that generates valid values for the [rpc_tls] field *)
 let rpc_tls_gen =
   QCheck.Gen.(
-    let+ (cert, key) = pair path_gen path_gen in
+    let+ cert, key = pair path_gen path_gen in
     cert ^ "," ^ key)
 
 (** A generator that generates valid values for the
@@ -120,7 +120,7 @@ module UnionRightBias = struct
     @@ fun (config1, config2) ->
     let union = Proxy_server_config.union_right_bias config1 config2 in
     let right opt1 opt2 =
-      match (opt1, opt2) with (_, Some _) -> opt2 | _ -> opt1
+      match (opt1, opt2) with _, Some _ -> opt2 | _ -> opt1
     in
     let endpoint ({endpoint = x; _} : Proxy_server_config.t) = x in
     let rpc_addr ({rpc_addr = x; _} : Proxy_server_config.t) = x in

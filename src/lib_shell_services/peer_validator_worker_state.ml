@@ -409,6 +409,6 @@ let pipeline_length_encoding =
       | {fetched_header_length; fetched_block_length} ->
           (fetched_header_length, fetched_block_length))
     (function
-      | (fetched_header_length, fetched_block_length) ->
+      | fetched_header_length, fetched_block_length ->
           {fetched_header_length; fetched_block_length})
     (obj2 (req "fetched_headers" int31) (req "fetched_blocks" int31))

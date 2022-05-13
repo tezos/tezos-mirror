@@ -59,7 +59,8 @@ val create :
 
 type block_validity =
   | Valid
-  | Invalid_after_precheck of error trace (* precheck succeeded but validation failed *)
+  | Invalid_after_precheck of
+      error trace (* precheck succeeded but validation failed *)
   | Invalid of error trace
 (* Invalid (precheck failed) *)
 

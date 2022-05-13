@@ -171,10 +171,10 @@ let compute_block_metadata_hash block_metadata =
 let split_operations_metadata = function
   | Block_validation.No_metadata_hash metadata -> (metadata, None)
   | Metadata_hash l ->
-      let (metadata, hashes) =
+      let metadata, hashes =
         List.fold_left
           (fun (metadata_acc, hashes_acc) l ->
-            let (metadata, hashes) = List.split l in
+            let metadata, hashes = List.split l in
             (metadata :: metadata_acc, hashes :: hashes_acc))
           ([], [])
           l
@@ -268,7 +268,7 @@ let protocol_env_of_protocol_level chain_store protocol_level block_hash =
 let restore_block_contents chain_store block_protocol_env ~block_metadata
     ~operations_metadata message max_operations_ttl last_allowed_fork_level
     block =
-  let (operations_metadata, operations_metadata_hashes) =
+  let operations_metadata, operations_metadata_hashes =
     split_operations_metadata operations_metadata
   in
   let contents =
@@ -414,12 +414,12 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
 
 let store_chunk cemented_store chunk =
   let open Lwt_result_syntax in
-  let* (lower_block, lower_env_version) =
+  let* lower_block, lower_env_version =
     match List.hd chunk with
     | None -> failwith "Cannot read chunk to cement."
     | Some e -> return e
   in
-  let* (_, higher_env_version) =
+  let* _, higher_env_version =
     match List.hd (List.rev chunk) with
     | None -> failwith "Cannot read chunk to cement."
     | Some e -> return e
@@ -448,7 +448,7 @@ let store_chunk cemented_store chunk =
             ( Block_repr.block_metadata_hash b,
               Block_repr.operations_metadata_hashes b )
           with
-          | (Some _, Some _) -> return_true
+          | Some _, Some _ -> return_true
           | _ -> return_false)
     in
     let* valid_lower_block = is_valid (Block_repr.level lower_block) in
@@ -496,7 +496,7 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
   let cemented_block_store = Block_store.cemented_block_store block_store in
   let chain_dir = Store.Chain.chain_dir chain_store in
   let cemented_blocks_dir = Naming.cemented_blocks_dir chain_dir in
-  let* (cemented_cycles, start_cycle_index) =
+  let* cemented_cycles, start_cycle_index =
     let* o =
       Cemented_block_store.load_table cemented_blocks_dir
       (* Filter the cemented cycles to get the ones to reconstruct *)

@@ -40,7 +40,7 @@ let ( let* ) m f = m >>=? f
 let wrap m = m >|= Environment.wrap_tzresult
 
 let make_context () =
-  let* (block, _) = Context.init 1 in
+  let* block, _ = Context.init 1 in
   let* incr = Incremental.begin_construction block in
   return (Incremental.alpha_ctxt incr)
 
@@ -59,13 +59,13 @@ let hash_key ctxt ~ticketer ~typ ~contents ~owner =
           ~owner)
 
 let assert_balance ctxt ~loc key expected =
-  let* (balance, _) = wrap @@ Ticket_balance.get_balance ctxt key in
+  let* balance, _ = wrap @@ Ticket_balance.get_balance ctxt key in
   match balance with
   | Some b -> Assert.equal_int ~loc (Z.to_int b) expected
   | None -> failwith "Expected balance %d" expected
 
 let assert_no_balance ctxt key =
-  let* (balance, _) = wrap @@ Ticket_balance.get_balance ctxt key in
+  let* balance, _ = wrap @@ Ticket_balance.get_balance ctxt key in
   match balance with
   | Some b -> failwith "Expected empty (none) balance but got %d" (Z.to_int b)
   | None -> return ()
@@ -76,7 +76,7 @@ let adjust_balance ctxt key delta =
 let assert_non_overlapping_keys ~loc ~ticketer1 ~ticketer2 ~contents1 ~contents2
     ~typ1 ~typ2 ~owner1 ~owner2 =
   let* ctxt = make_context () in
-  let* (k1, ctxt) =
+  let* k1, ctxt =
     hash_key
       ctxt
       ~ticketer:ticketer1
@@ -84,7 +84,7 @@ let assert_non_overlapping_keys ~loc ~ticketer1 ~ticketer2 ~contents1 ~contents2
       ~contents:contents1
       ~owner:owner1
   in
-  let* (k2, _ctxt) =
+  let* k2, _ctxt =
     hash_key
       ctxt
       ~ticketer:ticketer2
@@ -167,18 +167,18 @@ let test_non_overlapping_keys_owner () =
   *)
 let test_ticket_balance_single_update () =
   let* ctxt = make_context () in
-  let* (alice_red, ctxt) = make_key ctxt "alice_red" in
-  let* (_, ctxt) = adjust_balance ctxt alice_red 1 in
+  let* alice_red, ctxt = make_key ctxt "alice_red" in
+  let* _, ctxt = adjust_balance ctxt alice_red 1 in
   assert_balance ctxt ~loc:__LOC__ alice_red 1
 
 (** Test that updating the ticket-balance table with different keys
     updates both entries. *)
 let test_ticket_balance_different_owners () =
   let* ctxt = make_context () in
-  let* (alice_red, ctxt) = make_key ctxt "alice_red" in
-  let* (alice_blue, ctxt) = make_key ctxt "alice_blue" in
-  let* (_, ctxt) = adjust_balance ctxt alice_red 1 in
-  let* (_, ctxt) = adjust_balance ctxt alice_blue 1 in
+  let* alice_red, ctxt = make_key ctxt "alice_red" in
+  let* alice_blue, ctxt = make_key ctxt "alice_blue" in
+  let* _, ctxt = adjust_balance ctxt alice_red 1 in
+  let* _, ctxt = adjust_balance ctxt alice_blue 1 in
   let* () = assert_balance ctxt ~loc:__LOC__ alice_red 1 in
   let* () = assert_balance ctxt ~loc:__LOC__ alice_blue 1 in
   return ()
@@ -187,33 +187,33 @@ let test_ticket_balance_different_owners () =
     the net result of all balance updates *)
 let test_ticket_balance_multiple_updates () =
   let* ctxt = make_context () in
-  let* (alice_red, ctxt) = make_key ctxt "alice_red" in
-  let* (_, ctxt) = adjust_balance ctxt alice_red 1 in
-  let* (_, ctxt) = adjust_balance ctxt alice_red 2 in
-  let* (_, ctxt) = adjust_balance ctxt alice_red (-1) in
+  let* alice_red, ctxt = make_key ctxt "alice_red" in
+  let* _, ctxt = adjust_balance ctxt alice_red 1 in
+  let* _, ctxt = adjust_balance ctxt alice_red 2 in
+  let* _, ctxt = adjust_balance ctxt alice_red (-1) in
   assert_balance ctxt ~loc:__LOC__ alice_red 2
 
 (** Test that with no updates to the table, no balance is present in
     the table *)
 let test_empty_balance () =
   let* ctxt = make_context () in
-  let* (alice_red, ctxt) = make_key ctxt "alice_red" in
+  let* alice_red, ctxt = make_key ctxt "alice_red" in
   assert_no_balance ctxt alice_red
 
 (** Test that adding one entry with positive balance and then
     updating with a negative balance also removes the entry *)
 let test_empty_balance_after_update () =
   let* ctxt = make_context () in
-  let* (alice_red, ctxt) = make_key ctxt "alice_red" in
-  let* (_, ctxt) = adjust_balance ctxt alice_red 1 in
-  let* (_, ctxt) = adjust_balance ctxt alice_red (-1) in
+  let* alice_red, ctxt = make_key ctxt "alice_red" in
+  let* _, ctxt = adjust_balance ctxt alice_red 1 in
+  let* _, ctxt = adjust_balance ctxt alice_red (-1) in
   assert_no_balance ctxt alice_red
 
 (** Test that attempting to update an entry with a negative balance
     results in an error. *)
 let test_negative_balance () =
   let* ctxt = make_context () in
-  let* (alice_red, ctxt) = make_key ctxt "alice_red" in
+  let* alice_red, ctxt = make_key ctxt "alice_red" in
   adjust_balance ctxt alice_red (-1) >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (fun _err -> true)
 
@@ -222,20 +222,20 @@ let test_negative_balance () =
     *)
 let test_storage_space () =
   let* ctxt = make_context () in
-  let* (alice_red, ctxt) = make_key ctxt "alice_red" in
+  let* alice_red, ctxt = make_key ctxt "alice_red" in
   (* Space for adding an entry is 65 for the key plus 1 for the value. *)
-  let* (space, ctxt) = adjust_balance ctxt alice_red 1 in
+  let* space, ctxt = adjust_balance ctxt alice_red 1 in
   let* () = Assert.equal_int ~loc:__LOC__ 66 (Z.to_int space) in
   (* Adding one does not consume additional space. *)
-  let* (space, ctxt) = adjust_balance ctxt alice_red 1 in
+  let* space, ctxt = adjust_balance ctxt alice_red 1 in
   let* () = Assert.equal_int ~loc:__LOC__ 0 (Z.to_int space) in
   (* Adding a big balance costs extra. *)
-  let* (space, ctxt) = adjust_balance ctxt alice_red 1000 in
+  let* space, ctxt = adjust_balance ctxt alice_red 1000 in
   let* () = Assert.equal_int ~loc:__LOC__ 1 (Z.to_int space) in
   (* Reset balance to zero should free up space.
      The freed up space is 65 for the key + 2 for the value *)
-  let* (b, ctxt) = wrap @@ Ticket_balance.get_balance ctxt alice_red in
-  let* (space, ctxt) =
+  let* b, ctxt = wrap @@ Ticket_balance.get_balance ctxt alice_red in
+  let* space, ctxt =
     wrap
       (Ticket_balance.adjust_balance
          ctxt
@@ -244,10 +244,10 @@ let test_storage_space () =
   in
   let* () = Assert.equal_int ~loc:__LOC__ (-67) (Z.to_int space) in
   (* Adjusting the space to 0 again should not free anything *)
-  let* (space, ctxt) = adjust_balance ctxt alice_red 0 in
+  let* space, ctxt = adjust_balance ctxt alice_red 0 in
   let* () = Assert.equal_int ~loc:__LOC__ 0 (Z.to_int space) in
   (* Adding a balance requiers extra space. *)
-  let* (space, _) = adjust_balance ctxt alice_red 10 in
+  let* space, _ = adjust_balance ctxt alice_red 10 in
   Assert.equal_int ~loc:__LOC__ 66 (Z.to_int space)
 
 let tests =

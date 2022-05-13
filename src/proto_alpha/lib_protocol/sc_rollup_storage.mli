@@ -422,14 +422,14 @@ val initial_level :
 val get_boot_sector : Raw_context.t -> Sc_rollup_repr.t -> string tzresult Lwt.t
 
 (* [last_cemented_commitment_hash_with_level ctxt sc_rollup] returns the hash
-   and level of the last cemented commitment (lcc) for [sc_rollup]. If the
-   rollup exists but no lcc exists, the initial commitment
-   `Sc_rollup.Commitment.zero` together with the rollup origination level is
-   returned.
+    and level of the last cemented commitment (lcc) for [sc_rollup]. If the
+    rollup exists but no lcc exists, the initial commitment
+    `Sc_rollup.Commitment.zero` together with the rollup origination level is
+    returned.
 
-  May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}} *)
+   May fail with:
+     {ul
+       {li [Sc_rollup_does_not_exist] if [rollup] does not exist}} *)
 val last_cemented_commitment_hash_with_level :
   Raw_context.t ->
   Sc_rollup_repr.t ->

@@ -29,8 +29,7 @@
    Invocation: dune exec tezt/tests/main.exe -- big_map_all
    Subject: Check that RPC [/chain/<chain_id>/blocks/<block_id>/context/big_maps]
             behaves correctly with and without pagination
-
-  *)
+*)
 
 let init ~protocol =
   let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
@@ -185,7 +184,7 @@ let test_wrapper ~protocol =
          (Protocol.name protocol))
     ~tags:["big_map_all"; "rpc"]
   @@ fun () ->
-  let* (_, client) = init ~protocol in
+  let* _, client = init ~protocol in
   let entries : (string * int) list =
     List.map (fun i -> (Format.sprintf "\"%04i\"" i, i)) all_values
   in

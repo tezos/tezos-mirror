@@ -228,8 +228,8 @@ let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
   in
   let* () = postcheck2 nodes oph1 oph2 in
   match (op3, incheck3, postcheck3) with
-  | (None, None, None) -> unit
-  | (Some op3, Some incheck3, Some postcheck3) ->
+  | None, None, None -> unit
+  | Some op3, Some incheck3, Some postcheck3 ->
       let* oph3 =
         let* batch = mk_batch client op3 size3 in
         incheck3 ~__LOC__ nodes @@ fun () ->

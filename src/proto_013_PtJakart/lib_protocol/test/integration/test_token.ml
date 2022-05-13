@@ -61,7 +61,7 @@ let test_simple_balances () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let src = `Contract (Contract.implicit_contract pkh) in
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = `Contract (Contract.implicit_contract pkh) in
   let amount = Tez.one in
   wrap (Token.transfer ctxt src dest amount) >>=? fun (ctxt', _) ->
@@ -80,7 +80,7 @@ let test_simple_balance_updates () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let src = Contract.implicit_contract pkh in
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = Contract.implicit_contract pkh in
   let amount = Tez.one in
   wrap (Token.transfer ctxt (`Contract src) (`Contract dest) amount)
@@ -129,7 +129,7 @@ let test_allocated () =
   create_context () >>=? fun (ctxt, pkh) ->
   let dest = `Delegate_balance pkh in
   test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun _ ->
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = `Contract (Contract.implicit_contract pkh) in
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
   let dest = `Collected_commitments Blinded_public_key_hash.zero in
@@ -182,7 +182,7 @@ let test_transferring_to_sink ctxt sink amount expected_bupds =
   Assert.proto_error_with_info ~loc:__LOC__ res "Overflowing tez addition"
 
 let test_transferring_to_contract ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = Contract.implicit_contract pkh in
   let amount = random_amount () in
   test_transferring_to_sink
@@ -201,7 +201,7 @@ let test_transferring_to_collected_commitments ctxt =
     [(Commitments bpkh, Credited amount, Block_application)]
 
 let test_transferring_to_delegate_balance ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = Contract.implicit_contract pkh in
   let amount = random_amount () in
   test_transferring_to_sink
@@ -211,7 +211,7 @@ let test_transferring_to_delegate_balance ctxt =
     [(Contract dest, Credited amount, Block_application)]
 
 let test_transferring_to_frozen_deposits ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
@@ -254,7 +254,7 @@ let test_transferring_to_burned ctxt =
     true
   >>=? fun () ->
   let pkh = Signature.Public_key_hash.zero in
-  let (p, r) = (Random.bool (), Random.bool ()) in
+  let p, r = (Random.bool (), Random.bool ()) in
   wrap
     (Token.transfer ctxt `Minted (`Lost_endorsing_rewards (pkh, p, r)) amount)
   >>=? fun (_, bupds) ->
@@ -268,7 +268,7 @@ let test_transferring_to_burned ctxt =
     true
 
 let test_transferring_to_frozen_bonds ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let contract = Contract.implicit_contract pkh in
   let tx_rollup = mk_rollup () in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
@@ -368,7 +368,7 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   Assert.proto_error_with_info ~loc:__LOC__ res error_title
 
 let test_transferring_from_contract ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let src = Contract.implicit_contract pkh in
   let amount = random_amount () in
   test_transferring_from_bounded_source
@@ -387,7 +387,7 @@ let test_transferring_from_collected_commitments ctxt =
     [(Commitments bpkh, Debited amount, Block_application)]
 
 let test_transferring_from_delegate_balance ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
   let src = Contract.implicit_contract pkh in
   test_transferring_from_bounded_source
@@ -397,7 +397,7 @@ let test_transferring_from_delegate_balance ctxt =
     [(Contract src, Debited amount, Block_application)]
 
 let test_transferring_from_frozen_deposits ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
   test_transferring_from_bounded_source
     ctxt
@@ -414,7 +414,7 @@ let test_transferring_from_collected_fees ctxt =
     [(Block_fees, Debited amount, Block_application)]
 
 let test_transferring_from_frozen_bonds ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let contract = Contract.implicit_contract pkh in
   let tx_rollup = mk_rollup () in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
@@ -485,13 +485,13 @@ let cast_to_container_type x =
 let build_test_cases () =
   create_context () >>=? fun (ctxt, pkh) ->
   let origin = `Contract (Contract.implicit_contract pkh) in
-  let (user1, _, _) = Signature.generate_key () in
+  let user1, _, _ = Signature.generate_key () in
   let user1c = `Contract (Contract.implicit_contract user1) in
-  let (user2, _, _) = Signature.generate_key () in
+  let user2, _, _ = Signature.generate_key () in
   let user2c = `Contract (Contract.implicit_contract user2) in
-  let (baker1, baker1_pk, _) = Signature.generate_key () in
+  let baker1, baker1_pk, _ = Signature.generate_key () in
   let baker1c = `Contract (Contract.implicit_contract baker1) in
-  let (baker2, baker2_pk, _) = Signature.generate_key () in
+  let baker2, baker2_pk, _ = Signature.generate_key () in
   let baker2c = `Contract (Contract.implicit_contract baker2) in
   (* Allocate contracts for user1, user2, baker1, and baker2. *)
   wrap (Token.transfer ctxt origin user1c (random_amount ()))
@@ -567,23 +567,23 @@ let check_sink_balances ctxt ctxt' dest amount =
 
 let rec check_balances ctxt ctxt' src dest amount =
   match (cast_to_container_type src, cast_to_container_type dest) with
-  | (None, None) -> return_unit
-  | (Some (`Delegate_balance d), Some (`Contract c as contract))
+  | None, None -> return_unit
+  | Some (`Delegate_balance d), Some (`Contract c as contract)
     when Contract.implicit_contract d = c ->
       (* src and dest are in fact referring to the same contract *)
       check_balances ctxt ctxt' contract contract amount
-  | (Some (`Contract c as contract), Some (`Delegate_balance d))
+  | Some (`Contract c as contract), Some (`Delegate_balance d)
     when Contract.implicit_contract d = c ->
       (* src and dest are in fact referring to the same contract *)
       check_balances ctxt ctxt' contract contract amount
-  | (Some src, Some dest) when src = dest ->
+  | Some src, Some dest when src = dest ->
       (* src and dest are the same contract *)
       wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
       wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
       Assert.equal_tez ~loc:__LOC__ bal_dest bal_dest'
-  | (Some src, None) -> check_src_balances ctxt ctxt' src amount
-  | (None, Some dest) -> check_sink_balances ctxt ctxt' dest amount
-  | (Some src, Some dest) ->
+  | Some src, None -> check_src_balances ctxt ctxt' src amount
+  | None, Some dest -> check_sink_balances ctxt ctxt' dest amount
+  | Some src, Some dest ->
       check_src_balances ctxt ctxt' src amount >>=? fun _ ->
       check_sink_balances ctxt ctxt' dest amount
 
@@ -612,22 +612,22 @@ let test_all_combinations_of_sources_and_sinks () =
     if one is a credit while the other is a debit. *)
 let coalesce_balance_updates bu1 bu2 =
   match (bu1, bu2) with
-  | ((bu1_bal, bu1_balupd, bu1_origin), (bu2_bal, bu2_balupd, bu2_origin)) -> (
+  | (bu1_bal, bu1_balupd, bu1_origin), (bu2_bal, bu2_balupd, bu2_origin) -> (
       assert (bu1_bal = bu2_bal) ;
       assert (bu1_origin = bu2_origin) ;
       let open Receipt in
       match (bu1_balupd, bu2_balupd) with
-      | (Credited bu1_am, Credited bu2_am) ->
+      | Credited bu1_am, Credited bu2_am ->
           let bu_am =
             match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
           in
           (bu1_bal, Credited bu_am, bu1_origin)
-      | (Debited bu1_am, Debited bu2_am) ->
+      | Debited bu1_am, Debited bu2_am ->
           let bu_am =
             match bu1_am +? bu2_am with Ok am -> am | _ -> assert false
           in
           (bu1_bal, Debited bu_am, bu1_origin)
-      | (Credited _, Debited _) | (Debited _, Credited _) -> assert false)
+      | Credited _, Debited _ | Debited _, Credited _ -> assert false)
 
 (** Check that elt has the same balance in ctxt1 and ctxt2. *)
 let check_balances_are_consistent ctxt1 ctxt2 elt =
@@ -656,7 +656,7 @@ let test_transfer_n ctxt src dest =
   (* remove burning balance updates *)
   let debit_logs =
     List.filter
-      (fun b -> match b with (Receipt.Burned, _, _) -> false | _ -> true)
+      (fun b -> match b with Receipt.Burned, _, _ -> false | _ -> true)
       debit_logs
   in
   (* Credit the sink for each source. *)
@@ -670,7 +670,7 @@ let test_transfer_n ctxt src dest =
   (* remove minting balance updates *)
   let credit_logs =
     List.filter
-      (fun b -> match b with (Receipt.Minted, _, _) -> false | _ -> true)
+      (fun b -> match b with Receipt.Minted, _, _ -> false | _ -> true)
       credit_logs
   in
   (* Check equivalence of balance updates. *)
@@ -695,13 +695,13 @@ let test_transfer_n_with_non_empty_source () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let origin = `Contract (Contract.implicit_contract pkh) in
-  let (user1, _, _) = Signature.generate_key () in
+  let user1, _, _ = Signature.generate_key () in
   let user1c = `Contract (Contract.implicit_contract user1) in
-  let (user2, _, _) = Signature.generate_key () in
+  let user2, _, _ = Signature.generate_key () in
   let user2c = `Contract (Contract.implicit_contract user2) in
-  let (user3, _, _) = Signature.generate_key () in
+  let user3, _, _ = Signature.generate_key () in
   let user3c = `Contract (Contract.implicit_contract user3) in
-  let (user4, _, _) = Signature.generate_key () in
+  let user4, _, _ = Signature.generate_key () in
   let user4c = `Contract (Contract.implicit_contract user4) in
   (* Allocate contracts for user1, user2, user3, and user4. *)
   let amount =

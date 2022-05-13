@@ -45,9 +45,9 @@ open Alpha_context
 module type Mutable_level_store =
   Store.Mutable_value with type value = Raw_level.t
 
-(* We keep the number of messages and ticks to be included in the 
-   next commitment in memory. Note that we do not risk to increase 
-   these counters when the wrong branch is tracked by the rollup 
+(* We keep the number of messages and ticks to be included in the
+   next commitment in memory. Note that we do not risk to increase
+   these counters when the wrong branch is tracked by the rollup
    node, as only finalized heads are processed to build commitments.
 *)
 
@@ -265,10 +265,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       let cctxt = node_ctxt.cctxt in
       let sc_rollup_address = node_ctxt.rollup_address in
       let fee_parameter = node_ctxt.fee_parameter in
-      let* (source, src_pk, src_sk) =
-        Node_context.get_operator_keys node_ctxt
-      in
-      let* (_, _, Manager_operation_result {operation_result; _}) =
+      let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
+      let* _, _, Manager_operation_result {operation_result; _} =
         Client_proto_context.sc_rollup_publish
           cctxt
           ~chain:cctxt#chain

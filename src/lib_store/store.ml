@@ -45,10 +45,10 @@ module Shared = struct
     Lwt_idle_waiter.force_idle v.lock (fun () ->
         let* o_r = f v.data in
         match o_r with
-        | (Some new_data, res) ->
+        | Some new_data, res ->
             v.data <- new_data ;
             return res
-        | (None, res) -> return res)
+        | None, res -> return res)
 end
 
 type store = {
@@ -143,7 +143,7 @@ let read_ancestor_hash_by_level chain_store head level =
    target. *)
 let locked_is_acceptable_block chain_state (hash, level) =
   let open Lwt_syntax in
-  let* (_checkpoint_hash, checkpoint_level) =
+  let* _checkpoint_hash, checkpoint_level =
     Stored_data.get chain_state.checkpoint_data
   in
   (* The block must be above the checkpoint. *)
@@ -480,7 +480,7 @@ module Block = struct
     | false ->
         (* Safety check: never ever commit a block that is not
            compatible with the current checkpoint/target. *)
-        let*! (acceptable_block, known_invalid) =
+        let*! acceptable_block, known_invalid =
           Shared.use chain_store.chain_state (fun chain_state ->
               let*! acceptable_block =
                 locked_is_acceptable_block
@@ -1010,7 +1010,7 @@ module Chain = struct
               new_cache
           in
           chain_state.live_data_cache <- Some new_cache ;
-          let (live_blocks, live_ops) =
+          let live_blocks, live_ops =
             Ringo.Ring.fold
               new_cache
               ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
@@ -1064,7 +1064,7 @@ module Chain = struct
   let compute_locator_from_hash chain_store ?(max_size = max_locator_size)
       ?min_level (head_hash, head_header) seed =
     let open Lwt_syntax in
-    let* (caboose, _) =
+    let* caboose, _ =
       Shared.use chain_store.chain_state (fun chain_state ->
           match min_level with
           | None -> Block_store.caboose chain_store.block_store
@@ -1105,7 +1105,7 @@ module Chain = struct
 
   let compute_locator chain_store ?(max_size = 200) head seed =
     let open Lwt_syntax in
-    let* (caboose, _caboose_level) = caboose chain_store in
+    let* caboose, _caboose_level = caboose chain_store in
     Block_locator.compute
       ~get_predecessor:(fun h n ->
         Block.read_ancestor_hash_opt chain_store h ~distance:n)
@@ -1306,7 +1306,7 @@ module Chain = struct
             Lwt.return_some hcb
         | None ->
             (* If we don't, check that the head lafl is > caboose *)
-            let* (_, caboose_level) = Block_store.caboose block_store in
+            let* _, caboose_level = Block_store.caboose block_store in
             if Compare.Int32.(head_lafl >= caboose_level) then
               Lwt.return_some head_lafl
             else Lwt.return_none)
@@ -1421,7 +1421,7 @@ module Chain = struct
               new_head
               new_head_lafl
           in
-          let* (new_checkpoint, new_target) =
+          let* new_checkpoint, new_target =
             match lafl_block_opt with
             | None ->
                 (* This case may occur when importing a rolling
@@ -1552,7 +1552,7 @@ module Chain = struct
           let* () = write_alternate_heads chain_state new_alternate_heads in
           let* () = Stored_data.write chain_state.target_data new_target in
           (* Update live_data *)
-          let*! (live_blocks, live_operations) =
+          let*! live_blocks, live_operations =
             locked_compute_live_blocks
               ~update_cache:true
               chain_store
@@ -1638,7 +1638,7 @@ module Chain = struct
 
   let best_known_head_for_checkpoint chain_store ~checkpoint =
     let open Lwt_result_syntax in
-    let (_, checkpoint_level) = checkpoint in
+    let _, checkpoint_level = checkpoint in
     let*! current_head = current_head chain_store in
     let* valid =
       is_valid_for_checkpoint
@@ -1730,7 +1730,7 @@ module Chain = struct
                  in
                  let find_best_head heads =
                    assert (heads <> []) ;
-                   let (first_alternate_head, alternate_heads) =
+                   let first_alternate_head, alternate_heads =
                      ( List.hd heads |> WithExceptions.Option.get ~loc:__LOC__,
                        List.tl heads |> WithExceptions.Option.get ~loc:__LOC__
                      )
@@ -1760,9 +1760,9 @@ module Chain = struct
                          all_heads )
                  in
                  (* Case 1 *)
-                 let* (new_current_head, new_alternate_heads, new_checkpoint) =
+                 let* new_current_head, new_alternate_heads, new_checkpoint =
                    if filtered_heads <> [] then
-                     let* (best_alternate_head, alternate_heads) =
+                     let* best_alternate_head, alternate_heads =
                        find_best_head filtered_heads
                      in
                      return (best_alternate_head, alternate_heads, new_target)
@@ -1778,7 +1778,7 @@ module Chain = struct
                          all_heads
                      in
                      if filtered_heads <> [] then
-                       let* (best_alternate_head, alternate_heads) =
+                       let* best_alternate_head, alternate_heads =
                          find_best_head filtered_heads
                        in
                        return (best_alternate_head, alternate_heads, new_target)
@@ -1931,14 +1931,14 @@ module Chain = struct
       ( Cemented_block_store.get_highest_cemented_level cemented_store,
         cementing_highwatermark )
     with
-    | (None, (Some _ | None)) -> return_ok_unit
-    | (Some highest_cemented_level, None) ->
+    | None, (Some _ | None) -> return_ok_unit
+    | Some highest_cemented_level, None ->
         (* This case only happens after the store has been
            imported from a snapshot. *)
         Stored_data.write
           cementing_highwatermark_data
           (Some highest_cemented_level)
-    | (Some highest_cemented_level, Some cementing_highwatermark) ->
+    | Some highest_cemented_level, Some cementing_highwatermark ->
         (* Invariant: the cemented blocks are always correct *)
         if Compare.Int32.(highest_cemented_level > cementing_highwatermark) then
           Stored_data.write
@@ -1970,7 +1970,7 @@ module Chain = struct
     let* checkpoint_data =
       Stored_data.load (Naming.checkpoint_file chain_dir)
     in
-    let*! (_, checkpoint_level) = Stored_data.get checkpoint_data in
+    let*! _, checkpoint_level = Stored_data.get checkpoint_data in
     Prometheus.Gauge.set
       Store_metrics.metrics.checkpoint_level
       (Int32.to_float checkpoint_level) ;
@@ -1981,7 +1981,7 @@ module Chain = struct
     let* forked_chains_data =
       Stored_data.load (Naming.forked_chains_file chain_dir)
     in
-    let*! (current_head_hash, _) = Stored_data.get current_head_data in
+    let*! current_head_hash, _ = Stored_data.get current_head_data in
     let* o =
       Block_store.read_block
         ~read_metadata:true
@@ -2131,7 +2131,7 @@ module Chain = struct
     | None -> tzfail Inconsistent_chain_store
     | Some metadata ->
         Shared.update_with chain_state (fun chain_state ->
-            let*! (live_blocks, live_operations) =
+            let*! live_blocks, live_operations =
               locked_compute_live_blocks
                 ~force:true
                 ~update_cache:true
@@ -2376,7 +2376,7 @@ module Chain = struct
     if Compare.Int.(prev_proto_level < protocol_level) then
       let*! o = find_activation_block chain_store ~protocol_level in
       match o with
-      | Some {block = (bh, _); _} ->
+      | Some {block = bh, _; _} ->
           if Block_hash.(bh <> Block.hash block) then
             set_protocol_level chain_store ~protocol_level (block, protocol_hash)
           else return_unit
@@ -2393,7 +2393,7 @@ module Chain = struct
     match o with
     | None -> return_unit
     | Some {block; protocol; _} -> (
-        let*! (_, savepoint_level) = savepoint chain_store in
+        let*! _, savepoint_level = savepoint chain_store in
         if Compare.Int32.(savepoint_level > snd block) then
           (* the block is too far in the past *)
           return_unit
@@ -2432,7 +2432,7 @@ module Chain = struct
     | Some pred when Block_hash.equal (Block.hash pred) (Block.hash block) ->
         Lwt.return_none (* genesis *)
     | Some pred -> (
-        let* (_, save_point_level) = savepoint chain_store in
+        let* _, save_point_level = savepoint chain_store in
         let* protocol =
           if Compare.Int32.(Block.level pred < save_point_level) then
             let* o =
@@ -2623,7 +2623,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   let open Lwt_result_syntax in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
-  let*! (context_index, commit_genesis) =
+  let*! context_index, commit_genesis =
     match commit_genesis with
     | Some commit_genesis ->
         let*! context_index =
@@ -2713,12 +2713,12 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
         else
           let is_valid_switch =
             match (previous_history_mode, new_history_mode) with
-            | ((Full n, Full m) | (Rolling n, Rolling m)) when n = m -> false
-            | (Archive, Full _)
-            | (Archive, Rolling _)
-            | (Full _, Full _)
-            | (Full _, Rolling _)
-            | (Rolling _, Rolling _) ->
+            | (Full n, Full m | Rolling n, Rolling m) when n = m -> false
+            | Archive, Full _
+            | Archive, Rolling _
+            | Full _, Full _
+            | Full _, Rolling _
+            | Rolling _, Rolling _ ->
                 true
             | _ ->
                 (* The remaining combinations are invalid switches *)
@@ -3186,7 +3186,7 @@ module Unsafe = struct
       List.iter_es
         (fun ( _,
                {
-                 Protocol_levels.block = (bh, _);
+                 Protocol_levels.block = bh, _;
                  protocol;
                  commit_info = commit_info_opt;
                } ) ->
@@ -3197,7 +3197,7 @@ module Unsafe = struct
               (Block (bh, 0))
           in
           match (block_opt, commit_info_opt) with
-          | (None, _) -> (
+          | None, _ -> (
               match history_mode with
               | Rolling _ ->
                   (* If we are importing a rolling snapshot then allow the
@@ -3207,8 +3207,8 @@ module Unsafe = struct
                   fail_unless
                     (Block_hash.equal real_genesis_hash bh)
                     (Missing_activation_block (bh, protocol, history_mode)))
-          | (Some _block, None) -> return_unit
-          | (Some block, Some commit_info) ->
+          | Some _block, None -> return_unit
+          | Some block, Some commit_info ->
               let*! is_consistent =
                 Context.check_protocol_commit_consistency
                   ~expected_context_hash:(Block.context_hash block)

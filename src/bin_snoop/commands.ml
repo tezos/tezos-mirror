@@ -839,7 +839,7 @@ let usage () =
     ~global_options:Global_options.options
     commands_with_man
 
-let (original_args, autocomplete) =
+let original_args, autocomplete =
   (* for shell aliases *)
   let rec move_autocomplete_token_upfront acc = function
     | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
@@ -852,7 +852,7 @@ let (original_args, autocomplete) =
   | _ :: args -> move_autocomplete_token_upfront [] args
   | [] -> ([], None)
 
-let (list_solvers, list_models) =
+let list_solvers, list_models =
   ignore
     Clic.(
       setup_formatter
@@ -862,7 +862,7 @@ let (list_solvers, list_models) =
   let result =
     Lwt_main.run
       (let open Lwt_result_syntax in
-      let* (list_flags, args) =
+      let* list_flags, args =
         Clic.parse_global_options Global_options.options () original_args
       in
       match autocomplete with

@@ -288,7 +288,7 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
     ~tags:
       ["node"; "activate"; "user_activated"; "protocol"; "migration"; "voting"]
   @@ fun from_protocol ->
-  let* (node, client, level) =
+  let* node, client, level =
     prepare_migration
       ?yes_node_path
       ?yes_wallet

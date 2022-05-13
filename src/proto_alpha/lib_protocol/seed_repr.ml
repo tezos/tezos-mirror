@@ -79,7 +79,7 @@ let take_int32 s bound =
       Int32.sub Int32.max_int (Int32.rem Int32.max_int bound)
     in
     let rec loop s =
-      let (bytes, s) = take s in
+      let bytes, s = take s in
       let r = TzEndian.get_int32 bytes 0 in
       (* The absolute value of min_int is min_int.  Also, every
            positive integer is represented twice (positive and negative),
@@ -102,7 +102,7 @@ let take_int64 s bound =
     in
 
     let rec loop s =
-      let (bytes, s) = take s in
+      let bytes, s = take s in
       let r = TzEndian.get_int64 bytes 0 in
       (* The absolute value of min_int is min_int.  Also, every
            positive integer is represented twice (positive and negative),

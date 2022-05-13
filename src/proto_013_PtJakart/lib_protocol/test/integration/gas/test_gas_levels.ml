@@ -220,10 +220,10 @@ let apply_with_gas header ?(operations = []) (pred : Block.t) =
 let bake_with_gas ?policy ?timestamp ?operation ?operations pred =
   let operations =
     match (operation, operations) with
-    | (Some op, Some ops) -> Some (op :: ops)
-    | (Some op, None) -> Some [op]
-    | (None, Some ops) -> Some ops
-    | (None, None) -> None
+    | Some op, Some ops -> Some (op :: ops)
+    | Some op, None -> Some [op]
+    | None, Some ops -> Some ops
+    | None, None -> None
   in
   Block.Forge.forge_header ?timestamp ?policy ?operations pred
   >>=? fun header ->
@@ -300,7 +300,7 @@ let block_with_one_origination contract =
 let full_block () =
   init_block [nil_contract; fail_contract; loop_contract]
   >>=? fun (block, src, originated) ->
-  let (dst_nil, dst_fail, dst_loop) =
+  let dst_nil, dst_fail, dst_loop =
     match originated with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
   in
   return (block, src, dst_nil, dst_fail, dst_loop)
@@ -393,10 +393,9 @@ let test_malformed_block_max_limit_reached () =
   *)
   let lld =
     [(dst, Alpha_context.Gas.Arith.integral_of_int_exn 1)]
-    ::
-    List.map
-      (fun _ -> [(dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
-      [1; 1; 1; 1; 1]
+    :: List.map
+         (fun _ -> [(dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
+         [1; 1; 1; 1; 1]
   in
   bake_operations_with_gas ~counter:Z.one block src lld >>= function
   | Error _ -> return_unit
@@ -417,10 +416,9 @@ let test_malformed_block_max_limit_reached' () =
   let lld =
     [
       (dst, Alpha_context.Gas.Arith.integral_of_int_exn 1)
-      ::
-      List.map
-        (fun _ -> (dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000))
-        [1; 1; 1; 1; 1];
+      :: List.map
+           (fun _ -> (dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000))
+           [1; 1; 1; 1; 1];
     ]
   in
   bake_operations_with_gas ~counter:Z.one block src lld >>= function

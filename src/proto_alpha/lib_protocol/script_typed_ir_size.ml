@@ -605,16 +605,16 @@ let lambda_size lam =
       over the corpus of mainnet contracts in Granada.
 
   *)
-  let (lambda_nodes, lambda_size) =
+  let lambda_nodes, lambda_size =
     lambda_size ~count_lambda_nodes:true zero lam
   in
-  let (lambda_extra_size_nodes, lambda_extra_size) = lambda_extra_size lam in
+  let lambda_extra_size_nodes, lambda_extra_size = lambda_extra_size lam in
   let size = (lambda_size *? 157 /? 100) +! (lambda_extra_size *? 18 /? 100) in
   (Nodes.add lambda_nodes lambda_extra_size_nodes, size)
 
 let kinstr_size kinstr =
-  let (kinstr_extra_size_nodes, kinstr_extra_size) = kinstr_extra_size kinstr in
-  let (kinstr_nodes, kinstr_size) =
+  let kinstr_extra_size_nodes, kinstr_extra_size = kinstr_extra_size kinstr in
+  let kinstr_nodes, kinstr_size =
     kinstr_size ~count_lambda_nodes:true zero kinstr
   in
   let size = (kinstr_size *? 157 /? 100) +! (kinstr_extra_size *? 18 /? 100) in

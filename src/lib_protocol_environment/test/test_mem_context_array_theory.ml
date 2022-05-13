@@ -66,7 +66,7 @@ let value_arb = QCheck.map ~rev:Bytes.to_string Bytes.of_string QCheck.string
 let key_value_arb = QCheck.pair key_arb value_arb
 
 (* We generate contexts by starting from a fresh one and
-   doing a sequence of calls to [Context.add].  *)
+   doing a sequence of calls to [Context.add]. *)
 let context_arb : Context.t QCheck.arbitrary =
   let set_all key_value_list =
     Lwt_main.run

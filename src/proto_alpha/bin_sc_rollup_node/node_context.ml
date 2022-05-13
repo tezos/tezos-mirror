@@ -38,7 +38,7 @@ type t = {
 
 let get_operator_keys node_ctxt =
   let open Lwt_result_syntax in
-  let+ (_, pk, sk) = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
+  let+ _, pk, sk = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
   (node_ctxt.operator, pk, sk)
 
 let init (cctxt : Protocol_client_context.full) rollup_address operator

@@ -192,7 +192,7 @@ module Sc_rollup_add_messages_benchmark = struct
 
     let new_ctxt =
       let open Lwt_result_syntax in
-      let* (block, _) = Context.init1 () in
+      let* block, _ = Context.init1 () in
       let+ b = Incremental.begin_construction block in
       let state = Incremental.validation_state b in
       let ctxt = state.ctxt in
@@ -206,7 +206,7 @@ module Sc_rollup_add_messages_benchmark = struct
     let ctxt_with_rollup =
       let open Lwt_result_syntax in
       let* ctxt = new_ctxt in
-      let+ (rollup, _size, ctxt) =
+      let+ rollup, _size, ctxt =
         Lwt.map Environment.wrap_tzresult
         @@ Sc_rollup_storage.originate ctxt ~kind:Example_arith ~boot_sector:""
       in
@@ -215,7 +215,7 @@ module Sc_rollup_add_messages_benchmark = struct
 
     let add_message_and_increment_level ctxt rollup =
       let open Lwt_result_syntax in
-      let+ (inbox, _, ctxt) =
+      let+ inbox, _, ctxt =
         Lwt.map Environment.wrap_tzresult
         @@ Sc_rollup_storage.add_messages ctxt rollup ["CAFEBABE"]
       in
@@ -229,22 +229,22 @@ module Sc_rollup_add_messages_benchmark = struct
         if Raw_level_repr.((Raw_context.current_level ctxt).level > last_level)
         then return (inbox, ctxt)
         else
-          let* (inbox, ctxt) = add_message_and_increment_level ctxt rollup in
+          let* inbox, ctxt = add_message_and_increment_level ctxt rollup in
           add_messages_for_level ctxt inbox rollup
       in
-      let* (rollup, ctxt) = ctxt_with_rollup in
+      let* rollup, ctxt = ctxt_with_rollup in
       let inbox =
         Sc_rollup_inbox_repr.empty rollup (Raw_context.current_level ctxt).level
       in
-      let* (inbox, ctxt) = add_messages_for_level ctxt inbox rollup in
-      let+ (messages, _ctxt) =
+      let* inbox, ctxt = add_messages_for_level ctxt inbox rollup in
+      let+ messages, _ctxt =
         Lwt.return @@ Environment.wrap_tzresult
         @@ Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt rollup
       in
       (inbox, messages)
     in
 
-    let (inbox, current_messages) =
+    let inbox, current_messages =
       match Lwt_main.run @@ prepare_benchmark_scenario () with
       | Ok result -> result
       | Error _ -> assert false

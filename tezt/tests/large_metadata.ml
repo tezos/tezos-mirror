@@ -108,7 +108,7 @@ let check_default_limit_metadata =
     ~title:"Large metadata with default limit"
     ~tags:["large_metadata"; "default"]
   @@ fun protocol ->
-  let* (contract_id, client, _node) = setup_node ~limit:None protocol in
+  let* contract_id, client, _node = setup_node ~limit:None protocol in
   let small_exponent = 23 in
   (* Call the contract with a small exponent to make sure that the
      metadata is allowed. As the metadata cap is set to 10_000_000 bytes
@@ -158,7 +158,7 @@ let check_limit_metadata =
     ~title:"Large metadata with a small limit"
     ~tags:["large_metadata"; "limit"]
   @@ fun protocol ->
-  let* (contract_id, client, _node) =
+  let* contract_id, client, _node =
     setup_node ~limit:(Some (Node.Metadata_size_limit (Some 10_000))) protocol
   in
   let small_exponent = 13 in
@@ -209,7 +209,7 @@ let check_unlimited_metadata =
     ~title:"Large metadata without limit"
     ~tags:["large_metadata"; "unlimited"]
   @@ fun protocol ->
-  let* (contract_id, client, _node) =
+  let* contract_id, client, _node =
     setup_node ~limit:(Some (Node.Metadata_size_limit None)) protocol
   in
   (* We call the contract with a bigger exponent to exceed the
@@ -239,7 +239,7 @@ let check_metadata_force_recompute =
     ~title:"Force recompute large metadata"
     ~tags:["large_metadata"; "force"; "recompute"]
   @@ fun protocol ->
-  let* (contract_id, client, _node) =
+  let* contract_id, client, _node =
     setup_node ~limit:(Some (Node.Metadata_size_limit (Some 10_000))) protocol
   in
   let small_exponent = 13 in

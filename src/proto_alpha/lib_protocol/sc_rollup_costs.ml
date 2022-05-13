@@ -48,11 +48,11 @@ module Constants = struct
 end
 
 (* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
-  [l] is linear in the sum of lengths of the messages, and it is logarithmic 
-  in [l]. That is, [cost_add_messages([m_1; .. ; m_n], l)] = 
-  `n * cost_add_message_base + 
-   cost_add_message_per_bytes * \sum_{i=1}^n length(m_i) +
-   cost_add_inbox_per_level * l`.
+   [l] is linear in the sum of lengths of the messages, and it is logarithmic
+   in [l]. That is, [cost_add_messages([m_1; .. ; m_n], l)] =
+   `n * cost_add_message_base +
+    cost_add_message_per_bytes * \sum_{i=1}^n length(m_i) +
+    cost_add_inbox_per_level * l`.
 *)
 
 let cost_add_messages ~num_messages ~total_messages_size l =

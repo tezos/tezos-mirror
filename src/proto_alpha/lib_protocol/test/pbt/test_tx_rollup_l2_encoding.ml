@@ -48,7 +48,7 @@ let bls_pk =
     `Hex "8fee216367c463821f82c942a1cee3a01469b1da782736ca269a2accea6e0cc4"
     |> Hex.to_bytes_exn
   in
-  let (_pkh, public_key, _secret_key) = Bls.generate_key ~seed:ikm () in
+  let _pkh, public_key, _secret_key = Bls.generate_key ~seed:ikm () in
   public_key
 
 let l2_address = Protocol.Tx_rollup_l2_address.of_bls_pk bls_pk
@@ -83,7 +83,7 @@ let public_key_hash =
 let public_key_hash_gen =
   let open QCheck2.Gen in
   let+ seed = seed_gen in
-  let (pkh, _, _) = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
+  let pkh, _, _ = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
   pkh
 
 let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =

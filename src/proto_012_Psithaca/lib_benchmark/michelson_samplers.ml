@@ -366,7 +366,7 @@ end)
       else
         bind (uniform all_non_atomic_type_names) @@ function
         | `TPair -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
             match
@@ -375,14 +375,14 @@ end)
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TLambda -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty domain) = m_type ~size:lsize in
             let* (Ex_ty range) = m_type ~size:rsize in
             match lambda_t (-1) domain range ~annot:None with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TUnion -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
             match union_t (-1) (left, None) (right, None) ~annot:None with
@@ -394,7 +394,7 @@ end)
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TMap -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_comparable_ty key) = m_comparable_type ~size:lsize in
             let* (Ex_ty elt) = m_type ~size:rsize in
             match map_t (-1) key elt ~annot:None with
@@ -576,7 +576,7 @@ end)
         elt Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler =
      fun elt_type ->
       let open M in
-      let* (length, elements) =
+      let* length, elements =
         Structure_samplers.list
           ~range:P.parameters.list_size
           ~sampler:(value elt_type)
@@ -591,7 +591,7 @@ end)
      fun elt_ty ->
       let open M in
       let ety = comparable_downcast elt_ty in
-      let* (_, elements) =
+      let* _, elements =
         Structure_samplers.list
           ~range:P.parameters.set_size
           ~sampler:(value ety)

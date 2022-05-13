@@ -170,7 +170,7 @@ let wait_for_ready node =
   match node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_ready <-
         resolver :: node.persistent_state.pending_ready ;
       check_event node "tx_rollup_node_is_ready.v0" promise
@@ -186,7 +186,7 @@ let wait_for_tezos_level node level =
     when current_level >= level ->
       return current_level
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_level <-
         (level, resolver) :: node.persistent_state.pending_level ;
       check_event
@@ -196,7 +196,7 @@ let wait_for_tezos_level node level =
         promise
 
 let wait_for_full ?where node name filter =
-  let (promise, resolver) = Lwt.task () in
+  let promise, resolver = Lwt.task () in
   let current_events =
     String_map.find_opt name node.one_shot_event_handlers
     |> Option.value ~default:[]

@@ -59,7 +59,7 @@ let rec listen ?port addr =
 
 let accept main_socket =
   let open Lwt_syntax in
-  let* (fd, _sockaddr) = P2p_fd.accept main_socket in
+  let* fd, _sockaddr = P2p_fd.accept main_socket in
   return_ok fd
 
 let rec accept_n main_socket n =
@@ -188,7 +188,7 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
   let open Lwt_result_syntax in
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
-  let*! (main_socket, port) = listen ?port addr in
+  let*! main_socket, port = listen ?port addr in
   let* server_node =
     Process.detach
       ~prefix:"server: "

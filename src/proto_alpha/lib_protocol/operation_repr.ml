@@ -452,9 +452,9 @@ let rec of_list_internal = function
   | Contents o :: os -> (
       of_list_internal os >>? fun (Contents_list os) ->
       match (o, os) with
-      | (Manager_operation _, Single (Manager_operation _)) ->
+      | Manager_operation _, Single (Manager_operation _) ->
           Ok (Contents_list (Cons (o, os)))
-      | (Manager_operation _, Cons _) -> Ok (Contents_list (Cons (o, os)))
+      | Manager_operation _, Cons _ -> Ok (Contents_list (Cons (o, os)))
       | _ ->
           Error
             "Operation list of length > 1 should only contains manager \
@@ -570,7 +570,7 @@ module Encoding = struct
                 (amount, destination, parameters));
           inj =
             (fun (amount, destination, parameters) ->
-              let (entrypoint, parameters) =
+              let entrypoint, parameters =
                 match parameters with
                 | None -> (Entrypoint_repr.default, Script_repr.unit_parameter)
                 | Some (entrypoint, value) -> (entrypoint, value)
@@ -1614,89 +1614,88 @@ let equal_manager_operation_kind :
     type a b. a manager_operation -> b manager_operation -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Reveal _, Reveal _) -> Some Eq
-  | (Reveal _, _) -> None
-  | (Transaction _, Transaction _) -> Some Eq
-  | (Transaction _, _) -> None
-  | (Origination _, Origination _) -> Some Eq
-  | (Origination _, _) -> None
-  | (Delegation _, Delegation _) -> Some Eq
-  | (Delegation _, _) -> None
-  | (Register_global_constant _, Register_global_constant _) -> Some Eq
-  | (Register_global_constant _, _) -> None
-  | (Set_deposits_limit _, Set_deposits_limit _) -> Some Eq
-  | (Set_deposits_limit _, _) -> None
-  | (Tx_rollup_origination, Tx_rollup_origination) -> Some Eq
-  | (Tx_rollup_origination, _) -> None
-  | (Tx_rollup_submit_batch _, Tx_rollup_submit_batch _) -> Some Eq
-  | (Tx_rollup_submit_batch _, _) -> None
-  | (Tx_rollup_commit _, Tx_rollup_commit _) -> Some Eq
-  | (Tx_rollup_commit _, _) -> None
-  | (Tx_rollup_return_bond _, Tx_rollup_return_bond _) -> Some Eq
-  | (Tx_rollup_return_bond _, _) -> None
-  | (Tx_rollup_finalize_commitment _, Tx_rollup_finalize_commitment _) ->
-      Some Eq
-  | (Tx_rollup_finalize_commitment _, _) -> None
-  | (Tx_rollup_remove_commitment _, Tx_rollup_remove_commitment _) -> Some Eq
-  | (Tx_rollup_remove_commitment _, _) -> None
-  | (Tx_rollup_rejection _, Tx_rollup_rejection _) -> Some Eq
-  | (Tx_rollup_rejection _, _) -> None
-  | (Tx_rollup_dispatch_tickets _, Tx_rollup_dispatch_tickets _) -> Some Eq
-  | (Tx_rollup_dispatch_tickets _, _) -> None
-  | (Transfer_ticket _, Transfer_ticket _) -> Some Eq
-  | (Transfer_ticket _, _) -> None
-  | (Sc_rollup_originate _, Sc_rollup_originate _) -> Some Eq
-  | (Sc_rollup_originate _, _) -> None
-  | (Sc_rollup_add_messages _, Sc_rollup_add_messages _) -> Some Eq
-  | (Sc_rollup_add_messages _, _) -> None
-  | (Sc_rollup_cement _, Sc_rollup_cement _) -> Some Eq
-  | (Sc_rollup_cement _, _) -> None
-  | (Sc_rollup_publish _, Sc_rollup_publish _) -> Some Eq
-  | (Sc_rollup_publish _, _) -> None
-  | (Sc_rollup_refute _, Sc_rollup_refute _) -> Some Eq
-  | (Sc_rollup_refute _, _) -> None
-  | (Sc_rollup_timeout _, Sc_rollup_timeout _) -> Some Eq
-  | (Sc_rollup_timeout _, _) -> None
+  | Reveal _, Reveal _ -> Some Eq
+  | Reveal _, _ -> None
+  | Transaction _, Transaction _ -> Some Eq
+  | Transaction _, _ -> None
+  | Origination _, Origination _ -> Some Eq
+  | Origination _, _ -> None
+  | Delegation _, Delegation _ -> Some Eq
+  | Delegation _, _ -> None
+  | Register_global_constant _, Register_global_constant _ -> Some Eq
+  | Register_global_constant _, _ -> None
+  | Set_deposits_limit _, Set_deposits_limit _ -> Some Eq
+  | Set_deposits_limit _, _ -> None
+  | Tx_rollup_origination, Tx_rollup_origination -> Some Eq
+  | Tx_rollup_origination, _ -> None
+  | Tx_rollup_submit_batch _, Tx_rollup_submit_batch _ -> Some Eq
+  | Tx_rollup_submit_batch _, _ -> None
+  | Tx_rollup_commit _, Tx_rollup_commit _ -> Some Eq
+  | Tx_rollup_commit _, _ -> None
+  | Tx_rollup_return_bond _, Tx_rollup_return_bond _ -> Some Eq
+  | Tx_rollup_return_bond _, _ -> None
+  | Tx_rollup_finalize_commitment _, Tx_rollup_finalize_commitment _ -> Some Eq
+  | Tx_rollup_finalize_commitment _, _ -> None
+  | Tx_rollup_remove_commitment _, Tx_rollup_remove_commitment _ -> Some Eq
+  | Tx_rollup_remove_commitment _, _ -> None
+  | Tx_rollup_rejection _, Tx_rollup_rejection _ -> Some Eq
+  | Tx_rollup_rejection _, _ -> None
+  | Tx_rollup_dispatch_tickets _, Tx_rollup_dispatch_tickets _ -> Some Eq
+  | Tx_rollup_dispatch_tickets _, _ -> None
+  | Transfer_ticket _, Transfer_ticket _ -> Some Eq
+  | Transfer_ticket _, _ -> None
+  | Sc_rollup_originate _, Sc_rollup_originate _ -> Some Eq
+  | Sc_rollup_originate _, _ -> None
+  | Sc_rollup_add_messages _, Sc_rollup_add_messages _ -> Some Eq
+  | Sc_rollup_add_messages _, _ -> None
+  | Sc_rollup_cement _, Sc_rollup_cement _ -> Some Eq
+  | Sc_rollup_cement _, _ -> None
+  | Sc_rollup_publish _, Sc_rollup_publish _ -> Some Eq
+  | Sc_rollup_publish _, _ -> None
+  | Sc_rollup_refute _, Sc_rollup_refute _ -> Some Eq
+  | Sc_rollup_refute _, _ -> None
+  | Sc_rollup_timeout _, Sc_rollup_timeout _ -> Some Eq
+  | Sc_rollup_timeout _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Preendorsement _, Preendorsement _) -> Some Eq
-  | (Preendorsement _, _) -> None
-  | (Endorsement _, Endorsement _) -> Some Eq
-  | (Endorsement _, _) -> None
-  | (Seed_nonce_revelation _, Seed_nonce_revelation _) -> Some Eq
-  | (Seed_nonce_revelation _, _) -> None
-  | (Double_endorsement_evidence _, Double_endorsement_evidence _) -> Some Eq
-  | (Double_endorsement_evidence _, _) -> None
-  | (Double_preendorsement_evidence _, Double_preendorsement_evidence _) ->
+  | Preendorsement _, Preendorsement _ -> Some Eq
+  | Preendorsement _, _ -> None
+  | Endorsement _, Endorsement _ -> Some Eq
+  | Endorsement _, _ -> None
+  | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
+  | Seed_nonce_revelation _, _ -> None
+  | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq
+  | Double_endorsement_evidence _, _ -> None
+  | Double_preendorsement_evidence _, Double_preendorsement_evidence _ ->
       Some Eq
-  | (Double_preendorsement_evidence _, _) -> None
-  | (Double_baking_evidence _, Double_baking_evidence _) -> Some Eq
-  | (Double_baking_evidence _, _) -> None
-  | (Activate_account _, Activate_account _) -> Some Eq
-  | (Activate_account _, _) -> None
-  | (Proposals _, Proposals _) -> Some Eq
-  | (Proposals _, _) -> None
-  | (Ballot _, Ballot _) -> Some Eq
-  | (Ballot _, _) -> None
-  | (Failing_noop _, Failing_noop _) -> Some Eq
-  | (Failing_noop _, _) -> None
-  | (Manager_operation op1, Manager_operation op2) -> (
+  | Double_preendorsement_evidence _, _ -> None
+  | Double_baking_evidence _, Double_baking_evidence _ -> Some Eq
+  | Double_baking_evidence _, _ -> None
+  | Activate_account _, Activate_account _ -> Some Eq
+  | Activate_account _, _ -> None
+  | Proposals _, Proposals _ -> Some Eq
+  | Proposals _, _ -> None
+  | Ballot _, Ballot _ -> Some Eq
+  | Ballot _, _ -> None
+  | Failing_noop _, Failing_noop _ -> Some Eq
+  | Failing_noop _, _ -> None
+  | Manager_operation op1, Manager_operation op2 -> (
       match equal_manager_operation_kind op1.operation op2.operation with
       | None -> None
       | Some Eq -> Some Eq)
-  | (Manager_operation _, _) -> None
+  | Manager_operation _, _ -> None
 
 let rec equal_contents_kind_list :
     type a b. a contents_list -> b contents_list -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Single op1, Single op2) -> equal_contents_kind op1 op2
-  | (Single _, Cons _) -> None
-  | (Cons _, Single _) -> None
-  | (Cons (op1, ops1), Cons (op2, ops2)) -> (
+  | Single op1, Single op2 -> equal_contents_kind op1 op2
+  | Single _, Cons _ -> None
+  | Cons _, Single _ -> None
+  | Cons (op1, ops1), Cons (op2, ops2) -> (
       match equal_contents_kind op1 op2 with
       | None -> None
       | Some Eq -> (

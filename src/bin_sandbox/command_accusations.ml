@@ -13,7 +13,7 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
       EF.[af "Ready to start"; af "Root path deleted."]
   in
   let block_interval = 1 in
-  let (protocol, baker_list) =
+  let protocol, baker_list =
     let open Tezos_protocol in
     let bakers = List.take protocol.bootstrap_accounts bakers in
     let timestamp_delay =
@@ -73,9 +73,9 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
     let* _ = Tezos_client.Keyed.initialize state bak in
     return (client, bak)
   in
-  let* (client_0, baker_0) = baker 0 in
-  let* (client_1, baker_1) = baker 1 in
-  let* (client_2, baker_2) = baker 2 in
+  let* client_0, baker_0 = baker 0 in
+  let* client_1, baker_1 = baker 1 in
+  let* client_2, baker_2 = baker 2 in
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.(
@@ -157,7 +157,7 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
 
 let wait_for_operation_in_mempools state ~nodes:all_nodes ~kind ~client_exec how
     =
-  let (init, combine) =
+  let init, combine =
     match how with `At_least_one -> (false, ( || )) | `All -> (true, ( && ))
   in
   Helpers.wait_for state ~attempts:default_attempts ~seconds:8. (fun _ ->
@@ -177,7 +177,7 @@ let wait_for_operation_in_mempools state ~nodes:all_nodes ~kind ~client_exec how
 
 let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
     ~base_port node_exec client_exec () =
-  let* (all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2) =
+  let* all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2 =
     little_mesh_with_bakers
       ~bakers:1
       ~protocol
@@ -389,8 +389,7 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
       in
       Asynchronous_result.return ()
   | _ ->
-      let* (all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2)
-          =
+      let* all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2 =
         little_mesh_with_bakers
           ~bakers:2
           ~protocol
@@ -490,10 +489,8 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
           | `A [one] -> (Jqo.field ~k:"endorsement" one, Jqo.field ~k:"slot" one)
           | _ -> assert false
         in
-        let (inlined_endorsement_1, slot) =
-          transform_endorsement endorsement_0
-        in
-        let (inlined_endorsement_2, _) = transform_endorsement endorsement_1 in
+        let inlined_endorsement_1, slot = transform_endorsement endorsement_0 in
+        let inlined_endorsement_2, _ = transform_endorsement endorsement_1 in
         `O
           [
             ("branch", head_hash_json);
@@ -576,7 +573,7 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec client_exec
     () =
   let* () = Helpers.clear_root state in
   let block_interval = 2 in
-  let (protocol, baker_0_account) =
+  let protocol, baker_0_account =
     let d = protocol in
     let open Tezos_protocol in
     let baker = List.hd_exn d.bootstrap_accounts in
@@ -594,7 +591,7 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec client_exec
     Test_scenario.Topology.(
       net_in_the_middle "AT-" (mesh "Mid" 3) (mesh "Main" 4) (mesh "Acc" 4))
   in
-  let (mesh_nodes, intermediary_nodes, accuser_nodes) =
+  let mesh_nodes, intermediary_nodes, accuser_nodes =
     Test_scenario.Topology.build
       topology
       ~base_port
@@ -633,9 +630,9 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec client_exec
     let* _ = Tezos_client.Keyed.initialize state bak in
     return (client, bak)
   in
-  let* (client_0, baker_0) = baker 0 in
-  let* (client_1, baker_1) = baker 1 in
-  let* (client_2, baker_2) = baker 2 in
+  let* client_0, baker_0 = baker 0 in
+  let* client_1, baker_1 = baker 1 in
+  let* client_2, baker_2 = baker 2 in
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.(

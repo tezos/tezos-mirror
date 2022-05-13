@@ -92,8 +92,8 @@ let get_float_balances env state =
     fraction of tzbtc and xtz returned to the liquidity provider is
     lesser or equal than the fraction of lqt burnt. *)
 let is_remove_liquidity_consistent env state state' =
-  let (xtz, tzbtc, lqt) = get_float_balances env state in
-  let (xtz', tzbtc', lqt') = get_float_balances env state' in
+  let xtz, tzbtc, lqt = get_float_balances env state in
+  let xtz', tzbtc', lqt' = get_float_balances env state' in
   if lqt' < lqt then
     let flqt = (lqt -. lqt') /. lqt in
     let fxtz = (xtz -. xtz') /. xtz in
@@ -106,8 +106,8 @@ let is_remove_liquidity_consistent env state state' =
 
     See https://blog.nomadic-labs.com/progress-report-on-the-verification-of-liquidity-baking-smart-contracts.html#evolution-of-the-product-of-supplies *)
 let is_share_price_increasing env state state' =
-  let (xtz, tzbtc, lqt) = get_float_balances env state in
-  let (xtz', tzbtc', lqt') = get_float_balances env state' in
+  let xtz, tzbtc, lqt = get_float_balances env state in
+  let xtz', tzbtc', lqt' = get_float_balances env state' in
   xtz *. tzbtc /. (lqt *. lqt) <= xtz' *. tzbtc' /. (lqt' *. lqt')
 
 (** [positive_pools env state] returns [true] iff the three pools of
@@ -185,12 +185,10 @@ let validate_consistency :
  fun env state ->
   all_true
     (validate_cpmm_total_liquidity env state
-     ::
-     validate_balances env.cpmm_contract env state
-     ::
-     List.map
-       (fun account -> validate_balances account env state)
-       env.implicit_accounts)
+    :: validate_balances env.cpmm_contract env state
+    :: List.map
+         (fun account -> validate_balances account env state)
+         env.implicit_accounts)
 
 (** [validate_storage env blk] returns [true] iff the storage of the
     CPMM contract is consistent wrt. to its actual balances (tez,
@@ -248,7 +246,7 @@ let machine_validation_tests =
       (fun (specs, scenario) ->
         extract_qcheck_tzresult
           (let invariant = positive_pools in
-           let (state, env) = SymbolicMachine.build ~invariant specs in
+           let state, env = SymbolicMachine.build ~invariant specs in
            let _ = SymbolicMachine.run ~invariant scenario env state in
            return_unit));
   ]
@@ -263,7 +261,7 @@ let economic_tests =
       ~name:"No global gain"
       (Liquidity_baking_generator.arb_adversary_scenario 1_000_000 1_000_000 50)
       (fun (specs, attacker, scenario) ->
-        let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+        let state, env = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
           run_and_check (one_balance_decreases attacker env) scenario env state
         in
@@ -273,7 +271,7 @@ let economic_tests =
       ~name:"Remove liquidities is consistent"
       (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 50)
       (fun (specs, scenario) ->
-        let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+        let state, env = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
           run_and_check (is_remove_liquidity_consistent env) scenario env state
         in
@@ -283,7 +281,7 @@ let economic_tests =
       ~name:"Share price only increases"
       (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 50)
       (fun (specs, scenario) ->
-        let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+        let state, env = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
           run_and_check (is_share_price_increasing env) scenario env state
         in

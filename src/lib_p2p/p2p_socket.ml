@@ -377,7 +377,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
         version = announced_version;
       }
   in
-  let* (msg, recv_msg) =
+  let* msg, recv_msg =
     Connection_message.read
       ~canceler
       (P2p_io_scheduler.to_readable scheduled_conn)
@@ -407,7 +407,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
   let channel_key =
     Crypto_box.precompute identity.P2p_identity.secret_key msg.public_key
   in
-  let (local_nonce, remote_nonce) =
+  let local_nonce, remote_nonce =
     Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg
   in
   let cryptobox_data = {Crypto.channel_key; local_nonce; remote_nonce} in
@@ -478,7 +478,7 @@ module Reader = struct
     let open Lwt_syntax in
     let* r =
       let open Lwt_result_syntax in
-      let* (msg, size, stream) = read_message st stream in
+      let* msg, size, stream = read_message st stream in
       protect ~canceler:st.canceler (fun () ->
           let*! () = Lwt_pipe.Maybe_bounded.push st.messages (Ok (size, msg)) in
           return_some stream)
@@ -622,10 +622,10 @@ module Writer = struct
           0
       in
       function
-      | (buf_l, None) ->
+      | buf_l, None ->
           Sys.word_size + buf_list_size buf_l
           + Lwt_pipe.Maybe_bounded.push_overhead
-      | (buf_l, Some _) ->
+      | buf_l, Some _ ->
           (2 * Sys.word_size) + buf_list_size buf_l
           + Lwt_pipe.Maybe_bounded.push_overhead
     in
@@ -761,7 +761,7 @@ let write {writer; _} msg =
 let write_sync {writer; _} msg =
   let open Lwt_result_syntax in
   catch_closed_pipe (fun () ->
-      let (waiter, wakener) = Lwt.wait () in
+      let waiter, wakener = Lwt.wait () in
       let*? buf = Writer.encode_message writer msg in
       let*! () =
         Lwt_pipe.Maybe_bounded.push writer.messages (buf, Some wakener)
@@ -784,7 +784,7 @@ let raw_write_sync {writer; _} bytes =
   let open Lwt_syntax in
   let bytes = split_bytes writer.binary_chunks_size bytes in
   catch_closed_pipe (fun () ->
-      let (waiter, wakener) = Lwt.wait () in
+      let waiter, wakener = Lwt.wait () in
       let* () =
         Lwt_pipe.Maybe_bounded.push writer.messages (bytes, Some wakener)
       in
@@ -816,7 +816,7 @@ let close ?(wait = false) st =
 
 module Internal_for_tests = struct
   let mock_authenticated_connection default_metadata =
-    let (secret_key, public_key, _pkh) = Crypto_box.random_keypair () in
+    let secret_key, public_key, _pkh = Crypto_box.random_keypair () in
     let cryptobox_data =
       Crypto.
         {

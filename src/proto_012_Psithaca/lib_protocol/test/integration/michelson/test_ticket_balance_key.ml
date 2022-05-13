@@ -40,19 +40,19 @@ let ( let* ) m f = m >>=? f
 let wrap m = m >|= Environment.wrap_tzresult
 
 let new_ctxt () =
-  let* (block, _) = Context.init 1 in
+  let* block, _ = Context.init 1 in
   let* incr = Incremental.begin_construction block in
   return @@ Incremental.alpha_ctxt incr
 
 let make_contract ticketer = wrap @@ Lwt.return @@ Contract.of_b58check ticketer
 
 let make_ex_ticket ctxt ~ticketer ~typ ~content ~amount =
-  let* (Script_ir_translator.Ex_comparable_ty cty, ctxt) =
+  let* Script_ir_translator.Ex_comparable_ty cty, ctxt =
     let node = Micheline.root @@ Expr.from_string typ in
     wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
   in
   let* ticketer = make_contract ticketer in
-  let* (contents, ctxt) =
+  let* contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content in
     wrap @@ Script_ir_translator.parse_comparable_data ctxt cty node
   in
@@ -61,11 +61,9 @@ let make_ex_ticket ctxt ~ticketer ~typ ~content ~amount =
   return (Ticket_scanner.Ex_ticket (cty, ticket), ctxt)
 
 let make_key ctxt ~ticketer ~typ ~content ~amount ~owner =
-  let* (ex_ticket, ctxt) =
-    make_ex_ticket ctxt ~ticketer ~typ ~content ~amount
-  in
+  let* ex_ticket, ctxt = make_ex_ticket ctxt ~ticketer ~typ ~content ~amount in
   let* owner = make_contract owner in
-  let* (key, amount, ctxt) =
+  let* key, amount, ctxt =
     wrap
     @@ Ticket_balance_key.ticket_balance_key_and_amount ctxt ex_ticket ~owner
   in
@@ -92,7 +90,7 @@ let not_equal_script_hash ~loc msg key1 key2 =
 let assert_keys ~ticketer1 ~ticketer2 ~typ1 ~typ2 ~amount1 ~amount2 ~content1
     ~content2 ~owner1 ~owner2 assert_condition =
   let* ctxt = new_ctxt () in
-  let* (key1, amount1, ctxt) =
+  let* key1, amount1, ctxt =
     make_key
       ctxt
       ~ticketer:ticketer1
@@ -101,7 +99,7 @@ let assert_keys ~ticketer1 ~ticketer2 ~typ1 ~typ2 ~amount1 ~amount2 ~content1
       ~amount:amount1
       ~owner:owner1
   in
-  let* (key2, amount2, _) =
+  let* key2, amount2, _ =
     make_key
       ctxt
       ~ticketer:ticketer2
@@ -122,7 +120,7 @@ let assert_keys_equal ~loc =
 
 let assert_amount ~loc ~ticketer ~typ ~content ~amount ~owner expected =
   let* ctxt = new_ctxt () in
-  let* (_, amount, _ctxt) =
+  let* _, amount, _ctxt =
     make_key ctxt ~ticketer ~typ ~content ~amount ~owner
   in
   Assert.equal_int ~loc (Z.to_int amount) expected

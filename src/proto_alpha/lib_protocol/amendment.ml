@@ -98,7 +98,7 @@ let get_approval_and_update_participation_ema ctxt =
   Vote.get_participation_ema ctxt >>=? fun participation_ema ->
   Vote.get_current_quorum ctxt >>=? fun expected_quorum ->
   Vote.clear_ballots ctxt >>= fun ctxt ->
-  let (approval, new_participation_ema) =
+  let approval, new_participation_ema =
     approval_and_participation_ema
       ballots
       ~maximum_vote

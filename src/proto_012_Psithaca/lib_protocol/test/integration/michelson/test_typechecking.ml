@@ -802,9 +802,9 @@ let test_optimal_comb () =
           ty
           v
       >>=? fun (unparsed, ctxt) ->
-        let (unparsed_canonical, unparsed_size) = size_of_micheline unparsed in
+        let unparsed_canonical, unparsed_size = size_of_micheline unparsed in
         List.iter_es (fun other_repr ->
-            let (other_repr_canonical, other_repr_size) =
+            let other_repr_canonical, other_repr_size =
               size_of_micheline other_repr
             in
             if other_repr_size < unparsed_size then
@@ -845,7 +845,7 @@ let test_optimal_comb () =
 (* Check that UNPACK on contract is forbidden.
    See https://gitlab.com/tezos/tezos/-/issues/301 for the motivation
    behind this restriction.
-  *)
+*)
 let test_contract_not_packable () =
   let contract_unit =
     Prim (0, Script.T_contract, [Prim (0, T_unit, [], [])], [])

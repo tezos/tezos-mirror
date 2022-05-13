@@ -87,7 +87,7 @@ let setup_remote_signer (module C : M) client_config
       match
         List.filter_map
           (function
-            | (_, known_pkh, _, Some known_sk_uri)
+            | _, known_pkh, _, Some known_sk_uri
               when List.exists
                      (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh)
                      pkhs ->
@@ -176,7 +176,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
           base_dir
     | _ -> return_unit
   in
-  let (chain, block, confirmations, password_filename, protocol, sources) =
+  let chain, block, confirmations, password_filename, protocol, sources =
     match parsed_args with
     | None ->
         ( Client_config.default_chain,
@@ -218,11 +218,11 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
       in
       let get_mode () =
         match (mode, sources) with
-        | (`Mode_proxy, _) -> return Tezos_proxy.Proxy_services.Proxy_client
-        | (`Mode_light, None) ->
+        | `Mode_proxy, _ -> return Tezos_proxy.Proxy_services.Proxy_client
+        | `Mode_light, None ->
             failwith
               "--sources MUST be specified when --mode light is specified"
-        | (`Mode_light, Some sources_config) ->
+        | `Mode_light, Some sources_config ->
             let*! () =
               warn_if_duplicates_light_sources printer sources_config.uris
             in
@@ -275,8 +275,7 @@ let setup_mockup_rpc_client_config
           ~bootstrap_accounts_json:None
   in
   let* b = Tezos_mockup.Persistence.classify_base_dir base_dir in
-  let* ((mockup_env, {chain = chain_id; rpc_context; protocol_data}), mem_only)
-      =
+  let* (mockup_env, {chain = chain_id; rpc_context; protocol_data}), mem_only =
     match b with
     | Tezos_mockup.Persistence.Base_dir_is_empty
     | Tezos_mockup.Persistence.Base_dir_is_file
@@ -322,7 +321,7 @@ let main (module C : M) ~select_commands =
   let open Lwt_result_syntax in
   let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
-  let (original_args, autocomplete) =
+  let original_args, autocomplete =
     (* for shell aliases *)
     let rec move_autocomplete_token_upfront acc = function
       | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
@@ -363,7 +362,7 @@ let main (module C : M) ~select_commands =
             ~verbose_rpc_error_diagnostics:false
         in
         let*! r =
-          let* (parsed, remaining) = C.parse_config_args full original_args in
+          let* parsed, remaining = C.parse_config_args full original_args in
           let parsed_config_file = parsed.Client_config.parsed_config_file
           and parsed_args = parsed.Client_config.parsed_args
           and config_commands = parsed.Client_config.config_commands in

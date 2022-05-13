@@ -33,7 +33,6 @@
    fast machine. This is why this test is in the "long test" category.
    If at some point the cache layout can be set through protocol parameters,
    then we may consider duplicating these tests in the CI too.
-
 *)
 
 (*
@@ -288,7 +287,7 @@ let check ?(tags = []) label test ~protocol ~executors =
 *)
 let check_contract_cache_lowers_gas_consumption ~protocol =
   check "contract cache lowers gas consumption" ~protocol @@ fun () ->
-  let* (_, client) = init1 ~protocol in
+  let* _, client = init1 ~protocol in
   let* contract_id = originate_str_id_contract client "" in
   let* gas1 = call_contract contract_id "Left 1" client in
   let* gas2 = call_contract contract_id "Left 1" client in
@@ -312,7 +311,7 @@ let check_contract_cache_lowers_gas_consumption ~protocol =
 let check_full_cache ~protocol =
   check "contract cache does not go beyond its size limit" ~protocol
   @@ fun () ->
-  let* (_, client) = init1 ~protocol in
+  let* _, client = init1 ~protocol in
   let s = String.make 1024 'x' in
   let* counter = get_counter client in
 
@@ -358,7 +357,7 @@ let check_full_cache ~protocol =
 let check_block_impact_on_cache ~protocol =
   check "one cannot violate the cache size limit" ~protocol ~tags:["memory"]
   @@ fun () ->
-  let* (node, client) = init1 ~protocol in
+  let* node, client = init1 ~protocol in
 
   let* (Node.Observe memory_consumption) = Node.memory_consumption node in
 
@@ -385,7 +384,7 @@ let check_block_impact_on_cache ~protocol =
   let* gas = call_contracts (str_id_calls red_contracts) client in
 
   let* cached_contracts = get_cached_contracts client in
-  let (greens, reds) =
+  let greens, reds =
     List.partition (fun c -> List.mem c green_contracts) cached_contracts
   in
   if List.(exists (fun c -> mem c green_contracts) cached_contracts) then (
@@ -518,7 +517,7 @@ let check_cache_backtracking_during_chain_reorganization ~protocol =
 
 *)
 let check_reloading_efficiency ~protocol body =
-  let* (nodeA, clientA) = init1 ~protocol in
+  let* nodeA, clientA = init1 ~protocol in
   let* _ = body clientA in
   let* () = Client.bake_for clientA in
   Log.info "Contracts are in the cache" ;
@@ -618,7 +617,7 @@ let check_simulation_takes_cache_into_account ~protocol =
     ~tags:["simulation"]
     ~protocol
   @@ fun () ->
-  let* (_, client) = init1 ~protocol in
+  let* _, client = init1 ~protocol in
   let* chain_id = RPC.get_chain_id client in
   let* contract_id = originate_very_small_contract client in
   let* () = Client.bake_for client in

@@ -246,7 +246,7 @@ module Node = struct
       command to start the validation of the given [blocks] on the given
       [node]. It then waits for the [node] to stop properly. *)
   let replay_and_wait_for_termination blocks node =
-    let (callback, resolver) = Lwt.wait () in
+    let callback, resolver = Lwt.wait () in
     let on_terminate status =
       match Process.validate_status status with
       | Ok () -> Lwt.wakeup_later resolver ()

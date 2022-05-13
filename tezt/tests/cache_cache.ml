@@ -55,7 +55,7 @@ let register =
     ~title:"cache cache"
     ~tags:["cache"; "node"; "baker"]
   @@ fun protocol ->
-  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* contract_hash =

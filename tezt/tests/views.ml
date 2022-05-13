@@ -28,7 +28,7 @@
    Component:    Michelson
    Invocation:   dune exec tezt/tests/main.exe -- --file views.ml
    Subject:      Call smart contract views to catch performance regressions.
- *)
+*)
 
 (* This contract registers all SOURCE addresses that ever call it. It has views
    that return registered callers count and the last caller address respectively. *)

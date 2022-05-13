@@ -149,7 +149,7 @@ let wait_for_ready sc_node =
   match sc_node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       sc_node.persistent_state.pending_ready <-
         resolver :: sc_node.persistent_state.pending_ready ;
       check_event sc_node "sc_rollup_node_is_ready.v0" promise
@@ -179,7 +179,7 @@ let wait_for_level sc_node level =
     when current_level >= level ->
       return current_level
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       sc_node.persistent_state.pending_level <-
         (level, resolver) :: sc_node.persistent_state.pending_level ;
       check_event

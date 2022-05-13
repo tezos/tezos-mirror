@@ -107,13 +107,13 @@ let wrap m = m >|= Environment.wrap_tzresult
 let test_fold_keys_unaccounted () =
   let open Lwt_result_syntax in
   let* ctxt = Context.default_raw_context () in
-  let* (ctxt, _) = wrap (Table.init ctxt 1) in
-  let* (ctxt, _) = wrap (Table.init ctxt 2) in
+  let* ctxt, _ = wrap (Table.init ctxt 1) in
+  let* ctxt, _ = wrap (Table.init ctxt 2) in
   let*! items =
     Table.fold_keys_unaccounted
       ctxt
       ~order:`Undefined
-      ~f:(fun x acc -> Lwt.return @@ x :: acc)
+      ~f:(fun x acc -> Lwt.return @@ (x :: acc))
       ~init:[]
   in
   let items = List.sort Compare.Int.compare items in

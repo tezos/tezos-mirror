@@ -292,7 +292,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   let incoming = point_info = None in
   let incoming_str = if incoming then "incoming" else "outgoing" in
   let*! () = Events.(emit authenticate_start) (point, incoming_str) in
-  let* (info, auth_conn) =
+  let* info, auth_conn =
     protect
       ~canceler
       (fun () ->
@@ -350,7 +350,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   in
   let remote_point_info =
     match info.id_point with
-    | (addr, Some port) -> P2p_pool.register_new_point t.pool (addr, port)
+    | addr, Some port -> P2p_pool.register_new_point t.pool (addr, port)
     | _ -> None
   in
   let connection_point_info = Option.either point_info remote_point_info in
@@ -511,8 +511,8 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         match
           (info.id_point, Option.map P2p_point_state.Info.point point_info)
         with
-        | ((addr, _), Some (_, port)) -> (addr, Some port)
-        | (id_point, None) -> id_point
+        | (addr, _), Some (_, port) -> (addr, Some port)
+        | id_point, None -> id_point
       in
       let conn =
         create_connection

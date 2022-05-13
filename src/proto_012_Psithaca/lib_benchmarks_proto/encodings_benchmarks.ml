@@ -381,7 +381,7 @@ module Timelock = struct
     let plaintext_size =
       Base_samplers.sample_in_interval ~range:{min = 1; max = 10000} rng_state
     in
-    let (chest, chest_key) =
+    let chest, chest_key =
       Timelock.chest_sampler ~plaintext_size ~time ~rng_state
     in
     ((chest, chest_key), plaintext_size)
@@ -392,7 +392,7 @@ module Timelock = struct
          ~name:"ENCODING_Chest"
          ~to_string:(Data_encoding.Binary.to_string_exn Timelock.chest_encoding)
          ~generator:(fun rng_state ->
-           let ((chest, _), plaintext_size) = generator rng_state in
+           let (chest, _), plaintext_size = generator rng_state in
            (chest, {bytes = plaintext_size}))
 
   let () =
@@ -402,7 +402,7 @@ module Timelock = struct
          ~to_string:
            (Data_encoding.Binary.to_string_exn Timelock.chest_key_encoding)
          ~generator:(fun rng_state ->
-           let ((_, chest_key), _w) = generator rng_state in
+           let (_, chest_key), _w = generator rng_state in
            chest_key)
 
   let () =
@@ -412,7 +412,7 @@ module Timelock = struct
          ~to_bytes:(Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding)
          ~from_bytes:(Data_encoding.Binary.of_bytes_exn Timelock.chest_encoding)
          ~generator:(fun rng_state ->
-           let ((chest, _), _) = generator rng_state in
+           let (chest, _), _ = generator rng_state in
            let b =
              Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding chest
            in
@@ -427,6 +427,6 @@ module Timelock = struct
          ~from_bytes:
            (Data_encoding.Binary.of_bytes_exn Timelock.chest_key_encoding)
          ~generator:(fun rng_state ->
-           let ((_, chest_key), _w) = generator rng_state in
+           let (_, chest_key), _w = generator rng_state in
            chest_key)
 end

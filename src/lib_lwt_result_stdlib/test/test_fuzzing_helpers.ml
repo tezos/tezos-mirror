@@ -600,8 +600,8 @@ let eq_es_ep ?pp es ep =
     (let open Lwt_syntax in
     let+ es = es and+ ep = ep in
     match (es, ep) with
-    | (Ok ok_es, Ok ok_ep) -> eq ?pp ok_es ok_ep
-    | (Error error_es, Error trace_ep) ->
+    | Ok ok_es, Ok ok_ep -> eq ?pp ok_es ok_ep
+    | Error error_es, Error trace_ep ->
         let trace_ep_has_error_es =
           Support.Test_trace.fold
             (fun has error -> has || error = error_es)
@@ -615,19 +615,19 @@ let eq_es_ep ?pp es ep =
             error_es
             (Support.Test_trace.pp Format.pp_print_int)
             trace_ep
-    | (Ok _, Error _) -> QCheck.Test.fail_report "Ok _ is not Error _"
-    | (Error _, Ok _) -> QCheck.Test.fail_report "Error _ is not Ok _")
+    | Ok _, Error _ -> QCheck.Test.fail_report "Ok _ is not Error _"
+    | Error _, Ok _ -> QCheck.Test.fail_report "Error _ is not Ok _")
 
 let eq_ep ?pp a b =
   Lwt_main.run
     (let open Lwt_syntax in
     let+ a = a and+ b = b in
     match (a, b) with
-    | (Ok ok_es, Ok ok_ep) -> eq ?pp ok_es ok_ep
-    | (Error _, Error _) ->
+    | Ok ok_es, Ok ok_ep -> eq ?pp ok_es ok_ep
+    | Error _, Error _ ->
         true (* Not as precise as we could be, but precise enough *)
-    | (Ok _, Error _) -> QCheck.Test.fail_report "Ok _ is not Error _"
-    | (Error _, Ok _) -> QCheck.Test.fail_report "Error _ is not Ok _")
+    | Ok _, Error _ -> QCheck.Test.fail_report "Ok _ is not Error _"
+    | Error _, Ok _ -> QCheck.Test.fail_report "Error _ is not Ok _")
 
 module PP = struct
   let int = Format.pp_print_int

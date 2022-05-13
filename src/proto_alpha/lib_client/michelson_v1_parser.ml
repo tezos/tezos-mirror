@@ -40,20 +40,20 @@ let compare_parsed = Stdlib.compare
 
 (* Unexpanded toplevel expression should be a sequence *)
 let expand_all source ast errors =
-  let (unexpanded, loc_table) = extract_locations ast in
-  let (expanded, expansion_errors) =
+  let unexpanded, loc_table = extract_locations ast in
+  let expanded, expansion_errors =
     Michelson_v1_macros.expand_rec (root unexpanded)
   in
-  let (expanded, unexpansion_table) = extract_locations expanded in
+  let expanded, unexpansion_table = extract_locations expanded in
   let expansion_table =
     let sorted =
       List.sort (fun (_, a) (_, b) -> Stdlib.compare a b) unexpansion_table
     in
     let grouped =
       let rec group = function
-        | (acc, []) -> acc
-        | ([], (u, e) :: r) -> group ([(e, [u])], r)
-        | (((pe, us) :: racc as acc), (u, e) :: r) ->
+        | acc, [] -> acc
+        | [], (u, e) :: r -> group ([(e, [u])], r)
+        | ((pe, us) :: racc as acc), (u, e) :: r ->
             if e = pe then group ((e, u :: us) :: racc, r)
             else group ((e, [u]) :: acc, r)
       in
@@ -87,8 +87,8 @@ let expand_all source ast errors =
         errors @ expansion_errors @ errs )
 
 let parse_toplevel ?check source =
-  let (tokens, lexing_errors) = Micheline_parser.tokenize source in
-  let (asts, parsing_errors) = Micheline_parser.parse_toplevel ?check tokens in
+  let tokens, lexing_errors = Micheline_parser.tokenize source in
+  let asts, parsing_errors = Micheline_parser.parse_toplevel ?check tokens in
   let ast =
     let start = min_point asts and stop = max_point asts in
     Seq ({start; stop}, asts)
@@ -96,8 +96,8 @@ let parse_toplevel ?check source =
   expand_all source ast (lexing_errors @ parsing_errors)
 
 let parse_expression ?check source =
-  let (tokens, lexing_errors) = Micheline_parser.tokenize source in
-  let (ast, parsing_errors) = Micheline_parser.parse_expression ?check tokens in
+  let tokens, lexing_errors = Micheline_parser.tokenize source in
+  let ast, parsing_errors = Micheline_parser.parse_expression ?check tokens in
   expand_all source ast (lexing_errors @ parsing_errors)
 
 let expand_all ~source ~original = expand_all source original []

@@ -305,7 +305,7 @@ let random_seed rng =
 
 let generate_fresh_source pool rng =
   let seed = random_seed rng in
-  let (pkh, pk, sk) = Signature.generate_key ~seed () in
+  let pkh, pk, sk = Signature.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
   pool.pool <- fresh :: pool.pool ;
   pool.pool_size <- pool.pool_size + 1 ;
@@ -319,7 +319,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
   let open Lwt_result_syntax in
   Error_monad.protect
     (fun () ->
-      let* (heads_stream, stopper) = Shell_services.Monitor.heads cctxt `Main in
+      let* heads_stream, stopper = Shell_services.Monitor.heads cctxt `Main in
       let rec loop () : unit tzresult Lwt.t =
         let*! block_hash_and_header = Lwt_stream.get heads_stream in
         match block_hash_and_header with

@@ -607,7 +607,7 @@ module Interpreter_tests = struct
     originate_contract "contracts/sapling_contract.tz" "{ }" src0 genesis baker
     >>=? fun (dst, b1, anti_replay) ->
     let wa = wallet_gen () in
-    let (list_transac, total) =
+    let list_transac, total =
       shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
@@ -615,7 +615,7 @@ module Interpreter_tests = struct
     transac_and_sync ~memo_size b1 parameters total src0 dst baker
     >>=? fun (b2, _state) ->
     (* we shield again on another block, forging with the empty state *)
-    let (list_transac, total) =
+    let list_transac, total =
       shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
@@ -807,7 +807,7 @@ module Interpreter_tests = struct
        it as a parameter
     *)
     let wa = wallet_gen () in
-    let (transactions, _total) =
+    let transactions, _total =
       shield
         ~memo_size
         wa.sk
@@ -984,7 +984,7 @@ module Interpreter_tests = struct
     originate_contract "contracts/sapling_contract_drop.tz" "Unit" src b baker
     >>=? fun (dst, b, anti_replay) ->
     let {sk; vk} = wallet_gen () in
-    let (list_transac, _total) =
+    let list_transac, _total =
       shield ~memo_size:8 sk 4 vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in

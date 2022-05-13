@@ -42,9 +42,7 @@ let ballot_encoding =
     ~json:(string_enum [("yay", Yay); ("nay", Nay); ("pass", Pass)])
 
 let equal_ballot a b =
-  match (a, b) with
-  | (Yay, Yay) | (Nay, Nay) | (Pass, Pass) -> true
-  | _ -> false
+  match (a, b) with Yay, Yay | Nay, Nay | Pass, Pass -> true | _ -> false
 
 let pp_ballot ppf = function
   | Yay -> Format.fprintf ppf "yay"

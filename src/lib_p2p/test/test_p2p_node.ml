@@ -95,8 +95,8 @@ let wrap n f =
         let* r = f () in
         match r with
         | Ok () -> Lwt.return_unit
-        | Error
-            (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _) ->
+        | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
+          ->
             let* () = Event.(emit port_conflicts) () in
             gen_points () ;
             aux n f

@@ -3,7 +3,7 @@ open Internal_pervasives
 open Console
 
 let run state node_exec client_exec () =
-  let* (nodes, _protocol) =
+  let* nodes, _protocol =
     Test_scenario.network_with_protocol ~size:2 state ~node_exec ~client_exec
   in
   match nodes with

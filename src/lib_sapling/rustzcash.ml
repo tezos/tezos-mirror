@@ -33,7 +33,7 @@
    and return [true] otherwise (in which case result buffer contains the
    result). Because we lean on the OCaml type system to enforce that arguments
    are well-formed, we simply [assert] on the return value of the rust bindings.
-   *)
+*)
 
 (* Ctypes binding. We encapsulate the binding in a specific module *)
 module RS = Rustzcash_ctypes_bindings.Bindings (Rustzcash_ctypes_stubs)

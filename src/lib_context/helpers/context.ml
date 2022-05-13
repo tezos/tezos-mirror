@@ -46,8 +46,8 @@ let binary_mask = 0b10
 
 let decode_proof_version v =
   let extract_bit v mask = (v land mask <> 0, v land lnot mask) in
-  let (is_stream, v) = extract_bit v stream_mask in
-  let (is_binary, v) = extract_bit v binary_mask in
+  let is_stream, v = extract_bit v stream_mask in
+  let is_binary, v = extract_bit v binary_mask in
   if v <> 0 then Error `Invalid_proof_version else Ok {is_stream; is_binary}
 
 let encode_proof_version ~is_stream ~is_binary =
@@ -362,7 +362,7 @@ struct
     let key =
       match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
     in
-    let+ (p, r) = Store.Tree.produce_proof repo key f in
+    let+ p, r = Store.Tree.produce_proof repo key f in
     (Proof.to_tree p, r)
 
   let verify_tree_proof proof f =
@@ -374,7 +374,7 @@ struct
     let key =
       match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
     in
-    let+ (p, r) = Store.Tree.produce_stream repo key f in
+    let+ p, r = Store.Tree.produce_stream repo key f in
     (Proof.to_stream p, r)
 
   let verify_stream_proof proof f =

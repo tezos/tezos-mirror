@@ -62,7 +62,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
   let chain_store = Store.main_chain_store store in
   let genesis = Store.Chain.genesis chain_store in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
-  let* (baked_blocks, last) =
+  let* baked_blocks, last =
     Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
   in
   let*! savepoint = Store.Chain.savepoint chain_store in
@@ -175,7 +175,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
-  let* (baked_blocks, last) =
+  let* baked_blocks, last =
     Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
   in
   let*! lafl =

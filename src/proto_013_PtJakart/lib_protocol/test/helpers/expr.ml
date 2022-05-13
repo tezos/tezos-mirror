@@ -30,7 +30,7 @@ exception Expression_from_string
 
 (** Parse a Michelson expression from string, raising an exception on error. *)
 let from_string ?(check_micheline_indentation = false) str : Script.expr =
-  let (ast, errs) =
+  let ast, errs =
     Michelson_v1_parser.parse_expression ~check:check_micheline_indentation str
   in
   (match errs with
@@ -42,7 +42,7 @@ let from_string ?(check_micheline_indentation = false) str : Script.expr =
 
 (** Parses a Michelson contract from string, raising an exception on error. *)
 let toplevel_from_string ?(check_micheline_indentation = false) str =
-  let (ast, errs) =
+  let ast, errs =
     Michelson_v1_parser.parse_toplevel ~check:check_micheline_indentation str
   in
   match errs with [] -> ast.expanded | _ -> Stdlib.failwith "parse toplevel"

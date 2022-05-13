@@ -50,33 +50,33 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
     =
  fun ty x y ->
   match (ty, x, y) with
-  | (Unit_key _, (), ()) -> 0
-  | (Never_key _, _, _) -> .
-  | (Signature_key _, x, y) -> normalize_compare @@ Signature.compare x y
-  | (String_key _, x, y) -> normalize_compare @@ Script_string.compare x y
-  | (Bool_key _, x, y) -> normalize_compare @@ Compare.Bool.compare x y
-  | (Mutez_key _, x, y) -> normalize_compare @@ Tez.compare x y
-  | (Key_hash_key _, x, y) ->
+  | Unit_key _, (), () -> 0
+  | Never_key _, _, _ -> .
+  | Signature_key _, x, y -> normalize_compare @@ Signature.compare x y
+  | String_key _, x, y -> normalize_compare @@ Script_string.compare x y
+  | Bool_key _, x, y -> normalize_compare @@ Compare.Bool.compare x y
+  | Mutez_key _, x, y -> normalize_compare @@ Tez.compare x y
+  | Key_hash_key _, x, y ->
       normalize_compare @@ Signature.Public_key_hash.compare x y
-  | (Key_key _, x, y) -> normalize_compare @@ Signature.Public_key.compare x y
-  | (Int_key _, x, y) -> normalize_compare @@ Script_int.compare x y
-  | (Nat_key _, x, y) -> normalize_compare @@ Script_int.compare x y
-  | (Timestamp_key _, x, y) -> normalize_compare @@ Script_timestamp.compare x y
-  | (Address_key _, x, y) ->
+  | Key_key _, x, y -> normalize_compare @@ Signature.Public_key.compare x y
+  | Int_key _, x, y -> normalize_compare @@ Script_int.compare x y
+  | Nat_key _, x, y -> normalize_compare @@ Script_int.compare x y
+  | Timestamp_key _, x, y -> normalize_compare @@ Script_timestamp.compare x y
+  | Address_key _, x, y ->
       normalize_compare @@ Script_comparable.compare_address x y
-  | (Bytes_key _, x, y) -> normalize_compare @@ Compare.Bytes.compare x y
-  | (Chain_id_key _, x, y) -> normalize_compare @@ Chain_id.compare x y
-  | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
+  | Bytes_key _, x, y -> normalize_compare @@ Compare.Bytes.compare x y
+  | Chain_id_key _, x, y -> normalize_compare @@ Chain_id.compare x y
+  | Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry) ->
       let cl = reference_compare_comparable tl lx ly in
       if Compare.Int.(cl = 0) then reference_compare_comparable tr rx ry else cl
-  | (Union_key ((tl, _), _, _), L x, L y) -> reference_compare_comparable tl x y
-  | (Union_key _, L _, R _) -> -1
-  | (Union_key _, R _, L _) -> 1
-  | (Union_key (_, (tr, _), _), R x, R y) -> reference_compare_comparable tr x y
-  | (Option_key _, None, None) -> 0
-  | (Option_key _, None, Some _) -> -1
-  | (Option_key _, Some _, None) -> 1
-  | (Option_key (t, _), Some x, Some y) -> reference_compare_comparable t x y
+  | Union_key ((tl, _), _, _), L x, L y -> reference_compare_comparable tl x y
+  | Union_key _, L _, R _ -> -1
+  | Union_key _, R _, L _ -> 1
+  | Union_key (_, (tr, _), _), R x, R y -> reference_compare_comparable tr x y
+  | Option_key _, None, None -> 0
+  | Option_key _, None, Some _ -> -1
+  | Option_key _, Some _, None -> 1
+  | Option_key (t, _), Some x, Some y -> reference_compare_comparable t x y
 
 (* Generation of one to three values of the same comparable type. *)
 
@@ -324,9 +324,9 @@ let test_transitivity =
       let cxy = Script_comparable.compare_comparable ty x y in
       let cyz = Script_comparable.compare_comparable ty y z in
       match (cxy, cyz) with
-      | (0, n) | (n, 0) -> qcheck_compare_comparable ~expected:n ty x z
-      | (-1, -1) -> qcheck_compare_comparable ~expected:(-1) ty x z
-      | (1, 1) -> qcheck_compare_comparable ~expected:1 ty x z
+      | 0, n | n, 0 -> qcheck_compare_comparable ~expected:n ty x z
+      | -1, -1 -> qcheck_compare_comparable ~expected:(-1) ty x z
+      | 1, 1 -> qcheck_compare_comparable ~expected:1 ty x z
       | _ -> QCheck.assume_fail ())
 
 (* Test.
@@ -334,8 +334,7 @@ let test_transitivity =
  *)
 let test_pack_unpack =
   QCheck.Test.make
-    ~count:
-      100_000
+    ~count:100_000
       (* We run this test on many more cases than the default (100) because this
          is a very important property. Packing and then unpacking happens each
          time data is sent from a contract to another and also each time storage

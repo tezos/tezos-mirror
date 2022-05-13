@@ -41,8 +41,7 @@ let return x = of_result (ok x) [@@ocaml.inline always]
 let return_unit = return ()
 
 (* Inlined [Option.bind] for performance. *)
-let ( >>?? ) m f =
-  match m with None -> None | Some x -> f x
+let ( >>?? ) m f = match m with None -> None | Some x -> f x
   [@@ocaml.inline always]
 
 let bind m f gas =
@@ -50,14 +49,12 @@ let bind m f gas =
   match res with Ok y -> f y gas | Error _ as err -> of_result err gas
   [@@ocaml.inline always]
 
-let map f m gas =
-  m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
+let map f m gas = m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
   [@@ocaml.inline always]
 
 let bind_result m f = bind (of_result m) f [@@ocaml.inline always]
 
-let bind_recover m f gas =
-  m gas >>?? fun (x, gas) -> f x gas
+let bind_recover m f gas = m gas >>?? fun (x, gas) -> f x gas
   [@@ocaml.inline always]
 
 let consume_gas cost gas =
@@ -73,7 +70,7 @@ let run ctxt m =
       | Some (res, _new_gas_counter) -> ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
   | Limited {remaining = _} -> (
-      let (gas_counter, outdated_ctxt) =
+      let gas_counter, outdated_ctxt =
         local_gas_counter_and_outdated_context ctxt
       in
       match m gas_counter with

@@ -80,15 +80,15 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
           triple
 
   let pk state =
-    let (_, pk, _) = get_next state in
+    let _, pk, _ = get_next state in
     pk
 
   let pkh state =
-    let (pkh, _, _) = get_next state in
+    let pkh, _, _ = get_next state in
     pkh
 
   let sk state =
-    let (_, _, sk) = get_next state in
+    let _, _, sk = get_next state in
     sk
 
   let all = get_next

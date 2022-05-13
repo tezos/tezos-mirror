@@ -76,12 +76,12 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
 
   let rec init_loop total p alias small large =
     match (small, large) with
-    | ([], _) -> List.iter (fun (_, i) -> FallbackArray.set p i total) large
-    | (_, []) ->
+    | [], _ -> List.iter (fun (_, i) -> FallbackArray.set p i total) large
+    | _, [] ->
         (* This can only happen because of numerical inaccuracies e.g. when using
            [Mass.t = float] *)
         List.iter (fun (_, i) -> FallbackArray.set p i total) small
-    | ((qi, i) :: small', (qj, j) :: large') ->
+    | (qi, i) :: small', (qj, j) :: large' ->
         FallbackArray.set p i qi ;
         FallbackArray.set alias i j ;
         let qj' = Mass.sub (Mass.add qi qj) total in
@@ -93,7 +93,7 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
    fun ~fallback measure -> FallbackArray.of_list ~fallback ~proj:fst measure
 
   let check_and_cleanup measure =
-    let (total, measure) =
+    let total, measure =
       List.fold_left
         (fun ((total, m) as acc) ((_, p) as point) ->
           if Mass.(zero < p) then (Mass.add total p, point :: m)
@@ -110,10 +110,10 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
   (* NB: duplicate elements in the support are not merged;
      the algorithm should still function correctly. *)
   let create (measure : ('a * Mass.t) list) =
-    let (fallback, total, measure) = check_and_cleanup measure in
+    let fallback, total, measure = check_and_cleanup measure in
     let length = List.length measure in
     let n = Mass.of_int length in
-    let (_, small, large) =
+    let _, small, large =
       List.fold_left
         (fun (i, small, large) (_, p) ->
           let q = Mass.mul p n in
@@ -130,7 +130,7 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
 
   let sample {total; support; p; alias} draw_i_elt =
     let n = FallbackArray.length support in
-    let (i, elt) = draw_i_elt ~int_bound:n ~mass_bound:total in
+    let i, elt = draw_i_elt ~int_bound:n ~mass_bound:total in
     let p = FallbackArray.get p i in
     if Mass.(elt < p) then FallbackArray.get support i
     else
@@ -215,5 +215,5 @@ end
    10000 delegates without overflows.
 
    If/when this happens, the implementation should be revisited.
- *)
+*)
 include Make (Mass)

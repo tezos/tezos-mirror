@@ -38,7 +38,7 @@ module Authentication = struct
 
   let server _ch sched socket =
     let open Lwt_result_syntax in
-    let* (_info, auth_fd) = accept sched socket in
+    let* _info, auth_fd = accept sched socket in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let*! () = P2p_socket.close conn in
     Mock_sink.assert_has_event
@@ -54,7 +54,7 @@ module Authentication = struct
   let client _ch sched addr port =
     let open Lwt_result_syntax in
     let*! id2 = id2 in
-    let* (_, auth_fd) = connect sched addr port id2 in
+    let* _, auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
     let*! () = P2p_socket.close conn in
     Mock_sink.assert_has_event
@@ -89,7 +89,7 @@ module Nack = struct
 
   let server ch sched socket =
     let open Lwt_result_syntax in
-    let* (_info, auth_fd) = accept sched socket in
+    let* _info, auth_fd = accept sched socket in
     let*! () = P2p_socket.nack auth_fd P2p_rejection.No_motive [] in
     Mock_sink.assert_has_event
       ~strict:false
@@ -100,7 +100,7 @@ module Nack = struct
   let client ch sched addr port =
     let open Lwt_result_syntax in
     let*! id2 = id2 in
-    let* (_, auth_fd) = connect sched addr port id2 in
+    let* _, auth_fd = connect sched addr port id2 in
     let*! _conn = P2p_socket.accept ~canceler auth_fd Data_encoding.bytes in
     sync ch
 
@@ -140,12 +140,12 @@ module Read_and_write = struct
 
   let server ch sched socket =
     let open Lwt_result_syntax in
-    let* (_info, auth_fd) = accept sched socket in
+    let* _info, auth_fd = accept sched socket in
     let* conn = P2p_socket.accept ~canceler auth_fd Data_encoding.bytes in
     let* () =
       P2p_socket.write_sync conn @@ Bytes.of_string "a polite greeting"
     in
-    let* (_msg_size, _msg) = P2p_socket.read conn in
+    let* _msg_size, _msg = P2p_socket.read conn in
     let* () = sync ch in
     let*! () = P2p_socket.close conn in
     Mock_sink.assert_has_event
@@ -165,12 +165,12 @@ module Read_and_write = struct
   let client ch sched addr port =
     let open Lwt_result_syntax in
     let*! id2 = id2 in
-    let* (_, auth_fd) = connect sched addr port id2 in
+    let* _, auth_fd = connect sched addr port id2 in
     let* conn = P2p_socket.accept ~canceler auth_fd Data_encoding.bytes in
     let* () =
       P2p_socket.write_sync conn @@ Bytes.of_string "a polite request"
     in
-    let* (_msg_size, _msg) = P2p_socket.read conn in
+    let* _msg_size, _msg = P2p_socket.read conn in
     let* () = sync ch in
     let*! _stat = P2p_socket.close conn in
     Mock_sink.assert_has_event

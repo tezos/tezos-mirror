@@ -117,7 +117,7 @@ module Arbitrary = struct
     let generate =
       let open Gen in
       let* p = gen policy
-      and* (searched_for, searched_acl) = generate_entry
+      and* searched_for, searched_acl = generate_entry
       and* added_entry = generate_entry in
       let* policy =
         oneofl [p; RPC_server.Acl.put_policy (searched_for, searched_acl) p]
@@ -193,8 +193,8 @@ let acl_testable =
   in
   Alcotest.testable pp @@ fun left right ->
   match (left, right) with
-  | (Allow_all {except = l}, Allow_all {except = r})
-  | (Deny_all {except = l}, Deny_all {except = r}) ->
+  | Allow_all {except = l}, Allow_all {except = r}
+  | Deny_all {except = l}, Deny_all {except = r} ->
       l = r
   | _ -> false
 
@@ -227,9 +227,7 @@ let test_codec_identity =
 let check_find_policy =
   let open QCheck in
   let assert_results_satisfactory before_put after_put =
-    match (before_put, after_put) with
-    | (Some _, None) -> false
-    | (_, _) -> true
+    match (before_put, after_put) with Some _, None -> false | _, _ -> true
   in
   Test.make
     ~name:"put_policy preserves existing entries."

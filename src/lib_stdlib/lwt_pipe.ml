@@ -74,7 +74,7 @@ module Bounded = struct
     match q.push_waiter with
     | Some (t, _) -> Lwt.protected t
     | None ->
-        let (waiter, wakener) = Lwt.wait () in
+        let waiter, wakener = Lwt.wait () in
         q.push_waiter <- Some (waiter, wakener) ;
         Lwt.protected waiter
 
@@ -82,7 +82,7 @@ module Bounded = struct
     match q.pop_waiter with
     | Some (t, _) -> Lwt.protected t
     | None ->
-        let (waiter, wakener) = Lwt.wait () in
+        let waiter, wakener = Lwt.wait () in
         q.pop_waiter <- Some (waiter, wakener) ;
         Lwt.protected waiter
 
@@ -117,7 +117,7 @@ module Bounded = struct
 
   let rec pop ({closed; queue; current_size; _} as q) =
     if not (Queue.is_empty queue) then (
-      let (elt_size, elt) = Queue.pop queue in
+      let elt_size, elt = Queue.pop queue in
       notify_pop q ;
       q.current_size <- current_size - elt_size ;
       Lwt.return elt)
@@ -143,7 +143,7 @@ module Bounded = struct
 
   let rec peek ({closed; queue; _} as q) =
     if not (Queue.is_empty queue) then
-      let (_elt_size, elt) = Queue.peek queue in
+      let _elt_size, elt = Queue.peek queue in
       Lwt.return elt
     else if closed then Lwt.fail Closed
     else
@@ -184,7 +184,7 @@ module Bounded = struct
     else if q.closed then Lwt.fail Closed
     else
       let* () = wait_push q in
-      let (_, element) = Queue.pop q.queue in
+      let _, element = Queue.pop q.queue in
       q.current_size <- 0 ;
       notify_pop q ;
       Lwt.return [element]
@@ -227,7 +227,7 @@ module Unbounded = struct
     match q.push_waiter with
     | Some (t, _) -> Lwt.protected t
     | None ->
-        let (waiter, wakener) = Lwt.wait () in
+        let waiter, wakener = Lwt.wait () in
         q.push_waiter <- Some (waiter, wakener) ;
         Lwt.protected waiter
 

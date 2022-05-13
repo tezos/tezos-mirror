@@ -50,7 +50,7 @@ module Test1 = struct
 
   let program = seq [add_ii; push bool_ty false_; dip instr_hole; dip swap]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -121,7 +121,7 @@ module Test3 = struct
   module Rewriter =
     Rewrite.Make (Mikhailsky.Mikhailsky_signature) (Lang) (Path) (Patt)
 
-  let (timing, ((bef, aft), state)) =
+  let timing, ((bef, aft), state) =
     try time @@ fun () -> Inference.infer_with_state program
     with Inference.Ill_typed_script error ->
       let s = Mikhailsky.to_string program in
@@ -195,7 +195,7 @@ module Test4 = struct
         update_set;
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -224,7 +224,7 @@ module Test5 = struct
         update_map;
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -253,7 +253,7 @@ module Test5 = struct
               ]);
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -325,7 +325,7 @@ module Test7 = struct
         left;
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -370,7 +370,7 @@ module Test8 = struct
         push_int;
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -388,7 +388,7 @@ module Test9 = struct
 
   let program = seq [car; if_none hole hole]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -406,7 +406,7 @@ module Test10 = struct
 
   let program = seq [hash_key]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -425,7 +425,7 @@ module Test11 = struct
   let program =
     seq [lambda [dup; car; dip cdr; add_in]; push_int; apply; push_nat; exec]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -443,7 +443,7 @@ module Test12 = struct
 
   let program = seq [dup; dup; if_none hole (seq [drop]); dup; compare]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -462,7 +462,7 @@ module Test13 = struct
   let program =
     seq [push Type.(unparse_ty_exn (lambda int int)) (Data.lambda [])]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -480,7 +480,7 @@ module Test14 = struct
 
   let program = seq [nil; push_int; cons]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -498,7 +498,7 @@ module Test15 = struct
 
   let program = seq [empty_set; size_set; empty_map; size_map; nil; size_list]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -524,7 +524,7 @@ module Test16 = struct
         iter_set [dup; add_ii; add_ii];
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -559,7 +559,7 @@ module Test17 = struct
           ];
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;
@@ -601,7 +601,7 @@ module Test18 = struct
           (seq [drop; drop; push (option_ty (list_ty bool_ty)) Data.none]);
       ]
 
-  let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
+  let timing, (bef, aft) = time @@ fun () -> Inference.infer program
 
   let _ =
     Format.printf "Testing type inference\n" ;

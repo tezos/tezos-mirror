@@ -1857,7 +1857,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let open Cemented_block_store in
     let nb_cycles = List.length files in
     (* Rebuild fresh indexes: cannot cp because of concurrent accesses *)
-    let (fresh_level_index, fresh_hash_index) =
+    let fresh_level_index, fresh_hash_index =
       Exporter.create_cemented_block_indexes snapshot_exporter
     in
     protect (fun () ->
@@ -1922,7 +1922,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let ((limit_hash, limit_level) as export_block_descr) =
       Store.Block.descriptor export_block
     in
-    let (stream, bpush) = Lwt_stream.create_bounded 1000 in
+    let stream, bpush = Lwt_stream.create_bounded 1000 in
     (* Retrieve first floating block *)
     let* first_block =
       let*! o = Block_repr.read_next_block floating_ro_fd in
@@ -1984,7 +1984,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
        block below the block target. *)
     let protocol_levels =
       Protocol_levels.filter
-        (fun _ {Protocol_levels.block = (_, activation_level); _} ->
+        (fun _ {Protocol_levels.block = _, activation_level; _} ->
           activation_level < export_level)
         all_protocol_levels
     in
@@ -2055,7 +2055,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   *)
   let check_export_block_validity chain_store block =
     let open Lwt_result_syntax in
-    let (block_hash, block_level) = Store.Block.descriptor block in
+    let block_hash, block_level = Store.Block.descriptor block in
     let*! is_known = Store.Block.is_known_valid chain_store block_hash in
     let* () =
       fail_unless
@@ -2067,7 +2067,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         (Store.Block.is_genesis chain_store block_hash)
         (Invalid_export_block {block = Some block_hash; reason = `Genesis})
     in
-    let*! (_, savepoint_level) = Store.Chain.savepoint chain_store in
+    let*! _, savepoint_level = Store.Chain.savepoint chain_store in
     let* () =
       fail_when
         Compare.Int32.(savepoint_level > block_level)
@@ -2102,7 +2102,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
             (Invalid_export_block {block = Some block_hash; reason = `Pruned})
       | Some block_metadata -> return block_metadata
     in
-    let*! (_, caboose_level) = Store.Chain.caboose chain_store in
+    let*! _, caboose_level = Store.Chain.caboose chain_store in
     (* We will need the following blocks
        [ (target_block - max_op_ttl(target_block)) ; ... ; target_block ] *)
     let block_max_op_ttl = Store.Block.max_operations_ttl block_metadata in
@@ -2141,12 +2141,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           (* With the caboose, we do not allow to use the ~/- as it is a
              non sense. Additionally, it is not allowed to export the
              caboose block. *)
-          let*! (hash, _) = Store.Chain.caboose chain_store in
+          let*! hash, _ = Store.Chain.caboose chain_store in
           tzfail (Invalid_export_block {block = Some hash; reason = `Caboose})
       | _ -> Store.Chain.block_of_identifier chain_store block)
       |> trace (Invalid_export_block {block = None; reason = `Unknown})
     in
-    let* (pred_block, minimum_level_needed) =
+    let* pred_block, minimum_level_needed =
       check_export_block_validity chain_store export_block
     in
     return (export_block, pred_block, minimum_level_needed)
@@ -2185,7 +2185,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           else
             (* If the export block is cemented, cut the cycle containing the
                export block accordingly and retrieve the extra blocks *)
-            let (filtered_table, extra_cycles) =
+            let filtered_table, extra_cycles =
               List.partition
                 (fun {Cemented_block_store.end_level; _} ->
                   Compare.Int32.(export_block_level > end_level))
@@ -2212,7 +2212,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 then
                   (* When the cycles are short, we may keep more blocks in the
                      floating store than in cemented *)
-                  let*! (_, caboose_level) = Store.Chain.caboose chain_store in
+                  let*! _, caboose_level = Store.Chain.caboose chain_store in
                   Store.Block.read_block_by_level chain_store caboose_level
                 else return first_block_in_cycle
               in
@@ -2267,7 +2267,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let open Lwt_result_syntax in
     let export_rolling_f chain_store =
       let* () = check_history_mode chain_store ~rolling in
-      let* (export_block, pred_block, lowest_block_level_needed) =
+      let* export_block, pred_block, lowest_block_level_needed =
         retrieve_export_block chain_store block
       in
       (* The number of additional cycles to export is fixed as the
@@ -2347,7 +2347,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let open Lwt_result_syntax in
     let export_full_f chain_store =
       let* () = check_history_mode chain_store ~rolling in
-      let* (export_block, pred_block, _lowest_block_level_needed) =
+      let* export_block, pred_block, _lowest_block_level_needed =
         retrieve_export_block chain_store block
       in
       (* The number of additional cycles to export is fixed as the
@@ -2383,7 +2383,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         (fun () ->
           let src_cemented_dir = Naming.cemented_blocks_dir chain_dir in
           (* Compute the necessary cemented table *)
-          let* (cemented_table, extra_floating_blocks) =
+          let* cemented_table, extra_floating_blocks =
             compute_cemented_table_and_extra_cycle
               chain_store
               ~src_cemented_dir
@@ -2441,7 +2441,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       let*! _ = Lwt_utils_unix.safe_close floating_rw_fd in
       Lwt.return_unit
     in
-    let* (reading_thread, floating_block_stream) =
+    let* reading_thread, floating_block_stream =
       match extra_floating_blocks with
       | Some floating_blocks ->
           let*! () = finalizer () in
@@ -2452,7 +2452,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       | None ->
           (* The export block is in the floating stores, copy all the
              floating stores until the block is reached *)
-          let* (reading_thread, floating_block_stream) =
+          let* reading_thread, floating_block_stream =
             export_floating_blocks ~floating_ro_fd ~floating_rw_fd ~export_block
           in
           let reading_thread =
@@ -2994,12 +2994,12 @@ module Raw_importer : IMPORTER = struct
       return (return_unit, Lwt_stream.of_list [])
     else
       let*! fd = Lwt_unix.openfile floating_blocks_file Unix.[O_RDONLY] 0o444 in
-      let (stream, bounded_push) = Lwt_stream.create_bounded 1000 in
+      let stream, bounded_push = Lwt_stream.create_bounded 1000 in
       let rec loop ?pred_block nb_bytes_left =
         if nb_bytes_left < 0 then tzfail Corrupted_floating_store
         else if nb_bytes_left = 0 then return_unit
         else
-          let*! (block, len_read) = Block_repr.read_next_block_exn fd in
+          let*! block, len_read = Block_repr.read_next_block_exn fd in
           let* () =
             Block_repr.check_block_consistency ~genesis_hash ?pred_block block
           in
@@ -3123,7 +3123,7 @@ module Tar_importer : IMPORTER = struct
     in
     match o with
     | Some str ->
-        let (_ofs, res) =
+        let _ofs, res =
           Data_encoding.Binary.read_exn
             Protocol_levels.encoding
             str
@@ -3279,12 +3279,12 @@ module Tar_importer : IMPORTER = struct
     | Some floating_blocks_file ->
         let file_size = Onthefly.get_file_size floating_blocks_file in
         let floating_blocks_file_fd = Onthefly.get_raw_input_fd t.tar in
-        let (stream, bounded_push) = Lwt_stream.create_bounded 1000 in
+        let stream, bounded_push = Lwt_stream.create_bounded 1000 in
         let rec loop ?pred_block nb_bytes_left =
           if nb_bytes_left < 0L then tzfail Corrupted_floating_store
           else if nb_bytes_left = 0L then return_unit
           else
-            let*! (block, len_read) =
+            let*! block, len_read =
               Block_repr.read_next_block_exn floating_blocks_file_fd
             in
             let* () =
@@ -3619,7 +3619,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         (Snapshot_file_not_found snapshot_path)
     in
     let* snapshot_header = Importer.load_snapshot_header snapshot_importer in
-    let (snapshot_version, snapshot_metadata) = snapshot_header in
+    let snapshot_version, snapshot_metadata = snapshot_header in
     let* () =
       fail_unless
         (Version.is_supported snapshot_version)
@@ -3667,7 +3667,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         dst_context_dir
     in
     (* Restore context *)
-    let* (block_data, genesis_context_hash, block_validation_result) =
+    let* block_data, genesis_context_hash, block_validation_result =
       restore_and_apply_context
         snapshot_importer
         ?user_expected_block
@@ -3696,7 +3696,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~genesis_hash:genesis.block
         ~progress_display_mode
     in
-    let* (reading_thread, floating_blocks_stream) =
+    let* reading_thread, floating_blocks_stream =
       read_floating_blocks snapshot_importer ~genesis_hash:genesis.block
     in
     let {Block_validation.validation_store; block_metadata; ops_metadata} =
@@ -3837,7 +3837,7 @@ let read_snapshot_header ~snapshot_path =
     | Tar -> (module Make_snapshot_loader (Tar_loader) : Snapshot_loader)
     | Raw -> (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
   in
-  let* (version, metadata) = Loader.load_snapshot_header ~snapshot_path in
+  let* version, metadata = Loader.load_snapshot_header ~snapshot_path in
   return (Current_header (version, metadata))
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency

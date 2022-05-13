@@ -59,7 +59,7 @@ let logging_failure =
     ("exc", Data_encoding.string)
 
 let make_asynchronous_log_message_consumer () =
-  let (stream, push) = Lwt_stream.create () in
+  let stream, push = Lwt_stream.create () in
   let alive = ref true in
   Lwt.dont_wait
     (fun () ->

@@ -99,8 +99,8 @@ module Events = struct
           json |-> "view" |-> "mempool" |-> "known_valid" |> as_list_opt,
           json |-> "view" |-> "mempool" |-> "pending" |> as_list_opt )
       with
-      | (Some "notify", Some [], Some []) -> None
-      | (Some "notify", Some known_valid, Some pending) ->
+      | Some "notify", Some [], Some [] -> None
+      | Some "notify", Some known_valid, Some pending ->
           let known_valid = List.map JSON.as_string known_valid in
           let pending = List.map JSON.as_string pending in
           Some (known_valid, pending)
@@ -156,8 +156,8 @@ module Operation = struct
 
   let inject_transfers =
     inject_transfers
-      ~gas_limit:
-        1520 (* We make transfers to non allocated contracts in these tests *)
+      ~gas_limit:1520
+        (* We make transfers to non allocated contracts in these tests *)
       ~async:true
       ~force:true
 
@@ -570,7 +570,7 @@ module Memchecks = struct
     Log.info "- Waiting for observer to be notified of operation." ;
     let* observer_result = wait_observer in
     Log.info "- Checking observer received operations." ;
-    let (known_valid, pending) = observer_result in
+    let known_valid, pending = observer_result in
     if List.mem oph known_valid then
       Log.ok "  - %s was propagated to observer node as valid." oph
     else if List.mem oph pending then
@@ -1341,8 +1341,8 @@ module Simple_transfers = struct
         ~dest:Constant.bootstrap3
         ~fee:(fee + 1)
         ~amount:(bal - fee)
-        ~counter:
-          (counter + 5) (* Counter too large (aka "in the future"): wrong *)
+        ~counter:(counter + 5)
+          (* Counter too large (aka "in the future"): wrong *)
         nodes.main.client
     in
     let* () =
@@ -1939,8 +1939,7 @@ module Tx_rollup = struct
       Operation.inject_transfer_ticket
         ~protocol
         ~source:Constant.bootstrap1
-        ~gas_limit:
-          (min_deserialization_gas + 1000)
+        ~gas_limit:(min_deserialization_gas + 1000)
           (* we add 1000 (the gas for manager operation) to avoid failing with
              gas_exhausted right after precheck *)
         ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))

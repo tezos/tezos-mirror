@@ -29,7 +29,7 @@ let default = Temporary
 
 let combine c1 c2 =
   match (c1, c2) with
-  | (Permanent, _) | (_, Permanent) -> Permanent
-  | (Outdated, _) | (_, Outdated) -> Outdated
-  | (Branch, _) | (_, Branch) -> Branch
-  | (Temporary, Temporary) -> Temporary
+  | Permanent, _ | _, Permanent -> Permanent
+  | Outdated, _ | _, Outdated -> Outdated
+  | Branch, _ | _, Branch -> Branch
+  | Temporary, Temporary -> Temporary

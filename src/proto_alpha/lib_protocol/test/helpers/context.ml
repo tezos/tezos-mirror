@@ -371,11 +371,11 @@ type (_, _) tup =
 let tup_hd : type a r. (a, r) tup -> r -> a =
  fun tup elts ->
   match (tup, elts) with
-  | (T1, v) -> v
-  | (T2, (v, _)) -> v
-  | (T3, (v, _, _)) -> v
-  | (TList _, v :: _) -> v
-  | (TList _, []) -> assert false
+  | T1, v -> v
+  | T2, (v, _) -> v
+  | T3, (v, _, _) -> v
+  | TList _, v :: _ -> v
+  | TList _, [] -> assert false
 
 let tup_n : type a r. (a, r) tup -> int = function
   | T1 -> 1
@@ -386,10 +386,10 @@ let tup_n : type a r. (a, r) tup -> int = function
 let tup_get : type a r. (a, r) tup -> a list -> r =
  fun tup list ->
   match (tup, list) with
-  | (T1, [v]) -> v
-  | (T2, [v1; v2]) -> (v1, v2)
-  | (T3, [v1; v2; v3]) -> (v1, v2, v3)
-  | (TList _, l) -> l
+  | T1, [v] -> v
+  | T2, [v1; v2] -> (v1, v2)
+  | T3, [v1; v2; v3] -> (v1, v2, v3)
+  | TList _, l -> l
   | _ -> assert false
 
 let init_gen tup ?rng_state ?commitments ?(initial_balances = [])

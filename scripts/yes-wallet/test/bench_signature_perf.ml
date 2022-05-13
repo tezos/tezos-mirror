@@ -41,15 +41,15 @@ let wrong_keys =
   function Signature.P256 -> keys_p | Ed25519 -> keys_e | Secp256k1 -> keys_s
 
 let wrong_pk algo =
-  let (_, pk, _) = wrong_keys algo in
+  let _, pk, _ = wrong_keys algo in
   pk
 
 let pk algo =
-  let (_, pk, _) = keys algo in
+  let _, pk, _ = keys algo in
   pk
 
 let sk algo =
-  let (_, _, sk) = keys algo in
+  let _, _, sk = keys algo in
   sk
 
 let fake_sk algo =
@@ -106,11 +106,11 @@ let time ~yes_crypto ~algo size datas =
   Format.eprintf "Compacting memory...@?" ;
   Gc.compact () ;
   Format.eprintf "timing Ko check..." ;
-  let (time_check_ko, _) = Ko.check algo signed datas in
+  let time_check_ko, _ = Ko.check algo signed datas in
   Format.eprintf "Compacting memory...@?" ;
   Gc.compact () ;
   Format.eprintf "timing Ok check...@?" ;
-  let (time_check_ok, _) = Ok.check algo signed datas in
+  let time_check_ok, _ = Ok.check algo signed datas in
   Format.eprintf "end.@." ;
   Format.printf
     "%s,%d,%f,%f@."

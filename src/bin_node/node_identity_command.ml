@@ -30,7 +30,7 @@ let get_config data_dir config_file expected_pow =
   let open Lwt_result_syntax in
   let* cfg =
     match (data_dir, config_file) with
-    | (None, None) ->
+    | None, None ->
         let default_config =
           Node_config_file.default_data_dir
           // Node_data_version.default_config_file_name
@@ -38,14 +38,14 @@ let get_config data_dir config_file expected_pow =
         let*! config_file_exists = Lwt_unix.file_exists default_config in
         if config_file_exists then Node_config_file.read default_config
         else return Node_config_file.default_config
-    | (None, Some config_file) -> Node_config_file.read config_file
-    | (Some data_dir, None) ->
+    | None, Some config_file -> Node_config_file.read config_file
+    | Some data_dir, None ->
         let* cfg =
           Node_config_file.read
             (data_dir // Node_data_version.default_config_file_name)
         in
         return {cfg with data_dir}
-    | (Some data_dir, Some config_file) ->
+    | Some data_dir, Some config_file ->
         let* cfg = Node_config_file.read config_file in
         return {cfg with data_dir}
   in

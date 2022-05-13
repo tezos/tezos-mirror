@@ -122,10 +122,10 @@ module Make (Context : P) :
 
   let equal_instruction i1 i2 =
     match (i1, i2) with
-    | (IPush x, IPush y) -> Compare.Int.(x = y)
-    | (IAdd, IAdd) -> true
-    | (IStore x, IStore y) -> Compare.String.(x = y)
-    | (_, _) -> false
+    | IPush x, IPush y -> Compare.Int.(x = y)
+    | IAdd, IAdd -> true
+    | IStore x, IStore y -> Compare.String.(x = y)
+    | _, _ -> false
 
   let pp_instruction fmt = function
     | IPush x -> Format.fprintf fmt "push(%d)" x
@@ -192,7 +192,7 @@ module Make (Context : P) :
 
       let bind m f state =
         let open Lwt_syntax in
-        let* (state, res) = m state in
+        let* state, res = m state in
         match res with None -> return (state, None) | Some res -> f res state
 
       module Syntax = struct
@@ -230,7 +230,7 @@ module Make (Context : P) :
         match obytes with
         | None -> return (state, Some None)
         | Some bytes ->
-            let* (state, value) = decode encoding bytes state in
+            let* state, value = decode encoding bytes state in
             return (state, Some value)
 
       let children key encoding state =
@@ -243,11 +243,11 @@ module Make (Context : P) :
               match obytes with
               | None -> internal_error "Invalid children" state
               | Some bytes -> (
-                  let* (state, v) = decode encoding bytes state in
+                  let* state, v = decode encoding bytes state in
                   match v with
                   | None -> return (state, None)
                   | Some v -> (
-                      let* (state, l) = aux children in
+                      let* state, l = aux children in
                       match l with
                       | None -> return (state, None)
                       | Some l -> return (state, Some ((key, v) :: l)))))
@@ -650,7 +650,7 @@ module Make (Context : P) :
 
   let pp state =
     let open Lwt_syntax in
-    let* (_, pp) = Monad.run pp state in
+    let* _, pp = Monad.run pp state in
     match pp with
     | None -> return @@ fun fmt _ -> Format.fprintf fmt "<opaque>"
     | Some pp -> return pp
@@ -666,7 +666,7 @@ module Make (Context : P) :
       return ()
     in
     let open Lwt_syntax in
-    let* (state, _) = run m state in
+    let* state, _ = run m state in
     return state
 
   let state_hash state =
@@ -682,7 +682,7 @@ module Make (Context : P) :
     let open Lwt_syntax in
     let* state = Monad.run m state in
     match state with
-    | (_, Some hash) -> return hash
+    | _, Some hash -> return hash
     | _ -> (* Hash computation always succeeds. *) assert false
 
   let boot =
@@ -694,12 +694,12 @@ module Make (Context : P) :
 
   let result_of ~default m state =
     let open Lwt_syntax in
-    let* (_, v) = run m state in
+    let* _, v = run m state in
     match v with None -> return default | Some v -> return v
 
   let state_of m state =
     let open Lwt_syntax in
-    let* (s, _) = run m state in
+    let* s, _ = run m state in
     return s
 
   let get_tick = result_of ~default:Tick.initial CurrentTick.get
@@ -759,7 +759,7 @@ module Make (Context : P) :
   let next_char =
     let open Monad.Syntax in
     LexerState.(
-      let* (start, len) = get in
+      let* start, len = get in
       set (start, len + 1))
 
   let no_message_to_lex () =
@@ -767,7 +767,7 @@ module Make (Context : P) :
 
   let current_char =
     let open Monad.Syntax in
-    let* (start, len) = LexerState.get in
+    let* start, len = LexerState.get in
     let* msg = NextMessage.get in
     match msg with
     | None -> no_message_to_lex ()
@@ -778,7 +778,7 @@ module Make (Context : P) :
 
   let lexeme =
     let open Monad.Syntax in
-    let* (start, len) = LexerState.get in
+    let* start, len = LexerState.get in
     let* msg = NextMessage.get in
     match msg with
     | None -> no_message_to_lex ()

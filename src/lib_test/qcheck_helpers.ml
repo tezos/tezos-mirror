@@ -29,9 +29,9 @@ let qcheck_wrap ?verbose ?long ?rand =
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
     match (eq, cmp) with
-    | (Some eq, _) -> eq expected actual
-    | (None, Some cmp) -> cmp expected actual = 0
-    | (None, None) -> Stdlib.compare expected actual = 0
+    | Some eq, _ -> eq expected actual
+    | None, Some cmp -> cmp expected actual = 0
+    | None, None -> Stdlib.compare expected actual = 0
   in
   if pass then true
   else
@@ -50,9 +50,9 @@ let qcheck_eq ?pp ?cmp ?eq expected actual =
 let qcheck_neq ?pp ?cmp ?eq left right =
   let pass =
     match (eq, cmp) with
-    | (Some eq, _) -> eq left right
-    | (None, Some cmp) -> cmp left right = 0
-    | (None, None) -> Stdlib.compare left right = 0
+    | Some eq, _ -> eq left right
+    | None, Some cmp -> cmp left right = 0
+    | None, None -> Stdlib.compare left right = 0
   in
   if not pass then true
   else
@@ -141,7 +141,7 @@ let endpoint_arb =
     ":" ^ Int.to_string port
   in
   let url_string_gen =
-    let+ (protocol, path, opt_part) =
+    let+ protocol, path, opt_part =
       triple protocol_gen path_gen (opt port_arb)
     in
     String.concat "" [protocol; "://"; path; Option.value ~default:"" opt_part]

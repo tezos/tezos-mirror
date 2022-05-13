@@ -270,7 +270,7 @@ let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
 let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
     (cctxt : #Client_context.printer) =
   if emacs then
-    let (type_map, errs, _gas) =
+    let type_map, errs, _gas =
       match res with
       | Ok (type_map, gas) -> (type_map, [], Some gas)
       | Error

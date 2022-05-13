@@ -29,6 +29,6 @@ let combine_with_leftovers xs ys =
   match
     Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.combine_with_leftovers xs ys
   with
-  | (c, None) -> (c, None)
-  | (c, Some (Either.Left l)) -> (c, Some (`Left l))
-  | (c, Some (Either.Right r)) -> (c, Some (`Right r))
+  | c, None -> (c, None)
+  | c, Some (Either.Left l) -> (c, Some (`Left l))
+  | c, Some (Either.Right r) -> (c, Some (`Right r))

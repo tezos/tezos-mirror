@@ -28,7 +28,7 @@
    Component: Client - proxy mode
    Invocation: dune exec tezt/tests/main.exe -- --file proxy.ml
    Subject: Tests of the client's --mode proxy.
-  *)
+*)
 
 let ( >|= ) = Lwt.( >|= )
 
@@ -59,7 +59,7 @@ let test_cache_at_most_once ?query_string path =
          (Client.rpc_path_query_to_string ?query_string path))
     ~tags:["proxy"; "rpc"; "get"]
   @@ fun protocol ->
-  let* (_, client) = init ~protocol () in
+  let* _, client = init ~protocol () in
   let env =
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
     |> List.to_seq |> String_map.of_seq
@@ -83,8 +83,8 @@ let test_cache_at_most_once ?query_string path =
   let find_duplicate l =
     let rec go with_duplicates without_duplicates =
       match (with_duplicates, without_duplicates) with
-      | ([], []) -> None
-      | (hd_dup :: tl_dup, hd_nodup :: tl_nodup) ->
+      | [], [] -> None
+      | hd_dup :: tl_dup, hd_nodup :: tl_nodup ->
           if hd_dup = hd_nodup then go tl_dup tl_nodup else Some hd_dup
       | _ -> assert false
     in
@@ -175,7 +175,7 @@ let test_context_suffix_no_rpc ?query_string path =
          (Client.rpc_path_query_to_string ?query_string path))
     ~tags:["proxy"; "rpc"; "get"]
   @@ fun protocol ->
-  let* (_, client) = init ~protocol () in
+  let* _, client = init ~protocol () in
   let env =
     String_map.singleton
       "TEZOS_LOG"
@@ -282,7 +282,7 @@ let test_wrong_proto =
     ~title:"(Proxy) Wrong proto"
     ~tags:["proxy"; "initialization"]
   @@ fun protocol ->
-  let* (_, client) = init ~protocol () in
+  let* _, client = init ~protocol () in
   wrong_proto protocol client
 
 (** Test.
@@ -311,7 +311,7 @@ let test_transfer =
     ~title:"(Proxy) Transfer"
     ~tags:["proxy"; "transfer"]
   @@ fun protocol ->
-  let* (_, client) = init ~protocol () in
+  let* _, client = init ~protocol () in
   let* () =
     Client.transfer
       ~wait:"none"
@@ -399,7 +399,7 @@ module Location = struct
       printed to output. [tz_log] can be used to augment TEZOS_LOG
       (useful for debugging). *)
   let rpc_get ?(tz_log = []) ?query_string client rpc_path =
-    let (proxy_key, proxy_value) = ("proxy_rpc_ctxt", "debug") in
+    let proxy_key, proxy_value = ("proxy_rpc_ctxt", "debug") in
     List.iter
       (fun (k, v) ->
         if k = proxy_key && v = proxy_value then
@@ -424,7 +424,7 @@ module Location = struct
       to be executed on the given location ([expected_loc]).
       [tz_log] can be used to augment TEZOS_LOG (useful for debugging). *)
   let check_location ?tz_log alt_mode client rpc_path expected_loc =
-    let* (_, stderr) = rpc_get ?tz_log client rpc_path in
+    let* _, stderr = rpc_get ?tz_log client rpc_path in
     let actual_loc = parse_rpc_exec_location stderr rpc_path in
     if actual_loc <> expected_loc then
       Test.fail
@@ -461,7 +461,7 @@ module Location = struct
       ~title:"(Proxy) RPC get's location"
       ~tags:(locations_tags alt_mode)
     @@ fun protocol ->
-    let* (_, client) = init ~protocol () in
+    let* _, client = init ~protocol () in
     check_locations alt_mode client
 
   (** Check the output of [rpc get] on a number on RPC between two
@@ -500,9 +500,9 @@ module Location = struct
       ]
     in
     let perform (rpc_path, query_string) =
-      let* (vanilla_out, vanilla_err) =
+      let* vanilla_out, vanilla_err =
         rpc_get ?tz_log ~query_string vanilla rpc_path
-      and* (alt_out, alt_err) =
+      and* alt_out, alt_err =
         rpc_get ?tz_log ~query_string alternative rpc_path
       in
       if vanilla_out <> alt_out then
@@ -530,17 +530,17 @@ module Location = struct
         (* Unknown matches on the left-hand side: there should be no match
            in the vanilla output, because the vanilla client doesn't deal
            with alternative stuff. That is why [Unknown] is matched here. *)
-        | (Unknown, Unknown) when not (executes_locally alt_mode) ->
+        | Unknown, Unknown when not (executes_locally alt_mode) ->
             log_same_answer () ;
             Lwt.return_unit
-        | (Unknown, Local) ->
+        | Unknown, Local ->
             log_same_answer () ;
             Log.info
               "%s client, %s: done locally ✓"
               alt_mode_string
               (Client.rpc_path_query_to_string ~query_string rpc_path) ;
             Lwt.return_unit
-        | (loc, Local) ->
+        | loc, Local ->
             Test.fail
               "Vanilla client should not output whether an RPC (here: %s) is \
                executed locally or delegated to the endpoint. Expected %s but \
@@ -550,7 +550,7 @@ module Location = struct
               (location_to_string Unknown)
               (location_to_string loc)
               vanilla_err
-        | (_, loc) ->
+        | _, loc ->
             Test.fail
               "%s client should execute RPC %s locally: expected %s but found \
                %s. Inspected log:\n\
@@ -575,7 +575,7 @@ module Location = struct
       ~title:"(Proxy) Compare RPC get"
       ~tags:(compare_tags alt_mode)
     @@ fun protocol ->
-    let* (node, alternative) = init ~protocol () in
+    let* node, alternative = init ~protocol () in
     let* vanilla = Client.init ~endpoint:(Node node) () in
     let clients = {vanilla; alternative} in
     check_equivalence alt_mode clients
@@ -696,7 +696,7 @@ let test_split_key_heuristic =
     ~title:"(Proxy) split_key heuristic"
     ~tags:["proxy"; "rpc"; "get"]
   @@ fun protocol ->
-  let* (_, client) = init ~protocol () in
+  let* _, client = init ~protocol () in
   let test_one (path, query_string) =
     let full_path = "chains" :: "main" :: "blocks" :: "head" :: path in
     let* stderr =

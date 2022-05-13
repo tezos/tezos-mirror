@@ -248,7 +248,7 @@ let set_running ~timestamp peer_info point data conn_metadata =
   Info.log peer_info ~timestamp point Connection_established
 
 let set_disconnected ~timestamp ?(requested = false) peer_info =
-  let (current_point, (event : Pool_event.kind)) =
+  let current_point, (event : Pool_event.kind) =
     match peer_info.Info.state with
     | Accepted {current_point; _} ->
         peer_info.last_rejected_connection <- Some (current_point, timestamp) ;

@@ -45,19 +45,19 @@ let z_in_mutez_bounds (z : Z.t) : bool =
 
 let compare (c' : Z.t) (c : Tez.t tzresult) : bool =
   match (z_in_mutez_bounds @@ c', c) with
-  | (true, Ok c) ->
+  | true, Ok c ->
       Lib_test.Qcheck_helpers.qcheck_eq'
         ~pp:Z.pp_print
         ~expected:c'
         ~actual:(tez_to_z c)
         ()
-  | (true, Error _) ->
+  | true, Error _ ->
       QCheck.Test.fail_reportf
         "@[<h 0>Results are in Z bounds, but tez operation fails.@]"
-  | (false, Ok _) ->
+  | false, Ok _ ->
       QCheck.Test.fail_reportf
         "@[<h 0>Results are not in Z bounds, but tez operation did not fail.@]"
-  | (false, Error _) -> true
+  | false, Error _ -> true
 
 (* [prop_binop f f' (a, b)] compares the function [f] in Tez with a model
    function function [f'] in [Z].

@@ -99,7 +99,8 @@ type apply_mode =
       predecessor_level : Level.t;
       predecessor_round : Round.t;
       round : Round.t;
-    } (* Both partial and normal *)
+    }
+    (* Both partial and normal *)
   | Full_construction of {
       predecessor_block : Block_hash.t;
       payload_hash : Block_payload_hash.t;

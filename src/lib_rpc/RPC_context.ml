@@ -227,7 +227,7 @@ type stopper = unit -> unit
 
 let make_streamed_call s (ctxt : #streamed) p q i =
   let open Lwt_result_syntax in
-  let (stream, push) = Lwt_stream.create () in
+  let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
   let* spill_all = ctxt#call_streamed_service s ~on_chunk ~on_close p q i in
   let close () =

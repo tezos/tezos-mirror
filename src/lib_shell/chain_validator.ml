@@ -319,10 +319,10 @@ let may_switch_test_chain w active_chains spawn_child block =
   let*! r =
     let* v = Store.Block.testchain_status nv.parameters.chain_store block in
     match v with
-    | (Not_running, _) ->
+    | Not_running, _ ->
         let*! () = shutdown_child nv active_chains in
         return_unit
-    | ((Forking _ | Running _), None) -> return_unit (* only for snapshots *)
+    | (Forking _ | Running _), None -> return_unit (* only for snapshots *)
     | ( (Forking {protocol; expiration; _} | Running {protocol; expiration; _}),
         Some forking_block_hash ) ->
         may_create_child block protocol expiration forking_block_hash
@@ -414,7 +414,7 @@ let may_flush_or_update_prevalidator parameters event prevalidator chain_db
         let* () = Prevalidator.shutdown old_prevalidator in
         return_ok_unit
       else
-        let* (live_blocks, live_operations) =
+        let* live_blocks, live_operations =
           Store.Chain.live_blocks parameters.chain_store
         in
         Prevalidator.flush
@@ -627,7 +627,8 @@ let on_close w =
   in
   Lwt.join
     (Option.iter_s Prevalidator.shutdown !(nv.prevalidator)
-     :: Option.iter_s (fun (_, shutdown) -> shutdown ()) nv.child :: pvs)
+    :: Option.iter_s (fun (_, shutdown) -> shutdown ()) nv.child
+    :: pvs)
 
 let may_load_protocols parameters =
   let open Lwt_result_syntax in

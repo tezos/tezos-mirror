@@ -38,7 +38,7 @@ let mutez_int64 t = t
 let to_string amount =
   let mult_int = 1_000_000L in
   let rec left amount =
-    let (d, r) = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
+    let d, r = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
     if d > 0L then Format.asprintf "%s%03Ld" (left d) r
     else Format.asprintf "%Ld" r
   in
@@ -48,11 +48,11 @@ let to_string amount =
       else if v mod 100 > 0 then Format.asprintf "%02d" (v / 10)
       else Format.asprintf "%d" (v / 100)
     in
-    let (hi, lo) = (amount / 1000, amount mod 1000) in
+    let hi, lo = (amount / 1000, amount mod 1000) in
     if lo = 0 then Format.asprintf "%s" (triplet hi)
     else Format.asprintf "%03d%s" hi (triplet lo)
   in
-  let (ints, decs) =
+  let ints, decs =
     (Int64.(div amount mult_int), Int64.(to_int (rem amount mult_int)))
   in
   if decs > 0 then Format.asprintf "%s.%s" (left ints) (right decs)
@@ -72,7 +72,7 @@ let parse_floating tez_string =
   let parse_int s =
     match int_of_string_opt s with None -> fail () | Some i -> i
   in
-  let (integral, decimal) =
+  let integral, decimal =
     match tez_string =~** re with None -> fail () | Some (i, d) -> (i, d)
   in
   let integral = parse_int integral in

@@ -74,13 +74,13 @@ let create_context () =
     delegate's pkh. *)
 let init_test ~user_is_delegate =
   create_context () >>=? fun (ctxt, _) ->
-  let (delegate, delegate_pk, _) = Signature.generate_key () in
+  let delegate, delegate_pk, _ = Signature.generate_key () in
   let delegate_contract = Contract.Implicit delegate in
   let delegate_account = `Contract (Contract.Implicit delegate) in
   let user_contract =
     if user_is_delegate then delegate_contract
     else
-      let (user, _, _) = Signature.generate_key () in
+      let user, _, _ = Signature.generate_key () in
       Contract.Implicit user
   in
   let user_account = `Contract user_contract in
@@ -115,7 +115,7 @@ let test_delegate_then_freeze_deposit () =
   (* Fetch staking balance after delegation and before freeze. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
   (* Freeze a tx-rollup deposit. *)
-  let (tx_rollup, _) = mk_tx_rollup () in
+  let tx_rollup, _ = mk_tx_rollup () in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
   let deposit_amount = small_random_amount () in
   let deposit_account = `Frozen_bonds (user_contract, bond_id) in
@@ -163,7 +163,7 @@ let test_freeze_deposit_then_delegate () =
   (* Fetch user's initial balance before freeze. *)
   Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
   (* Freeze a tx-rollup deposit. *)
-  let (tx_rollup, _) = mk_tx_rollup () in
+  let tx_rollup, _ = mk_tx_rollup () in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
   let deposit_amount = small_random_amount () in
   let deposit_account = `Frozen_bonds (user_contract, bond_id) in
@@ -217,7 +217,7 @@ let test_allocated_when_frozen_deposits_exists ~user_is_delegate () =
   Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
   Assert.equal_bool ~loc:__LOC__ Tez.(user_balance > zero) true >>=? fun () ->
   (* Freeze a tx-rollup deposit. *)
-  let (tx_rollup, _) = mk_tx_rollup () in
+  let tx_rollup, _ = mk_tx_rollup () in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
   let deposit_amount = user_balance in
   let deposit_account = `Frozen_bonds (user_contract, bond_id) in
@@ -254,9 +254,9 @@ let test_total_stake ~user_is_delegate () =
   Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
   Assert.equal_bool ~loc:__LOC__ Tez.(user_balance > zero) true >>=? fun () ->
   (* Freeze 2 tx-rollup deposits. *)
-  let (tx_rollup, nonce) = mk_tx_rollup () in
+  let tx_rollup, nonce = mk_tx_rollup () in
   let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup in
-  let (tx_rollup, _) = mk_tx_rollup ~nonce () in
+  let tx_rollup, _ = mk_tx_rollup ~nonce () in
   let bond_id2 = Bond_id.Tx_rollup_bond_id tx_rollup in
   let deposit_amount = small_random_amount () in
   let deposit_account1 = `Frozen_bonds (user_contract, bond_id1) in
@@ -320,7 +320,7 @@ let test_rpcs () =
 let test_scenario scenario =
   init_test ~user_is_delegate:false
   >>=? fun (ctxt, user_contract, user_account, delegate1) ->
-  let (delegate2, delegate_pk2, _) = Signature.generate_key () in
+  let delegate2, delegate_pk2, _ = Signature.generate_key () in
   let delegate_contract2 = Contract.Implicit delegate2 in
   let delegate_account2 = `Contract delegate_contract2 in
   let delegate_balance2 = big_random_amount () in
@@ -330,8 +330,8 @@ let test_scenario scenario =
      revealing its manager key is a prerequisite. *)
   Contract.reveal_manager_key ctxt delegate2 delegate_pk2 >>>=? fun ctxt ->
   Delegate.set ctxt delegate_contract2 (Some delegate2) >>>=? fun ctxt ->
-  let (tx_rollup1, nonce) = mk_tx_rollup () in
-  let (tx_rollup2, _) = mk_tx_rollup ~nonce () in
+  let tx_rollup1, nonce = mk_tx_rollup () in
+  let tx_rollup2, _ = mk_tx_rollup ~nonce () in
   let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in
   let bond_id2 = Bond_id.Tx_rollup_bond_id tx_rollup2 in
   let deposit_amount = Tez.of_mutez_exn 1000L in

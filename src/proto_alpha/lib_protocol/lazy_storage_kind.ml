@@ -222,10 +222,10 @@ let equal :
     (i1, a1, u1) t -> (i2, a2, u2) t -> (i1 * a1 * u1, i2 * a2 * u2) cmp =
  fun k1 k2 ->
   match (k1, k2) with
-  | (Big_map, Big_map) -> Eq
-  | (Sapling_state, Sapling_state) -> Eq
-  | (Big_map, _) -> Neq
-  | (_, Big_map) -> Neq
+  | Big_map, Big_map -> Eq
+  | Sapling_state, Sapling_state -> Eq
+  | Big_map, _ -> Neq
+  | _, Big_map -> Neq
 
 type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
 
@@ -285,17 +285,17 @@ module IdSet = struct
 
   let mem (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
-    | (Big_map, {big_map; _}) -> Big_map.IdSet.mem id big_map
-    | (Sapling_state, {sapling_state; _}) ->
+    | Big_map, {big_map; _} -> Big_map.IdSet.mem id big_map
+    | Sapling_state, {sapling_state; _} ->
         Sapling_state.IdSet.mem id sapling_state
     [@@coq_axiom_with_reason "gadt"]
 
   let add (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
-    | (Big_map, {big_map; _}) ->
+    | Big_map, {big_map; _} ->
         let big_map = Big_map.IdSet.add id big_map in
         {set with big_map}
-    | (Sapling_state, {sapling_state; _}) ->
+    | Sapling_state, {sapling_state; _} ->
         let sapling_state = Sapling_state.IdSet.add id sapling_state in
         {set with sapling_state}
     [@@coq_axiom_with_reason "gadt"]
@@ -311,8 +311,8 @@ module IdSet = struct
   let fold (type i a u) (kind : (i, a, u) kind) (f : i -> 'acc -> 'acc) set
       (acc : 'acc) =
     match (kind, set) with
-    | (Big_map, {big_map; _}) -> Big_map.IdSet.fold f big_map acc
-    | (Sapling_state, {sapling_state; _}) ->
+    | Big_map, {big_map; _} -> Big_map.IdSet.fold f big_map acc
+    | Sapling_state, {sapling_state; _} ->
         Sapling_state.IdSet.fold f sapling_state acc
     [@@coq_axiom_with_reason "gadt"]
 

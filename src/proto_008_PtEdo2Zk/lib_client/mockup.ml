@@ -623,7 +623,7 @@ module Parsed_account = struct
     Client_keys.list_keys wallet >>=? fun all_keys ->
     List.iter_s
       (function
-        | (name, pkh, _pk_opt, Some sk_uri) -> (
+        | name, pkh, _pk_opt, Some sk_uri -> (
             let contract =
               Protocol.Alpha_context.Contract.implicit_contract pkh
             in
@@ -831,7 +831,7 @@ let mem_init :
   | None -> return Protocol_constants_overrides.no_overrides
   | Some json -> (
       match Data_encoding.Json.destruct lib_parameters_json_encoding json with
-      | (_, x) -> return x
+      | _, x -> return x
       | exception error ->
           failwith
             "cannot read protocol constants overrides: %a"

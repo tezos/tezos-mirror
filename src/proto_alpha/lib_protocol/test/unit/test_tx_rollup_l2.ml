@@ -102,8 +102,8 @@ let context_with_one_addr =
   let open Context_l2 in
   let open Syntax in
   let ctxt = empty_context in
-  let (_, _, addr1) = gen_l2_address () in
-  let+ (ctxt, _, idx1) = Address_index.get_or_associate_index ctxt addr1 in
+  let _, _, addr1 = gen_l2_address () in
+  let+ ctxt, _, idx1 = Address_index.get_or_associate_index ctxt addr1 in
   (ctxt, idx1)
 
 let ((_, pk, addr) as l2_addr1) = gen_l2_address ()
@@ -118,7 +118,7 @@ module Test_Address_medata = struct
   (** Test that an initilized metadata has a counter of zero and is correctly
       incremented. *)
   let test_init_and_incr () =
-    let* (ctxt, idx) = context_with_one_addr in
+    let* ctxt, idx = context_with_one_addr in
 
     let* metadata = get ctxt idx in
     assert (metadata = None) ;
@@ -136,7 +136,7 @@ module Test_Address_medata = struct
   (** Test that initializing an index to a public key fails if the index
       has already been initialized. *)
   let test_init_twice_fails () =
-    let* (ctxt, idx) = context_with_one_addr in
+    let* ctxt, idx = context_with_one_addr in
 
     let* ctxt = init_with_public_key ctxt idx pk in
 
@@ -164,7 +164,7 @@ module Test_Address_medata = struct
 
   (** Test that crediting more than {!Int64.max_int} causes an overflow. *)
   let test_counter_overflow () =
-    let* (ctxt, idx) = context_with_one_addr in
+    let* ctxt, idx = context_with_one_addr in
     let* ctxt = init_with_public_key ctxt idx pk in
 
     let* ctxt =
@@ -213,7 +213,7 @@ end
 module Test_index (Index : S) = struct
   let init_context_1 () =
     let open Context_l2.Syntax in
-    let* (ctxt, values) = Index.init_context_n 1 in
+    let* ctxt, values = Index.init_context_n 1 in
     let value = nth_exn values 0 in
     return (ctxt, value)
 
@@ -221,9 +221,9 @@ module Test_index (Index : S) = struct
       from the value gives the same index. *)
   let test_set_and_get () =
     let open Context_l2.Syntax in
-    let* (ctxt, value) = init_context_1 () in
+    let* ctxt, value = init_context_1 () in
 
-    let* (ctxt, created, idx1) = Index.get_or_associate_index ctxt value in
+    let* ctxt, created, idx1 = Index.get_or_associate_index ctxt value in
     assert (created = `Created) ;
     let* idx2 = Index.get ctxt value in
 
@@ -235,7 +235,7 @@ module Test_index (Index : S) = struct
     address increments the count. *)
   let test_associate_fresh_index () =
     let open Context_l2.Syntax in
-    let* (ctxt, value) = init_context_1 () in
+    let* ctxt, value = init_context_1 () in
 
     let* count = Index.count ctxt in
     assert (count = 0l) ;
@@ -243,7 +243,7 @@ module Test_index (Index : S) = struct
     let* idx = Index.get ctxt value in
     assert (idx = None) ;
 
-    let* (ctxt, created, idx) = Index.get_or_associate_index ctxt value in
+    let* ctxt, created, idx = Index.get_or_associate_index ctxt value in
     assert (created = `Created) ;
     let* count = Index.count ctxt in
 
@@ -255,18 +255,18 @@ module Test_index (Index : S) = struct
   (** Test that associating twice the same value give the same index. *)
   let test_associate_value_twice () =
     let open Context_l2.Syntax in
-    let* (ctxt, value) = init_context_1 () in
+    let* ctxt, value = init_context_1 () in
 
     let expected = Indexable.index_exn 0l in
 
-    let* (ctxt, created, idx) = Index.get_or_associate_index ctxt value in
+    let* ctxt, created, idx = Index.get_or_associate_index ctxt value in
     assert (created = `Created) ;
     assert (idx = expected) ;
 
     let* idx = Index.get ctxt value in
     assert (idx = Some (Indexable.index_exn 0l)) ;
 
-    let* (ctxt, existed, idx) = Index.get_or_associate_index ctxt value in
+    let* ctxt, existed, idx = Index.get_or_associate_index ctxt value in
     assert (existed = `Existed) ;
     assert (idx = expected) ;
 
@@ -277,7 +277,7 @@ module Test_index (Index : S) = struct
 
   let test_reach_too_many_l2 () =
     let open Context_l2.Syntax in
-    let* (ctxt, value) = init_context_1 () in
+    let* ctxt, value = init_context_1 () in
     let* ctxt = Index.set_count ctxt Int32.max_int in
 
     let* () =
@@ -370,7 +370,7 @@ module Test_Ticket_ledger = struct
 
   (** Test that crediting a ticket index to an index behaves correctly. *)
   let test_credit () =
-    let* (ctxt, idx1) = context_with_one_addr in
+    let* ctxt, idx1 = context_with_one_addr in
 
     let* amount = get ctxt ticket_idx1 idx1 in
     assert (Tx_rollup_l2_qty.(amount = zero)) ;
@@ -384,7 +384,7 @@ module Test_Ticket_ledger = struct
 
   (** Test that crediting more than {!Int64.max_int} causes an overflow. *)
   let test_credit_too_much () =
-    let* (ctxt, idx1) = context_with_one_addr in
+    let* ctxt, idx1 = context_with_one_addr in
 
     let* ctxt =
       credit ctxt ticket_idx1 idx1 (Tx_rollup_l2_qty.of_int64_exn Int64.max_int)
@@ -415,7 +415,7 @@ module Test_Ticket_ledger = struct
 
   (** Test that spending a ticket from an index to another one behaves correctly *)
   let test_spend_valid () =
-    let* (ctxt, idx1) = context_with_one_addr in
+    let* ctxt, idx1 = context_with_one_addr in
 
     let* ctxt =
       credit ctxt ticket_idx1 idx1 (Tx_rollup_l2_qty.of_int64_exn 10L)
@@ -435,7 +435,7 @@ module Test_Ticket_ledger = struct
 
   (** Test that spending a ticket without the required balance fails. *)
   let test_spend_without_balance () =
-    let* (ctxt, idx1) = context_with_one_addr in
+    let* ctxt, idx1 = context_with_one_addr in
 
     let* () =
       expect_error
@@ -446,7 +446,7 @@ module Test_Ticket_ledger = struct
     return_unit
 
   let test_remove_empty_balance () =
-    let* (ctxt, idx1) = context_with_one_addr in
+    let* ctxt, idx1 = context_with_one_addr in
 
     let* ctxt = credit ctxt ticket_idx1 idx1 Tx_rollup_l2_qty.one in
     let* qty = Internal_for_tests.get_opt ctxt ticket_idx1 idx1 in

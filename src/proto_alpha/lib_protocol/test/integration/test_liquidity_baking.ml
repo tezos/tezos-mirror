@@ -54,7 +54,6 @@ let generate_init_state () =
 (* The script hash of
 
    https://gitlab.com/dexter2tz/dexter2tz/-/blob/d98643881fe14996803997f1283e84ebd2067e35/dexter.liquidity_baking.mligo.tz
-
 *)
 let expected_cpmm_hash =
   Script_expr_hash.of_b58check_exn
@@ -63,7 +62,6 @@ let expected_cpmm_hash =
 (* The script hash of
 
    https://gitlab.com/dexter2tz/dexter2tz/-/blob/d98643881fe14996803997f1283e84ebd2067e35/lqt_fa12.mligo.tz
-
 *)
 let expected_lqt_hash =
   Script_expr_hash.of_b58check_exn
@@ -226,7 +224,7 @@ let liquidity_baking_toggle_50 n () =
 (* Test that the subsidy can restart if LB_on votes regain majority.
    Bake n_votes with LB_off, check that the subsidy is paused, bake
    n_votes with LB_on, check that the subsidy flows.
- *)
+*)
 let liquidity_baking_restart n_votes n () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->

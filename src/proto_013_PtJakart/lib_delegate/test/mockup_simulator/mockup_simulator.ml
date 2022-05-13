@@ -153,10 +153,10 @@ let locate_blocks (state : state)
       | None ->
           failwith "locate_blocks: can't find the block %a" Block_hash.pp hash
       | Some chain0 ->
-          let (_, chain) = List.split_n rel chain0 in
+          let _, chain = List.split_n rel chain0 in
           return chain)
   | `Head rel ->
-      let (_, chain) = List.split_n rel state.chain in
+      let _, chain = List.split_n rel state.chain in
       return chain
   | `Level _ -> failwith "locate_blocks: `Level block spec not handled"
   | `Genesis -> failwith "locate_blocks: `Genesis block spec net handled"
@@ -172,7 +172,7 @@ let locate_block (state : state)
 (** Return the collection of live blocks for a given block identifier. *)
 let live_blocks (state : state) block =
   locate_blocks state block >>=? fun chain ->
-  let (segment, _) = List.split_n state.live_depth chain in
+  let segment, _ = List.split_n state.live_depth chain in
   return
     (List.fold_left
        (fun set ({rpc_context; _} : block) ->
@@ -686,7 +686,7 @@ let rec listener ~(user_hooks : (module Hooks)) ~state ~broadcast_pipe =
 let create_fake_node_state ~i ~live_depth
     ~(genesis_block : Block_header.t * Environment_context.rpc_context)
     ~global_chain_table ~broadcast_pipes =
-  let (block_header0, rpc_context0) = genesis_block in
+  let block_header0, rpc_context0 = genesis_block in
   parse_protocol_data block_header0.protocol_data >>=? fun protocol_data ->
   let genesis0 =
     {
@@ -851,7 +851,7 @@ let deduce_baker_sk
       list) (total_accounts : int) (level : int) :
     Signature.secret_key tzresult Lwt.t =
   (match (total_accounts, level) with
-  | (_, 0) -> return 0 (* apparently this doesn't really matter *)
+  | _, 0 -> return 0 (* apparently this doesn't really matter *)
   | _ ->
       failwith
         "cannot deduce baker for a genesis block, total accounts = %d, level = \
@@ -859,7 +859,7 @@ let deduce_baker_sk
         total_accounts
         level)
   >>=? fun baker_index ->
-  let (_, secret) =
+  let _, secret =
     List.nth accounts_with_secrets baker_index
     |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -919,8 +919,8 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
   |> Environment.wrap_tzresult
   >>?= fun delegate_selection ->
   (match (delegate_selection, constants.initial_seed) with
-  | ([], seed_opt) -> return seed_opt
-  | (selection, (Some _ as seed)) -> (
+  | [], seed_opt -> return seed_opt
+  | selection, (Some _ as seed) -> (
       Faked_client_context.logger#warning "Checking provided seed."
       >>= fun () ->
       Tenderbrute.check_seed
@@ -932,7 +932,7 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
       | true -> return seed
       | false ->
           failwith "Provided initial seed does not match delegate selection")
-  | (_, None) ->
+  | _, None ->
       Faked_client_context.logger#warning
         "No initial seed provided, bruteforcing."
       >>= fun () ->
@@ -1129,7 +1129,7 @@ let run ?(config = default_config) bakers_spec =
           (take_third
              (List.fold_left
                 (fun (i, delegates_acc, ms) (n, user_hooks) ->
-                  let (delegates, leftover_delegates) =
+                  let delegates, leftover_delegates =
                     List.split_n n delegates_acc
                   in
                   let m =

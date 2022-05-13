@@ -32,7 +32,7 @@
 
 let baker_test ~title ~tags =
   Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol `Client ~protocol ~timestamp:Now ()
   in
   let level_2_promise = Node.wait_for_level node 2 in
@@ -52,7 +52,7 @@ let baker_stresstest =
     ~title:"baker stresstest"
     ~tags:["node"; "baker"; "stresstest"]
   @@ fun protocol ->
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
   in
   let* _ = Baker.init ~protocol node client in

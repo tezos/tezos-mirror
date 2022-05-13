@@ -103,7 +103,7 @@ let prove_with_secret secret ~time locked_value unlocked_value =
    which is equivalent to
    2 ^ time = (((2 ^ time) / l) * l) + (2 ^ time mod l) mod phi
    see https://eprint.iacr.org/2018/712.pdf section 3.2 for this proof
- *)
+*)
 let verify_time_lock rsa_public ~time locked_value unlocked_value proof =
   let l = hash_to_prime rsa_public ~time locked_value unlocked_value in
   let r = Z.(powm (of_int 2) (Z.of_int time) l) in
@@ -230,9 +230,9 @@ let open_chest chest chest_key ~time =
         | Some plaintext -> Correct plaintext)
 
 let create_chest_and_chest_key ~payload ~time =
-  let (rsa_public, rsa_secret) = gen_rsa_keys () in
+  let rsa_public, rsa_secret = gen_rsa_keys () in
   let locked_value = gen_locked_value rsa_public in
-  let (unlocked_value, proof) =
+  let unlocked_value, proof =
     unlock_and_prove_with_secret rsa_secret ~time locked_value
   in
   let sym_key = unlocked_value_to_symmetric_key unlocked_value in
@@ -240,7 +240,7 @@ let create_chest_and_chest_key ~payload ~time =
   ({locked_value; rsa_public; ciphertext}, {unlocked_value; proof})
 
 let create_chest_key chest ~time =
-  let (unlocked_value, proof) =
+  let unlocked_value, proof =
     unlock_and_prove_without_secret chest.rsa_public ~time chest.locked_value
   in
   {unlocked_value; proof}
@@ -282,9 +282,9 @@ let encrypt_unsafe symmetric_key plaintext =
 let chest_sampler ~rng_state ~plaintext_size ~time =
   Random.set_state rng_state ;
   let plaintext = gen_random_bytes_unsafe plaintext_size in
-  let (rsa_public, rsa_secret) = gen_rsa_keys_unsafe () in
+  let rsa_public, rsa_secret = gen_rsa_keys_unsafe () in
   let locked_value = gen_locked_value_unsafe rsa_public in
-  let (unlocked_value, proof) =
+  let unlocked_value, proof =
     unlock_and_prove_with_secret rsa_secret ~time locked_value
   in
   let sym_key = unlocked_value_to_symmetric_key unlocked_value in

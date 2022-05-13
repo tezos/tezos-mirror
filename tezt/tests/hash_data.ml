@@ -38,7 +38,7 @@
             with the output from the previous run. The test passes only if the
             outputs match exactly. It is important that return values
             of `hash data` remain constant over time.
-  *)
+*)
 
 (* These hooks must be attached to every process that should be captured for
    regression testing. Not plugged for negative tests, since tezos-client

@@ -166,7 +166,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   let module Block_services = Block_services.Make (Proto) (Next_proto) in
   let module S = Block_services.S in
   register0 S.live_blocks (fun (chain_store, block) () () ->
-      let* (live_blocks, _) =
+      let* live_blocks, _ =
         Store.Chain.compute_live_blocks chain_store ~block
       in
       return live_blocks) ;
@@ -178,7 +178,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         Proto.block_header_metadata_encoding
         (Store.Block.block_metadata metadata)
     in
-    let* (test_chain_status, _) =
+    let* test_chain_status, _ =
       Store.Block.testchain_status chain_store block
     in
     let max_operations_ttl = Store.Block.max_operations_ttl metadata in
@@ -282,7 +282,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     let predecessor_ops_metadata_hash =
       Store.Block.all_operations_metadata_hash predecessor_block
     in
-    let* (_block_metadata, ops_metadata) =
+    let* _block_metadata, ops_metadata =
       Block_validation.recompute_metadata
         ~chain_id
         ~predecessor_block_header:predecessor_header
@@ -430,7 +430,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   register2 S.Operation_hashes.operation_hash (fun (_, block) i j () () ->
       Lwt.catch
         (fun () ->
-          let (ops, _) = Store.Block.operations_hashes_path block i in
+          let ops, _ = Store.Block.operations_hashes_path block i in
           return (List.nth ops j |> WithExceptions.Option.to_exn ~none:Not_found))
         (fun _ -> Lwt.fail Not_found)) ;
   (* operation_metadata_hashes *)
@@ -597,10 +597,10 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           ~cache:`Lazy
           ()
       in
-      let* (state, acc) =
+      let* state, acc =
         List.fold_left_es
           (fun (state, acc) op ->
-            let* (state, result) = Next_proto.apply_operation state op in
+            let* state, result = Next_proto.apply_operation state op in
             return (state, (op.protocol_data, result) :: acc))
           (state, [])
           ops
@@ -713,7 +713,7 @@ let get_directory chain_store block =
                  current protocol *)
               Lwt.return (module Next_proto : Registered_protocol.T)
           | Some pred ->
-              let* (_, savepoint_level) = Store.Chain.savepoint chain_store in
+              let* _, savepoint_level = Store.Chain.savepoint chain_store in
               let* protocol_hash =
                 if Compare.Int32.(Store.Block.level pred < savepoint_level) then
                   let* predecessor_protocol =

@@ -200,14 +200,14 @@ let assert_has_events msg ?filter ?(strict = true) (pats : Pattern.t list) =
   let events = get_events ?filter () in
   if strict then
     match List.combine_with_leftovers pats events with
-    | (pes, None) -> List.iter (fun (p, e) -> Pattern.assert_event p e) pes
-    | (_, Some (Either.Left pats)) ->
+    | pes, None -> List.iter (fun (p, e) -> Pattern.assert_event p e) pes
+    | _, Some (Either.Left pats) ->
         Alcotest.fail
           (Format.asprintf
              "Missing events in sink: %a"
              (Format.pp_print_list Pattern.pp)
              pats)
-    | (_, Some (Either.Right events)) ->
+    | _, Some (Either.Right events) ->
         Alcotest.fail
           (Format.asprintf
              "Excess events in sink: %a"

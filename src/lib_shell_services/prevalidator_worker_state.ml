@@ -165,7 +165,7 @@ module Operation_encountered = struct
           (obj2
              (req "situation" (constant "injected"))
              (req "operation" Operation_hash.encoding))
-          (function (Injected, oph) -> Some ((), oph) | _ -> None)
+          (function Injected, oph -> Some ((), oph) | _ -> None)
           (fun ((), oph) -> (Injected, oph));
         case
           (Tag 1)
@@ -173,7 +173,7 @@ module Operation_encountered = struct
           (obj2
              (req "situation" (constant "arrived"))
              (req "operation" Operation_hash.encoding))
-          (function (Arrived, oph) -> Some ((), oph) | _ -> None)
+          (function Arrived, oph -> Some ((), oph) | _ -> None)
           (fun ((), oph) -> (Arrived, oph));
         case
           (Tag 2)
@@ -182,7 +182,7 @@ module Operation_encountered = struct
              (req "situation" (constant "notified"))
              (req "operation" Operation_hash.encoding)
              (req "peer" (option P2p_peer_id.encoding)))
-          (function (Notified peer, oph) -> Some ((), oph, peer) | _ -> None)
+          (function Notified peer, oph -> Some ((), oph, peer) | _ -> None)
           (fun ((), oph, peer) -> (Notified peer, oph));
         case
           (Tag 3)
@@ -190,7 +190,7 @@ module Operation_encountered = struct
           (obj2
              (req "situation" (constant "other"))
              (req "operation" Operation_hash.encoding))
-          (function (Other, hash) -> Some ((), hash) | _ -> None)
+          (function Other, hash -> Some ((), hash) | _ -> None)
           (fun ((), oph) -> (Other, oph));
       ]
 

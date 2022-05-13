@@ -145,9 +145,9 @@ module System = struct
       |> map (fun (date, time) ->
              Ptime.of_date_time (date, (time, 0)) |> Option.get))
 
-  let (min_day, min_ps) = Ptime.min |> Ptime.to_span |> Ptime.Span.to_d_ps
+  let min_day, min_ps = Ptime.min |> Ptime.to_span |> Ptime.Span.to_d_ps
 
-  let (max_day, max_ps) = Ptime.max |> Ptime.to_span |> Ptime.Span.to_d_ps
+  let max_day, max_ps = Ptime.max |> Ptime.to_span |> Ptime.Span.to_d_ps
 
   (** Gen.T of {!t} from days + picoseconds, parsed through {!Ptime.Span.of_d_ps}. *)
   let t_dps_gen : t Gen.t =
@@ -188,8 +188,7 @@ module System = struct
   *)
   let of_protocol_to_protocol_roundtrip_or_outside_rfc3339_with_gen gen =
     Test.make
-      ~name:
-        "System.[of|to]_protocol roundtrip or outside RFC3339 range"
+      ~name:"System.[of|to]_protocol roundtrip or outside RFC3339 range"
         (* Use both generators, otherwise statistically, we will almost
             never hit the RFC3339 time range. *)
       ~print:Protocol.print

@@ -33,12 +33,12 @@
 *)
 
 let test_raw_scenario time () =
-  let (public, secret) = Timelock.gen_rsa_keys () in
+  let public, secret = Timelock.gen_rsa_keys () in
   let locked_value = Timelock.gen_locked_value public in
-  let (unlocked, proof_1) =
+  let unlocked, proof_1 =
     Timelock.unlock_and_prove_with_secret secret ~time locked_value
   in
-  let (same_unlocked, proof_2) =
+  let same_unlocked, proof_2 =
     Timelock.unlock_and_prove_without_secret public ~time locked_value
   in
   assert (proof_1 = proof_2) ;
@@ -58,7 +58,7 @@ let test_raw_scenario time () =
 
 let bench () =
   let time = 10_000 in
-  let (public, secret) = Timelock.gen_rsa_keys () in
+  let public, secret = Timelock.gen_rsa_keys () in
   let locked_value = Timelock.gen_locked_value public in
   let unlocked_value = Timelock.unlock_with_secret secret ~time locked_value in
   let start = Unix.gettimeofday () in
@@ -82,9 +82,7 @@ let bench () =
 
 let test_high_level_scenario () =
   let payload = Bytes.of_string "zrethgfdsq" and time = 3456 in
-  let (chest, chest_key_1) =
-    Timelock.create_chest_and_chest_key ~payload ~time
-  in
+  let chest, chest_key_1 = Timelock.create_chest_and_chest_key ~payload ~time in
   let chest_key_2 = Timelock.create_chest_key ~time chest in
   let opening_result_1 = Timelock.open_chest chest chest_key_1 ~time in
   let opening_result_2 = Timelock.open_chest chest chest_key_2 ~time in
@@ -95,7 +93,7 @@ let test_high_level_scenario () =
 let test_negative () =
   let payload = Bytes.of_string "fdgfnhfd" and time = 10 in
   let wrong_time = 1000 in
-  let (rsa_public, rsa_secret) = Timelock.gen_rsa_keys () in
+  let rsa_public, rsa_secret = Timelock.gen_rsa_keys () in
   let locked_value = Timelock.gen_locked_value rsa_public in
   let sym_key =
     Timelock.locked_value_to_symmetric_key_with_secret
@@ -106,7 +104,7 @@ let test_negative () =
   let ciphertext = Timelock.encrypt sym_key payload in
   let chest = Timelock.{locked_value; rsa_public; ciphertext} in
   (* the opener does garbage*)
-  let (unlocked_value_wrong, proof_wrong) =
+  let unlocked_value_wrong, proof_wrong =
     Timelock.unlock_and_prove_without_secret
       rsa_public
       ~time:wrong_time
@@ -146,11 +144,11 @@ let test_sampler_and_get_plaintext_size () =
   (* used to check determinism*)
   let rng_state_same = Random.get_state () in
   let time = 1000 in
-  let (chest, chest_key) =
+  let chest, chest_key =
     Timelock.chest_sampler ~rng_state ~plaintext_size:100 ~time
   in
   assert (Timelock.get_plaintext_size chest = 100) ;
-  let (chest_same, chest_key_same) =
+  let chest_same, chest_key_same =
     Timelock.chest_sampler ~rng_state:rng_state_same ~plaintext_size:100 ~time
   in
   (* Check determinism*)

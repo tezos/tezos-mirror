@@ -1404,8 +1404,8 @@ module Cost_of = struct
         | Chain_id_t -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
         | Pair_t (tl, tr, _, YesYes) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
-            let (xl, xr) = x in
-            let (yl, yr) = y in
+            let xl, xr = x in
+            let yl, yr = y in
             (compare [@tailcall])
               tl
               xl
@@ -1414,21 +1414,21 @@ module Cost_of = struct
               (Compare (tr, xr, yr, k))
         | Union_t (tl, tr, _, YesYes) -> (
             match (x, y) with
-            | (L x, L y) ->
+            | L x, L y ->
                 (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
-            | (L _, R _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
-            | (R _, L _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
-            | (R x, R y) ->
+            | L _, R _ -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
+            | R _, L _ -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
+            | R x, R y ->
                 (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k)
         | Option_t (t, _, Yes) -> (
             match (x, y) with
-            | (None, None) ->
+            | None, None ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-            | (None, Some _) ->
+            | None, Some _ ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-            | (Some _, None) ->
+            | Some _, None ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-            | (Some x, Some y) ->
+            | Some x, Some y ->
                 (compare [@tailcall]) t x y Gas.(acc +@ compare_option_tag) k)
       and apply cost k =
         match k with

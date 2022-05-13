@@ -138,7 +138,7 @@ let mode_to_endpoint = function
    that contains a list of endpoints.
 *)
 let endpoint_arg ?(endpoint : endpoint option) client =
-  let either o1 o2 = match (o1, o2) with (Some _, _) -> o1 | _ -> o2 in
+  let either o1 o2 = match (o1, o2) with Some _, _ -> o1 | _ -> o2 in
   (* pass [?endpoint] first: it has precedence over client.mode *)
   match either endpoint (mode_to_endpoint client.mode) with
   | None -> []
@@ -190,7 +190,7 @@ let url_encode str =
         Buffer.add_char buffer c
     | c ->
         Buffer.add_char buffer '%' ;
-        let (c1, c2) = Hex.of_char c in
+        let c1, c2 = Hex.of_char c in
         Buffer.add_char buffer c1 ;
         Buffer.add_char buffer c2
   done ;
@@ -618,7 +618,7 @@ let spawn_gen_keys ?alias client =
   (spawn_command client ["gen"; "keys"; alias], alias)
 
 let gen_keys ?alias client =
-  let (p, alias) = spawn_gen_keys ?alias client in
+  let p, alias = spawn_gen_keys ?alias client in
   let* () = Process.check p in
   return alias
 
@@ -650,7 +650,7 @@ let spawn_bls_gen_keys ?hooks ?(force = false) ?alias client =
     alias )
 
 let bls_gen_keys ?hooks ?force ?alias client =
-  let (p, alias) = spawn_bls_gen_keys ?hooks ?force ?alias client in
+  let p, alias = spawn_bls_gen_keys ?hooks ?force ?alias client in
   let* () = Process.check p in
   return alias
 
@@ -1772,7 +1772,7 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
       Account.write keys ~base_dir:client.base_dir ;
       return (node, client)
   | `Light ->
-      let* (client, node1, _) =
+      let* client, node1, _ =
         init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
       in
       return (node1, client)
@@ -1781,7 +1781,7 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
     ?default_accounts_balance ?parameter_file ?timestamp ?keys tag ~protocol ()
     =
-  let* (node, client) =
+  let* node, client =
     init_with_node
       ?path
       ?admin_path

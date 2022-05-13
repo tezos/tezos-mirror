@@ -42,10 +42,10 @@ module Gen = struct
 
   let rec comb n xs =
     match (n, xs) with
-    | (0, _) -> Gen.return []
-    | (_, []) -> assert false
-    | (1, [x]) -> Gen.return [x]
-    | (n, x :: xs) ->
+    | 0, _ -> Gen.return []
+    | _, [] -> assert false
+    | 1, [x] -> Gen.return [x]
+    | n, x :: xs ->
         (* prob.  n / length xs *)
         let* m = int_bound (List.length (x :: xs) - 1) in
         if m < n then

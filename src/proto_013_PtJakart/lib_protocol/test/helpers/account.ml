@@ -41,7 +41,7 @@ let random_seed ~rng_state =
       Char.chr (Random.State.int rng_state 256))
 
 let new_account ?seed () =
-  let (pkh, pk, sk) = Signature.generate_key ~algo:Ed25519 ?seed () in
+  let pkh, pk, sk = Signature.generate_key ~algo:Ed25519 ?seed () in
   let account = {pkh; pk; sk} in
   Signature.Public_key_hash.Table.add known_accounts pkh account ;
   account
@@ -91,7 +91,7 @@ let generate_accounts ?rng_state ?(initial_balances = []) n : (t * Tez.t) list =
   in
   List.map
     (fun i ->
-      let (pkh, pk, sk) =
+      let pkh, pk, sk =
         Signature.generate_key ~algo:Ed25519 ~seed:(random_seed ~rng_state) ()
       in
       let account = {pkh; pk; sk} in
@@ -105,7 +105,7 @@ let commitment_secret =
   |> WithExceptions.Option.get ~loc:__LOC__
 
 let new_commitment ?seed () =
-  let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
+  let pkh, pk, sk = Signature.generate_key ?seed ~algo:Ed25519 () in
   let unactivated_account = {pkh; pk; sk} in
   let open Commitment in
   let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in

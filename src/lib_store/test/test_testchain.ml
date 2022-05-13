@@ -70,7 +70,7 @@ let fork_testchain chain_store (blocks, forked_block) =
       ~expiration
   in
   let testchain_store = Store.Chain.testchain_store testchain in
-  let* (test_blocks, head) =
+  let* test_blocks, head =
     append_blocks
       ~min_lafl:genesis_header.shell.level
       ~should_commit:true
@@ -87,7 +87,7 @@ let fork_testchain chain_store (blocks, forked_block) =
 let test_simple store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  let* (blocks, head) =
+  let* blocks, head =
     append_blocks
       ~should_commit:true
       ~should_set_head:true
@@ -101,7 +101,7 @@ let test_simple store =
 let test_inner store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  let* (blocks, head) =
+  let* blocks, head =
     append_blocks
       ~should_commit:true
       ~should_set_head:true
@@ -109,7 +109,7 @@ let test_inner store =
       ~kind:`Full
       10
   in
-  let* (testchain, blocks, head) = fork_testchain chain_store (blocks, head) in
+  let* testchain, blocks, head = fork_testchain chain_store (blocks, head) in
   let testchain_store = Store.Chain.testchain_store testchain in
   let* _ = fork_testchain testchain_store (blocks, head) in
   return_unit
@@ -117,7 +117,7 @@ let test_inner store =
 let test_shutdown store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  let* (blocks, head) =
+  let* blocks, head =
     append_blocks
       ~should_commit:true
       ~should_set_head:true
@@ -125,7 +125,7 @@ let test_shutdown store =
       ~kind:`Full
       10
   in
-  let* (testchain, blocks, _head) = fork_testchain chain_store (blocks, head) in
+  let* testchain, blocks, _head = fork_testchain chain_store (blocks, head) in
   let testchain_store = Store.Chain.testchain_store testchain in
   let testchain_id = Store.Chain.chain_id testchain_store in
   let*! o = Store.Chain.testchain chain_store in

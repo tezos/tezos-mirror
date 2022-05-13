@@ -46,7 +46,7 @@ let assert_some res = match res with Some r -> r | None -> assert false
 let init_with_tx_rollup ?additional_bootstrap_account_count
     ?(parameters = Parameters.default) ~protocol () =
   let* parameter_file = Parameters.parameter_file ~parameters protocol in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol
       ?additional_bootstrap_account_count
       ~parameter_file
@@ -183,7 +183,7 @@ module Regressions = struct
         ~title:"RPC (tx_rollups, regression) - inbox message hash"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "message"]
       @@ fun protocol ->
-      let* (_node, client) = Client.init_with_protocol `Client ~protocol () in
+      let* _node, client = Client.init_with_protocol `Client ~protocol () in
       let message = Rollup.make_batch "blob" in
       let*! _hash = Rollup.message_hash ~hooks ~message client in
       unit
@@ -195,7 +195,7 @@ module Regressions = struct
         ~title:"RPC (tx_rollups, regression) - inbox merkle tree hash"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "merkle_tree_hash"]
       @@ fun protocol ->
-      let* (_node, client) = Client.init_with_protocol `Client ~protocol () in
+      let* _node, client = Client.init_with_protocol `Client ~protocol () in
       let messages = List.map Rollup.make_batch ["blob"; "gloubiboulga"] in
       let* message_hashes =
         Lwt_list.map_p
@@ -216,7 +216,7 @@ module Regressions = struct
         ~title:"RPC (tx_rollups, regression) - inbox merkle tree path"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "merkle_tree_path"]
       @@ fun protocol ->
-      let* (_node, client) = Client.init_with_protocol `Client ~protocol () in
+      let* _node, client = Client.init_with_protocol `Client ~protocol () in
       let messages =
         List.map
           Rollup.make_batch
@@ -532,7 +532,7 @@ module Regressions = struct
       let* old_parameter_file =
         Parameters.(parameter_file ~parameters:default protocol)
       in
-      let* (_, old_client) =
+      let* _, old_client =
         Client.init_with_protocol
           ~parameter_file:old_parameter_file
           `Client
@@ -582,7 +582,7 @@ module Regressions = struct
         ~tags:["tx_rollup"; "client"; "fail"; "batch"]
       @@ fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (_node, client) =
+      let* _node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let invalid_address = "this is an invalid tx rollup address" in
@@ -759,7 +759,7 @@ let test_submit_batches_in_several_blocks =
     ~tags:["tx_rollup"]
   @@ fun protocol ->
   let* parameter_file = Parameters.parameter_file protocol in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let*! rollup =
@@ -851,7 +851,7 @@ let test_submit_from_originated_source =
     ~tags:["tx_rollup"; "client"]
   @@ fun protocol ->
   let* parameter_file = Parameters.parameter_file protocol in
-  let* (_node, client) =
+  let* _node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   (* We begin by originating a contract *)

@@ -352,7 +352,7 @@ type domain = subcache_domain list
 let sync_cache cache ~cache_nonce =
   let cache = enforce_size_limit cache in
   let cache = record_entries_removals cache in
-  let (cache, new_entries) = finalize_cache cache cache_nonce in
+  let cache, new_entries = finalize_cache cache cache_nonce in
   (cache, {keys = new_entries; counter = cache.counter})
 
 let subcache_keys_encoding : value_metadata KeyMap.t Data_encoding.t =
@@ -381,7 +381,7 @@ let sync t ~cache_nonce =
   with_caches t @@ fun caches ->
   FunctionalArray.fold_map
     (fun acc cache ->
-      let (cache, domain) = sync_cache cache ~cache_nonce in
+      let cache, domain = sync_cache cache ~cache_nonce in
       (domain :: acc, cache))
     caches
     []

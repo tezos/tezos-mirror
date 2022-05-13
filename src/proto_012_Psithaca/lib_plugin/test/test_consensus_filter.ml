@@ -105,7 +105,7 @@ module Generator = struct
   let print_timestamp = Timestamp.to_notation
 
   let near_timestamps =
-    let+ (i, diff) = pair int32 small_signed_32 in
+    let+ i, diff = pair int32 small_signed_32 in
     timestamp_of_int32 i |> fun ts1 ->
     timestamp_of_int32 Int32.(add i diff) |> fun ts2 -> (ts1, ts2)
 
@@ -122,7 +122,7 @@ module Generator = struct
     | Error _ -> assert false
 
   let successive_timestamp =
-    let+ (ts, (diff : int)) = pair timestamp small_nat in
+    let+ ts, (diff : int) = pair timestamp small_nat in
     let x =
       Period.of_seconds (Int64.of_int diff) >>? fun diff ->
       Timestamp.(ts +? diff) >>? fun ts2 -> Ok (ts, ts2)

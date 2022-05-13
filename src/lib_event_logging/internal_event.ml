@@ -330,7 +330,7 @@ module All_sinks = struct
     in
     (* We want to filter the list in one Lwt-go (atomically), and only then
        call close on the ones that are being deleted. *)
-    let (next_active, to_close_list) =
+    let next_active, to_close_list =
       List.partition
         (fun act ->
           match act with Active {configuration; _} -> except configuration)

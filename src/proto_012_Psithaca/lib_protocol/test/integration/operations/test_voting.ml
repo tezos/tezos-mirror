@@ -37,7 +37,7 @@
    accounts remain active during a voting period, which roughly
    translates to the following condition being assumed to hold:
    `blocks_per_voting_period <= preserved_cycles * blocks_per_cycle.`
-   *)
+*)
 
 open Protocol
 open Alpha_context
@@ -467,15 +467,15 @@ let get_smallest_prefix_voters_for_quorum active_delegates active_rolls
   |> fun active_rolls_sum ->
   let rec loop delegates rolls sum selected =
     match (delegates, rolls) with
-    | ([], []) -> selected
-    | (del :: delegates, del_rolls :: rolls) ->
+    | [], [] -> selected
+    | del :: delegates, del_rolls :: rolls ->
         if
           den * sum
           < Float.to_int (expected_quorum *. Int32.to_float active_rolls_sum)
         then
           loop delegates rolls (sum + Int32.to_int del_rolls) (del :: selected)
         else selected
-    | (_, _) -> []
+    | _, _ -> []
   in
   loop active_delegates active_rolls 0 []
 
@@ -825,8 +825,8 @@ let test_supermajority_in_exploration supermajority () =
   (* majority/minority vote depending on the [supermajority] parameter *)
   let num_yays = if supermajority then num_yays else num_yays - 1 in
   let open Alpha_context in
-  let (nays_delegates, rest) = List.split_n num_nays delegates_p2 in
-  let (yays_delegates, _) = List.split_n num_yays rest in
+  let nays_delegates, rest = List.split_n num_nays delegates_p2 in
+  let yays_delegates, _ = List.split_n num_yays rest in
   List.map_es (fun del -> Op.ballot (B b) del proposal Vote.Yay) yays_delegates
   >>=? fun operations_yays ->
   List.map_es (fun del -> Op.ballot (B b) del proposal Vote.Nay) nays_delegates

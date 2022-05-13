@@ -163,7 +163,7 @@ let nsample = 100
 let check_value_size () =
   let check (Ex (what, ty, v, error)) =
     let expected_size = footprint v in
-    let (_, size) = Script_typed_ir_size.value_size ty v in
+    let _, size = Script_typed_ir_size.value_size ty v in
     let size = Saturation_repr.to_int size in
     fail_when
       (expected_size + error < size || size < expected_size)
@@ -641,7 +641,7 @@ let check_ty_size () =
     match (sample_ty (Random.int 10 + 1) : ex_ty) with
     | Ex_ty ty ->
         let expected_size = footprint ty in
-        let (_, size) = Script_typed_ir_size.Internal_for_tests.ty_size ty in
+        let _, size = Script_typed_ir_size.Internal_for_tests.ty_size ty in
         let size = Saturation_repr.to_int size in
         let what = "some type" in
         fail_when

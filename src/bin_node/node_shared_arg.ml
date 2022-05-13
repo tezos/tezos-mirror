@@ -130,7 +130,7 @@ let load_net_config =
   function
   | BuiltIn net -> return net
   | Url uri ->
-      let*! (resp, body) = Cohttp_lwt_unix.Client.get uri in
+      let*! resp, body = Cohttp_lwt_unix.Client.get uri in
       let*! body_str = Cohttp_lwt.Body.to_string body in
       let* netconfig =
         match resp.status with
@@ -795,14 +795,14 @@ let read_and_patch_config_file ?(may_override_network = false)
   in
   let* synchronisation_threshold =
     match (bootstrap_threshold, synchronisation_threshold) with
-    | (Some _, Some _) ->
+    | Some _, Some _ ->
         tzfail
           (Invalid_command_line_arguments
              "--bootstrap-threshold is deprecated; use \
               --synchronisation-threshold instead. Do not use both at the same \
               time.")
-    | (None, Some threshold) | (Some threshold, None) -> return_some threshold
-    | (None, None) -> return_none
+    | None, Some threshold | Some threshold, None -> return_some threshold
+    | None, None -> return_none
   in
   let* network_data =
     match network with

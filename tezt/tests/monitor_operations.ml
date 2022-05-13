@@ -79,7 +79,7 @@ let monitor_operations =
   @@ fun protocol ->
   (* Step 1 *)
   (* initialize the node and the client *)
-  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
   (* Step 2 *)
   (* call the monitor_operations RPC *)
   let monitor_path =

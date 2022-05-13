@@ -73,7 +73,7 @@ let wakeup_error u = function
 
 let rec task w f =
   if w.running_idle || w.prevent_tasks then (
-    let (t, u) = Lwt.task () in
+    let t, u = Lwt.task () in
     w.pending_tasks <- u :: w.pending_tasks ;
     let* () = t in
     task w f)
@@ -85,7 +85,7 @@ let rec task w f =
     unwrap_error res)
 
 let when_idle w f =
-  let (t, u) = Lwt.task () in
+  let t, u = Lwt.task () in
   let canceled = ref false in
   Lwt.on_cancel t (fun () -> canceled := true) ;
   let f () =

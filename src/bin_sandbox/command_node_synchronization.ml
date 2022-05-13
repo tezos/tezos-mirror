@@ -76,7 +76,7 @@ let run state ~node_exec ~client_exec ~primary_history_mode
   let* _ =
     Test_scenario.Network.(start_up state ~client_exec (make all_nodes))
   in
-  let (baker_account, _) = List.hd_exn baker_list in
+  let baker_account, _ = List.hd_exn baker_list in
   let baker =
     Tezos_client.Keyed.make
       primary_client
@@ -161,9 +161,9 @@ let run state ~node_exec ~client_exec ~primary_history_mode
   in
   let* () =
     match (should_synch, are_synch) with
-    | (false, true) ->
+    | false, true ->
         fail (`Scenario_error "Nodes are not expected to be synchronized")
-    | (true, false) ->
+    | true, false ->
         fail (`Scenario_error "Nodes are expected to be synchronized")
     | _ -> return ()
   in
@@ -194,8 +194,8 @@ let run state ~node_exec ~client_exec ~primary_history_mode
   in
   let* () =
     match (should_synch, are_nodes_connected) with
-    | (true, false) -> fail (`Scenario_error "Expecting nodes to be connected")
-    | (false, true) ->
+    | true, false -> fail (`Scenario_error "Expecting nodes to be connected")
+    | false, true ->
         fail (`Scenario_error "Expecting nodes to not be connected")
     | _ -> return ()
   in
@@ -224,7 +224,7 @@ let cmd () =
       ~command_name:"node-synchronization"
       ()
   in
-  let (term, info) =
+  let term, info =
     Test_command_line.Run_command.make
       ~pp_error
       (const

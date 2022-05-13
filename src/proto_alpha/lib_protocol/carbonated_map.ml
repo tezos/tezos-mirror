@@ -132,19 +132,19 @@ module Make_builder (C : COMPARABLE) = struct
       (* The call to [f] must also account for gas *)
       f ctxt old_val_opt >>? fun (new_val_opt, ctxt) ->
       match (old_val_opt, new_val_opt) with
-      | (Some _, Some new_val) ->
+      | Some _, Some new_val ->
           (* Consume gas for adding to the map *)
           G.consume ctxt update_cost >|? fun ctxt ->
           ({map = M.add key new_val map; size}, ctxt)
-      | (Some _, None) ->
+      | Some _, None ->
           (* Consume gas for removing from the map *)
           G.consume ctxt update_cost >|? fun ctxt ->
           ({map = M.remove key map; size = size - 1}, ctxt)
-      | (None, Some new_val) ->
+      | None, Some new_val ->
           (* Consume gas for adding to the map *)
           G.consume ctxt update_cost >|? fun ctxt ->
           ({map = M.add key new_val map; size = size + 1}, ctxt)
-      | (None, None) -> ok ({map; size}, ctxt)
+      | None, None -> ok ({map; size}, ctxt)
 
     let to_list ctxt {map; size} =
       G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >|? fun ctxt ->

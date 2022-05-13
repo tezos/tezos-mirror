@@ -50,7 +50,7 @@ let () = Format.eprintf "Testing dummy program generator@.%!"
 let run x = x rng_state (Inference.M.empty ())
 
 let invent_term bef aft =
-  let (term, _state) = run (Autocomp.invent_term bef aft) in
+  let term, _state = run (Autocomp.invent_term bef aft) in
   Mikhailsky.seq term
 
 let invent_term bef aft =
@@ -61,7 +61,7 @@ let invent_term bef aft =
     Type.Stack.pp
     aft ;
   let term = invent_term bef aft in
-  let (bef', aft') = Inference.infer term in
+  let bef', aft' = Inference.infer term in
   Format.eprintf
     "generated type: %a => %a@."
     Type.Stack.pp
@@ -88,9 +88,9 @@ let () = Format.eprintf "Testing completion@.%!"
 
 let complete term =
   Format.eprintf "term: %a@." Mikhailsky.pp term ;
-  let ((bef, aft), state) = Inference.infer_with_state term in
+  let (bef, aft), state = Inference.infer_with_state term in
   Format.eprintf "Inferred type: %a => %a@." Type.Stack.pp bef Type.Stack.pp aft ;
-  let (term, (bef', aft'), _state) =
+  let term, (bef', aft'), _state =
     Autocomp.complete_code state term rng_state
   in
   Format.eprintf "completed: %a@." Mikhailsky.pp term ;

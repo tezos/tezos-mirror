@@ -242,9 +242,9 @@ module Box = struct
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
-    | (Pk a, Pk b) -> Bytes.equal a b
-    | (Sk a, Sk b) -> Bytes.equal a b
-    | (Ck a, Ck b) -> Bytes.equal a b
+    | Pk a, Pk b -> Bytes.equal a b
+    | Sk a, Sk b -> Bytes.equal a b
+    | Ck a, Ck b -> Bytes.equal a b
 
   let unsafe_sk_of_bytes buf =
     if Bytes.length buf <> skbytes then
@@ -386,8 +386,8 @@ module Ed25519 : SIGNATURE = struct
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
-    | (Pk a, Pk b) -> Bytes.compare a b
-    | (Sk a, Sk b) -> Bytes.compare a b
+    | Pk a, Pk b -> Bytes.compare a b
+    | Sk a, Sk b -> Bytes.compare a b
 
   let equal : type a. a key -> a key -> bool = fun a b -> compare a b = 0
 
@@ -448,8 +448,8 @@ module P256 : SIGNATURE = struct
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
-    | (Pk a, Pk b) -> Bytes.compare a b
-    | (Sk a, Sk b) -> Bytes.compare a b
+    | Pk a, Pk b -> Bytes.compare a b
+    | Sk a, Sk b -> Bytes.compare a b
 
   let equal : type a. a key -> a key -> bool = fun a b -> compare a b = 0
 

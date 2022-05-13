@@ -39,7 +39,7 @@ let wrap m = m >|= Environment.wrap_tzresult
 
 let new_ctxt () =
   let ( let* ) m f = m >>=? f in
-  let* (block, _contract) = Context.init1 () in
+  let* block, _contract = Context.init1 () in
   let* incr = Incremental.begin_construction block in
   return @@ Incremental.alpha_ctxt incr
 
@@ -81,7 +81,7 @@ let pp_int_map fmt map =
   Lwt_main.run
     (let ( let* ) m f = m >>=? f in
      let* ctxt = new_ctxt () in
-     let* (kvs, _) = wrap @@ Lwt.return @@ CM.to_list ctxt map in
+     let* kvs, _ = wrap @@ Lwt.return @@ CM.to_list ctxt map in
      return kvs)
   |> Result.value_f ~default:(fun () -> assert false)
   |> Format.fprintf fmt "%a" pp
@@ -115,11 +115,11 @@ let dummy_fail =
   Result.error (Environment.Error_monad.trace_of_error Dummy_error)
 
 let assert_map_contains ctxt map expected =
-  let* (kvs, _ctxt) = CM.to_list ctxt map in
+  let* kvs, _ctxt = CM.to_list ctxt map in
   Ok (List.sort compare kvs = List.sort compare expected)
 
 let assert_equal_map ctxt map expected =
-  let* (kvs, ctxt) = CM.to_list ctxt expected in
+  let* kvs, ctxt = CM.to_list ctxt expected in
   assert_map_contains ctxt map kvs
 
 (** Test that the size of an empty map is 0. *)
@@ -130,7 +130,7 @@ let test_empty =
 let test_update_add =
   unit_test "Update add" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
@@ -139,14 +139,14 @@ let test_update_add =
   let update_replace ctxt key value map =
     CM.update ctxt key (fun ctxt _ -> Ok (Some value, ctxt)) map
   in
-  let* (map, ctxt) = update_replace ctxt 4 4 map in
+  let* map, ctxt = update_replace ctxt 4 4 map in
   assert_map_contains ctxt map [(1, 1); (2, 2); (3, 3); (4, 4)]
 
 (** Test replacing an existing element. *)
 let test_update_replace =
   unit_test "Update replace" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
@@ -155,14 +155,14 @@ let test_update_replace =
   let update_replace ctxt key value map =
     CM.update ctxt key (fun ctxt _ -> Ok (Some value, ctxt)) map
   in
-  let* (map, ctxt) = update_replace ctxt 1 42 map in
+  let* map, ctxt = update_replace ctxt 1 42 map in
   assert_map_contains ctxt map [(1, 42); (2, 2); (3, 3)]
 
 (** Test merging when ignoring new overlapping keys. *)
 let test_merge_overlaps_left =
   unit_test "Merge overlap keep existing" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun ctxt left _ -> Ok (left, ctxt))
@@ -174,7 +174,7 @@ let test_merge_overlaps_left =
 let test_merge_overlaps_right =
   unit_test "Merge overlap replace" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun ctxt _ right -> Ok (right, ctxt))
@@ -186,7 +186,7 @@ let test_merge_overlaps_right =
 let test_merge_overlaps_add =
   unit_test "Merge overlap by adding" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun ctxt left right -> Ok (left + right, ctxt))
@@ -198,7 +198,7 @@ let test_merge_overlaps_add =
 let test_update_merge =
   unit_test "Update with merge add" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
@@ -214,27 +214,27 @@ let test_update_merge =
         | Some old_value -> Ok (Some (new_value + old_value), ctxt))
       map
   in
-  let* (map, ctxt) = update_merge ctxt 1 1 map in
-  let* (map, ctxt) = update_merge ctxt 4 4 map in
+  let* map, ctxt = update_merge ctxt 1 1 map in
+  let* map, ctxt = update_merge ctxt 4 4 map in
   assert_map_contains ctxt map [(1, 2); (2, 2); (3, 3); (4, 4)]
 
 (** Test merging two maps when keeping the original value for overlapping keys. *)
 let test_merge_map_keep_existing =
   unit_test "Merge overlap keep existing" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map1, ctxt) =
+  let* map1, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
       [(1, "a"); (2, "b"); (3, "c")]
   in
-  let* (map2, ctxt) =
+  let* map2, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
       [(2, "b'"); (3, "c'"); (4, "d'")]
   in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.merge ctxt ~merge_overlap:(fun ctxt left _ -> Ok (left, ctxt)) map1 map2
   in
   assert_map_contains ctxt map [(1, "a"); (2, "b"); (3, "c"); (4, "d'")]
@@ -243,19 +243,19 @@ let test_merge_map_keep_existing =
 let test_merge_map_replace_existing =
   unit_test "Merge overlap replace existing" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map1, ctxt) =
+  let* map1, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
       [(1, "a"); (2, "b"); (3, "c")]
   in
-  let* (map2, ctxt) =
+  let* map2, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
       [(2, "b'"); (3, "c'"); (4, "d'")]
   in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.merge
       ctxt
       ~merge_overlap:(fun ctxt _ right -> Ok (right, ctxt))
@@ -268,7 +268,7 @@ let test_merge_map_replace_existing =
 let test_update_delete =
   unit_test "Update delete" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (map, ctxt) =
+  let* map, ctxt =
     CM.of_list
       ctxt
       ~merge_overlap:(fun _ _ _ -> dummy_fail)
@@ -277,15 +277,15 @@ let test_update_delete =
   let delete ctxt key map =
     CM.update ctxt key (fun ctxt _ -> Ok (None, ctxt)) map
   in
-  let* (map, ctxt) = delete ctxt 1 map in
-  let* (map, ctxt) = delete ctxt 4 map in
+  let* map, ctxt = delete ctxt 1 map in
+  let* map, ctxt = delete ctxt 4 map in
   assert_map_contains ctxt map [(2, 2); (3, 3)]
 
 (** Test that merging [empty] with a map returns the same map. *)
 let test_empty_left_identity_for_merge =
   int_map_test "Empty map is left identity for merge" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (map', ctxt) =
+  let* map', ctxt =
     CM.merge ctxt ~merge_overlap:(fun _ _ _ -> dummy_fail) map CM.empty
   in
   assert_equal_map ctxt map map'
@@ -294,7 +294,7 @@ let test_empty_left_identity_for_merge =
 let test_empty_right_identity_for_merge =
   int_map_test "Empty map is right identity for merge" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (map', ctxt) =
+  let* map', ctxt =
     CM.merge ctxt ~merge_overlap:(fun _ _ _ -> dummy_fail) CM.empty map
   in
   assert_equal_map ctxt map map'
@@ -303,18 +303,18 @@ let test_empty_right_identity_for_merge =
 let test_size =
   int_map_test "Size returns the number of elements" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (kvs, _) = CM.to_list ctxt map in
+  let* kvs, _ = CM.to_list ctxt map in
   Result.ok Compare.List_length_with.(kvs = CM.size map)
 
 (** Test that all keys of a map are found. *)
 let test_find_existing =
   int_map_test "Find all elements" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (kvs, _) = CM.to_list ctxt map in
+  let* kvs, _ = CM.to_list ctxt map in
   let* _ =
     List.fold_left_e
       (fun ctxt (k, v) ->
-        let* (v_opt, ctxt) = CM.find ctxt k map in
+        let* v_opt, ctxt = CM.find ctxt k map in
         match v_opt with Some v' when v = v' -> Ok ctxt | _ -> dummy_fail)
       ctxt
       kvs
@@ -325,9 +325,9 @@ let test_find_existing =
 let test_find_non_existing =
   int_map_test "Should not find non-existing" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (kvs, _) = CM.to_list ctxt map in
+  let* kvs, _ = CM.to_list ctxt map in
   let key = 42 in
-  let* (v_opt, _) = CM.find ctxt key map in
+  let* v_opt, _ = CM.find ctxt key map in
   match List.find_opt (fun (k, _) -> k = key) kvs with
   | Some (_, value) -> Ok (Some value = v_opt)
   | None -> Ok (None = v_opt)
@@ -337,8 +337,8 @@ let test_to_list_of_list =
   int_map_test "To-list/of-list roundtrip" @@ fun map ->
   let ctxt = unsafe_new_context () in
   let merge_overlap ctxt x y = Ok (x + y, ctxt) in
-  let* (kvs, ctxt) = CM.to_list ctxt map in
-  let* (map', ctxt) = CM.of_list ctxt ~merge_overlap kvs in
+  let* kvs, ctxt = CM.to_list ctxt map in
+  let* map', ctxt = CM.of_list ctxt ~merge_overlap kvs in
   assert_equal_map ctxt map map'
 
 (** Test that merging two maps is equivalent to merging the concatenated
@@ -347,10 +347,10 @@ let test_merge_against_list =
   int_map_pair_test "Merge compared with list operation" @@ fun map1 map2 ->
   let ctxt = unsafe_new_context () in
   let merge_overlap ctxt x y = Ok (x + y, ctxt) in
-  let* (kvs1, ctxt) = CM.to_list ctxt map1 in
-  let* (kvs2, ctxt) = CM.to_list ctxt map2 in
-  let* (map_merged1, ctxt) = CM.merge ctxt ~merge_overlap map1 map2 in
-  let* (map_merged2, ctxt) = CM.of_list ~merge_overlap ctxt (kvs1 @ kvs2) in
+  let* kvs1, ctxt = CM.to_list ctxt map1 in
+  let* kvs2, ctxt = CM.to_list ctxt map2 in
+  let* map_merged1, ctxt = CM.merge ctxt ~merge_overlap map1 map2 in
+  let* map_merged2, ctxt = CM.of_list ~merge_overlap ctxt (kvs1 @ kvs2) in
   assert_equal_map ctxt map_merged1 map_merged2
 
 (** Test that merging a map with itself does not alter its size. *)
@@ -359,7 +359,7 @@ let test_size_merge_self =
   @@ fun map ->
   let ctxt = unsafe_new_context () in
   let size1 = CM.size map in
-  let* (map2, _) =
+  let* map2, _ =
     CM.merge
       ctxt
       ~merge_overlap:(fun ctxt left right -> Ok (left + right, ctxt))
@@ -385,8 +385,8 @@ let test_size_add_one =
   int_map_test "Add a new element increases size by one" @@ fun map ->
   let ctxt = unsafe_new_context () in
   let key = 42 in
-  let* (val_opt, ctxt) = CM.find ctxt key map in
-  let* (map', _ctxt) =
+  let* val_opt, ctxt = CM.find ctxt key map in
+  let* map', _ctxt =
     CM.update
       ctxt
       key
@@ -416,8 +416,8 @@ let test_size_add_one =
 let test_map =
   int_map_test "Test that map commutes with mapping over list" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (kvs, ctxt) = CM.to_list ctxt map in
-  let* (map', ctxt) = CM.map ctxt (fun ctxt _ x -> Ok (x + 1, ctxt)) map in
+  let* kvs, ctxt = CM.to_list ctxt map in
+  let* map', ctxt = CM.map ctxt (fun ctxt _ x -> Ok (x + 1, ctxt)) map in
   let kvs' = List.map (fun (k, v) -> (k, v + 1)) kvs in
   assert_map_contains ctxt map' kvs'
 
@@ -426,7 +426,7 @@ let test_map =
 let test_fold_empty =
   unit_test "Fold empty" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* (x, _) = CM.fold ctxt (fun _ctxt _acc _k _v -> dummy_fail) 0 CM.empty in
+  let* x, _ = CM.fold ctxt (fun _ctxt _acc _k _v -> dummy_fail) 0 CM.empty in
   Ok (x = 0)
 
 (** Test that folding over a map is equivalent to folding over the corresponding
@@ -441,9 +441,9 @@ let test_fold_empty =
 let test_fold =
   int_map_test "Test that fold commutes with folding over a list" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (kvs, ctxt) = CM.to_list ctxt map in
+  let* kvs, ctxt = CM.to_list ctxt map in
   let sum = List.fold_left (fun sum (k, v) -> k + v + sum) 0 kvs in
-  let* (sum', _) =
+  let* sum', _ =
     CM.fold ctxt (fun ctxt sum k v -> Ok (k + v + sum, ctxt)) 0 map
   in
   Ok (sum = sum')
@@ -454,8 +454,8 @@ let test_fold_to_list =
   int_map_test "Test that fold collecting the elements agrees with to-list"
   @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (kvs, ctxt) = CM.to_list ctxt map in
-  let* (kvs', _) =
+  let* kvs, ctxt = CM.to_list ctxt map in
+  let* kvs', _ =
     CM.fold ctxt (fun ctxt kvs k v -> Ok ((k, v) :: kvs, ctxt)) [] map
   in
   Ok (kvs = List.rev kvs')
@@ -474,10 +474,10 @@ let test_map_fail =
 let test_size_remove_one =
   int_map_test "Remove new element decreases size by one" @@ fun map ->
   let ctxt = unsafe_new_context () in
-  let* (kvs, ctxt) = CM.to_list ctxt map in
+  let* kvs, ctxt = CM.to_list ctxt map in
   let key = match kvs with (k, _) :: _ -> k | _ -> 42 in
-  let* (val_opt, ctxt) = CM.find ctxt key map in
-  let* (map', _ctxt) = CM.update ctxt key (fun ctxt _ -> Ok (None, ctxt)) map in
+  let* val_opt, ctxt = CM.find ctxt key map in
+  let* map', _ctxt = CM.update ctxt key (fun ctxt _ -> Ok (None, ctxt)) map in
   let size = CM.size map in
   let size' = CM.size map' in
   match val_opt with

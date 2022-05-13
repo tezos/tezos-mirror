@@ -42,5 +42,5 @@ let apply_message ctxt parameters message =
           Context.
             {tree; result = Inbox.Discarded [Environment.wrap_tzerror err]})
   in
-  let* (proof, result) = Context.produce_proof ctxt f in
+  let* proof, result = Context.produce_proof ctxt f in
   return (proof, result)

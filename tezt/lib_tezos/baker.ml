@@ -116,7 +116,7 @@ let wait_for_ready baker =
   match baker.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       baker.persistent_state.pending_ready <-
         resolver :: baker.persistent_state.pending_ready ;
       check_event baker "Baker started." promise

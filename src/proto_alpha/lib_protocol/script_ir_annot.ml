@@ -120,18 +120,18 @@ let classify_annot loc l :
     (var_annot option list * type_annot option list * field_annot option list)
     tzresult =
   try
-    let (_, rv, _, rt, _, rf) =
+    let _, rv, _, rt, _, rf =
       List.fold_left
         (fun (in_v, rv, in_t, rt, in_f, rf) a ->
           match (a, in_v, rv, in_t, rt, in_f, rf) with
-          | (Var_annot_opt a, true, _, _, _, _, _)
-          | (Var_annot_opt a, false, [], _, _, _, _) ->
+          | Var_annot_opt a, true, _, _, _, _, _
+          | Var_annot_opt a, false, [], _, _, _, _ ->
               (true, a :: rv, false, rt, false, rf)
-          | (Type_annot_opt a, _, _, true, _, _, _)
-          | (Type_annot_opt a, _, _, false, [], _, _) ->
+          | Type_annot_opt a, _, _, true, _, _, _
+          | Type_annot_opt a, _, _, false, [], _, _ ->
               (false, rv, true, a :: rt, false, rf)
-          | (Field_annot_opt a, _, _, _, _, true, _)
-          | (Field_annot_opt a, _, _, _, _, false, []) ->
+          | Field_annot_opt a, _, _, _, _, true, _
+          | Field_annot_opt a, _, _, _, _, false, [] ->
               (false, rv, false, rt, true, opt_field_of_field_opt a :: rf)
           | _ -> raise Exit)
         (false, [], false, [], false, [])
@@ -192,8 +192,8 @@ let extract_field_annot :
 
 let has_field_annot node =
   extract_field_annot node >|? function
-  | (_node, Some _) -> true
-  | (_node, None) -> false
+  | _node, Some _ -> true
+  | _node, None -> false
 
 let remove_field_annot node =
   extract_field_annot node >|? fun (node, _a) -> node

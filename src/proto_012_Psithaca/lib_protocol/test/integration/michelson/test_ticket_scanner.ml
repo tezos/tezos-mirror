@@ -40,7 +40,7 @@ let ( let* ) m f = m >>=? f
 let wrap m = m >|= Environment.wrap_tzresult
 
 let new_ctxt () =
-  let* (block, _) = Context.init 1 in
+  let* block, _ = Context.init 1 in
   let* incr = Incremental.begin_construction block in
   return @@ Incremental.alpha_ctxt incr
 
@@ -51,7 +51,7 @@ let string_list_of_ex_tickets ctxt tickets =
   let accum (xs, ctxt)
       (Ticket_scanner.Ex_ticket
         (cty, {Script_typed_ir.ticketer; contents; amount})) =
-    let* (x, ctxt) =
+    let* x, ctxt =
       wrap
       @@ Script_ir_translator.unparse_data
            ctxt
@@ -78,16 +78,16 @@ let string_list_of_ex_tickets ctxt tickets =
     in
     return (str :: xs, ctxt)
   in
-  let* (xs, ctxt) = List.fold_left_es accum ([], ctxt) tickets in
+  let* xs, ctxt = List.fold_left_es accum ([], ctxt) tickets in
   return (List.rev xs, ctxt)
 
 let make_ex_ticket ctxt ~ticketer ~type_exp ~content_exp ~amount =
-  let* (Script_ir_translator.Ex_comparable_ty cty, ctxt) =
+  let* Script_ir_translator.Ex_comparable_ty cty, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
     wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
   in
   let* ticketer = wrap @@ Lwt.return @@ Contract.of_b58check ticketer in
-  let* (contents, ctxt) =
+  let* contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content_exp in
     wrap @@ Script_ir_translator.parse_comparable_data ctxt cty node
   in
@@ -96,10 +96,8 @@ let make_ex_ticket ctxt ~ticketer ~type_exp ~content_exp ~amount =
   return (Ticket_scanner.Ex_ticket (cty, ticket), ctxt)
 
 let assert_equals_ex_tickets ctxt ~loc ex_tickets expected =
-  let* (str_tickets, ctxt) = string_list_of_ex_tickets ctxt ex_tickets in
-  let* (str_tickets_expected, _ctxt) =
-    string_list_of_ex_tickets ctxt expected
-  in
+  let* str_tickets, ctxt = string_list_of_ex_tickets ctxt ex_tickets in
+  let* str_tickets_expected, _ctxt = string_list_of_ex_tickets ctxt expected in
   assert_equal_string_list
     ~loc
     "Compare with expected tickets"
@@ -107,14 +105,14 @@ let assert_equals_ex_tickets ctxt ~loc ex_tickets expected =
     (List.sort String.compare str_tickets_expected)
 
 let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
-  let (Script_ir_translator.Ex_ty ty, ctxt) =
+  let Script_ir_translator.Ex_ty ty, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
     Result.value_f
       ~default:(fun () -> Stdlib.failwith "Failed to parse")
       (Script_ir_translator.parse_any_ty ctxt ~legacy:false node)
   in
   let node = Micheline.root @@ Expr.from_string value_exp in
-  let* (value, ctxt) =
+  let* value, ctxt =
     wrap
     @@ Script_ir_translator.parse_data
          ctxt
@@ -127,7 +125,7 @@ let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
 
 let assert_contains_tickets ctxt ~loc ~include_lazy ~type_exp ~value_exp
     expected =
-  let* (ex_tickets, _) =
+  let* ex_tickets, _ =
     tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp
   in
   assert_equals_ex_tickets ctxt ~loc ex_tickets expected
@@ -149,7 +147,7 @@ let assert_fail_non_empty_overlay ctxt ~loc ~include_lazy ~type_exp ~value_exp =
 let make_string_tickets ctxt ticketer_amounts =
   List.fold_right_es
     (fun (ticketer, content, amount) (tickets, ctxt) ->
-      let* (ticket, ctxt) =
+      let* ticket, ctxt =
         make_ex_ticket
           ctxt
           ~ticketer
@@ -162,21 +160,21 @@ let make_string_tickets ctxt ticketer_amounts =
     ([], ctxt)
 
 let tickets_from_big_map_ref ~pre_populated value_exp =
-  let* (block, contracts) = Context.init 1 in
+  let* block, contracts = Context.init 1 in
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  let* (operation, originated) =
+  let* operation, originated =
     Op.origination (B block) source ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
   let* inc = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt inc in
-  let* (ctxt, big_map_id) = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
   let int_ty_expr = Expr.from_string "int" in
-  let* (diffs, ctxt) =
-    let* (updates, ctxt) =
+  let* diffs, ctxt =
+    let* updates, ctxt =
       List.fold_left_es
         (fun (kvs, ctxt) (key, value) ->
-          let* (key_hash, ctxt) =
+          let* key_hash, ctxt =
             wrap
             @@ Script_ir_translator.hash_comparable_data
                  ctxt
@@ -218,10 +216,8 @@ let tickets_from_big_map_ref ~pre_populated value_exp =
 
 let assert_big_map_int_ticket_string_ref ~loc ~pre_populated ~big_map_exp
     ex_tickets =
-  let* (value_exp, ctxt) =
-    tickets_from_big_map_ref ~pre_populated big_map_exp
-  in
-  let* (ex_tickets, ctxt) = make_string_tickets ctxt ex_tickets in
+  let* value_exp, ctxt = tickets_from_big_map_ref ~pre_populated big_map_exp in
+  let* ex_tickets, ctxt = make_string_tickets ctxt ex_tickets in
   assert_contains_tickets
     ctxt
     ~include_lazy:true
@@ -232,9 +228,7 @@ let assert_big_map_int_ticket_string_ref ~loc ~pre_populated ~big_map_exp
 
 let assert_fail_non_empty_overlay_with_big_map_ref ~loc ~pre_populated
     ~big_map_exp =
-  let* (value_exp, ctxt) =
-    tickets_from_big_map_ref ~pre_populated big_map_exp
-  in
+  let* value_exp, ctxt = tickets_from_big_map_ref ~pre_populated big_map_exp in
   assert_fail_non_empty_overlay
     ctxt
     ~include_lazy:true
@@ -247,7 +241,7 @@ let test_tickets_in_unit_ticket () =
   let* ctxt = new_ctxt () in
   let type_exp = "ticket(unit)" in
   let value_exp = {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" Unit 10|} in
-  let* (ex_ticket, ctxt) =
+  let* ex_ticket, ctxt =
     make_ex_ticket
       ctxt
       ~ticketer:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
@@ -265,7 +259,7 @@ let test_tickets_in_unit_ticket () =
 
 let assert_string_tickets ~loc ~include_lazy ~type_exp ~value_exp ~expected =
   let* ctxt = new_ctxt () in
-  let* (ex_tickets, ctxt) = make_string_tickets ctxt expected in
+  let* ex_tickets, ctxt = make_string_tickets ctxt expected in
   assert_contains_tickets
     ctxt
     ~include_lazy

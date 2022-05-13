@@ -39,7 +39,7 @@
          migration patches legacy contracts, there's little point in
          having these tests run in CI. Instead, it should be run
          manually whenever a change is suspected to break it.
- *)
+*)
 
 let tests =
   let open Vesting_test in

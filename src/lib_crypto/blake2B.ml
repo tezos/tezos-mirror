@@ -143,14 +143,10 @@ module Make_minimal (K : Name) = struct
       except the last one which contains the rest. *)
   let to_path key l =
     let (`Hex key) = to_hex key in
-    String.sub key 0 2
-    ::
-    String.sub key 2 2
-    ::
-    String.sub key 4 2
-    ::
-    String.sub key 6 2
-    :: String.sub key 8 2 :: String.sub key 10 ((size * 2) - 10) :: l
+    String.sub key 0 2 :: String.sub key 2 2 :: String.sub key 4 2
+    :: String.sub key 6 2 :: String.sub key 8 2
+    :: String.sub key 10 ((size * 2) - 10)
+    :: l
 
   let of_path path =
     let path = String.concat "" path in
@@ -305,14 +301,14 @@ struct
     match p with
     | Op -> (H.leaf h, 1, 0)
     | Left (p, r) ->
-        let (l, s, pos) = check_path p h in
+        let l, s, pos = check_path p h in
         (H.node l r, s * 2, pos)
     | Right (l, p) ->
-        let (r, s, pos) = check_path p h in
+        let r, s, pos = check_path p h in
         (H.node l r, s * 2, pos + s)
 
   let check_path p h =
-    let (h, _, pos) = check_path p h in
+    let h, _, pos = check_path p h in
     (h, pos)
 end
 

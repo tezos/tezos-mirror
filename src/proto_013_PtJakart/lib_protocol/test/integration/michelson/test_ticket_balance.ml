@@ -45,7 +45,7 @@ type init_env = {
 }
 
 let init_env () =
-  let* (block, baker, contract, _src2) = Contract_helpers.init () in
+  let* block, baker, contract, _src2 = Contract_helpers.init () in
   return {block; baker; contract}
 
 let transaction block ~baker ~sender ~entrypoint ~recipient ~parameters =
@@ -69,7 +69,7 @@ let transaction block ~baker ~sender ~entrypoint ~recipient ~parameters =
 let originate = Contract_helpers.originate_contract_from_string
 
 let get_balance ctxt ~token ~owner =
-  let* (key_hash, ctxt) =
+  let* key_hash, ctxt =
     wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
   in
   wrap (Ticket_balance.get_balance ctxt key_hash)
@@ -77,15 +77,15 @@ let get_balance ctxt ~token ~owner =
 let assert_token_balance ~loc block token owner expected =
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* (balance, _) =
+  let* balance, _ =
     get_balance ctxt ~token ~owner:(Destination.Contract owner)
   in
   match (balance, expected) with
-  | (Some b, Some e) -> Assert.equal_int ~loc (Z.to_int b) e
-  | (Some b, None) ->
+  | Some b, Some e -> Assert.equal_int ~loc (Z.to_int b) e
+  | Some b, None ->
       failwith "%s: Expected no balance but got some %d" loc (Z.to_int b)
-  | (None, Some b) -> failwith "%s: Expected balance %d but got none" loc b
-  | (None, None) -> return ()
+  | None, Some b -> failwith "%s: Expected balance %d but got none" loc b
+  | None, None -> return ()
 
 let string_token ~ticketer content =
   let contents =
@@ -126,7 +126,7 @@ let get_new_contract before f =
 let test_add_strict () =
   let* {block; baker; contract = source_contract} = init_env () in
   (* Originate *)
-  let* (contract, _script, block) =
+  let* contract, _script, block =
     originate
       ~baker
       ~source_contract
@@ -179,7 +179,7 @@ let test_add_strict () =
 let test_add_remove () =
   let* {block; baker; contract = source_contract} = init_env () in
   (* Originate *)
-  let* (contract, _script, block) =
+  let* contract, _script, block =
     originate
       ~baker
       ~source_contract
@@ -235,7 +235,7 @@ let test_add_remove () =
 (** Test adding multiple tickets to a big-map. *)
 let test_add_to_big_map () =
   let* {block; baker; contract = source_contract} = init_env () in
-  let* (contract, _script, block) =
+  let* contract, _script, block =
     originate
       ~baker
       ~source_contract
@@ -298,7 +298,7 @@ let test_add_to_big_map () =
  *)
 let test_swap_big_map () =
   let* {block; baker; contract = source_contract} = init_env () in
-  let* (contract, _script, block) =
+  let* contract, _script, block =
     originate
       ~baker
       ~source_contract
@@ -385,7 +385,7 @@ let test_swap_big_map () =
 let test_send_tickets () =
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that can receive a ticket and store it in a list. *)
-  let* (ticket_receiver, _script, block) =
+  let* ticket_receiver, _script, block =
     originate
       ~baker
       ~source_contract
@@ -400,7 +400,7 @@ let test_send_tickets () =
   in
   (* A contract that, given an address to a contract that receives tickets,
      mints a ticket and sends it over. *)
-  let* (ticket_sender, _script, block) =
+  let* ticket_sender, _script, block =
     originate
       ~baker
       ~source_contract
@@ -447,7 +447,7 @@ let test_send_tickets () =
 let test_send_tickets_in_big_map () =
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that can receive a big-map with tickets. *)
-  let* (ticket_receiver, _script, block) =
+  let* ticket_receiver, _script, block =
     originate
       ~baker
       ~source_contract
@@ -465,7 +465,7 @@ let test_send_tickets_in_big_map () =
         a big-map.
       - [send (address)] for transferring the big-map to the given address.
   *)
-  let* (ticket_manager, _script, block) =
+  let* ticket_manager, _script, block =
     originate
       ~baker
       ~source_contract
@@ -572,7 +572,7 @@ let test_modify_big_map () =
        - [Add ((int, string))] for adding a ticket to the big-map.
        - [Remove(int)] for removing an index from the big-map.
   *)
-  let* (ticket_manager, _script, block) =
+  let* ticket_manager, _script, block =
     originate
       ~baker
       ~source_contract
@@ -660,7 +660,7 @@ let test_modify_big_map () =
 let test_send_tickets_in_big_map_and_drop () =
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that can receive a big-map with tickets but drops it. *)
-  let* (ticket_receiver, _script, block) =
+  let* ticket_receiver, _script, block =
     originate
       ~baker
       ~source_contract
@@ -675,7 +675,7 @@ let test_send_tickets_in_big_map_and_drop () =
   in
   (* A contract that, given an address, creates a ticket and sends it to the
      corresponding contract in a big-map. *)
-  let* (ticket_sender, _script, block) =
+  let* ticket_sender, _script, block =
     originate
       ~baker
       ~source_contract
@@ -733,7 +733,7 @@ let test_send_tickets_in_big_map_and_drop () =
 (* Test create contract with tickets *)
 let test_create_contract_with_ticket () =
   let* {block; baker; contract = source_contract} = init_env () in
-  let* (ticket_creator, _script, block) =
+  let* ticket_creator, _script, block =
     originate
       ~baker
       ~source_contract
@@ -765,7 +765,7 @@ let test_create_contract_with_ticket () =
   in
   let token_red = string_token ~ticketer:ticket_creator "Red" in
   (* Call ticket-creator to originate a new contract with one ticket *)
-  let* (new_contract, block) =
+  let* new_contract, block =
     get_new_contract block (fun block ->
         transaction
           ~entrypoint:Entrypoint.default
@@ -785,7 +785,7 @@ let test_create_contract_with_ticket () =
 
 let test_join_tickets () =
   let* {block; baker; contract = source_contract} = init_env () in
-  let* (ticket_joiner, _script, block) =
+  let* ticket_joiner, _script, block =
     originate
       ~baker
       ~source_contract
@@ -976,7 +976,7 @@ let ticket_wallet =
 (** Test ticket wallet implementation including sending tickets to self. *)
 let test_ticket_wallet () =
   let* {block; baker; contract = source_contract} = init_env () in
-  let* (ticket_builder, _script, block) =
+  let* ticket_builder, _script, block =
     originate
       ~baker
       ~source_contract
@@ -984,7 +984,7 @@ let test_ticket_wallet () =
       ~storage:(Printf.sprintf "%S" @@ Contract.to_b58check source_contract)
       block
   in
-  let* (ticket_wallet, _script, block) =
+  let* ticket_wallet, _script, block =
     originate
       ~baker
       ~source_contract

@@ -8,7 +8,7 @@ let c_headers =
    #endif\n"
 
 let () =
-  let (ml_filename, c_filename) = (Sys.argv.(1), Sys.argv.(2)) in
+  let ml_filename, c_filename = (Sys.argv.(1), Sys.argv.(2)) in
   let c_out = open_out_bin c_filename in
   let ml_out = open_out_bin ml_filename in
   let c_formatter = Format.formatter_of_out_channel c_out in

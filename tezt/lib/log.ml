@@ -241,19 +241,19 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color
         in
         Option.iter (log_line_to ~use_colors:false line) Cli.options.log_file ;
         match (Cli.options.log_level, level) with
-        | (_, Quiet) -> invalid_arg "Log.log_string: level cannot be Quiet"
-        | (Error, Error)
-        | (Warn, (Error | Warn))
-        | (Report, (Error | Warn | Report))
-        | (Info, (Error | Warn | Report | Info))
-        | (Debug, (Error | Warn | Report | Info | Debug)) ->
+        | _, Quiet -> invalid_arg "Log.log_string: level cannot be Quiet"
+        | Error, Error
+        | Warn, (Error | Warn)
+        | Report, (Error | Warn | Report)
+        | Info, (Error | Warn | Report | Info)
+        | Debug, (Error | Warn | Report | Info | Debug) ->
             (if level = Error then
              Log_buffer.iter @@ fun line ->
              log_line_to ~use_colors:Cli.options.color line channel) ;
             Log_buffer.reset () ;
             log_line_to ~use_colors:Cli.options.color line channel ;
             flush channel
-        | ((Quiet | Error | Warn | Report | Info), _) -> Log_buffer.push line
+        | (Quiet | Error | Warn | Report | Info), _ -> Log_buffer.push line
       in
       List.iter log_line lines
 
@@ -274,7 +274,7 @@ type test_result = Successful | Failed of string | Aborted
 
 let test_result ~test_index ~test_count ~failure_count ~iteration test_result
     test_name =
-  let (prefix, prefix_color) =
+  let prefix, prefix_color =
     match test_result with
     | Successful -> ("SUCCESS", Color.(FG.green ++ bold))
     | Failed _ -> ("FAILURE", Color.(FG.red ++ bold))

@@ -159,15 +159,15 @@ struct
 
   let rec term_lists_equal (lx : node list) (ly : node list) =
     match (lx, ly) with
-    | ([], _ :: _) | (_ :: _, []) -> false
-    | ([], []) -> true
-    | (hx :: tlx, hy :: tly) -> terms_equal hx hy && term_lists_equal tlx tly
+    | [], _ :: _ | _ :: _, [] -> false
+    | [], [] -> true
+    | hx :: tlx, hy :: tly -> terms_equal hx hy && term_lists_equal tlx tly
 
   let rec string_lists_equal (lx : string list) (ly : string list) =
     match (lx, ly) with
-    | ([], _ :: _) | (_ :: _, []) -> false
-    | ([], []) -> true
-    | (hx :: tlx, hy :: tly) ->
+    | [], _ :: _ | _ :: _, [] -> false
+    | [], [] -> true
+    | hx :: tlx, hy :: tly ->
         Compare.String.equal hx hy && string_lists_equal tlx tly
 
   let prim (head : head) (subterms : node list) (annots : string list) =

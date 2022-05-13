@@ -27,12 +27,12 @@
 let max_daysL =
   (* [= 2932896L] which is less than [Stdlib.max_int] even on 32-bit
      architecture. This ensures [Int64.to_int] is accurate no matter what. *)
-  let (max_days, _) = Ptime.(Span.to_d_ps (to_span max)) in
+  let max_days, _ = Ptime.(Span.to_d_ps (to_span max)) in
   Int64.of_int max_days
 
 let min_daysL =
   (* Same as [max_daysL] but min. *)
-  let (min_days, _) = Ptime.(Span.to_d_ps (to_span min)) in
+  let min_days, _ = Ptime.(Span.to_d_ps (to_span min)) in
   Int64.of_int min_days
 
 module Protocol = struct
@@ -47,14 +47,14 @@ module Protocol = struct
   let add = Int64.add
 
   let of_ptime t =
-    let (days, ps) = Ptime.Span.to_d_ps (Ptime.to_span t) in
+    let days, ps = Ptime.Span.to_d_ps (Ptime.to_span t) in
     let s_days = Int64.mul (Int64.of_int days) 86_400L in
     Int64.add s_days (Int64.div ps 1_000_000_000_000L)
 
   let to_ptime t =
     let daysL = Int64.div t 86_400L in
     let ps = Int64.mul (Int64.rem t 86_400L) 1_000_000_000_000L in
-    let (daysL, ps) =
+    let daysL, ps =
       if ps < 0L then
         (* [Ptime.Span.of_d_ps] only accepts picoseconds in the range 0L-86_399_999_999_999_999L. Subtract a day and add a day's worth of picoseconds if need be. *)
         (Int64.pred daysL, Int64.(add ps (mul 86_400L 1_000_000_000_000L)))
@@ -229,7 +229,7 @@ module System = struct
     | None -> invalid_arg "Time.of_seconds"
 
   let to_seconds x =
-    let (days, ps) = Ptime.(Span.to_d_ps (to_span x)) in
+    let days, ps = Ptime.(Span.to_d_ps (to_span x)) in
     let s_days = Int64.mul (Int64.of_int days) 86_400L in
     Int64.add s_days (Int64.div ps 1_000_000_000_000L)
 
@@ -326,9 +326,9 @@ module System = struct
 
   let recent a1 a2 =
     match (a1, a2) with
-    | (None, None) -> None
-    | (None, (Some _ as a)) | ((Some _ as a), None) -> a
-    | (Some (_, t1), Some (_, t2)) -> if t1 < t2 then a2 else a1
+    | None, None -> None
+    | None, (Some _ as a) | (Some _ as a), None -> a
+    | Some (_, t1), Some (_, t2) -> if t1 < t2 then a2 else a1
 
   let hash t = Int64.to_int (to_seconds t)
 

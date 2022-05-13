@@ -56,7 +56,7 @@ let check_encode_decode_outbox_message ctxt message =
     Environment.wrap_tzresult
     @@ Internal_for_tests.bytes_of_outbox_message message
   in
-  let* (message', _ctxt) = wrap @@ outbox_message_of_bytes ctxt bytes in
+  let* message', _ctxt = wrap @@ outbox_message_of_bytes ctxt bytes in
   let*? bytes' =
     Environment.wrap_tzresult
     @@ Internal_for_tests.bytes_of_outbox_message message'
@@ -77,7 +77,7 @@ let string_ticket ticketer contents amount =
 
 let init_ctxt () =
   let open Lwt_result_syntax in
-  let* (block, _baker, _contract, _src2) = Contract_helpers.init () in
+  let* block, _baker, _contract, _src2 = Contract_helpers.init () in
   let+ incr = Incremental.begin_construction block in
   Incremental.alpha_ctxt incr
 
@@ -106,7 +106,7 @@ let test_encode_decode_inbox_message () =
     ( Script_int.(abs @@ of_int 42),
       string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 )
   in
-  let* (deposit, _ctxt) =
+  let* deposit, _ctxt =
     wrap
     @@ Sc_rollup_management_protocol.make_inbox_message
          ctxt
@@ -131,7 +131,7 @@ let test_encode_decode_outbox_message () =
     ( Script_int.(abs @@ of_int 42),
       string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 )
   in
-  let* (transaction1, ctxt) =
+  let* transaction1, ctxt =
     let*? destination_contract =
       Environment.wrap_tzresult
         (Contract.of_b58check "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc")
@@ -145,7 +145,7 @@ let test_encode_decode_outbox_message () =
          ~destination
          ~entrypoint:Entrypoint.default
   in
-  let* (transaction2, ctxt) =
+  let* transaction2, ctxt =
     let*? destination_contract =
       Environment.wrap_tzresult
         (Contract.of_b58check "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc")

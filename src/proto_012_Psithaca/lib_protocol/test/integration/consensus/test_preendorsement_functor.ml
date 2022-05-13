@@ -82,11 +82,11 @@ end = struct
       b1
     >>= fun res ->
     match (res, post_process) with
-    | (Ok ok, Ok success_fun) -> success_fun ok
-    | (Error _, Error (error_title, _error_category)) ->
+    | Ok ok, Ok success_fun -> success_fun ok
+    | Error _, Error (error_title, _error_category) ->
         Assert.proto_error_with_info ~loc res error_title
-    | (Ok _, Error _) -> Assert.error ~loc res (fun _ -> false)
-    | (Error _, Ok _) -> Assert.error ~loc res (fun _ -> false)
+    | Ok _, Error _ -> Assert.error ~loc res (fun _ -> false)
+    | Error _, Ok _ -> Assert.error ~loc res (fun _ -> false)
 
   (****************************************************************)
   (*                      Tests                                   *)

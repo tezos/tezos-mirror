@@ -125,7 +125,7 @@ let verbosity = ref Notice
 
 let log level msg =
   match (level, !verbosity) with
-  | (Notice, _) | (Info, Info) | (Info, Debug) | (Debug, Debug) -> msg ()
+  | Notice, _ | Info, Info | Info, Debug | Debug, Debug -> msg ()
   | _ -> Lwt.return_unit
 
 let pp_sep ppf () = Format.fprintf ppf ",@ "
@@ -347,7 +347,7 @@ let random_seed rng =
 
 let generate_fresh_source state =
   let seed = random_seed state.rng_state in
-  let (pkh, pk, sk) = Signature.generate_key ~seed () in
+  let pkh, pk, sk = Signature.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
   state.pool <- fresh :: state.pool ;
   state.pool_size <- state.pool_size + 1 ;
@@ -361,7 +361,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
     (f : Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t) :
     (unit tzresult Lwt.t * RPC_context.stopper) tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* (heads_stream, stopper) = Shell_services.Monitor.heads cctxt `Main in
+  let* heads_stream, stopper = Shell_services.Monitor.heads cctxt `Main in
   let rec loop () : unit tzresult Lwt.t =
     let*! block_hash_and_header = Lwt_stream.get heads_stream in
     match block_hash_and_header with
@@ -1109,9 +1109,9 @@ let generate_random_transactions =
          (cctxt : Protocol_client_context.full) ->
       (verbosity :=
          match (debug_flag, verbose_flag) with
-         | (true, _) -> Debug
-         | (false, true) -> Info
-         | (false, false) -> Notice) ;
+         | true, _ -> Debug
+         | false, true -> Info
+         | false, false -> Notice) ;
       Smart_contracts.init
         cctxt
         (Option.value ~default:[] smart_contract_parameters)
@@ -1226,7 +1226,7 @@ let estimate_transaction_cost ?smart_contracts
   normalize_source cctxt (Wallet_alias "bootstrap2") >>= fun dst ->
   let rng_state = Random.State.make [|default_parameters.seed|] in
   (match (src, dst) with
-  | (Some src, Some dst) -> return (src, dst)
+  | Some src, Some dst -> return (src, dst)
   | _ ->
       cctxt#error "Cannot find bootstrap1 or bootstrap2 accounts in the wallet.")
   >>=? fun (src, dst) ->
@@ -1236,7 +1236,7 @@ let estimate_transaction_cost ?smart_contracts
     Option.bind smart_contracts (fun smart_contracts ->
         sample_smart_contracts smart_contracts rng_state)
   in
-  let (dst, fee, gas_limit) =
+  let dst, fee, gas_limit =
     Option.value
       selected_smart_constract
       ~default:

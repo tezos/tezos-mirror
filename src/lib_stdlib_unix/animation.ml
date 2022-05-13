@@ -89,7 +89,7 @@ let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
   if not print_progress then f (fun () -> Lwt.return_unit)
   else
     let clear_line fmt = Format.fprintf fmt "\027[2K\r" in
-    let (stream, notifier) = Lwt_stream.create () in
+    let stream, notifier = Lwt_stream.create () in
     let wrapped_notifier () =
       notifier (Some ()) ;
       Lwt.pause ()

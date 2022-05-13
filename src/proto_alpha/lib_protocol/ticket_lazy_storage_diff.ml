@@ -51,7 +51,7 @@ let () =
 let token_and_amount ctxt ex_ticket =
   Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
   >|? fun ctxt ->
-  let (token, amount) = Ticket_token.token_and_amount_of_ex_ticket ex_ticket in
+  let token, amount = Ticket_token.token_and_amount_of_ex_ticket ex_ticket in
   ((token, Script_int.to_zint amount), ctxt)
 
 (** Extracts the ticket-token and amount from an ex_ticket value and returns

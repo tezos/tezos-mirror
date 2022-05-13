@@ -55,7 +55,7 @@ let check_import_invariants ~test_descr ~rolling
       let*! savepoint = Store.Chain.savepoint imported_chain_store in
       let*! checkpoint = Store.Chain.checkpoint imported_chain_store in
       let*! caboose = Store.Chain.caboose imported_chain_store in
-      let (expected_present, expected_absent) =
+      let expected_present, expected_absent =
         List.partition
           (fun b ->
             Compare.Int32.(Store.Block.level b <= snd checkpoint)
@@ -236,7 +236,7 @@ let check_baking_continuity ~test_descr ~exported_chain_store
         Int32.(
           to_int (sub level_to_reach (Store.Block.level export_store_head)))
       in
-      let* (_blocks, last) =
+      let* _blocks, last =
         Alpha_utils.bake_n
           exported_chain_store
           nb_blocks_to_bake_in_export
@@ -265,7 +265,7 @@ let test store_path ~test_descr ?exported_block_level
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
-  let* (previously_baked_blocks, _current_head) =
+  let* previously_baked_blocks, _current_head =
     Alpha_utils.bake_n chain_store nb_blocks_to_bake_before_export genesis_block
   in
   (* We don't have a way to lock two stores in the same process =>
@@ -486,7 +486,7 @@ let test_rolling () =
     let chain_store = Store.main_chain_store store in
     let*! genesis_block = Store.Chain.genesis_block chain_store in
     let nb_cycles_to_bake = 6 in
-    let* (_blocks, head) =
+    let* _blocks, head =
       Alpha_utils.bake_until_n_cycle_end
         chain_store
         nb_cycles_to_bake
@@ -601,7 +601,7 @@ let test_drag_after_import () =
     let chain_store = Store.main_chain_store store in
     let*! genesis_block = Store.Chain.genesis_block chain_store in
     let nb_cycles_to_bake = 2 in
-    let* (_blocks, head) =
+    let* _blocks, head =
       Alpha_utils.bake_until_n_cycle_end
         chain_store
         nb_cycles_to_bake
@@ -664,10 +664,10 @@ let test_drag_after_import () =
     in
     let chain_store' = Store.main_chain_store store' in
     (* Finish to bake the current cycle. *)
-    let* (_, _head) =
+    let* _, _head =
       Alpha_utils.bake_until_cycle_end chain_store' export_block
     in
-    let*! (savepoint_hash, savepoint_level) =
+    let*! savepoint_hash, savepoint_level =
       Store.Chain.savepoint chain_store'
     in
     let* savepoint = Store.Block.read_block chain_store' savepoint_hash in
@@ -676,16 +676,16 @@ let test_drag_after_import () =
       Int32.(
         sub savepoint_level (of_int (Store.Block.max_operations_ttl metadata)))
     in
-    let*! (_, caboose_level) = Store.Chain.caboose chain_store' in
+    let*! _, caboose_level = Store.Chain.caboose chain_store' in
     Assert.Int32.equal ~msg:__LOC__ caboose_level expected_caboose ;
     let block_store = Store.Unsafe.get_block_store chain_store' in
     let rec restart n head =
       if n = 0 then return head
       else
-        let* (_, head) = Alpha_utils.bake_until_cycle_end chain_store' head in
+        let* _, head = Alpha_utils.bake_until_cycle_end chain_store' head in
         let*! () = Block_store.await_merging block_store in
-        let*! (_, caboose_level) = Store.Chain.caboose chain_store' in
-        let*! (_, savepoint_level) = Store.Chain.savepoint chain_store' in
+        let*! _, caboose_level = Store.Chain.caboose chain_store' in
+        let*! _, savepoint_level = Store.Chain.savepoint chain_store' in
         let* () =
           List.iter_es
             (fun level ->

@@ -32,11 +32,11 @@ include Compare.Make (struct
 
   let compare l1 l2 =
     match (l1, l2) with
-    | (Implicit pkh1, Implicit pkh2) ->
+    | Implicit pkh1, Implicit pkh2 ->
         Signature.Public_key_hash.compare pkh1 pkh2
-    | (Originated h1, Originated h2) -> Contract_hash.compare h1 h2
-    | (Implicit _, Originated _) -> -1
-    | (Originated _, Implicit _) -> 1
+    | Originated h1, Originated h2 -> Contract_hash.compare h1 h2
+    | Implicit _, Originated _ -> -1
+    | Originated _, Implicit _ -> 1
 end)
 
 let blake2b_hash_size =

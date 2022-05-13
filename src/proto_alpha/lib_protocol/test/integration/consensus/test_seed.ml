@@ -104,7 +104,7 @@ let test_revelation_early_wrong_right_twice () =
   Block.bake_until_cycle_end ~policy b >>=? fun b ->
   (* test that revealing at the right time but the wrong value
      produces an error *)
-  let (wrong_hash, _) = Nonce.generate () in
+  let wrong_hash, _ = Nonce.generate () in
   Op.seed_nonce_revelation
     (B b)
     level_commitment

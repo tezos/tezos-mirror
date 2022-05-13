@@ -216,12 +216,8 @@ let directory_descr_encoding =
           | Some s -> Resto.MethMap.add meth s services
         in
         let services =
-          Resto.MethMap.empty
-          |> add `GET get
-          |> add `POST post
-          |> add `DELETE delete
-          |> add `PUT put
-          |> add `PATCH patch
+          Resto.MethMap.empty |> add `GET get |> add `POST post
+          |> add `DELETE delete |> add `PUT put |> add `PATCH patch
         in
         {services; subdirs})
       (obj6

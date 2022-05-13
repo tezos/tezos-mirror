@@ -51,7 +51,7 @@ end
 
 module Simulation = struct
   let transfer ~arg ?simulation ?force k protocol =
-    let* (_node, client) = Client.init_with_protocol `Client ~protocol () in
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let* contract = Helpers.originate_fail_on_false client in
     Client.spawn_transfer
       ~amount:(Tez.of_int 2)

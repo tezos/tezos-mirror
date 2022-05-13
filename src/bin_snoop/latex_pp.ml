@@ -129,7 +129,7 @@ and pp_blob : Format.formatter -> Latex_syntax.blob -> unit =
 and pp_table : Format.formatter -> Latex_syntax.table -> unit =
  fun fmtr table ->
   match table with
-  | (spec, rows) ->
+  | spec, rows ->
       let width = Latex_syntax.spec_width spec in
       if
         not

@@ -54,9 +54,9 @@ module List = struct
   let rev_combine ~loc xs ys =
     let rec aux acc xs ys =
       match (xs, ys) with
-      | ([], []) -> acc
-      | (x :: xs, y :: ys) -> aux ((x, y) :: acc) xs ys
-      | ([], _ :: _) | (_ :: _, []) ->
+      | [], [] -> acc
+      | x :: xs, y :: ys -> aux ((x, y) :: acc) xs ys
+      | [], _ :: _ | _ :: _, [] ->
           raise (invalid "Lwtreslib.WithExceptions.List.rev_combine" loc)
     in
     aux [] xs ys
@@ -64,9 +64,9 @@ module List = struct
   let combine ~loc xs ys =
     let rec aux acc xs ys =
       match (xs, ys) with
-      | ([], []) -> acc
-      | (x :: xs, y :: ys) -> aux ((x, y) :: acc) xs ys
-      | ([], _ :: _) | (_ :: _, []) ->
+      | [], [] -> acc
+      | x :: xs, y :: ys -> aux ((x, y) :: acc) xs ys
+      | [], _ :: _ | _ :: _, [] ->
           raise (invalid "Lwtreslib.WithExceptions.List.combine" loc)
     in
     Stdlib.List.rev (aux [] xs ys)

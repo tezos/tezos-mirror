@@ -155,7 +155,7 @@ let wait_for_ready signer =
   match signer.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       signer.persistent_state.pending_ready <-
         resolver :: signer.persistent_state.pending_ready ;
       check_event signer "Signer started." promise

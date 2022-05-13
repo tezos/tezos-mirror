@@ -590,7 +590,7 @@ module Raw = struct
         ciphertext.payload_out
         ciphertext.nonce_out
       >?? fun plaintext ->
-      let (pkd, esk) = decompose_plaintext_out plaintext in
+      let pkd, esk = decompose_plaintext_out plaintext in
       (* symkey for payload_enc *)
       let symkey = DH.symkey_sender esk pkd in
       Crypto_box.Secretbox.secretbox_open

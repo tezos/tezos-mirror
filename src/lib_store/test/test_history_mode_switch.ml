@@ -229,16 +229,16 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
     ~msg:("expected history mode: " ^ descr)
     stored_history_mode
     target_mode ;
-  let*! (_, savepoint_level) = Store.Chain.savepoint chain_store in
-  let*! (_, caboose_level) = Store.Chain.caboose chain_store in
+  let*! _, savepoint_level = Store.Chain.savepoint chain_store in
+  let*! _, caboose_level = Store.Chain.caboose chain_store in
   let* () =
     match (previous_mode, target_mode) with
-    | (Archive, Archive)
-    | (Archive, Rolling _)
-    | (Archive, Full _)
-    | (Full _, Full _)
-    | (Full _, Rolling _)
-    | (Rolling _, Rolling _) ->
+    | Archive, Archive
+    | Archive, Rolling _
+    | Archive, Full _
+    | Full _, Full _
+    | Full _, Rolling _
+    | Rolling _, Rolling _ ->
         let* expected_savepoint_level =
           expected_savepoint
             chain_store
@@ -268,8 +268,8 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
     | _ -> Alcotest.fail "Should not happen in test"
   in
   match (previous_mode, target_mode) with
-  | (Archive, Full _) | (Full _, Full _) ->
-      let (below_savepoint, above_savepoint) =
+  | Archive, Full _ | Full _, Full _ ->
+      let below_savepoint, above_savepoint =
         List.split_n (Int32.to_int savepoint_level) blocks
       in
       let* () =
@@ -285,11 +285,11 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
           above_savepoint
       in
       return_unit
-  | (Archive, Rolling _) | (Full _, Rolling _) | (Rolling _, Rolling _) ->
-      let (below_caboose, above_caboose) =
+  | Archive, Rolling _ | Full _, Rolling _ | Rolling _, Rolling _ ->
+      let below_caboose, above_caboose =
         List.split_n Int32.(to_int (pred caboose_level)) blocks
       in
-      let (below_savepoint, above_savepoint) =
+      let below_savepoint, above_savepoint =
         List.split_n (Int32.to_int savepoint_level) above_caboose
       in
       let* () = assert_absence_in_store chain_store below_caboose in
@@ -306,7 +306,7 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
           above_savepoint
       in
       return_unit
-  | (p, n) when History_mode.equal p n -> return_unit
+  | p, n when History_mode.equal p n -> return_unit
   | _ -> assert false
 
 let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, context_dir)
@@ -314,7 +314,7 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, context_dir)
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
-  let* (previously_baked_blocks, _current_head) =
+  let* previously_baked_blocks, _current_head =
     Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
   in
   let*! () =
@@ -337,8 +337,8 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, context_dir)
         | [Store_errors.Cannot_switch_history_mode _] ->
             return
               (match (from_hm, to_hm) with
-              | (_, Archive) -> true
-              | (Rolling _, Full _) -> true
+              | _, Archive -> true
+              | Rolling _, Full _ -> true
               | _ -> false)
         | err ->
             Format.printf

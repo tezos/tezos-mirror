@@ -83,7 +83,7 @@ let public_key_hash =
 let public_key_hash_gen =
   let open QCheck2.Gen in
   let+ seed = seed_gen in
-  let (pkh, _, _) = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
+  let pkh, _, _ = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
   pkh
 
 let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =

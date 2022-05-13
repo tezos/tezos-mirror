@@ -562,9 +562,7 @@ let tezos_hacl =
                   (List.map
                      (fun l -> H (of_atom_list l))
                      Stdlib.List.(
-                       ["run"; "gen/gen.exe"]
-                       ::
-                       ["-api"; "gen/api.json"]
+                       ["run"; "gen/gen.exe"] :: ["-api"; "gen/api.json"]
                        :: List.map (fun s -> ["-stubs"; s]) js_stubs));
               ];
             ];
@@ -1138,10 +1136,10 @@ let _tezos_tooling =
         bisect_ppx;
         (* These next are only used in the CI, we add this dependency so that
            it is added to tezos/opam-repository. *)
-        ocamlformat;
+        ocamlformat
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2860
            Disabled until compatible with ocaml 4.14 *)
-        (* ometrics; *)
+        (* ometrics; *);
       ]
 
 let _tezos_tooling_js_inline_tests =
@@ -1257,8 +1255,7 @@ let _tezos_p2p_tests =
                    "262144";
                    (* 1 << 18 = 256kB *)
                    "--max-download-speed";
-                   "1048576";
-                   (* 1 << 20 = 1MB *)
+                   "1048576" (* 1 << 20 = 1MB *);
                  ]);
           alias_rule
             "runtest_p2p_socket_ipv4"
@@ -3955,16 +3952,15 @@ let _tezos_node =
     let deps_for_protocol protocol =
       let is_optional =
         match (Protocol.status protocol, Protocol.number protocol) with
-        | (_, V 000) ->
+        | _, V 000 ->
             (* The node always needs to be linked with this protocol for Mainnet. *)
             false
-        | (Active, V _) ->
+        | Active, V _ ->
             (* Active protocols cannot be optional because of a bug
                that results in inconsistent hashes. Once this bug is fixed,
                this exception can be removed. *)
             false
-        | ((Frozen | Overridden | Not_mainnet), _) | (Active, (Alpha | Other))
-          ->
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
             (* Other protocols are optional. *)
             true
       in
@@ -4023,9 +4019,8 @@ let _tezos_client =
     let deps_for_protocol protocol =
       let is_optional =
         match (Protocol.status protocol, Protocol.number protocol) with
-        | (Active, V _) -> false
-        | ((Frozen | Overridden | Not_mainnet), _) | (Active, (Alpha | Other))
-          ->
+        | Active, V _ -> false
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
             true
       in
       let targets =

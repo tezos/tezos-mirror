@@ -445,7 +445,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
             >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
-              let (unreachable_entrypoint, map) =
+              let unreachable_entrypoint, map =
                 Script_ir_translator.list_entrypoints_uncarbonated
                   arg_type
                   entrypoints

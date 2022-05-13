@@ -289,7 +289,7 @@ let simulate_operations ~must_succeed state signer
   let (Manager_list annot_op) =
     Annotated_manager_operation.manager_of_list operations
   in
-  let* (oph, op, result) =
+  let* oph, op, result =
     Injection.inject_manager_operation
       state.cctxt
       ~simulation:true (* Only simulation here *)
@@ -299,8 +299,8 @@ let simulate_operations ~must_succeed state signer
       ~source:signer.pkh
       ~src_pk:signer.pk
       ~src_sk:signer.sk
-      ~successor_level:
-        true (* Needed to simulate tx_rollup operations in the next block *)
+      ~successor_level:true
+        (* Needed to simulate tx_rollup operations in the next block *)
       ~fee:Limit.unknown
       ~gas_limit:Limit.unknown
       ~storage_limit:Limit.unknown
@@ -368,7 +368,7 @@ let inject_on_node state packed_contents =
 let rec inject_operations ~must_succeed state (operations : L1_operation.t list)
     =
   let open Lwt_result_syntax in
-  let* (_oph, packed_contents, result) =
+  let* _oph, packed_contents, result =
     simulate_operations ~must_succeed state state.signer operations
   in
   let results = Apply_results.to_list result in
@@ -705,14 +705,14 @@ let init cctxt ~signers =
     List.fold_left
       (fun acc (signer, strategy, tags) ->
         let tags = Tags.of_list tags in
-        let (strategy, tags) =
+        let strategy, tags =
           match Signature.Public_key_hash.Map.find_opt signer acc with
           | None -> (strategy, tags)
           | Some (other_strategy, other_tags) ->
               let strategy =
                 match (strategy, other_strategy) with
-                | (Each_block, Each_block) -> Each_block
-                | (Delay_block, _) | (_, Delay_block) ->
+                | Each_block, Each_block -> Each_block
+                | Delay_block, _ | _, Delay_block ->
                     (* Delay_block strategy takes over because we can always wait a
                        little bit more to inject operation which are to be injected
                        "each block". *)

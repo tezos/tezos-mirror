@@ -183,7 +183,7 @@ let commands () =
   let handle_parsing_error label (cctxt : Protocol_client_context.full)
       (emacs_mode, no_print_source) program body =
     match program with
-    | (program, []) -> body program
+    | program, [] -> body program
     | res_with_errors when emacs_mode ->
         cctxt#message
           "(@[<v 0>(%s . ())@ (errors . %a)@])"
@@ -191,7 +191,7 @@ let commands () =
           Michelson_v1_emacs.report_errors
           res_with_errors
         >>= fun () -> return_unit
-    | (parsed, errors) ->
+    | parsed, errors ->
         cctxt#message
           "%a"
           (fun ppf () ->
@@ -665,8 +665,7 @@ let commands () =
       no_options
       (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
-      @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param @@ stop)
+      @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
         Client_keys.sign cctxt sk bytes >>=? fun signature ->
         cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
@@ -708,8 +707,7 @@ let commands () =
            ~name:"entrypoint"
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
-      @@ prefixes ["for"]
-      @@ Program.source_param @@ stop)
+      @@ prefixes ["for"] @@ Program.source_param @@ stop)
       (fun ((emacs_mode, no_print_source) as setup) entrypoint program cctxt ->
         handle_parsing_error "entrypoint" cctxt setup program @@ fun program ->
         entrypoint_type

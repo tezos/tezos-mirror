@@ -503,7 +503,7 @@ let check_printable_benchmark =
       in
       (string, {Shared_linear.bytes = String.length string}))
     ~make_bench:(fun generator () ->
-      let (generated, workload) = generator () in
+      let generated, workload = generator () in
       let closure () =
         ignore (check_printable_ascii generated (String.length generated - 1))
       in
@@ -629,7 +629,7 @@ let () = Registration_helpers.register (module Ty_eq)
 
    This structure is the worse-case of the unparsing function for types because
    an extra test is performed to determine if the comb type needs to be folded.
- *)
+*)
 let rec dummy_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in

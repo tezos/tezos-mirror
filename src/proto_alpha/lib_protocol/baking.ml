@@ -104,7 +104,7 @@ let endorsing_rights_by_first_slot ctxt level =
     (fun (ctxt, (delegates_map, slots_map)) slot ->
       Stake_distribution.slot_owner ctxt level slot
       >|=? fun (ctxt, (pk, pkh)) ->
-      let (initial_slot, delegates_map) =
+      let initial_slot, delegates_map =
         match Signature.Public_key_hash.Map.find pkh delegates_map with
         | None ->
             (slot, Signature.Public_key_hash.Map.add pkh slot delegates_map)

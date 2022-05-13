@@ -98,7 +98,7 @@ let of_string s =
 let pp ppf (Tez_tag amount) =
   let mult_int = 1_000_000L in
   let[@coq_struct "amount"] rec left ppf amount =
-    let (d, r) = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
+    let d, r = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
     if d > 0L then Format.fprintf ppf "%a%03Ld" left d r
     else Format.fprintf ppf "%Ld" r
   in
@@ -108,11 +108,11 @@ let pp ppf (Tez_tag amount) =
       else if Compare.Int.(v mod 100 > 0) then Format.fprintf ppf "%02d" (v / 10)
       else Format.fprintf ppf "%d" (v / 100)
     in
-    let (hi, lo) = (amount / 1000, amount mod 1000) in
+    let hi, lo = (amount / 1000, amount mod 1000) in
     if Compare.Int.(lo = 0) then Format.fprintf ppf "%a" triplet hi
     else Format.fprintf ppf "%03d%a" hi triplet lo
   in
-  let (ints, decs) =
+  let ints, decs =
     (Int64.(div amount mult_int), Int64.(to_int (rem amount mult_int)))
   in
   left ppf ints ;

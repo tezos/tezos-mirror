@@ -49,7 +49,7 @@ let create ?(maxlength = 1 lsl 15) ?(fresh_buf_size = 2000) () =
 (* Invariant:
    - There is no two concurrent write at the same time
    - read should be called in the same order than write
- *)
+*)
 
 (* [get_buf_with_offset t write_len] Find a place where [write_len] data can be written onto the buffer [t].
 
@@ -178,7 +178,7 @@ let write ~maxlen ~fill_using t =
     Lwt.return {offset = t.data_end; length = 0; buf = t.buffer}
   else
     let open Lwt.Syntax in
-    let (buf, offset) = get_buf_with_offset t maxlen in
+    let buf, offset = get_buf_with_offset t maxlen in
     let maxlen =
       if buf == t.buffer then maxlen else min t.fresh_buf_size maxlen
     in

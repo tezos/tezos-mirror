@@ -229,7 +229,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   >>?= fun timestamp ->
   let external_operation_source = state.global_state.config.extra_operations in
   Operations_source.retrieve external_operation_source >>= fun extern_ops ->
-  let (simulation_kind, payload_round) =
+  let simulation_kind, payload_round =
     match kind with
     | Fresh pool ->
         let pool =
@@ -516,7 +516,7 @@ let prepare_waiting_for_quorum state =
   (consensus_threshold, get_consensus_operation_voting_power, candidate)
 
 let start_waiting_for_preendorsement_quorum state =
-  let (consensus_threshold, get_preendorsement_voting_power, candidate) =
+  let consensus_threshold, get_preendorsement_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
@@ -527,7 +527,7 @@ let start_waiting_for_preendorsement_quorum state =
     candidate
 
 let start_waiting_for_endorsement_quorum state =
-  let (consensus_threshold, get_endorsement_voting_power, candidate) =
+  let consensus_threshold, get_endorsement_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in

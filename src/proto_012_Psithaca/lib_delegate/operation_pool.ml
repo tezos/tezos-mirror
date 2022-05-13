@@ -47,9 +47,9 @@ module Prioritized_operation = struct
 
   let compare_priority t1 t2 =
     match (t1, t2) with
-    | (High _, Low _) -> 1
-    | (Low _, High _) -> -1
-    | (Low _, Low _) | (High _, High _) -> 0
+    | High _, Low _ -> 1
+    | Low _, High _ -> -1
+    | Low _, Low _ | High _, High _ -> 0
 
   let compare a b =
     let c = compare_priority a b in
@@ -203,8 +203,7 @@ let filter_with_relevant_consensus_ops ~(endorsement_filter : consensus_filter)
     (fun {protocol_data; _} ->
       match (protocol_data, preendorsement_filter) with
       (* 1a. Remove preendorsements. *)
-      | (Operation_data {contents = Single (Preendorsement _); _}, None) ->
-          false
+      | Operation_data {contents = Single (Preendorsement _); _}, None -> false
       (* 1b. Filter preendorsements. *)
       | ( Operation_data
             {
@@ -305,7 +304,7 @@ let ordered_pool_of_payload ~consensus_operations
 
 let extract_operations_of_list_list = function
   | [consensus; votes_payload; anonymous_payload; managers_payload] ->
-      let (preendorsements, endorsements) =
+      let preendorsements, endorsements =
         List.fold_left
           (fun ( (preendorsements : Kind.preendorsement Operation.t list),
                  (endorsements : Kind.endorsement Operation.t list) )

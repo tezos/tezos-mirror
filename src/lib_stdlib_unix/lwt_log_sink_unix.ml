@@ -184,10 +184,10 @@ let init ?(template = default_template) output =
 
 let find_log_rules default =
   match Sys.(getenv_opt "TEZOS_LOG", getenv_opt "LWT_LOG") with
-  | (Some rules, None) -> ("environment variable TEZOS_LOG", Some rules)
-  | (None, Some rules) -> ("environment variable LWT_LOG", Some rules)
-  | (None, None) -> ("configuration file", default)
-  | (Some rules, Some _) ->
+  | Some rules, None -> ("environment variable TEZOS_LOG", Some rules)
+  | None, Some rules -> ("environment variable LWT_LOG", Some rules)
+  | None, None -> ("configuration file", default)
+  | Some rules, Some _ ->
       Format.eprintf
         "@[<v 2>@{<warning>@{<title>Warning@}@} Both environment variables \
          TEZOS_LOG and LWT_LOG defined, using TEZOS_LOG.@]@\n\
@@ -196,7 +196,7 @@ let find_log_rules default =
 
 let initialize ?(cfg = default_cfg) () =
   Lwt_log_core.add_rule "*" (Internal_event.Level.to_lwt_log cfg.default_level) ;
-  let (origin, rules) = find_log_rules cfg.rules in
+  let origin, rules = find_log_rules cfg.rules in
   let* () =
     match rules with
     | None -> Lwt.return_unit

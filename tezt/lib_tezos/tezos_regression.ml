@@ -58,7 +58,7 @@ let hooks =
   in
   let on_spawn command arguments =
     (* Remove arguments that shouldn't be captured in regression output. *)
-    let (arguments, _) =
+    let arguments, _ =
       List.fold_left
         (fun (acc, scrub_next) arg ->
           if scrub_next then (acc, false)

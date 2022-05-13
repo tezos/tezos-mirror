@@ -40,19 +40,19 @@ open Assert.Compat
 (** Asserts that an input [given] will generate some output [expected] *)
 let assert_tokenize ~loc given expected =
   match Micheline_parser.tokenize given with
-  | (tokens, []) ->
+  | tokens, [] ->
       let tokens_got = List.map (fun x -> x.Micheline_parser.token) tokens in
       Assert.equal_tokens ~loc tokens_got expected
-  | (_, _) -> failwith "%s - Cannot tokenize %s" loc given
+  | _, _ -> failwith "%s - Cannot tokenize %s" loc given
 
 (** Asserts that the token produced by the input [given] is not
    present in the [forbidden_tokens] list. *)
 let assert_tokenize_error ~loc given forbidden_tokens =
   match Micheline_parser.tokenize given with
-  | (tokens, []) ->
+  | tokens, [] ->
       let tokens_got = List.map (fun x -> x.Micheline_parser.token) tokens in
       Assert.not_equal_tokens ~loc tokens_got forbidden_tokens
-  | (_, _) -> return_unit
+  | _, _ -> return_unit
 
 (** Basic tokenizing of strings, bytes, integers, identifiers,
    annotations, comments. *)
@@ -325,11 +325,11 @@ let test_condition_contract () =
 
 let assert_toplevel_parsing ~loc source expected =
   match Micheline_parser.tokenize source with
-  | (_, _ :: _) -> failwith "%s - Cannot tokenize %s" loc source
-  | (tokens, []) -> (
+  | _, _ :: _ -> failwith "%s - Cannot tokenize %s" loc source
+  | tokens, [] -> (
       match Micheline_parser.parse_toplevel tokens with
-      | (_, _ :: _) -> failwith "%s - Cannot parse_toplevel %s" loc source
-      | (ast, []) ->
+      | _, _ :: _ -> failwith "%s - Cannot parse_toplevel %s" loc source
+      | ast, [] ->
           let ast = List.map Micheline.strip_locations ast in
           let expected = List.map Micheline.strip_locations expected in
           let* () =
@@ -340,11 +340,11 @@ let assert_toplevel_parsing ~loc source expected =
 
 let assert_toplevel_parsing_error ~loc source forbidden_tokens =
   match Micheline_parser.tokenize source with
-  | (_, _ :: _) -> return_unit
-  | (tokens, []) -> (
+  | _, _ :: _ -> return_unit
+  | tokens, [] -> (
       match Micheline_parser.parse_toplevel tokens with
-      | (_, _ :: _) -> return_unit
-      | (ast, []) ->
+      | _, _ :: _ -> return_unit
+      | ast, [] ->
           let ast = List.map Micheline.strip_locations ast in
           let forbidden_tokens =
             List.map Micheline.strip_locations forbidden_tokens
@@ -661,11 +661,11 @@ let test_list_append_parsing () =
 
 let assert_expression_parsing ~loc source expected =
   match Micheline_parser.tokenize source with
-  | (_, _ :: _) -> failwith "%s - Cannot tokenize %s" loc source
-  | (tokens, []) -> (
+  | _, _ :: _ -> failwith "%s - Cannot tokenize %s" loc source
+  | tokens, [] -> (
       match Micheline_parser.parse_expression tokens with
-      | (_, _ :: _) -> failwith "%s - Cannot parse_expression %s" loc source
-      | (ast, []) ->
+      | _, _ :: _ -> failwith "%s - Cannot parse_expression %s" loc source
+      | ast, [] ->
           let ast = Micheline.strip_locations ast in
           let expected = Micheline.strip_locations expected in
           Assert.equal ~loc ast expected)

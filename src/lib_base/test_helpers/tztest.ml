@@ -46,7 +46,7 @@ let tztest (name : string) (speed : Alcotest.speed_level) (f : unit -> 'a Lwt.t)
           Lwt.fail Alcotest.Test_error)
 
 let tztest_qcheck ?count ~name generator f =
-  let (name, speed, run) =
+  let name, speed, run =
     QCheck_alcotest.to_alcotest
       ( QCheck.Test.make ?count ~name generator @@ fun x ->
         match Lwt_main.run (f x) with

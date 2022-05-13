@@ -84,7 +84,7 @@ let test_mk_buffer_safe =
       let safe_buffer =
         Bytes.create buf_len |> P2p_buffer_reader.mk_buffer_safe
       in
-      let (pos, length_to_copy, buf) =
+      let pos, length_to_copy, buf =
         P2p_buffer_reader.Internal_for_tests.destruct_buffer safe_buffer
       in
       Alcotest.(check int "pos is always 0") 0 pos ;

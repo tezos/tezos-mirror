@@ -117,7 +117,7 @@ module MakeSizedSet (S : TzLwtreslib.Set.S) = struct
       empty
 
   let partition f t =
-    let (s1, s2) = S.partition f t.set in
+    let s1, s2 = S.partition f t.set in
     let n = S.cardinal s1 in
     ({cardinal = n; set = s1}, {cardinal = t.cardinal - n; set = s2})
 
@@ -136,7 +136,7 @@ module MakeSizedSet (S : TzLwtreslib.Set.S) = struct
   let choose_opt t = S.choose_opt t.set
 
   let split e t =
-    let (l, b, r) = S.split e t.set in
+    let l, b, r = S.split e t.set in
     let n = S.cardinal l in
     if b then
       ({cardinal = n; set = l}, b, {cardinal = t.cardinal - n - 1; set = r})
@@ -260,7 +260,7 @@ module MakeSizedMap (M : TzLwtreslib.Map.S) = struct
       empty
 
   let partition f t =
-    let (m1, m2) = M.partition f t.map in
+    let m1, m2 = M.partition f t.map in
     let n = M.cardinal m1 in
     ({cardinal = n; map = m1}, {cardinal = t.cardinal - n; map = m2})
 
@@ -279,7 +279,7 @@ module MakeSizedMap (M : TzLwtreslib.Map.S) = struct
   let choose_opt t = M.choose_opt t.map
 
   let split key t =
-    let (l, data, r) = M.split key t.map in
+    let l, data, r = M.split key t.map in
     let n = M.cardinal l in
     match data with
     | Some _ ->

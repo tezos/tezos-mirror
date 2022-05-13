@@ -27,7 +27,7 @@ open Tezos_openapi
 
 let main () =
   (* Parse command line arguments. *)
-  let (version, filename) =
+  let version, filename =
     if Array.length Sys.argv <> 3 then (
       prerr_endline
         "Usage: rpc_openapi <VERSION> <API.json>\n\n\

@@ -47,7 +47,7 @@ module Input = struct
     S.mem_nullifier state nf
 
   let get state pos vk =
-    let (existing_cm, cipher) = S.get state pos in
+    let existing_cm, cipher = S.get state pos in
     match of_ciphertext ~pos cipher vk with
     | None -> None
     | Some (memo, forge_input) ->
@@ -55,7 +55,7 @@ module Input = struct
         else None
 
   let get_out state pos ovk =
-    let (existing_cm, cipher) = S.get state pos in
+    let existing_cm, cipher = S.get state pos in
     match of_ciphertext_out ~pos cipher ovk existing_cm with
     | None -> None
     | Some (memo, forge_input) ->
@@ -79,7 +79,7 @@ let dummy_input anti_replay ctx dummy_witness root =
   let ar = Core.Proving.ar_random () in
   (* The proof is considered valid even with a dummy witness if the amount
        given is 0. *)
-  let (cv, rk, proof_i) =
+  let cv, rk, proof_i =
     Core.Proving.spend_proof
       ctx
       vk
@@ -115,8 +115,8 @@ let dummy_output pctx ~memo_size =
   let o = make_output addr amount (Hacl.Rand.gen memo_size) in
   let rcm = Core.Rcm.random () in
   let esk = Core.DH.esk_random () in
-  let (cv_o, proof_o) = Core.Proving.output_proof pctx esk addr rcm ~amount in
-  let (ciphertext, cm) =
+  let cv_o, proof_o = Core.Proving.output_proof pctx esk addr rcm ~amount in
+  let ciphertext, cm =
     Core.Forge.Output.to_ciphertext_without_ovk o rcm esk cv_o
   in
   Core.UTXO.{cm; proof_o; ciphertext}
@@ -150,7 +150,7 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
             let open Input in
             let ar = Core.Proving.ar_random () in
             let witness = S.get_witness state i.pos in
-            let (cv, rk, proof_i) =
+            let cv, rk, proof_i =
               Core.Proving.spend_proof
                 ctx
                 vk
@@ -187,7 +187,7 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
                which is enough to hold 2^64 *)
             let open Core.Forge.Output in
             let esk = Core.DH.esk_random () in
-            let (cv_o, proof_o) =
+            let cv_o, proof_o =
               Core.Proving.output_proof
                 ctx
                 esk
@@ -195,7 +195,7 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
                 rcm
                 ~amount:forge_output.amount
             in
-            let (ciphertext, cm) = to_ciphertext forge_output cv_o vk rcm esk in
+            let ciphertext, cm = to_ciphertext forge_output cv_o vk rcm esk in
             Core.UTXO.{cm; proof_o; ciphertext})
           forge_outputs
       in
@@ -270,7 +270,7 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
                which is enough to hold 2^64 *)
             let open Core.Forge.Output in
             let esk = Core.DH.esk_random () in
-            let (cv_o, proof_o) =
+            let cv_o, proof_o =
               Core.Proving.output_proof
                 ctx
                 esk
@@ -278,7 +278,7 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
                 rcm
                 ~amount:forge_output.amount
             in
-            let (ciphertext, cm) =
+            let ciphertext, cm =
               to_ciphertext_without_ovk forge_output rcm esk cv_o
             in
             Core.UTXO.{cm; proof_o; ciphertext})

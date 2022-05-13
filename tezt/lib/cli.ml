@@ -193,7 +193,7 @@ let init ?args () =
       else if value.[i] = '=' then Some i
       else find_equal (i + 1)
     in
-    let (parameter, value) =
+    let parameter, value =
       match find_equal 0 with
       | None -> (value, "true")
       | Some i -> (String.sub value 0 i, String.sub value (i + 1) (len - i - 1))

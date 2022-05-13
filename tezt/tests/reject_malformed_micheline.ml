@@ -66,7 +66,7 @@ let make_data s =
 let reject_malformed_micheline =
   Protocol.register_test ~__FILE__ ~title:"Reject malformed micheline" ~tags:[]
   @@ fun protocol ->
-  let* (node, _client) = Client.init_with_protocol `Client ~protocol () in
+  let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let send_operation data =
     (* This RPC path is used because it doesn't require valid signatures. *)
     let rpc_path =

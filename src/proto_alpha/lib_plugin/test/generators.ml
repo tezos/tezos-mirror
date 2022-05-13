@@ -51,7 +51,7 @@ let dummy_manager_op_info oph =
 let dummy_manager_op_info_with_key_gen :
     (Plugin.Mempool.manager_op_info * Signature.public_key_hash) QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let+ (oph, (pkh, _, _)) = pair operation_hash_gen public_key_hash_gen in
+  let+ oph, (pkh, _, _) = pair operation_hash_gen public_key_hash_gen in
   (dummy_manager_op_info oph, pkh)
 
 let filter_state_gen : Plugin.Mempool.state QCheck2.Gen.t =

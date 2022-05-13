@@ -303,7 +303,7 @@ struct
       match index_opt with
       | Some idx -> return (ctxt, `Existed, idx)
       | None ->
-          let+ (ctxt, idx) = associate_index ctxt addr in
+          let+ ctxt, idx = associate_index ctxt addr in
           (ctxt, `Created, idx)
 
     module Internal_for_tests = struct
@@ -340,7 +340,7 @@ struct
       match index_opt with
       | Some idx -> return (ctxt, `Existed, idx)
       | None ->
-          let+ (ctxt, idx) = associate_index ctxt ticket in
+          let+ ctxt, idx = associate_index ctxt ticket in
           (ctxt, `Created, idx)
 
     module Internal_for_tests = struct

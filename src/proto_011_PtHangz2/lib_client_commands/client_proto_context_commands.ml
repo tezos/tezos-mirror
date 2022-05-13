@@ -949,7 +949,7 @@ let commands network () =
         | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
           -> (
             match (path, operations_json) with
-            | ([`Index n], `A lj) -> (
+            | [`Index n], `A lj -> (
                 match List.nth_opt lj n with
                 | Some j ->
                     failwith
@@ -1324,8 +1324,7 @@ let commands network () =
             ~desc:"Register and activate an Alphanet/Zeronet faucet account."
             (args2 (Secret_key.force_switch ()) encrypted_switch)
             (prefixes ["activate"; "account"]
-            @@ Secret_key.fresh_alias_param
-            @@ prefixes ["with"]
+            @@ Secret_key.fresh_alias_param @@ prefixes ["with"]
             @@ param
                  ~name:"activation_key"
                  ~desc:
@@ -1369,8 +1368,7 @@ let commands network () =
             ~desc:"Activate a fundraiser account."
             (args1 dry_run_switch)
             (prefixes ["activate"; "fundraiser"; "account"]
-            @@ Public_key_hash.alias_param
-            @@ prefixes ["with"]
+            @@ Public_key_hash.alias_param @@ prefixes ["with"]
             @@ param
                  ~name:"code"
                  (Clic.parameter (fun _ctx code ->

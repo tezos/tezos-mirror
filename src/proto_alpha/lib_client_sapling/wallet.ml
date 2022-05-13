@@ -88,7 +88,7 @@ let new_address (cctxt : #Client_context.full) name index_opt =
   return (Viewing_key.of_sk sk) >>=? fun vk ->
   (* Viewing_key.new_address finds the smallest index greater or equal to
      [index] that generates a correct address. *)
-  let (corrected_index, address) = Viewing_key.new_address vk index in
+  let corrected_index, address = Viewing_key.new_address vk index in
   Sapling_key.update
     cctxt
     name

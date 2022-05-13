@@ -378,7 +378,7 @@ module C = struct
 
   let map_f f tree =
     let open Lwt_syntax in
-    let+ (t, r) = f (of_local tree) in
+    let+ t, r = f (of_local tree) in
     (t.tree, r)
 
   let verify verifier proof f =

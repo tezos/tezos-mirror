@@ -139,7 +139,7 @@ let assert_cemented_bound block_store (lowest, highest) =
 
 let test_storing_and_access_predecessors block_store =
   let open Lwt_result_syntax in
-  let*! (blocks, _head) =
+  let*! blocks, _head =
     make_raw_block_list ~kind:`Full (genesis_hash, -1l) 50
   in
   let* () = List.iter_es (Block_store.store_block block_store) blocks in
@@ -177,7 +177,7 @@ let test_storing_and_access_predecessors block_store =
 
 let make_raw_block_list_with_lafl pred size ~lafl =
   let open Lwt_syntax in
-  let* (chunk, head) = make_raw_block_list ~kind:`Full pred size in
+  let* chunk, head = make_raw_block_list ~kind:`Full pred size in
   let change_lafl block =
     let metadata =
       WithExceptions.Option.to_exn ~none:Not_found block.Block_repr.metadata
@@ -205,7 +205,7 @@ let make_n_consecutive_cycles pred ~cycle_length ~nb_cycles =
           else cycle_length
         in
         let lafl = max 0l (snd pred) in
-        let* (chunk, head) =
+        let* chunk, head =
           make_raw_block_list_with_lafl pred cycle_length ~lafl
         in
         loop (chunk :: acc) (Block_repr.descriptor head) (n - 1)
@@ -220,7 +220,7 @@ let make_n_initial_consecutive_cycles block_store ~cycle_length ~nb_cycles =
 
 let test_simple_merge block_store =
   let open Lwt_result_syntax in
-  let*! (cycles, head) =
+  let*! cycles, head =
     make_n_initial_consecutive_cycles block_store ~cycle_length:10 ~nb_cycles:2
   in
   let head_metadata =
@@ -249,7 +249,7 @@ let test_simple_merge block_store =
 let test_consecutive_concurrent_merges block_store =
   let open Lwt_result_syntax in
   (* Append 10 cycles of 10 blocks *)
-  let*! (cycles, head) =
+  let*! cycles, head =
     make_n_initial_consecutive_cycles block_store ~cycle_length:10 ~nb_cycles:10
   in
   let head_metadata =
@@ -310,7 +310,7 @@ let test_consecutive_concurrent_merges block_store =
 let test_ten_cycles_merge block_store =
   let open Lwt_result_syntax in
   (* Append 10 cycles *)
-  let*! (cycles, head) =
+  let*! cycles, head =
     make_n_initial_consecutive_cycles
       block_store
       ~cycle_length:100
@@ -344,7 +344,7 @@ let test_merge_with_branches block_store =
   (* make an initial chain of 2 cycles of 100 blocks with each
      block's lafl pointing to the highest block of its preceding cycle.
      i.e. 1st cycle's lafl = 0, 2nd cycle's lafl = 99 *)
-  let*! (cycles, head) =
+  let*! cycles, head =
     make_n_initial_consecutive_cycles block_store ~cycle_length:100 ~nb_cycles:2
   in
   let all_blocks = List.concat cycles in
@@ -358,7 +358,7 @@ let test_merge_with_branches block_store =
           List.nth all_blocks (level - 1)
           |> WithExceptions.Option.get ~loc:__LOC__
         in
-        let*! (blocks, _head) =
+        let*! blocks, _head =
           make_raw_block_list_with_lafl
             ~lafl:0l
             (Block_repr.descriptor fork_root)
@@ -386,7 +386,7 @@ let test_merge_with_branches block_store =
           List.nth all_blocks (level - 1)
           |> WithExceptions.Option.get ~loc:__LOC__
         in
-        let*! (blocks, _head) =
+        let*! blocks, _head =
           make_raw_block_list_with_lafl
             ~lafl:99l
             (Block_repr.descriptor fork_root)
@@ -431,7 +431,7 @@ let test_merge_with_branches block_store =
 let perform_n_cycles_merge ?(cycle_length = 10) block_store history_mode
     nb_cycles =
   let open Lwt_result_syntax in
-  let*! (cycles, head) =
+  let*! cycles, head =
     make_n_initial_consecutive_cycles block_store ~cycle_length ~nb_cycles
   in
   let all_blocks = List.concat cycles in
@@ -495,7 +495,7 @@ let test_full_0_merge block_store =
     ((nb_cycles - 1) * cycle_length) - 1 (* lafl *) - 1
     (* lafl max_op_ttl *)
   in
-  let (expected_pruned_blocks, expected_preserved_blocks) =
+  let expected_pruned_blocks, expected_preserved_blocks =
     List.split_n
       (expected_savepoint_level - 1)
       (* the genesis block is not counted *) all_blocks
@@ -586,7 +586,7 @@ let test_rolling_0_merge block_store =
     ((nb_cycles - 1) * cycle_length) - 1 (* lafl *) - 1
     (* lafl max_op_ttl *)
   in
-  let (expected_pruned_blocks, expected_preserved_blocks) =
+  let expected_pruned_blocks, expected_preserved_blocks =
     List.split_n
       (expected_savepoint_level - 1)
       (* the genesis block is not counted *) all_blocks

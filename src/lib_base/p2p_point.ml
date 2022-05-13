@@ -77,9 +77,9 @@ module Id = struct
     let {addr; port; _} = addr_port_id_of_string_exn str in
     let port =
       match (port, default_port) with
-      | (Some port, _) -> port
-      | (None, Some port) -> port
-      | (None, None) -> invalid_arg "P2p_point.of_string_exn: no port"
+      | Some port, _ -> port
+      | None, Some port -> port
+      | None, None -> invalid_arg "P2p_point.of_string_exn: no port"
     in
     match Ipaddr.of_string_exn addr with
     | V4 addr -> (Ipaddr.v6_of_v4 addr, port)
@@ -164,10 +164,10 @@ module State = struct
 
   let of_peerid_state state pi =
     match (state, pi) with
-    | (Requested, _) -> Requested
-    | (Accepted _, Some pi) -> Accepted pi
-    | (Running _, Some pi) -> Running pi
-    | (Disconnected, _) -> Disconnected
+    | Requested, _ -> Requested
+    | Accepted _, Some pi -> Accepted pi
+    | Running _, Some pi -> Running pi
+    | Disconnected, _ -> Disconnected
     | _ -> invalid_arg "state_of_state_peerid"
 
   let pp_digram ppf = function
@@ -225,17 +225,17 @@ module State = struct
 
   let raw_filter (f : Filter.t) (s : t) =
     match (f, s) with
-    | (Requested, Requested) -> true
-    | (Requested, (Accepted _ | Running _ | Disconnected))
-    | ((Accepted | Running | Disconnected), Requested) ->
+    | Requested, Requested -> true
+    | Requested, (Accepted _ | Running _ | Disconnected)
+    | (Accepted | Running | Disconnected), Requested ->
         false
-    | (Accepted, Accepted _) -> true
-    | (Accepted, (Running _ | Disconnected))
-    | ((Running | Disconnected), Accepted _) ->
+    | Accepted, Accepted _ -> true
+    | Accepted, (Running _ | Disconnected)
+    | (Running | Disconnected), Accepted _ ->
         false
-    | (Running, Running _) -> true
-    | (Disconnected, Disconnected) -> true
-    | (Running, Disconnected) | (Disconnected, Running _) -> false
+    | Running, Running _ -> true
+    | Disconnected, Disconnected -> true
+    | Running, Disconnected | Disconnected, Running _ -> false
 
   let filter filters state = List.exists (fun f -> raw_filter f state) filters
 end

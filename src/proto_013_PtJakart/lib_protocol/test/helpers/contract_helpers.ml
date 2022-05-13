@@ -31,7 +31,7 @@ open Error_monad_operators
     used to bake. *)
 let init () =
   Context.init ~consensus_threshold:0 3 >|=? fun (b, contracts) ->
-  let (src0, src1, src2) =
+  let src0, src1, src2 =
     match contracts with
     | src0 :: src1 :: src2 :: _ -> (src0, src1, src2)
     | _ -> assert false

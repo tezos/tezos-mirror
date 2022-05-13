@@ -100,7 +100,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
           second_accuser_exec;
         ]
   in
-  let* (nodes, protocol) =
+  let* nodes, protocol =
     Test_scenario.network_with_protocol
       ?external_peer_ports
       ~protocol
@@ -163,7 +163,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     in
     Tezos_protocol.bootstrap_accounts protocol
     |> List.filter_mapi ~f:(fun idx acc ->
-           let (node, client) = pick_a_node_and_client idx in
+           let node, client = pick_a_node_and_client idx in
            let key = Tezos_protocol.Account.name acc in
            if List.mem ~equal:String.equal no_daemons_for key then None
            else
@@ -202,7 +202,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   let* () =
     List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
         let* () = Tezos_client.wait_for_node_bootstrap state client in
-        let (key, priv) = Tezos_protocol.Account.(name acc, private_key acc) in
+        let key, priv = Tezos_protocol.Account.(name acc, private_key acc) in
         let* () =
           Tezos_client.import_secret_key state client ~name:key ~key:priv
         in
@@ -290,7 +290,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             return (Some hash)
         | _ ->
             let admin = make_admin client in
-            let* (_, new_protocol_hash) =
+            let* _, new_protocol_hash =
               Tezos_admin_client.inject_protocol
                 admin
                 state

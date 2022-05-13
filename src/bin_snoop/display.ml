@@ -168,7 +168,7 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
       Ok (named_columns, timings)
 
 let column_is_constant (m : Matrix.t) =
-  let (rows, cols) = Matrix.shape m in
+  let rows, cols = Matrix.shape m in
   assert (cols = 1) ;
   let fst = Matrix.get m 0 0 in
   let flg = ref true in
@@ -183,7 +183,7 @@ let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
   match problem with
   | Inference.Degenerate _ -> assert false
   | Inference.Non_degenerate {input; output; nmap; _} ->
-      let (_, cols) = Matrix.shape input in
+      let _, cols = Matrix.shape input in
       let named_columns =
         List.init ~when_negative_length:() cols (fun c ->
             let name = Inference.NMap.nth_exn nmap c in
@@ -222,7 +222,7 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
   | Inference.Non_degenerate {input; _} ->
       let {Inference.weights; _} = solution in
       let predicted = Matrix.numpy_mul input weights in
-      let (columns, timings) = prune_problem problem in
+      let columns, timings = prune_problem problem in
       let columns =
         List.map
           (fun (c, m) -> (Format.asprintf "%a" Free_variable.pp c, m))
@@ -238,7 +238,7 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
 let empirical (workload_data : (Sparse_vec.String.t * float) list) :
     (int * (col:int -> unit Plot.t), string) result =
   let open Result_syntax in
-  let* (columns, timings) = empirical_data workload_data in
+  let* columns, timings = empirical_data workload_data in
   let* plots = plot_scatter "Empirical" columns [timings] in
   let nrows = List.length plots in
   Ok (nrows, fun ~col -> plot_stacked 0 col plots)

@@ -19,7 +19,6 @@
    * Remove unsafe functions
    * Remove deprecated functions (enforcing string immutability)
    * Add binary data extraction functions
-
 *)
 
 (** String operations.

@@ -153,7 +153,7 @@ let extract_messages_from_block block_info rollup_id =
                  amount
              in
              (deposit, Some (ticket_hash, ticket))
-      | (_, _) -> None
+      | _, _ -> None
     in
     let acc =
       match message_size_ticket with
@@ -220,14 +220,14 @@ let extract_messages_from_block block_info rollup_id =
         | None ->
             (* Should not happen *)
             ok acc)
-    | (_, Receipt No_operation_metadata) | (_, Empty) | (_, Too_large) ->
+    | _, Receipt No_operation_metadata | _, Empty | _, Too_large ->
         error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with
   | None -> ok ([], Ticket_hash_map.empty)
   | Some managed_operations ->
       let open Result_syntax in
-      let+ (rev_messages, new_tickets) =
+      let+ rev_messages, new_tickets =
         List.fold_left_e
           finalize_receipt
           ([], Ticket_hash_map.empty)
@@ -266,7 +266,7 @@ let process_messages_and_inboxes (state : State.t)
     ~(predecessor : L2block.t option) ?predecessor_context block_info =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
-  let*? (messages, new_tickets) =
+  let*? messages, new_tickets =
     extract_messages_from_block block_info state.State.rollup_info.rollup_id
   in
   let*! () = Event.(emit messages_application) (List.length messages) in
@@ -289,7 +289,7 @@ let process_messages_and_inboxes (state : State.t)
       }
   in
   let context = predecessor_context in
-  let* (context, contents) =
+  let* context, contents =
     Interpreter.interpret_messages
       context
       parameters
@@ -320,7 +320,7 @@ let process_messages_and_inboxes (state : State.t)
       return (`Old predecessor, predecessor_context)
   | Some inbox ->
       let*! context_hash = Context.commit context in
-      let (level, predecessor_hash) =
+      let level, predecessor_hash =
         match predecessor with
         | None -> (Tx_rollup_level.root, None)
         | Some {hash; header = {level; _}; _} ->
@@ -414,7 +414,7 @@ let rec process_block state current_hash =
         Event.(emit processing_block_predecessor)
           (predecessor_hash, Int32.pred block_level)
       in
-      let* (l2_predecessor, predecessor_context, blocks_to_commit) =
+      let* l2_predecessor, predecessor_context, blocks_to_commit =
         if originated_in_block rollup_id block_info then
           let*! () =
             Event.(emit detected_origination) (rollup_id, current_hash)
@@ -428,7 +428,7 @@ let rec process_block state current_hash =
       let*! () =
         Event.(emit processing_block) (current_hash, predecessor_hash)
       in
-      let* (l2_block, context) =
+      let* l2_block, context =
         process_messages_and_inboxes
           state
           ~predecessor:l2_predecessor
@@ -573,13 +573,13 @@ let fail_when_slashed (type kind) state l1_operation
                 balance_updates
             | _ -> []
           in
-          let (frozen_debit, punish) =
+          let frozen_debit, punish =
             List.fold_left
               (fun (frozen_debit, punish) -> function
                 | Receipt.(Tx_rollup_rejection_punishments, Credited _, _) ->
                     (* Someone was punished *)
                     (frozen_debit, true)
-                | (Frozen_bonds (committer, _), Debited _, _)
+                | Frozen_bonds (committer, _), Debited _, _
                   when Contract.(committer = Implicit operator) ->
                     (* Our frozen bonds are gone *)
                     (true, punish)
@@ -621,7 +621,7 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     when is_my_rollup tx_rollup ->
       let* () = dispatch_withdrawals_on_l1 state level in
       State.set_finalized_level state level
-  | (_, _) -> return acc
+  | _, _ -> return acc
 
 let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
     (op : kind manager_operation) (result : kind manager_operation_result)
@@ -647,7 +647,7 @@ let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
           let*! () = State.delete_finalized_level state in
           return_unit
       | Some level -> State.set_finalized_level state level)
-  | (_, _) -> return acc
+  | _, _ -> return acc
 
 let handle_l1_operation direction (block : Alpha_block_services.block_info)
     state acc (operation : Alpha_block_services.operation) =
@@ -700,7 +700,7 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
         handle_list acc rest
   in
   match (operation.protocol_data, operation.receipt) with
-  | (_, Receipt No_operation_metadata) | (_, Empty) | (_, Too_large) ->
+  | _, Receipt No_operation_metadata | _, Empty | _, Too_large ->
       fail [Tx_rollup_no_operation_metadata operation.hash]
   | ( Operation_data {contents = operation_contents; _},
       Receipt (Operation_metadata {contents = result_contents}) ) -> (
@@ -739,7 +739,7 @@ let handle_l1_reorg state acc reorg =
 let process_head state (current_hash, current_header) =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* (_, _, blocks_to_commit) = process_block state current_hash in
+  let* _, _, blocks_to_commit = process_block state current_hash in
   let* l1_reorg = State.set_tezos_head state current_hash in
   let* () = handle_l1_reorg state () l1_reorg in
   let* () = List.iter_es (commit_block_on_l1 state) blocks_to_commit in
@@ -882,8 +882,8 @@ let run configuration cctxt =
       ~signers:
         (List.filter_map
            (function
-             | (None, _, _) -> None
-             | (Some x, strategy, tags) -> Some (x, strategy, tags))
+             | None, _, _ -> None
+             | Some x, strategy, tags -> Some (x, strategy, tags))
            [
              (signers.operator, Injector.Each_block, [`Commitment]);
              (* Batches of L2 operations are submitted with a delay after each
@@ -918,7 +918,7 @@ let run configuration cctxt =
     let* () =
       Lwt.catch
         (fun () ->
-          let* (block_stream, interupt) =
+          let* block_stream, interupt =
             connect ~delay:reconnection_delay cctxt
           in
           let*! () =

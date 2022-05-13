@@ -141,9 +141,9 @@ let read_base_uri_from_env () =
       Sys.getenv_opt "TEZOS_SIGNER_HTTP_HOST",
       Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" )
   with
-  | (None, None, None, None) -> return_none
-  | (Some path, None, None, None) -> return_some (Socket.make_unix_base path)
-  | (None, Some host, None, None) -> (
+  | None, None, None, None -> return_none
+  | Some path, None, None, None -> return_some (Socket.make_unix_base path)
+  | None, Some host, None, None -> (
       try
         let port =
           match Sys.getenv_opt "TEZOS_SIGNER_TCP_PORT" with
@@ -153,7 +153,7 @@ let read_base_uri_from_env () =
         return_some (Socket.make_tcp_base host port)
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_TCP_PORT.@.")
-  | (None, None, Some host, None) -> (
+  | None, None, Some host, None -> (
       try
         let port =
           match Sys.getenv_opt "TEZOS_SIGNER_HTTP_PORT" with
@@ -163,7 +163,7 @@ let read_base_uri_from_env () =
         return_some (Http.make_base host port)
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_HTTP_PORT.@.")
-  | (None, None, None, Some host) -> (
+  | None, None, None, Some host -> (
       try
         let port =
           match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_PORT" with
@@ -173,7 +173,7 @@ let read_base_uri_from_env () =
         return_some (Https.make_base host port)
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_HTTPS_PORT.@.")
-  | (_, _, _, _) ->
+  | _, _, _, _ ->
       failwith
         "Only one the following environment variable must be defined: \
          TEZOS_SIGNER_UNIX_PATH, TEZOS_SIGNER_TCP_HOST, \

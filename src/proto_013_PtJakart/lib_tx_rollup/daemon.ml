@@ -128,7 +128,7 @@ let extract_messages_from_block block_info rollup_id =
                destination
                ticket_hash
                amount
-      | (_, _) -> None
+      | _, _ -> None
     in
     let acc =
       match message_and_size with
@@ -188,14 +188,14 @@ let extract_messages_from_block block_info rollup_id =
         | None ->
             (* Should not happen *)
             ok acc)
-    | (_, Receipt No_operation_metadata) | (_, Empty) | (_, Too_large) ->
+    | _, Receipt No_operation_metadata | _, Empty | _, Too_large ->
         error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with
   | None -> ok ([], 0)
   | Some managed_operations ->
       let open Result_syntax in
-      let+ (rev_messages, cumulated_size) =
+      let+ rev_messages, cumulated_size =
         List.fold_left_e finalize_receipt ([], 0) managed_operations
       in
       (List.rev rev_messages, cumulated_size)
@@ -213,7 +213,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     ?predecessor_context block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
-  let*? (messages, cumulated_size) =
+  let*? messages, cumulated_size =
     extract_messages_from_block block_info rollup_id
   in
   let*! () = Event.(emit messages_application) (List.length messages) in
@@ -229,7 +229,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
           state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
       }
   in
-  let* (context, contents) =
+  let* context, contents =
     Interpreter.interpret_messages
       predecessor_context
       parameters
@@ -271,7 +271,7 @@ let rec process_block state current_hash rollup_id :
   if Block_hash.equal state.State.rollup_info.origination_block current_hash
   then
     (* This is the rollup origination block, create L2 genesis block *)
-    let*! (genesis_block, genesis_ctxt) =
+    let*! genesis_block, genesis_ctxt =
       create_genesis_block state current_hash
     in
     return (genesis_block, Some genesis_ctxt)
@@ -294,13 +294,13 @@ let rec process_block state current_hash rollup_id :
         in
         (* Handle predecessor Tezos block first *)
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
-        let* (l2_predecessor_header, predecessor_context) =
+        let* l2_predecessor_header, predecessor_context =
           process_block state predecessor_hash rollup_id
         in
         let*! () =
           Event.(emit processing_block) (current_hash, predecessor_hash)
         in
-        let* (l2_block, context) =
+        let* l2_block, context =
           process_messages_and_inboxes
             state
             ~predecessor:l2_predecessor_header
@@ -469,7 +469,7 @@ let run configuration cctxt =
     let* () =
       Lwt.catch
         (fun () ->
-          let* (block_stream, interupt) =
+          let* block_stream, interupt =
             connect ~delay:reconnection_delay cctxt
           in
           let*! () =

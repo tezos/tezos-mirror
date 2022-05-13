@@ -120,7 +120,7 @@ let test_self_clean _ _ =
 
 let test_order _ _ =
   let t = IntESHashtbl.create 2 in
-  let (wter, wker) = Lwt.task () in
+  let wter, wker = Lwt.task () in
   let world = ref [] in
   (* PROMISE A *)
   let p_a =
