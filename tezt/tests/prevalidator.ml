@@ -1960,6 +1960,102 @@ module Revamped = struct
       return process
     in
     Process.check_error ~msg:(rex "proto.012-Psithaca.balance_is_empty") process
+
+  let inject_operations =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test private/injection/operations RPC"
+      ~tags:["mempool"; "injection"; "operations"; "rpc"]
+    @@ fun protocol ->
+    log_step 1 "Init a node and client with a fresh account" ;
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* new_account = Client.gen_and_show_keys ~alias:"new" client in
+
+    log_step 2 "Forge and sign five operations" ;
+    let* branch = Operation.get_injection_branch client in
+    let* ops =
+      Lwt_list.map_s
+        (fun (account : Account.key) ->
+          let* transfer =
+            Operation.mk_transfer
+              ~source:account
+              ~dest:Constant.bootstrap5
+              client
+          in
+          let* (`Hex raw_unsigned_op as unsigned_op) =
+            Operation.forge_operation ~branch ~batch:[transfer] client
+          in
+          let (`Hex signature_op) =
+            Operation.sign_manager_op_hex ~signer:account unsigned_op
+          in
+          return (`Hex (raw_unsigned_op ^ signature_op)))
+        [
+          new_account;
+          Constant.bootstrap1;
+          Constant.bootstrap2;
+          Constant.bootstrap3;
+          Constant.bootstrap4;
+        ]
+    in
+
+    log_step
+      3
+      "Try to inject two operations. Check that the injection failed (return \
+       an error) because one operation was invalid. And check that the valid \
+       operation is in the mempool" ;
+    let*? process =
+      RPC.(
+        Client.spawn
+          client
+          (private_injection_operations
+             ~ops:[List.nth ops 0; List.nth ops 1]
+             ()))
+    in
+    let* () = Process.check_error process in
+    let* mempool = Mempool.get_mempool client in
+    Check.(
+      (List.length mempool.applied = 1)
+        int
+        ~error_msg:"Expected only %R applied op, got %L") ;
+
+    log_step
+      4
+      "Inject two valid operations and check that they are in the applied \
+       mempool" ;
+    let* injected_ops =
+      RPC.(
+        call
+          node
+          (private_injection_operations
+             ~ops:[List.nth ops 2; List.nth ops 3]
+             ()))
+    in
+    let injected_ops = List.map (fun (`OpHash op) -> op) injected_ops in
+    let* () = check_mempool ~applied:(injected_ops @ mempool.applied) client in
+
+    log_step
+      5
+      "Force inject two operations, an invalid one and a valid one. Check that \
+       the first one is `branch_refused` and the second is in the applied \
+       mempool" ;
+    let* injected_ops2 =
+      RPC.(
+        call
+          node
+          (private_injection_operations
+             ~force:true
+             ~ops:[List.nth ops 0; List.nth ops 4]
+             ()))
+    in
+    let injected_ops2 = List.map (fun (`OpHash op) -> op) injected_ops2 in
+    let* () =
+      check_mempool
+        ~applied:((List.nth injected_ops2 1 :: injected_ops) @ mempool.applied)
+        ~branch_refused:[List.nth injected_ops2 0]
+        client
+    in
+
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -4106,6 +4202,7 @@ let register ~protocols =
   Revamped.wrong_signed_branch_delayed_becomes_refused protocols ;
   Revamped.precheck_with_empty_balance [Protocol.Ithaca]
   (* FIXME: handle the case for Alpha. *) ;
+  Revamped.inject_operations protocols ;
   run_batched_operation protocols ;
   propagation_future_endorsement protocols ;
   forge_pre_filtered_operation protocols ;
