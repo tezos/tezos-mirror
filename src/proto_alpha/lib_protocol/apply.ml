@@ -3483,6 +3483,10 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
     ~baking_reward
     ~reward_bonus
   >>=? fun (ctxt, baking_receipts) ->
+  (* if end of nonce revelation period, compute seed *)
+  (if Level.may_compute_randao ctxt then Seed.compute_randao ctxt
+  else return ctxt)
+  >>=? fun ctxt ->
   (* end of cycle *)
   (if Level.may_snapshot_rolls ctxt then Stake_distribution.snapshot ctxt
   else return ctxt)

@@ -39,6 +39,9 @@ val init :
 
 val for_cycle : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
+(** Computes RANDAO output for cycle #(current_cycle + preserved + 1) *)
+val compute_randao : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
 (** If it is the end of the cycle, computes and stores the seed of cycle at
     distance [preserved_cycle+2] in the future using the seed of the previous
     cycle and the revelations of the current one.  *)

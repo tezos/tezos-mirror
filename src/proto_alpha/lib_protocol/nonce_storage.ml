@@ -80,17 +80,23 @@ let () =
     (function Inconsistent_nonce -> Some () | _ -> None)
     (fun () -> Inconsistent_nonce)
 
-(* checks that the level of a revelation is not too early or too late wrt to the
-   current context and that a nonce has not been already revealed for that level *)
+(* Checks that the level of a revelation is not too early or too late wrt to the
+   current context and that a nonce has not been already revealed for that level.
+   Also checks that we are not past the nonce revelation period. *)
 let get_unrevealed ctxt (level : Level_repr.t) =
   let cur_level = Level_storage.current ctxt in
   match Cycle_repr.pred cur_level.cycle with
   | None -> fail Too_early_revelation (* no revelations during cycle 0 *)
   | Some revealed_cycle -> (
+      let current_level = Level_storage.current ctxt in
       if Cycle_repr.(revealed_cycle < level.Level_repr.cycle) then
         fail Too_early_revelation
-      else if Cycle_repr.(level.Level_repr.cycle < revealed_cycle) then
-        fail Too_late_revelation
+      else if
+        Cycle_repr.(level.Level_repr.cycle < revealed_cycle)
+        || Compare.Int32.(
+             current_level.cycle_position
+             >= Constants_storage.nonce_revelation_threshold ctxt)
+      then fail Too_late_revelation
       else
         Storage.Seed.Nonce.get ctxt level >>=? function
         | Revealed _ -> fail Previously_revealed_nonce

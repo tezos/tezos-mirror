@@ -36,6 +36,62 @@
 
 open Protocol
 
+(** Checking that, in the absence of nonce revelations and VDF computation,
+    the seed of each cycle is correctly computed based on the seed of
+    the previous cycle. *)
+let test_seed_no_commitment () =
+  let n_cycles = 15 in
+  let (Hash initial_seed) =
+    let empty_bytes = Bytes.(copy empty) in
+    Tezos_crypto.Hacl.Blake2b.direct empty_bytes Nonce_hash.size
+  in
+  let seeds =
+    (* compute the first `n_cycles` expected seeds *)
+    let zero_bytes = Bytes.make Nonce_hash.size '\000' in
+    let rec make_seeds s = function
+      | 0 -> []
+      | n ->
+          let (Hash h) =
+            Tezos_crypto.Hacl.Blake2b.direct
+              (Bytes.cat s zero_bytes)
+              Nonce_hash.size
+          in
+          h :: make_seeds h (n - 1)
+    in
+    make_seeds initial_seed n_cycles
+  in
+  let check_seed b expected_seed =
+    let open Alpha_context in
+    Context.get_seed (B b) >>=? fun s ->
+    let seed_bytes = Data_encoding.Binary.to_bytes_exn Seed.seed_encoding s in
+    (if expected_seed <> seed_bytes then
+     let seed_pp =
+       Hex.show
+         (Hex.of_string
+            (Data_encoding.Binary.to_string_exn Seed.seed_encoding s))
+     in
+     let expected_seed_pp = Hex.show (Hex.of_bytes expected_seed) in
+     Stdlib.failwith
+       (Format.sprintf "Seed: %s\nExpected: %s\n\n" seed_pp expected_seed_pp)) ;
+    return b
+  in
+  let rec bake_and_check_seed b = function
+    | [] -> return b
+    | s :: seeds ->
+        Block.bake_until_cycle_end b >>=? fun b ->
+        check_seed b s >>=? fun b ->
+        Block.bake_n 2 b >>=? fun b -> bake_and_check_seed b seeds
+  in
+  Context.init3
+    ~blocks_per_cycle:8l
+    ~consensus_threshold:0
+    ~blocks_per_reveal_period:2l
+    ()
+  >>=? fun (b, _delegates) ->
+  Context.get_constants (B b) >>=? fun _ ->
+  check_seed b initial_seed >>=? fun b ->
+  bake_and_check_seed b seeds >>=? fun _ -> return_unit
+
 (** Baking [blocks_per_commitment] blocks without a [seed_nonce_hash]
     commitment fails with an "Invalid commitment in block header" error. *)
 let test_no_commitment () =
@@ -226,6 +282,10 @@ let test_unrevealed () =
 
 let tests =
   [
+    Tztest.tztest
+      "seed computation (no commitment)"
+      `Quick
+      test_seed_no_commitment;
     Tztest.tztest "no commitment" `Quick test_no_commitment;
     Tztest.tztest
       "revelation_early_wrong_right_twice"

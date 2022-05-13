@@ -1213,6 +1213,8 @@ module Level : sig
   val dawn_of_a_new_cycle : context -> Cycle.t option
 
   val may_snapshot_rolls : context -> bool
+
+  val may_compute_randao : context -> bool
 end
 
 (** This module re-exports definitions from {!Fitness_repr}. *)
@@ -1286,6 +1288,8 @@ module Seed : sig
   type error += Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
 
   val for_cycle : context -> Cycle.t -> seed tzresult Lwt.t
+
+  val compute_randao : context -> context tzresult Lwt.t
 
   val cycle_end :
     context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t

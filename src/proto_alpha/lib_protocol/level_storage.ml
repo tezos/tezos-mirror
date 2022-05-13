@@ -120,3 +120,8 @@ let may_snapshot_rolls ctxt =
   Compare.Int32.equal
     (Int32.rem level.cycle_position blocks_per_stake_snapshot)
     (Int32.pred blocks_per_stake_snapshot)
+
+let may_compute_randao ctxt =
+  let level = current ctxt in
+  let nonce_reveal_cutoff = Constants_storage.nonce_revelation_threshold ctxt in
+  Compare.Int32.equal level.cycle_position nonce_reveal_cutoff
