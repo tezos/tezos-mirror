@@ -813,8 +813,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
-        @@ prefixes ["to"]
-        @@ threshold_param ()
+        @@ prefixes ["to"] @@ threshold_param ()
         @@ prefixes ["and"; "public"; "keys"; "to"]
         @@ non_terminal_seq (public_key_param ()) ~suffix:["on"; "behalf"; "of"]
         @@ Client_proto_contracts.ContractAlias.destination_param

@@ -784,11 +784,11 @@ module Random = struct
     sampler_for_cycle c cycle >>=? fun (c, seed, state) ->
     let sample ~int_bound ~mass_bound =
       let state = init_random_state seed level offset in
-      let (i, state) = take_int64 (Int64.of_int int_bound) state in
-      let (elt, _) = take_int64 mass_bound state in
+      let i, state = take_int64 (Int64.of_int int_bound) state in
+      let elt, _ = take_int64 mass_bound state in
       (Int64.to_int i, elt)
     in
-    let (pk, pkh) = Sampler.sample state sample in
+    let pk, pkh = Sampler.sample state sample in
     return (c, (pk, pkh))
 end
 
@@ -1017,7 +1017,7 @@ let delegate_participation_info ctxt delegate =
       let contract = Contract_repr.Implicit delegate in
       Storage.Contract.Missed_endorsements.find ctxt contract
       >>=? fun missed_endorsements ->
-      let (missed_slots, missed_levels, remaining_allowed_missed_slots) =
+      let missed_slots, missed_levels, remaining_allowed_missed_slots =
         match missed_endorsements with
         | None -> (0, 0, maximal_cycle_inactivity)
         | Some {remaining_slots; missed_levels} ->

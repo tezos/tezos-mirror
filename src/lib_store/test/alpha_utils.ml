@@ -79,7 +79,7 @@ module Account = struct
   let known_accounts = Signature.Public_key_hash.Table.create 17
 
   let new_account ?seed () =
-    let (pkh, pk, sk) = Signature.generate_key ?seed () in
+    let pkh, pk, sk = Signature.generate_key ?seed () in
     let account = {pkh; pk; sk} in
     Signature.Public_key_hash.Table.add known_accounts pkh account ;
     account
@@ -119,7 +119,7 @@ module Account = struct
 
   let new_commitment ?seed () =
     let open Lwt_result_syntax in
-    let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
+    let pkh, pk, sk = Signature.generate_key ?seed ~algo:Ed25519 () in
     let unactivated_account = {pkh; pk; sk} in
     let open Commitment in
     let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
@@ -306,7 +306,7 @@ module Forge = struct
       | _ -> Round.zero
     in
     let proto_level = Store.Block.proto_level pred in
-    let* (pkh, round, expected_timestamp) =
+    let* pkh, round, expected_timestamp =
       dispatch_policy rpc_ctxt policy pred
     in
     let timestamp = Option.value ~default:expected_timestamp timestamp in
@@ -511,7 +511,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       `Lazy
       element_of_key
   in
-  let* (validation, block_header_metadata) =
+  let* validation, block_header_metadata =
     let*! r =
       let open Environment.Error_monad in
       let* vstate =
@@ -529,7 +529,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       let* vstate =
         List.fold_left_es
           (List.fold_left_es (fun vstate op ->
-               let* (state, _result) = apply_operation vstate op in
+               let* state, _result = apply_operation vstate op in
                return state))
           vstate
           operations
@@ -671,10 +671,10 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
 let bake chain_store ?synchronous_merge ?policy ?operation ?operations pred =
   let operations =
     match (operation, operations) with
-    | (Some op, Some ops) -> Some (op :: ops)
-    | (Some op, None) -> Some [op]
-    | (None, Some ops) -> Some ops
-    | (None, None) -> None
+    | Some op, Some ops -> Some (op :: ops)
+    | Some op, None -> Some [op]
+    | None, Some ops -> Some ops
+    | None, None -> None
   in
   apply_and_store ?synchronous_merge chain_store ?policy ?operations pred
 
@@ -685,7 +685,7 @@ let get_constants rpc_ctxt b = Alpha_services.Constants.all rpc_ctxt b
 
 let bake_n chain_store ?synchronous_merge ?policy n b =
   let open Lwt_result_syntax in
-  let* (bl, last) =
+  let* bl, last =
     List.fold_left_es
       (fun (bl, last) _ ->
         let* b = bake ?synchronous_merge chain_store ?policy last in
@@ -711,10 +711,10 @@ let bake_until_cycle_end chain_store ?synchronous_merge ?policy b =
 
 let bake_until_n_cycle_end chain_store ?synchronous_merge ?policy n b =
   let open Lwt_result_syntax in
-  let* (bll, last) =
+  let* bll, last =
     List.fold_left_es
       (fun (bll, last) _ ->
-        let* (bl, last) =
+        let* bl, last =
           bake_until_cycle_end chain_store ?synchronous_merge ?policy last
         in
         return (bl :: bll, last))
@@ -739,7 +739,7 @@ let bake_until_cycle chain_store ?synchronous_merge ?policy cycle b =
     in
     if Int32.equal (Cycle.to_int32 cycle) current_cycle then return (bl, b)
     else
-      let* (bl', b') =
+      let* bl', b' =
         bake_until_cycle_end chain_store ?synchronous_merge ?policy b
       in
       loop (bl @ bl', b')

@@ -292,7 +292,7 @@ module Ledger_commands = struct
           Bytes.cat (Signature.bytes_of_watermark watermark) base_msg)
     in
     let path = Bip32_path.tezos_root @ path in
-    let* (hash_opt, signature) =
+    let* hash_opt, signature =
       wrap_ledger_cmd (fun pp ->
           let {Ledgerwallet_tezos.Version.major; minor; patch; _} = version in
           let open Result_syntax in
@@ -302,7 +302,7 @@ module Ledger_commands = struct
             in
             Ok (None, s)
           else
-            let* (h, s) =
+            let* h, s =
               Ledgerwallet_tezos.sign_and_hash
                 ~pp
                 hid
@@ -453,7 +453,7 @@ module Ledger_uri = struct
     let components = String.split_no_empty '/' (Uri.path uri) in
     match components with
     | s :: tl ->
-        let (curve, more_path) =
+        let curve, more_path =
           match Ledgerwallet_tezos.curve_of_string s with
           | Some curve -> (curve, tl)
           | None -> (Ledger_id.curve, s :: tl)
@@ -669,7 +669,7 @@ let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
                       pp_curve
                       curve
                       Version.pp
-                      (let (a, b, c) = min_version_of_derivation_scheme curve in
+                      (let a, b, c = min_version_of_derivation_scheme curve in
                        {version with major = a; minor = b; patch = c})
                       Version.pp
                       version)
@@ -933,7 +933,7 @@ let generic_commands group =
                            "; "
                            (List.map (Printf.sprintf "0x%lX") full_path))
                     in
-                    let* (pkh, pk) =
+                    let* pkh, pk =
                       Ledger_commands.public_key_hash hidapi curve path
                     in
                     let*! () =
@@ -949,7 +949,7 @@ let generic_commands group =
                         pkh
                     in
                     match (test_sign, version.app_class) with
-                    | (true, Tezos) -> (
+                    | true, Tezos -> (
                         let pkh_bytes =
                           Signature.Public_key_hash.to_bytes pkh
                         in
@@ -990,11 +990,11 @@ let generic_commands group =
                                 signature
                             in
                             return_unit)
-                    | (true, TezBake) ->
+                    | true, TezBake ->
                         failwith
                           "Option --test-sign only works for the Tezos Wallet \
                            app."
-                    | (false, _) -> return_unit)
+                    | false, _ -> return_unit)
                 | `Ledger _ when test_sign ->
                     failwith
                       "Option --test-sign only works with a full ledger \
@@ -1320,7 +1320,7 @@ let high_water_mark_commands group watermark_spelling =
                     "Fatal: this operation is only valid with the Tezos Baking \
                      application"
               | TezBake when (not no_legacy_apdu) && version.major < 2 ->
-                  let* (hwm, hwm_round_opt) =
+                  let* hwm, hwm_round_opt =
                     Ledger_commands.wrap_ledger_cmd (fun pp ->
                         Ledgerwallet_tezos.get_high_watermark ~pp hidapi)
                   in
@@ -1341,7 +1341,7 @@ let high_water_mark_commands group watermark_spelling =
                     Ledgerwallet_tezos.Version.pp
                     version
               | TezBake ->
-                  let* (`Main_hwm (mh, mr), `Test_hwm (th, tr), `Chain_id ci) =
+                  let* `Main_hwm (mh, mr), `Test_hwm (th, tr), `Chain_id ci =
                     Ledger_commands.wrap_ledger_cmd (fun pp ->
                         Ledgerwallet_tezos.get_all_high_watermarks ~pp hidapi)
                   in
@@ -1387,7 +1387,7 @@ let high_water_mark_commands group watermark_spelling =
                     Ledger_commands.wrap_ledger_cmd (fun pp ->
                         Ledgerwallet_tezos.set_high_watermark ~pp hidapi hwm)
                   in
-                  let* (new_hwm, new_hwm_round_opt) =
+                  let* new_hwm, new_hwm_round_opt =
                     Ledger_commands.wrap_ledger_cmd (fun pp ->
                         Ledgerwallet_tezos.get_high_watermark ~pp hidapi)
                   in

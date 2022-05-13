@@ -46,10 +46,10 @@ let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8932
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2794 
-   the below default values have been copied from 
-   `src/proto_alpha/lib_client/client_proto_args.ml`, but 
-   we need to check whether these values are sensible for the rollup 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2794
+   the below default values have been copied from
+   `src/proto_alpha/lib_client/client_proto_args.ml`, but
+   we need to check whether these values are sensible for the rollup
    node.
 *)
 let default_minimal_fees =

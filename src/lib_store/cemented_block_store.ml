@@ -158,7 +158,7 @@ let load_table cemented_blocks_dir =
                 let start_level_opt = Int32.of_string_opt start_level in
                 let end_level_opt = Int32.of_string_opt end_level in
                 match (start_level_opt, end_level_opt) with
-                | (Some start_level, Some end_level) ->
+                | Some start_level, Some end_level ->
                     let file =
                       Naming.cemented_blocks_file
                         cemented_blocks_dir
@@ -210,7 +210,7 @@ let load_metadata_table cemented_blocks_dir =
                   let start_level_opt = Int32.of_string_opt start_level in
                   let end_level_opt = Int32.of_string_opt end_level in
                   match (start_level_opt, end_level_opt) with
-                  | (Some start_level, Some end_level) ->
+                  | Some start_level, Some end_level ->
                       let file =
                         Naming.cemented_blocks_file
                           cemented_blocks_dir
@@ -486,7 +486,7 @@ let read_block fd block_number =
   in
   let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)
-  let* (block, _len) = Block_repr.read_next_block_exn fd in
+  let* block, _len = Block_repr.read_next_block_exn fd in
   Lwt.return block
 
 let get_lowest_cemented_level cemented_store =
@@ -674,7 +674,7 @@ let trigger_full_gc cemented_store cemented_blocks_files offset =
   if nb_files <= offset then Lwt.return_unit
   else
     let cemented_files = Array.to_list cemented_blocks_files in
-    let (files_to_remove, _files_to_keep) =
+    let files_to_remove, _files_to_keep =
       List.split_n (nb_files - offset) cemented_files
     in
     (* Remove the rest of the files to prune *)
@@ -707,7 +707,7 @@ let trigger_rolling_gc cemented_store cemented_blocks_files offset =
     Cemented_block_level_index.filter
       cemented_store.cemented_block_level_index
       (fun (_, level) -> Compare.Int32.(level > last_level_to_purge)) ;
-    let (files_to_remove, _files_to_keep) =
+    let files_to_remove, _files_to_keep =
       List.split_n (nb_files - offset) cemented_files
     in
     (* Remove the rest of the files to prune *)
@@ -854,7 +854,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                            (Bad_offset
                               {level = n; cycle = Naming.file_path file}))
                     in
-                    let*! (block, _) = Block_repr.read_next_block_exn fd in
+                    let*! block, _ = Block_repr.read_next_block_exn fd in
                     let* () =
                       fail_unless
                         Compare.Int32.(

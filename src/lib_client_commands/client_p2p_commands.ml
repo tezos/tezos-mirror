@@ -64,7 +64,7 @@ let commands () =
         let*! () = cctxt#message "GLOBAL STATS" in
         let*! () = cctxt#message "  %a" P2p_stat.pp stat in
         let*! () = cctxt#message "CONNECTIONS" in
-        let (incoming, outgoing) =
+        let incoming, outgoing =
           List.partition (fun c -> c.P2p_connection.Info.incoming) conns
         in
         let*! () =

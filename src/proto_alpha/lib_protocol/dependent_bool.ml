@@ -41,10 +41,10 @@ type ('a, 'b) ex_dand = Ex_dand : ('a, 'b, _) dand -> ('a, 'b) ex_dand
 let dand : type a b. a dbool -> b dbool -> (a, b) ex_dand =
  fun a b ->
   match (a, b) with
-  | (No, No) -> Ex_dand NoNo
-  | (No, Yes) -> Ex_dand NoYes
-  | (Yes, No) -> Ex_dand YesNo
-  | (Yes, Yes) -> Ex_dand YesYes
+  | No, No -> Ex_dand NoNo
+  | No, Yes -> Ex_dand NoYes
+  | Yes, No -> Ex_dand YesNo
+  | Yes, Yes -> Ex_dand YesYes
 
 let dbool_of_dand : type a b r. (a, b, r) dand -> r dbool = function
   | NoNo -> No
@@ -58,7 +58,7 @@ let merge_dand :
     type a b c1 c2. (a, b, c1) dand -> (a, b, c2) dand -> (c1, c2) eq =
  fun w1 w2 ->
   match (w1, w2) with
-  | (NoNo, NoNo) -> Eq
-  | (NoYes, NoYes) -> Eq
-  | (YesNo, YesNo) -> Eq
-  | (YesYes, YesYes) -> Eq
+  | NoNo, NoNo -> Eq
+  | NoYes, NoYes -> Eq
+  | YesNo, YesNo -> Eq
+  | YesYes, YesYes -> Eq

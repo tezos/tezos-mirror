@@ -72,13 +72,12 @@ module State = struct
 
   let raw_filter (f : Filter.t) (s : t) =
     match (f, s) with
-    | (Accepted, Accepted) -> true
-    | (Accepted, (Running | Disconnected)) | ((Running | Disconnected), Accepted)
-      ->
+    | Accepted, Accepted -> true
+    | Accepted, (Running | Disconnected) | (Running | Disconnected), Accepted ->
         false
-    | (Running, Running) -> true
-    | (Disconnected, Disconnected) -> true
-    | (Running, Disconnected) | (Disconnected, Running) -> false
+    | Running, Running -> true
+    | Disconnected, Disconnected -> true
+    | Running, Disconnected | Disconnected, Running -> false
 
   let filter filters state = List.exists (fun f -> raw_filter f state) filters
 end
@@ -213,7 +212,7 @@ module Pool_event = struct
         "An event that may happen during maintenance of and other operations \
          on the connection to a specific peer."
     @@ conv
-         (fun {kind; timestamp; point = (addr, port)} ->
+         (fun {kind; timestamp; point = addr, port} ->
            (kind, timestamp, addr, port))
          (fun (kind, timestamp, addr, port) ->
            {kind; timestamp; point = (addr, port)})

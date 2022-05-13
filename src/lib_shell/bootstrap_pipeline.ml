@@ -96,7 +96,7 @@ open Validation_errors
    [Block_locator] from the network. A large step is defined by
    [big_step_size]. In that case an event is made every
    [big_step_size_announced]. *)
-let (big_step_size, big_step_size_announce) = (2000, 1000)
+let big_step_size, big_step_size_announce = (2000, 1000)
 
 (** The promises which fetches headers and operations communicate
    through a [Lwt_pipe.Bounded]. This pipe stores headers by batch. The size
@@ -161,7 +161,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
       (Future_block_header
          {block = hash; time = time_now; block_time = header.shell.timestamp})
   in
-  let*! (checkpoint_hash, checkpoint_level) =
+  let*! checkpoint_hash, checkpoint_level =
     Store.Chain.checkpoint chain_store
   in
   let* () =
@@ -319,7 +319,7 @@ let headers_fetch_worker_loop pipeline =
            If the queue is full, the [Lwt_pipe.Bounded.push] promise is pending
            until some headers are popped from the queue. *)
         let rec process_headers headers =
-          let (batch, remaining_headers) =
+          let batch, remaining_headers =
             List.split_n header_batch_size headers
           in
           let* () =
@@ -477,7 +477,7 @@ let rec validation_worker_loop pipeline =
   let open Lwt_result_syntax in
   let*! r =
     let*! () = Lwt.pause () in
-    let* (hash, header, operations) =
+    let* hash, header, operations =
       protect ~canceler:pipeline.canceler (fun () ->
           let*! v = Lwt_pipe.Bounded.pop pipeline.fetched_blocks in
           return v)

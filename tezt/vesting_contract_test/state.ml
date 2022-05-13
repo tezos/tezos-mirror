@@ -35,12 +35,12 @@ let update : ('s -> 's) -> (unit, 's) t = fun f s -> ((), f s)
 
 let map : ('a -> 'b) -> ('a, 's) t -> ('b, 's) t =
  fun f m s ->
-  let (a, s') = m s in
+  let a, s' = m s in
   (f a, s')
 
 let bind : ('a -> ('b, 's) t) -> ('a, 's) t -> ('b, 's) t =
  fun f m s ->
-  let (a, s') = m s in
+  let a, s' = m s in
   f a s'
 
 module type MONAD = sig

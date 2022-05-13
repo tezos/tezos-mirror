@@ -96,7 +96,7 @@ let () =
 
 let rec read_string rbuf ~len =
   let open Lwt_result_syntax in
-  let (fd, buf, ofs, total) = !rbuf in
+  let fd, buf, ofs, total = !rbuf in
   if Bytes.length buf - ofs < len then (
     let blen = Bytes.length buf - ofs in
     let neu = Bytes.create (blen + 1_000_000) in
@@ -170,7 +170,7 @@ module Make_legacy (I : Dump_interface) = struct
     let open Lwt_result_syntax in
     let* l = get_int4 rbuf in
     let length = Int32.to_int l in
-    let (fd, buf, ofs, total) = !rbuf in
+    let fd, buf, ofs, total = !rbuf in
     rbuf := (fd, buf, ofs - 4, total) ;
     return (length + 4)
 
@@ -195,8 +195,8 @@ module Make_legacy (I : Dump_interface) = struct
     let step i =
       if i >= total then return_none
       else
-        let* (length_name, name) = read_variable_length_string rbuf in
-        let* (length_hash, hash) = read_fixed_length_hash rbuf in
+        let* length_name, name = read_variable_length_string rbuf in
+        let* length_hash, hash = read_fixed_length_hash rbuf in
         let node = (name, hash) in
         let i = i + length_name + length_hash in
         return_some (node, i)
@@ -232,7 +232,7 @@ module Make_legacy (I : Dump_interface) = struct
         let len = total - 1 in
         let b = Bytes.create len in
         let+ () = read_mbytes rbuf b in
-        let (info, parents) =
+        let info, parents =
           Data_encoding.Binary.of_bytes_exn eoc_encoding_raw b
         in
         Eoc {info; parents}

@@ -176,11 +176,8 @@ let spawn_config_init node arguments =
   in
   spawn_command
     node
-    ("config"
-     ::
-     "init"
-     ::
-     "--data-dir" :: node.persistent_state.data_dir :: make_arguments arguments)
+    ("config" :: "init" :: "--data-dir" :: node.persistent_state.data_dir
+   :: make_arguments arguments)
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
@@ -367,7 +364,7 @@ let wait_for_ready node =
   match node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_ready <-
         resolver :: node.persistent_state.pending_ready ;
       check_event node "node_is_ready.v0" promise
@@ -378,7 +375,7 @@ let wait_for_level node level =
     when current_level >= level ->
       return current_level
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_level <-
         (level, resolver) :: node.persistent_state.pending_level ;
       check_event
@@ -397,7 +394,7 @@ let wait_for_identity node =
   | Running {session_state = {identity = Known identity; _}; _} ->
       return identity
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_identity <-
         resolver :: node.persistent_state.pending_identity ;
       check_event node "read_identity.v0" promise
@@ -504,7 +501,7 @@ let get_peers node =
     line arguments needed to spawn a [command] like [run]
     or [replay] for the given [node] and extra [arguments]. *)
 let runlike_command_arguments node command arguments =
-  let (net_addr, rpc_addr) =
+  let net_addr, rpc_addr =
     match node.persistent_state.runner with
     | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
     | Some _ ->
@@ -519,18 +516,11 @@ let runlike_command_arguments node command arguments =
     | None -> command_args
     | Some port -> "--advertised-net-port" :: string_of_int port :: command_args
   in
-  command
-  ::
-  "--data-dir"
-  ::
-  node.persistent_state.data_dir
-  ::
-  "--net-addr"
-  ::
-  (net_addr ^ string_of_int node.persistent_state.net_port)
-  ::
-  "--rpc-addr"
-  :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port) :: command_args
+  command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
+  :: (net_addr ^ string_of_int node.persistent_state.net_port)
+  :: "--rpc-addr"
+  :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
+  :: command_args
 
 let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     ?event_sections_levels node arguments =

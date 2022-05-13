@@ -32,7 +32,7 @@ type signer = {
 
 let get_signer cctxt pkh =
   let open Lwt_result_syntax in
-  let* (alias, pk, sk) = Client_keys.get_key cctxt pkh in
+  let* alias, pk, sk = Client_keys.get_key cctxt pkh in
   return {alias; pkh; pk; sk}
 
 type 'block reorg = {

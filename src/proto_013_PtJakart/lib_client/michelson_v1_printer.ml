@@ -138,7 +138,7 @@ let unparse ?type_map parse expanded =
   let source =
     match type_map with
     | Some type_map ->
-        let (unexpanded, unexpansion_table) =
+        let unexpanded, unexpansion_table =
           expanded |> Michelson_v1_primitives.strings_of_prims |> root
           |> Michelson_v1_macros.unexpand_rec |> Micheline.extract_locations
         in
@@ -170,8 +170,8 @@ let unparse ?type_map parse expanded =
         |> Format.asprintf "%a" Micheline_printer.print_expr
   in
   match parse source with
-  | (res, []) -> res
-  | (_, _ :: _) -> Stdlib.failwith "Michelson_v1_printer.unparse"
+  | res, [] -> res
+  | _, _ :: _ -> Stdlib.failwith "Michelson_v1_printer.unparse"
 
 let unparse_toplevel ?type_map =
   unparse ?type_map Michelson_v1_parser.parse_toplevel

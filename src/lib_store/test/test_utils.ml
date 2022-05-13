@@ -31,8 +31,8 @@ open Filename.Infix
 let equal_metadata ?msg m1 m2 =
   let eq m1 m2 =
     match (m1, m2) with
-    | (None, None) -> true
-    | (Some m1, Some m2) -> m1 = m2
+    | None, None -> true
+    | Some m1, Some m2 -> m1 = m2
     | _ -> false
   in
   let pp ppf (md : Tezos_store.Store.Block.metadata option) =
@@ -131,8 +131,8 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
       in
       let*! () =
         match (savepoint_b_opt, savepoint_metadata_opt) with
-        | (Some _, Some _) -> Lwt.return_unit
-        | (Some _, None) ->
+        | Some _, Some _ -> Lwt.return_unit
+        | Some _, None ->
             Assert.fail_msg
               "check_invariant: could not find savepoint's metadata"
         | _ -> Assert.fail_msg "check_invariant: could not find savepoint block"
@@ -142,8 +142,8 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
         Block.read_block_metadata chain_store (fst caboose)
       in
       match (caboose_b_opt, caboose_metadata_opt) with
-      | (Some _, (Some _ | None)) -> return_unit
-      | (None, _) ->
+      | Some _, (Some _ | None) -> return_unit
+      | None, _ ->
           Format.eprintf "caboose lvl : %ld@." (snd caboose) ;
           Assert.fail_msg "check_invariant: could not find the caboose block")
     (fun exn ->
@@ -371,13 +371,13 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
 let prune_block block = block.Block_repr.metadata <- None
 
 let pp_block fmt b =
-  let (h, lvl) = Store.Block.descriptor b in
+  let h, lvl = Store.Block.descriptor b in
   Format.fprintf fmt "%a (%ld)" Block_hash.pp h lvl
 
 let raw_descriptor b = (Block_repr.hash b, Block_repr.level b)
 
 let pp_raw_block fmt b =
-  let (h, lvl) = raw_descriptor b in
+  let h, lvl = raw_descriptor b in
   Format.fprintf fmt "%a (%ld)" Block_hash.pp h lvl
 
 let store_raw_block chain_store (raw_block : Block_repr.t) =
@@ -484,13 +484,13 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
       (Store.context_index (Store.Chain.global_store chain_store))
       (Store.Block.context_hash root_b)
   in
-  let*! (blocks, _last) =
+  let*! blocks, _last =
     make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ~kind root n
   in
-  let* (_, _, blocks) =
+  let* _, _, blocks =
     List.fold_left_es
       (fun (ctxt_opt, last_opt, blocks) b ->
-        let* (ctxt, last_opt, b) =
+        let* ctxt, last_opt, b =
           if should_commit then
             let open Tezos_context in
             let ctxt = WithExceptions.Option.get ~loc:__LOC__ ctxt_opt in
@@ -666,7 +666,7 @@ module Example_tree = struct
     in
     let chain_store = Store.main_chain_store store in
     let main_chain = List.map (fun i -> Format.sprintf "A%d" i) (1 -- 8) in
-    let* (blocks, _head) =
+    let* blocks, _head =
       append_blocks chain_store ~kind:`Full (List.length main_chain)
     in
     let*! main_blocks =
@@ -677,7 +677,7 @@ module Example_tree = struct
     let a2 = List.nth main_blocks 2 |> WithExceptions.Option.get ~loc:__LOC__ in
     let main_blocks = combine_exn main_chain main_blocks in
     let branch_chain = List.map (fun i -> Format.sprintf "B%d" i) (1 -- 8) in
-    let* (branch, _head) =
+    let* branch, _head =
       append_blocks
         chain_store
         ~root:(Store.Block.descriptor a2)

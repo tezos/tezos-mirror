@@ -138,7 +138,7 @@ module Handle_operations = struct
        it would be overkill. *)
     let gen =
       let open QCheck2.Gen in
-      let* (tree, pair_blocks_opt, old_mempool) =
+      let* tree, pair_blocks_opt, old_mempool =
         Generators_tree.tree_gen ?blocks:None ()
       in
       let* live_blocks = sublist (Tree.values tree) in
@@ -153,7 +153,7 @@ module Handle_operations = struct
       gen
     @@ fun (tree, pair_blocks_opt, old_mempool, live_blocks) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
     let expected_superset : unit Prevalidation.operation Op_map.t =
       (* Take all blocks *)
@@ -193,7 +193,7 @@ module Handle_operations = struct
       (Generators_tree.tree_gen ())
     @@ fun (tree, pair_blocks_opt, _) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
     let equal = Block.equal in
     let ancestor : Block.t =
@@ -239,7 +239,7 @@ module Handle_operations = struct
       Generators_tree.(tree_gen ())
     @@ fun (tree, pair_blocks_opt, old_mempool) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
     let cleared = ref Operation_hash.Set.empty in
     let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
@@ -280,7 +280,7 @@ module Handle_operations = struct
       (Generators_tree.tree_gen ())
     @@ fun (tree, pair_blocks_opt, old_mempool) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
     let injected = ref Operation_hash.Set.empty in
     let inject_operation oph _op =
@@ -392,13 +392,13 @@ module Recyle_operations = struct
         (fun oph _ -> not (Op_map.mem oph blocks_ops))
         classification_pendings_ops
     in
-    let* (classification_ops, pending_ops) =
+    let* classification_ops, pending_ops =
       Op_map.bindings classification_pendings_ops
       |> Generators_tree.split_in_two
     in
     let classification_ops = oph_op_list_to_map classification_ops in
     let pending_ops = oph_op_list_to_map pending_ops in
-    let* (tree, from_to, _) = Generators_tree.tree_gen ~blocks () in
+    let* tree, from_to, _ = Generators_tree.tree_gen ~blocks () in
     let+ classification = classification_of_ops_gen classification_ops in
     (tree, from_to, classification, pending_ops)
 
@@ -421,7 +421,7 @@ module Recyle_operations = struct
       Gen.(pair gen bool)
     @@ fun ((tree, pair_blocks_opt, classes, pending), handle_branch_refused) ->
     assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
     let parse raw hash =
       Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
@@ -452,7 +452,7 @@ module Recyle_operations = struct
       QCheck2.Gen.(pair gen bool)
     @@ fun ((tree, pair_blocks_opt, classes, pending), handle_branch_refused) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
     let equal = Block.equal in
     let ancestor : Block.t =
@@ -537,7 +537,7 @@ module Recyle_operations = struct
         ~outdated:true
         classes
     in
-    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
     let parse raw hash =
       Some (Prevalidation.Internal_for_tests.make_operation hash raw ())

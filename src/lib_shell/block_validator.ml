@@ -240,8 +240,8 @@ let on_validation_request w
                                 | Ok x -> return x
                                 (* [Unavailable_protocol] is expected to be the
                                    first error in the trace *)
-                                | Error
-                                    (Unavailable_protocol {protocol; _} :: _) ->
+                                | Error (Unavailable_protocol {protocol; _} :: _)
+                                  ->
                                     let* _ =
                                       Protocol_validator
                                       .fetch_and_compile_protocol
@@ -360,15 +360,15 @@ let on_completion :
  fun w request v st ->
   let open Lwt_syntax in
   match (request, v) with
-  | (Request.Request_validation {hash; _}, Already_commited) ->
+  | Request.Request_validation {hash; _}, Already_commited ->
       Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
       let* () = Worker.log_event w (Previously_validated hash) in
       Lwt.return_unit
-  | (Request.Request_validation {hash; _}, Outdated_block) ->
+  | Request.Request_validation {hash; _}, Outdated_block ->
       Prometheus.Counter.inc_one metrics.outdated_blocks_count ;
       let* () = Worker.log_event w (Previously_validated hash) in
       Lwt.return_unit
-  | (Request.Request_validation _, Validated) -> (
+  | Request.Request_validation _, Validated -> (
       let () =
         Shell_metrics.Worker.update metrics.validation_worker_metrics st
       in
@@ -376,7 +376,7 @@ let on_completion :
       match Request.view request with
       | Validation v -> Worker.log_event w (Validation_success (v, st))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_validation _, Validation_error errs) -> (
+  | Request.Request_validation _, Validation_error errs -> (
       let () =
         Shell_metrics.Worker.update metrics.validation_worker_metrics st
       in
@@ -385,19 +385,19 @@ let on_completion :
       | Validation v ->
           Worker.log_event w (Event.Validation_failure (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_preapplication _, Preapplied _) -> (
+  | Request.Request_preapplication _, Preapplied _ -> (
       Prometheus.Counter.inc_one metrics.preapplied_blocks_count ;
       match Request.view request with
       | Preapplication v ->
           Worker.log_event w (Event.Preapplication_success (v, st))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_preapplication _, Preapplication_error errs) -> (
+  | Request.Request_preapplication _, Preapplication_error errs -> (
       Prometheus.Counter.inc_one metrics.preapplication_errors_count ;
       match Request.view request with
       | Preapplication v ->
           Worker.log_event w (Event.Preapplication_failure (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_validation _, Validation_error_after_precheck errs) -> (
+  | Request.Request_validation _, Validation_error_after_precheck errs -> (
       let () =
         Shell_metrics.Worker.update metrics.validation_worker_metrics st
       in
@@ -408,7 +408,7 @@ let on_completion :
             w
             (Event.Validation_failure_after_precheck (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_validation _, Precheck_failed errs) -> (
+  | Request.Request_validation _, Precheck_failed errs -> (
       let () =
         Shell_metrics.Worker.update metrics.validation_worker_metrics st
       in

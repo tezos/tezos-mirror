@@ -41,7 +41,7 @@ open Store_errors
 
    - We suppose that the stores have not been modified outside of the
    store.
- *)
+*)
 
 (* [check_cementing_highwatermark ~chain_dir block_store] checks that
    the cementing_highwatermark is consistent with the cemented
@@ -53,18 +53,18 @@ let check_cementing_highwatermark ~cementing_highwatermark block_store =
     Cemented_block_store.get_highest_cemented_level cemented_store
   in
   match (highest_cemented_level, cementing_highwatermark) with
-  | (Some highest_cemented_level, Some cementing_highwatermark) ->
+  | Some highest_cemented_level, Some cementing_highwatermark ->
       fail_unless
         (Int32.equal highest_cemented_level cementing_highwatermark)
         (Inconsistent_cementing_highwatermark
            {highest_cemented_level; cementing_highwatermark})
-  | (Some _, None) ->
+  | Some _, None ->
       (* Can be the case after a snapshot import *)
       return_unit
-  | (None, Some _) ->
+  | None, Some _ ->
       (* Can be the case in Rolling 0 *)
       return_unit
-  | (None, None) -> return_unit
+  | None, None -> return_unit
 
 let is_block_stored block_store (descriptor, expected_metadata, block_name) =
   let open Lwt_result_syntax in
@@ -94,7 +94,7 @@ let check_protocol_levels block_store ~caboose protocol_levels =
   let open Lwt_result_syntax in
   Protocol_levels.iter_es
     (fun proto_level
-         {Protocol_levels.block = (hash, activation_level); protocol; _} ->
+         {Protocol_levels.block = hash, activation_level; protocol; _} ->
       if Compare.Int32.(activation_level < snd caboose) then
         (* Cannot say anything *)
         return_unit
@@ -238,7 +238,7 @@ let check_consistency chain_dir genesis =
 let fix_floating_stores chain_dir =
   let open Lwt_result_syntax in
   let store_kinds = [Floating_block_store.RO; RW; RW_TMP; RO_TMP] in
-  let*! (existing_floating_stores, incomplete_floating_stores) =
+  let*! existing_floating_stores, incomplete_floating_stores =
     List.partition_s
       (fun kind -> Floating_block_store.all_files_exists chain_dir kind)
       store_kinds
@@ -441,19 +441,18 @@ let lowest_floating_blocks floating_stores =
            in
            let lowest_block_with_metadata =
              match (last_min_with_metadata, Block_repr.metadata block) with
-             | (Some last_min_with_metadata, Some _) ->
+             | Some last_min_with_metadata, Some _ ->
                  Some (min last_min_with_metadata (Block_repr.level block))
-             | (Some last_min_with_metadata, None) ->
-                 Some last_min_with_metadata
-             | (None, Some _) -> Some (Block_repr.level block)
-             | (None, None) -> None
+             | Some last_min_with_metadata, None -> Some last_min_with_metadata
+             | None, Some _ -> Some (Block_repr.level block)
+             | None, None -> None
            in
            return (lowest_block, lowest_block_with_metadata))
          (None, None))
       floating_stores
   in
   let min l = List.fold_left (Option.merge min) None l in
-  let (lw, lwm) = List.split l in
+  let lw, lwm = List.split l in
   (* If we have failed getting a block with metadata from both the
      RO and RW floating stores, then it is not possible to determine
      a savepoint. The store is broken. *)
@@ -532,13 +531,13 @@ let infer_savepoint_and_caboose chain_dir block_store =
   let cemented_caboose_candidate = lowest_cemented_block cemented_block_files in
   let floating_stores = Block_store.floating_block_stores block_store in
   match (cemented_savepoint_candidate, cemented_caboose_candidate) with
-  | (Some cemented_savepoint, Some caboose) ->
+  | Some cemented_savepoint, Some caboose ->
       (* Cemented candidates are available. However, we must check
          that the lowest block with metadata from the floating store
          is not lower than the cemented candidate and thus, a better
          candidate. It can be the case when [checkpoint_level -
          max_op_ttl < lowest_cemented_level_with_metadata]. *)
-      let* (_, lowest_floating_with_metadata) =
+      let* _, lowest_floating_with_metadata =
         lowest_floating_blocks floating_stores
       in
       let sp =
@@ -551,10 +550,10 @@ let infer_savepoint_and_caboose chain_dir block_store =
         | None -> cemented_savepoint
       in
       return (sp, caboose)
-  | (None, Some caboose_level) ->
+  | None, Some caboose_level ->
       (* No cemented cycle with metadata but some cycles. Search for
          the savepoint in the floating blocks. *)
-      let* (_, lowest_floating_with_metadata) =
+      let* _, lowest_floating_with_metadata =
         lowest_floating_blocks floating_stores
       in
       let* savepoint_level =
@@ -563,10 +562,10 @@ let infer_savepoint_and_caboose chain_dir block_store =
         | None -> tzfail (Corrupted_store Cannot_find_floating_savepoint)
       in
       return (savepoint_level, caboose_level)
-  | (None, None) ->
+  | None, None ->
       (* No cycle found. Searching for savepoint and caboose in the
          floating block store.*)
-      let* (lowest_floating, lowest_floating_with_metadata) =
+      let* lowest_floating, lowest_floating_with_metadata =
         lowest_floating_blocks floating_stores
       in
       let* savepoint_level =
@@ -580,7 +579,7 @@ let infer_savepoint_and_caboose chain_dir block_store =
         | None -> tzfail (Corrupted_store Cannot_find_floating_caboose)
       in
       return (savepoint_level, caboose_level)
-  | (Some _, None) ->
+  | Some _, None ->
       (* Inconsistent as a cemented cycle with metadata implies that
          the caboose candidate is known. *)
       assert false
@@ -618,7 +617,7 @@ let fix_savepoint_and_caboose ?history_mode chain_dir block_store head genesis =
       let genesis_descr = Block_repr.descriptor genesis_block in
       return (genesis_descr, genesis_descr)
   | None | Some (Full _) | Some (Rolling _) ->
-      let* (savepoint_level, caboose_level) =
+      let* savepoint_level, caboose_level =
         infer_savepoint_and_caboose chain_dir block_store
       in
       let* savepoint =
@@ -860,7 +859,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
   let* highest_cemented_proto_level =
     match cemented_protocol_levels with
     | [] -> return 0
-    | (_, {block = (_, block_level); _}) :: _ ->
+    | (_, {block = _, block_level; _}) :: _ ->
         let* block_o =
           Cemented_block_store.get_cemented_block_by_level
             ~read_metadata:false
@@ -1070,7 +1069,7 @@ let fix_chain_state chain_dir block_store ~head ~cementing_highwatermark
   (* For archive mode, do not update the savepoint/caboose to the
      inferred ones if they are breaking the invariants (savepoint =
      caboose = genesis). *)
-  let* (savepoint, caboose) =
+  let* savepoint, caboose =
     match chain_config.history_mode with
     | History_mode.Archive ->
         if snd tmp_savepoint = 0l && snd tmp_caboose = 0l then
@@ -1231,7 +1230,7 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
   let*! cementing_highwatermark =
     fix_cementing_highwatermark chain_dir block_store
   in
-  let* (savepoint, caboose) =
+  let* savepoint, caboose =
     fix_savepoint_and_caboose chain_dir block_store head genesis
   in
   let* checkpoint = fix_checkpoint chain_dir block_store head in

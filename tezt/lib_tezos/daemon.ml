@@ -332,7 +332,7 @@ module Make (X : PARAMETERS) = struct
     unit
 
   let wait_for_full ?where daemon name filter =
-    let (promise, resolver) = Lwt.task () in
+    let promise, resolver = Lwt.task () in
     let current_events =
       String_map.find_opt name daemon.one_shot_event_handlers
       |> Option.value ~default:[]
@@ -389,8 +389,8 @@ module Make (X : PARAMETERS) = struct
         let* perf = Process.program_path "perf" in
         let* heaptrack_print = Process.program_path "heaptrack_print" in
         match (perf, heaptrack_print) with
-        | (None, _) | (_, None) -> cannot_observe
-        | (Some perf, Some heaptrack_print) -> (
+        | None, _ | _, None -> cannot_observe
+        | Some perf, Some heaptrack_print -> (
             try
               let pid = Process.pid process |> string_of_int in
               let get_trace =

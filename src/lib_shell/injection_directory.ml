@@ -37,7 +37,7 @@ let read_chain_id validator chain =
 let inject_block validator ?force ?chain bytes operations =
   let open Lwt_result_syntax in
   let*! chain_id = read_chain_id validator chain in
-  let* (hash, block) =
+  let* hash, block =
     Validator.validate_block validator ?force ?chain_id bytes operations
   in
   return
@@ -85,14 +85,14 @@ let build_rpc_directory validator =
     dir := RPC_directory.register !dir s (fun () p q -> f p q)
   in
   let inject_operation ~force q contents =
-    let*! (hash, wait) =
+    let*! hash, wait =
       inject_operation validator ~force ?chain:q#chain contents
     in
     let* () = if q#async then return_unit else wait in
     return hash
   in
   register0 Injection_services.S.block (fun q (raw, operations) ->
-      let* (hash, wait) =
+      let* hash, wait =
         inject_block validator ?chain:q#chain ~force:q#force raw operations
       in
       let* () = if q#async then return_unit else wait in
@@ -102,7 +102,7 @@ let build_rpc_directory validator =
     Injection_services.S.private_operation
     (inject_operation ~force:true) ;
   register0 Injection_services.S.protocol (fun q protocol ->
-      let*! (hash, wait) = inject_protocol state protocol in
+      let*! hash, wait = inject_protocol state protocol in
       let* () = if q#async then return_unit else wait in
       return hash) ;
   !dir

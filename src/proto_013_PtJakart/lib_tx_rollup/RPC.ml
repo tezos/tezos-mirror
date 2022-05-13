@@ -258,7 +258,7 @@ module Block = struct
             let open Inbox in
             let inbox = block.inbox in
             let index = state.context_index in
-            let* (prev_ctxt, message) =
+            let* prev_ctxt, message =
               if message_pos = 0 then
                 (* We must take the block predecessor context *)
                 let*? message =
@@ -290,7 +290,7 @@ module Block = struct
                           L2block.Hash.pp
                           hash)
               else
-                let*? (pred_message, message) =
+                let*? pred_message, message =
                   match List.drop_n (message_pos - 1) inbox.contents with
                   | pred_message :: message :: _ -> ok (pred_message, message)
                   | _ ->
@@ -310,7 +310,7 @@ module Block = struct
                       .tx_rollup_max_withdrawals_per_batch;
                 }
             in
-            let* (proof, _) =
+            let* proof, _ =
               Prover_apply.apply_message prev_ctxt l2_parameters message.message
             in
             return_some proof)
@@ -474,8 +474,8 @@ module Context_RPC = struct
     let* ticket_id = get_ticket_index c ticket in
     let* address_id = get_address_index c address in
     match (ticket_id, address_id) with
-    | (None, _) | (_, None) -> return Tx_rollup_l2_qty.zero
-    | (Some ticket_id, Some address_id) ->
+    | None, _ | _, None -> return Tx_rollup_l2_qty.zero
+    | Some ticket_id, Some address_id ->
         Context.Ticket_ledger.get c ticket_id address_id
 
   let () =
@@ -627,7 +627,7 @@ let launch ~host ~acl ~node ~dir () =
 let start configuration state =
   let open Lwt_result_syntax in
   let Configuration.{rpc_addr; _} = configuration in
-  let (host, rpc_port) = rpc_addr in
+  let host, rpc_port = rpc_addr in
   let host = P2p_addr.to_string host in
   let dir = register state in
   let node = `TCP (`Port rpc_port) in

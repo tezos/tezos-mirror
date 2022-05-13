@@ -76,7 +76,7 @@ let pp fmt =
   function
   | Batch str ->
       let subsize = 10 in
-      let (str, ellipsis) =
+      let str, ellipsis =
         if Compare.Int.(subsize < String.length str) then
           let substring = String.sub str 0 subsize in
           (substring, "...")

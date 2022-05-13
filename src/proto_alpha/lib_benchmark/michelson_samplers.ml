@@ -372,21 +372,21 @@ end)
       else
         bind (uniform all_non_atomic_type_names) @@ function
         | `TPair -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
             match pair_t (-1) left right with
             | Error _ -> assert false
             | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TLambda -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty domain) = m_type ~size:lsize in
             let* (Ex_ty range) = m_type ~size:rsize in
             match lambda_t (-1) domain range with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TUnion -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
             match union_t (-1) left right with
@@ -398,7 +398,7 @@ end)
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TMap -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_comparable_ty key) = m_comparable_type ~size:lsize in
             let* (Ex_ty elt) = m_type ~size:rsize in
             match map_t (-1) key elt with
@@ -520,7 +520,7 @@ end)
       let seed =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
       in
-      let (_pkh, public_key, _secret_key) = Bls.generate_key ~seed () in
+      let _pkh, public_key, _secret_key = Bls.generate_key ~seed () in
       Tx_rollup_l2_address.Indexable.value
         (Tx_rollup_l2_address.of_bls_pk public_key)
 
@@ -601,7 +601,7 @@ end)
         =
      fun elt_type ->
       let open M in
-      let* (length, elements) =
+      let* length, elements =
         Structure_samplers.list
           ~range:P.parameters.list_size
           ~sampler:(value elt_type)
@@ -615,7 +615,7 @@ end)
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
      fun elt_ty ->
       let open M in
-      let* (_, elements) =
+      let* _, elements =
         Structure_samplers.list
           ~range:P.parameters.set_size
           ~sampler:(value elt_ty)

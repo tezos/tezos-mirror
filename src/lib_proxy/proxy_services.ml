@@ -175,7 +175,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
     chain block =
   let open Lwt_syntax in
   match (mode, raw_hash_of_block block) with
-  | (Light_client _, _) | (Proxy_client, _) | (_, Some _) ->
+  | Light_client _, _ | Proxy_client, _ | _, Some _ ->
       (* - If tezos-client executes: don't clear anything, because the client
            is short-lived and should not observe chain reorganization
          - If raw_hash_of_blocks returns [Some]: don't clear anything, because
@@ -183,8 +183,8 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
            Remember that contexts are kept in an LRU cache though, so clearing
            will eventually happen; but we don't schedule it. *)
       Lwt.return_unit
-  | (Proxy_server {sleep; sym_block_caching_time; _}, _) ->
-      let (chain_string, block_string) =
+  | Proxy_server {sleep; sym_block_caching_time; _}, _ ->
+      let chain_string, block_string =
         Tezos_shell_services.Block_services.
           (chain_to_string chain, to_string block)
       in
@@ -276,7 +276,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
             let (module C) =
               Light_core.get_core (module Proxy_environment) printer sources
             in
-            let (chain_string, block_string) =
+            let chain_string, block_string =
               Tezos_shell_services.Block_services.
                 (chain_to_string chain, to_string block)
             in
@@ -309,7 +309,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
   let get_env_rpc_context chain block =
     let open Lwt_result_syntax in
     let* block_hash_opt = B2H.hash_of_block rpc_context chain block in
-    let (block_key, (fill_b2h : Block_hash.t -> unit)) =
+    let block_key, (fill_b2h : Block_hash.t -> unit) =
       match block_hash_opt with
       | None -> (block, fun block_hash -> B2H.add chain block block_hash)
       | Some block_hash -> (`Hash (block_hash, 0), ignore)

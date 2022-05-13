@@ -523,15 +523,13 @@ module Make (Proto : Registered_protocol.T) = struct
             ~cache
             block_header [@time.duration_lwt application_beginning])
        in
-       let* (state, ops_metadata) =
+       let* state, ops_metadata =
          (List.fold_left_es
             (fun (state, acc) ops ->
-              let* (state, ops_metadata) =
+              let* state, ops_metadata =
                 List.fold_left_es
                   (fun (state, acc) op ->
-                    let* (state, op_metadata) =
-                      Proto.apply_operation state op
-                    in
+                    let* state, op_metadata = Proto.apply_operation state op in
                     return (state, op_metadata :: acc))
                   (state, [])
                   ops
@@ -541,7 +539,7 @@ module Make (Proto : Registered_protocol.T) = struct
             operations [@time.duration_lwt operations_application])
        in
        let ops_metadata = List.rev ops_metadata in
-       let* (validation_result, block_data) =
+       let* validation_result, block_data =
          (Proto.finalize_block
             state
             (Some block_header.shell) [@time.duration_lwt block_finalization])
@@ -620,7 +618,7 @@ module Make (Proto : Registered_protocol.T) = struct
             predecessor_context
             predecessor_hash
         in
-        let* (validation_result, block_metadata, ops_metadata) =
+        let* validation_result, block_metadata, ops_metadata =
           proto_apply_operations
             chain_id
             context
@@ -668,7 +666,7 @@ module Make (Proto : Registered_protocol.T) = struct
                     found = validation_result.fitness;
                   }))
         in
-        let* (validation_result, new_protocol_env_version) =
+        let* validation_result, new_protocol_env_version =
           may_init_new_protocol
             new_protocol
             block_header
@@ -681,7 +679,7 @@ module Make (Proto : Registered_protocol.T) = struct
             (min (max_operations_ttl + 1) validation_result.max_operations_ttl)
         in
         let validation_result = {validation_result with max_operations_ttl} in
-        let* (block_metadata, ops_metadata) =
+        let* block_metadata, ops_metadata =
           compute_metadata
             ~operation_metadata_size_limit
             new_protocol_env_version
@@ -735,7 +733,7 @@ module Make (Proto : Registered_protocol.T) = struct
         predecessor_hash
     in
     let* operations = parse_operations block_hash operations in
-    let* (validation_result, block_metadata, ops_metadata) =
+    let* validation_result, block_metadata, ops_metadata =
       proto_apply_operations
         chain_id
         context
@@ -747,7 +745,7 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     let context = Shell_context.unwrap_disk_context validation_result.context in
     let*! new_protocol = Context.get_protocol context in
-    let* (_validation_result, new_protocol_env_version) =
+    let* _validation_result, new_protocol_env_version =
       may_init_new_protocol
         new_protocol
         block_header
@@ -918,7 +916,7 @@ module Make (Proto : Registered_protocol.T) = struct
                receipts,
                acc_validation_state )
              operations ->
-          let*! (new_validation_result, new_validation_state, rev_receipts) =
+          let*! new_validation_result, new_validation_state, rev_receipts =
             List.fold_left_s
               (fun (acc_validation_result, acc_validation_state, receipts) op ->
                 match parse op with
@@ -974,7 +972,7 @@ module Make (Proto : Registered_protocol.T) = struct
         fitness = [];
       }
     in
-    let* (validation_result, block_header_metadata) =
+    let* validation_result, block_header_metadata =
       Proto.finalize_block preapply_state.state (Some shell_header)
     in
     let*! validation_result =
@@ -995,7 +993,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let shell_header : Block_header.shell_header =
       {shell_header with proto_level; fitness = validation_result.fitness}
     in
-    let* (validation_result, cache, new_protocol_env_version) =
+    let* validation_result, cache, new_protocol_env_version =
       if Protocol_hash.equal protocol Proto.hash then
         let (Environment_context.Context.Context {cache; _}) =
           validation_result.context
@@ -1034,7 +1032,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let preapply_result =
       ({shell_header with context = context_hash}, validation_result_list)
     in
-    let* (block_metadata, ops_metadata) =
+    let* block_metadata, ops_metadata =
       compute_metadata
         ~operation_metadata_size_limit
         new_protocol_env_version
@@ -1094,14 +1092,14 @@ module Make (Proto : Registered_protocol.T) = struct
         (fun state ops ->
           List.fold_left_es
             (fun state op ->
-              let* (state, _op_metadata) = Proto.apply_operation state op in
+              let* state, _op_metadata = Proto.apply_operation state op in
               return state)
             state
             ops)
         state
         operations
     in
-    let* (_validation_result, _block_data) = Proto.finalize_block state None in
+    let* _validation_result, _block_data = Proto.finalize_block state None in
     return_unit
 
   let precheck chain_id ~(predecessor_block_header : Block_header.t)

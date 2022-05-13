@@ -243,7 +243,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
       Event.(emit disabled_config_validation) ()
     else Lwt.return_unit
   in
-  let* (discovery_addr, discovery_port) =
+  let* discovery_addr, discovery_port =
     match config.p2p.discovery_addr with
     | None ->
         let*! () = Event.(emit disabled_discovery_addr) () in
@@ -254,7 +254,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         | [] -> failwith "Cannot resolve P2P discovery address: %S" addr
         | (addr, port) :: _ -> return (Some addr, Some port))
   in
-  let* (listening_addr, listening_port) =
+  let* listening_addr, listening_port =
     match config.p2p.listen_addr with
     | None ->
         let*! () = Event.(emit disabled_listen_addr) () in
@@ -267,11 +267,11 @@ let init_node ?sandbox ?target ~identity ~singleprocess
   in
   let* p2p_config =
     match (listening_addr, sandbox) with
-    | (Some addr, Some _) when Ipaddr.V6.(compare addr unspecified) = 0 ->
+    | Some addr, Some _ when Ipaddr.V6.(compare addr unspecified) = 0 ->
         return_none
-    | (Some addr, Some _) when not (Ipaddr.V6.is_private addr) ->
+    | Some addr, Some _ when not (Ipaddr.V6.is_private addr) ->
         tzfail (Non_private_sandbox addr)
-    | (None, Some _) -> return_none
+    | None, Some _ -> return_none
     | _ ->
         let* trusted_points =
           Node_config_file.resolve_bootstrap_addrs
@@ -302,10 +302,10 @@ let init_node ?sandbox ?target ~identity ~singleprocess
   in
   let* sandbox_param =
     match (config.blockchain_network.genesis_parameters, sandbox) with
-    | (None, None) -> return_none
-    | (Some parameters, None) ->
+    | None, None -> return_none
+    | Some parameters, None ->
         return_some (parameters.context_key, parameters.values)
-    | (_, Some filename) ->
+    | _, Some filename ->
         let* json =
           trace (Invalid_sandbox_file filename)
           @@ Lwt_utils_unix.Json.read_file filename
@@ -727,8 +727,8 @@ module Manpage = struct
       `P
         ("The environment variable $(b,TEZOS_LOG) is used to fine-tune what is \
           going to be logged. The syntax is \
-          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
-          one of $(i," ^ log_sections
+          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is one \
+          of $(i," ^ log_sections
        ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
           $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
           wildcard in sections, i.e. $(b, node* -> debug). The rules are \

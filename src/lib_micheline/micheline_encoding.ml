@@ -180,7 +180,7 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                       (req "annots" annots_encoding))
                    (function
                      | Prim (_, v, [], annots) -> Some (v, annots) | _ -> None)
-                   (function (prim, annots) -> Prim (0, prim, [], annots));
+                   (function prim, annots -> Prim (0, prim, [], annots));
                  (* Single arg, no annots *)
                  case
                    (Tag 5)
@@ -189,7 +189,7 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                    (obj2 (req "prim" prim_encoding) (req "arg" expr_encoding))
                    (function
                      | Prim (_, v, [arg], []) -> Some (v, arg) | _ -> None)
-                   (function (prim, arg) -> Prim (0, prim, [arg], []));
+                   (function prim, arg -> Prim (0, prim, [arg], []));
                  (* Single arg, with annots *)
                  case
                    (Tag 6)
@@ -259,8 +259,8 @@ let table_encoding ~variant location_encoding prim_encoding =
   let open Data_encoding in
   conv
     (fun node ->
-      let (canon, assoc) = extract_locations node in
-      let (_, table) = List.split assoc in
+      let canon, assoc = extract_locations node in
+      let _, table = List.split assoc in
       (canon, table))
     (fun (canon, table) ->
       let table = Array.of_list table in

@@ -478,8 +478,7 @@ let () =
     ~pp:(fun ppf contract ->
       Format.fprintf
         ppf
-        "Transactions of 0ꜩ towards a contract without code are forbidden \
-         (%a)."
+        "Transactions of 0ꜩ towards a contract without code are forbidden (%a)."
         Contract.pp
         contract)
     Data_encoding.(obj1 (req "contract" Contract.encoding))
@@ -996,12 +995,12 @@ let ex_ticket_size :
   Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
   Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt ty
   >>?= fun (ty', ctxt) ->
-  let (ty_nodes, ty_size) = Script_typed_ir_size.node_size ty' in
+  let ty_nodes, ty_size = Script_typed_ir_size.node_size ty' in
   let ty_size = Saturation_repr.to_int ty_size in
   let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
   Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
   (* contents *)
-  let (val_nodes, val_size) = Script_typed_ir_size.value_size ty ticket in
+  let val_nodes, val_size = Script_typed_ir_size.value_size ty ticket in
   let val_size = Saturation_repr.to_int val_size in
   let val_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:val_nodes in
   Gas.consume ctxt val_size_cost >>?= fun ctxt ->
@@ -1027,7 +1026,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
     (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
        {payload_size = ticket_size; limit})
   >>=? fun () ->
-  let (ex_token, ticket_amount) =
+  let ex_token, ticket_amount =
     Ticket_token.token_and_amount_of_ex_ticket ex_ticket
   in
   Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
@@ -1041,7 +1040,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
     Tx_rollup_l2_qty.(ticket_amount <= zero)
     Forbidden_zero_ticket_quantity
   >>?= fun () ->
-  let (deposit, message_size) =
+  let deposit, message_size =
     Tx_rollup_message.make_deposit
       payer
       l2_destination
@@ -1471,7 +1470,7 @@ let apply_external_manager_operation_content :
          letting the client automatically set an appropriate storage limit.
          TODO : is this concern still honored by the token management
          refactoring ? *)
-      let (ctxt, paid_size) =
+      let ctxt, paid_size =
         Fees.record_global_constant_storage_space ctxt size
       in
       let result =
@@ -1523,7 +1522,7 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [])
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
-      let (message, message_size) = Tx_rollup_message.make_batch content in
+      let message, message_size = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_inbox.append_message ctxt tx_rollup state message
       >>=? fun (ctxt, state, paid_storage_size_diff) ->
@@ -1814,12 +1813,12 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
                     (Skipped (Script_typed_ir.manager_kind op.operation)))
                 rest
             in
-            Lwt.return (Failure, List.rev (skipped @ result :: applied))
+            Lwt.return (Failure, List.rev (skipped @ (result :: applied)))
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
               (pack_internal_manager_operation_result op (Applied result)
-               :: applied)
+              :: applied)
               (emitted @ rest))
   in
   apply ctxt [] ops
@@ -1904,7 +1903,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_submit_batch {content; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let size_limit = Constants.tx_rollup_hard_size_limit_per_message ctxt in
-      let (_message, message_size) = Tx_rollup_message.make_batch content in
+      let _message, message_size = Tx_rollup_message.make_batch content in
       Tx_rollup_gas.hash_cost message_size >>?= fun cost ->
       Gas.consume ctxt cost >>?= fun ctxt ->
       fail_unless
@@ -2171,7 +2170,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
         ~chain_id
         internal_operations
       >>= function
-      | (Success ctxt, internal_operations_results) -> (
+      | Success ctxt, internal_operations_results -> (
           burn_storage_fees ctxt operation_results ~storage_limit ~payer:source
           >>= function
           | Ok (ctxt, storage_limit, operation_results) -> (
@@ -2203,7 +2202,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
                 ( Failure,
                   Backtracked (operation_results, Some errors),
                   internal_operations_results ))
-      | (Failure, internal_operations_results) ->
+      | Failure, internal_operations_results ->
           Lwt.return
             (Failure, Applied operation_results, internal_operations_results))
   | Error errors ->
@@ -2392,7 +2391,7 @@ let rec apply_manager_contents_list_rec :
         ~gas_consumed_in_precheck:(Some (Gas.cost_of_gas consumed_gas))
         op
       >>= function
-      | (Failure, operation_result, internal_operation_results) ->
+      | Failure, operation_result, internal_operation_results ->
           let result =
             Manager_operation_result
               {balance_updates; operation_result; internal_operation_results}
@@ -2400,7 +2399,7 @@ let rec apply_manager_contents_list_rec :
           Lwt.return
             ( Failure,
               Cons_result (result, mark_skipped ~payload_producer level rest) )
-      | (Success ctxt, operation_result, internal_operation_results) ->
+      | Success ctxt, operation_result, internal_operation_results ->
           let result =
             Manager_operation_result
               {balance_updates; operation_result; internal_operation_results}
@@ -2466,7 +2465,8 @@ type apply_mode =
       predecessor_level : Level.t;
       predecessor_round : Round.t;
       round : Round.t;
-    } (* Both partial and normal *)
+    }
+    (* Both partial and normal *)
   | Full_construction of {
       predecessor_block : Block_hash.t;
       payload_hash : Block_payload_hash.t;
@@ -2574,7 +2574,7 @@ let compute_expected_consensus_content (type consensus_op_kind)
                     round = predecessor_round;
                   } ))
       | Full_construction {payload_hash; predecessor_block = branch; _} ->
-          let (ctxt', round) =
+          let ctxt', round =
             match Consensus.get_preendorsements_quorum_round ctxt with
             | None ->
                 ( Consensus.set_preendorsements_quorum_round ctxt operation_round,
@@ -2738,7 +2738,7 @@ let check_denunciation_age ctxt kind given_level =
        {kind; level = given_level; last_cycle = last_slashable_cycle})
 
 let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
-  let (already_slashed, punish) =
+  let already_slashed, punish =
     match mistake with
     | `Double_baking ->
         ( Delegate.already_slashed_for_double_baking,
@@ -2778,8 +2778,8 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
         Double_endorsement_evidence_result balance_updates
   in
   match (op1.protocol_data.contents, op2.protocol_data.contents) with
-  | (Single (Preendorsement e1), Single (Preendorsement e2))
-  | (Single (Endorsement e1), Single (Endorsement e2)) ->
+  | Single (Preendorsement e1), Single (Preendorsement e2)
+  | Single (Endorsement e1), Single (Endorsement e2) ->
       let kind = if preendorsement then Preendorsement else Endorsement in
       let op1_hash = Operation.hash op1 in
       let op2_hash = Operation.hash op2 in
@@ -2806,7 +2806,7 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
         (Signature.Public_key_hash.equal delegate1 delegate2)
         (Inconsistent_denunciation {kind; delegate1; delegate2})
       >>=? fun () ->
-      let (delegate_pk, delegate) = (delegate1_pk, delegate1) in
+      let delegate_pk, delegate = (delegate1_pk, delegate1) in
       Operation.check_signature delegate_pk chain_id op1 >>?= fun () ->
       Operation.check_signature delegate_pk chain_id op2 >>?= fun () ->
       punish_delegate
@@ -2849,7 +2849,7 @@ let punish_double_baking ctxt chain_id bh1 bh2 ~payload_producer =
     Signature.Public_key_hash.(delegate1 = delegate2)
     (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
   >>=? fun () ->
-  let (delegate_pk, delegate) = (delegate1_pk, delegate1) in
+  let delegate_pk, delegate = (delegate1_pk, delegate1) in
   Block_header.check_signature bh1 chain_id delegate_pk >>?= fun () ->
   Block_header.check_signature bh2 chain_id delegate_pk >>?= fun () ->
   punish_delegate

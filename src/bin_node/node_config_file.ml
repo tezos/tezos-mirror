@@ -835,7 +835,7 @@ let rpc : rpc Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {cors_origins; cors_headers; listen_addrs; tls; acl; media_type} ->
-      let (cert, key) =
+      let cert, key =
         match tls with
         | None -> (None, None)
         | Some {cert; key} -> (Some cert, Some key)
@@ -858,15 +858,15 @@ let rpc : rpc Data_encoding.t =
            media_type ) ->
       let tls =
         match (cert, key) with
-        | (None, _) | (_, None) -> None
-        | (Some cert, Some key) -> Some {cert; key}
+        | None, _ | _, None -> None
+        | Some cert, Some key -> Some {cert; key}
       in
       let listen_addrs =
         match (listen_addrs, legacy_listen_addr) with
-        | (Some addrs, None) -> addrs
-        | (None, Some addr) -> [addr]
-        | (None, None) -> default_rpc.listen_addrs
-        | (Some _, Some _) ->
+        | Some addrs, None -> addrs
+        | None, Some addr -> [addr]
+        | None, None -> default_rpc.listen_addrs
+        | Some _, Some _ ->
             Stdlib.failwith
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
@@ -1505,9 +1505,9 @@ let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
   | Ok {addr; port; peer_id} ->
       let service_port =
         match (port, default_port) with
-        | (Some port, _) -> port
-        | (None, Some default_port) -> default_port
-        | (None, None) -> default_p2p_port
+        | Some port, _ -> port
+        | None, Some default_port -> default_port
+        | None, None -> default_p2p_port
       in
       let service = string_of_int service_port in
       let node = if addr = "" || addr = "_" then default_addr else addr in

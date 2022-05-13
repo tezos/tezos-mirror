@@ -58,7 +58,7 @@ let setup f ~protocol =
         Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
       ]
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
   in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
@@ -108,7 +108,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   f rollup_address sc_rollup_node configuration_filename
 
 (* TODO: create and insert issue number. Many tests
-can be refactored using test_scenario.*)
+   can be refactored using test_scenario.*)
 let test_scenario {output_file_prefix; variant; tags; description} scenario =
   let output_file _ = output_file_prefix ^ "_" ^ variant in
   let tags = tags @ [variant] in
@@ -151,7 +151,6 @@ let hash (hash, (_ : Sc_rollup_client.commitment)) = hash
    --------------------------------------------
 
    - Rollup addresses are fully determined by operation hashes and origination nonce.
-
 *)
 let test_origination =
   let output_file _ = "sc_rollup_origination" in
@@ -176,7 +175,6 @@ let test_origination =
    ------------------------------
 
    A rollup node has a configuration file that must be initialized.
-
 *)
 let with_fresh_rollup ?(boot_sector = "") f tezos_node tezos_client
     bootstrap1_key =
@@ -241,7 +239,6 @@ let test_rollup_node_configuration =
 
    A running rollup node can be asked the address of the rollup it is
    interacting with.
-
 *)
 let test_rollup_node_running =
   test
@@ -277,7 +274,6 @@ let test_rollup_node_running =
 
    When a rollup node is running, a rollup client can ask this
    node its rollup address.
-
 *)
 let test_rollup_client_gets_address =
   let output_file _ = "sc_rollup_client_gets_address" in
@@ -304,10 +300,10 @@ let test_rollup_client_gets_address =
       return ())
 
 (* Fetching the initial level of a sc rollup
-   -----------------------------------------
+    -----------------------------------------
 
-  We can fetch the level when a smart contract rollup was
-  originated from the context.
+   We can fetch the level when a smart contract rollup was
+   originated from the context.
 *)
 let test_rollup_get_initial_level =
   let output_file _ = "sc_rollup_get_initial_level" in
@@ -339,10 +335,10 @@ let test_rollup_get_initial_level =
         bootstrap)
 
 (* Fetching the last cemented commitment info for a sc rollup
-   ----------------------------------------------------------
+    ----------------------------------------------------------
 
-  We can fetch the hash and level of the last cemented commitment. Initially,
-  this corresponds to `(Sc_rollup.Commitment_hash.zero, origination_level)`.
+   We can fetch the hash and level of the last cemented commitment. Initially,
+   this corresponds to `(Sc_rollup.Commitment_hash.zero, origination_level)`.
 *)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2944
@@ -367,7 +363,7 @@ let test_rollup_get_last_cemented_commitment_hash_with_level =
             ~sc_rollup_address
             client
         in
-        let (hash, level) =
+        let hash, level =
           last_cemented_commitment_hash_with_level lcc_info_json
         in
         (* The hardcoded value of `Sc_rollup.Commitment.zero` is
@@ -463,7 +459,7 @@ let test_rollup_inbox_size =
       ( with_fresh_rollup @@ fun sc_rollup_address _sc_rollup_node _filename ->
         let n = 10 in
         let* () = send_messages n sc_rollup_address client in
-        let* (_, inbox_size) =
+        let* _, inbox_size =
           get_inbox_from_tezos_node sc_rollup_address client
         in
         return
@@ -555,7 +551,7 @@ let test_rollup_inbox_current_messages_hash =
         in
         let open Tezos_crypto.Context_hash in
         (* no messages have been sent *)
-        let* (pristine_hash, _) =
+        let* pristine_hash, _ =
           get_inbox_from_tezos_node sc_rollup_address client
         in
         let* expected = Sc_rollup_inbox.predict_current_messages_hash [] in
@@ -574,7 +570,7 @@ let test_rollup_inbox_current_messages_hash =
         let* () =
           send_message client sc_rollup_address @@ prepare_batch fst_batch
         in
-        let* (fst_batch_hash, _) =
+        let* fst_batch_hash, _ =
           get_inbox_from_tezos_node sc_rollup_address client
         in
         let () =
@@ -609,7 +605,7 @@ let test_rollup_inbox_current_messages_hash =
               (list string)
               ~error_msg:"expected messages:\n%R\nretrieved:\n%L")
         in
-        let* (snd_batch_hash, _) =
+        let* snd_batch_hash, _ =
           get_inbox_from_tezos_node sc_rollup_address client
         in
         let* expected =
@@ -626,7 +622,7 @@ let test_rollup_inbox_current_messages_hash =
            - the hash matches the 'pristine' hash: a.k.a there are no 'current messages'
         *)
         let* () = send_message client sc_rollup_address @@ prepare_batch [] in
-        let* (empty_batch_hash, _) =
+        let* empty_batch_hash, _ =
           get_inbox_from_tezos_node sc_rollup_address client
         in
         let () =
@@ -651,7 +647,6 @@ let test_rollup_inbox_current_messages_hash =
    In addition, this maintenance includes the computation of a Merkle
    tree which must have the same root hash as the one stored by the
    protocol in the context.
-
 *)
 let test_rollup_inbox_of_rollup_node variant scenario =
   let output_file _ = "sc_rollup_inbox_of_rollup_node_" ^ variant in
@@ -798,7 +793,6 @@ let test_rollup_list =
 
    When a rollup node starts, we want to make sure that in the absence of
    messages it will boot into the initial state.
-
 *)
 let test_rollup_node_boots_into_initial_state =
   let go client sc_rollup_address sc_rollup_node =
@@ -847,7 +841,6 @@ let test_rollup_node_boots_into_initial_state =
 
    When the rollup node receives messages, we like to see evidence that the PVM
    has advanced.
-
 *)
 let test_rollup_node_advances_pvm_state =
   let go client sc_rollup_address sc_rollup_node =
@@ -1311,7 +1304,6 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
    -------------------------------------------------------
 
    Originate a rollup with a custom boot sector and check if the RPC returns it.
-
 *)
 let test_rollup_origination_boot_sector =
   let boot_sector = "10 10 10 + +" in
@@ -1347,7 +1339,6 @@ let test_rollup_origination_boot_sector =
 
    Originate 2 rollups with different boot sectors to check if the are
    actually different.
-
 *)
 let test_rollup_node_uses_boot_sector =
   let go_boot client sc_rollup_address sc_rollup_node =
@@ -1410,7 +1401,7 @@ let test_rollup_client_show_address =
     ~tags:["run"; "client"]
     "Shows the address of a registered account"
     (fun protocol ->
-      let* (sc_client, account) = client_with_initial_keys ~protocol in
+      let* sc_client, account = client_with_initial_keys ~protocol in
       let* shown_account =
         Sc_rollup_client.show_address
           ~alias:account.Account.aggregate_alias
@@ -1463,7 +1454,7 @@ let test_rollup_client_list_keys =
     ~tags:["run"; "client"]
     "Lists known aliases in the client"
     (fun protocol ->
-      let* (sc_client, account) = client_with_initial_keys ~protocol in
+      let* sc_client, account = client_with_initial_keys ~protocol in
       let* maybe_keys = Sc_rollup_client.list_keys sc_client in
       let expected_keys =
         [(account.aggregate_alias, account.aggregate_public_key_hash)]

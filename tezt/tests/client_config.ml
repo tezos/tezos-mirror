@@ -36,7 +36,7 @@ let additional_bootstrap_accounts =
     ~title:"additional bootstrap accounts"
     ~tags:["client"; "bootstrap"; "accounts"]
   @@ fun protocol ->
-  let* (_node, client) =
+  let* _node, client =
     Client.init_with_protocol
       ~additional_bootstrap_account_count:2
       `Client

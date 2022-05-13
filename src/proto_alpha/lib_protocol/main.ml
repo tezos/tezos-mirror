@@ -684,48 +684,48 @@ let relative_position_within_block op1 op2 =
   let (Operation_data op1) = op1.protocol_data in
   let (Operation_data op2) = op2.protocol_data in
   match[@coq_match_with_default] (op1.contents, op2.contents) with
-  | (Single (Preendorsement _), Single (Preendorsement _)) -> 0
-  | (Single (Preendorsement _), _) -> -1
-  | (_, Single (Preendorsement _)) -> 1
-  | (Single (Endorsement _), Single (Endorsement _)) -> 0
-  | (Single (Endorsement _), _) -> -1
-  | (_, Single (Endorsement _)) -> 1
-  | (Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _)) -> 0
-  | (_, Single (Seed_nonce_revelation _)) -> 1
-  | (Single (Seed_nonce_revelation _), _) -> -1
+  | Single (Preendorsement _), Single (Preendorsement _) -> 0
+  | Single (Preendorsement _), _ -> -1
+  | _, Single (Preendorsement _) -> 1
+  | Single (Endorsement _), Single (Endorsement _) -> 0
+  | Single (Endorsement _), _ -> -1
+  | _, Single (Endorsement _) -> 1
+  | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
+  | _, Single (Seed_nonce_revelation _) -> 1
+  | Single (Seed_nonce_revelation _), _ -> -1
   | ( Single (Double_preendorsement_evidence _),
       Single (Double_preendorsement_evidence _) ) ->
       0
-  | (_, Single (Double_preendorsement_evidence _)) -> 1
-  | (Single (Double_preendorsement_evidence _), _) -> -1
+  | _, Single (Double_preendorsement_evidence _) -> 1
+  | Single (Double_preendorsement_evidence _), _ -> -1
   | ( Single (Double_endorsement_evidence _),
       Single (Double_endorsement_evidence _) ) ->
       0
-  | (_, Single (Double_endorsement_evidence _)) -> 1
-  | (Single (Double_endorsement_evidence _), _) -> -1
-  | (Single (Double_baking_evidence _), Single (Double_baking_evidence _)) -> 0
-  | (_, Single (Double_baking_evidence _)) -> 1
-  | (Single (Double_baking_evidence _), _) -> -1
-  | (Single (Activate_account _), Single (Activate_account _)) -> 0
-  | (_, Single (Activate_account _)) -> 1
-  | (Single (Activate_account _), _) -> -1
-  | (Single (Proposals _), Single (Proposals _)) -> 0
-  | (_, Single (Proposals _)) -> 1
-  | (Single (Proposals _), _) -> -1
-  | (Single (Ballot _), Single (Ballot _)) -> 0
-  | (_, Single (Ballot _)) -> 1
-  | (Single (Ballot _), _) -> -1
-  | (Single (Failing_noop _), Single (Failing_noop _)) -> 0
-  | (_, Single (Failing_noop _)) -> 1
-  | (Single (Failing_noop _), _) -> -1
+  | _, Single (Double_endorsement_evidence _) -> 1
+  | Single (Double_endorsement_evidence _), _ -> -1
+  | Single (Double_baking_evidence _), Single (Double_baking_evidence _) -> 0
+  | _, Single (Double_baking_evidence _) -> 1
+  | Single (Double_baking_evidence _), _ -> -1
+  | Single (Activate_account _), Single (Activate_account _) -> 0
+  | _, Single (Activate_account _) -> 1
+  | Single (Activate_account _), _ -> -1
+  | Single (Proposals _), Single (Proposals _) -> 0
+  | _, Single (Proposals _) -> 1
+  | Single (Proposals _), _ -> -1
+  | Single (Ballot _), Single (Ballot _) -> 0
+  | _, Single (Ballot _) -> 1
+  | Single (Ballot _), _ -> -1
+  | Single (Failing_noop _), Single (Failing_noop _) -> 0
+  | _, Single (Failing_noop _) -> 1
+  | Single (Failing_noop _), _ -> -1
   (* Manager operations with smaller counter are pre-validated first. *)
-  | (Single (Manager_operation op1), Single (Manager_operation op2)) ->
+  | Single (Manager_operation op1), Single (Manager_operation op2) ->
       Z.compare op1.counter op2.counter
-  | (Cons (Manager_operation op1, _), Single (Manager_operation op2)) ->
+  | Cons (Manager_operation op1, _), Single (Manager_operation op2) ->
       Z.compare op1.counter op2.counter
-  | (Single (Manager_operation op1), Cons (Manager_operation op2, _)) ->
+  | Single (Manager_operation op1), Cons (Manager_operation op2, _) ->
       Z.compare op1.counter op2.counter
-  | (Cons (Manager_operation op1, _), Cons (Manager_operation op2, _)) ->
+  | Cons (Manager_operation op1, _), Cons (Manager_operation op2, _) ->
       Z.compare op1.counter op2.counter
 
 let init ctxt block_header =

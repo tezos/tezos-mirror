@@ -160,7 +160,7 @@ let test_inner_error () =
 
 (* Test that no gas-exhaustion error is produced and that no gas is consumed
    when run in unlimited mode.
- *)
+*)
 let test_unlimited () =
   with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =

@@ -47,7 +47,7 @@ let operation_receipt_encoding = Data_encoding.unit
 
 let operation_data_and_receipt_encoding =
   Data_encoding.conv
-    (function ((), ()) -> ())
+    (function (), () -> ())
     (fun () -> ((), ()))
     Data_encoding.unit
 

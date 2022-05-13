@@ -64,8 +64,8 @@ let almost_full_cache cache ~cache_index =
   match
     (cache_size cache ~cache_index, cache_size_limit cache ~cache_index)
   with
-  | (Some size, Some limit) -> size + entry_size >= limit
-  | (_, _) -> assert false
+  | Some size, Some limit -> size + entry_size >= limit
+  | _, _ -> assert false
 
 let equal_identifiers k1 k2 = identifier_of_key k1 = identifier_of_key k2
 
@@ -142,7 +142,7 @@ let pp_entries =
   Format.pp_print_list pp_entry
 
 let pp_cache fmt cache =
-  let (layout, entries, cache) = cache in
+  let layout, entries, cache = cache in
   Format.fprintf
     fmt
     "(layout: %a, entries: [%a], cache: %a)"
@@ -340,7 +340,7 @@ let check_key_of_identifier_assigns_given_identifier =
 
 *)
 let inserted_entries_are_in get (_, entries, cache) =
-  let (cache, _) = sync cache ~cache_nonce:Bytes.empty in
+  let cache, _ = sync cache ~cache_nonce:Bytes.empty in
   let full_flags = Array.make (number_of_caches cache) false in
   let rec process cache' = function
     | [] -> true
@@ -442,15 +442,15 @@ let update_removes_cached_value (_, entries, cache) =
   List.for_all
     (fun (_, i, k, _) ->
       match (find cache' k, find cache k) with
-      | (None, None) -> true
-      | (Some v, _) ->
+      | None, None -> true
+      | Some v, _ ->
           if selected_for_removal v then
             QCheck.Test.fail_reportf
               "For key %s, got %d, expecting absence\n"
               i
               v
           else true
-      | (None, Some v) ->
+      | None, Some v ->
           if not (selected_for_removal v) then
             QCheck.Test.fail_reportf
               "For key %s, expecting %d, got absence\n"
@@ -493,12 +493,12 @@ let future_cache_expectation_repeats_the_past
   if number_of_caches cache > 1 then true
   else
     let lr_entries = List.rev entries in
-    let (cache, _) = sync cache ~cache_nonce:Bytes.empty in
+    let cache, _ = sync cache ~cache_nonce:Bytes.empty in
     let remove_some_entries n (cache, lr_entries) =
       Utils.fold_n_times
         n
         (fun (cache, lr_entries) ->
-          let (least_recent_entries, lr_entries) =
+          let least_recent_entries, lr_entries =
             List.split_n nb_removals lr_entries
           in
           let cache =
@@ -510,10 +510,10 @@ let future_cache_expectation_repeats_the_past
           (fst (sync cache ~cache_nonce:Bytes.empty), lr_entries))
         (cache, lr_entries)
     in
-    let (cache, lr_entries) = remove_some_entries 10 (cache, lr_entries) in
+    let cache, lr_entries = remove_some_entries 10 (cache, lr_entries) in
     let predicted_cache = future_cache_expectation ~time_in_blocks cache in
     let predicted_size = number_of_keys predicted_cache in
-    let (cache', _) = remove_some_entries time_in_blocks (cache, lr_entries) in
+    let cache', _ = remove_some_entries time_in_blocks (cache, lr_entries) in
     let actual_size = number_of_keys cache' in
     if predicted_size - actual_size > actual_size / 3 then
       QCheck.Test.fail_reportf
@@ -545,11 +545,11 @@ let after_sync_cache_nonce_are_set (entries, cache, fresh_entries) =
   in
   let nonce1 = Bytes.of_string "init" in
   let nonce2 = Bytes.of_string "new" in
-  let (cache, _) = sync cache ~cache_nonce:nonce1 in
+  let cache, _ = sync cache ~cache_nonce:nonce1 in
   if_in_then_has_cache_nonce cache entries nonce1
   &&
   let cache = insert_entries cache fresh_entries in
-  let (cache, _) = sync cache ~cache_nonce:nonce2 in
+  let cache, _ = sync cache ~cache_nonce:nonce2 in
   if_in_then_has_cache_nonce cache fresh_entries nonce2
 
 let check_after_sync_cache_nonce_are_set =
@@ -559,7 +559,7 @@ let check_after_sync_cache_nonce_are_set =
     QCheck.(
       make
         Gen.(
-          let* (_, entries, cache) = gen_cache () in
+          let* _, entries, cache = gen_cache () in
           let* fresh_entries = gen_entries (number_of_caches cache) in
           return (entries, cache, fresh_entries)))
     after_sync_cache_nonce_are_set
@@ -609,7 +609,7 @@ let check_list_keys_returns_entries =
 *)
 
 let key_rank_returns_valid_rank (_, entries, cache) =
-  let (cache, _) = sync cache ~cache_nonce:Bytes.empty in
+  let cache, _ = sync cache ~cache_nonce:Bytes.empty in
   List.for_all
     (fun cache_index ->
       match list_keys cache ~cache_index with
@@ -624,9 +624,9 @@ let key_rank_returns_valid_rank (_, entries, cache) =
                 ( key_rank cache k,
                   position_of_assoc ~equal:equal_identifiers k ks )
               with
-              | (None, None) -> true
-              | (Some rank, Some pos) -> rank = pos
-              | (_, _) -> false)
+              | None, None -> true
+              | Some rank, Some pos -> rank = pos
+              | _, _ -> false)
             entries)
     (0 -- (number_of_caches cache - 1))
 
@@ -651,7 +651,7 @@ let same_cache_keys cache cache' =
 
 let from_cache_with_same_domain_copies (_, _, cache) =
   let open Lwt_result_syntax in
-  let (cache, domain) = sync cache ~cache_nonce:Bytes.empty in
+  let cache, domain = sync cache ~cache_nonce:Bytes.empty in
   let* cache' = from_cache cache domain ~value_of_key:(fun _ -> assert false) in
   return (same_cache_keys cache cache')
 

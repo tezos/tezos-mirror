@@ -1141,7 +1141,7 @@ let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
    | Timestamp_key _ -> Size.timestamp v
    | Address_key _ -> Size.address v
    | Pair_key ((leaf, _), (node, _), _) ->
-       let (lv, rv) = v in
+       let lv, rv = v in
        let size =
          Size.add
            (size_of_comparable_value leaf lv)
@@ -1179,69 +1179,69 @@ let extract_ir_sized_step :
  fun ctxt instr stack ->
   let open Script_typed_ir in
   match (instr, stack) with
-  | (IDrop (_, _), _) -> Instructions.drop
-  | (IDup (_, _), _) -> Instructions.dup
-  | (ISwap (_, _), _) -> Instructions.swap
-  | (IConst (_, _, _), _) -> Instructions.const
-  | (ICons_pair (_, _), _) -> Instructions.cons_pair
-  | (ICar (_, _), _) -> Instructions.car
-  | (ICdr (_, _), _) -> Instructions.cdr
-  | (IUnpair (_, _), _) -> Instructions.unpair
-  | (ICons_some (_, _), _) -> Instructions.cons_some
-  | (ICons_none (_, _), _) -> Instructions.cons_none
-  | (IIf_none _, _) -> Instructions.if_none
-  | (IOpt_map _, _) -> Instructions.opt_map
-  | (ICons_left (_, _), _) -> Instructions.left
-  | (ICons_right (_, _), _) -> Instructions.right
-  | (IIf_left _, _) -> Instructions.if_left
-  | (ICons_list (_, _), _) -> Instructions.cons_list
-  | (INil (_, _), _) -> Instructions.nil
-  | (IIf_cons _, _) -> Instructions.if_cons
-  | (IList_iter (_, _, _), _) -> Instructions.list_iter
-  | (IList_map (_, _, _), _) -> Instructions.list_map
-  | (IList_size (_, _), (list, _)) -> Instructions.list_size (Size.list list)
-  | (IEmpty_set (_, _, _), _) -> Instructions.empty_set
-  | (ISet_iter _, (set, _)) -> Instructions.set_iter (Size.set set)
-  | (ISet_mem (_, _), (v, (set, _))) ->
+  | IDrop (_, _), _ -> Instructions.drop
+  | IDup (_, _), _ -> Instructions.dup
+  | ISwap (_, _), _ -> Instructions.swap
+  | IConst (_, _, _), _ -> Instructions.const
+  | ICons_pair (_, _), _ -> Instructions.cons_pair
+  | ICar (_, _), _ -> Instructions.car
+  | ICdr (_, _), _ -> Instructions.cdr
+  | IUnpair (_, _), _ -> Instructions.unpair
+  | ICons_some (_, _), _ -> Instructions.cons_some
+  | ICons_none (_, _), _ -> Instructions.cons_none
+  | IIf_none _, _ -> Instructions.if_none
+  | IOpt_map _, _ -> Instructions.opt_map
+  | ICons_left (_, _), _ -> Instructions.left
+  | ICons_right (_, _), _ -> Instructions.right
+  | IIf_left _, _ -> Instructions.if_left
+  | ICons_list (_, _), _ -> Instructions.cons_list
+  | INil (_, _), _ -> Instructions.nil
+  | IIf_cons _, _ -> Instructions.if_cons
+  | IList_iter (_, _, _), _ -> Instructions.list_iter
+  | IList_map (_, _, _), _ -> Instructions.list_map
+  | IList_size (_, _), (list, _) -> Instructions.list_size (Size.list list)
+  | IEmpty_set (_, _, _), _ -> Instructions.empty_set
+  | ISet_iter _, (set, _) -> Instructions.set_iter (Size.set set)
+  | ISet_mem (_, _), (v, (set, _)) ->
       let (module S) = set in
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_mem sz (Size.set set)
-  | (ISet_update (_, _), (v, (_flag, (set, _)))) ->
+  | ISet_update (_, _), (v, (_flag, (set, _))) ->
       let (module S) = set in
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_update sz (Size.set set)
-  | (ISet_size (_, _), (set, _)) -> Instructions.set_size (Size.set set)
-  | (IEmpty_map (_, _, _), _) -> Instructions.empty_map
-  | (IMap_map _, (map, _)) -> Instructions.map_map (Size.map map)
-  | (IMap_iter _, (map, _)) -> Instructions.map_iter (Size.map map)
-  | (IMap_mem (_, _), (v, (((module Map) as map), _))) ->
+  | ISet_size (_, _), (set, _) -> Instructions.set_size (Size.set set)
+  | IEmpty_map (_, _, _), _ -> Instructions.empty_map
+  | IMap_map _, (map, _) -> Instructions.map_map (Size.map map)
+  | IMap_iter _, (map, _) -> Instructions.map_iter (Size.map map)
+  | IMap_mem (_, _), (v, (((module Map) as map), _)) ->
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_mem key_size (Size.map map)
-  | (IMap_get (_, _), (v, (((module Map) as map), _))) ->
+  | IMap_get (_, _), (v, (((module Map) as map), _)) ->
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_get key_size (Size.map map)
-  | (IMap_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
+  | IMap_update (_, _), (v, (_elt_opt, (((module Map) as map), _))) ->
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_update key_size (Size.map map)
-  | (IMap_get_and_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
+  | IMap_get_and_update (_, _), (v, (_elt_opt, (((module Map) as map), _))) ->
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_get_and_update key_size (Size.map map)
-  | (IMap_size (_, _), (map, _)) -> Instructions.map_size (Size.map map)
-  | (IEmpty_big_map (_, _, _, _), _) -> Instructions.empty_big_map
-  | (IBig_map_mem (_, _), (v, ({diff = {size; _}; key_type; _}, _))) ->
+  | IMap_size (_, _), (map, _) -> Instructions.map_size (Size.map map)
+  | IEmpty_big_map (_, _, _, _), _ -> Instructions.empty_big_map
+  | IBig_map_mem (_, _), (v, ({diff = {size; _}; key_type; _}, _)) ->
       let key_size = size_of_comparable_value key_type v in
       Instructions.big_map_mem key_size size
-  | (IBig_map_get (_, _), (v, ({diff = {size; _}; key_type; _}, _))) ->
+  | IBig_map_get (_, _), (v, ({diff = {size; _}; key_type; _}, _)) ->
       let key_size = size_of_comparable_value key_type v in
       Instructions.big_map_get key_size size
-  | (IBig_map_update (_, _), (v, (_, ({diff = {size; _}; key_type; _}, _)))) ->
+  | IBig_map_update (_, _), (v, (_, ({diff = {size; _}; key_type; _}, _))) ->
       let key_size = size_of_comparable_value key_type v in
       Instructions.big_map_update key_size size
   | ( IBig_map_get_and_update (_, _),
       (v, (_, ({diff = {size; _}; key_type; _}, _))) ) ->
       let key_size = size_of_comparable_value key_type v in
       Instructions.big_map_get_and_update key_size size
-  | (IConcat_string (_, _), (ss, _)) ->
+  | IConcat_string (_, _), (ss, _) ->
       let list_size = Size.list ss in
       let total_bytes =
         List.fold_left
@@ -1250,109 +1250,109 @@ let extract_ir_sized_step :
           ss.elements
       in
       Instructions.concat_string list_size total_bytes
-  | (IConcat_string_pair (_, _), (s1, (s2, _))) ->
+  | IConcat_string_pair (_, _), (s1, (s2, _)) ->
       Instructions.concat_string_pair
         (Size.script_string s1)
         (Size.script_string s2)
-  | (ISlice_string (_, _), (_off, (_len, (s, _)))) ->
+  | ISlice_string (_, _), (_off, (_len, (s, _))) ->
       Instructions.slice_string (Size.script_string s)
-  | (IString_size (_, _), (s, _)) ->
+  | IString_size (_, _), (s, _) ->
       Instructions.string_size (Size.script_string s)
-  | (IConcat_bytes (_, _), (ss, _)) ->
+  | IConcat_bytes (_, _), (ss, _) ->
       let list_size = Size.list ss in
       let total_bytes =
         List.fold_left (fun x s -> Size.(add x (bytes s))) Size.zero ss.elements
       in
       Instructions.concat_bytes list_size total_bytes
-  | (IConcat_bytes_pair (_, _), (s1, (s2, _))) ->
+  | IConcat_bytes_pair (_, _), (s1, (s2, _)) ->
       Instructions.concat_bytes_pair (Size.bytes s1) (Size.bytes s2)
-  | (ISlice_bytes (_, _), (_off, (_len, (s, _)))) ->
+  | ISlice_bytes (_, _), (_off, (_len, (s, _))) ->
       Instructions.slice_bytes (Size.bytes s)
-  | (IBytes_size (_, _), _) -> Instructions.bytes_size
-  | (IAdd_seconds_to_timestamp (_, _), (s, (t, _))) ->
+  | IBytes_size (_, _), _ -> Instructions.bytes_size
+  | IAdd_seconds_to_timestamp (_, _), (s, (t, _)) ->
       Instructions.add_seconds_to_timestamp (Size.timestamp t) (Size.integer s)
-  | (IAdd_timestamp_to_seconds (_, _), (t, (s, _))) ->
+  | IAdd_timestamp_to_seconds (_, _), (t, (s, _)) ->
       Instructions.add_timestamp_to_seconds (Size.timestamp t) (Size.integer s)
-  | (ISub_timestamp_seconds (_, _), (t, (s, _))) ->
+  | ISub_timestamp_seconds (_, _), (t, (s, _)) ->
       Instructions.sub_timestamp_seconds (Size.timestamp t) (Size.integer s)
-  | (IDiff_timestamps (_, _), (t1, (t2, _))) ->
+  | IDiff_timestamps (_, _), (t1, (t2, _)) ->
       Instructions.diff_timestamps (Size.timestamp t1) (Size.timestamp t2)
-  | (IAdd_tez (_, _), (x, (y, _))) ->
+  | IAdd_tez (_, _), (x, (y, _)) ->
       Instructions.add_tez (Size.mutez x) (Size.mutez y)
-  | (ISub_tez (_, _), (x, (y, _))) ->
+  | ISub_tez (_, _), (x, (y, _)) ->
       Instructions.sub_tez (Size.mutez x) (Size.mutez y)
-  | (ISub_tez_legacy (_, _), (x, (y, _))) ->
+  | ISub_tez_legacy (_, _), (x, (y, _)) ->
       Instructions.sub_tez_legacy (Size.mutez x) (Size.mutez y)
-  | (IMul_teznat (_, _), (x, (y, _))) ->
+  | IMul_teznat (_, _), (x, (y, _)) ->
       Instructions.mul_teznat (Size.mutez x) (Size.integer y)
-  | (IMul_nattez (_, _), (x, (y, _))) ->
+  | IMul_nattez (_, _), (x, (y, _)) ->
       Instructions.mul_nattez (Size.integer x) (Size.mutez y)
-  | (IEdiv_teznat (_, _), (x, (y, _))) ->
+  | IEdiv_teznat (_, _), (x, (y, _)) ->
       Instructions.ediv_teznat (Size.mutez x) (Size.integer y)
-  | (IEdiv_tez (_, _), (x, (y, _))) ->
+  | IEdiv_tez (_, _), (x, (y, _)) ->
       Instructions.ediv_tez (Size.mutez x) (Size.mutez y)
-  | (IOr (_, _), _) -> Instructions.or_
-  | (IAnd (_, _), _) -> Instructions.and_
-  | (IXor (_, _), _) -> Instructions.xor_
-  | (INot (_, _), _) -> Instructions.not_
-  | (IIs_nat (_, _), (x, _)) -> Instructions.is_nat (Size.integer x)
-  | (INeg (_, _), (x, _)) -> Instructions.neg (Size.integer x)
-  | (IAbs_int (_, _), (x, _)) -> Instructions.abs_int (Size.integer x)
-  | (IInt_nat (_, _), (x, _)) -> Instructions.int_nat (Size.integer x)
-  | (IAdd_int (_, _), (x, (y, _))) ->
+  | IOr (_, _), _ -> Instructions.or_
+  | IAnd (_, _), _ -> Instructions.and_
+  | IXor (_, _), _ -> Instructions.xor_
+  | INot (_, _), _ -> Instructions.not_
+  | IIs_nat (_, _), (x, _) -> Instructions.is_nat (Size.integer x)
+  | INeg (_, _), (x, _) -> Instructions.neg (Size.integer x)
+  | IAbs_int (_, _), (x, _) -> Instructions.abs_int (Size.integer x)
+  | IInt_nat (_, _), (x, _) -> Instructions.int_nat (Size.integer x)
+  | IAdd_int (_, _), (x, (y, _)) ->
       Instructions.add_int (Size.integer x) (Size.integer y)
-  | (IAdd_nat (_, _), (x, (y, _))) ->
+  | IAdd_nat (_, _), (x, (y, _)) ->
       Instructions.add_nat (Size.integer x) (Size.integer y)
-  | (ISub_int (_, _), (x, (y, _))) ->
+  | ISub_int (_, _), (x, (y, _)) ->
       Instructions.sub_int (Size.integer x) (Size.integer y)
-  | (IMul_int (_, _), (x, (y, _))) ->
+  | IMul_int (_, _), (x, (y, _)) ->
       Instructions.mul_int (Size.integer x) (Size.integer y)
-  | (IMul_nat (_, _), (x, (y, _))) ->
+  | IMul_nat (_, _), (x, (y, _)) ->
       Instructions.mul_nat (Size.integer x) (Size.integer y)
-  | (IEdiv_int (_, _), (x, (y, _))) ->
+  | IEdiv_int (_, _), (x, (y, _)) ->
       Instructions.ediv_int (Size.integer x) (Size.integer y)
-  | (IEdiv_nat (_, _), (x, (y, _))) ->
+  | IEdiv_nat (_, _), (x, (y, _)) ->
       Instructions.ediv_nat (Size.integer x) (Size.integer y)
-  | (ILsl_nat (_, _), (x, (y, _))) ->
+  | ILsl_nat (_, _), (x, (y, _)) ->
       Instructions.lsl_nat (Size.integer x) (Size.integer y)
-  | (ILsr_nat (_, _), (x, (y, _))) ->
+  | ILsr_nat (_, _), (x, (y, _)) ->
       Instructions.lsr_nat (Size.integer x) (Size.integer y)
-  | (IOr_nat (_, _), (x, (y, _))) ->
+  | IOr_nat (_, _), (x, (y, _)) ->
       Instructions.or_nat (Size.integer x) (Size.integer y)
-  | (IAnd_nat (_, _), (x, (y, _))) ->
+  | IAnd_nat (_, _), (x, (y, _)) ->
       Instructions.and_nat (Size.integer x) (Size.integer y)
-  | (IAnd_int_nat (_, _), (x, (y, _))) ->
+  | IAnd_int_nat (_, _), (x, (y, _)) ->
       Instructions.and_int_nat (Size.integer x) (Size.integer y)
-  | (IXor_nat (_, _), (x, (y, _))) ->
+  | IXor_nat (_, _), (x, (y, _)) ->
       Instructions.xor_nat (Size.integer x) (Size.integer y)
-  | (INot_int (_, _), (x, _)) -> Instructions.not_int (Size.integer x)
-  | (IIf _, _) -> Instructions.if_
-  | (ILoop (_, _, _), _) -> Instructions.loop
-  | (ILoop_left (_, _, _), _) -> Instructions.loop_left
-  | (IDip (_, _, _), _) -> Instructions.dip
-  | (IExec (_, _), _) -> Instructions.exec
-  | (IApply (_, _, _), _) -> Instructions.apply
-  | (ILambda (_, _, _), _) -> Instructions.lambda
-  | (IFailwith (_, _, _), _) -> Instructions.failwith_
-  | (ICompare (_, cmp_ty, _), (a, (b, _))) ->
+  | INot_int (_, _), (x, _) -> Instructions.not_int (Size.integer x)
+  | IIf _, _ -> Instructions.if_
+  | ILoop (_, _, _), _ -> Instructions.loop
+  | ILoop_left (_, _, _), _ -> Instructions.loop_left
+  | IDip (_, _, _), _ -> Instructions.dip
+  | IExec (_, _), _ -> Instructions.exec
+  | IApply (_, _, _), _ -> Instructions.apply
+  | ILambda (_, _, _), _ -> Instructions.lambda
+  | IFailwith (_, _, _), _ -> Instructions.failwith_
+  | ICompare (_, cmp_ty, _), (a, (b, _)) ->
       extract_compare_sized_step cmp_ty a b
-  | (IEq (_, _), _) -> Instructions.eq
-  | (INeq (_, _), _) -> Instructions.neq
-  | (ILt (_, _), _) -> Instructions.lt
-  | (IGt (_, _), _) -> Instructions.gt
-  | (ILe (_, _), _) -> Instructions.le
-  | (IGe (_, _), _) -> Instructions.ge
-  | (IAddress (_, _), _) -> Instructions.address
-  | (IContract (_, _, _, _), _) -> Instructions.contract
-  | (ITransfer_tokens (_, _), _) -> Instructions.transfer_tokens
-  | (IView (_, _, _), _) -> Instructions.view
-  | (IImplicit_account (_, _), _) -> Instructions.implicit_account
-  | (ICreate_contract _, _) -> Instructions.create_contract
-  | (ISet_delegate (_, _), _) -> Instructions.set_delegate
-  | (INow (_, _), _) -> Instructions.now
-  | (IBalance (_, _), _) -> Instructions.balance
-  | (ILevel (_, _), _) -> Instructions.level
-  | (ICheck_signature (_, _), (public_key, (_signature, (message, _)))) -> (
+  | IEq (_, _), _ -> Instructions.eq
+  | INeq (_, _), _ -> Instructions.neq
+  | ILt (_, _), _ -> Instructions.lt
+  | IGt (_, _), _ -> Instructions.gt
+  | ILe (_, _), _ -> Instructions.le
+  | IGe (_, _), _ -> Instructions.ge
+  | IAddress (_, _), _ -> Instructions.address
+  | IContract (_, _, _, _), _ -> Instructions.contract
+  | ITransfer_tokens (_, _), _ -> Instructions.transfer_tokens
+  | IView (_, _, _), _ -> Instructions.view
+  | IImplicit_account (_, _), _ -> Instructions.implicit_account
+  | ICreate_contract _, _ -> Instructions.create_contract
+  | ISet_delegate (_, _), _ -> Instructions.set_delegate
+  | INow (_, _), _ -> Instructions.now
+  | IBalance (_, _), _ -> Instructions.balance
+  | ILevel (_, _), _ -> Instructions.level
+  | ICheck_signature (_, _), (public_key, (_signature, (message, _))) -> (
       match public_key with
       | Signature.Ed25519 _pk ->
           let pk = Size.of_int Ed25519.size in
@@ -1369,69 +1369,69 @@ let extract_ir_sized_step :
           let signature = Size.of_int Signature.size in
           let message = Size.bytes message in
           Instructions.check_signature_p256 pk signature message)
-  | (IHash_key (_, _), _) -> Instructions.hash_key
-  | (IPack (_, ty, _), (v, _)) ->
+  | IHash_key (_, _), _ -> Instructions.hash_key
+  | IPack (_, ty, _), (v, _) ->
       let encoding_size = Size.of_encoded_value ctxt ty v in
       Instructions.pack encoding_size
-  | (IUnpack (_, _, _), _) -> Instructions.unpack
-  | (IBlake2b (_, _), (bytes, _)) -> Instructions.blake2b (Size.bytes bytes)
-  | (ISha256 (_, _), (bytes, _)) -> Instructions.sha256 (Size.bytes bytes)
-  | (ISha512 (_, _), (bytes, _)) -> Instructions.sha512 (Size.bytes bytes)
-  | (ISource (_, _), _) -> Instructions.source
-  | (ISender (_, _), _) -> Instructions.sender
-  | (ISelf (_, _, _, _), _) -> Instructions.self
-  | (ISelf_address (_, _), _) -> Instructions.self_address
-  | (IAmount (_, _), _) -> Instructions.amount
-  | (ISapling_empty_state (_, _, _), _) -> Instructions.sapling_empty_state
-  | (ISapling_verify_update (_, _), (transaction, (_state, _))) ->
+  | IUnpack (_, _, _), _ -> Instructions.unpack
+  | IBlake2b (_, _), (bytes, _) -> Instructions.blake2b (Size.bytes bytes)
+  | ISha256 (_, _), (bytes, _) -> Instructions.sha256 (Size.bytes bytes)
+  | ISha512 (_, _), (bytes, _) -> Instructions.sha512 (Size.bytes bytes)
+  | ISource (_, _), _ -> Instructions.source
+  | ISender (_, _), _ -> Instructions.sender
+  | ISelf (_, _, _, _), _ -> Instructions.self
+  | ISelf_address (_, _), _ -> Instructions.self_address
+  | IAmount (_, _), _ -> Instructions.amount
+  | ISapling_empty_state (_, _, _), _ -> Instructions.sapling_empty_state
+  | ISapling_verify_update (_, _), (transaction, (_state, _)) ->
       let inputs = Size.sapling_transaction_inputs transaction in
       let outputs = Size.sapling_transaction_outputs transaction in
       let state = Size.zero in
       Instructions.sapling_verify_update inputs outputs state
-  | (IDig (_, n, _, _), _) -> Instructions.dig n
-  | (IDug (_, n, _, _), _) -> Instructions.dug n
-  | (IDipn (_, n, _, _, _), _) -> Instructions.dipn n
-  | (IDropn (_, n, _, _), _) -> Instructions.dropn n
-  | (IChainId (_, _), _) -> Instructions.chain_id
-  | (INever _, _) -> .
-  | (IVoting_power (_, _), _) -> Instructions.voting_power
-  | (ITotal_voting_power (_, _), _) -> Instructions.total_voting_power
-  | (IKeccak (_, _), (bytes, _)) -> Instructions.keccak (Size.bytes bytes)
-  | (ISha3 (_, _), (bytes, _)) -> Instructions.sha3 (Size.bytes bytes)
-  | (IAdd_bls12_381_g1 (_, _), _) -> Instructions.add_bls12_381_g1
-  | (IAdd_bls12_381_g2 (_, _), _) -> Instructions.add_bls12_381_g2
-  | (IAdd_bls12_381_fr (_, _), _) -> Instructions.add_bls12_381_fr
-  | (IMul_bls12_381_g1 (_, _), _) -> Instructions.mul_bls12_381_g1
-  | (IMul_bls12_381_g2 (_, _), _) -> Instructions.mul_bls12_381_g2
-  | (IMul_bls12_381_fr (_, _), _) -> Instructions.mul_bls12_381_fr
-  | (IMul_bls12_381_z_fr (_, _), (_fr, (z, _))) ->
+  | IDig (_, n, _, _), _ -> Instructions.dig n
+  | IDug (_, n, _, _), _ -> Instructions.dug n
+  | IDipn (_, n, _, _, _), _ -> Instructions.dipn n
+  | IDropn (_, n, _, _), _ -> Instructions.dropn n
+  | IChainId (_, _), _ -> Instructions.chain_id
+  | INever _, _ -> .
+  | IVoting_power (_, _), _ -> Instructions.voting_power
+  | ITotal_voting_power (_, _), _ -> Instructions.total_voting_power
+  | IKeccak (_, _), (bytes, _) -> Instructions.keccak (Size.bytes bytes)
+  | ISha3 (_, _), (bytes, _) -> Instructions.sha3 (Size.bytes bytes)
+  | IAdd_bls12_381_g1 (_, _), _ -> Instructions.add_bls12_381_g1
+  | IAdd_bls12_381_g2 (_, _), _ -> Instructions.add_bls12_381_g2
+  | IAdd_bls12_381_fr (_, _), _ -> Instructions.add_bls12_381_fr
+  | IMul_bls12_381_g1 (_, _), _ -> Instructions.mul_bls12_381_g1
+  | IMul_bls12_381_g2 (_, _), _ -> Instructions.mul_bls12_381_g2
+  | IMul_bls12_381_fr (_, _), _ -> Instructions.mul_bls12_381_fr
+  | IMul_bls12_381_z_fr (_, _), (_fr, (z, _)) ->
       Instructions.mul_bls12_381_z_fr (Size.integer z)
-  | (IMul_bls12_381_fr_z (_, _), (z, _)) ->
+  | IMul_bls12_381_fr_z (_, _), (z, _) ->
       Instructions.mul_bls12_381_fr_z (Size.integer z)
-  | (IInt_bls12_381_fr (_, _), _) -> Instructions.int_bls12_381_z_fr
-  | (INeg_bls12_381_g1 (_, _), _) -> Instructions.neg_bls12_381_g1
-  | (INeg_bls12_381_g2 (_, _), _) -> Instructions.neg_bls12_381_g2
-  | (INeg_bls12_381_fr (_, _), _) -> Instructions.neg_bls12_381_fr
-  | (IPairing_check_bls12_381 (_, _), (list, _)) ->
+  | IInt_bls12_381_fr (_, _), _ -> Instructions.int_bls12_381_z_fr
+  | INeg_bls12_381_g1 (_, _), _ -> Instructions.neg_bls12_381_g1
+  | INeg_bls12_381_g2 (_, _), _ -> Instructions.neg_bls12_381_g2
+  | INeg_bls12_381_fr (_, _), _ -> Instructions.neg_bls12_381_fr
+  | IPairing_check_bls12_381 (_, _), (list, _) ->
       Instructions.pairing_check_bls12_381 (Size.list list)
-  | (IComb (_, n, _, _), _) -> Instructions.comb (Size.of_int n)
-  | (IUncomb (_, n, _, _), _) -> Instructions.uncomb (Size.of_int n)
-  | (IComb_get (_, n, _, _), _) -> Instructions.comb_get (Size.of_int n)
-  | (IComb_set (_, n, _, _), _) -> Instructions.comb_set (Size.of_int n)
-  | (IDup_n (_, n, _, _), _) -> Instructions.dupn (Size.of_int n)
-  | (ITicket (_, _), _) -> Instructions.ticket
-  | (IRead_ticket (_, _), _) -> Instructions.read_ticket
-  | (ISplit_ticket (_, _), (_ticket, ((amount_a, amount_b), _))) ->
+  | IComb (_, n, _, _), _ -> Instructions.comb (Size.of_int n)
+  | IUncomb (_, n, _, _), _ -> Instructions.uncomb (Size.of_int n)
+  | IComb_get (_, n, _, _), _ -> Instructions.comb_get (Size.of_int n)
+  | IComb_set (_, n, _, _), _ -> Instructions.comb_set (Size.of_int n)
+  | IDup_n (_, n, _, _), _ -> Instructions.dupn (Size.of_int n)
+  | ITicket (_, _), _ -> Instructions.ticket
+  | IRead_ticket (_, _), _ -> Instructions.read_ticket
+  | ISplit_ticket (_, _), (_ticket, ((amount_a, amount_b), _)) ->
       Instructions.split_ticket (Size.integer amount_a) (Size.integer amount_b)
-  | (IJoin_tickets (_, cmp_ty, _), ((ticket1, ticket2), _)) ->
+  | IJoin_tickets (_, cmp_ty, _), ((ticket1, ticket2), _) ->
       let size1 = size_of_comparable_value cmp_ty ticket1.contents in
       let size2 = size_of_comparable_value cmp_ty ticket2.contents in
       let tez1 = Size.integer ticket1.amount in
       let tez2 = Size.integer ticket2.amount in
       Instructions.join_tickets size1 size2 tez1 tez2
-  | (IHalt _, _) -> Instructions.halt
-  | (ILog _, _) -> Instructions.log
-  | (IOpen_chest (_, _), (_, (chest, (time, _)))) ->
+  | IHalt _, _ -> Instructions.halt
+  | ILog _, _ -> Instructions.log
+  | IOpen_chest (_, _), (_, (chest, (time, _))) ->
       let plaintext_size = Timelock.get_plaintext_size chest - 1 in
       let log_time = Z.log2 Z.(one + Script_int_repr.to_zint time) in
       Instructions.open_chest log_time plaintext_size

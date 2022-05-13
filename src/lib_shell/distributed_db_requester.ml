@@ -81,7 +81,7 @@ module Make_raw
     let initial_delay = Request_message.initial_delay
 
     let rec send state gid keys =
-      let (first_keys, keys) = List.split_n Request_message.max_length keys in
+      let first_keys, keys = List.split_n Request_message.max_length keys in
       let msg = Request_message.forge state.data first_keys in
       state.send gid msg ;
       let open Peer_metadata in
@@ -319,7 +319,7 @@ module Raw_operations = struct
         type notified_value = Operation.t list * Operation_list_list_hash.path
 
         let probe (_block, expected_ofs) expected_hash (ops, path) =
-          let (received_hash, received_ofs) =
+          let received_hash, received_ofs =
             Operation_list_list_hash.check_path
               path
               (Operation_list_hash.compute (List.map Operation.hash ops))

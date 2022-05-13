@@ -491,7 +491,7 @@ module MakeHashingScheme (Tree : TREE) :
     if Raw_level_repr.(level < inbox.level) then
       fail (Invalid_level_add_messages level)
     else
-      let (history, inbox) = archive_if_needed history inbox level in
+      let history, inbox = archive_if_needed history inbox level in
       List.fold_left_es
         (fun (messages, inbox) payload ->
           add_message inbox payload messages >>= return)

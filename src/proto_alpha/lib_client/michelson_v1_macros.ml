@@ -122,9 +122,9 @@ let expand_set_caddadr original =
         | _ :: _ -> error (Invalid_arity (str, List.length args, 0)))
         >>? fun () ->
         (match extract_field_annots annot with
-        | ([], annot) -> ok (None, annot)
-        | ([f], annot) -> ok (Some f, annot)
-        | (_, _) -> error (Unexpected_macro_annotation str))
+        | [], annot -> ok (None, annot)
+        | [f], annot -> ok (Some f, annot)
+        | _, _ -> error (Unexpected_macro_annotation str))
         >>? fun (field_annot, annot) ->
         let rec parse i acc =
           if i = 4 then acc
@@ -237,9 +237,9 @@ let expand_map_caddadr original =
         | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1)))
         >>? fun code ->
         (match extract_field_annots annot with
-        | ([], annot) -> ok (None, annot)
-        | ([f], annot) -> ok (Some f, annot)
-        | (_, _) -> error (Unexpected_macro_annotation str))
+        | [], annot -> ok (None, annot)
+        | [f], annot -> ok (Some f, annot)
+        | _, _ -> error (Unexpected_macro_annotation str))
         >>? fun (field_annot, annot) ->
         let rec parse i acc =
           if i = 4 then acc
@@ -383,14 +383,14 @@ let parse_pair_substr str ~len start =
   let rec parse ?left i =
     if i = len - 1 then raise_notrace Not_a_pair
     else if str.[i] = 'P' then
-      let (next_i, l) = parse ~left:true (i + 1) in
-      let (next_i, r) = parse ~left:false next_i in
+      let next_i, l = parse ~left:true (i + 1) in
+      let next_i, r = parse ~left:false next_i in
       (next_i, P (i, l, r))
     else if str.[i] = 'A' && left = Some true then (i + 1, A)
     else if str.[i] = 'I' && left <> Some true then (i + 1, I)
     else raise_notrace Not_a_pair
   in
-  let (last, ast) = parse start in
+  let last, ast = parse start in
   if last <> len - 1 then raise_notrace Not_a_pair else ast
 
 let unparse_pair_item ast =
@@ -405,18 +405,18 @@ let unparse_pair_item ast =
 let pappaiir_annots_pos ast annot =
   let rec find_annots_pos p_pos ast annots acc =
     match (ast, annots) with
-    | (_, []) -> (annots, acc)
-    | (P (i, left, right), _) ->
-        let (annots, acc) = find_annots_pos i left annots acc in
+    | _, [] -> (annots, acc)
+    | P (i, left, right), _ ->
+        let annots, acc = find_annots_pos i left annots acc in
         find_annots_pos i right annots acc
-    | (A, a :: annots) ->
+    | A, a :: annots ->
         let pos =
           match IntMap.find p_pos acc with
           | None -> ([a], [])
           | Some (_, cdr) -> ([a], cdr)
         in
         (annots, IntMap.add p_pos pos acc)
-    | (I, a :: annots) ->
+    | I, a :: annots ->
         let pos =
           match IntMap.find p_pos acc with
           | None -> ([], [a])
@@ -439,7 +439,7 @@ let expand_pappaiir original =
                | _ -> false)
       then
         try
-          let (field_annots, annot) = extract_field_annots annot in
+          let field_annots, annot = extract_field_annots annot in
           let ast = parse_pair_substr str ~len 0 in
           let field_annots_pos = pappaiir_annots_pos ast field_annots in
           let rec parse p (depth, acc) =
@@ -447,13 +447,13 @@ let expand_pappaiir original =
             | P (i, left, right) ->
                 let annot =
                   match (i, IntMap.find i field_annots_pos) with
-                  | (0, None) -> annot
-                  | (_, None) -> []
-                  | (0, Some ([], cdr_annot)) -> "%" :: cdr_annot @ annot
-                  | (_, Some ([], cdr_annot)) -> "%" :: cdr_annot
-                  | (0, Some (car_annot, cdr_annot)) ->
+                  | 0, None -> annot
+                  | _, None -> []
+                  | 0, Some ([], cdr_annot) -> ("%" :: cdr_annot) @ annot
+                  | _, Some ([], cdr_annot) -> "%" :: cdr_annot
+                  | 0, Some (car_annot, cdr_annot) ->
                       car_annot @ cdr_annot @ annot
-                  | (_, Some (car_annot, cdr_annot)) -> car_annot @ cdr_annot
+                  | _, Some (car_annot, cdr_annot) -> car_annot @ cdr_annot
                 in
                 let acc =
                   if depth = 0 then Prim (loc, "PAIR", [], annot) :: acc
@@ -464,7 +464,7 @@ let expand_pappaiir original =
                 (depth, acc) |> parse left |> parse right
             | A | I -> (depth + 1, acc)
           in
-          let (_, expanded) = parse ast (0, []) in
+          let _, expanded = parse ast (0, []) in
           (match args with
           | [] -> ok ()
           | _ :: _ -> error (Invalid_arity (str, List.length args, 0)))
@@ -498,7 +498,7 @@ let expand_unpappaiir original =
                 (depth, acc) |> parse left |> parse right
             | A | I -> (depth + 1, acc)
           in
-          let (_, rev_expanded) = parse ast (0, []) in
+          let _, rev_expanded = parse ast (0, []) in
           let expanded = Seq (loc, List.rev rev_expanded) in
           (match args with
           | [] -> ok ()
@@ -541,8 +541,7 @@ let expand_compare original =
   let cmp loc is annot =
     let is =
       match List.rev_map (fun i -> Prim (loc, i, [], [])) is with
-      | Prim (loc, i, args, _) :: r ->
-          List.rev (Prim (loc, i, args, annot) :: r)
+      | Prim (loc, i, args, _) :: r -> List.rev (Prim (loc, i, args, annot) :: r)
       | is -> List.rev is
     in
     ok (Some (Seq (loc, is)))
@@ -712,7 +711,7 @@ let expand_rec expr =
   let rec error_map (expanded, errors) f = function
     | [] -> (List.rev expanded, List.rev errors)
     | hd :: tl ->
-        let (new_expanded, new_errors) = f hd in
+        let new_expanded, new_errors = f hd in
         error_map
           (new_expanded :: expanded, List.rev_append new_errors errors)
           f
@@ -724,10 +723,10 @@ let expand_rec expr =
     | Ok expanded -> (
         match expanded with
         | Seq (loc, items) ->
-            let (items, errors) = error_map expand_rec items in
+            let items, errors = error_map expand_rec items in
             (Seq (loc, items), errors)
         | Prim (loc, name, args, annot) ->
-            let (args, errors) = error_map expand_rec args in
+            let args, errors = error_map expand_rec args in
             (Prim (loc, name, args, annot), errors)
         | (Int _ | String _ | Bytes _) as atom -> (atom, []))
     | Error errors -> (expr, errors)
@@ -737,7 +736,7 @@ let expand_rec expr =
 let unexpand_carn_and_cdrn expanded =
   match expanded with
   | Seq (loc, [Prim (_, "GET", [Int (locn, n)], annot)]) ->
-      let (half, parity) = Z.ediv_rem n (Z.of_int 2) in
+      let half, parity = Z.ediv_rem n (Z.of_int 2) in
       if Z.(parity = zero) then
         Some (Prim (loc, "CDR", [Int (locn, half)], annot))
       else Some (Prim (loc, "CAR", [Int (locn, half)], annot))
@@ -802,7 +801,7 @@ let unexpand_set_caddadr expanded =
             Prim (_, "SWAP", [], []);
             Prim (_, "PAIR", [], pair_annots);
           ] ) ->
-        let (_, pair_annots) = extract_field_annots pair_annots in
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("A" :: acc) (List.rev_append pair_annots annots) sub
     | Seq
         ( _,
@@ -812,7 +811,7 @@ let unexpand_set_caddadr expanded =
             Prim (_, "CAR", [], _);
             Prim (_, "PAIR", [], pair_annots);
           ] ) ->
-        let (_, pair_annots) = extract_field_annots pair_annots in
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("D" :: acc) (List.rev_append pair_annots annots) sub
     | _ -> None
   in
@@ -879,7 +878,7 @@ let unexpand_map_caddadr expanded =
             Prim (_, "SWAP", [], []);
             Prim (_, "PAIR", [], pair_annots);
           ] ) ->
-        let (_, pair_annots) = extract_field_annots pair_annots in
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("A" :: acc) (List.rev_append pair_annots annots) sub
     | Seq
         ( _,
@@ -889,7 +888,7 @@ let unexpand_map_caddadr expanded =
             Prim (_, "CAR", [], []);
             Prim (_, "PAIR", [], pair_annots);
           ] ) ->
-        let (_, pair_annots) = extract_field_annots pair_annots in
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("D" :: acc) (List.rev_append pair_annots annots) sub
     | _ -> None
   in
@@ -910,7 +909,7 @@ let unexpand_deprecated_dxiiivp expanded =
         | Seq (_, [Prim (_, "DIP", [sub], [])]) -> count (acc + 1) sub
         | sub -> (acc, sub)
       in
-      let (depth, sub) = count 1 sub in
+      let depth, sub = count 1 sub in
       Some (Prim (loc, "DIP", [Int (loc, Z.of_int depth); sub], []))
   | _ -> None
 
@@ -952,46 +951,46 @@ let unexpand_pappaiir expanded =
   | Seq (loc, (_ :: _ as nodes)) -> (
       let rec exec stack nodes =
         match (nodes, stack) with
-        | ([], _) -> stack
+        | [], _ -> stack
         (* support new expansion using [DIP n] *)
         | ( Prim (ploc, "DIP", [Int (loc, n); Seq (sloc, sub)], []) :: rest,
             a :: rstack )
           when Z.to_int n > 1 ->
             exec
               (a
-               ::
-               exec
-                 rstack
-                 [
-                   Prim (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
-                 ])
+              :: exec
+                   rstack
+                   [
+                     Prim
+                       (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
+                   ])
               rest
-        | (Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, a :: rstack)
+        | Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, a :: rstack
           when Z.to_int n = 1 ->
             exec (a :: exec rstack sub) rest
-        | (Prim (ploc, "DIP", [Int (loc, n); Seq (sloc, sub)], []) :: rest, [])
+        | Prim (ploc, "DIP", [Int (loc, n); Seq (sloc, sub)], []) :: rest, []
           when Z.to_int n > 1 ->
             exec
               (A
-               ::
-               exec
-                 []
-                 [
-                   Prim (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
-                 ])
+              :: exec
+                   []
+                   [
+                     Prim
+                       (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
+                   ])
               rest
-        | (Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, [])
+        | Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, []
           when Z.to_int n = 1 ->
             exec (A :: exec [] sub) rest
         (* support old expansion using [DIP] *)
-        | (Prim (_, "DIP", [Seq (_, sub)], []) :: rest, a :: rstack) ->
+        | Prim (_, "DIP", [Seq (_, sub)], []) :: rest, a :: rstack ->
             exec (a :: exec rstack sub) rest
-        | (Prim (_, "DIP", [Seq (_, sub)], []) :: rest, []) ->
+        | Prim (_, "DIP", [Seq (_, sub)], []) :: rest, [] ->
             exec (A :: exec [] sub) rest
-        | (Prim (_, "PAIR", [], []) :: rest, a :: b :: rstack) ->
+        | Prim (_, "PAIR", [], []) :: rest, a :: b :: rstack ->
             exec (P (0, a, b) :: rstack) rest
-        | (Prim (_, "PAIR", [], []) :: rest, [a]) -> exec [P (0, a, I)] rest
-        | (Prim (_, "PAIR", [], []) :: rest, []) -> exec [P (0, A, I)] rest
+        | Prim (_, "PAIR", [], []) :: rest, [a] -> exec [P (0, a, I)] rest
+        | Prim (_, "PAIR", [], []) :: rest, [] -> exec [P (0, A, I)] rest
         | _ -> raise_notrace Not_a_pair
       in
       match exec [] nodes with
@@ -1008,41 +1007,41 @@ let unexpand_unpappaiir expanded =
   | Seq (loc, (_ :: _ as nodes)) -> (
       let rec exec stack nodes =
         match (nodes, stack) with
-        | ([], _) -> stack
+        | [], _ -> stack
         (* support new expansion using [DIP n] *)
         | ( Prim (ploc, "DIP", [Int (loc, n); Seq (sloc, sub)], []) :: rest,
             a :: rstack )
           when Z.to_int n > 1 ->
             exec
               (a
-               ::
-               exec
-                 rstack
-                 [
-                   Prim (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
-                 ])
+              :: exec
+                   rstack
+                   [
+                     Prim
+                       (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
+                   ])
               rest
-        | (Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, a :: rstack)
+        | Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, a :: rstack
           when Z.to_int n = 1 ->
             exec (a :: exec rstack sub) rest
-        | (Prim (ploc, "DIP", [Int (loc, n); Seq (sloc, sub)], []) :: rest, [])
+        | Prim (ploc, "DIP", [Int (loc, n); Seq (sloc, sub)], []) :: rest, []
           when Z.to_int n > 1 ->
             exec
               (A
-               ::
-               exec
-                 []
-                 [
-                   Prim (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
-                 ])
+              :: exec
+                   []
+                   [
+                     Prim
+                       (ploc, "DIP", [Int (loc, Z.pred n); Seq (sloc, sub)], []);
+                   ])
               rest
-        | (Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, [])
+        | Prim (_, "DIP", [Int (_, n); Seq (_, sub)], []) :: rest, []
           when Z.to_int n = 1 ->
             exec (A :: exec [] sub) rest
         (* support old expansion using [DIP] *)
-        | (Prim (_, "DIP", [Seq (_, sub)], []) :: rest, a :: rstack) ->
+        | Prim (_, "DIP", [Seq (_, sub)], []) :: rest, a :: rstack ->
             exec (a :: exec rstack sub) rest
-        | (Prim (_, "DIP", [Seq (_, sub)], []) :: rest, []) ->
+        | Prim (_, "DIP", [Seq (_, sub)], []) :: rest, [] ->
             exec (A :: exec [] sub) rest
         | ( Seq
               ( _,

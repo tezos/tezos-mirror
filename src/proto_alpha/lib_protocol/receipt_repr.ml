@@ -237,22 +237,21 @@ let is_not_zero c = not (Compare.Int.equal c 0)
 
 let compare_balance ba bb =
   match (ba, bb) with
-  | (Contract ca, Contract cb) -> Contract_repr.compare ca cb
-  | (Deposits pkha, Deposits pkhb) ->
-      Signature.Public_key_hash.compare pkha pkhb
-  | ( Lost_endorsing_rewards (pkha, pa, ra),
-      Lost_endorsing_rewards (pkhb, pb, rb) ) ->
+  | Contract ca, Contract cb -> Contract_repr.compare ca cb
+  | Deposits pkha, Deposits pkhb -> Signature.Public_key_hash.compare pkha pkhb
+  | Lost_endorsing_rewards (pkha, pa, ra), Lost_endorsing_rewards (pkhb, pb, rb)
+    ->
       let c = Signature.Public_key_hash.compare pkha pkhb in
       if is_not_zero c then c
       else
         let c = Compare.Bool.compare pa pb in
         if is_not_zero c then c else Compare.Bool.compare ra rb
-  | (Commitments bpkha, Commitments bpkhb) ->
+  | Commitments bpkha, Commitments bpkhb ->
       Blinded_public_key_hash.compare bpkha bpkhb
-  | (Frozen_bonds (ca, ra), Frozen_bonds (cb, rb)) ->
+  | Frozen_bonds (ca, ra), Frozen_bonds (cb, rb) ->
       let c = Contract_repr.compare ca cb in
       if is_not_zero c then c else Bond_id_repr.compare ra rb
-  | (_, _) ->
+  | _, _ ->
       let index b =
         match b with
         | Contract _ -> 0
@@ -361,7 +360,7 @@ let balance_updates_encoding =
   @@ list
        (conv
           (function
-            | (balance, balance_update, update_origin) ->
+            | balance, balance_update, update_origin ->
                 ((balance, balance_update), update_origin))
           (fun ((balance, balance_update), update_origin) ->
             (balance, balance_update, update_origin))
@@ -396,7 +395,7 @@ let group_balance_updates balance_updates =
             | None -> ok (Some update)
             | Some balance -> (
                 match (balance, update) with
-                | (Credited a, Debited b) | (Debited b, Credited a) ->
+                | Credited a, Debited b | Debited b, Credited a ->
                     (* Remove the binding since it just fell down to zero *)
                     if Tez_repr.(a = b) then ok None
                     else if Tez_repr.(a > b) then
@@ -405,10 +404,10 @@ let group_balance_updates balance_updates =
                     else
                       Tez_repr.(b -? a) >>? fun update ->
                       ok (Some (Debited update))
-                | (Credited a, Credited b) ->
+                | Credited a, Credited b ->
                     Tez_repr.(a +? b) >>? fun update ->
                     ok (Some (Credited update))
-                | (Debited a, Debited b) ->
+                | Debited a, Debited b ->
                     Tez_repr.(a +? b) >>? fun update ->
                     ok (Some (Debited update))))
           acc)

@@ -172,7 +172,7 @@ let () =
     in
     aux argv
   in
-  let (options, argv) =
+  let options, argv =
     List.partition
       (fun arg ->
         (String.length arg > 0 && String.get arg 0 = '-')

@@ -121,7 +121,7 @@ let get_batches ctxt constants queue =
     }
   in
   try
-    let* (rev_batches, rev_current_trs, to_remove) =
+    let* rev_batches, rev_current_trs, to_remove =
       Tx_queue.fold_es
         (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
           let new_trs = tr :: rev_current_trs in
@@ -169,7 +169,7 @@ let get_batches ctxt constants queue =
 
 let on_batch state =
   let open Lwt_result_syntax in
-  let* (batches, to_remove) =
+  let* batches, to_remove =
     get_batches state.incr_context state.constants state.transactions
   in
   match batches with
@@ -199,7 +199,7 @@ let on_register state ~apply (tr : L2_transaction.t) =
   let batch_string =
     Data_encoding.Binary.to_string_exn Tx_rollup_l2_batch.encoding (V1 batch)
   in
-  let (_msg, msg_size) = Tx_rollup_message.make_batch batch_string in
+  let _msg, msg_size = Tx_rollup_message.make_batch batch_string in
   let* () =
     fail_when
       (msg_size
@@ -215,7 +215,7 @@ let on_register state ~apply (tr : L2_transaction.t) =
   let prev_context = context in
   let* context =
     if apply then
-      let* (new_context, result, _withdrawals) =
+      let* new_context, result, _withdrawals =
         let parameters =
           Tx_rollup_l2_apply.
             {
@@ -325,7 +325,7 @@ end
 
 let table = Worker.create_table Queue
 
-let (worker_promise, worker_waker) = Lwt.task ()
+let worker_promise, worker_waker = Lwt.task ()
 
 let init ~rollup ~signer ~batch_burn_limit index constants =
   let open Lwt_result_syntax in

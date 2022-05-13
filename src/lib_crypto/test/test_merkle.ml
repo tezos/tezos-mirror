@@ -46,7 +46,7 @@ let rec list_of_tree = function
   | Empty -> ([], 0)
   | Leaf x -> ([x], 1)
   | Node (x, y) ->
-      let (x, sx) = list_of_tree x and (y, sy) = list_of_tree y in
+      let x, sx = list_of_tree x and y, sy = list_of_tree y in
       assert (sx = sy) ;
       (x @ y, sx + sy)
 
@@ -70,14 +70,14 @@ end)
 *)
 let rec compare_list xs ys =
   match (xs, ys) with
-  | ([], []) -> true
-  | ([x], y :: ys) when x = y -> ys = [] || compare_list xs ys
-  | (x :: xs, y :: ys) when x = y -> compare_list xs ys
-  | (_, _) -> false
+  | [], [] -> true
+  | [x], y :: ys when x = y -> ys = [] || compare_list xs ys
+  | x :: xs, y :: ys when x = y -> compare_list xs ys
+  | _, _ -> false
 
 let check_size i =
   let l = 0 -- i in
-  let (l2, _) = list_of_tree (Merkle.compute l) in
+  let l2, _ = list_of_tree (Merkle.compute l) in
   if compare_list l l2 then ()
   else
     Format.kasprintf
@@ -119,7 +119,7 @@ let check_path i =
   List.iter
     (fun j ->
       let path = Merkle.compute_path l j in
-      let (found, pos) = Merkle.check_path path j in
+      let found, pos = Merkle.check_path path j in
       if found = orig && j = pos then ()
       else Format.kasprintf failwith "Failed for %d in %d." j i)
     l
@@ -148,7 +148,7 @@ let test_path_examples _ =
     "path to 3rd element"
     (Merkle.compute_path [4; 5; 6; 7] 2)
     (Right (Node (Leaf 4, Leaf 5), Left (Op, Leaf 7))) ;
-  let (t, idx) =
+  let t, idx =
     Merkle.check_path (Right (Node (Leaf 4, Leaf 5), Left (Op, Leaf 7))) 6
   in
   Alcotest.check

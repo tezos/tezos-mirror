@@ -272,7 +272,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
           Apply_results.kind_equal_list contents result.contents )
       with
-      | (Some Operation.Eq, Some Apply_results.Eq) ->
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result")
   | _ -> failwith "Unexpected result"
@@ -293,12 +293,12 @@ let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ~chain_id
     ~latency
   >>=? function
-  | (Operation_data op', Operation_metadata result) -> (
+  | Operation_data op', Operation_metadata result -> (
       match
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
           Apply_results.kind_equal_list contents result.contents )
       with
-      | (Some Operation.Eq, Some Apply_results.Eq) ->
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result")
   | _ -> failwith "Unexpected result"
@@ -530,7 +530,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     | Single_manager minfo ->
         gas_patching_stats minfo need_patching gas_consumed
     | Cons_manager (minfo, rest) ->
-        let (need_patching, gas_consumed) =
+        let need_patching, gas_consumed =
           gas_patching_stats minfo need_patching gas_consumed
         in
         gas_patching_stats_list rest need_patching gas_consumed
@@ -580,7 +580,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           in
           let rest_opt = loop rest in
           match (annotated_op_opt, rest_opt) with
-          | (None, None) -> None
+          | None, None -> None
           | _ ->
               let op = Option.value ~default:annotated_op annotated_op_opt in
               let rest = Option.value ~default:rest rest_opt in
@@ -649,7 +649,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind Annotated_manager_operation.t * kind Kind.manager contents_result ->
       kind Kind.manager contents tzresult Lwt.t =
    fun ~first -> function
-    | ((Manager_info c as op), (Manager_operation_result _ as result)) ->
+    | (Manager_info c as op), (Manager_operation_result _ as result) ->
         (if user_gas_limit_needs_patching c.gas_limit then
          Lwt.return (estimated_gas_single result) >>=? fun gas ->
          if Gas.Arith.(gas = zero) then
@@ -717,16 +717,16 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind Kind.manager contents_list tzresult Lwt.t =
    fun first annotated_list result_list ->
     match (annotated_list, result_list) with
-    | (Single_manager annotated, Single_result res) ->
+    | Single_manager annotated, Single_result res ->
         patch ~first (annotated, res) >>=? fun op -> return (Single op)
-    | (Cons_manager (annotated, annotated_rest), Cons_result (res, res_rest)) ->
+    | Cons_manager (annotated, annotated_rest), Cons_result (res, res_rest) ->
         patch ~first (annotated, res) >>=? fun op ->
         patch_list false annotated_rest res_rest >>=? fun rest ->
         return (Cons (op, rest))
     | _ -> assert false
   in
   let gas_limit_per_patched_op =
-    let (need_gas_patching, gas_consumed) =
+    let need_gas_patching, gas_consumed =
       gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
     in
     if need_gas_patching = 0 then hard_gas_limit_per_operation
@@ -1026,7 +1026,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
       >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Cons_and_result (_, _, rest) ->
-          let (op, result) = unpack_contents_list rest in
+          let op, result = unpack_contents_list rest in
           return (oph, op, result)
       | _ -> assert false)
   | Some _ when has_reveal operations ->

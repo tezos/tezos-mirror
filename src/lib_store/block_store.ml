@@ -114,7 +114,7 @@ let global_predecessor_lookup block_store hash pow_nth =
         | None -> Lwt.return_none
         | Some predecessors -> Lwt.return (List.nth_opt predecessors pow_nth))
       (block_store.rw_floating_block_store
-       :: block_store.ro_floating_block_stores)
+     :: block_store.ro_floating_block_stores)
   in
   match o with
   | Some hash -> Lwt.return_some hash
@@ -231,7 +231,7 @@ let mem block_store key =
             List.exists_s
               (fun store -> Floating_block_store.mem store predecessor_hash)
               (block_store.rw_floating_block_store
-               :: block_store.ro_floating_block_stores)
+             :: block_store.ro_floating_block_stores)
           in
           return
             (is_known_in_floating
@@ -257,7 +257,7 @@ let read_block ~read_metadata block_store key_kind =
                   (fun store ->
                     Floating_block_store.read_block store adjusted_hash)
                   (block_store.rw_floating_block_store
-                   :: block_store.ro_floating_block_stores)
+                 :: block_store.ro_floating_block_stores)
               in
               match o with
               | Some block -> Lwt.return_some block
@@ -298,7 +298,7 @@ let read_block_metadata block_store key_kind =
                 (fun store ->
                   Floating_block_store.read_block store adjusted_hash)
                 (block_store.rw_floating_block_store
-                 :: block_store.ro_floating_block_stores)
+               :: block_store.ro_floating_block_stores)
             in
             match o with
             | Some block -> return block.metadata
@@ -517,7 +517,7 @@ let infer_savepoint block_store current_head ~target_offset =
 
 (* [expected_caboose block_store ~target_offset] computes the
    expected caboose based on the [target_offset]). None is returned if
-   the cemented store cannot satisfy the targeted offset.  *)
+   the cemented store cannot satisfy the targeted offset. *)
 let expected_caboose block_store ~target_offset =
   let cemented_store = cemented_block_store block_store in
   match Cemented_block_store.cemented_blocks_files cemented_store with
@@ -593,7 +593,7 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
   let open Lwt_result_syntax in
   let open History_mode in
   match (previous_history_mode, new_history_mode) with
-  | (Full _, Rolling m) | (Rolling _, Rolling m) ->
+  | Full _, Rolling m | Rolling _, Rolling m ->
       let m =
         (Option.value m ~default:History_mode.default_additional_cycles).offset
       in
@@ -617,7 +617,7 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
       let* () = write_savepoint block_store new_savepoint in
       let* () = write_caboose block_store new_caboose in
       return_unit
-  | (Full _, Full m) ->
+  | Full _, Full m ->
       let m =
         (Option.value m ~default:History_mode.default_additional_cycles).offset
       in
@@ -632,7 +632,7 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
       in
       let* () = write_savepoint block_store new_savepoint in
       return_unit
-  | (Archive, Full m) | (Archive, Rolling m) ->
+  | Archive, Full m | Archive, Rolling m ->
       let m =
         (Option.value m ~default:History_mode.default_additional_cycles).offset
       in
@@ -728,7 +728,7 @@ let compute_new_savepoint block_store history_mode ~new_store
              store. We drag the savepoint only if it is not in the new
              floating store nor in the cycles to cements U cemented
              cycles. *)
-          let (savepoint_hash, savepoint_level) = savepoint in
+          let savepoint_hash, savepoint_level = savepoint in
           let is_savepoint_in_cemented =
             List.exists
               (fun (l, h) -> l <= savepoint_level && savepoint_level <= h)
@@ -824,7 +824,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let* lafl_block =
     read_predecessor_block_by_level block_store ~head:new_head new_head_lafl
   in
-  let (final_hash, final_level) = Block_repr.descriptor lafl_block in
+  let final_hash, final_level = Block_repr.descriptor lafl_block in
   (* 1. Append to the new RO [new_store] blocks between
      [lowest_bound_to_preserve_in_floating] and [lafl_block].
      N.B. size in memory proportional to max_op_ttl of the lafl block
@@ -989,7 +989,7 @@ let move_all_floating_stores block_store ~new_ro_store =
         List.iter_s
           Floating_block_store.close
           (block_store.rw_floating_block_store
-           :: block_store.ro_floating_block_stores)
+         :: block_store.ro_floating_block_stores)
       in
       let*! r =
         protect (fun () ->
@@ -1108,10 +1108,10 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
   let*! new_ro_store =
     Floating_block_store.init block_store.chain_dir ~readonly:false RO_TMP
   in
-  let* (new_savepoint, new_caboose) =
+  let* new_savepoint, new_caboose =
     Lwt.catch
       (fun () ->
-        let* (cycles_interval_to_cement, new_savepoint, new_caboose) =
+        let* cycles_interval_to_cement, new_savepoint, new_caboose =
           update_floating_stores
             block_store
             ~history_mode
@@ -1244,7 +1244,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
       let* () =
         Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
             (* Move the rw in the ro stores and create a new tmp *)
-            let* (old_ro_store, old_rw_store, _new_rw_store) =
+            let* old_ro_store, old_rw_store, _new_rw_store =
               instanciate_temporary_floating_store block_store
             in
             (* Important: do not clean-up the temporary stores on
@@ -1266,7 +1266,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                         in
                         on_error (Merge_error :: err))
                       (fun () ->
-                        let* (new_ro_store, new_savepoint, new_caboose) =
+                        let* new_ro_store, new_savepoint, new_caboose =
                           create_merging_thread
                             block_store
                             ~history_mode
@@ -1337,7 +1337,7 @@ let merge_temporary_floating block_store =
     List.iter_s
       Floating_block_store.close
       (block_store.rw_floating_block_store
-       :: block_store.ro_floating_block_stores)
+     :: block_store.ro_floating_block_stores)
   in
   (* Remove RO_TMP if it still exists *)
   let ro_tmp_floating_store_dir_path =
@@ -1434,14 +1434,14 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
       (Naming.savepoint_file chain_dir)
       ~initial_data:genesis_descr
   in
-  let*! (_, savepoint_level) = Stored_data.get savepoint in
+  let*! _, savepoint_level = Stored_data.get savepoint in
   Prometheus.Gauge.set
     Store_metrics.metrics.savepoint_level
     (Int32.to_float savepoint_level) ;
   let* caboose =
     Stored_data.init (Naming.caboose_file chain_dir) ~initial_data:genesis_descr
   in
-  let*! (_, caboose_level) = Stored_data.get caboose in
+  let*! _, caboose_level = Stored_data.get caboose in
   Prometheus.Gauge.set
     Store_metrics.metrics.caboose_level
     (Int32.to_float caboose_level) ;

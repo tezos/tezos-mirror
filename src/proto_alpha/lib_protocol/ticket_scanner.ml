@@ -132,7 +132,7 @@ module Ticket_inspection = struct
      If neither left nor right branch contains a ticket, [False_ht] is
      returned. *)
   let pair_has_tickets pair ht1 ht2 =
-    match (ht1, ht2) with (False_ht, False_ht) -> False_ht | _ -> pair ht1 ht2
+    match (ht1, ht2) with False_ht, False_ht -> False_ht | _ -> pair ht1 ht2
 
   let map_has_tickets map ht =
     match ht with False_ht -> False_ht | _ -> map ht
@@ -321,9 +321,9 @@ module Ticket_collection = struct
     let open Script_typed_ir in
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     match (hty, ty) with
-    | (False_ht, _) -> (k [@ocaml.tailcall]) ctxt acc
-    | (Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _, _)) ->
-        let (l, r) = x in
+    | False_ht, _ -> (k [@ocaml.tailcall]) ctxt acc
+    | Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _, _) ->
+        let l, r = x in
         (tickets_of_value [@ocaml.tailcall])
           ~include_lazy
           ctxt
@@ -340,7 +340,7 @@ module Ticket_collection = struct
               r
               acc
               k)
-    | (Union_ht (htyl, htyr), Union_t (tyl, tyr, _, _)) -> (
+    | Union_ht (htyl, htyr), Union_t (tyl, tyr, _, _) -> (
         match x with
         | L v ->
             (tickets_of_value [@ocaml.tailcall])
@@ -360,7 +360,7 @@ module Ticket_collection = struct
               v
               acc
               k)
-    | (Option_ht el_hty, Option_t (el_ty, _, _)) -> (
+    | Option_ht el_hty, Option_t (el_ty, _, _) -> (
         match x with
         | Some x ->
             (tickets_of_value [@ocaml.tailcall])
@@ -372,7 +372,7 @@ module Ticket_collection = struct
               acc
               k
         | None -> (k [@ocaml.tailcall]) ctxt acc)
-    | (List_ht el_hty, List_t (el_ty, _)) ->
+    | List_ht el_hty, List_t (el_ty, _) ->
         let {elements; _} = x in
         (tickets_of_list [@ocaml.tailcall])
           ctxt
@@ -382,9 +382,9 @@ module Ticket_collection = struct
           elements
           acc
           k
-    | (Set_ht _, Set_t (key_ty, _)) ->
+    | Set_ht _, Set_t (key_ty, _) ->
         (tickets_of_set [@ocaml.tailcall]) ctxt key_ty x acc k
-    | (Map_ht (_, val_hty), Map_t (key_ty, val_ty, _)) ->
+    | Map_ht (_, val_hty), Map_t (key_ty, val_ty, _) ->
         (tickets_of_comparable [@ocaml.tailcall])
           ctxt
           key_ty
@@ -398,11 +398,11 @@ module Ticket_collection = struct
               x
               acc
               k)
-    | (Big_map_ht (_, val_hty), Big_map_t (key_ty, _, _)) ->
+    | Big_map_ht (_, val_hty), Big_map_t (key_ty, _, _) ->
         if include_lazy then
           (tickets_of_big_map [@ocaml.tailcall]) ctxt val_hty key_ty x acc k
         else (k [@ocaml.tailcall]) ctxt acc
-    | (True_ht, Ticket_t (comp_ty, _)) ->
+    | True_ht, Ticket_t (comp_ty, _) ->
         (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
 
   and tickets_of_list :

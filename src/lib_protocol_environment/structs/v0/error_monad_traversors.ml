@@ -88,9 +88,9 @@ let rec map_p f l =
       tx >>= fun x ->
       tl >>= fun l ->
       match (x, l) with
-      | (Ok x, Ok l) -> Lwt.return_ok (x :: l)
-      | (Error trace1, Error trace2) -> Lwt.return_error (trace1 @ trace2)
-      | (Ok _, Error trace) | (Error trace, Ok _) -> Lwt.return_error trace)
+      | Ok x, Ok l -> Lwt.return_ok (x :: l)
+      | Error trace1, Error trace2 -> Lwt.return_error (trace1 @ trace2)
+      | Ok _, Error trace | Error trace, Ok _ -> Lwt.return_error trace)
 
 let mapi_p f l =
   let rec mapi_p f i l =
@@ -101,26 +101,26 @@ let mapi_p f l =
         tx >>= fun x ->
         tl >>= fun l ->
         match (x, l) with
-        | (Ok x, Ok l) -> Lwt.return_ok (x :: l)
-        | (Error trace1, Error trace2) -> Lwt.return_error (trace1 @ trace2)
-        | (Ok _, Error trace) | (Error trace, Ok _) -> Lwt.return_error trace)
+        | Ok x, Ok l -> Lwt.return_ok (x :: l)
+        | Error trace1, Error trace2 -> Lwt.return_error (trace1 @ trace2)
+        | Ok _, Error trace | Error trace, Ok _ -> Lwt.return_error trace)
   in
   mapi_p f 0 l
 
 let rec map2_s f l1 l2 =
   match (l1, l2) with
-  | ([], []) -> return_nil
-  | (_ :: _, []) | ([], _ :: _) -> invalid_arg "Error_monad.map2_s"
-  | (h1 :: t1, h2 :: t2) ->
+  | [], [] -> return_nil
+  | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.map2_s"
+  | h1 :: t1, h2 :: t2 ->
       f h1 h2 >>=? fun rh ->
       map2_s f t1 t2 >>=? fun rt -> return (rh :: rt)
 
 let mapi2_s f l1 l2 =
   let rec mapi2_s i f l1 l2 =
     match (l1, l2) with
-    | ([], []) -> return_nil
-    | (_ :: _, []) | ([], _ :: _) -> invalid_arg "Error_monad.mapi2_s"
-    | (h1 :: t1, h2 :: t2) ->
+    | [], [] -> return_nil
+    | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.mapi2_s"
+    | h1 :: t1, h2 :: t2 ->
         f i h1 h2 >>=? fun rh ->
         mapi2_s (i + 1) f t1 t2 >>=? fun rt -> return (rh :: rt)
   in
@@ -128,18 +128,18 @@ let mapi2_s f l1 l2 =
 
 let rec map2 f l1 l2 =
   match (l1, l2) with
-  | ([], []) -> ok_nil
-  | (_ :: _, []) | ([], _ :: _) -> invalid_arg "Error_monad.map2"
-  | (h1 :: t1, h2 :: t2) ->
+  | [], [] -> ok_nil
+  | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.map2"
+  | h1 :: t1, h2 :: t2 ->
       f h1 h2 >>? fun rh ->
       map2 f t1 t2 >>? fun rt -> Ok (rh :: rt)
 
 let mapi2 f l1 l2 =
   let rec mapi2 i f l1 l2 =
     match (l1, l2) with
-    | ([], []) -> ok_nil
-    | (_ :: _, []) | ([], _ :: _) -> invalid_arg "Error_monad.mapi2"
-    | (h1 :: t1, h2 :: t2) ->
+    | [], [] -> ok_nil
+    | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.mapi2"
+    | h1 :: t1, h2 :: t2 ->
         f i h1 h2 >>? fun rh ->
         mapi2 (i + 1) f t1 t2 >>? fun rt -> Ok (rh :: rt)
   in
@@ -199,9 +199,9 @@ let rec iter_p f l =
       tx >>= fun tx_res ->
       tl >>= fun tl_res ->
       match (tx_res, tl_res) with
-      | (Ok (), Ok ()) -> Lwt.return_ok ()
-      | (Error trace1, Error trace2) -> Lwt.return_error (trace1 @ trace2)
-      | (Ok (), Error trace) | (Error trace, Ok ()) -> Lwt.return_error trace)
+      | Ok (), Ok () -> Lwt.return_ok ()
+      | Error trace1, Error trace2 -> Lwt.return_error (trace1 @ trace2)
+      | Ok (), Error trace | Error trace, Ok () -> Lwt.return_error trace)
 
 let iteri_p f l =
   let rec iteri_p i f l =
@@ -212,38 +212,38 @@ let iteri_p f l =
         tx >>= fun tx_res ->
         tl >>= fun tl_res ->
         match (tx_res, tl_res) with
-        | (Ok (), Ok ()) -> Lwt.return ok_unit
-        | (Error trace1, Error trace2) -> Lwt.return_error (trace1 @ trace2)
-        | (Ok (), Error trace) | (Error trace, Ok ()) -> Lwt.return_error trace)
+        | Ok (), Ok () -> Lwt.return ok_unit
+        | Error trace1, Error trace2 -> Lwt.return_error (trace1 @ trace2)
+        | Ok (), Error trace | Error trace, Ok () -> Lwt.return_error trace)
   in
   iteri_p 0 f l
 
 let rec iter2_p f l1 l2 =
   match (l1, l2) with
-  | ([], []) -> return_unit
-  | ([], _) | (_, []) -> invalid_arg "Error_monad.iter2_p"
-  | (x1 :: l1, x2 :: l2) -> (
+  | [], [] -> return_unit
+  | [], _ | _, [] -> invalid_arg "Error_monad.iter2_p"
+  | x1 :: l1, x2 :: l2 -> (
       let tx = f x1 x2 and tl = iter2_p f l1 l2 in
       tx >>= fun tx_res ->
       tl >>= fun tl_res ->
       match (tx_res, tl_res) with
-      | (Ok (), Ok ()) -> Lwt.return_ok ()
-      | (Error trace1, Error trace2) -> Lwt.return_error (trace1 @ trace2)
-      | (Ok (), Error trace) | (Error trace, Ok ()) -> Lwt.return_error trace)
+      | Ok (), Ok () -> Lwt.return_ok ()
+      | Error trace1, Error trace2 -> Lwt.return_error (trace1 @ trace2)
+      | Ok (), Error trace | Error trace, Ok () -> Lwt.return_error trace)
 
 let iteri2_p f l1 l2 =
   let rec iteri2_p i f l1 l2 =
     match (l1, l2) with
-    | ([], []) -> return_unit
-    | ([], _) | (_, []) -> invalid_arg "Error_monad.iteri2_p"
-    | (x1 :: l1, x2 :: l2) -> (
+    | [], [] -> return_unit
+    | [], _ | _, [] -> invalid_arg "Error_monad.iteri2_p"
+    | x1 :: l1, x2 :: l2 -> (
         let tx = f i x1 x2 and tl = iteri2_p (i + 1) f l1 l2 in
         tx >>= fun tx_res ->
         tl >>= fun tl_res ->
         match (tx_res, tl_res) with
-        | (Ok (), Ok ()) -> Lwt.return_ok ()
-        | (Error trace1, Error trace2) -> Lwt.return_error (trace1 @ trace2)
-        | (Ok (), Error trace) | (Error trace, Ok ()) -> Lwt.return_error trace)
+        | Ok (), Ok () -> Lwt.return_ok ()
+        | Error trace1, Error trace2 -> Lwt.return_error (trace1 @ trace2)
+        | Ok (), Error trace | Error trace, Ok () -> Lwt.return_error trace)
   in
   iteri2_p 0 f l1 l2
 

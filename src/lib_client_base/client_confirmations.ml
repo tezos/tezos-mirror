@@ -152,7 +152,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
         | Error err -> Lwt.fail (WrapError err))
     | None -> Lwt.return_unit
   in
-  let* (stream, stop) = Shell_services.Monitor.heads ctxt chain in
+  let* stream, stop = Shell_services.Monitor.heads ctxt chain in
   let*! o = Lwt_stream.get stream in
   match o with
   | None -> assert false
@@ -289,7 +289,7 @@ let wait_for_bootstrapped ?(retry = fun f x -> f x)
         ctxt#error "Progress not monitored anymore\n%!"
       in
       ()) ;
-  let* (stream, _stop) = retry Monitor_services.bootstrapped ctxt in
+  let* stream, _stop = retry Monitor_services.bootstrapped ctxt in
   let*! () =
     Lwt_stream.iter_s
       (fun (hash, time) ->

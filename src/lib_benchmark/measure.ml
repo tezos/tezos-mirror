@@ -422,7 +422,7 @@ let collect_stats : 'a workload_data -> workloads_stats =
   let time_dist_data =
     List.rev_map (fun {qty; _} -> qty) workload_data |> Array.of_list
   in
-  let (min, max) = farray_min_max time_dist_data in
+  let min, max = farray_min_max time_dist_data in
   let dist = Emp.of_raw_data time_dist_data in
   let mean = Emp.Float.empirical_mean dist in
   let var = Emp.Float.empirical_variance dist in
@@ -620,7 +620,7 @@ let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t) =
   {
     Generator.apply =
       (fun aspect closure ->
-        let (dt, r) = Time.measure_and_return closure in
+        let dt, r = Time.measure_and_return closure in
         Stdlib.Hashtbl.add table aspect dt ;
         r);
     aspects =

@@ -30,7 +30,7 @@
    Invocation: make test-tezt
    Subject: This file is the entrypoint of all Tezt tests. It dispatches to
             other files.
- *)
+*)
 
 let protocols = [Protocol.Alpha; Protocol.Jakarta; Protocol.Ithaca]
 

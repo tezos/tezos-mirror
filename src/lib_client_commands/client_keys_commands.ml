@@ -131,7 +131,7 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                   with Not_found -> false
             in
             let rec loop attempts =
-              let (public_key_hash, public_key, secret_key) =
+              let public_key_hash, public_key, secret_key =
                 Signature.generate_key ()
               in
               let hash =
@@ -183,10 +183,10 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
     let prompt = if default then "(Y/n/q)" else "(y/N/q)" in
     let* gen = cctxt#prompt "%s %s: " msg prompt in
     match (default, String.lowercase_ascii gen) with
-    | (default, "") -> return default
-    | (_, "y") -> return_true
-    | (_, "n") -> return_false
-    | (_, "q") -> failwith "Exit by user request."
+    | default, "" -> return default
+    | _, "y" -> return_true
+    | _, "n" -> return_false
+    | _, "q" -> failwith "Exit by user request."
     | _ -> get_boolean_answer cctxt ~msg ~default
   in
   let* email = cctxt#prompt "Enter the e-mail used for the paper wallet: " in
@@ -285,7 +285,7 @@ let generate_test_keys =
       let* source_list =
         List.init_es ~when_negative_length:[] n (fun i ->
             let alias = Format.sprintf "bootstrap%d" (i + 6) in
-            let (pkh, pk, sk) =
+            let pkh, pk, sk =
               Signature.generate_key ~algo:Signature.Ed25519 ()
             in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
@@ -338,7 +338,7 @@ module Bls_commands = struct
         (Bip39.to_words mnemonic)
     in
     let seed = Mnemonic.to_32_bytes mnemonic in
-    let (pkh, pk, sk) = Aggregate_signature.generate_key ~seed () in
+    let pkh, pk, sk = Aggregate_signature.generate_key ~seed () in
     let*? pk_uri = Tezos_signer_backends.Unencrypted.Aggregate.make_pk pk in
     let* sk_uri =
       if encrypted then
@@ -361,14 +361,14 @@ module Bls_commands = struct
         let* pkh_str = Aggregate_alias.Public_key_hash.to_source pkh in
         let*! () =
           match (pk, sk) with
-          | (None, None) -> cctxt#message "%s: %s" name pkh_str
-          | (_, Some uri) ->
+          | None, None -> cctxt#message "%s: %s" name pkh_str
+          | _, Some uri ->
               let scheme =
                 Option.value ~default:"aggregate_unencrypted"
                 @@ Uri.scheme (uri : aggregate_sk_uri :> Uri.t)
               in
               cctxt#message "%s: %s (%s sk known)" name pkh_str scheme
-          | (Some _, _) -> cctxt#message "%s: %s (pk known)" name pkh_str
+          | Some _, _ -> cctxt#message "%s: %s (pk known)" name pkh_str
         in
         return_unit)
       aggregate_keys_list
@@ -405,7 +405,7 @@ module Bls_commands = struct
     let* name = Aggregate_alias.Secret_key.of_fresh cctxt false name in
     let* pk_uri = aggregate_neuterize sk_uri in
     let* () = aggregate_fail_if_already_registered cctxt force pk_uri name in
-    let* (pkh, public_key) =
+    let* pkh, public_key =
       import_aggregate_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
     in
     let*! () =
@@ -482,7 +482,7 @@ let commands network : Client_context.full Clic.command list =
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
           (fun (force, algo) name (cctxt : Client_context.full) ->
             let* name = Secret_key.of_fresh cctxt force name in
-            let (pkh, pk, sk) = Signature.generate_key ~algo () in
+            let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
               Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
@@ -499,7 +499,7 @@ let commands network : Client_context.full Clic.command list =
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
           (fun (force, algo, encrypted) name (cctxt : Client_context.full) ->
             let* name = Secret_key.of_fresh cctxt force name in
-            let (pkh, pk, sk) = Signature.generate_key ~algo () in
+            let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
               if encrypted then
@@ -602,7 +602,7 @@ let commands network : Client_context.full Clic.command list =
         let* name = Secret_key.of_fresh cctxt force name in
         let* pk_uri = Client_keys.neuterize sk_uri in
         let* () = fail_if_already_registered cctxt force pk_uri name in
-        let* (pkh, public_key) =
+        let* pkh, public_key =
           Client_keys.import_secret_key
             ~io:(cctxt :> Client_context.io_wallet)
             pk_uri
@@ -633,7 +633,7 @@ let commands network : Client_context.full Clic.command list =
             in
             let* pk_uri = Client_keys.neuterize sk_uri in
             let* () = fail_if_already_registered cctxt force pk_uri name in
-            let* (pkh, _public_key) = Client_keys.public_key_hash pk_uri in
+            let* pkh, _public_key = Client_keys.public_key_hash pk_uri in
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name);
       ])
   @ [
@@ -646,7 +646,7 @@ let commands network : Client_context.full Clic.command list =
         @@ Public_key.fresh_alias_param @@ Client_keys.pk_uri_param @@ stop)
         (fun force name pk_uri (cctxt : Client_context.full) ->
           let* name = Public_key.of_fresh cctxt force name in
-          let* (pkh, public_key) = Client_keys.public_key_hash pk_uri in
+          let* pkh, public_key = Client_keys.public_key_hash pk_uri in
           let* () = Public_key_hash.add ~force cctxt name pkh in
           let*! () =
             cctxt#message
@@ -677,14 +677,14 @@ let commands network : Client_context.full Clic.command list =
               let* v = Public_key_hash.to_source pkh in
               let*! () =
                 match (pk, sk) with
-                | (None, None) -> cctxt#message "%s: %s" name v
-                | (_, Some uri) ->
+                | None, None -> cctxt#message "%s: %s" name v
+                | _, Some uri ->
                     let scheme =
                       Option.value ~default:"unencrypted"
                       @@ Uri.scheme (uri : sk_uri :> Uri.t)
                     in
                     cctxt#message "%s: %s (%s sk known)" name v scheme
-                | (Some _, _) -> cctxt#message "%s: %s (pk known)" name v
+                | Some _, _ -> cctxt#message "%s: %s (pk known)" name v
               in
               return_unit)
             l);
@@ -764,8 +764,7 @@ let commands network : Client_context.full Clic.command list =
         ~desc:"Compute deterministic nonce."
         no_options
         (prefixes ["generate"; "nonce"; "for"]
-        @@ Public_key_hash.alias_param
-        @@ prefixes ["from"]
+        @@ Public_key_hash.alias_param @@ prefixes ["from"]
         @@ string
              ~name:"data"
              ~desc:"string from which to deterministically generate the nonce"
@@ -787,8 +786,7 @@ let commands network : Client_context.full Clic.command list =
         ~desc:"Compute deterministic nonce hash."
         no_options
         (prefixes ["generate"; "nonce"; "hash"; "for"]
-        @@ Public_key_hash.alias_param
-        @@ prefixes ["from"]
+        @@ Public_key_hash.alias_param @@ prefixes ["from"]
         @@ string
              ~name:"data"
              ~desc:
@@ -860,7 +858,7 @@ let commands network : Client_context.full Clic.command list =
               in
               let* pk_uri = neuterize unencrypted_sk_uri in
               let* () = fail_if_already_registered cctxt force pk_uri name in
-              let* (pkh, public_key) =
+              let* pkh, public_key =
                 import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
               in
               let* () =
@@ -881,7 +879,7 @@ let commands network : Client_context.full Clic.command list =
         @@ PVSS_secret_key.fresh_alias_param @@ stop)
         (fun force name (cctxt : Client_context.full) ->
           let* name = PVSS_secret_key.of_fresh cctxt force name in
-          let (pk, sk) = Pvss_secp256k1.generate_keys () in
+          let pk, sk = Pvss_secp256k1.generate_keys () in
           let* () = PVSS_public_key.add ~force cctxt name pk in
           let* sk_uri =
             Tezos_signer_backends.Encrypted.encrypt_pvss_key cctxt sk

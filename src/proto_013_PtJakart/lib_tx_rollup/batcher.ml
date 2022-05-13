@@ -120,7 +120,7 @@ let get_batches ctxt constants queue =
     }
   in
   try
-    let* (rev_batches, rev_current_trs, to_remove) =
+    let* rev_batches, rev_current_trs, to_remove =
       Tx_queue.fold_es
         (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
           let new_trs = tr :: rev_current_trs in
@@ -168,7 +168,7 @@ let get_batches ctxt constants queue =
 
 let on_batch state =
   let open Lwt_result_syntax in
-  let* (batches, to_remove) =
+  let* batches, to_remove =
     get_batches state.incr_context state.constants state.transactions
   in
   match batches with
@@ -195,7 +195,7 @@ let on_register state ~apply (tr : L2_transaction.t) =
   let prev_context = context in
   let* context =
     if apply then
-      let* (new_context, result, _withdrawals) =
+      let* new_context, result, _withdrawals =
         let parameters =
           Tx_rollup_l2_apply.
             {

@@ -84,19 +84,19 @@ end) : Internal_event.SINK with type t = t = struct
     let section_prefixes =
       let all =
         List.filter_map
-          (function ("section-prefix", l) -> Some l | _ -> None)
+          (function "section-prefix", l -> Some l | _ -> None)
           (Uri.query uri)
       in
       match all with [] -> None | more -> Some (List.concat more)
     in
     let* filter =
       match (Uri.get_query_param uri "level-at-least", section_prefixes) with
-      | (None, None) -> return (`Level_at_least Internal_event.Level.default)
-      | (Some l, None) -> (
+      | None, None -> return (`Level_at_least Internal_event.Level.default)
+      | Some l, None -> (
           match Internal_event.Level.of_string l with
           | Some l -> return (`Level_at_least l)
           | None -> fail_parsing "Wrong level: %S" l)
-      | (base_level, Some l) -> (
+      | base_level, Some l -> (
           try
             let sections =
               let parse_section s =

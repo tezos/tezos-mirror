@@ -37,7 +37,8 @@ say () {
 make_dot_ocamlformat () {
     local path="$1"
     cat > "$path" <<EOF
-version=0.18.0
+version=0.21.0
+ocaml-version=4.12.1
 wrap-fun-args=false
 let-binding-spacing=compact
 field-space=loose
@@ -53,7 +54,6 @@ doc-comments=before
 margin=80
 module-item-spacing=sparse
 parens-tuple=always
-parens-tuple-patterns=always
 EOF
 }
 

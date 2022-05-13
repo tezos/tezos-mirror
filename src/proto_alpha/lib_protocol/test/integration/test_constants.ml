@@ -107,8 +107,8 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
 
 (* Check that
    [sc_rollup_commitment_storage_size_in_bytes = commitments_entry_size +
-   commitment_stake_count_entry_size + commitment_added_entry_size] 
-   
+   commitment_stake_count_entry_size + commitment_added_entry_size]
+
    Required to ensure [sc_rollup_stake_amount] and [sc_rollup_max_lookahead] are
    correctly scaled with respect to each other - see
    {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}

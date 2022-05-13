@@ -148,7 +148,7 @@ module Context = struct
   let add_tree (Context ({ops = (module Ops); ctxt; _} as c)) key (Tree t) =
     let open Lwt_syntax in
     match equiv c.equality_witness t.equality_witness with
-    | (Some Refl, Some Refl) ->
+    | Some Refl, Some Refl ->
         let+ ctxt = Ops.add_tree ctxt key t.tree in
         Context {c with ctxt}
     | _ -> err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
@@ -202,7 +202,7 @@ module Context = struct
 
     let equal (Tree {ops = (module Ops); tree; equality_witness; _}) (Tree t) =
       match equiv equality_witness t.equality_witness with
-      | (Some Refl, Some Refl) -> Ops.Tree.equal tree t.tree
+      | Some Refl, Some Refl -> Ops.Tree.equal tree t.tree
       | _ -> false
 
     let empty
@@ -228,7 +228,7 @@ module Context = struct
     let add_tree (Tree ({ops = (module Ops); _} as c)) key (Tree t) =
       let open Lwt_syntax in
       match equiv c.equality_witness t.equality_witness with
-      | (Some Refl, Some Refl) ->
+      | Some Refl, Some Refl ->
           let+ tree = Ops.Tree.add_tree c.tree key t.tree in
           Tree {c with tree}
       | _ -> err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
@@ -299,7 +299,7 @@ module Context = struct
     let project : tree -> M.tree =
      fun (Tree t) ->
       match equiv t.equality_witness equality_witness with
-      | (Some Refl, Some Refl) -> t.tree
+      | Some Refl, Some Refl -> t.tree
       | _ -> err_implementation_mismatch ~expected:impl_name ~got:t.impl_name
   end
 
@@ -326,7 +326,7 @@ module Context = struct
     let project : tree -> M.tree =
      fun (Tree t) ->
       match equiv t.equality_witness equality_witness with
-      | (Some Refl, Some Refl) -> t.tree
+      | Some Refl, Some Refl -> t.tree
       | _ -> err_implementation_mismatch ~expected:impl_name ~got:t.impl_name
   end
 
@@ -364,10 +364,10 @@ module Context = struct
   let verify_tree_proof proof (f : tree -> (tree * 'a) Lwt.t) =
     let open Lwt_result_syntax in
     let* (module Proof_context) = proof_context ~kind:`Tree proof in
-    let* (tree, r) =
+    let* tree, r =
       Proof_context.M.verify_tree_proof proof (fun tree ->
           let tree = Proof_context.inject tree in
-          let*! (tree, r) = f tree in
+          let*! tree, r = f tree in
           Lwt.return (Proof_context.project tree, r))
     in
     return (Proof_context.inject tree, r)
@@ -375,10 +375,10 @@ module Context = struct
   let verify_stream_proof proof (f : tree -> (tree * 'a) Lwt.t) =
     let open Lwt_result_syntax in
     let* (module Proof_context) = proof_context ~kind:`Stream proof in
-    let* (tree, r) =
+    let* tree, r =
       Proof_context.M.verify_stream_proof proof (fun tree ->
           let tree = Proof_context.inject tree in
-          let*! (tree, r) = f tree in
+          let*! tree, r = f tree in
           Lwt.return (Proof_context.project tree, r))
     in
     return (Proof_context.inject tree, r)
@@ -531,7 +531,7 @@ module Context = struct
     let sync (Context ctxt) ~cache_nonce =
       let open Environment_cache in
       let open Data_encoding in
-      let (cache, domain) = sync ctxt.cache ~cache_nonce in
+      let cache, domain = sync ctxt.cache ~cache_nonce in
       let bytes = Binary.to_bytes_exn domain_encoding domain in
       let ctxt = Context {ctxt with cache} in
       add ctxt cache_domain_path bytes

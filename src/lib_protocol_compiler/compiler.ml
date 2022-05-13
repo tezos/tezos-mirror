@@ -58,7 +58,7 @@ let load_embedded_cmi (unit_name, content) =
   assert (magic = Bytes.of_string Config.cmi_magic_number) ;
   (* Read cmi_name and cmi_sign *)
   let pos = magic_len in
-  let (cmi_name, cmi_sign) = Marshal.from_bytes content pos in
+  let cmi_name, cmi_sign = Marshal.from_bytes content pos in
   let pos = pos + Marshal.total_size content pos in
   (* Read cmi_crcs *)
   let cmi_crcs = Marshal.from_bytes content pos in
@@ -212,7 +212,7 @@ let main {compile_ml; pack_objects; link_shared} =
         Arg.usage args_spec usage_msg ;
         Stdlib.exit 1
   in
-  let (announced_hash, protocol) =
+  let announced_hash, protocol =
     match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
     | Ok (hash, proto) -> (hash, proto)
     | Error err ->

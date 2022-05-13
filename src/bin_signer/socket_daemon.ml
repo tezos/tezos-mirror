@@ -110,7 +110,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
   let* fds = bind path in
   let rec loop fd =
     let open Lwt_syntax in
-    let* (cfd, _) = Lwt_unix.accept fd in
+    let* cfd, _ = Lwt_unix.accept fd in
     Lwt.dont_wait
       (fun () ->
         Unit.catch_s (fun () ->

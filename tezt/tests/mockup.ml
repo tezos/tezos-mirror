@@ -32,11 +32,11 @@
             because most tests of the mockup are written with the python
             framework for now. It was important, though, to provide the
             mockup's API in tezt; for other tests that use the mockup.
-  *)
+*)
 
 (* Test.
    Call `tezos-client rpc list` and check that return code is 0.
- *)
+*)
 let test_rpc_list =
   Protocol.register_test
     ~__FILE__
@@ -49,7 +49,7 @@ let test_rpc_list =
 
 (* Test.
    Call `tezos-client rpc /chains/<chain_id>/blocks/<block_id>/header/shell` and check that return code is 0.
- *)
+*)
 let test_rpc_header_shell =
   Protocol.register_test
     ~__FILE__
@@ -64,8 +64,8 @@ let transfer_data =
   (Constant.bootstrap1.alias, Tez.one, Constant.bootstrap2.alias)
 
 let test_balances_after_transfer giver amount receiver =
-  let (giver_balance_before, giver_balance_after) = giver in
-  let (receiver_balance_before, receiver_balance_after) = receiver in
+  let giver_balance_before, giver_balance_after = giver in
+  let receiver_balance_before, receiver_balance_after = receiver in
   if not Tez.(giver_balance_after < giver_balance_before - amount) then
     Test.fail
       "Invalid balance of giver after transfer: %s (before it was %s)"
@@ -86,14 +86,14 @@ let test_balances_after_transfer giver amount receiver =
 
 (* Test.
    Transfer some tz and check balance changes are as expected.
- *)
+*)
 let test_transfer =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Transfer"
     ~tags:["mockup"; "client"; "transfer"]
   @@ fun protocol ->
-  let (giver, amount, receiver) = transfer_data in
+  let giver, amount, receiver = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   let* giver_balance_before = Client.get_balance_for ~account:giver client in
   let* receiver_balance_before =
@@ -121,7 +121,7 @@ let test_calling_contract_with_global_constant_success =
     ~title:"(Mockup) Calling a contract with a global constant success"
     ~tags:["mockup"; "client"; "global_constant"]
   @@ fun protocol ->
-  let (src, _, _) = transfer_data in
+  let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   let value = "999" in
   let burn_cap = Some (Tez.of_int 1) in
@@ -157,7 +157,7 @@ let test_register_global_constant_success =
     ~title:"(Mockup) Register Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
   @@ fun protocol ->
-  let (src, _, _) = transfer_data in
+  let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   let value = "999" in
   let burn_cap = Some (Tez.of_int 1) in
@@ -171,7 +171,7 @@ let test_register_global_constant_failure =
     ~title:"(Mockup) Register Global Constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
   @@ fun protocol ->
-  let (src, _, _) = transfer_data in
+  let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   let value = "Pair 1 (constant \"foobar\")" in
   let burn_cap = Some (Tez.of_int 1) in
@@ -189,7 +189,7 @@ let test_originate_contract_with_global_constant_success =
     ~title:"(Mockup) Originate Contract with Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
   @@ fun protocol ->
-  let (src, _, _) = transfer_data in
+  let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   let value = "999" in
   let burn_cap = Some (Tez.of_int 1) in
@@ -213,7 +213,7 @@ let test_typechecking_and_normalization_work_with_constants =
     ~title:"(Mockup) Typechecking and normalization work with constants"
     ~tags:["mockup"; "client"; "global_constant"]
   @@ fun protocol ->
-  let (src, _, _) = transfer_data in
+  let src, _, _ = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   (* Register the type *)
   let value = "unit" in
@@ -233,7 +233,7 @@ let test_simple_baking_event =
     ~title:"(Mockup) Transfer (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
   @@ fun protocol ->
-  let (giver, amount, receiver) = transfer_data in
+  let giver, amount, receiver = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
@@ -255,7 +255,7 @@ let test_same_transfer_twice =
     ~title:"(Mockup) Same transfer twice (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
   @@ fun protocol ->
-  let (giver, amount, receiver) = transfer_data in
+  let giver, amount, receiver = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
@@ -280,7 +280,7 @@ let test_transfer_same_participants =
     ~title:"(Mockup) Transfer same participants (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
   @@ fun protocol ->
-  let (giver, amount, receiver) = transfer_data in
+  let giver, amount, receiver = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
@@ -316,7 +316,7 @@ let test_multiple_baking =
   (* For the equality test below to hold, alice, bob and baker must be
      different accounts. Here, alice is bootstrap1, bob is bootstrap2 and
      baker is bootstrap3. *)
-  let (alice, _amount, bob) = transfer_data and baker = "bootstrap3" in
+  let alice, _amount, bob = transfer_data and baker = "bootstrap3" in
   if String.(equal alice bob || equal bob baker || equal baker alice) then
     Test.fail "alice, bob and baker need to be different accounts" ;
   let* client =
@@ -409,7 +409,7 @@ let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
             ~post_migration)
 
 let test_migration_transfer ?migration_spec () =
-  let (giver, amount, receiver) = ("alice", Tez.of_int 1, "bob") in
+  let giver, amount, receiver = ("alice", Tez.of_int 1, "bob") in
   test_migration
     ?migration_spec
     ~pre_migration:(fun client ->
@@ -577,7 +577,7 @@ let test_empty_block_baking =
     ~title:"(Mockup) Transfer (empty, asynchronous)"
     ~tags:["mockup"; "client"; "empty"; "bake_for"; "asynchronous"]
   @@ fun protocol ->
-  let (giver, _amount, _receiver) = transfer_data in
+  let giver, _amount, _receiver = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in

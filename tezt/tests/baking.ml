@@ -291,7 +291,7 @@ let mempool_from_list_of_ops client protocol operations =
     match operations with
     | [] -> return (List.rev acc)
     | (account, op) :: tl ->
-        let* (mempool_op, binary_proto_data) =
+        let* mempool_op, binary_proto_data =
           mempool_operation_from_op client protocol account op
         in
         let shell_op =
@@ -586,7 +586,7 @@ let baking_operation_exception_ithaca =
     ~tags:["baking"; "exception"]
     ~supports:Protocol.(Between_protocols (number Ithaca, number Ithaca))
   @@ fun protocol ->
-  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* new_account = Client.gen_and_show_keys client in
@@ -656,7 +656,7 @@ let baking_operation_exception =
     ~tags:["baking"; "exception"]
     ~supports:Protocol.(From_protocol (number Alpha))
   @@ fun protocol ->
-  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* new_account = Client.gen_and_show_keys client in

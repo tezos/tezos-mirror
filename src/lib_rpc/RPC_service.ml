@@ -62,9 +62,9 @@ include (
         include Resto.MakeService (RPC_encoding)
       end
       with type (+'m, 'pr, 'p, 'q, 'i, 'o, 'e) t :=
-            ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
+        ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
        and type (+'m, 'pr, 'p, 'q, 'i, 'o, 'e) service :=
-            ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw)
+        ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw)
 
 let error_path = ref None
 

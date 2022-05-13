@@ -53,7 +53,7 @@ let gas_limit = Alpha_context.Gas.Arith.integral_of_int_exn 3000
 (** Groups ten transactions between the same parties. *)
 let test_multiple_transfers () =
   Context.init 3 >>=? fun (blk, contracts) ->
-  let (c1, c2, c3) =
+  let c1, c2, c3 =
     match contracts with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
   in
   List.map_es
@@ -85,7 +85,7 @@ let test_multiple_transfers () =
 (** Groups ten delegated originations. *)
 let test_multiple_origination_and_delegation () =
   Context.init 2 >>=? fun (blk, contracts) ->
-  let (c1, c2) =
+  let c1, c2 =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
   let n = 10 in
@@ -108,7 +108,7 @@ let test_multiple_origination_and_delegation () =
   >>=? fun originations ->
   (* These computed originated contracts are not the ones really created *)
   (* We will extract them from the tickets *)
-  let (originations_operations, _) = List.split originations in
+  let originations_operations, _ = List.split originations in
   Op.combine_operations ~source:c1 (B blk) originations_operations
   >>=? fun operation ->
   Incremental.begin_construction blk >>=? fun inc ->
@@ -171,7 +171,7 @@ let expect_balance_too_low = function
     Variant without fees. *)
 let test_failing_operation_in_the_middle () =
   Context.init 2 >>=? fun (blk, contracts) ->
-  let (c1, c2) =
+  let c1, c2 =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
   Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one >>=? fun op1 ->
@@ -201,9 +201,9 @@ let test_failing_operation_in_the_middle () =
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
          (Manager_operation_result {operation_result = Failed (_, trace); _})
-       :: Contents_result
-            (Manager_operation_result {operation_result = Skipped _; _})
-          :: _ ->
+    :: Contents_result
+         (Manager_operation_result {operation_result = Skipped _; _})
+    :: _ ->
       let trace_string =
         Format.asprintf "%a" Environment.Error_monad.pp_trace trace
       in
@@ -221,7 +221,7 @@ let test_failing_operation_in_the_middle () =
     Variant with fees, that should be spent even in case of failure. *)
 let test_failing_operation_in_the_middle_with_fees () =
   Context.init 2 >>=? fun (blk, contracts) ->
-  let (c1, c2) =
+  let c1, c2 =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
@@ -250,9 +250,9 @@ let test_failing_operation_in_the_middle_with_fees () =
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
          (Manager_operation_result {operation_result = Failed (_, trace); _})
-       :: Contents_result
-            (Manager_operation_result {operation_result = Skipped _; _})
-          :: _ ->
+    :: Contents_result
+         (Manager_operation_result {operation_result = Skipped _; _})
+    :: _ ->
       let trace_string =
         Format.asprintf "%a" Environment.Error_monad.pp_trace trace
       in
@@ -287,8 +287,8 @@ let expect_wrong_signature list =
 
 let test_wrong_signature_in_the_middle () =
   Context.init 2 >>=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (blk, c1 :: c2 :: _) ->
+  | _, [] | _, [_] -> assert false
+  | blk, c1 :: c2 :: _ ->
       Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one
       >>=? fun op1 ->
       Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one

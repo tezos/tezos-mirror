@@ -313,7 +313,7 @@ struct
     with Lwt_dropbox.Closed -> ()
 
   let drop_request_and_wait w message_box request =
-    let (t, u) = Lwt.wait () in
+    let t, u = Lwt.wait () in
     Lwt.catch
       (fun () ->
         Lwt_dropbox.put message_box (queue_item ~u request) ;
@@ -380,14 +380,14 @@ struct
       match w.buffer with
       | Queue_buffer message_queue -> (
           try
-            let (t, u) = Lwt.wait () in
+            let t, u = Lwt.wait () in
             Lwt_pipe.Unbounded.push message_queue (queue_item ~u request) ;
             t
           with Lwt_pipe.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
             Lwt_result_syntax.tzfail (Closed {base = base_name; name}))
       | Bounded_buffer message_queue ->
-          let (t, u) = Lwt.wait () in
+          let t, u = Lwt.wait () in
           Lwt.try_bind
             (fun () ->
               Lwt_pipe.Bounded.push message_queue (queue_item ~u request))
@@ -408,9 +408,7 @@ struct
               Lwt_pipe.Bounded.peek_all_now message_queue
         with Lwt_pipe.Closed -> []
       in
-      List.map
-        (function (t, Message (req, _)) -> (t, Request.view req))
-        peeked
+      List.map (function t, Message (req, _) -> (t, Request.view req)) peeked
 
     let pending_requests_length (type a) (w : a queue t) =
       let pipe_length (type a) (q : a buffer) =
@@ -424,12 +422,12 @@ struct
 
   let close (type a) (w : a t) =
     let wakeup = function
-      | (_, Message (_, Some u)) ->
+      | _, Message (_, Some u) ->
           let name = Format.asprintf "%a" Name.pp w.name in
           Lwt.wakeup_later
             u
             (Result_syntax.tzfail (Closed {base = base_name; name}))
-      | (_, Message (_, None)) -> ()
+      | _, Message (_, None) -> ()
     in
     let close_queue message_queue =
       let messages = Lwt_pipe.Bounded.pop_all_now message_queue in
@@ -716,22 +714,22 @@ struct
 
   let state w =
     match (w.state, w.status) with
-    | (None, Launching _) ->
+    | None, Launching _ ->
         invalid_arg
           (Format.asprintf
              "Worker.state (%s[%a]): state called before worker was initialized"
              base_name
              Name.pp
              w.name)
-    | (None, (Closing _ | Closed _)) ->
+    | None, (Closing _ | Closed _) ->
         invalid_arg
           (Format.asprintf
              "Worker.state (%s[%a]): state called after worker was terminated"
              base_name
              Name.pp
              w.name)
-    | (None, _) -> assert false
-    | (Some state, _) -> state
+    | None, _ -> assert false
+    | Some state, _ -> state
 
   let pending_requests q = Queue.pending_requests q
 

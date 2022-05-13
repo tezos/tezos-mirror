@@ -42,8 +42,8 @@ let get :
     (Raw_context.t * Tx_rollup_inbox_repr.t) tzresult Lwt.t =
  fun ctxt level tx_rollup ->
   find ctxt level tx_rollup >>=? function
-  | (_, None) -> fail (Inbox_does_not_exist (tx_rollup, level))
-  | (ctxt, Some inbox) -> return (ctxt, inbox)
+  | _, None -> fail (Inbox_does_not_exist (tx_rollup, level))
+  | ctxt, Some inbox -> return (ctxt, inbox)
 
 (** [prepare_inbox ctxt rollup state level] prepares the metadata
     for an inbox at [level], which may imply creating it if it does
@@ -173,7 +173,7 @@ let append_message :
   >>=? fun () ->
   Tx_rollup_hash_builder.message ctxt message >>?= fun (ctxt, message_hash) ->
   Tx_rollup_gas.consume_add_message_cost ctxt >>?= fun ctxt ->
-  let (ctxt, inbox_merkle_root) =
+  let ctxt, inbox_merkle_root =
     Raw_context.Tx_rollup.add_message ctxt rollup message_hash
   in
   let new_inbox = update_inbox inbox message_size inbox_merkle_root in

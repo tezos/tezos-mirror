@@ -331,7 +331,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
         let* body = post_process_bson_response ~body meth uri in
         return (`Json (`Ok body))
     | _ -> (
-        let* (content_type, other_resp) =
+        let* content_type, other_resp =
           post_process_error_responses response meth uri accept
         in
         (* We attempt to decode in JSON. It might

@@ -164,7 +164,7 @@ let get_delegates (cctxt : Protocol_client_context.full)
     List.map_es
       (fun pkh ->
         Client_keys.get_key cctxt pkh >>=? function
-        | (alias, pk, sk_uri) -> return (proj_delegate (alias, pkh, pk, sk_uri)))
+        | alias, pk, sk_uri -> return (proj_delegate (alias, pkh, pk, sk_uri)))
       pkhs)
   >>=? fun delegates ->
   Tezos_signer_backends.Encrypted.decrypt_list

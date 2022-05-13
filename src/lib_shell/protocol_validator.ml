@@ -113,7 +113,7 @@ let validate state hash protocol =
       in
       match Protocol_hash.Map.find hash state.pending with
       | None ->
-          let (res, wakener) = Lwt.task () in
+          let res, wakener = Lwt.task () in
           let broadcast = Protocol_hash.Map.cardinal state.pending = 0 in
           state.pending <-
             Protocol_hash.Map.add hash (protocol, res, wakener) state.pending ;

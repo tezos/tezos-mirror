@@ -118,7 +118,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
         match l with
         | [] -> ([], l)
         | x :: xs ->
-            let (l1, l2) = split_at Int64.(pred n) xs in
+            let l1, l2 = split_at Int64.(pred n) xs in
             (x :: l1, l2)
 
     let hash ~height t1 t2 =
@@ -140,23 +140,23 @@ module Make_Storage (C : Core_sig.Validator) = struct
       assert (Compare.Int64.(pos >= 0L && pos <= pow2 height)) ;
       assert (Compare.Int.(height >= 0 && height <= 32)) ;
       match (tree, height, cms) with
-      | (_, _, []) -> tree
-      | (Empty, 0, [cm]) -> Leaf cm
-      | (Leaf _, _, _)
+      | _, _, [] -> tree
+      | Empty, 0, [cm] -> Leaf cm
+      | Leaf _, _, _
       (* The second conjuntion of the precondition is violated by a Leaf (which
          is already full) and a non empty cms. *)
-      | (_, 0, _) ->
+      | _, 0, _ ->
           (* Only leaves can be at height 0. *)
           assert false
-      | (Empty, height, _) -> insert_node Empty Empty (height - 1) pos cms
-      | (Node (_, t1, t2), height, _) -> insert_node t1 t2 (height - 1) pos cms
+      | Empty, height, _ -> insert_node Empty Empty (height - 1) pos cms
+      | Node (_, t1, t2), height, _ -> insert_node t1 t2 (height - 1) pos cms
 
     and insert_node t1 t2 height pos cms =
-      let (t1, t2) =
+      let t1, t2 =
         if Compare.Int64.(pos < pow2 height) then (
           assert (t2 = Empty) ;
           let at = Int64.(sub (pow2 height) pos) in
-          let (cml, cmr) = split_at at cms in
+          let cml, cmr = split_at at cms in
           let t1 = insert t1 height pos cml in
           let t2 = insert t2 height 0L cmr in
           (t1, t2))
@@ -321,7 +321,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
         (list C.Nullifier.encoding)
 
     let get_from t pos =
-      let (es, _) =
+      let es, _ =
         fold
           (fun e (acc, cnt) ->
             if Compare.Int64.(cnt >= pos) then (e :: acc, Int64.succ cnt)
@@ -432,7 +432,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
     }
 
   let add state cm_cipher_list =
-    let (cm_list, cipher_list) = List.split cm_cipher_list in
+    let cm_list, cipher_list = List.split cm_cipher_list in
     assert (
       List.for_all
         (fun cipher -> C.Ciphertext.get_memo_size cipher = state.memo_size)

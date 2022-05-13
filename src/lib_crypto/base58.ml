@@ -103,7 +103,7 @@ let raw_encode ?(alphabet = Alphabet.default) s =
   let rec loop s i =
     if s = Z.zero then i
     else
-      let (s, r) = Z.div_rem s zbase in
+      let s, r = Z.div_rem s zbase in
       Bytes.set res i (to_char ~alphabet (Z.to_int r)) ;
       loop s (i - 1)
   in
@@ -222,7 +222,7 @@ struct
       assert (String.length s = length) ;
       of_raw s
     in
-    let (encoded_prefix, encoded_length) = make_encoded_prefix prefix length in
+    let encoded_prefix, encoded_length = make_encoded_prefix prefix length in
     check_ambiguous_prefix encoded_prefix encoded_length !encodings ;
     let encoding =
       {prefix; length; encoded_prefix; encoded_length; to_raw; of_raw; wrap}
@@ -280,7 +280,7 @@ struct
     let min = raw_decode ~alphabet (request ^ String.make (len - n) zero) in
     let max = raw_decode ~alphabet (request ^ String.make (len - n) last) in
     match (min, max) with
-    | (Some min, Some max) ->
+    | Some min, Some max ->
         let prefix_len = TzString.common_prefix min max in
         Some (String.sub min 0 prefix_len)
     | _ -> None

@@ -84,10 +84,10 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let set = accu in
       Interp_costs.set_iter set
   | ISet_mem _ ->
-      let v = accu and (set, _) = stack in
+      let v = accu and set, _ = stack in
       Interp_costs.set_mem v set
   | ISet_update _ ->
-      let v = accu and (_, (set, _)) = stack in
+      let v = accu and _, (set, _) = stack in
       Interp_costs.set_update v set
   | IMap_map _ ->
       let map = accu in
@@ -96,59 +96,59 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let map = accu in
       Interp_costs.map_iter map
   | IMap_mem _ ->
-      let v = accu and (map, _) = stack in
+      let v = accu and map, _ = stack in
       Interp_costs.map_mem v map
   | IMap_get _ ->
-      let v = accu and (map, _) = stack in
+      let v = accu and map, _ = stack in
       Interp_costs.map_get v map
   | IMap_update _ ->
-      let k = accu and (_, (map, _)) = stack in
+      let k = accu and _, (map, _) = stack in
       Interp_costs.map_update k map
   | IMap_get_and_update _ ->
-      let k = accu and (_, (map, _)) = stack in
+      let k = accu and _, (map, _) = stack in
       Interp_costs.map_get_and_update k map
   | IBig_map_mem _ ->
-      let (Big_map map, _) = stack in
+      let Big_map map, _ = stack in
       Interp_costs.big_map_mem map.diff
   | IBig_map_get _ ->
-      let (Big_map map, _) = stack in
+      let Big_map map, _ = stack in
       Interp_costs.big_map_get map.diff
   | IBig_map_update _ ->
-      let (_, (Big_map map, _)) = stack in
+      let _, (Big_map map, _) = stack in
       Interp_costs.big_map_update map.diff
   | IBig_map_get_and_update _ ->
-      let (_, (Big_map map, _)) = stack in
+      let _, (Big_map map, _) = stack in
       Interp_costs.big_map_get_and_update map.diff
   | IAdd_seconds_to_timestamp _ ->
-      let n = accu and (t, _) = stack in
+      let n = accu and t, _ = stack in
       Interp_costs.add_seconds_timestamp n t
   | IAdd_timestamp_to_seconds _ ->
-      let t = accu and (n, _) = stack in
+      let t = accu and n, _ = stack in
       Interp_costs.add_timestamp_seconds t n
   | ISub_timestamp_seconds _ ->
-      let t = accu and (n, _) = stack in
+      let t = accu and n, _ = stack in
       Interp_costs.sub_timestamp_seconds t n
   | IDiff_timestamps _ ->
-      let t1 = accu and (t2, _) = stack in
+      let t1 = accu and t2, _ = stack in
       Interp_costs.diff_timestamps t1 t2
   | IConcat_string_pair _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.concat_string_pair x y
   | IConcat_string _ ->
       let ss = accu in
       Interp_costs.concat_string_precheck ss
   | ISlice_string _ ->
       let _offset = accu in
-      let (_length, (s, _)) = stack in
+      let _length, (s, _) = stack in
       Interp_costs.slice_string s
   | IConcat_bytes_pair _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.concat_bytes_pair x y
   | IConcat_bytes _ ->
       let ss = accu in
       Interp_costs.concat_string_precheck ss
   | ISlice_bytes _ ->
-      let (_, (s, _)) = stack in
+      let _, (s, _) = stack in
       Interp_costs.slice_bytes s
   | IMul_teznat _ -> Interp_costs.mul_teznat
   | IMul_nattez _ -> Interp_costs.mul_nattez
@@ -159,28 +159,28 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let x = accu in
       Interp_costs.neg x
   | IAdd_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.add_int x y
   | IAdd_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.add_nat x y
   | ISub_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.sub_int x y
   | IMul_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.mul_int x y
   | IMul_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.mul_nat x y
   | IEdiv_teznat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.ediv_teznat x y
   | IEdiv_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.ediv_int x y
   | IEdiv_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.ediv_nat x y
   | ILsl_nat _ ->
       let x = accu in
@@ -189,25 +189,25 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let x = accu in
       Interp_costs.lsr_nat x
   | IOr_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.or_nat x y
   | IAnd_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.and_nat x y
   | IAnd_int_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.and_int_nat x y
   | IXor_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.xor_nat x y
   | INot_int _ ->
       let x = accu in
       Interp_costs.not_int x
   | ICompare (_, ty, _) ->
-      let a = accu and (b, _) = stack in
+      let a = accu and b, _ = stack in
       Interp_costs.compare ty a b
   | ICheck_signature _ ->
-      let key = accu and (_, (message, _)) = stack in
+      let key = accu and _, (message, _) = stack in
       Interp_costs.check_signature key message
   | IHash_key _ ->
       let pk = accu in
@@ -242,10 +242,10 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let outputs = List.length tx.outputs in
       Interp_costs.sapling_verify_update_deprecated ~inputs ~outputs
   | ISplit_ticket _ ->
-      let ticket = accu and ((amount_a, amount_b), _) = stack in
+      let ticket = accu and (amount_a, amount_b), _ = stack in
       Interp_costs.split_ticket ticket.amount amount_a amount_b
   | IJoin_tickets (_, ty, _) ->
-      let (ticket_a, ticket_b) = accu in
+      let ticket_a, ticket_b = accu in
       Interp_costs.join_tickets ty ticket_a ticket_b
   | IHalt _ -> Interp_costs.halt
   | IDrop _ -> Interp_costs.drop
@@ -341,7 +341,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let z = accu in
       Interp_costs.mul_bls12_381_fr_z z
   | IMul_bls12_381_z_fr _ ->
-      let (z, _) = stack in
+      let z, _ = stack in
       Interp_costs.mul_bls12_381_z_fr z
   | IDup_n (_, n, _, _) -> Interp_costs.dupn n
   | IComb (_, n, _, _) -> Interp_costs.comb n
@@ -351,7 +351,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ITicket _ -> Interp_costs.ticket
   | IRead_ticket _ -> Interp_costs.read_ticket
   | IOpen_chest _ ->
-      let _chest_key = accu and (chest, (time, _)) = stack in
+      let _chest_key = accu and chest, (time, _) = stack in
       Interp_costs.open_chest ~chest ~time:(Script_int.to_zint time)
   | ILog _ -> Gas.free
  [@@ocaml.inline always]
@@ -437,7 +437,6 @@ let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
    non-instrumented code. "Zero-cost logging" means that the normal
    non-instrumented execution is not impacted by the ability to
    instrument it, not that the logging itself has no cost.
-
 *)
 let log_next_kinstr logger i =
   let apply k =
@@ -472,7 +471,7 @@ let rec kundip :
   match w with
   | KPrefix (kinfo, w) ->
       let k = IConst (kinfo, accu, k) in
-      let (accu, stack) = stack in
+      let accu, stack = stack in
       kundip w accu stack k
   | KRest -> (accu, stack, k)
 
@@ -514,7 +513,7 @@ let apply ctxt gas capture_ty capture lam =
             ] )
       in
       let lam' = Lam (full_descr, full_expr) in
-      let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+      let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
 let make_transaction_to_contract ctxt ~destination ~amount ~entrypoint ~location
@@ -624,7 +623,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
-  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+  let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
 
 (** [create_contract (ctxt, sc) gas storage_ty code delegate credit init]
@@ -663,7 +662,7 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let piop = Internal_operation {source = sc.self; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
-  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+  let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, contract, ctxt, gas)
 
 (* [unpack ctxt ty bytes] deserialize [bytes] into a value of type [ty]. *)
@@ -709,10 +708,10 @@ let rec interp_stack_prefix_preserving_operation :
     (d * w) * result =
  fun f n accu stk ->
   match (n, stk) with
-  | (KPrefix (_, n), rest) ->
+  | KPrefix (_, n), rest ->
       interp_stack_prefix_preserving_operation f n (fst rest) (snd rest)
       |> fun ((v, rest'), result) -> ((accu, (v, rest')), result)
-  | (KRest, v) -> f accu v
+  | KRest, v -> f accu v
 
 (*
 

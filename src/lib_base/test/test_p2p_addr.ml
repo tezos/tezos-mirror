@@ -113,8 +113,8 @@ let eq l r =
   in
   let eq_peer_id idl idr =
     match (idl, idr) with
-    | (None, None) -> true
-    | (Some idl, Some idr) -> P2p_peer_id.(idl = idr)
+    | None, None -> true
+    | Some idl, Some idr -> P2p_peer_id.(idl = idr)
     | _ -> false
   in
   eq_addr l.addr r.addr && l.port = r.port && eq_peer_id l.peer_id r.peer_id

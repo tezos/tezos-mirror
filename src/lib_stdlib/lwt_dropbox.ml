@@ -59,7 +59,7 @@ let wait_put_with_timeout ~timeout dropbox =
   match dropbox.put_waiter with
   | Some (waiter, _wakener) -> Lwt.pick [timeout; Lwt.protected waiter]
   | None ->
-      let (waiter, wakener) = Lwt.wait () in
+      let waiter, wakener = Lwt.wait () in
       dropbox.put_waiter <- Some (waiter, wakener) ;
       Lwt.pick [timeout; Lwt.protected waiter]
 
@@ -67,7 +67,7 @@ let wait_put_no_timeout dropbox =
   match dropbox.put_waiter with
   | Some (waiter, _wakener) -> Lwt.protected waiter
   | None ->
-      let (waiter, wakener) = Lwt.wait () in
+      let waiter, wakener = Lwt.wait () in
       dropbox.put_waiter <- Some (waiter, wakener) ;
       Lwt.protected waiter
 

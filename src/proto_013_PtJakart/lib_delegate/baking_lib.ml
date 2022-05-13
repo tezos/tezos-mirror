@@ -246,7 +246,7 @@ let propose_at_next_level ~minimal_timestamp state =
     cctxt#message "Proposal injected" >>= fun () -> return state
 
 let endorsement_quorum state =
-  let (power, endorsements) = state_endorsing_power state in
+  let power, endorsements = state_endorsing_power state in
   if
     Compare.Int.(
       power >= state.global_state.constants.parametric.consensus_threshold)

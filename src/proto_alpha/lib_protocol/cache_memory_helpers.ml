@@ -142,8 +142,7 @@ let option_size_vec some x =
   let some x = ret_adding (some x) h1w in
   Option.fold ~none:zero ~some x
 
-let list_cell_size elt_size =
-  header_size +! word_size +! word_size +! elt_size
+let list_cell_size elt_size = header_size +! word_size +! word_size +! elt_size
   [@@ocaml.inline always]
 
 let list_fold_size elt_size list =
@@ -152,8 +151,7 @@ let list_fold_size elt_size list =
     zero
     list
 
-let boxed_tup2 x y =
-  header_size +! word_size +! word_size +! x +! y
+let boxed_tup2 x y = header_size +! word_size +! word_size +! x +! y
   [@@ocaml.inline always]
 
 let node_size =

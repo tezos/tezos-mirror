@@ -375,8 +375,7 @@ let item_encoding =
 
 let item_in_memory_size
     (Item
-      ( kind
-      (* kinds are constant tags *),
+      ( kind (* kinds are constant tags *),
         _id_is_a_Z_fitting_in_an_int_for_a_long_time,
         diff )) =
   let open Cache_memory_helpers in

@@ -47,13 +47,11 @@ let split_no_empty delim ?(limit = max_int) path =
     else do_split acc limit i
   and do_split acc limit i =
     if limit <= 0 then
-      if i = l then List.rev acc
-      else List.rev (String.sub path i (l - i) :: acc)
+      if i = l then List.rev acc else List.rev (String.sub path i (l - i) :: acc)
     else do_component acc (pred limit) i i
   and do_component acc limit i j =
     if j >= l then
-      if i = j then List.rev acc
-      else List.rev (String.sub path i (j - i) :: acc)
+      if i = j then List.rev acc else List.rev (String.sub path i (j - i) :: acc)
     else if path.[j] = delim then
       do_slashes (String.sub path i (j - i) :: acc) limit j
     else do_component acc limit i (j + 1)

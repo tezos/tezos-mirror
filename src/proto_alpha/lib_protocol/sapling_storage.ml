@@ -121,10 +121,10 @@ module Commitments : COMMITMENTS = struct
     assert_node node height ;
     assert_height height ;
     Storage.Sapling.Commitments.find (ctx, id) node >|=? function
-    | (ctx, None) ->
+    | ctx, None ->
         let hash = H.uncommitted ~height in
         (ctx, hash)
-    | (ctx, Some hash) -> (ctx, hash)
+    | ctx, Some hash -> (ctx, hash)
 
   let left node = Int64.mul node 2L
 
@@ -137,7 +137,7 @@ module Commitments : COMMITMENTS = struct
       match l with
       | [] -> ([], l)
       | x :: xs ->
-          let (l1, l2) = split_at Int64.(pred n) xs in
+          let l1, l2 = split_at Int64.(pred n) xs in
           (x :: l1, l2)
 
   (* [insert tree height pos cms] inserts the list of commitments
@@ -154,9 +154,9 @@ module Commitments : COMMITMENTS = struct
     assert_height height ;
     assert_pos pos height ;
     match (height, cms) with
-    | (_, []) ->
+    | _, [] ->
         get_root_height ctx id node height >|=? fun (ctx, h) -> (ctx, 0, h)
-    | (0, [cm]) ->
+    | 0, [cm] ->
         let h = H.of_commitment cm in
         Storage.Sapling.Commitments.init (ctx, id) node h
         >|=? fun (ctx, size) -> (ctx, size, h)
@@ -164,7 +164,7 @@ module Commitments : COMMITMENTS = struct
         let height = height - 1 in
         (if Compare.Int64.(pos < pow2 height) then
          let at = Int64.(sub (pow2 height) pos) in
-         let (cml, cmr) = split_at at cms in
+         let cml, cmr = split_at at cms in
          insert ctx id (left node) height pos cml >>=? fun (ctx, size_l, hl) ->
          insert ctx id (right node) height 0L cmr >|=? fun (ctx, size_r, hr) ->
          (ctx, size_l + size_r, hl, hr)
@@ -187,8 +187,8 @@ module Commitments : COMMITMENTS = struct
     (* we don't count gas for this function, it is called only by RPC *)
     >>=?
     function
-    | (_ctx, None) -> return acc
-    | (_ctx, Some h) ->
+    | _ctx, None -> return acc
+    | _ctx, Some h ->
         if Compare.Int.(height = 0) then return (f acc h)
         else
           let full = pow2 (height - 1) in
@@ -251,7 +251,7 @@ end
 
 (* Collection of nullifiers w/o duplicates, append-only. It has a dual
    implementation with a hash map for constant `mem` and with a ordered set to
-   retrieve by position.  *)
+   retrieve by position. *)
 module Nullifiers = struct
   let init = Storage.Sapling.nullifiers_init
 

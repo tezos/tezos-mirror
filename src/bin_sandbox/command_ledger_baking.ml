@@ -359,7 +359,7 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
   let other_baker_account =
     fst (List.nth_exn protocol.Tezos_protocol.bootstrap_accounts 1)
   in
-  let* (nodes, protocol) =
+  let* nodes, protocol =
     Test_scenario.network_with_protocol
       ~protocol
       ~size
@@ -417,7 +417,7 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
         Tezos_client.Ledger.set_hwm state ~client:(client 0) ~uri ~level)
   in
   let* chain_id = get_chain_id state ~client:(client 0) in
-  let* (baker, ledger_account) =
+  let* baker, ledger_account =
     setup_baking_ledger state uri ~client:(client 0) ~protocol
   in
   Interactive_test.Pauser.add_commands

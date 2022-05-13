@@ -95,7 +95,7 @@ let connect t saddr =
 
 let accept sock =
   let open Lwt_syntax in
-  let* (fd, saddr) = Lwt_unix.accept sock in
+  let* fd, saddr = Lwt_unix.accept sock in
   let* t = create fd in
   let* () = Events.(emit accept_fd) (t.id, string_of_sockaddr saddr) in
   Lwt.return (t, saddr)

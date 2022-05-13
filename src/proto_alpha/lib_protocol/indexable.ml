@@ -141,11 +141,11 @@ let compare :
     =
  fun c x y ->
   match (x, y) with
-  | ((Hidden_index x | Index x), (Hidden_index y | Index y)) ->
+  | (Hidden_index x | Index x), (Hidden_index y | Index y) ->
       Compare.Int32.compare x y
-  | ((Hidden_value x | Value x), (Hidden_value y | Value y)) -> c x y
-  | ((Hidden_index _ | Index _), (Hidden_value _ | Value _)) -> -1
-  | ((Hidden_value _ | Value _), (Hidden_index _ | Index _)) -> 1
+  | (Hidden_value x | Value x), (Hidden_value y | Value y) -> c x y
+  | (Hidden_index _ | Index _), (Hidden_value _ | Value _) -> -1
+  | (Hidden_value _ | Value _), (Hidden_index _ | Index _) -> 1
 
 let compare_values c : 'a value -> 'a value -> int =
  fun (Value x) (Value y) -> c x y

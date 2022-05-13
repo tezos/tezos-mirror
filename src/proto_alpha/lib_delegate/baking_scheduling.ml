@@ -48,7 +48,7 @@ type events =
   Lwt.t
 
 let create_loop_state block_stream operation_worker =
-  let (future_block_stream, push_future_block) = Lwt_stream.create () in
+  let future_block_stream, push_future_block = Lwt_stream.create () in
   {
     block_stream;
     qc_stream = Operation_worker.get_quorum_event_stream operation_worker;
@@ -511,12 +511,12 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
   let next_round = compute_next_round_time state in
   compute_next_potential_baking_time_at_next_level state >>= fun next_baking ->
   match (next_round, next_baking) with
-  | (None, None) ->
+  | None, None ->
       Events.(emit waiting_for_new_head ()) >>= fun () ->
       return (Lwt_utils.never_ending () >>= fun () -> assert false)
   (* We have no slot at the next level in the near future, we will
      patiently wait for the next round. *)
-  | (Some next_round, None) -> (
+  | Some next_round, None -> (
       (* If there is an elected block, then we make the assumption
          that the bakers at the next level have also received an
          endorsement quorum, and we delay a bit injecting at the next
@@ -527,7 +527,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
       | Some _elected_block -> delay_next_round_timeout next_round)
   (* There is no timestamp for a successor round but there is for a
      future baking slot, we will wait to bake. *)
-  | (None, Some next_baking) -> wait_baking_time_next_level next_baking
+  | None, Some next_baking -> wait_baking_time_next_level next_baking
   (* We choose the earliest timestamp between waiting to bake and
      waiting for the next round. *)
   | ( Some ((next_round_time, next_round) as next_round_info),

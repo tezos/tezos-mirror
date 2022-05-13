@@ -268,8 +268,7 @@ let make_key ctxt content =
     ctxt
     ~ticketer:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
     ~typ:"string"
-    ~contents:
-      (Printf.sprintf {|"%s"|} content)
+    ~contents:(Printf.sprintf {|"%s"|} content)
       (* In practice, the owner is a rollup address, but this is important only
          for the table of tickets *)
     ~owner:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
@@ -280,7 +279,7 @@ let make_ticket str =
       ( Context.init1 () >>=? fun (blk, _) ->
         Incremental.begin_construction blk >>=? fun incr ->
         let ctxt = Incremental.alpha_ctxt incr in
-        let (ticket, _ctxt) = make_key ctxt str in
+        let ticket, _ctxt = make_key ctxt str in
         return ticket )
   with
   | Ok x -> x
@@ -313,8 +312,8 @@ let input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple =
     | 0 -> acc
     | n ->
         (* Generate random identities *)
-        let (sk1, pk1) = gen_l2_account rng_state in
-        let (sk2, pk2) = gen_l2_account rng_state in
+        let sk1, pk1 = gen_l2_account rng_state in
+        let sk2, pk2 = gen_l2_account rng_state in
         let addr1 = Tx_rollup_l2_address.of_bls_pk pk1 in
         let addr2 = Tx_rollup_l2_address.of_bls_pk pk2 in
         (* Pick indexes *)
@@ -343,13 +342,13 @@ let init_ctxt input =
   let* tree =
     list_fold_left_m
       (fun tree couple ->
-        let* (tree, _, idx1) =
+        let* tree, _, idx1 =
           Address_index.get_or_associate_index tree couple.addr1.addr
         in
         let* tree =
           Address_metadata.init_with_public_key tree idx1 couple.addr1.pk
         in
-        let* (tree, _, idx2) =
+        let* tree, _, idx2 =
           Address_index.get_or_associate_index tree couple.addr2.addr
         in
         let* tree =
@@ -358,7 +357,7 @@ let init_ctxt input =
         let* tree =
           list_fold_left_m
             (fun tree ticket ->
-              let* (tree, _, tidx) =
+              let* tree, _, tidx =
                 Ticket_index.get_or_associate_index tree ticket.hash
               in
               let* tree = Ticket_ledger.credit tree tidx idx1 qty in
@@ -394,7 +393,7 @@ let create_operation ~rng_state input senders =
     let value = Indexable.from_value value in
     either idx value
   in
-  let (couple, source) =
+  let couple, source =
     (* The source must be unique in the transfer. The l2 operation forbids
        operation to have multiple transfers from the same source. *)
     let rec pick_until_new () =
@@ -475,7 +474,7 @@ let create_transaction ~rng_state input nb_op =
   let rec aux acc senders = function
     | 0 -> acc
     | n ->
-        let (op, signer, senders) = create_operation ~rng_state input senders in
+        let op, signer, senders = create_operation ~rng_state input senders in
         let acc = (op, signer) :: acc in
         aux acc senders (n - 1)
   in
@@ -484,7 +483,7 @@ let create_transaction ~rng_state input nb_op =
   aux acc senders nb_op
 
 let make_msg ~rng_state input nb_op =
-  let (transaction, signers) =
+  let transaction, signers =
     create_transaction ~rng_state input nb_op |> List.split
   in
   let buf =
@@ -525,7 +524,7 @@ let create_proof store max_withdrawals msg =
   let open Prover_context.Syntax in
   let index = Irmin_context.index store in
   let* hash = hash_tree_from_store store in
-  let* (proof, _) =
+  let* proof, _ =
     Irmin_context.produce_stream_proof index (`Node hash) (fun tree ->
         Prover_apply.(
           catch

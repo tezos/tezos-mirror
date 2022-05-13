@@ -49,7 +49,7 @@ let wait_for_protocol_table_update node =
     let proto_hash = JSON.(json |-> "proto_hash" |> as_string_opt) in
     let block_hash = JSON.(json |-> "block_hash" |> as_string_opt) in
     match (proto_hash, block_hash) with
-    | (Some ph, Some bh) -> Some (ph, bh)
+    | Some ph, Some bh -> Some (ph, bh)
     | _ -> None
   in
   let* activation_block =
@@ -127,7 +127,7 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
       ~block:migration_block
       client_1
   in
-  let* (ph_n1_alt, bh_n1_alt) = activation_promise_node_1 in
+  let* ph_n1_alt, bh_n1_alt = activation_promise_node_1 in
   Log.info "Node 1 activates protocol %s on block %s" ph_n1_alt bh_n1_alt ;
   (* Shutdown node_1 and make an alternate activation on node_2. *)
   let* () = Node.terminate node_1 in
@@ -147,7 +147,7 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
       ~block:migration_block
       client_2
   in
-  let* (ph_n2, bh_n2) = activation_promise_node_2 in
+  let* ph_n2, bh_n2 = activation_promise_node_2 in
   Log.info "Node 2 activates protocol %s on block %s" ph_n2 bh_n2 ;
   if String.equal bh_n1_alt bh_n2 then Test.fail "Activation block must differ." ;
   (* Bake a few blocks (eg [num_blocks]) to increase the fitness of node's 2 chain. *)
@@ -168,7 +168,7 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
   let* _ = Node.wait_for_level node_1 target_level
   and* _ = Node.wait_for_level node_2 8 in
   Log.info "Both nodes are at level %d." target_level ;
-  let* (ph_n1, bh_n1) = activation_promise_switch in
+  let* ph_n1, bh_n1 = activation_promise_switch in
   Log.info
     "Node 1 updated its protocol table activation block for protocol %s at \
      block %s"

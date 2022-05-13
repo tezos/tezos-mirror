@@ -27,7 +27,6 @@
 
 open Protocol
 module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
-
 open Alpha_context
 
 (* This type collects a block and the context that results from its application *)
@@ -670,10 +669,10 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?payload_round ?check_size ~baking_mode ?liquidity_baking_toggle_vote pred =
   let operations =
     match (operation, operations) with
-    | (Some op, Some ops) -> Some (op :: ops)
-    | (Some op, None) -> Some [op]
-    | (None, Some ops) -> Some ops
-    | (None, None) -> None
+    | Some op, Some ops -> Some (op :: ops)
+    | Some op, None -> Some [op]
+    | None, Some ops -> Some ops
+    | None, None -> None
   in
   Forge.forge_header
     ?payload_round

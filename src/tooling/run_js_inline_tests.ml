@@ -51,13 +51,11 @@ let add_inline_tests_mode_js fields =
       | Sexp.List (Sexp.Atom "inline_tests" :: p) ->
           Sexp.List
             (Sexp.Atom "inline_tests"
-             ::
-             Sexp.List [Sexp.Atom "modes"; Sexp.Atom "js"]
-             ::
-             List.filter
-               (function
-                 | Sexp.List (Sexp.Atom "modes" :: _) -> false | _ -> true)
-               p)
+            :: Sexp.List [Sexp.Atom "modes"; Sexp.Atom "js"]
+            :: List.filter
+                 (function
+                   | Sexp.List (Sexp.Atom "modes" :: _) -> false | _ -> true)
+                 p)
       | x -> x)
     fields
 

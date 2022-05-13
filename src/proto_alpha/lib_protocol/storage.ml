@@ -395,11 +395,11 @@ module Global_constants = struct
            let name = ["global_constant"]
          end))
          (Make_index (Script_expr_hash))
-         (struct
-           type t = Script_repr.expr
+      (struct
+        type t = Script_repr.expr
 
-           let encoding = Script_repr.expr_encoding
-         end)
+        let encoding = Script_repr.expr_encoding
+      end)
 end
 
 (** Big maps handling *)
@@ -492,11 +492,11 @@ module Big_map = struct
              let name = ["contents"]
            end))
            (Make_index (Script_expr_hash))
-           (struct
-             type t = Script_repr.expr
+        (struct
+          type t = Script_repr.expr
 
-             let encoding = Script_repr.expr_encoding
-           end)
+          let encoding = Script_repr.expr_encoding
+        end)
 
     type context = I.context
 
@@ -938,7 +938,7 @@ module Cycle = struct
            let name = ["slashed_deposits"]
          end))
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
-            (Slashed_level)
+      (Slashed_level)
 
   module Selected_stake_distribution =
     Indexed_context.Make_map
@@ -1017,11 +1017,11 @@ module Cycle = struct
            let name = ["nonces"]
          end))
          (Make_index (Raw_level_repr.Index))
-         (struct
-           type t = nonce_status
+      (struct
+        type t = nonce_status
 
-           let encoding = nonce_status_encoding
-         end)
+        let encoding = nonce_status_encoding
+      end)
 
   module Seed =
     Indexed_context.Make_map
@@ -1259,7 +1259,7 @@ module Commitments =
          let name = ["commitments"]
        end))
        (Make_index (Blinded_public_key_hash.Index))
-       (Tez_repr)
+    (Tez_repr)
 
 (** Ramp up rewards... *)
 
@@ -1277,33 +1277,33 @@ module Ramp_up = struct
            let name = ["ramp_up"; "rewards"]
          end))
          (Make_index (Cycle_repr.Index))
-         (struct
-           type t = reward
+      (struct
+        type t = reward
 
-           let encoding =
-             Data_encoding.(
-               conv
-                 (fun {
-                        baking_reward_fixed_portion;
-                        baking_reward_bonus_per_slot;
-                        endorsing_reward_per_slot;
-                      } ->
-                   ( baking_reward_fixed_portion,
-                     baking_reward_bonus_per_slot,
-                     endorsing_reward_per_slot ))
-                 (fun ( baking_reward_fixed_portion,
-                        baking_reward_bonus_per_slot,
-                        endorsing_reward_per_slot ) ->
-                   {
+        let encoding =
+          Data_encoding.(
+            conv
+              (fun {
                      baking_reward_fixed_portion;
                      baking_reward_bonus_per_slot;
                      endorsing_reward_per_slot;
-                   })
-                 (obj3
-                    (req "baking_reward_fixed_portion" Tez_repr.encoding)
-                    (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-                    (req "endorsing_reward_per_slot" Tez_repr.encoding)))
-         end)
+                   } ->
+                ( baking_reward_fixed_portion,
+                  baking_reward_bonus_per_slot,
+                  endorsing_reward_per_slot ))
+              (fun ( baking_reward_fixed_portion,
+                     baking_reward_bonus_per_slot,
+                     endorsing_reward_per_slot ) ->
+                {
+                  baking_reward_fixed_portion;
+                  baking_reward_bonus_per_slot;
+                  endorsing_reward_per_slot;
+                })
+              (obj3
+                 (req "baking_reward_fixed_portion" Tez_repr.encoding)
+                 (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
+                 (req "endorsing_reward_per_slot" Tez_repr.encoding)))
+      end)
 end
 
 module Pending_migration = struct
@@ -1571,11 +1571,11 @@ module Sc_rollup = struct
            let name = ["commitments"]
          end))
          (Make_index (Sc_rollup_repr.Commitment_hash_index))
-         (struct
-           type t = Sc_rollup_repr.Commitment.t
+      (struct
+        type t = Sc_rollup_repr.Commitment.t
 
-           let encoding = Sc_rollup_repr.Commitment.encoding
-         end)
+        let encoding = Sc_rollup_repr.Commitment.encoding
+      end)
 
   module Commitment_stake_count =
     Make_indexed_carbonated_data_storage
@@ -1584,11 +1584,11 @@ module Sc_rollup = struct
            let name = ["commitment_stake_count"]
          end))
          (Make_index (Sc_rollup_repr.Commitment_hash_index))
-         (struct
-           type t = int32
+      (struct
+        type t = int32
 
-           let encoding = Data_encoding.int32
-         end)
+        let encoding = Data_encoding.int32
+      end)
 
   module Commitment_added =
     Make_indexed_carbonated_data_storage
@@ -1597,11 +1597,11 @@ module Sc_rollup = struct
            let name = ["commitment_added"]
          end))
          (Make_index (Sc_rollup_repr.Commitment_hash_index))
-         (struct
-           type t = Raw_level_repr.t
+      (struct
+        type t = Raw_level_repr.t
 
-           let encoding = Raw_level_repr.encoding
-         end)
+        let encoding = Raw_level_repr.encoding
+      end)
 
   module Game =
     Make_indexed_carbonated_data_storage
@@ -1610,11 +1610,11 @@ module Sc_rollup = struct
            let name = ["game"]
          end))
          (Make_index (Sc_rollup_game_repr.Index))
-         (struct
-           type t = Sc_rollup_game_repr.t
+      (struct
+        type t = Sc_rollup_game_repr.t
 
-           let encoding = Sc_rollup_game_repr.encoding
-         end)
+        let encoding = Sc_rollup_game_repr.encoding
+      end)
 
   module Game_timeout =
     Make_indexed_carbonated_data_storage
@@ -1623,11 +1623,11 @@ module Sc_rollup = struct
            let name = ["game_timeout"]
          end))
          (Make_index (Sc_rollup_game_repr.Index))
-         (struct
-           type t = Raw_level_repr.t
+      (struct
+        type t = Raw_level_repr.t
 
-           let encoding = Raw_level_repr.encoding
-         end)
+        let encoding = Raw_level_repr.encoding
+      end)
 
   module Opponent =
     Make_indexed_carbonated_data_storage

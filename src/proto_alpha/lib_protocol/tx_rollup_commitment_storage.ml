@@ -183,11 +183,10 @@ let check_commitment_predecessor ctxt state commitment =
     ( commitment.predecessor,
       Tx_rollup_state_repr.next_commitment_predecessor state )
   with
-  | (Some pred_hash, Some expected_hash) when Hash.(pred_hash = expected_hash)
-    ->
+  | Some pred_hash, Some expected_hash when Hash.(pred_hash = expected_hash) ->
       return ctxt
-  | (None, None) -> return ctxt
-  | (provided, expected) -> fail (Wrong_predecessor_hash {provided; expected})
+  | None, None -> return ctxt
+  | provided, expected -> fail (Wrong_predecessor_hash {provided; expected})
 
 let check_commitment_batches_and_merkle_root ctxt state inbox commitment =
   let Tx_rollup_inbox_repr.{inbox_length; merkle_root; _} = inbox in

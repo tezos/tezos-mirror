@@ -177,7 +177,7 @@ and infer_cmd_full_auto model_name workload_data solver
     | _ -> None
   in
   let solver = solver_of_string solver infer_opts in
-  let (graph, measurements) = Dep_graph.load_files model_name workload_files in
+  let graph, measurements = Dep_graph.load_files model_name workload_files in
   if Dep_graph.G.is_empty graph then (
     Format.eprintf "Empty dependency graph.@." ;
     exit 1) ;
@@ -193,7 +193,7 @@ and infer_cmd_full_auto model_name workload_data solver
       Dep_graph.D.output_graph oc graph ;
       close_out oc)
     infer_opts.dot_file ;
-  let (map, report) =
+  let map, report =
     Dep_graph.T.fold
       (fun workload_file (overrides_map, report) ->
         Format.eprintf "Processing: %s@." workload_file ;
@@ -248,11 +248,11 @@ and infer_cmd_full_auto model_name workload_data solver
   in
   perform_save_solution map infer_opts ;
   match (infer_opts.report, report) with
-  | (Cmdline.NoReport, _) -> ()
-  | (Cmdline.ReportToStdout, Some report) ->
+  | Cmdline.NoReport, _ -> ()
+  | Cmdline.ReportToStdout, Some report ->
       let s = Report.to_latex report in
       Format.printf "%s" s
-  | (Cmdline.ReportToFile output_file, Some report) ->
+  | Cmdline.ReportToFile output_file, Some report ->
       let s = Report.to_latex report in
       Lwt_main.run
         (let open Lwt_syntax in

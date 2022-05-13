@@ -115,7 +115,7 @@ let process_head Node_context.({cctxt; rollup_address; _} as node_ctxt) store
       @@ let*! history = State.history_of_hash store predecessor in
          let*! messages_tree = State.get_message_tree store predecessor in
          let*? level = Raw_level.of_int32 level in
-         let* (messages_tree, history, inbox) =
+         let* messages_tree, history, inbox =
            Store.Inbox.add_messages history inbox level messages messages_tree
          in
          let*! () = State.set_message_tree store head_hash messages_tree in

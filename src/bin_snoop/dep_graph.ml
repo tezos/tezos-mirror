@@ -158,7 +158,7 @@ module Solver = struct
           {dependencies = deps; undecided_variables = undecided; meta = n.meta}
 
   let rec propagate_solved state (n : 'a solved) solved_but_not_propagated =
-    let (solved_but_not_propagated, unsolved) =
+    let solved_but_not_propagated, unsolved =
       List.fold_left
         (fun (solved_acc, unsolved_acc) unsolved ->
           Fv_set.fold
@@ -183,7 +183,7 @@ module Solver = struct
 
   let solve {solved; unsolved} =
     assert (solved = []) ;
-    let (roots, others) =
+    let roots, others =
       List.partition
         (fun (node : 'a unsolved) ->
           Fv_set.is_empty node.dependencies

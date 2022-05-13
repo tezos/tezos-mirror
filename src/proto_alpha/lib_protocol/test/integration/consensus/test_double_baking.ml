@@ -58,7 +58,7 @@ let order_block_hashes ~correct_order bh1 bh2 =
   else (bh1, bh2)
 
 let double_baking ctxt ?(correct_order = true) bh1 bh2 =
-  let (bh1, bh2) = order_block_hashes ~correct_order bh1 bh2 in
+  let bh1, bh2 = order_block_hashes ~correct_order bh1 bh2 in
   Op.double_baking ctxt bh1 bh2
 
 (****************************************************************)
@@ -104,7 +104,7 @@ let order_endorsements ~correct_order op1 op2 =
    [test_valid_double_baking_followed_by_double_endorsing] and
    [test_valid_double_endorsing_followed_by_double_baking] *)
 let double_endorsement ctxt ?(correct_order = true) op1 op2 =
-  let (e1, e2) = order_endorsements ~correct_order op1 op2 in
+  let e1, e2 = order_endorsements ~correct_order op1 op2 in
   Op.double_endorsement ctxt e1 e2
 
 let test_valid_double_baking_followed_by_double_endorsing () =

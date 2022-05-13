@@ -26,7 +26,7 @@
 module Contracts = Tezos_client_alpha_commands.Client_proto_stresstest_contracts
 
 let weighted_average (xs : (float * float) list) =
-  let (total_weight, total_sum) =
+  let total_weight, total_sum =
     List.fold_left
       (fun (total_weight, total_sum) (weight, value) ->
         (total_weight +. weight, total_sum +. (value *. weight)))
@@ -115,7 +115,7 @@ let calculate_smart_contract_parameters (average_block : Average_block.t)
           | None -> Stdlib.failwith ("no gas cost estimation for: " ^ alias)
           | Some (_, x) -> x
         in
-        let (invocation_fee, invocation_gas_limit) =
+        let invocation_fee, invocation_gas_limit =
           deduce_fee_and_gas_limit gas_estimation
         in
         ( alias,

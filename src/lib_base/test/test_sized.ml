@@ -114,7 +114,7 @@ module SizedSet_test = struct
       ~name:"partition"
       Gen.(pair generator (fun1 Observable.int bool))
       (fun (s, f) ->
-        let (s1, s2) = SizedSet.partition (Fn.apply f) s in
+        let s1, s2 = SizedSet.partition (Fn.apply f) s in
         assert_consistent s1 && assert_consistent s2)
 
   let split =
@@ -122,7 +122,7 @@ module SizedSet_test = struct
       ~name:"split"
       Gen.(pair generator small_nat)
       (fun (s, v) ->
-        let (s1, _, s2) = SizedSet.split v s in
+        let s1, _, s2 = SizedSet.split v s in
         assert_consistent s1 && assert_consistent s2)
 
   let add_seq =
@@ -262,7 +262,7 @@ module SizedMap_test = struct
       ~name:"partition"
       Gen.(pair generator (fun2 Observable.int Observable.int bool))
       (fun (m, f) ->
-        let (s1, s2) = SizedMap.partition (Fn.apply f) m in
+        let s1, s2 = SizedMap.partition (Fn.apply f) m in
         assert_consistent s1 && assert_consistent s2)
 
   let split =
@@ -270,7 +270,7 @@ module SizedMap_test = struct
       ~name:"split"
       Gen.(pair generator small_nat)
       (fun (m, v) ->
-        let (s1, _, s2) = SizedMap.split v m in
+        let s1, _, s2 = SizedMap.split v m in
         assert_consistent s1 && assert_consistent s2)
 
   let add_seq =

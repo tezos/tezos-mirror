@@ -474,7 +474,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         let key_to_string k = String.concat ";" k in
         let rec key_to_merkle_tree t target =
           match (Store.Tree.destruct t, target) with
-          | (_, []) ->
+          | _, [] ->
               (* We cannot use this case as the base case, because a merkle_node
                  is a map from string to something. In this case, we have
                  no key to put in the map's domain. *)
@@ -482,7 +482,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 (Invalid_argument
                    (Printf.sprintf "Reached end of key (top-level key was: %s)"
                    @@ key_to_string key))
-          | (_, [hd]) ->
+          | _, [hd] ->
               let finally key =
                 (* get_tree is safe because we iterate on keys *)
                 let* tree = Store.Tree.get_tree t [key] in
@@ -504,7 +504,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                   String.Map.add key v acc)
                 String.Map.empty
                 l
-          | (`Node _, target_hd :: target_tl) ->
+          | `Node _, target_hd :: target_tl ->
               let continue key =
                 (* get_tree is safe because we iterate on keys *)
                 let* tree = Store.Tree.get_tree t [key] in
@@ -523,7 +523,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                   String.Map.add key atom acc)
                 String.Map.empty
                 l
-          | (`Contents _, _) ->
+          | `Contents _, _ ->
               raise
                 (Invalid_argument
                    (Printf.sprintf
@@ -782,9 +782,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
             | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
             | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
           (function
-            | (`Blob, h) ->
+            | `Blob, h ->
                 `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
-            | (`Node, h) ->
+            | `Node, h ->
                 `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
           (obj2 (req "kind" kind_encoding) (req "value" bytes))
     end
@@ -859,10 +859,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 (`Contents, Context_hash.to_bytes (Hash.to_context_hash h))
             | Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
           (function
-            | (`Contents, h) ->
+            | `Contents, h ->
                 let h = Hash.of_context_hash (Context_hash.of_bytes_exn h) in
                 Contents (h, ())
-            | (`Node, h) ->
+            | `Node, h ->
                 Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
           (obj2 (req "kind" kind_encoding) (req "value" bytes))
 

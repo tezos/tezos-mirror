@@ -260,9 +260,9 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
 
   (* Split a float into sign/exponent/mantissa *)
   let split bits =
-    let (sign, rest) = take 1 bits in
-    let (expo, rest) = take 11 rest in
-    let (mant, _) = take 52 rest in
+    let sign, rest = take 1 bits in
+    let expo, rest = take 11 rest in
+    let mant, _ = take 52 rest in
     (sign, expo, mant)
 
   (* Convert bits of exponent to int. *)
@@ -284,14 +284,14 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
       Lang.size Lang.repr =
     assert (precision > 0) ;
     assert_fp_is_correct x ;
-    let (_sign, exp, mant) = decompose x in
+    let _sign, exp, mant = decompose x in
     let exp = Int64.to_int @@ exponent_bits_to_int exp in
-    let (bits, _) = take precision mant in
+    let bits, _ = take precision mant in
     (* the mantissa is always implicitly prefixed by one (except for
        denormalized numbers, excluded here) *)
     let bits = 1L :: bits in
     (* convert mantissa to sum of powers of 2 computed with shifts *)
-    let (_, result_opt) =
+    let _, result_opt =
       List.fold_left
         (fun (k, term_opt) bit ->
           if bit = 1L then
@@ -368,7 +368,7 @@ end = struct
 
   let rec lift_binop op x y =
     match (x, y) with
-    | (Term x, Term y) -> Term (op x y)
+    | Term x, Term y -> Term (op x y)
     | _ -> lift_binop op (cast_safe x) (cast_safe y)
 
   let gensym : unit -> string =
@@ -392,12 +392,12 @@ end = struct
 
   let ( * ) x y =
     match (x, y) with
-    | (Term x, Term y) -> Term X.(x * y)
-    | (Term x, Const y) | (Const y, Term x) ->
+    | Term x, Term y -> Term X.(x * y)
+    | Term x, Const y | Const y, Term x ->
         (* let-bind the non-constant term to avoid copying it. *)
         Term
           (X.let_ ~name:(gensym ()) x (fun x -> FPA.approx_mult precision x y))
-    | (Const x, Const y) -> Const (x *. y)
+    | Const x, Const y -> Const (x *. y)
 
   let ( / ) = lift_binop X.( / )
 
@@ -424,9 +424,9 @@ end = struct
 
   let app (type a b) (fn : (a -> b) repr) (arg : a repr) : b repr =
     match (fn, arg) with
-    | (Term fn, Term arg) -> Term (X.app fn arg)
-    | (Term fn, Const f) -> Term (X.app fn (X.float f))
-    | (Const _, _) -> assert false
+    | Term fn, Term arg -> Term (X.app fn arg)
+    | Term fn, Const f -> Term (X.app fn (X.float f))
+    | Const _, _ -> assert false
 
   let let_ (type a b) ~name (m : a repr) (fn : a repr -> b repr) : b repr =
     match m with

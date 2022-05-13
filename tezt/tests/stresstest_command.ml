@@ -142,7 +142,7 @@ let test_stresstest_sources_format =
   let additional_bootstrap_account_count =
     max 0 (n_bootstraps_total - (Account.Bootstrap.keys |> Array.length))
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol
       ~nodes_args:[Synchronisation_threshold 0; Connections 0]
       ~additional_bootstrap_account_count
@@ -181,11 +181,10 @@ let test_stresstest_sources_format =
   in
   let source_accounts =
     List.hd bootstraps_to_use
-    ::
-    sublist_bounds_included
-      source_pkhs_cutoff
-      (n_bootstraps_to_use - 1)
-      bootstraps_to_use
+    :: sublist_bounds_included
+         source_pkhs_cutoff
+         (n_bootstraps_to_use - 1)
+         bootstraps_to_use
   in
   (* Helpers to check that operations (from the mempool or the last
      block) have the right sources. *)
@@ -287,7 +286,7 @@ let test_stresstest_n_transfers =
   let additional_bootstrap_account_count =
     max 0 (n_bootstraps - (Account.Bootstrap.keys |> Array.length))
   in
-  let* (_node, client) =
+  let* _node, client =
     Client.init_with_protocol
       ~nodes_args:[Synchronisation_threshold 0; Connections 0]
       ~additional_bootstrap_account_count
@@ -353,11 +352,11 @@ let test_stresstest_multiple_nodes =
   let additional_bootstrap_account_count =
     max 0 (n_bootstraps_total - (Account.Bootstrap.keys |> Array.length))
   in
-  let* (central_node, central_client) =
+  let* central_node, central_client =
     Client.init_with_protocol
       ~nodes_args:Node.[Synchronisation_threshold 0; Connections (n_nodes - 1)]
-      ~event_sections_levels:
-        [("prevalidator", `Debug)] (* for "arrived" request events *)
+      ~event_sections_levels:[("prevalidator", `Debug)]
+        (* for "arrived" request events *)
       ~additional_bootstrap_account_count
       `Client
       ~protocol
@@ -386,7 +385,7 @@ let test_stresstest_multiple_nodes =
                (((i + 1) * n_bootstraps_per_node) + 1)
                ((i + 2) * n_bootstraps_per_node)
         in
-        let* (node, client) =
+        let* node, client =
           Client.init_with_node
             ~nodes_args:Node.[Synchronisation_threshold 0; Connections 1]
             ~keys:accounts

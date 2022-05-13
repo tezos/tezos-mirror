@@ -79,7 +79,7 @@ let wallet_parameter () =
       let* (Bls12_381 public_key_hash) =
         Client_keys.Aggregate_alias.Public_key_hash.find cctxt alias
       in
-      let* (_, pk_opt) =
+      let* _, pk_opt =
         Client_keys.Aggregate_alias.Public_key.find cctxt alias
       in
       let public_key =
@@ -317,7 +317,7 @@ let aggregate_signature signatures =
 
 let craft_batch ~transactions =
   let open Result_syntax in
-  let (transactions, signatures) =
+  let transactions, signatures =
     List.split
       (List.map
          (fun L2_transaction.{transaction; signatures} ->
@@ -641,7 +641,7 @@ let transfer () =
     (fun counter qty ticket_hash signer destination cctxt ->
       let open Lwt_result_syntax in
       let open Tx_rollup_l2_batch.V1 in
-      let* (signer, sk_uri, counter) =
+      let* signer, sk_uri, counter =
         prepare_operation_parameters cctxt signer counter
       in
       (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2903
@@ -687,7 +687,7 @@ let withdraw () =
     (fun counter qty ticket_hash signer destination cctxt ->
       let open Lwt_result_syntax in
       let open Tx_rollup_l2_batch.V1 in
-      let* (signer, sk_uri, counter) =
+      let* signer, sk_uri, counter =
         prepare_operation_parameters cctxt signer counter
       in
       let contents = [Withdraw {destination; ticket_hash; qty}] in
@@ -781,9 +781,9 @@ let call ?body meth raw_url (cctxt : #Configuration.tx_client_context) =
        body is not given. In that case, the body should be an empty
        JSON object. *)
     match (meth, body) with
-    | (_, Some _) -> body
-    | (`DELETE, None) | (`GET, None) -> None
-    | (`PATCH, None) | (`PUT, None) | (`POST, None) -> Some (`O [])
+    | _, Some _ -> body
+    | `DELETE, None | `GET, None -> None
+    | `PATCH, None | `PUT, None | `POST, None -> Some (`O [])
   in
   let* answer = cctxt#generic_media_type_call ?body meth uri in
   let*! () = display_answer cctxt answer in

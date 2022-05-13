@@ -221,11 +221,11 @@ module Storage = struct
     >>=? fun (address_hash, ctxt) ->
     Big_map.get_opt ctxt tokens address_hash >|= Environment.wrap_tzresult
     >>=? function
-    | (_, Some canonical) -> (
+    | _, Some canonical -> (
         match Tezos_micheline.Micheline.root canonical with
         | Tezos_micheline.Micheline.Int (_, amount) -> return @@ Some amount
         | _ -> assert false)
-    | (_, None) -> return @@ None
+    | _, None -> return @@ None
 
   let getBalance (ctxt : Context.t) ~(contract : Contract.t)
       (owner : Script_typed_ir.address) =

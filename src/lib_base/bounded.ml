@@ -46,7 +46,6 @@ module Int32 = struct
 
   module Make (B : BOUNDS) = struct
     include Compare.Int32 (* This includes [type t = int32] *)
-
     include B
 
     let to_int32 x = x

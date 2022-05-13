@@ -117,10 +117,10 @@ let connectable t start_time expected seen_points =
 
     let compare (t1, _) (t2, _) =
       match (t1, t2) with
-      | (None, None) -> 0
-      | (None, Some _) -> 1
-      | (Some _, None) -> -1
-      | (Some t1, Some t2) -> Time.System.compare t2 t1
+      | None, None -> 0
+      | None, Some _ -> 1
+      | Some _, None -> -1
+      | Some t1, Some t2 -> Time.System.compare t2 t1
   end) in
   let acc = Bounded_point_info.create expected in
   let f point pi seen_points =
@@ -152,7 +152,7 @@ let rec try_to_contact_loop t start_time ~seen_points min_to_contact
   let open Lwt_syntax in
   if min_to_contact <= 0 then Lwt.return_true
   else
-    let (candidates, seen_points) =
+    let candidates, seen_points =
       connectable t start_time max_to_contact seen_points
     in
     if candidates = [] then

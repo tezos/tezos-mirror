@@ -235,7 +235,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
   let open Lwt_result_syntax in
-  let (start_prevalidator, start_testchain) =
+  let start_prevalidator, start_testchain =
     match p2p_params with
     | Some _ -> (not disable_mempool, enable_testchain)
     | None -> (true, true)
@@ -247,7 +247,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       disable_mempool
   in
   Shell_metrics.Version.init p2p ;
-  let* (validator_process, store) =
+  let* validator_process, store =
     let open Block_validator_process in
     let validator_environment =
       {

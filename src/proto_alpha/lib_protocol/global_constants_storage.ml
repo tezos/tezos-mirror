@@ -185,7 +185,7 @@ let expand_node context node =
           match (args, annot) with
           (* A constant Prim should always have a single String argument,
               being a properly formatted hash. *)
-          | ([String (_, address)], []) -> (
+          | [String (_, address)], [] -> (
               match Script_expr_hash.of_b58check_opt address with
               | None -> fail Badly_formed_constant_expression
               | Some hash -> (

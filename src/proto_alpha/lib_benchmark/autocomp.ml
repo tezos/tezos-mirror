@@ -141,7 +141,7 @@ module SM = struct
 
   let ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t =
    fun m f rng_state s ->
-    let (x, s) = m rng_state s in
+    let x, s = m rng_state s in
     f x rng_state s
    [@@inline]
 
@@ -294,14 +294,12 @@ struct
         complete_data_list path (i + 1) tl (term :: acc)
 
   let complete_data typing node rng_state =
-    let (root_type_opt, _) =
-      Inference.M.get_data_annot Kernel.Path.root typing
-    in
+    let root_type_opt, _ = Inference.M.get_data_annot Kernel.Path.root typing in
     match root_type_opt with
     | None -> Stdlib.failwith "Autocomp.complete_data: cannot get type of expr"
     | Some ty ->
-        let (_, typing) = Inference.instantiate_base ty typing in
-        let (result, _) =
+        let _, typing = Inference.instantiate_base ty typing in
+        let result, _ =
           try complete_data node Kernel.Path.root rng_state typing
           with Autocompletion_error (Cannot_complete_data (subterm, path)) ->
             Format.eprintf "Cannot complete data@." ;
@@ -309,7 +307,7 @@ struct
             Format.eprintf "%a@." Mikhailsky.pp subterm ;
             Stdlib.failwith "in autocomp.ml: unrecoverable failure"
         in
-        let (typ, _typing) =
+        let typ, _typing =
           try Inference.infer_data_with_state result
           with Inference.Ill_typed_script error ->
             Format.eprintf "%a@." Inference.pp_inference_error error ;
@@ -352,15 +350,15 @@ struct
         complete_code_list path (i + 1) tl (term :: acc)
 
   let complete_code typing node rng_state =
-    let (root_type_opt, _) =
+    let root_type_opt, _ =
       Inference.M.get_instr_annot Kernel.Path.root typing
     in
     match root_type_opt with
     | None -> Stdlib.failwith "Autocomp.complete_code: cannot get type of expr"
     | Some {bef; aft} ->
-        let (_, typing) = Inference.instantiate bef typing in
-        let (_, typing) = Inference.instantiate aft typing in
-        let (result, _) =
+        let _, typing = Inference.instantiate bef typing in
+        let _, typing = Inference.instantiate aft typing in
+        let result, _ =
           try complete_code node Kernel.Path.root rng_state typing with
           | Autocompletion_error (Cannot_complete_code (subterm, path)) ->
               Format.eprintf "Cannot complete code@." ;
@@ -369,14 +367,14 @@ struct
               Stdlib.failwith "in autocomp.ml: unrecoverable failure"
           | _ -> assert false
         in
-        let ((bef, aft), typing) =
+        let (bef, aft), typing =
           try Inference.infer_with_state result
           with Inference.Ill_typed_script error ->
             Format.eprintf "%a@." Inference.pp_inference_error error ;
             Format.eprintf "%a@." Mikhailsky.pp result ;
             assert false
         in
-        let (bef, typing) = instantiate_and_set_stack bef typing in
-        let (aft, typing) = instantiate_and_set_stack aft typing in
+        let bef, typing = instantiate_and_set_stack bef typing in
+        let aft, typing = instantiate_and_set_stack aft typing in
         (result, (bef, aft), typing)
 end

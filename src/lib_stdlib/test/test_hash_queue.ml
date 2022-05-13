@@ -50,11 +50,11 @@ let gen_values n =
 let add_multiple_values q vs = List.iter (fun (k, v) -> Queue.replace q k v) vs
 
 (* Invariants:
-  - (key, value) are ("val<i>", i) for i in [0, n-1]
-  - keys are added in increasing order, hence ("val<0>", 0) is always the oldest
-    value if `capacity` >= `n`.
-  - there is no capacity check. If n > capacity, the oldest values are replaced
-  *)
+   - (key, value) are ("val<i>", i) for i in [0, n-1]
+   - keys are added in increasing order, hence ("val<0>", 0) is always the oldest
+     value if `capacity` >= `n`.
+   - there is no capacity check. If n > capacity, the oldest values are replaced
+*)
 let init_queue capacity n =
   let q = Queue.create capacity in
   let vs = gen_values n in
@@ -178,7 +178,7 @@ let test_fold () =
 
 let test_elements () =
   let q = init_queue 10 10 in
-  let (_, vs) = gen_values 10 |> List.split in
+  let _, vs = gen_values 10 |> List.split in
   let elts = Queue.elements q in
   Assert.Int.List.equal ~loc:__LOC__ vs elts
 

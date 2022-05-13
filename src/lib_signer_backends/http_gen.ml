@@ -95,7 +95,7 @@ struct
       let open Lwt_result_syntax in
       assert (Uri.scheme uri = Some scheme) ;
       let path = Uri.path uri in
-      let* (base, pkh) =
+      let* base, pkh =
         match String.rindex_opt path '/' with
         | None -> failwith "Invalid locator %a" Uri.pp_hum uri
         | Some i ->
@@ -111,7 +111,7 @@ struct
 
     let public_key uri =
       let open Lwt_result_syntax in
-      let* (base, pkh) = parse (uri : pk_uri :> Uri.t) in
+      let* base, pkh = parse (uri : pk_uri :> Uri.t) in
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -159,7 +159,7 @@ struct
 
     let sign ?watermark uri msg =
       let open Lwt_result_syntax in
-      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* base, pkh = parse (uri : sk_uri :> Uri.t) in
       let msg =
         match watermark with
         | None -> msg
@@ -179,7 +179,7 @@ struct
 
     let deterministic_nonce uri msg =
       let open Lwt_result_syntax in
-      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* base, pkh = parse (uri : sk_uri :> Uri.t) in
       let* signature = get_signature base pkh msg in
       RPC_client.call_service
         ~logger:P.logger
@@ -193,7 +193,7 @@ struct
 
     let deterministic_nonce_hash uri msg =
       let open Lwt_result_syntax in
-      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* base, pkh = parse (uri : sk_uri :> Uri.t) in
       let* signature = get_signature base pkh msg in
       RPC_client.call_service
         ~logger:P.logger
@@ -207,7 +207,7 @@ struct
 
     let supports_deterministic_nonces uri =
       let open Lwt_result_syntax in
-      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* base, pkh = parse (uri : sk_uri :> Uri.t) in
       let*! r =
         RPC_client.call_service
           ~logger:P.logger

@@ -241,9 +241,9 @@ end) : S = struct
     let target_index = index target and cell_index = index cell in
     let rec valid_path index cell_ptr path =
       match (cell_ptr, path) with
-      | (final_cell, []) ->
+      | final_cell, [] ->
           equal_ptr target_ptr final_cell && Compare.Int.(index = target_index)
-      | (cell_ptr, cell_ptr' :: path) ->
+      | cell_ptr, cell_ptr' :: path ->
           assume_some (deref cell_ptr) @@ fun cell ->
           assume_some (deref cell_ptr') @@ fun cell' ->
           mem equal_ptr cell_ptr' cell.back_pointers

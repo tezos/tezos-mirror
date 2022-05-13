@@ -133,10 +133,8 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
           save_to ;
         return ())
       else
-        let* (bench_num, nsamples, config) =
-          let* (patch, override) =
-            patch_benchmark_config ~patches ~bench_name
-          in
+        let* bench_num, nsamples, config =
+          let* patch, override = patch_benchmark_config ~patches ~bench_name in
           let* config =
             match patch with
             | No_patch -> return None

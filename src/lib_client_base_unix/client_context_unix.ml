@@ -69,7 +69,7 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
           in
           Lwt.return (fd, sighandler)
         in
-        let* (fd, sh) = lock () in
+        let* fd, sh = lock () in
         (* catch might be useless if f always uses the error monad *)
         let* res =
           Lwt.finalize f (fun () ->

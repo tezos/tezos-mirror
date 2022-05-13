@@ -204,7 +204,7 @@ module Scheduler (IO : IO) = struct
     in
     if Lwt_canceler.canceled st.canceler then Lwt.return_unit
     else
-      let (prio, (conn, msg)) =
+      let prio, (conn, msg) =
         if not (Queue.is_empty st.readys_high) then
           (true, Queue.pop st.readys_high)
         else (false, Queue.pop st.readys_low)
@@ -467,7 +467,7 @@ type t = {
 
    Each connection's quota is the average bandwidth consumption
    divided by the number of connections minus the over consumption of
-   the previous round.  *)
+   the previous round. *)
 let reset_quota st =
   Events.(emit__dont_wait__use_with_care reset_quota ()) ;
   let {Moving_average.average = current_inflow; _} =
@@ -491,8 +491,7 @@ let reset_quota st =
    connections and starting the associated moving average worker.
 
    The worker will call [reset_quota] at each update.
-
- *)
+*)
 let create ?max_upload_speed ?max_download_speed ?read_queue_size
     ?write_queue_size ~read_buffer_size () =
   Events.(emit__dont_wait__use_with_care create ()) ;

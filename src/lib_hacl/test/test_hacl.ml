@@ -270,7 +270,7 @@ let secretbox = [("secretbox", `Quick, test_secretbox)]
 *)
 let test_box () =
   let open Box in
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let k = dh pk sk in
   let nonce = Nonce.gen () in
   let msg_orig = msg in
@@ -292,7 +292,7 @@ open Ed25519
 let test_keypair_ed25519 () =
   let seed = Hacl.Rand.gen 32 in
   match (sk_of_bytes seed, sk_of_bytes seed) with
-  | (Some sk, Some sk') ->
+  | Some sk, Some sk' ->
       let pk = neuterize sk in
       let pk' = neuterize sk' in
       Alcotest.(check bool "of_seed" true (Ed25519.equal pk pk')) ;
@@ -306,13 +306,13 @@ let test_keypair_ed25519 () =
     is accepted by [Sign.verify].
 *)
 let test_sign_ed25519 () =
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let signature = sign ~sk ~msg in
   Alcotest.(check bool "verify" true (verify ~pk ~msg ~signature))
 
 (** Checks the neuterize function for public key generation. *)
 let test_public_ed25519 () =
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let pk' = to_bytes pk in
   let ppk = to_bytes (neuterize pk) in
   let psk = to_bytes (neuterize sk) in
@@ -343,13 +343,13 @@ let check_p256_bytes_public =
 let nb_iterations = 10
 
 let test_export_p256 () =
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let sk_bytes = to_bytes sk in
   let pk_bytes = to_bytes pk in
   Alcotest.(check int __LOC__ sk_size (Bytes.length sk_bytes)) ;
   Alcotest.(check int __LOC__ pk_size (Bytes.length pk_bytes)) ;
   match (sk_of_bytes sk_bytes, pk_of_bytes pk_bytes) with
-  | (Some sk', Some pk') ->
+  | Some sk', Some pk' ->
       let pk'' = neuterize pk' in
       Alcotest.(check check_p256_bytes_secret "sk'" sk sk') ;
       Alcotest.(check check_p256_bytes_public "pk'" pk pk') ;
@@ -363,7 +363,7 @@ let test_export_p256 () =
   done
 
 let test_write_key_p256 () =
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let sk_bytes = to_bytes sk in
   let pk_bytes = to_bytes pk in
   let sk_buf = Bytes.create sk_size in
@@ -375,7 +375,7 @@ let test_write_key_p256 () =
 
 let test_write_key_pos_p256 () =
   let pos = 42 in
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let sk_bytes = to_bytes sk in
   let pk_bytes = to_bytes pk in
   let sk_buf = Bytes.create (sk_size + pos) in
@@ -389,7 +389,7 @@ let test_write_key_pos_p256 () =
 
 let test_write_key_with_ledger () =
   (* This test simulates  the code in Ledger_commands.public_key_returning_instruction *)
-  let (pk, _) = keypair () in
+  let pk, _ = keypair () in
   let pk_bytes = to_bytes pk in
   let buf = Bytes.create (pk_size + 1) in
   match pk_of_bytes pk_bytes with
@@ -408,7 +408,7 @@ let test_write_key_p256 () =
   done
 
 let test_keypair_p256 () =
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let pk' = neuterize sk in
   Alcotest.(check bytes "keccak_256" (P256.to_bytes pk) (P256.to_bytes pk'))
 
@@ -418,7 +418,7 @@ let test_keypair_p256 () =
   done
 
 let test_sign_p256 () =
-  let (pk, sk) = keypair () in
+  let pk, sk = keypair () in
   let signature = sign ~sk ~msg in
   Alcotest.(check bool "sign_p256" true (verify ~pk ~msg ~signature))
 
@@ -433,7 +433,7 @@ let test_vectors_p256 () =
     List.map
       (fun (sk, pk) ->
         match (sk_of_bytes (of_hex sk), pk_of_bytes (of_hex pk)) with
-        | (Some sk, Some pk) -> (sk, pk)
+        | Some sk, Some pk -> (sk, pk)
         | _ -> Alcotest.fail "invalid key")
       Vectors_p256.keys
   in

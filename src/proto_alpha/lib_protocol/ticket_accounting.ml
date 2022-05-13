@@ -78,7 +78,7 @@ let ticket_balances_of_value ctxt ~include_lazy ty value =
   >>=? fun (tickets, ctxt) ->
   List.fold_left_e
     (fun (acc, ctxt) ticket ->
-      let (token, amount) = Ticket_token.token_and_amount_of_ex_ticket ticket in
+      let token, amount = Ticket_token.token_and_amount_of_ex_ticket ticket in
       Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
       >|? fun ctxt -> ((token, Script_int.to_zint amount) :: acc, ctxt))
     ([], ctxt)
@@ -139,7 +139,7 @@ let ticket_diffs_of_lazy_storage_diff ctxt ~storage_type_has_tickets
    Move the docs from HackMd to [docs/alpha] folder.
    The documentation referenced here should be moved to a permanent place and
    the comment below should be updated.
- *)
+*)
 
 (** Description here:
     https://hackmd.io/lutm_5JNRVW-nNFSFkCXLQ?view#Implementation

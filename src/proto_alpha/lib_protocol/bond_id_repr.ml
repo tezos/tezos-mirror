@@ -30,7 +30,7 @@ include Compare.Make (struct
 
   let compare id1 id2 =
     match (id1, id2) with
-    | (Tx_rollup_bond_id id1, Tx_rollup_bond_id id2) ->
+    | Tx_rollup_bond_id id1, Tx_rollup_bond_id id2 ->
         Tx_rollup_repr.compare id1 id2
 end)
 

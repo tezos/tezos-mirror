@@ -398,7 +398,7 @@ module Delegate_sampler_state :
   Indexed_data_storage
     with type key = Cycle_repr.t
      and type value =
-          (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+      (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
      and type t := Raw_context.t
 
 (** Votes *)

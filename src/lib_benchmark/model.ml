@@ -42,8 +42,8 @@ let rec elim_arities :
     type elt m1 m2 a. (elt, m1, a) arity -> (elt, m2, a) arity -> (m1, m2) eq =
   fun (type elt m1 m2 a) (ar1 : (elt, m1, a) arity) (ar2 : (elt, m2, a) arity) ->
    match (ar1, ar2) with
-   | (Zero_arity, Zero_arity) -> (Eq : (m1, m2) eq)
-   | (Succ_arity a1, Succ_arity a2) -> (
+   | Zero_arity, Zero_arity -> (Eq : (m1, m2) eq)
+   | Succ_arity a1, Succ_arity a2 -> (
        match elim_arities a1 a2 with Eq -> (Eq : (m1, m2) eq))
    | _ -> .
 
@@ -102,7 +102,7 @@ let apply_model : 'arg -> 'arg model -> applied =
        match arity with
        | Zero_arity -> f
        | Succ_arity ar ->
-           let (arg, rest) = arg in
+           let arg, rest = arg in
            apply conv ar (X.app f (conv arg)) rest
 
      let applied = apply X.int arity model elim
@@ -128,7 +128,7 @@ module Instantiate (X : Costlang.S) (M : Model_impl) :
     match arity with
     | Zero_arity -> f
     | Succ_arity ar ->
-        let (arg, rest) = arg in
+        let arg, rest = arg in
         apply conv ar (X.app f (conv arg)) rest
 
   let model elim = apply X.int arity model elim

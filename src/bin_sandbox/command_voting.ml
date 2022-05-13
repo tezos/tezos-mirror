@@ -170,7 +170,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       state
       EF.[af "Ready to start"; af "Root path deleted."]
   in
-  let (protocol, baker_0_account, baker_0_balance) =
+  let protocol, baker_0_account, baker_0_balance =
     let open Tezos_protocol in
     let baker = List.nth_exn protocol.bootstrap_accounts 0 in
     ( {
@@ -184,7 +184,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       fst baker,
       snd baker )
   in
-  let* (nodes, protocol) =
+  let* nodes, protocol =
     Test_scenario.network_with_protocol
       ~protocol
       ~size
@@ -431,7 +431,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
         return ()
       else return ()
     in
-    let* (res, hash) =
+    let* res, hash =
       Tezos_admin_client.inject_protocol admin_0 state ~path:tmpdir
     in
     let* () =
@@ -1031,8 +1031,7 @@ $ Arg.(
            `\"--with-ledger=ledger://...\"` option in which case some steps \
            have to be interactive. In this case, the option \
            `--serialize-proposals` is recommended, because if it is not \
-           provided, the proposal vote will be a “Sign Unverified” \
-           operation.";
+           provided, the proposal vote will be a “Sign Unverified” operation.";
       ]
     in
     Cmd.info ~doc ~man "voting"

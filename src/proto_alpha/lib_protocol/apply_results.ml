@@ -1070,7 +1070,7 @@ module Internal_result = struct
               (amount, destination, parameters));
         inj =
           (fun (amount, destination, parameters) ->
-            let (entrypoint, parameters) =
+            let entrypoint, parameters =
               match parameters with
               | None -> (Entrypoint.default, Script.unit_parameter)
               | Some (entrypoint, value) -> (entrypoint, value)
@@ -1268,78 +1268,76 @@ let equal_manager_kind :
     type a b. a Kind.manager -> b Kind.manager -> (a, b) eq option =
  fun ka kb ->
   match (ka, kb) with
-  | (Kind.Reveal_manager_kind, Kind.Reveal_manager_kind) -> Some Eq
-  | (Kind.Reveal_manager_kind, _) -> None
-  | (Kind.Transaction_manager_kind, Kind.Transaction_manager_kind) -> Some Eq
-  | (Kind.Transaction_manager_kind, _) -> None
-  | (Kind.Origination_manager_kind, Kind.Origination_manager_kind) -> Some Eq
-  | (Kind.Origination_manager_kind, _) -> None
-  | (Kind.Delegation_manager_kind, Kind.Delegation_manager_kind) -> Some Eq
-  | (Kind.Delegation_manager_kind, _) -> None
+  | Kind.Reveal_manager_kind, Kind.Reveal_manager_kind -> Some Eq
+  | Kind.Reveal_manager_kind, _ -> None
+  | Kind.Transaction_manager_kind, Kind.Transaction_manager_kind -> Some Eq
+  | Kind.Transaction_manager_kind, _ -> None
+  | Kind.Origination_manager_kind, Kind.Origination_manager_kind -> Some Eq
+  | Kind.Origination_manager_kind, _ -> None
+  | Kind.Delegation_manager_kind, Kind.Delegation_manager_kind -> Some Eq
+  | Kind.Delegation_manager_kind, _ -> None
   | ( Kind.Register_global_constant_manager_kind,
       Kind.Register_global_constant_manager_kind ) ->
       Some Eq
-  | (Kind.Register_global_constant_manager_kind, _) -> None
-  | (Kind.Set_deposits_limit_manager_kind, Kind.Set_deposits_limit_manager_kind)
+  | Kind.Register_global_constant_manager_kind, _ -> None
+  | Kind.Set_deposits_limit_manager_kind, Kind.Set_deposits_limit_manager_kind
     ->
       Some Eq
-  | (Kind.Set_deposits_limit_manager_kind, _) -> None
+  | Kind.Set_deposits_limit_manager_kind, _ -> None
   | ( Kind.Tx_rollup_origination_manager_kind,
       Kind.Tx_rollup_origination_manager_kind ) ->
       Some Eq
-  | (Kind.Tx_rollup_origination_manager_kind, _) -> None
+  | Kind.Tx_rollup_origination_manager_kind, _ -> None
   | ( Kind.Tx_rollup_submit_batch_manager_kind,
       Kind.Tx_rollup_submit_batch_manager_kind ) ->
       Some Eq
-  | (Kind.Tx_rollup_submit_batch_manager_kind, _) -> None
-  | (Kind.Tx_rollup_commit_manager_kind, Kind.Tx_rollup_commit_manager_kind) ->
+  | Kind.Tx_rollup_submit_batch_manager_kind, _ -> None
+  | Kind.Tx_rollup_commit_manager_kind, Kind.Tx_rollup_commit_manager_kind ->
       Some Eq
-  | (Kind.Tx_rollup_commit_manager_kind, _) -> None
+  | Kind.Tx_rollup_commit_manager_kind, _ -> None
   | ( Kind.Tx_rollup_return_bond_manager_kind,
       Kind.Tx_rollup_return_bond_manager_kind ) ->
       Some Eq
-  | (Kind.Tx_rollup_return_bond_manager_kind, _) -> None
+  | Kind.Tx_rollup_return_bond_manager_kind, _ -> None
   | ( Kind.Tx_rollup_finalize_commitment_manager_kind,
       Kind.Tx_rollup_finalize_commitment_manager_kind ) ->
       Some Eq
-  | (Kind.Tx_rollup_finalize_commitment_manager_kind, _) -> None
+  | Kind.Tx_rollup_finalize_commitment_manager_kind, _ -> None
   | ( Kind.Tx_rollup_remove_commitment_manager_kind,
       Kind.Tx_rollup_remove_commitment_manager_kind ) ->
       Some Eq
-  | (Kind.Tx_rollup_remove_commitment_manager_kind, _) -> None
-  | ( Kind.Tx_rollup_rejection_manager_kind,
-      Kind.Tx_rollup_rejection_manager_kind ) ->
+  | Kind.Tx_rollup_remove_commitment_manager_kind, _ -> None
+  | Kind.Tx_rollup_rejection_manager_kind, Kind.Tx_rollup_rejection_manager_kind
+    ->
       Some Eq
-  | (Kind.Tx_rollup_rejection_manager_kind, _) -> None
+  | Kind.Tx_rollup_rejection_manager_kind, _ -> None
   | ( Kind.Tx_rollup_dispatch_tickets_manager_kind,
       Kind.Tx_rollup_dispatch_tickets_manager_kind ) ->
       Some Eq
-  | (Kind.Tx_rollup_dispatch_tickets_manager_kind, _) -> None
-  | (Kind.Transfer_ticket_manager_kind, Kind.Transfer_ticket_manager_kind) ->
+  | Kind.Tx_rollup_dispatch_tickets_manager_kind, _ -> None
+  | Kind.Transfer_ticket_manager_kind, Kind.Transfer_ticket_manager_kind ->
       Some Eq
-  | (Kind.Transfer_ticket_manager_kind, _) -> None
-  | ( Kind.Sc_rollup_originate_manager_kind,
-      Kind.Sc_rollup_originate_manager_kind ) ->
+  | Kind.Transfer_ticket_manager_kind, _ -> None
+  | Kind.Sc_rollup_originate_manager_kind, Kind.Sc_rollup_originate_manager_kind
+    ->
       Some Eq
-  | (Kind.Sc_rollup_originate_manager_kind, _) -> None
+  | Kind.Sc_rollup_originate_manager_kind, _ -> None
   | ( Kind.Sc_rollup_add_messages_manager_kind,
       Kind.Sc_rollup_add_messages_manager_kind ) ->
       Some Eq
-  | (Kind.Sc_rollup_add_messages_manager_kind, _) -> None
-  | (Kind.Sc_rollup_cement_manager_kind, Kind.Sc_rollup_cement_manager_kind) ->
+  | Kind.Sc_rollup_add_messages_manager_kind, _ -> None
+  | Kind.Sc_rollup_cement_manager_kind, Kind.Sc_rollup_cement_manager_kind ->
       Some Eq
-  | (Kind.Sc_rollup_cement_manager_kind, _) -> None
-  | (Kind.Sc_rollup_publish_manager_kind, Kind.Sc_rollup_publish_manager_kind)
-    ->
+  | Kind.Sc_rollup_cement_manager_kind, _ -> None
+  | Kind.Sc_rollup_publish_manager_kind, Kind.Sc_rollup_publish_manager_kind ->
       Some Eq
-  | (Kind.Sc_rollup_publish_manager_kind, _) -> None
-  | (Kind.Sc_rollup_refute_manager_kind, Kind.Sc_rollup_refute_manager_kind) ->
+  | Kind.Sc_rollup_publish_manager_kind, _ -> None
+  | Kind.Sc_rollup_refute_manager_kind, Kind.Sc_rollup_refute_manager_kind ->
       Some Eq
-  | (Kind.Sc_rollup_refute_manager_kind, _) -> None
-  | (Kind.Sc_rollup_timeout_manager_kind, Kind.Sc_rollup_timeout_manager_kind)
-    ->
+  | Kind.Sc_rollup_refute_manager_kind, _ -> None
+  | Kind.Sc_rollup_timeout_manager_kind, Kind.Sc_rollup_timeout_manager_kind ->
       Some Eq
-  | (Kind.Sc_rollup_timeout_manager_kind, _) -> None
+  | Kind.Sc_rollup_timeout_manager_kind, _ -> None
 
 module Encoding = struct
   type 'kind case =
@@ -1991,10 +1989,10 @@ let contents_result_list_encoding =
     | Contents_result o :: os -> (
         of_list os >>? fun (Contents_result_list os) ->
         match (o, os) with
-        | ( Manager_operation_result _,
-            Single_result (Manager_operation_result _) ) ->
+        | Manager_operation_result _, Single_result (Manager_operation_result _)
+          ->
             Ok (Contents_result_list (Cons_result (o, os)))
-        | (Manager_operation_result _, Cons_result _) ->
+        | Manager_operation_result _, Cons_result _ ->
             Ok (Contents_result_list (Cons_result (o, os)))
         | _ -> Error "cannot decode ill-formed operation result")
   in
@@ -2030,9 +2028,9 @@ let contents_and_result_list_encoding =
     | Contents_and_result (op, res) :: rest -> (
         of_list rest >>? fun (Contents_and_result_list rest) ->
         match (op, rest) with
-        | (Manager_operation _, Single_and_result (Manager_operation _, _)) ->
+        | Manager_operation _, Single_and_result (Manager_operation _, _) ->
             Ok (Contents_and_result_list (Cons_and_result (op, res, rest)))
-        | (Manager_operation _, Cons_and_result (_, _, _)) ->
+        | Manager_operation _, Cons_and_result (_, _, _) ->
             Ok (Contents_and_result_list (Cons_and_result (op, res, rest)))
         | _ -> Error "cannot decode ill-formed combined operation result")
   in
@@ -2071,28 +2069,27 @@ let kind_equal :
     kind contents -> kind2 contents_result -> (kind, kind2) eq option =
  fun op res ->
   match (op, res) with
-  | (Endorsement _, Endorsement_result _) -> Some Eq
-  | (Endorsement _, _) -> None
-  | (Preendorsement _, Preendorsement_result _) -> Some Eq
-  | (Preendorsement _, _) -> None
-  | (Seed_nonce_revelation _, Seed_nonce_revelation_result _) -> Some Eq
-  | (Seed_nonce_revelation _, _) -> None
-  | (Double_preendorsement_evidence _, Double_preendorsement_evidence_result _)
-    ->
+  | Endorsement _, Endorsement_result _ -> Some Eq
+  | Endorsement _, _ -> None
+  | Preendorsement _, Preendorsement_result _ -> Some Eq
+  | Preendorsement _, _ -> None
+  | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
+  | Seed_nonce_revelation _, _ -> None
+  | Double_preendorsement_evidence _, Double_preendorsement_evidence_result _ ->
       Some Eq
-  | (Double_preendorsement_evidence _, _) -> None
-  | (Double_endorsement_evidence _, Double_endorsement_evidence_result _) ->
+  | Double_preendorsement_evidence _, _ -> None
+  | Double_endorsement_evidence _, Double_endorsement_evidence_result _ ->
       Some Eq
-  | (Double_endorsement_evidence _, _) -> None
-  | (Double_baking_evidence _, Double_baking_evidence_result _) -> Some Eq
-  | (Double_baking_evidence _, _) -> None
-  | (Activate_account _, Activate_account_result _) -> Some Eq
-  | (Activate_account _, _) -> None
-  | (Proposals _, Proposals_result) -> Some Eq
-  | (Proposals _, _) -> None
-  | (Ballot _, Ballot_result) -> Some Eq
-  | (Ballot _, _) -> None
-  | (Failing_noop _, _) ->
+  | Double_endorsement_evidence _, _ -> None
+  | Double_baking_evidence _, Double_baking_evidence_result _ -> Some Eq
+  | Double_baking_evidence _, _ -> None
+  | Activate_account _, Activate_account_result _ -> Some Eq
+  | Activate_account _, _ -> None
+  | Proposals _, Proposals_result -> Some Eq
+  | Proposals _, _ -> None
+  | Ballot _, Ballot_result -> Some Eq
+  | Ballot _, _ -> None
+  | Failing_noop _, _ ->
       (* the Failing_noop operation always fails and can't have result *)
       None
   | ( Manager_operation {operation = Reveal _; _},
@@ -2112,10 +2109,10 @@ let kind_equal :
       Some Eq
   | ( Manager_operation {operation = Reveal _; _},
       Manager_operation_result
-        {operation_result = Skipped Alpha_context.Kind.Reveal_manager_kind; _}
-    ) ->
+        {operation_result = Skipped Alpha_context.Kind.Reveal_manager_kind; _} )
+    ->
       Some Eq
-  | (Manager_operation {operation = Reveal _; _}, _) -> None
+  | Manager_operation {operation = Reveal _; _}, _ -> None
   | ( Manager_operation {operation = Transaction _; _},
       Manager_operation_result
         {operation_result = Applied (Transaction_result _); _} ) ->
@@ -2139,7 +2136,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Transaction _; _}, _) -> None
+  | Manager_operation {operation = Transaction _; _}, _ -> None
   | ( Manager_operation {operation = Origination _; _},
       Manager_operation_result
         {operation_result = Applied (Origination_result _); _} ) ->
@@ -2163,7 +2160,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Origination _; _}, _) -> None
+  | Manager_operation {operation = Origination _; _}, _ -> None
   | ( Manager_operation {operation = Delegation _; _},
       Manager_operation_result
         {operation_result = Applied (Delegation_result _); _} ) ->
@@ -2187,7 +2184,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Delegation _; _}, _) -> None
+  | Manager_operation {operation = Delegation _; _}, _ -> None
   | ( Manager_operation {operation = Register_global_constant _; _},
       Manager_operation_result
         {operation_result = Applied (Register_global_constant_result _); _} ) ->
@@ -2215,7 +2212,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Register_global_constant _; _}, _) -> None
+  | Manager_operation {operation = Register_global_constant _; _}, _ -> None
   | ( Manager_operation {operation = Set_deposits_limit _; _},
       Manager_operation_result
         {operation_result = Applied (Set_deposits_limit_result _); _} ) ->
@@ -2241,7 +2238,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Set_deposits_limit _; _}, _) -> None
+  | Manager_operation {operation = Set_deposits_limit _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_origination; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_origination_result _); _} ) ->
@@ -2267,7 +2264,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_origination; _}, _) -> None
+  | Manager_operation {operation = Tx_rollup_origination; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_submit_batch _; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_submit_batch_result _); _} ) ->
@@ -2293,7 +2290,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_submit_batch _; _}, _) -> None
+  | Manager_operation {operation = Tx_rollup_submit_batch _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_commit _; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_commit_result _); _} ) ->
@@ -2318,7 +2315,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_commit _; _}, _) -> None
+  | Manager_operation {operation = Tx_rollup_commit _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_return_bond _; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_return_bond_result _); _} ) ->
@@ -2344,7 +2341,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_return_bond _; _}, _) -> None
+  | Manager_operation {operation = Tx_rollup_return_bond _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_finalize_commitment _; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_finalize_commitment_result _); _}
@@ -2376,12 +2373,12 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_finalize_commitment _; _}, _) ->
+  | Manager_operation {operation = Tx_rollup_finalize_commitment _; _}, _ ->
       None
   | ( Manager_operation {operation = Tx_rollup_remove_commitment _; _},
       Manager_operation_result
-        {operation_result = Applied (Tx_rollup_remove_commitment_result _); _}
-    ) ->
+        {operation_result = Applied (Tx_rollup_remove_commitment_result _); _} )
+    ->
       Some Eq
   | ( Manager_operation {operation = Tx_rollup_remove_commitment _; _},
       Manager_operation_result
@@ -2408,8 +2405,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_remove_commitment _; _}, _) ->
-      None
+  | Manager_operation {operation = Tx_rollup_remove_commitment _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_rejection _; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_rejection_result _); _} ) ->
@@ -2435,7 +2431,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_rejection _; _}, _) -> None
+  | Manager_operation {operation = Tx_rollup_rejection _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_dispatch_tickets _; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_dispatch_tickets_result _); _} )
@@ -2465,7 +2461,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Tx_rollup_dispatch_tickets _; _}, _) -> None
+  | Manager_operation {operation = Tx_rollup_dispatch_tickets _; _}, _ -> None
   | ( Manager_operation {operation = Transfer_ticket _; _},
       Manager_operation_result
         {operation_result = Applied (Transfer_ticket_result _); _} ) ->
@@ -2490,7 +2486,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Transfer_ticket _; _}, _) -> None
+  | Manager_operation {operation = Transfer_ticket _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_originate _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_originate_result _); _} ) ->
@@ -2516,7 +2512,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Sc_rollup_originate _; _}, _) -> None
+  | Manager_operation {operation = Sc_rollup_originate _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_add_messages _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_add_messages_result _); _} ) ->
@@ -2542,7 +2538,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Sc_rollup_add_messages _; _}, _) -> None
+  | Manager_operation {operation = Sc_rollup_add_messages _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_cement _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_cement_result _); _} ) ->
@@ -2567,7 +2563,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Sc_rollup_cement _; _}, _) -> None
+  | Manager_operation {operation = Sc_rollup_cement _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_publish _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_publish_result _); _} ) ->
@@ -2592,7 +2588,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Sc_rollup_publish _; _}, _) -> None
+  | Manager_operation {operation = Sc_rollup_publish _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_refute _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_refute_result _); _} ) ->
@@ -2617,7 +2613,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Sc_rollup_refute _; _}, _) -> None
+  | Manager_operation {operation = Sc_rollup_refute _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_timeout _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_timeout_result _); _} ) ->
@@ -2642,7 +2638,7 @@ let kind_equal :
           _;
         } ) ->
       Some Eq
-  | (Manager_operation {operation = Sc_rollup_timeout _; _}, _) -> None
+  | Manager_operation {operation = Sc_rollup_timeout _; _}, _ -> None
 
 let rec kind_equal_list :
     type kind kind2.
@@ -2650,9 +2646,9 @@ let rec kind_equal_list :
     =
  fun contents res ->
   match (contents, res) with
-  | (Single op, Single_result res) -> (
+  | Single op, Single_result res -> (
       match kind_equal op res with None -> None | Some Eq -> Some Eq)
-  | (Cons (op, ops), Cons_result (res, ress)) -> (
+  | Cons (op, ops), Cons_result (res, ress) -> (
       match kind_equal op res with
       | None -> None
       | Some Eq -> (
@@ -2668,8 +2664,8 @@ let[@coq_axiom_with_reason "gadt"] rec pack_contents_list :
     kind contents_and_result_list =
  fun contents res ->
   match (contents, res) with
-  | (Single op, Single_result res) -> Single_and_result (op, res)
-  | (Cons (op, ops), Cons_result (res, ress)) ->
+  | Single op, Single_result res -> Single_and_result (op, res)
+  | Cons (op, ops), Cons_result (res, ress) ->
       Cons_and_result (op, res, pack_contents_list ops ress)
   | ( Single (Manager_operation _),
       Cons_result (Manager_operation_result _, Single_result _) ) ->
@@ -2690,7 +2686,7 @@ let[@coq_axiom_with_reason "gadt"] rec pack_contents_list :
       Single_result
         (Manager_operation_result {operation_result = Backtracked _; _}) ) ->
       .
-  | (Single _, Cons_result _) -> .
+  | Single _, Cons_result _ -> .
 
 let rec unpack_contents_list :
     type kind.
@@ -2698,7 +2694,7 @@ let rec unpack_contents_list :
     kind contents_list * kind contents_result_list = function
   | Single_and_result (op, res) -> (Single op, Single_result res)
   | Cons_and_result (op, res, rest) ->
-      let (ops, ress) = unpack_contents_list rest in
+      let ops, ress = unpack_contents_list rest in
       (Cons (op, ops), Cons_result (res, ress))
 
 let rec to_list = function
@@ -2717,8 +2713,8 @@ let operation_data_and_metadata_encoding =
               (req "contents" (dynamic_size contents_and_result_list_encoding))
               (opt "signature" Signature.encoding))
            (function
-             | (Operation_data _, No_operation_metadata) -> None
-             | (Operation_data op, Operation_metadata res) -> (
+             | Operation_data _, No_operation_metadata -> None
+             | Operation_data op, Operation_metadata res -> (
                  match kind_equal_list op.contents res.contents with
                  | None ->
                      Pervasives.failwith
@@ -2729,7 +2725,7 @@ let operation_data_and_metadata_encoding =
                            (pack_contents_list op.contents res.contents),
                          op.signature )))
            (fun (Contents_and_result_list contents, signature) ->
-             let (op_contents, res_contents) = unpack_contents_list contents in
+             let op_contents, res_contents = unpack_contents_list contents in
              ( Operation_data {contents = op_contents; signature},
                Operation_metadata {contents = res_contents} ));
          case
@@ -2739,9 +2735,9 @@ let operation_data_and_metadata_encoding =
               (req "contents" (dynamic_size Operation.contents_list_encoding))
               (opt "signature" Signature.encoding))
            (function
-             | (Operation_data op, No_operation_metadata) ->
+             | Operation_data op, No_operation_metadata ->
                  Some (Contents_list op.contents, op.signature)
-             | (Operation_data _, Operation_metadata _) -> None)
+             | Operation_data _, Operation_metadata _ -> None)
            (fun (Contents_list contents, signature) ->
              (Operation_data {contents; signature}, No_operation_metadata));
        ]

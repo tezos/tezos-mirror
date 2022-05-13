@@ -194,7 +194,7 @@ let make_problem_from_workloads :
         Free_variable.Sparse_vec.is_empty affine.linear_comb)
       lines
   then
-    let (predicted, measured) =
+    let predicted, measured =
       List.map (fun (Full (affine, Quantity q)) -> (affine.const, q)) lines
       |> List.split
     in
@@ -210,7 +210,7 @@ let make_problem_from_workloads :
     in
     Degenerate {predicted; measured}
   else
-    let (input, output, nmap) = line_list_to_ols lines in
+    let input, output, nmap = line_list_to_ols lines in
     Non_degenerate {lines; input; output; nmap}
 
 let make_problem :
@@ -238,7 +238,7 @@ let make_problem :
 let fv_to_string fv = Format.asprintf "%a" Free_variable.pp fv
 
 let to_list_of_rows (m : Scikit.Matrix.t) : float list list =
-  let (lines, cols) = Scikit.Matrix.shape m in
+  let lines, cols = Scikit.Matrix.shape m in
   let init n f =
     List.init ~when_negative_length:() n f
     |> (* lines/column count cannot be negative *)
@@ -258,7 +258,7 @@ let of_list_of_rows (m : float list list) : Scikit.Matrix.t =
   mat
 
 let model_matrix_to_csv (m : Scikit.Matrix.t) (nmap : NMap.t) : Csv.csv =
-  let (_, cols) = Scikit.Matrix.shape m in
+  let _, cols = Scikit.Matrix.shape m in
   let names =
     List.init ~when_negative_length:() cols (fun i ->
         fv_to_string (NMap.nth_exn nmap i))

@@ -278,7 +278,7 @@ let commands () =
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
       (fun (show_types, emacs_mode, no_print_source, original_gas) program cctxt ->
         match program with
-        | (program, []) ->
+        | program, [] ->
             resolve_max_gas cctxt cctxt#block original_gas
             >>=? fun original_gas ->
             typecheck_program
@@ -301,7 +301,7 @@ let commands () =
               Michelson_v1_emacs.report_errors
               res_with_errors
             >>= fun () -> return_unit
-        | (parsed, errors) ->
+        | parsed, errors ->
             cctxt#message
               "%a"
               (fun ppf () ->
@@ -436,8 +436,7 @@ let commands () =
       no_options
       (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
-      @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param @@ stop)
+      @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
         Client_keys.sign cctxt sk bytes >>=? fun signature ->
         cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
@@ -476,11 +475,10 @@ let commands () =
       (args2 emacs_mode_switch no_print_source_flag)
       (prefixes ["get"; "script"; "entrypoint"; "type"; "of"]
       @@ string ~name:"entrypoint" ~desc:"the entrypoint to describe"
-      @@ prefixes ["for"]
-      @@ Program.source_param @@ stop)
+      @@ prefixes ["for"] @@ Program.source_param @@ stop)
       (fun (emacs_mode, no_print_source) entrypoint program cctxt ->
         match program with
-        | (program, []) ->
+        | program, [] ->
             entrypoint_type
               cctxt
               ~chain:cctxt#chain
@@ -501,7 +499,7 @@ let commands () =
               Michelson_v1_emacs.report_errors
               res_with_errors
             >>= fun () -> return_unit
-        | (parsed, errors) ->
+        | parsed, errors ->
             cctxt#message
               "%a"
               (fun ppf () ->
@@ -521,7 +519,7 @@ let commands () =
       @@ Program.source_param @@ stop)
       (fun (emacs_mode, no_print_source) program cctxt ->
         match program with
-        | (program, []) ->
+        | program, [] ->
             list_entrypoints cctxt ~chain:cctxt#chain ~block:cctxt#block program
             >>= fun entrypoints ->
             print_entrypoints_list
@@ -536,7 +534,7 @@ let commands () =
               Michelson_v1_emacs.report_errors
               res_with_errors
             >>= fun () -> return_unit
-        | (parsed, errors) ->
+        | parsed, errors ->
             cctxt#message
               "%a"
               (fun ppf () ->
@@ -558,7 +556,7 @@ let commands () =
       @@ Program.source_param @@ stop)
       (fun (emacs_mode, no_print_source) program cctxt ->
         match program with
-        | (program, []) ->
+        | program, [] ->
             list_unreachables
               cctxt
               ~chain:cctxt#chain
@@ -577,7 +575,7 @@ let commands () =
               Michelson_v1_emacs.report_errors
               res_with_errors
             >>= fun () -> return_unit
-        | (parsed, errors) ->
+        | parsed, errors ->
             cctxt#message
               "%a"
               (fun ppf () ->

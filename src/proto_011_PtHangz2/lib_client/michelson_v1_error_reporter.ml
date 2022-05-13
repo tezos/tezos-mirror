@@ -458,7 +458,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               print_enumeration
               (List.map
                  (fun k ->
-                   let (a, n) = human_kind k in
+                   let a, n = human_kind k in
                    a ^ " " ^ n)
                  exp)
         | Invalid_never_expr loc ->

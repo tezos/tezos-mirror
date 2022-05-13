@@ -305,7 +305,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
           Apply_results.kind_equal_list contents result.contents )
       with
-      | (Some Operation.Eq, Some Apply_results.Eq) ->
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result")
   | _ -> failwith "Unexpected result"
@@ -324,12 +324,12 @@ let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ~op:(Operation.pack op)
     ~chain_id
   >>=? function
-  | (Operation_data op', Operation_metadata result) -> (
+  | Operation_data op', Operation_metadata result -> (
       match
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
           Apply_results.kind_equal_list contents result.contents )
       with
-      | (Some Operation.Eq, Some Apply_results.Eq) ->
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result")
   | _ -> failwith "Unexpected result"
@@ -521,10 +521,10 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     | Single _ -> None
     | Cons ((Manager_operation _ as c), rest) -> (
         match (may_need_patching_single c, may_need_patching rest) with
-        | (None, None) -> None
-        | (Some c, None) -> Some (Cons (c, rest))
-        | (None, Some rest) -> Some (Cons (c, rest))
-        | (Some c, Some rest) -> Some (Cons (c, rest)))
+        | None, None -> None
+        | Some c, None -> Some (Cons (c, rest))
+        | None, Some rest -> Some (Cons (c, rest))
+        | Some c, Some rest -> Some (Cons (c, rest)))
   in
   let rec patch_fee : type kind. bool -> kind contents -> kind contents =
    fun first -> function
@@ -576,7 +576,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind contents * kind contents_result ->
       kind contents tzresult Lwt.t =
    fun first -> function
-    | (Manager_operation c, (Manager_operation_result _ as result)) ->
+    | Manager_operation c, (Manager_operation_result _ as result) ->
         (if user_gas_limit_needs_patching c.gas_limit then
          Lwt.return (estimated_gas_single result) >>=? fun gas ->
          if Gas.Arith.(gas = zero) then
@@ -615,7 +615,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         let cm = Manager_operation {c with gas_limit; storage_limit} in
         if compute_fee && c.fee = Tez.zero then return (patch_fee first cm)
         else return cm
-    | (c, _) -> return c
+    | c, _ -> return c
   in
   let rec patch_list :
       type kind.
@@ -830,7 +830,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
     | Cons_manager (Manager_info {operation = Reveal _; _}, _) -> true
     | _ -> false
   in
-  let (compute_fee, fee) =
+  let compute_fee, fee =
     match fee with None -> (true, Tez.zero) | Some fee -> (false, fee)
   in
   let contents_of_manager ~source ~fee ~counter ~gas_limit ~storage_limit
@@ -903,7 +903,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
       >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Cons_and_result (_, _, rest) ->
-          let (op, result) = unpack_contents_list rest in
+          let op, result = unpack_contents_list rest in
           return (oph, op, result)
       | _ -> assert false)
   | Some _ when is_reveal operations ->

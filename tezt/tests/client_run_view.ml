@@ -28,7 +28,7 @@
    Component:    Client
    Invocation:   dune exec tezt/tests/main.exe -- --file client_run_view.ml
    Subject:      Check that run view command to tezos-client behaves correctly
- *)
+*)
 
 let viewable_script =
   {|
@@ -105,7 +105,7 @@ let init_with_contract ?(alias = "viewable_script") ?(prg = viewable_script)
   Lwt.return (client, contract)
 
 let test_run_view_generic ?unlimited_gas ~protocol ~view ~input ~expected () =
-  let* (client, contract) = init_with_contract ~protocol () in
+  let* client, contract = init_with_contract ~protocol () in
   let* view = Client.run_view ?unlimited_gas ~view ~contract ?input client in
   if String.equal (String.trim view) expected then unit
   else Test.fail ~__LOC__ "Unexpected view result: %s" view
@@ -161,7 +161,7 @@ let check_storage_is contract client expected =
      contract that implements the desired interface. It could be 'SELF' or
      another deployed contract, as tested below. *)
 let test_run_external_nested_view ~protocol () =
-  let* (client, contract) =
+  let* client, contract =
     init_with_contract ~prg:viewable_script ~alias:"contract1" ~protocol ()
   in
   let* contract' =
@@ -220,7 +220,7 @@ let test_run_view_unknown_contract ~protocol () =
 
 (* Runs view `unknown` on the viewable_contract and fails *)
 let test_run_view_unknown_view ~protocol () =
-  let* (client, contract) = init_with_contract ~protocol () in
+  let* client, contract = init_with_contract ~protocol () in
   let failed_command =
     Client.spawn_run_view ~view:"unknown" ~contract ~input:"10" client
   in
@@ -230,7 +230,7 @@ let test_run_view_unknown_view ~protocol () =
 (* Runs high consumption view `loop` with 961 as input and default gas limit,
    and fails because of gas exhaustion. *)
 let test_run_view_loop_default_limit ~protocol () =
-  let* (client, contract) = init_with_contract ~protocol () in
+  let* client, contract = init_with_contract ~protocol () in
   let failed_command =
     Client.spawn_run_view ~view:"loop" ~contract ~input:"961" client
   in

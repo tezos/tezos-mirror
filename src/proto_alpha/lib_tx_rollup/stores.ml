@@ -207,7 +207,7 @@ struct
 
     let encode v =
       let dst = Bytes.create encoded_size in
-      let (tag, value_bytes) =
+      let tag, value_bytes =
         match v with
         | None -> (0, Bytes.make V.encoded_size '\000')
         | Some v -> (1, V.encode v |> Bytes.unsafe_of_string)
@@ -217,7 +217,7 @@ struct
       Bytes.unsafe_to_string dst
 
     let decode str offset =
-      let (tag, offset) = read_int8 str offset in
+      let tag, offset = read_int8 str offset in
       match tag with
       | 0 -> None
       | 1 ->
@@ -438,14 +438,14 @@ module L2_block_info = struct
     Bytes.unsafe_to_string dst
 
   let decode str offset =
-    let (file_offset, offset) = read_int64 str offset in
-    let (predecessor, offset) =
+    let file_offset, offset = read_int64 str offset in
+    let predecessor, offset =
       read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
     in
     let predecessor =
       if L2block.Hash.(predecessor = zero) then None else Some predecessor
     in
-    let (context, _) =
+    let context, _ =
       read_str
         str
         ~offset
@@ -477,11 +477,11 @@ module Tezos_block_info = struct
     Bytes.unsafe_to_string dst
 
   let decode str offset =
-    let (l2_block, offset) =
+    let l2_block, offset =
       read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
     in
-    let (level, offset) = read_int32 str offset in
-    let (predecessor, _) =
+    let level, offset = read_int32 str offset in
+    let predecessor, _ =
       read_str str ~offset ~len:Block_hash.size Block_hash.of_string_exn
     in
     {l2_block; level; predecessor}
@@ -506,10 +506,10 @@ module Commitment_info = struct
     Bytes.unsafe_to_string dst
 
   let decode str offset =
-    let (block, offset) =
+    let block, offset =
       read_str str ~offset ~len:Block_hash.size Block_hash.of_string_exn
     in
-    let (operation, _) =
+    let operation, _ =
       read_str str ~offset ~len:Operation_hash.size Operation_hash.of_string_exn
     in
     {block; operation}
@@ -666,7 +666,7 @@ module L2_block_store = struct
 
   let init ~data_dir ~readonly ~cache_size =
     let open Lwt_syntax in
-    let (flag, perms) =
+    let flag, perms =
       if readonly then (Unix.O_RDONLY, 0o444) else (Unix.O_RDWR, 0o644)
     in
     let* fd =

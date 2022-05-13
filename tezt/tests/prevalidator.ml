@@ -99,7 +99,7 @@ module Revamped = struct
         JSON.
           (json |-> "origin" |> as_string_opt, json |-> "oph" |> as_string_opt)
       with
-      | (Some "injected", Some h) when String.equal h oph -> Some ()
+      | Some "injected", Some h when String.equal h oph -> Some ()
       | _ -> None
     in
     Node.wait_for node "banned_operation_encountered.v0" filter
@@ -424,7 +424,7 @@ module Revamped = struct
       ~tags:["mempool"; "ban"; "branch_delayed"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* (node, client) = Client.init_with_protocol ~protocol `Client () in
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
 
     log_step 2 "Forge and inject an operation on the node." ;
     let* (`OpHash oph1) =
@@ -484,14 +484,14 @@ module Revamped = struct
       ~tags:["mempool"; "manager_restriction"; "injection"]
     @@ fun protocol ->
     log_step 1 "Initialize two nodes and connect them." ;
-    let* (node1, client1) =
+    let* node1, client1 =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
         `Client
         ()
     in
-    let* (node2, client2) =
+    let* node2, client2 =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
@@ -558,21 +558,21 @@ module Revamped = struct
       ~tags:["mempool"; "manager_restriction"; "propagation"]
     @@ fun protocol ->
     log_step 1 "Initialize three nodes with the protocol." ;
-    let* (node1, client1) =
+    let* node1, client1 =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0; Private_mode]
         ~protocol
         `Client
         ()
     in
-    let* (node2, client2) =
+    let* node2, client2 =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0; Private_mode]
         ~protocol
         `Client
         ()
     in
-    let* (node3, client3) =
+    let* node3, client3 =
       Client.init_with_protocol
         ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0]
@@ -635,7 +635,7 @@ module Revamped = struct
     log_step
       1
       "Initialize a node, with the precheck of operation disable and a client." ;
-    let* (node, client) =
+    let* node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0; Disable_operations_precheck]
         ~protocol
@@ -722,7 +722,7 @@ module Revamped = struct
       ~tags:["mempool"; "manager_restriction"; "flush"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* (node, client) =
+    let* node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
@@ -825,7 +825,7 @@ module Revamped = struct
       ~tags:["mempool"; "manager_restriction"; "inject"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* (node, client) =
+    let* node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
@@ -897,7 +897,7 @@ module Revamped = struct
       ~tags:["mempool"; "wrong"; "signature"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* (node, client) =
+    let* node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
@@ -996,7 +996,7 @@ module Revamped = struct
       ~tags:["mempool"; "manager_restriction"; "ban"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* (node, client) =
+    let* node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
@@ -1071,7 +1071,7 @@ module Revamped = struct
       ~tags:["mempool"; "manager_restriction"; "flush"; "ban"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* (node, client) =
+    let* node, client =
       Client.init_with_protocol
         ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0]
@@ -1269,7 +1269,7 @@ module Revamped = struct
       string_of_classification ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
     let* mempool = Mempool.get_mempool client in
-    let (mempool_classification, mempool_without_classification) =
+    let mempool_classification, mempool_without_classification =
       match classification with
       | `Branch_delayed ->
           (mempool.branch_delayed, {Mempool.empty with branch_delayed = []})
@@ -1391,13 +1391,13 @@ module Revamped = struct
     log_step
       1
       "Node 1 activates the protocol and Node 2 catches up with Node 1." ;
-    let* (node1, client1) =
+    let* node1, client1 =
       Client.init_with_node
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
     in
-    let* (node2, client2) =
+    let* node2, client2 =
       Client.init_with_node
         ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 2]
@@ -1439,7 +1439,7 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph2] client2 in
 
     log_step 5 "Add node3 connected only to node2." ;
-    let* (node3, client3) =
+    let* node3, client3 =
       Client.init_with_node
         ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
@@ -1480,7 +1480,7 @@ module Revamped = struct
       ~tags:["mempool"; "node"; "ban"; "reinject"]
     @@ fun protocol ->
     log_step 1 "Start a single node and activate the protocol." ;
-    let* (node1, client1) =
+    let* node1, client1 =
       Client.init_with_node
         ~nodes_args:[Synchronisation_threshold 0; Connections 0]
         `Client
@@ -1571,14 +1571,14 @@ module Revamped = struct
       ~tags:["mempool"; "node"; "ban"]
     @@ fun protocol ->
     log_step 1 "Start two nodes, connect them, activate the protocol." ;
-    let* (node1, client1) =
+    let* node1, client1 =
       Client.init_with_node
         ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
         `Client
         ()
     in
-    let* (node2, client2) =
+    let* node2, client2 =
       Client.init_with_node
         ~event_sections_levels:[("prevalidator", `Debug)]
         ~nodes_args:[Synchronisation_threshold 0; Connections 1]
@@ -1768,7 +1768,7 @@ module Revamped = struct
       9
       "Check that this extra operation is applied and replaces one with lower \
        fees." ;
-    let (removed_oph, kept_ops) =
+    let removed_oph, kept_ops =
       match ops with
       | [] -> assert false
       | removed :: applied -> (removed, applied)
@@ -1935,7 +1935,7 @@ module Revamped = struct
       ~title:"Precheck refused an operation which empties a balance"
       ~tags:["mempool"; "precheck"; "empty"; "balance"]
     @@ fun protocol ->
-    let* (_node, client) = Client.init_with_protocol ~protocol `Client () in
+    let* _node, client = Client.init_with_protocol ~protocol `Client () in
     let*! json_balance =
       RPC.Contracts.get_balance
         ~contract_id:Constant.bootstrap1.public_key_hash
@@ -2507,7 +2507,7 @@ let propagation_future_endorsement =
   let* () = Client.endorse_for client_1 ~force:true ~protocol in
   let* () = endorser_waiter in
   Log.info "%s" step4_msg ;
-  let* (bytes, hash) = get_endorsement_has_bytes ~protocol client_1 in
+  let* bytes, hash = get_endorsement_has_bytes ~protocol client_1 in
   Log.info "%s" step5_msg ;
   let* _ = RPC.mempool_ban_operation ~data:(`String hash) client_1 in
   Log.info "%s" step6_msg ;
@@ -2869,8 +2869,8 @@ let ban_operation_and_check_applied =
   Log.info "Step 1: Start two nodes, connect them, activate the protocol." ;
   let* node_1 =
     Node.init
-      ~event_sections_levels:
-        [("prevalidator", `Debug)] (* to witness operation arrival events *)
+      ~event_sections_levels:[("prevalidator", `Debug)]
+        (* to witness operation arrival events *)
       [Synchronisation_threshold 0; Connections 1]
   and* node_2 = Node.init [Synchronisation_threshold 0; Connections 1] in
   let* client_1 = Client.init ~endpoint:Client.(Node node_1) ()
@@ -2955,7 +2955,7 @@ let wait_for_arrival_of_ophash ophash node =
       ( json |-> "view" |-> "request" |> as_string_opt,
         json |-> "view" |-> "operation_hash" |> as_string_opt )
     with
-    | (Some "arrived", Some s) when String.equal s ophash ->
+    | Some "arrived", Some s when String.equal s ophash ->
         Log.info "Witnessed arrival of operation %s." ophash ;
         Some ()
     | _ -> None
@@ -3708,7 +3708,7 @@ let test_get_post_mempool_filter =
   Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
   let open Filter_config in
   log_step 1 step1_msg ;
-  let* (node1, client1) =
+  let* node1, client1 =
     (* We need event level [debug] for event
        [invalid_mempool_filter_configuration]. *)
     init_single_node_and_activate_protocol
@@ -3958,7 +3958,7 @@ let test_mempool_filter_operation_arrival =
   in
   Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
   log_step 1 step1 ;
-  let* (node1, client1, node2, client2) =
+  let* node1, client1, node2, client2 =
     init_two_connected_nodes_and_activate_protocol
     (* Need event level [debug] to receive operation arrival events in [node1]. *)
       ~event_sections_levels1:[("prevalidator", `Debug)]

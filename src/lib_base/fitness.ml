@@ -48,11 +48,11 @@ include Compare.Make (struct
   let compare f1 f2 =
     let rec compare_rec f1 f2 =
       match (f1, f2) with
-      | ([], []) -> 0
-      | (i1 :: f1, i2 :: f2) ->
+      | [], [] -> 0
+      | i1 :: f1, i2 :: f2 ->
           let i = compare_bytes i1 i2 in
           if i = 0 then compare_rec f1 f2 else i
-      | (_, _) -> assert false
+      | _, _ -> assert false
     in
     let len = compare (List.length f1) (List.length f2) in
     if len = 0 then compare_rec f1 f2 else len

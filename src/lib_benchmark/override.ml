@@ -38,7 +38,7 @@ let add_into_map name duration map =
 
 let load_file ~filename map =
   let lines = Csv.import ~filename () in
-  let (header, values) =
+  let header, values =
     match lines with
     | [] | [_] | _ :: _ :: _ :: _ ->
         Stdlib.failwith "Override.load: invalid csv"

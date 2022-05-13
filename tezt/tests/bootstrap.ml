@@ -307,7 +307,7 @@ let check_rpc_force_bootstrapped () =
   Log.info "Start a node." ;
   let* node = Node.init [Synchronisation_threshold 255] in
   let* client = Client.init ~endpoint:(Node node) () in
-  let (bootstrapped_promise, bootstrapped_resolver) = Lwt.task () in
+  let bootstrapped_promise, bootstrapped_resolver = Lwt.task () in
   Node.on_event node (bootstrapped_event bootstrapped_resolver) ;
   Log.info "Force the node to be bootstrapped." ;
   let* _ = RPC.force_bootstrapped client in

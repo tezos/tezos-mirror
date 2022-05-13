@@ -198,8 +198,8 @@ module RequestsTree : REQUESTS_TREE = struct
 
   let rec add (t : tree) (k : string list) : tree =
     match (t, k) with
-    | (_, []) | (All, _) -> All
-    | (Partial map, k_hd :: k_tail) -> (
+    | _, [] | All, _ -> All
+    | Partial map, k_hd :: k_tail -> (
         let sub_t_opt = StringMap.find_opt k_hd map in
         match sub_t_opt with
         | None -> Partial (StringMap.add k_hd (add empty k_tail) map)
@@ -209,9 +209,9 @@ module RequestsTree : REQUESTS_TREE = struct
 
   let rec find_opt (t : tree) (k : string list) : tree option =
     match (t, k) with
-    | (All, _) -> Some All
-    | (Partial _, []) -> None
-    | (Partial map, k_hd :: k_tail) -> (
+    | All, _ -> Some All
+    | Partial _, [] -> None
+    | Partial map, k_hd :: k_tail -> (
         let sub_t_opt = StringMap.find_opt k_hd map in
         match sub_t_opt with
         | None -> None
@@ -260,7 +260,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
       (requested_key : Local.key) : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let (key_to_get, split) =
+    let key_to_get, split =
       match kind with
       | Mem ->
           (* If the value is not going to be used, don't request a parent *)

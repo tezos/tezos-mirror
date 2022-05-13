@@ -1105,8 +1105,8 @@ let () =
         ppf
         "Invariant '%ld (genesis) ≤ %ld (caboose) ≤ %ld (savepoint) ≤ %a \
          [cementing_highwatermark] ≤\n\
-        \ %ld (checkpoint) ≤ all(alternate_heads ∪ (%ld) current_head)' \
-         does not hold"
+        \ %ld (checkpoint) ≤ all(alternate_heads ∪ (%ld) current_head)' does \
+         not hold"
         genesis
         caboose
         savepoint

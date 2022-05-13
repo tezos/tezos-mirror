@@ -132,9 +132,9 @@ let address_and_port_for_runtime rpc_addr =
          looked_for
   in
   match (Uri.host rpc_addr, Uri.port rpc_addr) with
-  | (None, _) -> wrong_rpc_addr "Hostname"
-  | (_, None) -> wrong_rpc_addr "Port"
-  | (Some rpc_server_address, Some rpc_server_port) -> (
+  | None, _ -> wrong_rpc_addr "Hostname"
+  | _, None -> wrong_rpc_addr "Port"
+  | Some rpc_server_address, Some rpc_server_port -> (
       match P2p_addr.of_string_opt rpc_server_address with
       | Some rpc_server_address -> Ok (rpc_server_address, rpc_server_port)
       | None ->
@@ -181,15 +181,15 @@ let to_runtime
   match
     (endpoint, rpc_addr, sym_block_caching_time_error sym_block_caching_time)
   with
-  | (None, _, _) ->
+  | None, _, _ ->
       fail
         {|Endpoint not specified: pass argument --endpoint or specify "endpoint" field in CONFIG file|}
-  | (_, None, _) ->
+  | _, None, _ ->
       fail
         {|RPC address not specified: pass argument --rpc-addr or specify "rpc_addr" field in CONFIG file|}
-  | (_, _, Some err) -> fail err
-  | (Some endpoint, Some rpc_addr, None) ->
-      let* (rpc_server_address, rpc_server_port) =
+  | _, _, Some err -> fail err
+  | Some endpoint, Some rpc_addr, None ->
+      let* rpc_server_address, rpc_server_port =
         address_and_port_for_runtime rpc_addr
       in
       let* rpc_server_tls =

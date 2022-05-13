@@ -132,7 +132,7 @@ end = struct
     (Int32.rem (TzEndian.get_int32 seed 0) n, Hacl.Hash.SHA256.digest seed)
 
   let next (step, counter, seed) =
-    let (random_gap, seed) =
+    let random_gap, seed =
       if step <= 1l then (0l, seed)
       else draw seed (Int32.succ (Int32.div step 2l))
     in
@@ -147,18 +147,18 @@ let estimated_length seed {head_hash; history; _} =
   let rec loop acc state = function
     | [] -> acc
     | _ :: hist ->
-        let (step, state) = Step.next state in
+        let step, state = Step.next state in
         loop (acc + step) state hist
   in
   let state = Step.init seed head_hash in
-  let (step, state) = Step.next state in
+  let step, state = Step.next state in
   loop step state history
 
 let fold ~f ~init {head_hash; history; _} seed =
   let rec loop state acc = function
     | [] | [_] -> acc
     | block :: (pred :: rem as hist) ->
-        let (step, state) = Step.next state in
+        let step, state = Step.next state in
         let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
         loop state acc hist
   in
@@ -183,7 +183,7 @@ let fold_truncate ~f ~init ~save_point ~limit {head_hash; history; _} seed =
   let rec loop state step_sum acc = function
     | [] | [_] -> acc
     | block :: (pred :: rem as hist) ->
-        let (step, state) = Step.next state in
+        let step, state = Step.next state in
         let new_step_sum = step + step_sum in
         if new_step_sum >= limit then
           f acc ~block ~pred:save_point ~step ~strict_step:false
@@ -209,7 +209,7 @@ let compute ~get_predecessor ~caboose ~size head_hash head_header seed =
   let rec loop acc size state current_block_hash =
     if size = 0 then Lwt.return acc
     else
-      let (step, state) = Step.next state in
+      let step, state = Step.next state in
       let* o = get_predecessor current_block_hash step in
       match o with
       | None ->

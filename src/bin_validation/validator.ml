@@ -288,7 +288,7 @@ let run input output =
                 operations
                 ~cache)
         in
-        let (block_application_result, cache) =
+        let block_application_result, cache =
           match block_application_result with
           | Error [Validation_errors.Inconsistent_hash _] as err ->
               (* This is a special case added for Hangzhou that could
@@ -470,7 +470,7 @@ let run input output =
 let main ?socket_dir () =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
-  let*! (in_channel, out_channel) =
+  let*! in_channel, out_channel =
     match socket_dir with
     | Some socket_dir ->
         let*! () = Tezos_base_unix.Internal_event_unix.init () in

@@ -760,9 +760,9 @@ let prim_encoding =
          (* Alpha_013 addition *)
          ("tx_rollup_l2_address", T_tx_rollup_l2_address);
          ("MIN_BLOCK_TIME", I_MIN_BLOCK_TIME);
-         ("sapling_transaction", T_sapling_transaction);
+         ("sapling_transaction", T_sapling_transaction)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
-         (* Keep the comment above at the end of the list *)
+         (* Keep the comment above at the end of the list *);
        ]
 
 let () =

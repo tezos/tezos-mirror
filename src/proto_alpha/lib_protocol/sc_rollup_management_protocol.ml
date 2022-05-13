@@ -123,7 +123,7 @@ type outbox_message = Atomic_transaction_batch of atomic_transaction_batch
 
 let make_inbox_message ctxt ty ~payload ~sender ~source =
   let open Lwt_tzresult_syntax in
-  let+ (payload, ctxt) =
+  let+ payload, ctxt =
     Script_ir_translator.unparse_data
       ctxt
       Script_ir_translator.Optimized
@@ -191,7 +191,7 @@ let transactions_batch_of_internal ctxt {transactions_internal} =
   let open Lwt_tzresult_syntax in
   let or_internal_transaction ctxt
       {unparsed_parameters_ty; unparsed_parameters; destination; entrypoint} =
-    let*? (Ex_ty parameters_ty, ctxt) =
+    let*? Ex_ty parameters_ty, ctxt =
       Script_ir_translator.parse_ty
         ~legacy:false
         ~allow_lazy_storage:false
@@ -205,7 +205,7 @@ let transactions_batch_of_internal ctxt {transactions_internal} =
        We should rule out big-maps.
        [allow_forged] controls both tickets and big-maps. Here we only want to
        allow tickets. *)
-    let* (parameters, ctxt) =
+    let* parameters, ctxt =
       Script_ir_translator.parse_data
         ctxt
         ~legacy:false
@@ -225,10 +225,10 @@ let transactions_batch_of_internal ctxt {transactions_internal} =
           },
         ctxt )
   in
-  let+ (ctxt, transactions) =
+  let+ ctxt, transactions =
     List.fold_left_map_es
       (fun ctxt msg ->
-        let+ (t, ctxt) = or_internal_transaction ctxt msg in
+        let+ t, ctxt = or_internal_transaction ctxt msg in
         (ctxt, t))
       ctxt
       transactions_internal
@@ -248,16 +248,16 @@ let outbox_message_of_bytes ctxt bytes =
     | Some x -> ok x
     | None -> error Error_decode_inbox_message
   in
-  let+ (ts, ctxt) = transactions_batch_of_internal ctxt msg in
+  let+ ts, ctxt = transactions_batch_of_internal ctxt msg in
   (Atomic_transaction_batch ts, ctxt)
 
 module Internal_for_tests = struct
   let make_transaction ctxt parameters_ty ~parameters ~destination ~entrypoint =
     let open Lwt_tzresult_syntax in
-    let* (unparsed_parameters, ctxt) =
+    let* unparsed_parameters, ctxt =
       Script_ir_translator.unparse_data ctxt Optimized parameters_ty parameters
     in
-    let*? (unparsed_parameters_ty, ctxt) =
+    let*? unparsed_parameters_ty, ctxt =
       Script_ir_translator.unparse_ty
         ctxt
         ~loc:Micheline.dummy_location

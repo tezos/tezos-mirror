@@ -367,8 +367,8 @@ let init1 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?blocks_per_cycle
     1
   >|=? function
-  | (_, []) -> assert false
-  | (b, contract_1 :: _) -> (b, contract_1)
+  | _, [] -> assert false
+  | b, contract_1 :: _ -> (b, contract_1)
 
 let init2 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
@@ -390,8 +390,8 @@ let init2 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?blocks_per_cycle
     2
   >|=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
+  | _, [] | _, [_] -> assert false
+  | b, contract_1 :: contract_2 :: _ -> (b, contract_1, contract_2)
 
 let init_with_constants constants n =
   let accounts = Account.generate_accounts n in

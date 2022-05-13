@@ -30,7 +30,7 @@ let never_ending () = fst (Lwt.wait ())
 
 (* A worker launcher, takes a cancel callback to call upon *)
 let worker name ~on_event ~run ~cancel =
-  let (stop, stopper) = Lwt.wait () in
+  let stop, stopper = Lwt.wait () in
   let fail e =
     Lwt.finalize
       (fun () ->

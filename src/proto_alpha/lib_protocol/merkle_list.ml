@@ -165,7 +165,7 @@ end)
      Post-condition: len(to_bin pos depth) = depth *)
   let to_bin ~pos ~depth =
     let rec aux acc pos depth =
-      let (pos', dir) = (pos / 2, pos mod 2) in
+      let pos', dir = (pos / 2, pos mod 2) in
       match depth with
       | 0 -> acc
       | d -> aux (Compare.Int.(dir = 1) :: acc) pos' (d - 1)
@@ -184,36 +184,36 @@ end)
   let snoc t (el : elt) =
     let rec traverse tree depth key =
       match (tree, key) with
-      | (Node (_, t_left, Empty), true :: _key) ->
+      | Node (_, t_left, Empty), true :: _key ->
           (* The base case where the left subtree is full and we start
            * the right subtree by creating a new tree the size of the remaining
            * depth and placing the new element in its leftmost position. *)
           let t_right = make_spine_with el (depth - 1) in
           node_of t_left t_right
-      | (Node (_, t_left, Empty), false :: key) ->
+      | Node (_, t_left, Empty), false :: key ->
           (* Traversing left, the left subtree is not full (and thus the right
            * subtree is empty). Recurse on left subtree. *)
           let t_left = traverse t_left (depth - 1) key in
           node_of t_left Empty
-      | (Node (_, t_left, t_right), true :: key) ->
+      | Node (_, t_left, t_right), true :: key ->
           (* Traversing right, the left subtree is full.
            * Recurse on right subtree *)
           let t_right = traverse t_right (depth - 1) key in
           node_of t_left t_right
-      | (_, _) ->
+      | _, _ ->
           (* Impossible by construction of the tree and of the key.
            * See [tree] invariants and [to_bin]. *)
           assert false
     in
 
-    let (tree', depth') =
+    let tree', depth' =
       match (t.tree, t.depth, t.next_pos) with
-      | (Empty, 0, 0) -> (node_of (leaf_of el) Empty, 1)
-      | (tree, depth, pos) when Int32.(equal (shift_left 1l depth) (of_int pos))
+      | Empty, 0, 0 -> (node_of (leaf_of el) Empty, 1)
+      | tree, depth, pos when Int32.(equal (shift_left 1l depth) (of_int pos))
         ->
           let t_right = make_spine_with el depth in
           (node_of tree t_right, depth + 1)
-      | (tree, depth, pos) ->
+      | tree, depth, pos ->
           let key = to_bin ~pos ~depth in
           (traverse tree depth key, depth)
     in
@@ -230,29 +230,29 @@ end)
   let snoc_tr t (el : elt) =
     let rec traverse (z : zipper) tree depth key =
       match (tree, key) with
-      | (Node (_, t_left, Empty), true :: _key) ->
+      | Node (_, t_left, Empty), true :: _key ->
           let t_right = make_spine_with el (depth - 1) in
           rebuild_tree z (node_of t_left t_right)
-      | (Node (_, t_left, Empty), false :: key) ->
+      | Node (_, t_left, Empty), false :: key ->
           let z = Left (z, Empty) in
           (traverse [@tailcall]) z t_left (depth - 1) key
-      | (Node (_, t_left, t_right), true :: key) ->
+      | Node (_, t_left, t_right), true :: key ->
           let z = Right (t_left, z) in
           (traverse [@tailcall]) z t_right (depth - 1) key
-      | (_, _) ->
+      | _, _ ->
           (* Impossible by construction of the tree and of the key.
            * See [tree] invariants and [to_bin]. *)
           assert false
     in
 
-    let (tree', depth') =
+    let tree', depth' =
       match (t.tree, t.depth, t.next_pos) with
-      | (Empty, 0, 0) -> (node_of (leaf_of el) Empty, 1)
-      | (tree, depth, pos) when Int32.(equal (shift_left 1l depth) (of_int pos))
+      | Empty, 0, 0 -> (node_of (leaf_of el) Empty, 1)
+      | tree, depth, pos when Int32.(equal (shift_left 1l depth) (of_int pos))
         ->
           let t_right = make_spine_with el depth in
           (node_of tree t_right, depth + 1)
-      | (tree, depth, pos) ->
+      | tree, depth, pos ->
           let key = to_bin ~pos ~depth in
           (traverse Top tree depth key, depth)
     in
@@ -278,8 +278,8 @@ end)
       let key = to_bin ~pos ~depth in
       let rec aux acc tree key =
         match (tree, key) with
-        | (Leaf _, []) -> ok acc
-        | (Node (_, l, r), b :: key) ->
+        | Leaf _, [] -> ok acc
+        | Node (_, l, r), b :: key ->
             if b then aux (root l :: acc) r key else aux (root r :: acc) l key
         | _ -> error Merkle_list_invalid_position
       in
@@ -325,9 +325,9 @@ end)
     let equal t1 t2 =
       let rec eq_tree t1 t2 =
         match (t1, t2) with
-        | (Empty, Empty) -> true
-        | (Leaf h1, Leaf h2) -> H.equal h1 h2
-        | (Node (h1, l1, r1), Node (h2, l2, r2)) ->
+        | Empty, Empty -> true
+        | Leaf h1, Leaf h2 -> H.equal h1 h2
+        | Node (h1, l1, r1), Node (h2, l2, r2) ->
             H.equal h1 h2 && eq_tree l1 l2 && eq_tree r1 r2
         | _ -> false
       in

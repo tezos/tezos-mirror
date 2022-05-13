@@ -346,10 +346,10 @@ let pp_balance_updates ppf = function
               | Lost_endorsing_rewards (pkh, p, r) ->
                   let reason =
                     match (p, r) with
-                    | (false, false) -> ""
-                    | (false, true) -> ",revelation"
-                    | (true, false) -> ",participation"
-                    | (true, true) -> ",participation,revelation"
+                    | false, false -> ""
+                    | false, true -> ",revelation"
+                    | true, false -> ",participation"
+                    | true, true -> ",participation,revelation"
                   in
                   Format.asprintf
                     "lost endorsing rewards(%a%s)"

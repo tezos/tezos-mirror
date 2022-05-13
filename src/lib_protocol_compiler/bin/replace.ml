@@ -153,7 +153,7 @@ let main () =
   let version =
     try Sys.argv.(4) with Invalid_argument _ -> guess_version ()
   in
-  let (hash, proto, check_hash) = read_proto destination final_protocol_file in
+  let hash, proto, check_hash = read_proto destination final_protocol_file in
   process ~template ~destination proto version hash check_hash
 
 let () = main ()

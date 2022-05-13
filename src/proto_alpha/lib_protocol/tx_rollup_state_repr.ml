@@ -471,7 +471,7 @@ let record_inbox_creation t level =
         (Internal_error "Trying to create an inbox in the past")
   | None -> ok ())
   >>? fun () ->
-  let (uncommitted_inboxes, new_level) = extend t.uncommitted_inboxes in
+  let uncommitted_inboxes, new_level = extend t.uncommitted_inboxes in
   adjust_storage_allocation t ~delta:Tx_rollup_inbox_repr.size
   >>? fun (t, diff) ->
   ok
@@ -489,7 +489,7 @@ let next_commitment_level state current_level =
     ( range_oldest state.uncommitted_inboxes,
       range_newest state.uncommitted_inboxes )
   with
-  | (Some oldest_level, Some newest_level) -> (
+  | Some oldest_level, Some newest_level -> (
       if
         (* We want to return an error if there is only one inbox in the
            storage, and this inbox has been created in the current
@@ -510,8 +510,8 @@ let next_commitment_level state current_level =
             >>? fun () -> ok oldest_level
         | None -> error (Internal_error "tezos_head_level was not properly set")
       )
-  | (None, None) -> error No_uncommitted_inbox
-  | (Some _, None) | (None, Some _) ->
+  | None, None -> error No_uncommitted_inbox
+  | Some _, None | None, Some _ ->
       error (Internal_error "rollup state is inconsistent")
 
 let next_commitment_to_finalize state =
@@ -523,7 +523,7 @@ let record_inbox_deletion state candidate =
   match range_oldest state.unfinalized_commitments with
   | Some level when Tx_rollup_level_repr.(candidate = level) ->
       shrink state.unfinalized_commitments >>? fun unfinalized_commitments ->
-      let (finalized_commitments, _) = extend state.finalized_commitments in
+      let finalized_commitments, _ = extend state.finalized_commitments in
       ok {state with unfinalized_commitments; finalized_commitments}
   | _ -> error (Internal_error "Trying to delete the wrong inbox")
 
@@ -535,7 +535,7 @@ let record_commitment_creation state level hash =
         (Internal_error "Trying to create the wrong commitment")
       >>? fun () ->
       shrink state.uncommitted_inboxes >>? fun uncommitted_inboxes ->
-      let (unfinalized_commitments, _) = extend state.unfinalized_commitments in
+      let unfinalized_commitments, _ = extend state.unfinalized_commitments in
       let state =
         {
           state with
@@ -623,7 +623,7 @@ let finalized_commitments_range state =
     ( range_oldest state.finalized_commitments,
       range_newest state.finalized_commitments )
   with
-  | (Some oldest, Some newest) -> Some (oldest, newest)
+  | Some oldest, Some newest -> Some (oldest, newest)
   | _ -> None
 
 let check_level_can_be_rejected state level =
@@ -631,7 +631,7 @@ let check_level_can_be_rejected state level =
     ( range_oldest state.unfinalized_commitments,
       range_newest state.unfinalized_commitments )
   with
-  | (Some oldest, Some newest) ->
+  | Some oldest, Some newest ->
       error_unless Tx_rollup_level_repr.(oldest <= level && level <= newest)
       @@ Cannot_reject_level
            {provided = level; accepted_range = Some (oldest, newest)}
@@ -641,9 +641,9 @@ let last_removed_commitment_hashes state = state.last_removed_commitment_hashes
 
 let head_levels state =
   match (state.uncommitted_inboxes, state.tezos_head_level) with
-  | (Empty {next = l}, Some tz_level) ->
+  | Empty {next = l}, Some tz_level ->
       Option.map (fun l -> (l, tz_level)) (Tx_rollup_level_repr.pred l)
-  | (Interval {newest; _}, Some tz_level) -> Some (newest, tz_level)
+  | Interval {newest; _}, Some tz_level -> Some (newest, tz_level)
   | _ -> None
 
 module Internal_for_tests = struct

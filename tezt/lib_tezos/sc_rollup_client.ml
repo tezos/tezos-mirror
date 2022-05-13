@@ -59,7 +59,7 @@ let commitment_from_json json =
       }
 
 let commitment_with_hash_from_json json =
-  let (hash, commitment_json) =
+  let hash, commitment_json =
     (JSON.get "hash" json, JSON.get "commitment" json)
   in
   Option.map
@@ -160,8 +160,8 @@ let parse_list_keys output =
   |> List.fold_left
        (fun acc k ->
          match (k, acc) with
-         | (None, _) | (_, None) -> None
-         | (Some k, Some acc) -> Some (k :: acc))
+         | None, _ | _, None -> None
+         | Some k, Some acc -> Some (k :: acc))
        (Some [])
   |> function
   | None ->

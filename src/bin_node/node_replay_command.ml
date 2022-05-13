@@ -166,7 +166,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
         config.shell.block_validator_limits.operation_metadata_size_limit;
     }
   in
-  let* (validator_process, store) =
+  let* validator_process, store =
     if singleprocess then
       let* store =
         Store.init
@@ -236,7 +236,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           match predecessor_opt with
           | None -> tzfail Cannot_replay_orphan
           | Some predecessor ->
-              let*! (_, savepoint_level) =
+              let*! _, savepoint_level =
                 Store.Chain.savepoint main_chain_store
               in
               if Store.Block.level block <= savepoint_level then
@@ -318,19 +318,19 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                     (exp : Block_validation.operation_metadata list list)
                     (got : Block_validation.operation_metadata list list) =
                   match (exp, got) with
-                  | ([], []) -> return_unit
-                  | ([], _ :: _) | (_ :: _, []) -> assert false
-                  | ([] :: exps, [] :: gots) ->
+                  | [], [] -> return_unit
+                  | [], _ :: _ | _ :: _, [] -> assert false
+                  | [] :: exps, [] :: gots ->
                       check_receipts (succ i) 0 exps gots
-                  | ((_ :: _) :: _, [] :: _) | ([] :: _, (_ :: _) :: _) ->
+                  | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ ->
                       assert false
-                  | ((exp :: exps) :: expss, (got :: gots) :: gotss) ->
+                  | (exp :: exps) :: expss, (got :: gots) :: gotss ->
                       let* () =
                         let equal a b =
                           match (a, b) with
                           | Block_validation.(Metadata a, Metadata b) ->
                               Bytes.equal a b
-                          | (Too_large_metadata, Too_large_metadata) -> true
+                          | Too_large_metadata, Too_large_metadata -> true
                           | _ -> false
                         in
                         if not (equal exp got) then
@@ -517,8 +517,8 @@ module Manpage = struct
       `P
         ("The environment variable $(b,TEZOS_LOG) is used to fine-tune what is \
           going to be logged. The syntax is \
-          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
-          one of $(i," ^ log_sections
+          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is one \
+          of $(i," ^ log_sections
        ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
           $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
           wildcard in sections, i.e. $(b, client* -> debug). The rules are \

@@ -122,7 +122,7 @@ let rec size_of_comparable_value :
    | Address_t -> address v
    | Tx_rollup_l2_address_t -> tx_rollup_l2_address v
    | Pair_t (leaf, node, _, YesYes) ->
-       let (lv, rv) = v in
+       let lv, rv = v in
        let size =
          size_of_comparable_value leaf lv + size_of_comparable_value node rv
        in

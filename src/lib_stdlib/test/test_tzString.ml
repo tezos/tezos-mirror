@@ -1,6 +1,6 @@
 (* Verify the default behavior of split is handling multiple instances of the
    separator in a row
- *)
+*)
 let test_split_duplicated_separator () =
   let inputs =
     [

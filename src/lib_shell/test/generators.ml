@@ -111,7 +111,7 @@ let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
 let operation_with_hash_gen ?proto_gen ?block_hash_t () :
     unit Prevalidation.operation QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let+ (oph, op) = raw_operation_with_hash_gen ?proto_gen ?block_hash_t () in
+  let+ oph, op = raw_operation_with_hash_gen ?proto_gen ?block_hash_t () in
   Prevalidation.Internal_for_tests.make_operation op oph ()
 
 let operation_with_hash_and_priority_gen ?proto_gen ?block_hash_t () :

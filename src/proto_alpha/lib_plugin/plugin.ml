@@ -598,7 +598,7 @@ module Mempool = struct
   (** Returns the weight of an operation, i.e. the fees w.r.t the gas and size
       consumption in the block. *)
   let weight_manager_operation ~validation_state ?size ~fee ~gas op =
-    let (weight, _resources) =
+    let weight, _resources =
       weight_and_resources_manager_operation
         ~validation_state
         ?size
@@ -623,7 +623,7 @@ module Mempool = struct
     match validation_state with
     | None -> `Weight_ok (`No_replace, [])
     | Some validation_state -> (
-        let (weight, op_resources) =
+        let weight, op_resources =
           weight_and_resources_manager_operation
             ~validation_state
             ~fee
@@ -914,7 +914,7 @@ module Mempool = struct
     match
       (grandparent_level_start, validation_state_before, round_zero_duration)
     with
-    | (None, _, _) | (_, None, _) | (_, _, None) -> Lwt.return_true
+    | None, _, _ | _, None, _ | _, _, None -> Lwt.return_true
     | ( Some grandparent_level_start,
         Some validation_state_before,
         Some round_zero_duration ) -> (
@@ -2000,8 +2000,8 @@ module RPC = struct
             type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
             Script.expr list tzresult Lwt.t = function
-          | (Bot_t, (EmptyCell, EmptyCell)) -> return_nil
-          | (Item_t (ty, rest_ty), (v, rest)) ->
+          | Bot_t, (EmptyCell, EmptyCell) -> return_nil
+          | Item_t (ty, rest_ty), (v, rest) ->
               Script_ir_translator.unparse_data
                 ctxt
                 Unparsing_mode.unparsing_mode
@@ -2300,11 +2300,11 @@ module RPC = struct
               balance
             >>=? fun bal -> return (ctxt, addr, bal))
         >>=? fun (ctxt, self, balance) ->
-        let (source, payer) =
+        let source, payer =
           match (src_opt, pay_opt) with
-          | (None, None) -> (self, self)
-          | (Some c, None) | (None, Some c) -> (c, c)
-          | (Some src, Some pay) -> (src, pay)
+          | None, None -> (self, self)
+          | Some c, None | None, Some c -> (c, c)
+          | Some src, Some pay -> (src, pay)
         in
         return (ctxt, {balance; self; source; payer})
       in
@@ -2517,12 +2517,12 @@ module RPC = struct
                (View_helpers.make_tzip4_viewer_script ty)
                Tez.zero
           >>=? fun (ctxt, viewer_contract) ->
-          let (source, payer) =
+          let source, payer =
             match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (contract, contract)
+            | Some source, Some payer -> (source, payer)
+            | Some source, None -> (source, source)
+            | None, Some payer -> (payer, payer)
+            | None, None -> (contract, contract)
           in
           let gas =
             Option.value
@@ -2609,12 +2609,12 @@ module RPC = struct
           script_view_type ctxt contract decoded_script view
           >>=? fun (input_ty, output_ty) ->
           Contract.get_balance ctxt contract >>=? fun balance ->
-          let (source, payer) =
+          let source, payer =
             match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (contract, contract)
+            | Some source, Some payer -> (source, payer)
+            | Some source, None -> (source, source)
+            | None, Some payer -> (payer, payer)
+            | None, None -> (contract, contract)
           in
           let now =
             match now with None -> Script_timestamp.now ctxt | Some t -> t
@@ -2740,7 +2740,7 @@ module RPC = struct
                    storage;
                  })
           in
-          let (size, cost) = Script_ir_translator.script_size script in
+          let size, cost = Script_ir_translator.script_size script in
           Gas.consume ctxt cost >>?= fun _ctxt -> return @@ size) ;
 
       Registration.register0
@@ -2835,7 +2835,7 @@ module RPC = struct
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
             >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
-              let (unreachable_entrypoint, map) =
+              let unreachable_entrypoint, map =
                 Script_ir_translator.list_entrypoints_uncarbonated
                   arg_type
                   entrypoints
@@ -3246,7 +3246,7 @@ module RPC = struct
         S.last_cemented_commitment_hash_with_level
       @@ fun ctxt address () () ->
       let open Lwt_tzresult_syntax in
-      let+ (last_cemented_commitment, level, _ctxt) =
+      let+ last_cemented_commitment, level, _ctxt =
         Alpha_context.Sc_rollup.last_cemented_commitment_hash_with_level
           ctxt
           address
@@ -3257,7 +3257,7 @@ module RPC = struct
       Registration.register2 ~chunked:false S.commitment
       @@ fun ctxt address commitment_hash () () ->
       let open Lwt_result_syntax in
-      let+ (commitment, _) =
+      let+ commitment, _ =
         Alpha_context.Sc_rollup.get_commitment ctxt address commitment_hash
       in
       commitment
@@ -3554,8 +3554,8 @@ module RPC = struct
             in
             let ops =
               match (sourcePubKey, revealed) with
-              | (None, _) | (_, Some _) -> ops
-              | (Some pk, None) ->
+              | None, _ | _, Some _ -> ops
+              | Some pk, None ->
                   let operation = Reveal pk in
                   Contents
                     (Manager_operation
@@ -3777,8 +3777,8 @@ module RPC = struct
 
   let requested_levels ~default_level ctxt cycles levels =
     match (levels, cycles) with
-    | ([], []) -> [default_level]
-    | (levels, cycles) ->
+    | [], [] -> [default_level]
+    | levels, cycles ->
         (* explicitly fail when requested levels or cycle are in the past...
            or too far in the future...
            TODO: https://gitlab.com/tezos/tezos/-/issues/2335

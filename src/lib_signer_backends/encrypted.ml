@@ -91,8 +91,8 @@ module Raw = struct
     match
       (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce, algo)
     with
-    | (None, _) -> return_none
-    | (Some bytes, Encrypted_sk Signature.Ed25519) -> (
+    | None, _ -> return_none
+    | Some bytes, Encrypted_sk Signature.Ed25519 -> (
         match
           Data_encoding.Binary.of_bytes_opt Ed25519.Secret_key.encoding bytes
         with
@@ -102,7 +102,7 @@ module Raw = struct
             failwith
               "Corrupted wallet, deciphered key is not a valid Ed25519 secret \
                key")
-    | (Some bytes, Encrypted_sk Signature.Secp256k1) -> (
+    | Some bytes, Encrypted_sk Signature.Secp256k1 -> (
         match
           Data_encoding.Binary.of_bytes_opt Secp256k1.Secret_key.encoding bytes
         with
@@ -112,7 +112,7 @@ module Raw = struct
             failwith
               "Corrupted wallet, deciphered key is not a valid Secp256k1 \
                secret key")
-    | (Some bytes, Encrypted_sk Signature.P256) -> (
+    | Some bytes, Encrypted_sk Signature.P256 -> (
         match
           Data_encoding.Binary.of_bytes_opt P256.Secret_key.encoding bytes
         with
@@ -121,7 +121,7 @@ module Raw = struct
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid P256 secret key")
-    | (Some bytes, Encrypted_aggregate_sk) -> (
+    | Some bytes, Encrypted_aggregate_sk -> (
         match
           Data_encoding.Binary.of_bytes_opt Bls.Secret_key.encoding bytes
         with
@@ -270,7 +270,7 @@ let rec noninteractive_decrypt_loop algo ~encrypted_sk =
 
 let decrypt_payload cctxt ?name encrypted_sk =
   let open Lwt_result_syntax in
-  let* (algo, encrypted_sk) =
+  let* algo, encrypted_sk =
     match Base58.decode encrypted_sk with
     | Some (Encrypted_ed25519 encrypted_sk) ->
         return (Encrypted_sk Signature.Ed25519, encrypted_sk)

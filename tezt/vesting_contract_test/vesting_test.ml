@@ -699,8 +699,7 @@ let vesting_3_keys_2s =
   let open StateMonad in
   let* () = activate_alpha in
   Log.info
-    "For 4 first users (ids 0-3) give each ꜩ100 and register him as a \
-     delegate." ;
+    "For 4 first users (ids 0-3) give each ꜩ100 and register him as a delegate." ;
   Log.info "This action automatically starts tracking their balances." ;
   let* () = iter_int make_delegate 4 in
 
@@ -1145,11 +1144,9 @@ let test_full_contract =
   in
   let* () =
     initialise_vesting_state
-      ~vesting_increment:
-        (Tez.of_mutez_int 636089108075)
+      ~vesting_increment:(Tez.of_mutez_int 636089108075)
         (* 1/12th of the total initial balance. *)
-      ~payout_interval:
-        Ptime.Span.(of_int_s (60 * 60 * 24 * 365 / 12))
+      ~payout_interval:Ptime.Span.(of_int_s (60 * 60 * 24 * 365 / 12))
         (* Approximately one month. *)
       ~overall_threshold:4
       [

@@ -255,9 +255,9 @@ let check_locked_round fitness ~locked_round =
   in
   let correct =
     match (locked_round, expected_locked_round) with
-    | (None, None) -> true
-    | (Some _, None) | (None, Some _) -> false
-    | (Some v, Some v') -> Round_repr.(v = v')
+    | None, None -> true
+    | Some _, None | None, Some _ -> false
+    | Some v, Some v' -> Round_repr.(v = v')
   in
   error_unless correct Wrong_fitness
 

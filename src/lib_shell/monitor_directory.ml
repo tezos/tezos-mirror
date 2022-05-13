@@ -36,7 +36,7 @@ let build_rpc_directory validator mainchain_validator =
     dir := RPC_directory.gen_register !dir s (fun ((), a) p q -> f a p q)
   in
   gen_register0 Monitor_services.S.bootstrapped (fun () () ->
-      let (block_stream, stopper) =
+      let block_stream, stopper =
         Chain_validator.new_head_watcher mainchain_validator
       in
       let first_run = ref true in
@@ -62,7 +62,7 @@ let build_rpc_directory validator mainchain_validator =
       let shutdown () = Lwt_watcher.shutdown stopper in
       RPC_answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.valid_blocks (fun q () ->
-      let (block_stream, stopper) = Store.global_block_watcher store in
+      let block_stream, stopper = Store.global_block_watcher store in
       let shutdown () = Lwt_watcher.shutdown stopper in
       let in_chains (chain_store, _block) =
         match q#chains with
@@ -122,7 +122,7 @@ let build_rpc_directory validator mainchain_validator =
       match Validator.get validator (Store.Chain.chain_id chain_store) with
       | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
-          let (block_stream, stopper) =
+          let block_stream, stopper =
             Chain_validator.new_head_watcher chain_validator
           in
           let* head = Store.Chain.current_head chain_store in
@@ -159,14 +159,14 @@ let build_rpc_directory validator mainchain_validator =
           in
           RPC_answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.protocols (fun () () ->
-      let (stream, stopper) = Store.Protocol.protocol_watcher store in
+      let stream, stopper = Store.Protocol.protocol_watcher store in
       let shutdown () = Lwt_watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in
       RPC_answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.commit_hash (fun () () ->
       RPC_answer.return Tezos_version.Current_git_info.commit_hash) ;
   gen_register0 Monitor_services.S.active_chains (fun () () ->
-      let (stream, stopper) = Validator.chains_watcher validator in
+      let stream, stopper = Validator.chains_watcher validator in
       let shutdown () = Lwt_watcher.shutdown stopper in
       let first_call =
         (* Only notify the newly created chains if this is false *)

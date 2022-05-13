@@ -42,8 +42,8 @@ let get_next_context b =
 
 let register_two_contracts ?consensus_threshold () =
   Context.init ?consensus_threshold 2 >|=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
+  | _, [] | _, [_] -> assert false
+  | b, contract_1 :: contract_2 :: _ -> (b, contract_1, contract_2)
 
 let assert_proto_error_id loc id result =
   let test err =

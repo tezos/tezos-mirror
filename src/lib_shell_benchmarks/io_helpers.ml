@@ -66,7 +66,7 @@ let commit context =
 
 let prepare_empty_context base_dir =
   let open Lwt_result_syntax in
-  let* (index, context, _context_hash) = prepare_genesis base_dir in
+  let* index, context, _context_hash = prepare_genesis base_dir in
   let*! context_hash = commit context in
   let*! () = Tezos_context.Context.close index in
   return context_hash
@@ -85,7 +85,7 @@ let load_context_from_disk base_dir context_hash =
   Lwt_main.run (load_context_from_disk_lwt base_dir context_hash)
 
 let with_context ~base_dir ~context_hash f =
-  let (context, index) = load_context_from_disk base_dir context_hash in
+  let context, index = load_context_from_disk base_dir context_hash in
   Lwt_main.run
     (let open Lwt_syntax in
     let* res = f context in
@@ -151,30 +151,30 @@ module Key_map = struct
     if is_empty tree then `Key_does_not_collide
     else
       match (key, tree) with
-      | ([], Leaf _) -> `Key_exists
-      | (_, Leaf _) -> `Key_has_prefix
-      | ([], Node _) -> `Key_has_suffix
-      | (seg :: tl, Node map) -> (
+      | [], Leaf _ -> `Key_exists
+      | _, Leaf _ -> `Key_has_prefix
+      | [], Node _ -> `Key_has_suffix
+      | seg :: tl, Node map -> (
           match String_map.find_opt seg map with
           | None -> `Key_does_not_collide
           | Some subtree -> does_not_collide tl subtree)
 
   let rec mem key tree =
     match (key, tree) with
-    | ([], Leaf _) -> true
-    | (_, Leaf _) -> false
-    | ([], Node _) -> false
-    | (seg :: tl, Node map) -> (
+    | [], Leaf _ -> true
+    | _, Leaf _ -> false
+    | [], Node _ -> false
+    | seg :: tl, Node map -> (
         match String_map.find_opt seg map with
         | None -> false
         | Some subtree -> mem tl subtree)
 
   let rec find_opt key tree =
     match (key, tree) with
-    | ([], Leaf v) -> Some v
-    | (_ :: _, Leaf _) -> None
-    | ([], Node _) -> None
-    | (seg :: tl, Node map) -> (
+    | [], Leaf v -> Some v
+    | _ :: _, Leaf _ -> None
+    | [], Node _ -> None
+    | seg :: tl, Node map -> (
         match String_map.find_opt seg map with
         | None -> None
         | Some subtree -> find_opt tl subtree)
@@ -220,7 +220,7 @@ let rec take_n n list acc =
     | x :: tl -> take_n (n - 1) tl (x :: acc)
 
 let sample_without_replacement n list =
-  let (first_n, rest) = take_n n list [] in
+  let first_n, rest = take_n n list [] in
   let reservoir = Array.of_list first_n in
   let reject = ref [] in
   List.iteri

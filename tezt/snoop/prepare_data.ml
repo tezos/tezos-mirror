@@ -153,7 +153,7 @@ let concat snoop protocol tmp_files target =
    and concat the results *)
 
 let prepare_michelson kind snoop cfg protocol =
-  let (target, terms_count) =
+  let target, terms_count =
     match kind with
     | Snoop.Code ->
         ( Files.(working_dir // michelson_data_dir // michelson_code_file),

@@ -58,7 +58,7 @@ let assert_presence_in_cemented_store ?(with_metadata = true) cemented_store
 
 let test_cement_pruned_blocks cemented_store =
   let open Lwt_result_syntax in
-  let*! (blocks, _head) =
+  let*! blocks, _head =
     make_raw_block_list ~kind:`Pruned (genesis_hash, -1l) 4095
   in
   let* () =
@@ -71,7 +71,7 @@ let test_cement_pruned_blocks cemented_store =
 
 let test_cement_full_blocks cemented_store =
   let open Lwt_result_syntax in
-  let*! (blocks, _head) =
+  let*! blocks, _head =
     make_raw_block_list ~kind:`Full (genesis_hash, -1l) 4095
   in
   let* () =
@@ -84,7 +84,7 @@ let test_cement_full_blocks cemented_store =
 
 let test_metadata_retrieval cemented_store =
   let open Lwt_result_syntax in
-  let*! (blocks, _head) =
+  let*! blocks, _head =
     make_raw_block_list ~kind:`Full (genesis_hash, -1l) 100
   in
   let* () =

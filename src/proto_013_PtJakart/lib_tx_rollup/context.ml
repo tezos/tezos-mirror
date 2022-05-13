@@ -176,7 +176,7 @@ let produce_proof ctxt f =
     | Some kinded_key -> return kinded_key
     | None -> fail [Error.Tx_rollup_tree_kinded_key_not_found]
   in
-  let*! (proof, result) =
+  let*! proof, result =
     produce_stream_proof index kinded_key (fun tree ->
         let*! res = f tree in
         Lwt.return (res.tree, res))
@@ -213,5 +213,5 @@ let init_context index =
   assert (
     Context_hash.(
       tree_hash = Protocol.Tx_rollup_message_result_repr.empty_l2_context_hash)) ;
-  let* (ctxt, _) = add_tree ctxt tree in
+  let* ctxt, _ = add_tree ctxt tree in
   return ctxt

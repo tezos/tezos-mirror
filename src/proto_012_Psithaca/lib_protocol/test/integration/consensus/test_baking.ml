@@ -259,7 +259,7 @@ let test_rewards_block_and_payload_producer () =
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker_b2')
-    ~operations:(tx :: preendos @ endos)
+    ~operations:((tx :: preendos) @ endos)
     b1
   >>=? fun b2' ->
   (* [baker_b2], as payload producer, gets the block reward and the fees *)
@@ -310,7 +310,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
   let initial_bal1 = if has_active_stake then tpr else Int64.sub tpr 1L in
   Context.init ~initial_balances:[initial_bal1; tpr] ~consensus_threshold:0 2
   >>=? fun (b0, accounts) ->
-  let (account1, _account2) =
+  let account1, _account2 =
     match accounts with a1 :: a2 :: _ -> (a1, a2) | _ -> assert false
   in
   Context.Contract.pkh account1 >>=? fun pkh1 ->
@@ -336,7 +336,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
 
 let test_committee_sampling () =
   let test_distribution max_round distribution =
-    let (initial_balances, bounds) = List.split distribution in
+    let initial_balances, bounds = List.split distribution in
     let accounts =
       Account.generate_accounts ~initial_balances (List.length initial_balances)
     in
@@ -368,7 +368,7 @@ let test_committee_sampling () =
       bounds ;
     List.iter
       (fun {Plugin.RPC.Baking_rights.delegate = pkh; _} ->
-        let (bounds, n) = Stdlib.Hashtbl.find stats pkh in
+        let bounds, n = Stdlib.Hashtbl.find stats pkh in
         Stdlib.Hashtbl.replace stats pkh (bounds, n + 1))
       bakers ;
     let one_failed = ref false in

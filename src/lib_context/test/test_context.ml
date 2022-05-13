@@ -323,7 +323,7 @@ let test_fold {idx; genesis; _} =
       let* ctxt = add ctxt ["foo"; "toto"] foo1 in
       let* ctxt = add ctxt ["foo"; "bar"; "toto"] foo2 in
       let fold depth ecs ens =
-        let* (cs, ns) =
+        let* cs, ns =
           fold
             ?depth
             ctxt
@@ -382,7 +382,7 @@ let test_trees {idx; genesis; _} =
       let* v1 = Tree.add v1 ["foo"; "toto"] foo1 in
       let* v1 = Tree.add v1 ["foo"; "bar"; "toto"] foo2 in
       let fold depth ecs ens =
-        let* (cs, ns) =
+        let* cs, ns =
           Tree.fold
             v1
             ?depth

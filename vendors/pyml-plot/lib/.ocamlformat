@@ -7,5 +7,4 @@ doc-comments=before
 margin=80
 module-item-spacing=sparse
 parens-tuple=always
-parens-tuple-patterns=always
 break-string-literals=newlines-and-wrap

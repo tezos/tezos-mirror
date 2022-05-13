@@ -51,7 +51,7 @@ let info_of_point_info i =
 let info_of_peer_info pool i =
   let open P2p_peer.Info in
   let open P2p_peer.State in
-  let (state, id_point) =
+  let state, id_point =
     match P2p_peer_state.get i with
     | Accepted {current_point; _} -> (Accepted, Some current_point)
     | Running {current_point; _} -> (Running, Some current_point)
@@ -113,7 +113,7 @@ let build_rpc_directory net =
   in
   let dir =
     RPC_directory.gen_register0 dir P2p_services.S.events (fun () () ->
-        let (stream, stopper) = P2p.watcher net in
+        let stream, stopper = P2p.watcher net in
         let shutdown () = Lwt_watcher.shutdown stopper in
         let next () = Lwt_stream.get stream in
         RPC_answer.return_stream {next; shutdown})
@@ -207,7 +207,7 @@ let build_rpc_directory net =
                 let evts = P2p_peer_state.Info.events gi in
                 if not q#monitor then RPC_answer.return evts
                 else
-                  let (stream, stopper) = P2p_peer_state.Info.watch gi in
+                  let stream, stopper = P2p_peer_state.Info.watch gi in
                   let shutdown () = Lwt_watcher.shutdown stopper in
                   let first_request = ref true in
                   let next () =
@@ -391,7 +391,7 @@ let build_rpc_directory net =
                 let evts = P2p_point_state.Info.events gi in
                 if not q#monitor then RPC_answer.return evts
                 else
-                  let (stream, stopper) = P2p_point_state.Info.watch gi in
+                  let stream, stopper = P2p_point_state.Info.watch gi in
                   let shutdown () = Lwt_watcher.shutdown stopper in
                   let first_request = ref true in
                   let next () =

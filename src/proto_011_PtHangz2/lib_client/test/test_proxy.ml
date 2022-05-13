@@ -55,9 +55,9 @@ let key_gen : string list QCheck2.Gen.t =
 (** Whether [t1] is a prefix of [t2] *)
 let rec is_prefix t1 t2 =
   match (t1, t2) with
-  | ([], _) -> true
-  | (_, []) -> false
-  | (x1 :: rest1, x2 :: rest2) when x1 = x2 -> is_prefix rest1 rest2
+  | [], _ -> true
+  | _, [] -> false
+  | x1 :: rest1, x2 :: rest2 when x1 = x2 -> is_prefix rest1 rest2
   | _ -> false
 
 let test_split_key =

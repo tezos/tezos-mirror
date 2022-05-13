@@ -241,7 +241,9 @@ let inferred_params_table (solution : Inference.solution) =
               (fun l -> Latex_syntax.Row (List.map (fun x -> [maths x]) l))
               lines
           in
-          let rows = Latex_syntax.Hline :: hdr :: data @ [Latex_syntax.Hline] in
+          let rows =
+            (Latex_syntax.Hline :: hdr :: data) @ [Latex_syntax.Hline]
+          in
           Some (spec, rows))
 
 let overrides_table (overrides : float Free_variable.Map.t) =
@@ -259,7 +261,7 @@ let overrides_table (overrides : float Free_variable.Map.t) =
         overrides
         []
     in
-    let rows = Latex_syntax.Hline :: hdr :: data @ [Latex_syntax.Hline] in
+    let rows = (Latex_syntax.Hline :: hdr :: data) @ [Latex_syntax.Hline] in
     Some (spec, rows)
 
 module Int_set = Set.Make (Int)

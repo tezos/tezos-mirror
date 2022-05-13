@@ -31,7 +31,7 @@ let srcdir =
   if Filename.basename srcdir = "TEZOS_PROTOCOL" then Filename.dirname srcdir
   else srcdir
 
-let (hash, sources) =
+let hash, sources =
   match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir srcdir) with
   | Ok (None, proto) -> (Protocol.hash proto, proto)
   | Ok (Some hash, proto) -> (hash, proto)

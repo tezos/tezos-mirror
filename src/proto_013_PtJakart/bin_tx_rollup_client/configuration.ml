@@ -40,7 +40,7 @@ let default =
 let valid_endpoint _configuration s =
   let endpoint = Uri.of_string s in
   match (Uri.scheme endpoint, Uri.query endpoint, Uri.fragment endpoint) with
-  | (Some ("http" | "https"), [], None) -> return endpoint
+  | Some ("http" | "https"), [], None -> return endpoint
   | _ -> failwith "Endpoint should be of the form http[s]://address:port"
 
 let endpoint_arg () =
@@ -83,7 +83,7 @@ let make (base_dir, endpoint) =
   }
 
 let parse argv =
-  let* (opts, argv) =
+  let* opts, argv =
     Clic.parse_global_options (global_options ()) default argv
   in
   return (make opts, argv)

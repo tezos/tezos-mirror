@@ -223,7 +223,7 @@ let test_random algo =
     let open Lwt_result_syntax in
     if i >= loops then return_unit
     else
-      let (_, _, sk) = Signature.generate_key ~algo () in
+      let _, _, sk = Signature.generate_key ~algo () in
       let* sk_uri =
         Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt ctx sk
       in
@@ -241,7 +241,7 @@ let test_random_aggregate () =
     let open Lwt_result_syntax in
     if i >= loops then return_unit
     else
-      let (_, _, sk) = Aggregate_signature.generate_key () in
+      let _, _, sk = Aggregate_signature.generate_key () in
       let* sk_uri =
         Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt_aggregate
           ctx

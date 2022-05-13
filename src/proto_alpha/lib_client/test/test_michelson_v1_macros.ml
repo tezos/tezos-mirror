@@ -46,7 +46,7 @@ let to_string e = Format.asprintf "%a" pp e
 let assert_expands
     (original : (Micheline_parser.location, string) Micheline.node)
     (expanded : (Micheline_parser.location, string) Micheline.node) =
-  let ({Michelson_v1_parser.expanded = expansion; _}, errors) =
+  let {Michelson_v1_parser.expanded = expansion; _}, errors =
     let source = to_string (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
@@ -693,7 +693,7 @@ let test_map_cdadr () =
     [unparse.Michelson_v1_parser.unexpanded] contains the original
     expression with macros *)
 let assert_unexpansion original ex =
-  let ({Michelson_v1_parser.expanded; _}, errors) =
+  let {Michelson_v1_parser.expanded; _}, errors =
     let source = to_string (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
@@ -1320,7 +1320,7 @@ let tests =
     ("map_car unexpansion", fun _ -> Lwt.return (test_unexpand_map_car ()));
     ("diip unexpansion", fun _ -> Lwt.return (test_unexpand_diip ()));
     ("diip_duup1 unexpansion", fun _ -> Lwt.return (test_unexpand_diip_duup1 ()));
-    ("diip_duup2 unexpansion", fun _ -> Lwt.return (test_unexpand_diip_duup2 ()));
+    ("diip_duup2 unexpansion", fun _ -> Lwt.return (test_unexpand_diip_duup2 ()))
     (***********************************************************************)
     (*BUG
       the function in Michelson_v1_macros.unexpand_map_caddadr
@@ -1329,7 +1329,7 @@ let tests =
     (*"diip unexpansion",  (fun _ -> Lwt.return (test_unexpand_diip ())) ;*)
     (*"map_cdr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_cdr ())) ;*)
     (*"map_caadr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_caadr ())) ;*)
-    (*"map_cdadr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_cdadr ())) ;*)
+    (*"map_cdadr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_cdadr ())) ;*);
   ]
 
 let wrap (n, f) =

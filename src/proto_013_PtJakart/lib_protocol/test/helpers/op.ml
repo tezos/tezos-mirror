@@ -185,7 +185,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
    | true -> (None, counter))
   >>=? fun (manager_op, counter) ->
   (* Update counters and transform into a contents_list *)
-  let (counter, rev_operations) =
+  let counter, rev_operations =
     List.fold_left
       (fun (counter, acc) -> function
         | Contents (Manager_operation m) ->

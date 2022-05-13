@@ -63,7 +63,7 @@ let pk_json (alias, _pkh, pk) =
 
 (* P-256 pk : 33+1 bytes
    ed25519 pk sk : 32+1 bytes
- *)
+*)
 
 let sk_of_pk (pk_s : string) : string =
   let open Tezos_crypto.Signature in
@@ -199,7 +199,7 @@ let get_delegates (proto : protocol) context
   match proto with
   | Florence ->
       let open Tezos_protocol_009_PsFLoren.Protocol in
-      let* (ctxt, _) =
+      let* ctxt, _ =
         let*! r =
           Alpha_context.prepare
             context
@@ -211,7 +211,7 @@ let get_delegates (proto : protocol) context
         Lwt.return @@ Environment.wrap_tzresult r
       in
       (* Loop on delegates to extract keys and compute the total stake. *)
-      let* (delegates, total_stake) =
+      let* delegates, total_stake =
         Alpha_context.Delegate.fold
           ctxt
           ~init:(Ok ([], Alpha_context.Tez.zero))
@@ -220,7 +220,7 @@ let get_delegates (proto : protocol) context
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? (key_list_acc, staking_balance_acc) = acc in
+            let*? key_list_acc, staking_balance_acc = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
@@ -259,7 +259,7 @@ let get_delegates (proto : protocol) context
         delegates
   | Granada ->
       let open Tezos_protocol_010_PtGRANAD.Protocol in
-      let* (ctxt, _, _) =
+      let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare
             context
@@ -271,7 +271,7 @@ let get_delegates (proto : protocol) context
         Lwt.return @@ Environment.wrap_tzresult r
       in
       (* Loop on delegates to extract keys and compute the total stake. *)
-      let* (delegates, total_stake) =
+      let* delegates, total_stake =
         Alpha_context.Delegate.fold
           ctxt
           ~init:(Ok ([], Alpha_context.Tez.zero))
@@ -280,7 +280,7 @@ let get_delegates (proto : protocol) context
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? (key_list_acc, staking_balance_acc) = acc in
+            let*? key_list_acc, staking_balance_acc = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
@@ -319,7 +319,7 @@ let get_delegates (proto : protocol) context
         delegates
   | Hangzhou ->
       let open Tezos_protocol_011_PtHangz2.Protocol in
-      let* (ctxt, _, _) =
+      let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare
             context
@@ -331,7 +331,7 @@ let get_delegates (proto : protocol) context
         Lwt.return @@ Environment.wrap_tzresult r
       in
       (* Loop on delegates to extract keys and compute the total stake. *)
-      let* (delegates, total_stake) =
+      let* delegates, total_stake =
         Alpha_context.Delegate.fold
           ctxt
           ~init:(Ok ([], Alpha_context.Tez.zero))
@@ -340,7 +340,7 @@ let get_delegates (proto : protocol) context
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? (key_list_acc, staking_balance_acc) = acc in
+            let*? key_list_acc, staking_balance_acc = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
@@ -379,14 +379,14 @@ let get_delegates (proto : protocol) context
         delegates
   | Ithaca ->
       let open Tezos_protocol_012_Psithaca.Protocol in
-      let* (ctxt, _, _) =
+      let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
         in
         Lwt.return @@ Environment.wrap_tzresult r
       in
       (* Loop on delegates to extract keys and compute the total stake. *)
-      let* (delegates, total_stake) =
+      let* delegates, total_stake =
         Alpha_context.Delegate.fold
           ctxt
           ~order:`Sorted
@@ -396,7 +396,7 @@ let get_delegates (proto : protocol) context
               let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? (key_list_acc, staking_balance_acc) = acc in
+            let*? key_list_acc, staking_balance_acc = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
@@ -435,14 +435,14 @@ let get_delegates (proto : protocol) context
         delegates
   | Alpha ->
       let open Tezos_protocol_alpha.Protocol in
-      let* (ctxt, _, _) =
+      let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
         in
         Lwt.return @@ Environment.wrap_tzresult r
       in
       (* Loop on delegates to extract keys and compute the total stake. *)
-      let* (delegates, total_stake) =
+      let* delegates, total_stake =
         Alpha_context.Delegate.fold
           ctxt
           ~order:`Sorted
@@ -452,7 +452,7 @@ let get_delegates (proto : protocol) context
               let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? (key_list_acc, staking_balance_acc) = acc in
+            let*? key_list_acc, staking_balance_acc = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r

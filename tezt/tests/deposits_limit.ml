@@ -36,7 +36,7 @@ let test_set_deposits_limit =
     ~title:"set deposits limit"
     ~tags:["deposits_limit"]
   @@ fun protocol ->
-  let* (_, client) = Client.init_with_protocol ~protocol `Client () in
+  let* _, client = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
   let* result = Client.set_deposits_limit ~src ~limit:"1000" client in
   Regression.capture result ;
@@ -49,7 +49,7 @@ let test_unset_deposits_limit =
     ~title:"unset deposits limit"
     ~tags:["deposits_limit"]
   @@ fun protocol ->
-  let* (_, client) = Client.init_with_protocol ~protocol `Client () in
+  let* _, client = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
   let* result = Client.unset_deposits_limit ~src client in
   Regression.capture result ;

@@ -272,7 +272,7 @@ module Description = struct
             service ;
           Option.iter
             (fun input ->
-              let (schema, bin_schema) = Lazy.force input in
+              let schema, bin_schema = Lazy.force input in
               pp_content
                 ppf
                 ~tag:"pre"
@@ -408,7 +408,7 @@ let make_index node required_version =
     ("shell", "Shell", Some "/shell/rpc_introduction.rst.inc", [""], shell_dir)
     :: protocol_dirs
   in
-  let (_version, name, intro, path, dir) =
+  let _version, name, intro, path, dir =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun (version, _name, _intro, _path, _dir) ->

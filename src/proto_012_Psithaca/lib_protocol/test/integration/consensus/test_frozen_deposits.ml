@@ -47,7 +47,7 @@ let constants =
   }
 
 let get_first_2_accounts_contracts contracts =
-  let ((contract1, account1), (contract2, account2)) =
+  let (contract1, account1), (contract2, account2) =
     match contracts with
     | [a1; a2] ->
         ( ( a1,
@@ -64,24 +64,24 @@ let get_first_2_accounts_contracts contracts =
 
 (* Terminology:
 
-- staking balance = full balance + delegated stake; obtained with
-   Delegate.staking_balance
+   - staking balance = full balance + delegated stake; obtained with
+      Delegate.staking_balance
 
-- active stake = the amount of tez with which a delegate participates in
-   consensus; it must be greater than 1 roll and less or equal the staking
-   balance; it is computed in [Delegate_storage.select_distribution_for_cycle]
+   - active stake = the amount of tez with which a delegate participates in
+      consensus; it must be greater than 1 roll and less or equal the staking
+      balance; it is computed in [Delegate_storage.select_distribution_for_cycle]
 
-- frozen deposits = represents frozen_deposits_percentage of the maximum stake during
-   preserved_cycles + max_slashing_period cycles; obtained with
-   Delegate.current_frozen_deposits
+   - frozen deposits = represents frozen_deposits_percentage of the maximum stake during
+      preserved_cycles + max_slashing_period cycles; obtained with
+      Delegate.current_frozen_deposits
 
-- spendable balance = full balance - frozen deposits; obtained with Contract.balance
+   - spendable balance = full balance - frozen deposits; obtained with Contract.balance
 
-- full balance = spendable balance + frozen deposits; obtained with Delegate.full_balance
+   - full balance = spendable balance + frozen deposits; obtained with Delegate.full_balance
 *)
 let test_invariants () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (contract2, _account2)) =
+  let (contract1, account1), (contract2, _account2) =
     get_first_2_accounts_contracts contracts
   in
   Context.Delegate.staking_balance (B genesis) account1
@@ -142,7 +142,7 @@ let test_invariants () =
 
 let test_set_limit balance_percentage () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (_contract2, account2)) =
+  let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
   (Context.Delegate.frozen_deposits_limit (B genesis) account1 >>=? function
@@ -200,7 +200,7 @@ let test_set_limit balance_percentage () =
 
 let test_cannot_bake_with_zero_deposits () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (_contract2, account2)) =
+  let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
   (* N.B. there is no non-zero frozen deposits value for which one cannot bake:
@@ -226,7 +226,7 @@ let test_cannot_bake_with_zero_deposits () =
 
 let test_deposits_after_stake_removal () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (contract2, account2)) =
+  let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
   Context.Delegate.current_frozen_deposits (B genesis) account1
@@ -294,7 +294,7 @@ let test_deposits_after_stake_removal () =
 
 let test_unfreeze_deposits_after_deactivation () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (_contract2, account2)) =
+  let (contract1, account1), (_contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
   Context.Delegate.full_balance (B genesis) account1 >>=? fun initial_balance ->
@@ -340,7 +340,7 @@ let test_unfreeze_deposits_after_deactivation () =
 
 let test_frozen_deposits_with_delegation () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((_contract1, account1), (contract2, account2)) =
+  let (_contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
   Context.Delegate.staking_balance (B genesis) account1
@@ -400,7 +400,7 @@ let test_frozen_deposits_with_delegation () =
 
 let test_frozen_deposits_with_overdelegation () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (contract2, account2)) =
+  let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
   (* - [account1] and [account2] give their spendable balance to [new_account]
@@ -479,7 +479,7 @@ let test_frozen_deposits_with_overdelegation () =
 let test_set_limit_with_overdelegation () =
   let constants = {constants with frozen_deposits_percentage = 10} in
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (contract2, account2)) =
+  let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts
   in
   (* - [account1] and [account2] will give 80% of their balance to
@@ -547,7 +547,7 @@ let test_set_limit_with_overdelegation () =
    [new_cycle + preserved_cycles]. *)
 let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (contract2, _account2)) =
+  let (contract1, account1), (contract2, _account2) =
     match contracts with
     | [a1; a2] ->
         ( ( a1,

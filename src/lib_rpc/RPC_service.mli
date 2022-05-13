@@ -51,9 +51,9 @@ include module type of struct
     include Resto.MakeService (RPC_encoding)
   end
   with type (+'m, 'pr, 'p, 'q, 'i, 'o, 'e) t :=
-        ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
+    ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
    and type (+'m, 'pr, 'p, 'q, 'i, 'o, 'e) service :=
-        ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
+    ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
 
 val get_service :
   ?description:string ->

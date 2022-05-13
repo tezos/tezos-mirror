@@ -225,7 +225,7 @@ let handle_prechecked oph op classes =
 
     4. Add the operation to the [in_mempool] set. *)
 let handle_error oph op classification classes =
-  let (bounded_map, tztrace) =
+  let bounded_map, tztrace =
     match classification with
     | `Branch_refused tztrace -> (classes.branch_refused, tztrace)
     | `Branch_delayed tztrace -> (classes.branch_delayed, tztrace)
@@ -262,9 +262,9 @@ let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
   let ( +> ) accum to_add =
     let merge_fun _k accum_v_opt to_add_v_opt =
       match (accum_v_opt, to_add_v_opt) with
-      | (Some accum_v, None) -> Some accum_v
-      | (None, Some (to_add_v, _err)) -> Some to_add_v
-      | (Some _accum_v, Some (to_add_v, _err)) ->
+      | Some accum_v, None -> Some accum_v
+      | None, Some (to_add_v, _err) -> Some to_add_v
+      | Some _accum_v, Some (to_add_v, _err) ->
           (* This case should not happen, because the different classes
              should be disjoint. However, if this invariant is broken,
              it is not critical, hence we do not raise an error.
@@ -272,7 +272,7 @@ let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
              the invariant is not critical,
              we don't advertise the node administrator either (no log). *)
           Some to_add_v
-      | (None, None) -> None
+      | None, None -> None
     in
     Map.merge merge_fun accum to_add
   in
@@ -373,14 +373,14 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
       mempool
       operations
   in
-  let* (ancestor, path) =
+  let* ancestor, path =
     chain.new_blocks ~from_block:from_branch ~to_block:to_branch
   in
   let+ mempool =
     pop_block (block_store.hash ancestor) from_branch old_mempool
   in
   let new_mempool = List.fold_left push_block mempool path in
-  let (new_mempool, outdated) =
+  let new_mempool, outdated =
     Map.partition
       (fun _oph op ->
         is_branch_alive op.Prevalidation.raw.Operation.shell.branch)

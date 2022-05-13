@@ -42,14 +42,14 @@ module Expr : TESTABLE with type t = Micheline_printer.node = struct
 
   let rec equal l r =
     match (l, r) with
-    | (Int (locl, il), Int (locr, ir)) -> locl = locr && il = ir
-    | (String (locl, sl), String (locr, sr)) -> locl = locr && sl = sr
-    | (Bytes (locl, bl), Bytes (locr, br)) -> locl = locr && bl = br
-    | (Prim (locl, pl, nodesl, annotl), Prim (locr, pr, nodesr, annotr)) ->
+    | Int (locl, il), Int (locr, ir) -> locl = locr && il = ir
+    | String (locl, sl), String (locr, sr) -> locl = locr && sl = sr
+    | Bytes (locl, bl), Bytes (locr, br) -> locl = locr && bl = br
+    | Prim (locl, pl, nodesl, annotl), Prim (locr, pr, nodesr, annotr) ->
         locl = locr && pl = pr
         && List.equal equal nodesl nodesr
         && annotl = annotr
-    | (Seq (locl, nodesl), Seq (locr, nodesr)) ->
+    | Seq (locl, nodesl), Seq (locr, nodesr) ->
         locl = locr && List.equal equal nodesl nodesr
     | _ -> false
 end

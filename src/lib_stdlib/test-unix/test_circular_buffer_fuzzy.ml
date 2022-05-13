@@ -126,7 +126,7 @@ let rec ops_gen acc i =
     let open QCheck in
     let open Gen in
     ops_gen
-      (let* (nb_writes, ops) = acc in
+      (let* nb_writes, ops = acc in
        let gen = if nb_writes > 0 then op else write_op in
        map
          (fun op ->
@@ -242,10 +242,10 @@ let () =
         Lwt.return_false
     | Read read_len -> (
         try
-          let (left_has_raised, left_buf) =
+          let left_has_raised, left_buf =
             read_data ~without_invalid_argument read_len left_state
           in
-          let (right_has_raised, right_buf) =
+          let right_has_raised, right_buf =
             read_data ~without_invalid_argument read_len right_state
           in
           if left_has_raised then

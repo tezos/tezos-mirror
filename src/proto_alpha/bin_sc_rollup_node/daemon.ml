@@ -51,7 +51,7 @@ let categorise_heads (node_ctxt : Node_context.t) old_heads new_heads =
 
   let number_of_new_heads = List.length new_heads in
 
-  let (head_states, _, _) =
+  let head_states, _, _ =
     List.fold_right
       (fun head (heads, n, m) ->
         ({head; finalized = n <= 0; seen_before = m <= 0} :: heads, n - 1, m - 1))
@@ -136,7 +136,7 @@ module Make (PVM : Pvm.S) = struct
              as such. Heads in `old_heads` whose level is greater than
              `new_level` can be safely discarded.
           *)
-          let (final_heads, _non_final_heads) =
+          let final_heads, _non_final_heads =
             List.partition
               (fun head ->
                 let (Layer1.Head {level; _}) = head in
@@ -220,7 +220,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       sc_rollup_node_operator
       fee_parameter
   in
-  let* (_pkh, _pk, _skh) = Node_context.get_operator_keys node_ctxt in
+  let* _pkh, _pk, _skh = Node_context.get_operator_keys node_ctxt in
   (* Check that the public key hash is valid. *)
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
   Daemon.run node_ctxt configuration store

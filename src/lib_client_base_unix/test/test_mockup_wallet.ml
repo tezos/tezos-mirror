@@ -63,8 +63,8 @@ let testable_string_list_ignoring_order : string list Alcotest.testable =
 let validate_key (_, pk_hash, pk_sig_opt, sk_uri_opt) =
   let open Lwt_result_syntax in
   match (pk_sig_opt, sk_uri_opt) with
-  | (Some pk_sig, Some sk_uri) -> (
-      let* (pk_hash_from_sk, pk_sig_from_sk_opt) =
+  | Some pk_sig, Some sk_uri -> (
+      let* pk_hash_from_sk, pk_sig_from_sk_opt =
         let* pk = Client_keys.neuterize sk_uri in
         Client_keys.public_key_hash pk
       in
@@ -82,7 +82,7 @@ let validate_key (_, pk_hash, pk_sig_opt, sk_uri_opt) =
                "PK is consistent with SK"
                pk_sig
                pk_sig_from_sk))
-  | (_, _) -> failwith "Key has no public signature or secret key"
+  | _, _ -> failwith "Key has no public signature or secret key"
 
 (** Check that names in [key_list] match the ones in [accounts_names],
     ignoring order *)

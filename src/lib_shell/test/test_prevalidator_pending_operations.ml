@@ -60,11 +60,11 @@ let test_iterators_ordering ~name ~iterator return_value =
   let previous_priority = ref `High in
   let previous_prio_ok ~priority ~previous_priority =
     match (previous_priority, priority) with
-    | (`High, `High) -> true
-    | ((`High | `Medium), `Medium) -> true
-    | ((`High | `Medium), `Low _) -> true
-    | (`Low q_prev, `Low q_new) -> CompareListQ.(q_new <= q_prev)
-    | (_, _) -> false
+    | `High, `High -> true
+    | (`High | `Medium), `Medium -> true
+    | (`High | `Medium), `Low _ -> true
+    | `Low q_prev, `Low q_new -> CompareListQ.(q_new <= q_prev)
+    | _, _ -> false
   in
   iterator
     (fun priority _hash _op () ->

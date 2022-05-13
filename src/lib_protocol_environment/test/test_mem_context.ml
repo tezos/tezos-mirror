@@ -218,7 +218,7 @@ let test_fold {genesis = ctxt; _} =
   let* ctxt = Context.add ctxt ["foo"; "toto"] foo1 in
   let* ctxt = Context.add ctxt ["foo"; "bar"; "toto"] foo2 in
   let fold depth ecs ens =
-    let* (cs, ns) =
+    let* cs, ns =
       Context.fold
         ?depth
         ctxt
@@ -314,7 +314,7 @@ let test_trees {genesis = ctxt; _} =
   let* v1 = Context.Tree.add v1 ["foo"; "toto"] foo1 in
   let* v1 = Context.Tree.add v1 ["foo"; "bar"; "toto"] foo2 in
   let fold depth ecs ens =
-    let* (cs, ns) =
+    let* cs, ns =
       Context.Tree.fold
         v1
         ?depth

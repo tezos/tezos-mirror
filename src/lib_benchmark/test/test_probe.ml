@@ -32,10 +32,10 @@ module Aspect = struct
 
   let compare (x : t) (y : t) =
     match (x, y) with
-    | (Hashing_Sha256, Hashing_Sha256) -> 0
-    | (Hashing_Blake2b, Hashing_Blake2b) -> 0
-    | (Hashing_Blake2b, Hashing_Sha256) -> -1
-    | (Hashing_Sha256, Hashing_Blake2b) -> 1
+    | Hashing_Sha256, Hashing_Sha256 -> 0
+    | Hashing_Blake2b, Hashing_Blake2b -> 0
+    | Hashing_Blake2b, Hashing_Sha256 -> -1
+    | Hashing_Sha256, Hashing_Blake2b -> 1
 end
 
 type workload = Blake2b of {nbytes : int} | Sha256 of {nbytes : int}

@@ -269,7 +269,7 @@ module Public_key = Client_aliases.Alias (struct
           Json_only
           ~title:"Locator_only"
           uri_encoding
-          (function (uri, None) -> Some uri | (_, Some _) -> None)
+          (function uri, None -> Some uri | _, Some _ -> None)
           (fun uri -> (uri, None));
         case
           Json_only
@@ -277,7 +277,7 @@ module Public_key = Client_aliases.Alias (struct
           (obj2
              (req "locator" uri_encoding)
              (req "key" Signature.Public_key.encoding))
-          (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
+          (function uri, Some key -> Some (uri, key) | _, None -> None)
           (fun (uri, key) -> (uri, Some key));
       ]
 end)
@@ -407,7 +407,7 @@ module Aggregate_alias = struct
             Json_only
             uri_encoding
             ~title:"Locator_only"
-            (function (uri, None) -> Some uri | (_, Some _) -> None)
+            (function uri, None -> Some uri | _, Some _ -> None)
             (fun uri -> (uri, None));
           case
             Json_only
@@ -415,7 +415,7 @@ module Aggregate_alias = struct
             (obj2
                (req "locator" uri_encoding)
                (req "key" Aggregate_signature.Public_key.encoding))
-            (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
+            (function uri, Some key -> Some (uri, key) | _, None -> None)
             (fun (uri, key) -> (uri, Some key));
         ]
   end)
@@ -653,11 +653,11 @@ let sign cctxt ?watermark sk_uri buf =
         | Some name -> (
             let* r = Public_key.find cctxt name in
             match r with
-            | (_, None) ->
+            | _, None ->
                 let* pk = public_key pk_uri in
                 let* () = Public_key.update cctxt name (pk_uri, Some pk) in
                 return pk
-            | (_, Some pubkey) -> return pubkey)
+            | _, Some pubkey -> return pubkey)
       in
       let* () =
         fail_unless
@@ -725,8 +725,8 @@ let register_keys cctxt xs =
    we take it. *)
 let join_keys keys1_opt keys2 =
   match (keys1_opt, keys2) with
-  | (Some (_, Some _, None), (_, None, None)) -> keys1_opt
-  | (Some (_, _, Some _), _) -> keys1_opt
+  | Some (_, Some _, None), (_, None, None) -> keys1_opt
+  | Some (_, _, Some _), _ -> keys1_opt
   | _ -> Some keys2
 
 (* For efficiency, this function avoids loading the wallet, except for
@@ -795,18 +795,18 @@ let get_key cctxt pkh =
   let open Lwt_result_syntax in
   let* r = raw_get_key cctxt pkh in
   match r with
-  | (pkh, Some pk, Some sk) -> return (pkh, pk, sk)
-  | (_pkh, _pk, None) ->
+  | pkh, Some pk, Some sk -> return (pkh, pk, sk)
+  | _pkh, _pk, None ->
       failwith "Unknown secret key for %a" Signature.Public_key_hash.pp pkh
-  | (_pkh, None, _sk) ->
+  | _pkh, None, _sk ->
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_public_key cctxt pkh =
   let open Lwt_result_syntax in
   let* r = raw_get_key cctxt pkh in
   match r with
-  | (pkh, Some pk, _sk) -> return (pkh, pk)
-  | (_pkh, None, _sk) ->
+  | pkh, Some pk, _sk -> return (pkh, pk)
+  | _pkh, None, _sk ->
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_keys (cctxt : #Client_context.wallet) =
@@ -964,13 +964,13 @@ let aggregate_sign cctxt sk_uri buf =
         | Some name -> (
             let* r = Aggregate_alias.Public_key.find cctxt name in
             match r with
-            | (_, None) ->
+            | _, None ->
                 let* pk = aggregate_public_key pk_uri in
                 let* () =
                   Aggregate_alias.Public_key.update cctxt name (pk_uri, Some pk)
                 in
                 return pk
-            | (_, Some pubkey) -> return pubkey)
+            | _, Some pubkey -> return pubkey)
       in
       let* () =
         fail_unless

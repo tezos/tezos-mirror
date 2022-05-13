@@ -156,7 +156,7 @@ let parse_and_cache_script ctxt ~destination ~get_non_cached_script =
       >>=? fun (ex_script, ctxt) ->
       (* Add the parsed script to the script-cache in order to avoid having to
          re-parse when applying the operation at a later stage. *)
-      let (size, cost) = Script_ir_translator.script_size ex_script in
+      let size, cost = Script_ir_translator.script_size ex_script in
       Gas.consume ctxt cost >>?= fun ctxt ->
       Script_cache.insert ctxt destination (script, ex_script) size
       >>?= fun ctxt -> return (ex_script, ctxt)
@@ -279,7 +279,7 @@ let tickets_of_operation ctxt
 let add_transfer_to_token_map ctxt token_map {destination; tickets} =
   List.fold_left_es
     (fun (token_map, ctxt) ticket ->
-      let (ticket_token, amount) =
+      let ticket_token, amount =
         Ticket_token.token_and_amount_of_ex_ticket ticket
       in
       Ticket_token_map.add ctxt ~ticket_token ~destination ~amount token_map)

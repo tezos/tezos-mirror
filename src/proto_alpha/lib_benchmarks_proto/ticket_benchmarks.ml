@@ -188,7 +188,7 @@ let rec dummy_type_generator ~rng_state size =
   if size <= 1 then ticket_or_int
   else
     match (ticket_or_int, dummy_type_generator ~rng_state (size - 3)) with
-    | (Ex_ty l, Ex_ty r) -> (
+    | Ex_ty l, Ex_ty r -> (
         match pair_t (-1) l r with
         | Error _ -> assert false
         | Ok (Ty_ex_c t) -> Ex_ty t)
@@ -203,7 +203,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let make_bench_helper rng_state config () =
     let open Result_syntax in
-    let* (ctxt, _) = Lwt_main.run (Execution_context.make ~rng_state) in
+    let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state) in
     let ctxt = Gas_helpers.set_limit ctxt in
     let size = Random.State.int rng_state config.max_size in
     let (Ex_ty ty) = dummy_type_generator ~rng_state size in
@@ -245,7 +245,7 @@ let () = Registration_helpers.register (module Has_tickets_type_benchmark)
 
 let ticket_sampler rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
-  let (pkh, _, _) = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
+  let pkh, _, _ = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
   let ticketer = Alpha_context.Contract.Implicit pkh in
   Script_typed_ir.
     {ticketer; contents = Script_int.zero; amount = Script_int.one_n}
@@ -261,12 +261,12 @@ module Collect_tickets_benchmark : Benchmark.S = struct
   let make_bench_helper rng_state config () =
     let open Script_typed_ir in
     let open Result_syntax in
-    let* (ctxt, _) = Lwt_main.run (Execution_context.make ~rng_state) in
+    let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state) in
     let ctxt = Gas_helpers.set_limit ctxt in
     let ty =
       match list_t (-1) ticket_ty with Error _ -> assert false | Ok t -> t
     in
-    let (length, elements) =
+    let length, elements =
       Structure_samplers.list
         ~range:{min = 0; max = config.max_size}
         ~sampler:ticket_sampler
@@ -274,7 +274,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
     in
     let boxed_ticket_list = {elements; length} in
     Environment.wrap_tzresult
-    @@ let* (has_tickets, ctxt) = Ticket_scanner.type_has_tickets ctxt ty in
+    @@ let* has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
        let workload = {nodes = length} in
        let closure () =
          ignore

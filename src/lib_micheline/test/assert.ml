@@ -40,16 +40,16 @@ module Compat = struct
 
   let rec iter2_p f l1 l2 =
     match (l1, l2) with
-    | ([], []) -> return_unit
-    | ([], _) | (_, []) -> invalid_arg "Error_monad.iter2_p"
-    | (x1 :: l1, x2 :: l2) -> (
+    | [], [] -> return_unit
+    | [], _ | _, [] -> invalid_arg "Error_monad.iter2_p"
+    | x1 :: l1, x2 :: l2 -> (
         let tx = f x1 x2 and tl = iter2_p f l1 l2 in
         let tx_res = tx in
         let tl_res = tl in
         match (tx_res, tl_res) with
-        | (Ok (), Ok ()) -> Ok ()
-        | (Error exn1, Error exn2) -> failwith "%s -- %s" exn1 exn2
-        | (Ok (), Error exn) | (Error exn, Ok ()) -> Error exn)
+        | Ok (), Ok () -> Ok ()
+        | Error exn1, Error exn2 -> failwith "%s -- %s" exn1 exn2
+        | Ok (), Error exn | Error exn, Ok () -> Error exn)
 end
 
 open Compat

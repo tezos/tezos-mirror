@@ -64,7 +64,7 @@ module type V2 = sig
        and type Signature.watermark = Signature.watermark
        and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
        and type Pvss_secp256k1.Encrypted_share.t =
-            Pvss_secp256k1.Encrypted_share.t
+        Pvss_secp256k1.Encrypted_share.t
        and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
        and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
        and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
@@ -75,7 +75,7 @@ module type V2 = sig
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-            ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
        and module Sapling = Tezos_sapling.Core.Validator_legacy

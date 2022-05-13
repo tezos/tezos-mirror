@@ -181,7 +181,7 @@ module Acl = struct
                 (req "address" endpoint_encoding)
                 (req "whitelist" @@ list matcher_encoding))
              (function
-               | (addr, Deny_all {except}) -> Some (addr, except) | _ -> None)
+               | addr, Deny_all {except} -> Some (addr, except) | _ -> None)
              (fun (addr, except) -> (addr, Deny_all {except}));
            case
              ~title:"Blacklist"
@@ -190,7 +190,7 @@ module Acl = struct
                 (req "address" endpoint_encoding)
                 (req "blacklist" @@ list matcher_encoding))
              (function
-               | (addr, Allow_all {except}) -> Some (addr, except) | _ -> None)
+               | addr, Allow_all {except} -> Some (addr, except) | _ -> None)
              (fun (addr, except) -> (addr, Allow_all {except}));
          ]
 
@@ -202,8 +202,8 @@ module Acl = struct
     let match_addr searched_port searched_addr (endpoint, acl) =
       let open P2p_point.Id in
       match (endpoint.addr = searched_addr, endpoint.port, searched_port) with
-      | (true, None, _) -> Some acl
-      | (true, Some port, Some searched_port) when port = searched_port ->
+      | true, None, _ -> Some acl
+      | true, Some port, Some searched_port when port = searched_port ->
           Some acl
       | _ -> None
     in

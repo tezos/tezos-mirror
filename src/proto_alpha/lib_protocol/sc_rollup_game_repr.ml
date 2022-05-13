@@ -208,13 +208,13 @@ module Index = struct
     match Staker.compare a b with 1 -> (b, a) | _ -> (a, b)
 
   let staker stakers player =
-    let (alice, bob) = normalize stakers in
+    let alice, bob = normalize stakers in
     match player with Alice -> alice | Bob -> bob
 end
 
 let initial inbox ~(parent : Commitment.t) ~(child : Commitment.t) ~refuter
     ~defender =
-  let (alice, _) = Index.normalize (refuter, defender) in
+  let alice, _ = Index.normalize (refuter, defender) in
   let alice_to_play = Staker.equal alice refuter in
   let tick = Sc_rollup_tick_repr.of_number_of_ticks child.number_of_ticks in
   {
@@ -420,7 +420,7 @@ let check_dissection start start_tick stop stop_tick dissection =
   in
   let* _ =
     match (List.hd dissection, List.last_opt dissection) with
-    | (Some (a, a_tick), Some (b, b_tick)) ->
+    | Some (a, a_tick), Some (b, b_tick) ->
         check
           (Option.equal State_hash.equal a start
           && (not (Option.equal State_hash.equal b stop))
@@ -455,7 +455,7 @@ let check_proof start start_tick stop stop_tick proof =
 let play game refutation =
   let result =
     let open Result_syntax in
-    let* (start, start_tick, stop, stop_tick) =
+    let* start, start_tick, stop, stop_tick =
       find_choice game refutation.choice
     in
     match refutation.step with

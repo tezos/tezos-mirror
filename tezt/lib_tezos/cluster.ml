@@ -76,7 +76,7 @@ let star = meta_star symmetric_add_peer
 
 let wait_for_connections node connections =
   let counter = ref 0 in
-  let (waiter, resolver) = Lwt.task () in
+  let waiter, resolver = Lwt.task () in
   Node.on_event node (fun {name; value} ->
       if name = "node_chain_validator.v0" then
         match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with

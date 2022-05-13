@@ -46,7 +46,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
 
 let get_current_proposal cctxt =
   let open Lwt_result_syntax in
-  let* (block_stream, _block_stream_stopper) =
+  let* block_stream, _block_stream_stopper =
     Node_rpc.monitor_proposals cctxt ~chain:cctxt#chain ()
   in
   Lwt_stream.peek block_stream >>= function
@@ -59,7 +59,7 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
     =
   let open State_transitions in
   let open Lwt_result_syntax in
-  let* (_, current_proposal) = get_current_proposal cctxt in
+  let* _, current_proposal = get_current_proposal cctxt in
   let config = Baking_configuration.make ~force () in
   let* state = create_state cctxt ~config ~current_proposal delegates in
   let proposal = state.level_state.latest_proposal in
@@ -98,7 +98,7 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
 let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
   let open Lwt_result_syntax in
-  let* (_, current_proposal) = get_current_proposal cctxt in
+  let* _, current_proposal = get_current_proposal cctxt in
   let config = Baking_configuration.make ~force () in
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
@@ -226,7 +226,7 @@ let propose_at_next_level ~minimal_timestamp state =
   let cctxt = state.global_state.cctxt in
   assert (Option.is_some state.level_state.elected_block) ;
   if minimal_timestamp then
-    let* (minimal_round, delegate) =
+    let* minimal_round, delegate =
       match
         Baking_scheduling.first_potential_round_at_next_level
           state
@@ -272,7 +272,7 @@ let propose_at_next_level ~minimal_timestamp state =
     cctxt#message "Proposal injected" >>= fun () -> return state
 
 let endorsement_quorum state =
-  let (power, endorsements) = state_endorsing_power state in
+  let power, endorsements = state_endorsing_power state in
   if
     Compare.Int.(
       power >= state.global_state.constants.parametric.consensus_threshold)
@@ -293,7 +293,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
     ?(minimal_timestamp = false) ?extra_operations ?context_path delegates =
   let open Lwt_result_syntax in
-  let* (_block_stream, current_proposal) = get_current_proposal cctxt in
+  let* _block_stream, current_proposal = get_current_proposal cctxt in
   let config =
     Baking_configuration.make
       ?minimal_fees
@@ -340,7 +340,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             propose_at_next_level ~minimal_timestamp state
         | None -> (
             Baking_scheduling.compute_bootstrap_event state >>?= fun event ->
-            let*! (state, _action) = State_transitions.step state event in
+            let*! state, _action = State_transitions.step state event in
             let latest_proposal = state.level_state.latest_proposal in
             let open State_transitions in
             let round = state.round_state.current_round in
@@ -462,7 +462,7 @@ let baking_minimal_timestamp state =
         consensus_threshold
     else return_unit
   in
-  let* (minimal_round, delegate) =
+  let* minimal_round, delegate =
     match
       Baking_scheduling.first_potential_round_at_next_level
         state
@@ -515,7 +515,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?extra_operations
       ()
   in
-  let* (block_stream, current_proposal) = get_current_proposal cctxt in
+  let* block_stream, current_proposal = get_current_proposal cctxt in
   let* state =
     create_state
       cctxt

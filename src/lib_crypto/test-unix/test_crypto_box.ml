@@ -31,7 +31,7 @@
     Subject:      Roundtrips for functions built on the HACL* NaCl API.
 *)
 
-let (_sk, pk, _pkh) = Crypto_box.random_keypair ()
+let _sk, pk, _pkh = Crypto_box.random_keypair ()
 
 (** The test defines a proof-of-work target, generates a proof-of-work
     for that target, and then verifies it the proof of work is accepted

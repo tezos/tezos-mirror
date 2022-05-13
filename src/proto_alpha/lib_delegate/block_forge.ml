@@ -361,13 +361,12 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     | Apply _ as x -> x
   in
   (match (simulation_mode, simulation_kind) with
-  | (Baking_state.Node, Filter operation_pool) ->
-      filter_via_node ~operation_pool
-  | (Node, Apply {ordered_pool; payload_hash}) ->
+  | Baking_state.Node, Filter operation_pool -> filter_via_node ~operation_pool
+  | Node, Apply {ordered_pool; payload_hash} ->
       apply_via_node ~ordered_pool ~payload_hash
-  | (Local context_index, Filter operation_pool) ->
+  | Local context_index, Filter operation_pool ->
       filter_with_context ~context_index ~operation_pool
-  | (Local context_index, Apply {ordered_pool; payload_hash}) ->
+  | Local context_index, Apply {ordered_pool; payload_hash} ->
       apply_with_context ~context_index ~ordered_pool ~payload_hash)
   >>=? fun (shell_header, operations, payload_hash) ->
   Baking_pow.mine

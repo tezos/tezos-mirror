@@ -134,7 +134,7 @@ module Public_key_hash = struct
 
     let compare a b =
       match (a, b) with
-      | (Bls12_381 x, Bls12_381 y) -> Bls.Public_key_hash.compare x y
+      | Bls12_381 x, Bls12_381 y -> Bls.Public_key_hash.compare x y
   end)
 
   include Helpers.MakeEncoder (struct
@@ -197,8 +197,7 @@ module Public_key = struct
     type nonrec t = t
 
     let compare a b =
-      match (a, b) with
-      | (Bls12_381 x, Bls12_381 y) -> Bls.Public_key.compare x y
+      match (a, b) with Bls12_381 x, Bls12_381 y -> Bls.Public_key.compare x y
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -292,8 +291,7 @@ module Secret_key = struct
     type nonrec t = t
 
     let compare a b =
-      match (a, b) with
-      | (Bls12_381 x, Bls12_381 y) -> Bls.Secret_key.compare x y
+      match (a, b) with Bls12_381 x, Bls12_381 y -> Bls.Secret_key.compare x y
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -462,15 +460,15 @@ let sign (Secret_key.Bls12_381 sk) bytes = Bls12_381 (Bls.sign sk bytes)
 
 let check pk signature message =
   match (pk, signature) with
-  | (Public_key.Bls12_381 pk, Unknown signature) ->
+  | Public_key.Bls12_381 pk, Unknown signature ->
       Bls.of_bytes_opt signature
       |> Option.map (fun signature -> Bls.check pk signature message)
       |> Option.value ~default:false
-  | (Public_key.Bls12_381 pk, Bls12_381 signature) ->
+  | Public_key.Bls12_381 pk, Bls12_381 signature ->
       Bls.check pk signature message
 
 let generate_key ?seed () =
-  let (pkh, pk, sk) = Bls.generate_key ?seed () in
+  let pkh, pk, sk = Bls.generate_key ?seed () in
   ( Public_key_hash.Bls12_381 pkh,
     Public_key.Bls12_381 pk,
     Secret_key.Bls12_381 sk )
@@ -490,7 +488,7 @@ let aggregate_signature_opt signatures =
   let open Result_syntax in
   let aux acc s =
     match s with
-    | Bls12_381 s -> return @@ s :: acc
+    | Bls12_381 s -> return @@ (s :: acc)
     | Unknown s ->
         let* s = Bls.of_bytes s in
         return (s :: acc)

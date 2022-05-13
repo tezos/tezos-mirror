@@ -51,15 +51,15 @@ let throwaway_context =
 let dummy_script : Cache.cached_contract =
   let str = "{ parameter unit; storage unit; code FAILWITH }" in
   let storage =
-    let (parsed, _) = Michelson_v1_parser.parse_expression "Unit" in
+    let parsed, _ = Michelson_v1_parser.parse_expression "Unit" in
     Alpha_context.Script.lazy_expr parsed.expanded
   in
   let code =
-    let (parsed, _) = Michelson_v1_parser.parse_expression ~check:false str in
+    let parsed, _ = Michelson_v1_parser.parse_expression ~check:false str in
     Alpha_context.Script.lazy_expr parsed.expanded
   in
   let script = Alpha_context.Script.{code; storage} in
-  let (ex_script, _) =
+  let ex_script, _ =
     Script_ir_translator.parse_script
       throwaway_context
       ~legacy:true
@@ -96,7 +96,7 @@ end
 
 (* We can't produce a Script_cache.identifier without calling [Script_cache.find]. *)
 let identifier_of_contract (c : Alpha_context.Contract.t) : Cache.identifier =
-  let (_, id, _) = Cache.find throwaway_context c |> assert_ok_lwt in
+  let _, id, _ = Cache.find throwaway_context c |> assert_ok_lwt in
   id
 
 let contract_of_int i : Alpha_context.Contract.t =
@@ -185,7 +185,7 @@ module Cache_update_benchmark : Benchmark.S = struct
     let cache_cardinal =
       Base_samplers.sample_in_interval ~range:{min = 1; max = 100_000} rng_state
     in
-    let (ctxt, some_key_in_domain) = prepare_context rng_state cache_cardinal in
+    let ctxt, some_key_in_domain = prepare_context rng_state cache_cardinal in
     cache_update_benchmark ctxt some_key_in_domain cache_cardinal
 
   let create_benchmarks ~rng_state ~bench_num config =

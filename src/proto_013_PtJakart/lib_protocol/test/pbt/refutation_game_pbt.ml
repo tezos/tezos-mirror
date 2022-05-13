@@ -206,11 +206,11 @@ module Strategies (P : TestPVM) = struct
   from initial_state. Here t0 is the last known tick smaller that t
   (or the intial tick if no such exits) *)
   let state_at history tick initial_state =
-    let (lower, ostate, _) = Sc_rollup_tick_repr.Map.split tick history in
+    let lower, ostate, _ = Sc_rollup_tick_repr.Map.split tick history in
     match ostate with
     | Some state -> Lwt.return (state, history)
     | None ->
-        let (tick0, state0) =
+        let tick0, state0 =
           match Sc_rollup_tick_repr.Map.max_binding lower with
           | Some (t, s) -> (t, s)
           | None -> (Sc_rollup_tick_repr.initial, initial_state)
@@ -263,11 +263,11 @@ module Strategies (P : TestPVM) = struct
               ~default:Sc_rollup_tick_repr.initial
               (Sc_rollup_tick_repr.of_int stop_at)
           in
-          let* (starting_state, history) =
+          let* starting_state, history =
             state_at history section_start_at P.Internal_for_tests.initial_state
           in
           let* section_start_state = P.state_hash starting_state in
-          let* (stoping_state, history) =
+          let* stoping_state, history =
             state_at history section_stop_at P.Internal_for_tests.initial_state
           in
           let* section_stop_state = P.state_hash stoping_state in
@@ -321,7 +321,7 @@ module Strategies (P : TestPVM) = struct
             loop game move
       in
 
-      let (game, move) = initial (Commit commit) refutation in
+      let game, move = initial (Commit commit) refutation in
       loop game move
     in
     outcome
@@ -405,7 +405,7 @@ module Strategies (P : TestPVM) = struct
     let open Section in
     let cardinal = dissection_cardinal d in
     let x = Random.int cardinal in
-    let (_, section) =
+    let _, section =
       try
         fold_over_dissection
           (fun _ s (n, _) -> if n = x then raise (Section s) else (n + 1, None))
@@ -466,7 +466,7 @@ module Strategies (P : TestPVM) = struct
   checks that the stop state of a section conflicts with the one in the history.
   *)
   let conflicting_section history (section : Section.section) =
-    let* (new_state, _) =
+    let* new_state, _ =
       state_at
         history
         section.section_stop_at
@@ -505,20 +505,20 @@ module Strategies (P : TestPVM) = struct
       | Some s -> Lwt.return s
     in
     Game.Section.pp_section Format.std_formatter section ;
-    let* (next_dissection, history) =
+    let* next_dissection, history =
       dissection_of_section history branching section
     in
     let empty_history = Sc_rollup_tick_repr.Map.empty in
-    let* (conflict_resolution_step, history) =
+    let* conflict_resolution_step, history =
       match next_dissection with
       | None ->
-          let* (stop_state, history) =
+          let* stop_state, history =
             state_at
               history
               (Sc_rollup_tick_repr.next section.section_start_at)
               P.Internal_for_tests.initial_state
           in
-          let* (start_state, _) =
+          let* start_state, _ =
             state_at
               history
               section.section_start_at
@@ -529,7 +529,7 @@ module Strategies (P : TestPVM) = struct
                 (None, P.Internal_for_tests.make_proof start_state stop_state),
               empty_history )
       | Some next_dissection ->
-          let* (state, history) =
+          let* state, history =
             state_at
               history
               section.section_stop_at
@@ -546,7 +546,7 @@ module Strategies (P : TestPVM) = struct
   let machine_directed_committer {branching; _} pred =
     let history = ref Sc_rollup_tick_repr.Map.empty in
     let initial ((section_start_at : Sc_rollup_tick_repr.t), start_state) =
-      let* (section_stop_at, stop_state) =
+      let* section_stop_at, stop_state =
         execute_until section_start_at start_state @@ fun tick _ -> pred tick
       in
       let* section_start_state = P.state_hash start_state in
@@ -563,7 +563,7 @@ module Strategies (P : TestPVM) = struct
            }
     in
     let next_move dissection =
-      let* (move, history') = next_move !history branching dissection in
+      let* move, history' = next_move !history branching dissection in
       history := history' ;
       Lwt.return move
     in
@@ -577,7 +577,7 @@ module Strategies (P : TestPVM) = struct
       let ({section_start_at; section_stop_at; _} : Section.section) =
         section
       in
-      let* (_stop_at, stop_state) =
+      let* _stop_at, stop_state =
         execute_until section_start_at section_start_state @@ fun tick _ ->
         tick >= section_stop_at
       in
@@ -585,7 +585,7 @@ module Strategies (P : TestPVM) = struct
       let history = remember history section_start_at section_start_state in
       let history = remember history section_stop_at stop_state in
       let* section_stop_state = P.state_hash stop_state in
-      let* (next_dissection, history) =
+      let* next_dissection, history =
         dissection_of_section
           history
           branching
@@ -594,7 +594,7 @@ module Strategies (P : TestPVM) = struct
       let* conflict_resolution_step =
         match next_dissection with
         | None ->
-            let* (state, _) =
+            let* state, _ =
               state_at
                 history
                 section_start_at
@@ -609,7 +609,7 @@ module Strategies (P : TestPVM) = struct
       Lwt.return @@ RefuteByConflict conflict_resolution_step
     in
     let next_move dissection =
-      let* (move, _) = next_move history branching dissection in
+      let* move, _ = next_move history branching dissection in
       Lwt.return move
     in
     ({initial; next_move} : _ client)
@@ -655,7 +655,7 @@ module Strategies (P : TestPVM) = struct
                       @@ Section.(add_section section empty_dissection)
                   | Some dissection -> Lwt.return dissection
                 in
-                let (_, section) =
+                let _, section =
                   Option.value
                     ~default:(Sc_rollup_tick_repr.initial, section)
                     (Section.last_section next_dissection)
@@ -809,7 +809,7 @@ let test_random_dissection (module P : TestPVM) start_at length branching =
         section_stop_state;
       }
   in
-  let* (option_dissection, _) =
+  let* option_dissection, _ =
     let empty_history = Sc_rollup_tick_repr.Map.empty in
     S.dissection_of_section empty_history branching section
   in

@@ -128,7 +128,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
   let rec loop remaining_fork_points lvl (pred_header : Block_header.t) =
     if lvl > chain_length then return pred_header
     else
-      let (proto_level, remaining_fork_points) =
+      let proto_level, remaining_fork_points =
         match remaining_fork_points with
         | h :: t when h = lvl -> (pred_header.shell.proto_level + 1, t)
         | remaining_fork_points ->
@@ -208,10 +208,10 @@ let time ?(runs = 1) f =
     let rec loop cnt sum =
       if cnt = runs then sum
       else
-        let (_, t) = time1 f in
+        let _, t = time1 f in
         loop (cnt + 1) (sum +. t)
     in
-    let (res, t) = time1 f in
+    let res, t = time1 f in
     let sum = loop 1 t in
     (res, sum /. float runs)
 
@@ -272,10 +272,10 @@ let test_pred (base_dir : string) : unit tzresult Lwt.t =
         ~distance
     in
     match (lin_res, exp_res) with
-    | (None, None) -> return_unit
-    | (None, Some _) | (Some _, None) ->
+    | None, None -> return_unit
+    | None, Some _ | Some _, None ->
         Assert.fail_msg "mismatch between exponential and linear predecessor_n"
-    | (Some lin_res, Some exp_res) ->
+    | Some lin_res, Some exp_res ->
         (* check that the two results are the same *)
         assert (lin_res = exp_res) ;
         let*! pred = Store.Block.read_block_opt chain_store lin_res in
@@ -361,7 +361,7 @@ let bench_locator base_dir =
   in
   let*! head = res in
   let check_locator max_size : unit tzresult Lwt.t =
-    let*! (caboose, _) = Store.Chain.caboose chain_store in
+    let*! caboose, _ = Store.Chain.caboose chain_store in
     let* block = Store.Block.read_block chain_store head in
     time ~runs (fun () ->
         Store.Chain.compute_locator chain_store ~max_size block seed)
@@ -500,7 +500,7 @@ let test_protocol_locator base_dir =
   in
   let*! store = Shell_test_helpers.init_chain ~history_mode base_dir in
   let chain_store = Store.main_chain_store store in
-  let*! (caboose_hash, _) = Store.Chain.caboose chain_store in
+  let*! caboose_hash, _ = Store.Chain.caboose chain_store in
   let* () =
     List.iter_es
       (fun i ->

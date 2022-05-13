@@ -53,7 +53,7 @@ let is_operation_in_applied_mempool mempool oph =
         "bytes": "..."
       }
     }
- *)
+*)
 let wait_for_denunciation accuser =
   let filter json = JSON.(json |-> "hash" |> as_string_opt) in
   Accuser.wait_for accuser "double_baking_denounced.v0" filter
@@ -83,7 +83,7 @@ let wait_for_denunciation accuser =
        }
      ]
    }
- *)
+*)
 let wait_for_denunciation_injection node client accuser =
   let filter json =
     match JSON.(json |-> "view" |-> "request" |> as_string_opt) with

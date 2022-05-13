@@ -32,7 +32,7 @@ module Configurator = Configurator.V1
 let query ?env ~default cmd =
   let run_git () =
     try
-      let (ic, oc, ec) = Unix.open_process_full cmd [||] in
+      let ic, oc, ec = Unix.open_process_full cmd [||] in
       let out = input_line ic in
       if Unix.close_process_full (ic, oc, ec) = Unix.WEXITED 0 then out
       else default
@@ -70,7 +70,7 @@ let raw_current_version = "$Format:%(describe:tags)$"
 
    If one commit is associated with two or more tags,
    output always the most recently added tag that match the regexp `v*`
-   *)
+*)
 let git_describe =
   let parse s =
     match parse_version s with

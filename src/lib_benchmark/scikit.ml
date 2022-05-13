@@ -34,7 +34,7 @@ end
 
 module LinearModel = struct
   let assert_matrix_nontrivial (m : Matrix.t) =
-    let (l, c) = Matrix.shape m in
+    let l, c = Matrix.shape m in
     assert (l <> 0 && c <> 0)
 
   let ridge ~(alpha : float) ?(fit_intercept : bool = false)

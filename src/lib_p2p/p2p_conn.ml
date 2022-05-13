@@ -145,7 +145,7 @@ let read t =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
-      let* (s, msg) = Lwt_pipe.Maybe_bounded.pop t.messages in
+      let* s, msg = Lwt_pipe.Maybe_bounded.pop t.messages in
       let* () =
         Events.(emit bytes_popped_from_queue)
           (s, (P2p_socket.info t.conn).peer_id)

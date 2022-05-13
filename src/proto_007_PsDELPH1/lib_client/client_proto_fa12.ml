@@ -420,8 +420,8 @@ let parse_callback error expr =
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
           match (String.sub s 0 pos, name) with
-          | (addr, "default") -> of_b58_check (addr, None)
-          | (addr, name) -> of_b58_check (addr, Some name)))
+          | addr, "default" -> of_b58_check (addr, None)
+          | addr, name -> of_b58_check (addr, Some name)))
   | _ -> error ()
 
 let action_of_expr ~entrypoint expr =
@@ -520,7 +520,7 @@ let derive_action expr t_param =
     | ( Micheline.Prim (_, Script.D_Right, [right], _),
         Micheline.Prim (_, Script.T_or, [_; t_right], _) ) ->
         derive right t_right
-    | (_, Micheline.Prim (_, _, _, annots)) ->
+    | _, Micheline.Prim (_, _, _, annots) ->
         find_entrypoint_in_annot error annots expr
     | _ -> error ()
   in

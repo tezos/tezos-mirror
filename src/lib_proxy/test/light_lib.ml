@@ -95,8 +95,8 @@ let is_empty = function SLeaf -> true | SDir dir -> StringMap.is_empty dir
 
 let rec simple_tree_eq t1 t2 =
   match (t1, t2) with
-  | (SLeaf, SLeaf) -> true
-  | (SDir dir1, SDir dir2) ->
+  | SLeaf, SLeaf -> true
+  | SDir dir1, SDir dir2 ->
       let b1 = StringMap.bindings dir1 in
       let b2 = StringMap.bindings dir2 in
       if List.length b1 != List.length b2 then false
@@ -104,7 +104,7 @@ let rec simple_tree_eq t1 t2 =
         List.for_all (fun ((k1, t1), (k2, t2)) ->
             k1 = k2 && simple_tree_eq t1 t2)
         @@ List.combine_drop b1 b2
-  | (SLeaf, d) | (d, SLeaf) -> is_empty d
+  | SLeaf, d | d, SLeaf -> is_empty d
 
 let rec irmin_tree_to_simple_tree tree =
   let open Lwt_syntax in

@@ -202,10 +202,10 @@ module Dune = struct
         [
           S
             (match (kind, names) with
-            | (Library, [_]) -> "library"
-            | (Library, _) -> "libraries"
-            | (Executable, [_]) -> "executable"
-            | (Executable, _) -> "executables");
+            | Library, [_] -> "library"
+            | Library, _ -> "libraries"
+            | Executable, [_] -> "executable"
+            | Executable, _ -> "executables");
           (match names with
           | [name] -> [S "name"; S name]
           | _ -> S "names" :: of_atom_list names);
@@ -231,11 +231,11 @@ module Dune = struct
           (if inline_tests then
            let modes : mode list =
              match (modes, js_of_ocaml) with
-             | (None, None) ->
+             | None, None ->
                  (* Make the default dune behavior explicit *)
                  [Native]
-             | (None, Some _) -> [Native; JS]
-             | (Some modes, _) ->
+             | None, Some _ -> [Native; JS]
+             | Some modes, _ ->
                  (* always preserve mode if specified *)
                  modes
            in
@@ -243,18 +243,17 @@ module Dune = struct
              S "inline_tests";
              [S "flags"; S "-verbose"];
              S "modes"
-             ::
-             of_list
-               (List.map
-                  (function
-                    | JS ->
-                        (* We don't run inline_tests in JS by default because of the issue #1947.
-                           In short, we don't want [dune runtest] to depend on node.
-                           Remove this code after we switch to dune.3.0
-                           and address https://gitlab.com/tezos/tezos/-/issues/1947 *)
-                        E
-                    | mode -> S (string_of_mode mode))
-                  modes);
+             :: of_list
+                  (List.map
+                     (function
+                       | JS ->
+                           (* We don't run inline_tests in JS by default because of the issue #1947.
+                              In short, we don't want [dune runtest] to depend on node.
+                              Remove this code after we switch to dune.3.0
+                              and address https://gitlab.com/tezos/tezos/-/issues/1947 *)
+                           E
+                       | mode -> S (string_of_mode mode))
+                     modes);
            ]
           else E);
           (match preprocess with
@@ -300,12 +299,12 @@ module Dune = struct
       ?deps_dune ?action ?locks ?package name =
     let deps =
       match (deps, alias_deps, deps_dune) with
-      | (_ :: _, _, Some _) | (_, _ :: _, Some _) ->
+      | _ :: _, _, Some _ | _, _ :: _, Some _ ->
           invalid_arg
             "Dune.alias_rule: cannot specify both ~deps_dune and ~deps or \
              ~alias_deps"
-      | ([], [], Some deps) -> deps
-      | (_, _, None) ->
+      | [], [], Some deps -> deps
+      | _, _, None ->
           List.map (fun x -> S x) deps
           @ List.map (fun x -> [S "alias"; S x]) alias_deps
           |> of_list
@@ -438,16 +437,16 @@ module Version = struct
 
   let ( && ) a b =
     match (a, b) with
-    | (True, x) | (x, True) -> x
-    | (False, _) | (_, False) -> False
+    | True, x | x, True -> x
+    | False, _ | _, False -> False
     | _ -> And (a, b)
 
   let and_list = List.fold_left ( && ) True
 
   let ( || ) a b =
     match (a, b) with
-    | (True, _) | (_, True) -> True
-    | (False, x) | (x, False) -> x
+    | True, _ | _, True -> True
+    | False, x | x, False -> x
     | _ -> Or (a, b)
 
   let or_list = List.fold_left ( || ) False
@@ -514,8 +513,8 @@ module Opam = struct
         description;
         x_opam_monorepo_opam_provided;
       } =
-    let (depopts, depends) = List.partition (fun dep -> dep.optional) depends in
-    let (depopts, conflicts) =
+    let depopts, depends = List.partition (fun dep -> dep.optional) depends in
+    let depopts, conflicts =
       (* Opam documentation says this about [depopts]:
          "If you require specific versions, add a [conflicts] field with the ones
          that won't work."
@@ -637,10 +636,9 @@ module Opam = struct
     in
     let pp_dependency fmt {package; version; with_test; _} =
       match (version, with_test) with
-      | (True, false) -> pp_string fmt package
-      | (True, true) ->
-          Format.fprintf fmt "@[%a {with-test}@]" pp_string package
-      | (version, false) ->
+      | True, false -> pp_string fmt package
+      | True, true -> Format.fprintf fmt "@[%a {with-test}@]" pp_string package
+      | version, false ->
           Format.fprintf
             fmt
             "@[%a { %a }@]"
@@ -648,7 +646,7 @@ module Opam = struct
             package
             (pp_version_constraint ~in_and:false)
             version
-      | (version, true) ->
+      | version, true ->
           Format.fprintf
             fmt
             "@[%a { with-test & %a }@]"
@@ -737,11 +735,10 @@ end = struct
   let s_expr_of_entry (name, payload) = Dune.[S name; payload]
 
   let to_s_expr (t : t) =
-    let (any, names) =
+    let any, names =
       List.partition_map
         (function
-          | (Any, entry) -> Left entry
-          | (Profile name, entry) -> Right (name, entry))
+          | Any, entry -> Left entry | Profile name, entry -> Right (name, entry))
         t
     in
     let names =
@@ -776,8 +773,8 @@ end = struct
           (fun (name, entries) ->
             Dune.(
               S name
-              ::
-              of_list (List.map s_expr_of_entry (List.sort compare_key entries))))
+              :: of_list
+                   (List.map s_expr_of_entry (List.sort compare_key entries))))
           (List.sort compare_key (String_map.bindings names))
       in
       Dune.(S "env" :: of_list l)
@@ -949,7 +946,7 @@ module Target = struct
         | Private_library name
         | Public_executable ({public_name = name; _}, _)
         | Private_executable (name, _)
-        | Test_executable {names = (name, _); _} ->
+        | Test_executable {names = name, _; _} ->
             name)
 
   let rec names_for_dune = function
@@ -974,7 +971,7 @@ module Target = struct
         | Private_library internal_name -> Ok internal_name
         | Public_executable ({public_name = name; _}, _)
         | Private_executable (name, _)
-        | Test_executable {names = (name, _); _} ->
+        | Test_executable {names = name, _; _} ->
             Error name)
 
   let iter_internal_by_path f =
@@ -1082,19 +1079,19 @@ module Target = struct
       in
       List.flatten (List.map (get_opens []) deps) @ opens
     in
-    let (js_compatible, js_of_ocaml) =
+    let js_compatible, js_of_ocaml =
       match (js_compatible, js_of_ocaml) with
-      | (Some false, Some _) ->
+      | Some false, Some _ ->
           invalid_arg
             "Target.internal: cannot specify both `~js_compatible:false` and \
              `~js_of_ocaml`"
-      | (Some true, Some jsoo) -> (true, Some jsoo)
-      | (Some true, None) -> (true, Some Dune.[])
-      | (None, Some jsoo) -> (true, Some jsoo)
-      | (Some false, None) | (None, None) -> (false, None)
+      | Some true, Some jsoo -> (true, Some jsoo)
+      | Some true, None -> (true, Some Dune.[])
+      | None, Some jsoo -> (true, Some jsoo)
+      | Some false, None | None, None -> (false, None)
     in
     let kind = make_kind names in
-    let (preprocess, inline_tests) =
+    let preprocess, inline_tests =
       match inline_tests with
       | None -> (preprocess, false)
       | Some (Inline_tests_backend target) -> (
@@ -1145,7 +1142,7 @@ module Target = struct
                 "for targets which provide private executables such as %S, you \
                  must specify ~opam (set it to \"\" for no opam file)"
                 name
-          | Test_executable {names = (name, _); _} ->
+          | Test_executable {names = name, _; _} ->
               invalid_argf
                 "for targets which provide test executables such as %S, you \
                  must specify ~opam (set it to \"\" for no opam file)"
@@ -1189,10 +1186,10 @@ module Target = struct
     let static_cclibs = Option.value static_cclibs ~default:[] in
     let modules =
       match (modules, all_modules_except) with
-      | (None, None) -> All
-      | (Some modules, None) -> Modules modules
-      | (None, Some all_modules_except) -> All_modules_except all_modules_except
-      | (Some _, Some _) ->
+      | None, None -> All
+      | Some modules, None -> Modules modules
+      | None, Some all_modules_except -> All_modules_except all_modules_except
+      | Some _, Some _ ->
           invalid_arg
             "Target.internal: cannot specify both ?modules and \
              ?all_modules_except"
@@ -1213,7 +1210,7 @@ module Target = struct
         | Some modes -> List.mem Dune.Native modes
       in
       match (kind, opam, dep_files) with
-      | (Test_executable {names; run = true}, Some package, _) ->
+      | Test_executable {names; run = true}, Some package, _ ->
           let runtest_js_rules =
             if run_js then
               List.map
@@ -1229,13 +1226,13 @@ module Target = struct
             else []
           in
           runtest_rules @ runtest_js_rules
-      | (Test_executable {names = (name, _); run = false; _}, _, _ :: _) ->
+      | Test_executable {names = name, _; run = false; _}, _, _ :: _ ->
           invalid_argf
             "for targets which provide test executables such as %S, \
              [~dep_files] is only meaningful for runtest alias. It cannot be \
              used together with [runtest:false]"
             name
-      | (_, _, _ :: _) -> assert false
+      | _, _, _ :: _ -> assert false
       | _ -> []
     in
     let dune =
@@ -1491,7 +1488,7 @@ let write filename f =
       x
 
 let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
-  let (libraries, empty_files_to_create) =
+  let libraries, empty_files_to_create =
     let empty_files_to_create = ref [] in
     let rec get_library (dep : Target.t) =
       let name =
@@ -1594,8 +1591,8 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   let preprocess =
     let make_pp (PPS (target, args) : Target.preprocessor) =
       match Target.names_for_dune target with
-      | (name, []) -> Dune.pps ~args name
-      | (hd, (_ :: _ as tl)) ->
+      | name, [] -> Dune.pps ~args name
+      | hd, (_ :: _ as tl) ->
           invalid_arg
             ("preprocessor target has multiple names, don't know which one to \
               choose: "
@@ -1635,7 +1632,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   in
   let package =
     match (internal.kind, internal.opam) with
-    | (Public_executable _, Some opam) -> Some opam
+    | Public_executable _, Some opam -> Some opam
     | _ -> None
   in
   let instrumentation =
@@ -1649,7 +1646,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     in
     List.filter_map (fun x -> x) [bisect_ppx; time_measurement_ppx]
   in
-  let ((kind : Dune.kind), internal_names, public_names) =
+  let (kind : Dune.kind), internal_names, public_names =
     let get_internal_name {Target.internal_name; _} = internal_name in
     let get_public_name {Target.public_name; _} = public_name in
     match internal.kind with
@@ -1661,7 +1658,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
           List.map get_internal_name (head :: tail),
           List.map get_public_name (head :: tail) )
     | Private_executable (head, tail) -> (Executable, head :: tail, [])
-    | Test_executable {names = (head, tail); _} -> (Executable, head :: tail, [])
+    | Test_executable {names = head, tail; _} -> (Executable, head :: tail, [])
   in
   let documentation =
     match internal.documentation with
@@ -1837,7 +1834,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     Opam.t =
   let for_release = release <> None in
   let map l f = List.map f l in
-  let (depends, x_opam_monorepo_opam_provided) =
+  let depends, x_opam_monorepo_opam_provided =
     List.split @@ map internals
     @@ fun internal ->
     let with_test =
@@ -1881,7 +1878,9 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let depends =
     {
       Opam.package = "dune";
-      version = Version.at_least "2.9";
+      (* We artificially constrain the version of dune to split the tooling
+         upgrade. This is temporary. *)
+      version = Version.(and_list [at_least "2.9"; less_than "3.0"]);
       with_test = false;
       optional = false;
     }
@@ -2189,7 +2188,7 @@ let check_js_of_ocaml () =
     | Public_library {public_name; _} -> public_name
     | Private_library internal_name -> internal_name
     | Public_executable ({public_name = name; _}, _) -> name
-    | Private_executable (name, _) | Test_executable {names = (name, _); _} ->
+    | Private_executable (name, _) | Test_executable {names = name, _; _} ->
         Filename.concat path name
   in
   let missing_from_target = ref String_map.empty in
@@ -2303,7 +2302,7 @@ let check_circular_opam_deps () =
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let (packages_dir, release, remove_extra_files) =
+let packages_dir, release, remove_extra_files =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
@@ -2332,13 +2331,13 @@ let (packages_dir, release, remove_extra_files) =
   Arg.parse spec anon_fun usage_msg ;
   let release =
     match (!url, !sha256, !sha512, !version) with
-    | ("", "", "", "") -> None
-    | ("", _, _, _) | (_, "", _, _) | (_, _, "", _) | (_, _, _, "") ->
+    | "", "", "", "" -> None
+    | "", _, _, _ | _, "", _, _ | _, _, "", _ | _, _, _, "" ->
         prerr_endline
           "Error: either all of --url, --sha256, --sha512 and --release must \
            be specified, or none of them." ;
         exit 1
-    | (url, sha256, sha512, version) ->
+    | url, sha256, sha512, version ->
         Some {version; url = {url; sha256; sha512}}
   in
   (!packages_dir, release, !remove_extra_files)

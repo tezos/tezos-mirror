@@ -75,7 +75,7 @@ let parse_arg (json : Json.t) : arg =
 
 let rec parse_tree (json : Json.t) : Json.t tree =
   match Json.as_variant json with
-  | ("static", static) ->
+  | "static", static ->
       Json.as_record static @@ fun get ->
       Static
         {
@@ -86,14 +86,14 @@ let rec parse_tree (json : Json.t) : Json.t tree =
           patch_service = get "patch_service";
           subdirs = get "subdirs" |> Option.map parse_subdirs;
         }
-  | ("dynamic", dynamic) -> Dynamic dynamic
-  | (name, _) -> failwith ("parse_tree: don't know what to do with: " ^ name)
+  | "dynamic", dynamic -> Dynamic dynamic
+  | name, _ -> failwith ("parse_tree: don't know what to do with: " ^ name)
 
 and parse_subdirs (json : Json.t) : Json.t subdirs =
   match Json.as_variant json with
-  | ("suffixes", suffixes) ->
+  | "suffixes", suffixes ->
       Suffixes (suffixes |> Json.as_list |> List.map parse_suffix)
-  | ("dynamic_dispatch", dynamic_dispatch) ->
+  | "dynamic_dispatch", dynamic_dispatch ->
       Json.as_record dynamic_dispatch @@ fun get ->
       Dynamic_dispatch
         {
@@ -106,7 +106,7 @@ and parse_subdirs (json : Json.t) : Json.t subdirs =
             |> opt_mandatory "dynamic_dispatch.tree" dynamic_dispatch
             |> parse_tree;
         }
-  | (name, _) -> failwith ("parse_subdir: don't know what to do with: " ^ name)
+  | name, _ -> failwith ("parse_subdir: don't know what to do with: " ^ name)
 
 and parse_suffix (json : Json.t) : Json.t suffix =
   Json.as_record json @@ fun get ->
@@ -154,7 +154,7 @@ and flatten_static path acc static =
         static.delete_service,
         static.patch_service )
     with
-    | (None, None, None, None, None) -> acc
+    | None, None, None, None, None -> acc
     | _ ->
         let endpoint =
           {
@@ -231,7 +231,7 @@ let parse_query_parameter (json : Json.t) : query_parameter =
   let name = get "name" |> opt_mandatory "name" json |> Json.as_string in
   let description = get "description" |> Option.map Json.as_string in
   (* Then, fetch information which is in the "kind" field. *)
-  let (kind, id, descr) =
+  let kind, id, descr =
     (get "kind" |> opt_mandatory "kind" json |> Json.as_record) @@ fun get ->
     (* Function used for everything but kind "flag". *)
     let parse_kind_with_name make record =
@@ -246,13 +246,13 @@ let parse_query_parameter (json : Json.t) : query_parameter =
     (* Field "kind" encodes a variant.
        There must be exactly one of either: "optional", "multi", "single" or "flag". *)
     match (get "optional", get "multi", get "single", get "flag") with
-    | (Some optional, None, None, None) ->
+    | Some optional, None, None, None ->
         parse_kind_with_name (fun name -> Optional {name}) optional
-    | (None, Some multi, None, None) ->
+    | None, Some multi, None, None ->
         parse_kind_with_name (fun name -> Multi {name}) multi
-    | (None, None, Some single, None) ->
+    | None, None, Some single, None ->
         parse_kind_with_name (fun name -> Single {name}) single
-    | (None, None, None, Some flag) ->
+    | None, None, None, Some flag ->
         let () =
           Json.as_record flag @@ fun _get ->
           (* Flags have no fields. *)
@@ -264,9 +264,9 @@ let parse_query_parameter (json : Json.t) : query_parameter =
   (* Both the top level and the kind can contain a description. Merge them. *)
   let description =
     match (description, descr) with
-    | (None, None) -> None
-    | ((Some _ as x), None) | (None, (Some _ as x)) -> x
-    | (Some x, Some y) -> Some (y ^ " " ^ x)
+    | None, None -> None
+    | (Some _ as x), None | None, (Some _ as x) -> x
+    | Some x, Some y -> Some (y ^ " " ^ x)
   in
   {id; name; description; kind}
 

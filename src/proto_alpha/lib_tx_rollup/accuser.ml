@@ -142,21 +142,20 @@ let build_rejection state ~(reject_commitment : Tx_rollup_commitment.Full.t)
     let tree = List.fold_left snoc nil reject_commitment.messages in
     Environment.wrap_tzresult @@ compute_path tree position
   in
-  let* (previous_message_result, previous_message_result_path, previous_context)
-      =
+  let* previous_message_result, previous_message_result_path, previous_context =
     match (block.header.predecessor, position) with
-    | (None, 0) ->
+    | None, 0 ->
         (* Rejecting first message of first level, no predecessor *)
         let*! context = Context.init_context state.State.context_index in
         return
           ( Tx_rollup_message_result.init,
             Tx_rollup_commitment.Merkle.dummy_path,
             context )
-    | (predecessor, _) ->
-        let* (inbox_of_previous_message, previous_message_position) =
+    | predecessor, _ ->
+        let* inbox_of_previous_message, previous_message_position =
           match (predecessor, position) with
-          | (None, 0) -> assert false (* handled above *)
-          | (Some predecessor_hash, 0) ->
+          | None, 0 -> assert false (* handled above *)
+          | Some predecessor_hash, 0 ->
               let*! predecessor = State.get_block state predecessor_hash in
               let*? predecessor =
                 Result.of_option
@@ -212,7 +211,7 @@ let build_rejection state ~(reject_commitment : Tx_rollup_commitment.Full.t)
           state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
       }
   in
-  let+ (proof, _) =
+  let+ proof, _ =
     Prover_apply.apply_message previous_context l2_parameters message
   in
   Tx_rollup_rejection

@@ -170,10 +170,10 @@ module Internal_for_tests : sig
       (Filter : Prevalidator_filters.FILTER)
       (Prevalidation_t : Prevalidation.T
                            with type validation_state =
-                                 Filter.Proto.validation_state
+                             Filter.Proto.validation_state
                             and type protocol_operation = Filter.Proto.operation
                             and type operation_receipt =
-                                 Filter.Proto.operation_receipt) : sig
+                             Filter.Proto.operation_receipt) : sig
     (** The corresponding internal type of the mempool (see {!Prevalidator.S}),
         that depends on the protocol *)
     type types_state

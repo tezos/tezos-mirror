@@ -197,7 +197,7 @@ module Alias (Entity : Entity) = struct
     let* mtime = wallet#last_modification_time Entity.name in
     let cache = peek_cache wallet in
     match (mtime, cache) with
-    | (Some fresh_mtime, Some {mtime = Some cache_mtime; _})
+    | Some fresh_mtime, Some {mtime = Some cache_mtime; _}
       when fresh_mtime = cache_mtime ->
         return (WithExceptions.Option.get ~loc:__LOC__ cache)
     | _ ->

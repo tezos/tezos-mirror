@@ -84,7 +84,7 @@ let test_bake_two =
     ~title:"Tenderbake transfer - baking 2"
     ~tags:["baking"; "tenderbake"]
   @@ fun protocol ->
-  let* (_proto_hash, endpoint, client) = init protocol in
+  let* _proto_hash, endpoint, client = init protocol in
   let end_idx = List.length bootstrap_accounts in
   let rec loop i =
     if i = end_idx then Lwt.return_unit
@@ -115,7 +115,7 @@ let test_low_level_commands =
     ~title:"Tenderbake low level commands"
     ~tags:["propose"; "endorse"; "preendorse"; "tenderbake"; "low_level"]
   @@ fun protocol ->
-  let* (_proto_hash, endpoint, client) = init protocol in
+  let* _proto_hash, endpoint, client = init protocol in
   Log.info "Doing a propose -> preendorse -> endorse cycle" ;
   let proposer = endorsers in
   let preendorsers = endorsers in
@@ -156,7 +156,7 @@ let test_repropose =
         "repropose";
       ]
   @@ fun protocol ->
-  let* (_proto_hash, endpoint, client) = init protocol in
+  let* _proto_hash, endpoint, client = init protocol in
   Log.info "Doing a propose -> preendorse -> endorse cycle" ;
   let proposer = endorsers in
   let preendorsers = endorsers in

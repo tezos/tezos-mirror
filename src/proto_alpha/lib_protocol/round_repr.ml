@@ -211,29 +211,29 @@ let () =
 
 (* The duration of round n follows the arithmetic sequence:
 
-     round_duration(0)   = first_round_duration
-     round_duration(r+1) = round_duration(r) + delay_increment_per_round
+        round_duration(0)   = first_round_duration
+        round_duration(r+1) = round_duration(r) + delay_increment_per_round
 
-   Hence, this sequence can be explicited into:
+      Hence, this sequence can be explicited into:
 
-     round_duration(r) = first_round_duration + r * delay_increment_per_round
+        round_duration(r) = first_round_duration + r * delay_increment_per_round
 
-   The level offset of round r is the sum of the durations of the rounds up
-   until round r - 1. In other words, when r > 0
+      The level offset of round r is the sum of the durations of the rounds up
+      until round r - 1. In other words, when r > 0
 
-     raw_level_offset_of_round(0)   = 0
-     raw_level_offset_of_round(r+1) =
-       raw_level_offset_of_round(r) + round_duration(r)
+        raw_level_offset_of_round(0)   = 0
+        raw_level_offset_of_round(r+1) =
+          raw_level_offset_of_round(r) + round_duration(r)
 
-Hence
+   Hence
 
-     raw_level_offset_of_round(r) = Σ_{k=0}^{r-1} (round_duration(k))
+        raw_level_offset_of_round(r) = Σ_{k=0}^{r-1} (round_duration(k))
 
-   After unfolding the series, the same function can be finally explicited into
+      After unfolding the series, the same function can be finally explicited into
 
-     raw_level_offset_of_round(0) = 0
-     raw_level_offset_of_round(r) = r * first_round_duration
-                                + 1/2 * r * (r - 1) * delay_increment_per_round
+        raw_level_offset_of_round(0) = 0
+        raw_level_offset_of_round(r) = r * first_round_duration
+                                   + 1/2 * r * (r - 1) * delay_increment_per_round
 *)
 let raw_level_offset_of_round round_durations ~round =
   if Compare.Int32.(round = zero) then ok Int64.zero

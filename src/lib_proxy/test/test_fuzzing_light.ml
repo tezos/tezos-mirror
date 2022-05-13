@@ -187,10 +187,10 @@ let test_union_translation =
 let rec union_merkle_node n1 n2 =
   let open Tezos_shell_services.Block_services in
   match (n1, n2) with
-  | (Hash h1, Hash h2) when h1 = h2 -> Some n1
-  | (Data raw_context1, Data raw_context2) when raw_context1 = raw_context2 ->
+  | Hash h1, Hash h2 when h1 = h2 -> Some n1
+  | Data raw_context1, Data raw_context2 when raw_context1 = raw_context2 ->
       Some n1
-  | (Continue mtree1, Continue mtree2) -> (
+  | Continue mtree1, Continue mtree2 -> (
       match union_merkle_tree mtree1 mtree2 with
       | None -> None
       | Some u -> Some (Continue u))
@@ -460,7 +460,7 @@ module AddTree = struct
 end
 
 module Consensus = struct
-  let (chain, block) = (`Main, `Head 0)
+  let chain, block = (`Main, `Head 0)
 
   class mock_rpc_context : RPC_context.simple =
     object

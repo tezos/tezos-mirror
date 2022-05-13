@@ -28,8 +28,7 @@
    Component:    Protocol demo counter
    Invocation:   dune exec tezt/tests/main.exe -- --file demo_counter.ml
    Subject:      Minimal test for the protocol demo counter
-
- *)
+*)
 
 let check_a ?__LOC__ client expected =
   let* a = Demo_client.get_a client in

@@ -65,34 +65,34 @@ let preformat root =
   in
   let rec preformat_expr = function
     | Int (loc, value) ->
-        let (cml, csz) = preformat_loc loc in
+        let cml, csz = preformat_loc loc in
         Int ((cml, String.length (Z.to_string value) + csz, loc), value)
     | String (loc, value) ->
-        let (cml, csz) = preformat_loc loc in
+        let cml, csz = preformat_loc loc in
         String ((cml, String.length value + csz, loc), value)
     | Bytes (loc, value) ->
-        let (cml, csz) = preformat_loc loc in
+        let cml, csz = preformat_loc loc in
         Bytes ((cml, (Bytes.length value * 2) + 2 + csz, loc), value)
     | Prim (loc, name, items, annots) ->
-        let (cml, csz) = preformat_loc loc in
+        let cml, csz = preformat_loc loc in
         let asz = preformat_annots annots in
         let items = List.map preformat_expr items in
-        let (ml, sz) =
+        let ml, sz =
           List.fold_left
             (fun (tml, tsz) e ->
-              let (ml, sz, _) = location e in
+              let ml, sz, _ = location e in
               (tml || ml, tsz + 1 + sz))
             (cml, String.length name + csz + asz)
             items
         in
         Prim ((ml, sz, loc), name, items, annots)
     | Seq (loc, items) ->
-        let (cml, csz) = preformat_loc loc in
+        let cml, csz = preformat_loc loc in
         let items = List.map preformat_expr items in
-        let (ml, sz) =
+        let ml, sz =
           List.fold_left
             (fun (tml, tsz) e ->
-              let (ml, sz, _) = location e in
+              let ml, sz, _ = location e in
               (tml || ml, tsz + 3 + sz))
             (cml, 4 + csz)
             items
@@ -165,9 +165,9 @@ let rec print_expr_unwrapped ppf = function
       if (not ml) && s < 80 then Format.fprintf ppf "{ @[<h 0>"
       else Format.fprintf ppf "{ @[<v 0>" ;
       (match (comment, items) with
-      | (None, _) -> ()
-      | (Some comment, []) -> Format.fprintf ppf "%a" print_comment comment
-      | (Some comment, _) -> Format.fprintf ppf "%a@ " print_comment comment) ;
+      | None, _ -> ()
+      | Some comment, [] -> Format.fprintf ppf "%a" print_comment comment
+      | Some comment, _ -> Format.fprintf ppf "%a@ " print_comment comment) ;
       Format.pp_print_list
         ~pp_sep:(fun ppf () -> Format.fprintf ppf " ;@ ")
         print_expr_unwrapped

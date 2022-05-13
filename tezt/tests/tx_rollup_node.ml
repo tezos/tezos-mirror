@@ -222,7 +222,7 @@ let test_node_configuration =
     ~tags:["tx_rollup"; "configuration"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
@@ -297,7 +297,7 @@ let test_tx_node_origination =
     ~tags:["tx_rollup"; "ready"; "originate"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
@@ -312,7 +312,7 @@ let test_not_allow_deposit =
     ~tags:["tx_rollup"; "node"; "allow"; "deposit"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
@@ -356,7 +356,7 @@ let test_allow_deposit =
     ~tags:["tx_rollup"; "node"; "allow"; "deposit"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
@@ -410,7 +410,7 @@ let test_tx_node_store_inbox =
     ~tags:["tx_rollup"; "store"; "inbox"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
@@ -501,7 +501,7 @@ let test_node_cannot_connect =
     ~tags:["tx_rollup"; "node"; "connect"]
   @@ fun protocol ->
   let* parameter_file = Parameters.parameter_file protocol in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let originator = Constant.bootstrap1.public_key_hash in
@@ -538,11 +538,11 @@ let test_node_disconnect =
     ~tags:["tx_rollup"; "node"; "disconnect"]
   @@ fun protocol ->
   let* parameter_file = Parameters.parameter_file protocol in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let originator = Constant.bootstrap1.public_key_hash in
-  let* (rollup, tx_node) = init_and_run_rollup_node ~originator node client in
+  let* rollup, tx_node = init_and_run_rollup_node ~originator node client in
   (* Submit a batch *)
   let (`Batch content) = Rollup.make_batch "tezos_l2_batch_1" in
   let*! () =
@@ -744,7 +744,7 @@ let build_rejection ~tx_level ~tx_node ~message_pos ~client ?agreed_context_hash
     in
     return (JSON.encode message_path)
   in
-  let* (agreed_context_hash, agreed_message_result_path) =
+  let* agreed_context_hash, agreed_message_result_path =
     if message_pos = 0 && tx_level = 0 then
       return (Constant.tx_rollup_empty_l2_context, "[]")
     else if message_pos = 0 then
@@ -832,11 +832,11 @@ let test_ticket_deposit_from_l1_to_l2 =
     ~tags:["tx_rollup"; "deposit"; "ticket"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node ~originator:operator node client
       in
       let tx_client =
@@ -955,7 +955,7 @@ let craft_withdraw_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket =
   return (transaction, signature)
 
 let craft_batch_for_one_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
-  let* (transaction, signature) =
+  let* transaction, signature =
     craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket
   in
   let transactions_and_sig =
@@ -996,11 +996,11 @@ let test_l2_to_l2_transaction =
     ~tags:["tx_rollup"; "rollup"; "internal"; "transaction"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node ~originator node client
       in
       let tx_client =
@@ -1139,7 +1139,7 @@ let tx_client_inject_transaction ~tx_client ?failswith transaction signature =
       signature
   in
   let expect_failure = Option.is_some failswith in
-  let* (stdout, stderr) =
+  let* stdout, stderr =
     Tx_rollup_client.inject_batcher_transaction
       ~expect_failure
       tx_client
@@ -1160,7 +1160,7 @@ let tx_client_inject_transaction ~tx_client ?failswith transaction signature =
 
 let craft_tx_and_inject ?failswith ?counter tx_client ~qty ~signer ~dest ~ticket
     =
-  let* (transaction, signature) =
+  let* transaction, signature =
     craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket
   in
   tx_client_inject_transaction ~tx_client ?failswith transaction [signature]
@@ -1263,12 +1263,12 @@ let test_batcher =
     ~tags:["tx_rollup"; "node"; "batcher"; "transaction"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let originator = Constant.bootstrap2.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~originator
           ~operator
@@ -1286,7 +1286,7 @@ let test_batcher =
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (_level, _contract_id) =
+      let* _level, _contract_id =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -1356,7 +1356,7 @@ let test_batcher =
       Log.info "Crafting a l2 transaction with wrong signature" ;
       let* _txh =
         (* craft a transaction, but ignore the signature *)
-        let* (transaction, _signature) =
+        let* transaction, _signature =
           craft_tx_and_sign
             tx_client
             ~qty:1L
@@ -1365,7 +1365,7 @@ let test_batcher =
             ~ticket:ticket_id
         in
         (* craft a signature, for an ignored transaction *)
-        let* (_transaction, signature) =
+        let* _transaction, signature =
           craft_tx_and_sign
             tx_client
             ~qty:2L
@@ -1493,7 +1493,7 @@ let test_reorganization =
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
       let nodes_args = Node.[Connections 2; Synchronisation_threshold 0] in
-      let* (node1, client1) =
+      let* node1, client1 =
         Client.init_with_protocol
           ~nodes_args
           ~parameter_file
@@ -1502,7 +1502,7 @@ let test_reorganization =
           ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node ~originator:operator node1 client1
       in
       let tx_client =
@@ -1513,7 +1513,7 @@ let test_reorganization =
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let* bls_key_2 = Client.bls_gen_and_show_keys client1 in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (_level, _contract_id) =
+      let* _level, _contract_id =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -1613,12 +1613,12 @@ let test_l2_proof_rpc_position =
     ~tags:["tx_rollup"; "node"; "proofs"; "rejection"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let originator = Constant.bootstrap2.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node ~originator node client
       in
       let tx_client =
@@ -1629,7 +1629,7 @@ let test_l2_proof_rpc_position =
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (_level, _contract_id) =
+      let* _level, _contract_id =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -1822,18 +1822,18 @@ let test_reject_bad_commitment =
     ~tags:["tx_rollup"; "node"; "proofs"; "rejection"; "slashed"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
       let operator = Constant.bootstrap3.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node ~originator node client
       in
       (* Generating some identities *)
       let* bls_key1 = Client.bls_gen_and_show_keys client in
       let pkh1_str = bls_key1.aggregate_public_key_hash in
-      let* (_level, _contract_id) =
+      let* _level, _contract_id =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -1915,12 +1915,12 @@ let test_committer =
     ~tags:["tx_rollup"; "node"; "commitments"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let originator = Constant.bootstrap2.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~originator
           ~operator
@@ -1936,7 +1936,7 @@ let test_committer =
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (tzlevel, _) =
+      let* tzlevel, _ =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -2023,11 +2023,11 @@ let test_tickets_context =
     ~tags:["tx_rollup"; "tickets"; "context"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
@@ -2042,7 +2042,7 @@ let test_tickets_context =
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (_level, contract_id) =
+      let* _level, contract_id =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -2141,12 +2141,12 @@ let test_withdrawals =
           ~parameters:Parameters.{finality_period = 2; withdraw_period = 2}
           protocol
       in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap2.public_key_hash in
       let operator = Constant.bootstrap1.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~originator
           ~operator
@@ -2170,7 +2170,7 @@ let test_withdrawals =
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (_level, deposit_contract) =
+      let* _level, deposit_contract =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -2221,7 +2221,7 @@ let test_withdrawals =
           ~expected_balance:5
       in
       Log.info "Submitting withdrawals to queue" ;
-      let* (tx, signature) =
+      let* tx, signature =
         craft_withdraw_and_sign
           tx_client
           ~signer:bls_key_2
@@ -2230,7 +2230,7 @@ let test_withdrawals =
           ~qty:5L
       in
       let* _ = tx_client_inject_transaction ~tx_client tx [signature] in
-      let* (tx, signature) =
+      let* tx, signature =
         craft_withdraw_and_sign
           tx_client
           ~signer:bls_key_1
@@ -2320,12 +2320,12 @@ let test_accuser =
       ~parameters:Parameters.{finality_period = 5; withdraw_period = 5}
       protocol
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let originator = Constant.bootstrap2.public_key_hash in
   let operator = Constant.bootstrap1.public_key_hash in
-  let* (tx_rollup_hash, tx_node) =
+  let* tx_rollup_hash, tx_node =
     (* Starting without committer/operator *)
     init_and_run_rollup_node
       ~originator
@@ -2337,7 +2337,7 @@ let test_accuser =
   (* Generating one identity *)
   let* bls_key_1 = Client.bls_gen_and_show_keys client in
   let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
-  let* (_level, _deposit_contract) =
+  let* _level, _deposit_contract =
     make_deposit
       ~source:Constant.bootstrap2.public_key_hash
       ~tx_rollup_hash
@@ -2387,11 +2387,11 @@ let test_batcher_large_message =
           ~parameters:Parameters.{finality_period = 5; withdraw_period = 5}
           protocol
       in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
-      let* (_tx_rollup_hash, tx_node) =
+      let* _tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
@@ -2415,7 +2415,7 @@ let test_batcher_large_message =
         in
         List.init 200 (fun _ -> transfer_content)
       in
-      let* (tx, signature) =
+      let* tx, signature =
         craft_tx_transfers_and_sign
           ~counter:1L
           ~signer:bls_key
@@ -2438,11 +2438,11 @@ let test_transfer_command =
     ~tags:["tx_rollup"; "client"; "transfer"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
@@ -2455,7 +2455,7 @@ let test_transfer_command =
       (* Generating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
       let* bls_key_2 = Client.bls_gen_and_show_keys client in
-      let* (_level, _contract_id) =
+      let* _level, _contract_id =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -2502,11 +2502,11 @@ let test_withdraw_command =
     ~tags:["tx_rollup"; "client"; "withdraw"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
-      let* (tx_rollup_hash, tx_node) =
+      let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
@@ -2518,7 +2518,7 @@ let test_withdraw_command =
       in
       (* Generating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
-      let* (_level, _contract_id) =
+      let* _level, _contract_id =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
@@ -2569,12 +2569,12 @@ let test_catch_up =
       ~parameters:Parameters.{finality_period = 5; withdraw_period = 5}
       protocol
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let originator = Constant.bootstrap2.public_key_hash in
   let operator = Constant.bootstrap1.public_key_hash in
-  let* (tx_rollup_hash, tx_node) =
+  let* tx_rollup_hash, tx_node =
     (* Starting without committer/operator *)
     init_and_run_rollup_node
       ~originator
@@ -2590,7 +2590,7 @@ let test_catch_up =
   let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
   let* bls_key_2 = Client.bls_gen_and_show_keys client in
   let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-  let* (tzlevel, _deposit_contract) =
+  let* tzlevel, _deposit_contract =
     make_deposit
       ~source:Constant.bootstrap2.public_key_hash
       ~tx_rollup_hash
@@ -2662,7 +2662,7 @@ let test_origination_deposit_same_block =
     ~tags:["tx_rollup"; "origination"; "genesis"; "deposit"]
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (node, client) =
+      let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let* contract_id =
@@ -2683,8 +2683,7 @@ let test_origination_deposit_same_block =
       Log.info "Originating rollup" ;
       let*! tx_rollup_hash =
         Client.Tx_rollup.originate
-          ~fee:
-            (Tez.of_int 100)
+          ~fee:(Tez.of_int 100)
             (* High fee to ensure the origination appears in the block before the
                deposit *)
           ~src:originator

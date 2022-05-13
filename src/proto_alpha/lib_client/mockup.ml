@@ -1091,7 +1091,7 @@ module Parsed_account = struct
     Client_keys.list_keys wallet >>=? fun all_keys ->
     List.iter_s
       (function
-        | (name, pkh, _pk_opt, Some sk_uri) -> (
+        | name, pkh, _pk_opt, Some sk_uri -> (
             let contract = Contract.Implicit pkh in
             Client_proto_context.get_balance
               rpc_context
@@ -1345,7 +1345,7 @@ let mem_init :
   | None -> return Protocol_constants_overrides.no_overrides
   | Some json -> (
       match Data_encoding.Json.destruct lib_parameters_json_encoding json with
-      | (_, x) -> return x
+      | _, x -> return x
       | exception error ->
           failwith
             "cannot read protocol constants overrides: %a"
@@ -1432,7 +1432,7 @@ let mem_init :
         [Block_hash.to_bytes hash; Operation_list_hash.(to_bytes @@ compute [])]
     in
     let open Protocol.Alpha_context.Block_header in
-    let (_, _, sk) = Signature.generate_key () in
+    let _, _, sk = Signature.generate_key () in
     let proof_of_work_nonce =
       Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
     in

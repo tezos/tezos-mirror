@@ -78,7 +78,7 @@ let test_participation ~sufficient_participation () =
   let minimal_nb_active_slots =
     mpr.numerator * expected_nb_slots / mpr.denominator
   in
-  let (account1, account2) =
+  let account1, account2 =
     match accounts with a1 :: a2 :: _ -> (a1, a2) | _ -> assert false
   in
   let del1 = Context.Contract.pkh account1 in
@@ -94,7 +94,7 @@ let test_participation ~sufficient_participation () =
       Environment.wrap_tzresult (Raw_level.of_int32 int_level) >>?= fun level ->
       Context.get_endorsing_power_for_delegate (B b_crt) ~levels:[level] del1
       >>=? fun endorsing_power_for_level ->
-      let (endorser, new_endorsing_power) =
+      let endorser, new_endorsing_power =
         if sufficient_participation && endorsing_power < minimal_nb_active_slots
         then (del2, endorsing_power + endorsing_power_for_level)
         else (del1, endorsing_power)

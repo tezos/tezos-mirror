@@ -70,13 +70,13 @@ let rpc_error_encoding =
            (req "kind" (constant "connection_failed"))
            (req "message" string))
         (function Connection_failed msg -> Some ((), msg) | _ -> None)
-        (function ((), msg) -> Connection_failed msg);
+        (function (), msg -> Connection_failed msg);
       case
         (Tag 2)
         ~title:"Bad_request"
         (obj2 (req "kind" (constant "bad_request")) (req "message" string))
         (function Bad_request msg -> Some ((), msg) | _ -> None)
-        (function ((), msg) -> Bad_request msg);
+        (function (), msg -> Bad_request msg);
       case
         (Tag 3)
         ~title:"Method_not_allowed"
@@ -84,7 +84,7 @@ let rpc_error_encoding =
            (req "kind" (constant "method_not_allowed"))
            (req "allowed" (list RPC_service.meth_encoding)))
         (function Method_not_allowed meths -> Some ((), meths) | _ -> None)
-        (function ((), meths) -> Method_not_allowed meths);
+        (function (), meths -> Method_not_allowed meths);
       case
         (Tag 4)
         ~title:"Unsupported_media_type"
@@ -92,7 +92,7 @@ let rpc_error_encoding =
            (req "kind" (constant "unsupported_media_type"))
            (opt "content_type" string))
         (function Unsupported_media_type m -> Some ((), m) | _ -> None)
-        (function ((), m) -> Unsupported_media_type m);
+        (function (), m -> Unsupported_media_type m);
       case
         (Tag 5)
         ~title:"Not_acceptable"
@@ -105,7 +105,7 @@ let rpc_error_encoding =
               Some ((), proposed, acceptable)
           | _ -> None)
         (function
-          | ((), proposed, acceptable) -> Not_acceptable {proposed; acceptable});
+          | (), proposed, acceptable -> Not_acceptable {proposed; acceptable});
       case
         (Tag 6)
         ~title:"Unexpected_status_code"
@@ -119,7 +119,7 @@ let rpc_error_encoding =
               Some ((), Cohttp.Code.code_of_status code, content, media_type)
           | _ -> None)
         (function
-          | ((), code, content, media_type) ->
+          | (), code, content, media_type ->
               let code = Cohttp.Code.status_of_code code in
               Unexpected_status_code {code; content; media_type});
       case
@@ -135,7 +135,7 @@ let rpc_error_encoding =
               Some ((), received, acceptable, body)
           | _ -> None)
         (function
-          | ((), received, acceptable, body) ->
+          | (), received, acceptable, body ->
               Unexpected_content_type {received; acceptable; body});
       case
         (Tag 8)
@@ -150,14 +150,14 @@ let rpc_error_encoding =
               Some ((), content, media_type, error)
           | _ -> None)
         (function
-          | ((), content, media_type, error) ->
+          | (), content, media_type, error ->
               Unexpected_content {content; media_type; error});
       case
         (Tag 9)
         ~title:"OCaml_exception"
         (obj2 (req "kind" (constant "ocaml_exception")) (req "content" string))
         (function OCaml_exception msg -> Some ((), msg) | _ -> None)
-        (function ((), msg) -> OCaml_exception msg);
+        (function (), msg -> OCaml_exception msg);
       case
         (Tag 10)
         ~title:"Unauthorized URI"

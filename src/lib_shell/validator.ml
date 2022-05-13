@@ -109,7 +109,7 @@ let read_block store h =
 
 let read_block_header db h =
   let open Lwt_option_syntax in
-  let* (chain_id, block) = read_block (Distributed_db.store db) h in
+  let* chain_id, block = read_block (Distributed_db.store db) h in
   let header = Store.Block.header block in
   return (chain_id, header)
 

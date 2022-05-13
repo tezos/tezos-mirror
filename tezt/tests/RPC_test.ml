@@ -37,7 +37,7 @@
    Subject: RPC regression tests capture the output of RPC calls and compare it
             with the output from the previous run. The test passes only if the
             outputs match exactly.
-  *)
+*)
 
 (* These hooks must be attached to every process that should be captured for
    regression testing *)
@@ -56,7 +56,7 @@ let hooks = Tezos_regression.hooks
    implicit argument to specify the list of protocols to test. *)
 let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
     ?node_parameters sub_group =
-  let (client_mode_tag, title_tag) =
+  let client_mode_tag, title_tag =
     match test_mode_tag with
     | `Client -> (`Client, "client")
     | `Client_data_dir_proxy_server -> (`Client, "proxy_server_data_dir")
@@ -91,7 +91,7 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
         true
     | `Client | `Light | `Proxy -> false
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol
       ?parameter_file
       ?nodes_args:node_parameters
@@ -633,9 +633,9 @@ let mempool_node_flags =
       Synchronisation_threshold 0;
       (* Node does not need to be synchronized with peers before being
          bootstrapped *)
-      Connections 1;
+      Connections 1
       (* Number of connection allowed for each of our 2 nodes used in the
-         mempool tests *)
+         mempool tests *);
     ]
 
 let bake_empty_block ?endpoint client =

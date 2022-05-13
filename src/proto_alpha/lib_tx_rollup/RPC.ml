@@ -457,8 +457,8 @@ module Context_RPC = struct
     let* ticket_id = get_ticket_index c ticket in
     let* address_id = get_address_index c address in
     match (ticket_id, address_id) with
-    | (None, _) | (_, None) -> return Tx_rollup_l2_qty.zero
-    | (Some ticket_id, Some address_id) ->
+    | None, _ | _, None -> return Tx_rollup_l2_qty.zero
+    | Some ticket_id, Some address_id ->
         Context.Ticket_ledger.get c ticket_id address_id
 
   let () =
@@ -620,7 +620,7 @@ let launch ~host ~acl ~node ~dir () =
 let start configuration state =
   let open Lwt_result_syntax in
   let Node_config.{rpc_addr; _} = configuration in
-  let (host, rpc_port) = rpc_addr in
+  let host, rpc_port = rpc_addr in
   let host = P2p_addr.to_string host in
   let dir = register state in
   let node = `TCP (`Port rpc_port) in

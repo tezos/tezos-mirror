@@ -32,7 +32,7 @@ module Make (Trace : Traced_sigs.Trace.S) :
   module Traced_result_syntax = struct
     include Result_syntax
 
-    let (fail[@ocaml.inline "always"]) = fun e -> fail (Trace.make e)
+    let (fail [@ocaml.inline "always"]) = fun e -> fail (Trace.make e)
 
     let rec join_errors trace_acc = function
       | Ok _ :: ts -> join_errors trace_acc ts
@@ -54,9 +54,9 @@ module Make (Trace : Traced_sigs.Trace.S) :
 
     let both a b =
       match (a, b) with
-      | (Ok a, Ok b) -> Ok (a, b)
-      | (Error err, Ok _) | (Ok _, Error err) -> Error err
-      | (Error erra, Error errb) -> Error (Trace.conp erra errb)
+      | Ok a, Ok b -> Ok (a, b)
+      | Error err, Ok _ | Ok _, Error err -> Error err
+      | Error erra, Error errb -> Error (Trace.conp erra errb)
 
     let ( and* ) = both
 
@@ -66,7 +66,7 @@ module Make (Trace : Traced_sigs.Trace.S) :
   module Lwt_traced_result_syntax = struct
     include Lwt_result_syntax
 
-    let (fail[@ocaml.inline "always"]) = fun e -> fail (Trace.make e)
+    let (fail [@ocaml.inline "always"]) = fun e -> fail (Trace.make e)
 
     let join ts =
       let open Lwt_syntax in
@@ -80,7 +80,7 @@ module Make (Trace : Traced_sigs.Trace.S) :
 
     let both a b =
       let open Lwt_syntax in
-      let+ (a, b) = both a b in
+      let+ a, b = both a b in
       Traced_result_syntax.both a b
 
     let ( and* ) = both

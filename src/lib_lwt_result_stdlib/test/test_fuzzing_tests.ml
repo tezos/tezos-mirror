@@ -724,7 +724,7 @@ end) : Test = struct
         (Format.asprintf "%s.fold_left_map, Stdlib.List.fold_left_map" M.name)
       (triple accum one many)
       (fun (Fun (_, fn), init, input) ->
-        let (a, xs) = M.fold_left_map (FoldOf.fn fn) init (M.of_list input) in
+        let a, xs = M.fold_left_map (FoldOf.fn fn) init (M.of_list input) in
         eq (a, xs) (with_stdlib_fold_left_map (fn, init, input)))
 
   let fold_left_map_e =
@@ -1793,7 +1793,7 @@ end) : Test = struct
            in
            !acc)
           (let acc = ref init in
-           let (leftright, leftovers) =
+           let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            M.iter (uncurry @@ Iter2Of.fn acc fn) leftright ;
@@ -1816,7 +1816,7 @@ end) : Test = struct
            in
            !acc)
           (let acc = ref init in
-           let (leftright, leftovers) =
+           let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* () = M.iter_e (uncurry @@ Iter2EOf.fn_e acc fn) leftright in
@@ -1839,7 +1839,7 @@ end) : Test = struct
            in
            !acc)
           (let acc = ref init in
-           let (leftright, leftovers) =
+           let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let*! () = M.iter_s (uncurry @@ Iter2SOf.fn_s acc fn) leftright in
@@ -1862,7 +1862,7 @@ end) : Test = struct
            in
            !acc)
           (let acc = ref init in
-           let (leftright, leftovers) =
+           let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* () = M.iter_es (uncurry @@ Iter2ESOf.fn_e acc fn) leftright in
@@ -1881,7 +1881,7 @@ end) : Test = struct
              (Map2Of.fn fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let t = M.map (uncurry @@ Map2Of.fn fn) leftright in
@@ -1899,7 +1899,7 @@ end) : Test = struct
              (Map2EOf.fn_e fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.map_e (uncurry @@ Map2EOf.fn_e fn) leftright in
@@ -1917,7 +1917,7 @@ end) : Test = struct
              (Map2SOf.fn fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.map_s (uncurry @@ Map2SOf.fn fn) leftright in
@@ -1937,7 +1937,7 @@ end) : Test = struct
              (Map2ESOf.fn_e fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.map_es (uncurry @@ Map2ESOf.fn_e fn) leftright in
@@ -1958,7 +1958,7 @@ end) : Test = struct
              (Map2Of.fn fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let t = M.rev_map (uncurry @@ Map2Of.fn fn) leftright in
@@ -1976,7 +1976,7 @@ end) : Test = struct
              (Map2EOf.fn_e fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.rev_map_e (uncurry @@ Map2EOf.fn_e fn) leftright in
@@ -1994,7 +1994,7 @@ end) : Test = struct
              (Map2SOf.fn fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.rev_map_s (uncurry @@ Map2SOf.fn fn) leftright in
@@ -2014,7 +2014,7 @@ end) : Test = struct
              (Map2ESOf.fn_e fn)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.rev_map_es (uncurry @@ Map2ESOf.fn_e fn) leftright in
@@ -2036,7 +2036,7 @@ end) : Test = struct
              init
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let t = M.fold_left (uncurry_l @@ Fold2Of.fn fn) init leftright in
@@ -2055,7 +2055,7 @@ end) : Test = struct
              init
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t =
@@ -2076,7 +2076,7 @@ end) : Test = struct
              init
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t =
@@ -2099,7 +2099,7 @@ end) : Test = struct
              init
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t =
@@ -2212,14 +2212,14 @@ end) : Test = struct
              (Cond2Of.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let t = M.for_all (uncurry @@ Cond2Of.fn pred) leftright in
            match (t, leftovers) with
-           | (false, _) -> Ok false
-           | (true, None) -> Ok true
-           | (true, Some _) -> Error 101))
+           | false, _ -> Ok false
+           | true, None -> Ok true
+           | true, Some _ -> Error 101))
 
   let for_all_e =
     Test.make
@@ -2234,14 +2234,14 @@ end) : Test = struct
              (Cond2EOf.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.for_all_e (uncurry @@ Cond2EOf.fn pred) leftright in
            match (t, leftovers) with
-           | (false, _) -> Ok false
-           | (true, None) -> Ok true
-           | (true, Some _) -> Error 101))
+           | false, _ -> Ok false
+           | true, None -> Ok true
+           | true, Some _ -> Error 101))
 
   let for_all_s =
     Test.make
@@ -2256,14 +2256,14 @@ end) : Test = struct
              (Cond2SOf.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let+ t = M.for_all_s (uncurry @@ Cond2SOf.fn pred) leftright in
            match (t, leftovers) with
-           | (false, _) -> Ok false
-           | (true, None) -> Ok true
-           | (true, Some _) -> Error 101))
+           | false, _ -> Ok false
+           | true, None -> Ok true
+           | true, Some _ -> Error 101))
 
   let for_all_es =
     Test.make
@@ -2277,14 +2277,14 @@ end) : Test = struct
              (Cond2ESOf.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.for_all_es (uncurry @@ Cond2ESOf.fn pred) leftright in
            match (t, leftovers) with
-           | (false, _) -> Lwt.return_ok false
-           | (true, None) -> Lwt.return_ok true
-           | (true, Some _) -> Lwt.return_error 101))
+           | false, _ -> Lwt.return_ok false
+           | true, None -> Lwt.return_ok true
+           | true, Some _ -> Lwt.return_error 101))
 
   let tests_for_all = [for_all; for_all_e; for_all_s; for_all_es]
 
@@ -2300,14 +2300,14 @@ end) : Test = struct
              (Cond2Of.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let t = M.exists (uncurry @@ Cond2Of.fn pred) leftright in
            match (t, leftovers) with
-           | (true, _) -> Ok true
-           | (false, None) -> Ok false
-           | (false, Some _) -> Error 101))
+           | true, _ -> Ok true
+           | false, None -> Ok false
+           | false, Some _ -> Error 101))
 
   let exists_e =
     Test.make
@@ -2322,14 +2322,14 @@ end) : Test = struct
              (Cond2EOf.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.exists_e (uncurry @@ Cond2EOf.fn pred) leftright in
            match (t, leftovers) with
-           | (true, _) -> Ok true
-           | (false, None) -> Ok false
-           | (false, Some _) -> Error 101))
+           | true, _ -> Ok true
+           | false, None -> Ok false
+           | false, Some _ -> Error 101))
 
   let exists_s =
     Test.make
@@ -2344,14 +2344,14 @@ end) : Test = struct
              (Cond2SOf.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let+ t = M.exists_s (uncurry @@ Cond2SOf.fn pred) leftright in
            match (t, leftovers) with
-           | (true, _) -> Ok true
-           | (false, None) -> Ok false
-           | (false, Some _) -> Error 101))
+           | true, _ -> Ok true
+           | false, None -> Ok false
+           | false, Some _ -> Error 101))
 
   let exists_es =
     Test.make
@@ -2365,14 +2365,14 @@ end) : Test = struct
              (Cond2ESOf.fn pred)
              (M.of_list left)
              (M.of_list right))
-          (let (leftright, leftovers) =
+          (let leftright, leftovers =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
            let* t = M.exists_es (uncurry @@ Cond2ESOf.fn pred) leftright in
            match (t, leftovers) with
-           | (true, _) -> Lwt.return_ok true
-           | (false, None) -> Lwt.return_ok false
-           | (false, Some _) -> Lwt.return_error 101))
+           | true, _ -> Lwt.return_ok true
+           | false, None -> Lwt.return_ok false
+           | false, Some _ -> Lwt.return_error 101))
 
   let tests_exists = [exists; exists_e; exists_s; exists_es]
 

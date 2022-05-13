@@ -178,7 +178,7 @@ let commands () =
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
       (fun (show_types, emacs_mode, no_print_source, original_gas) program cctxt ->
         match program with
-        | (program, []) ->
+        | program, [] ->
             resolve_max_gas cctxt cctxt#block original_gas
             >>=? fun original_gas ->
             typecheck_program
@@ -201,7 +201,7 @@ let commands () =
               Michelson_v1_emacs.report_errors
               res_with_errors
             >>= fun () -> return_unit
-        | (parsed, errors) ->
+        | parsed, errors ->
             cctxt#message
               "%a"
               (fun ppf () ->
@@ -334,8 +334,7 @@ let commands () =
       no_options
       (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
-      @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param @@ stop)
+      @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
         Client_keys.sign cctxt sk bytes >>=? fun signature ->
         cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->

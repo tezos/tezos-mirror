@@ -334,7 +334,7 @@ module Make (Context : CONTEXT) = struct
     let open Indexable in
     match destruct indexable with
     | Right v -> (
-        let+ (ctxt, created, idx) = get_or_associate_index ctxt v in
+        let+ ctxt, created, idx = get_or_associate_index ctxt v in
         match created with
         | `Existed -> (ctxt, indexes, idx)
         | `Created -> (ctxt, add_index indexes (v, idx), idx))
@@ -428,7 +428,7 @@ module Make (Context : CONTEXT) = struct
         * Bls_signature.pk)
         m =
      fun ctxt indexes op ->
-      let* (ctxt, indexes, pk, idx) =
+      let* ctxt, indexes, pk, idx =
         match Indexable.destruct op.signer with
         | Left signer_index ->
             (* Get the public key from the index. *)
@@ -439,7 +439,7 @@ module Make (Context : CONTEXT) = struct
         | Right (Bls_pk signer_pk) -> (
             (* Initialize the ctxt with public_key if it's necessary. *)
             let addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
-            let* (ctxt, created, idx) =
+            let* ctxt, created, idx =
               Address_index.get_or_associate_index ctxt addr
             in
 
@@ -515,10 +515,10 @@ module Make (Context : CONTEXT) = struct
         | Some buf -> return buf
         | None -> fail Invalid_transaction_encoding
       in
-      let* (ctxt, indexes, transmitted, _, rev_ops) =
+      let* ctxt, indexes, transmitted, _, rev_ops =
         list_fold_left_m
           (fun (ctxt, indexes, transmitted, signers, ops) op ->
-            let* (ctxt, indexes, op, pk) =
+            let* ctxt, indexes, op, pk =
               operation_with_signer_index ctxt indexes op
             in
             let compare x y =
@@ -546,13 +546,13 @@ module Make (Context : CONTEXT) = struct
         ('signer, 'content) t ->
         (ctxt * indexes * (Indexable.index_only, 'content) t) m =
      fun ctxt ({contents = transactions; aggregated_signature} as batch) ->
-      let* (ctxt, indexes, transmitted, rev_new_transactions) =
+      let* ctxt, indexes, transmitted, rev_new_transactions =
         list_fold_left_m
           (fun (ctxt, indexes, transmitted, new_transactions) transaction ->
             (* To check the signature, we need the list of [buf] each signer
                signed. That is, the [buf] is the binary encoding of the
                [transaction]. *)
-            let* (ctxt, indexes, transmitted, transaction) =
+            let* ctxt, indexes, transmitted, transaction =
               check_transaction ctxt indexes transmitted transaction
             in
             return (ctxt, indexes, transmitted, transaction :: new_transactions))
@@ -603,10 +603,10 @@ module Make (Context : CONTEXT) = struct
           let withdrawal = Tx_rollup_withdraw.{claimer; ticket_hash; amount} in
           return (ctxt, indexes, Some withdrawal)
       | Transfer {destination; ticket_hash; qty} ->
-          let* (ctxt, indexes, dest_idx) =
+          let* ctxt, indexes, dest_idx =
             address_index ctxt indexes destination
           in
-          let* (ctxt, indexes, tidx) = ticket_index ctxt indexes ticket_hash in
+          let* ctxt, indexes, tidx = ticket_index ctxt indexes ticket_hash in
           let source_idx = address_of_signer_index source_idx in
           let* ctxt = transfer ctxt source_idx dest_idx tidx qty in
           return (ctxt, indexes, None)
@@ -636,10 +636,10 @@ module Make (Context : CONTEXT) = struct
      fun ctxt indexes {signer; counter; contents} ->
       (* Before applying any operation, we check the counter *)
       let* () = check_counter ctxt signer counter in
-      let* (ctxt, indexes, rev_withdrawals) =
+      let* ctxt, indexes, rev_withdrawals =
         list_fold_left_m
           (fun (ctxt, indexes, withdrawals) content ->
-            let* (ctxt, indexes, withdrawal_opt) =
+            let* ctxt, indexes, withdrawal_opt =
               apply_operation_content ctxt indexes signer content
             in
             return (ctxt, indexes, Option.to_list withdrawal_opt @ withdrawals))
@@ -664,7 +664,7 @@ module Make (Context : CONTEXT) = struct
         match ops with
         | [] -> return (ctxt, prev_indexes, Transaction_success, withdrawals)
         | op :: rst ->
-            let* (ctxt, indexes, status, withdrawals) =
+            let* ctxt, indexes, status, withdrawals =
               catch
                 (apply_operation ctxt prev_indexes op)
                 (fun (ctxt, indexes, op_withdrawals) ->
@@ -705,12 +705,12 @@ module Make (Context : CONTEXT) = struct
         (Indexable.unknown, Indexable.unknown) t ->
         (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.t list) m =
      fun ctxt parameters batch ->
-      let* (ctxt, indexes, batch) = check_signature ctxt batch in
+      let* ctxt, indexes, batch = check_signature ctxt batch in
       let {contents; _} = batch in
-      let* (ctxt, indexes, rev_results, withdrawals) =
+      let* ctxt, indexes, rev_results, withdrawals =
         list_fold_left_m
           (fun (prev_ctxt, prev_indexes, results, withdrawals) transaction ->
-            let* (new_ctxt, new_indexes, status, transaction_withdrawals) =
+            let* new_ctxt, new_indexes, status, transaction_withdrawals =
               apply_transaction prev_ctxt prev_indexes transaction
             in
             let* new_ctxt = update_counters new_ctxt status transaction in
@@ -741,10 +741,10 @@ module Make (Context : CONTEXT) = struct
       (ctxt * deposit_result * Tx_rollup_withdraw.t option) m =
    fun initial_ctxt Tx_rollup_message.{sender; destination; ticket_hash; amount} ->
     let apply_deposit () =
-      let* (ctxt, indexes, aidx) =
+      let* ctxt, indexes, aidx =
         address_index initial_ctxt empty_indexes destination
       in
-      let* (ctxt, indexes, tidx) =
+      let* ctxt, indexes, tidx =
         ticket_index ctxt indexes Indexable.(value ticket_hash)
       in
       let* ctxt = deposit ctxt aidx tidx amount in
@@ -768,7 +768,7 @@ module Make (Context : CONTEXT) = struct
     let open Tx_rollup_message in
     match msg with
     | Deposit deposit ->
-        let* (ctxt, result, withdrawl_opt) = apply_deposit ctxt deposit in
+        let* ctxt, result, withdrawl_opt = apply_deposit ctxt deposit in
         return (ctxt, (Deposit_result result, Option.to_list withdrawl_opt))
     | Batch str -> (
         let batch =
@@ -776,7 +776,7 @@ module Make (Context : CONTEXT) = struct
         in
         match batch with
         | Some (V1 batch) ->
-            let* (ctxt, result, withdrawals) =
+            let* ctxt, result, withdrawals =
               Batch_V1.apply_batch ctxt parameters batch
             in
             return (ctxt, (Batch_V1_result result, withdrawals))

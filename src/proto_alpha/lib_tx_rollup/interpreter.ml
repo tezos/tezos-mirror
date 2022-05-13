@@ -50,7 +50,7 @@ let () =
     the proof size boundaries. *)
 let interpret_message ~rejection_max_proof_size ctxt l2_parameters message =
   let open Lwt_result_syntax in
-  let* (proof, res) = Prover_apply.apply_message ctxt l2_parameters message in
+  let* proof, res = Prover_apply.apply_message ctxt l2_parameters message in
   let proof_size = Prover_apply.proof_size proof in
   let result =
     if proof_size > rejection_max_proof_size then
@@ -69,20 +69,20 @@ let interpret_messages ~rejection_max_proof_size ctxt l2_parameters messages =
   let open Lwt_result_syntax in
   let ctxt_hash = Context.hash ctxt in
   let* tree_hash = Context.tree_hash_of_context ctxt in
-  let+ (ctxt, _ctxt_hash, _tree_hash, rev_contents) =
+  let+ ctxt, _ctxt_hash, _tree_hash, rev_contents =
     List.fold_left_es
       (fun (ctxt, ctxt_hash, tree_hash, acc) message ->
-        let* (tree, result) =
+        let* tree, result =
           interpret_message ~rejection_max_proof_size ctxt l2_parameters message
         in
-        let* (ctxt, ctxt_hash, tree_hash) =
+        let* ctxt, ctxt_hash, tree_hash =
           match result with
           | Inbox.Interpreted _ ->
               (* The message was successfully interpreted but the status in
                  [result] may indicate that the application failed. The context
                  may have been modified with e.g. updated counters. *)
               let tree_hash = Context.hash_tree tree in
-              let*! (ctxt, ctxt_hash) = Context.add_tree ctxt tree in
+              let*! ctxt, ctxt_hash = Context.add_tree ctxt tree in
               return (ctxt, ctxt_hash, tree_hash)
           | Inbox.Discarded _ ->
               (* The message was discarded before attempting to interpret it. The
@@ -115,10 +115,10 @@ let interpret_batch ~rejection_max_proof_size ctxt l2_parameters batch =
       Protocol.Tx_rollup_l2_batch.encoding
       batch
   in
-  let (message, _) =
+  let message, _ =
     Protocol.Alpha_context.Tx_rollup_message.make_batch batch_bytes
   in
-  let* (_tree, result) =
+  let* _tree, result =
     interpret_message ~rejection_max_proof_size ctxt l2_parameters message
   in
   match result with Inbox.Discarded trace -> fail trace | _ -> return ()

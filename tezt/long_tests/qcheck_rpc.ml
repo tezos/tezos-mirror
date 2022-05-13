@@ -28,7 +28,7 @@
    Component: Node
    Invocation: dune exec tezt/long_tests/main.exe -- --file qcheck_rpc.ml
    Subject: Property testing the RPC server
-  *)
+*)
 
 (*
    {0 Description}
@@ -63,7 +63,7 @@ let protocol = Protocol.Alpha
 
    Note: this is not exhaustive; it includes the inputs
    that are easy to generate (e.g., excluding a ["sapling_state_id"])
- *)
+*)
 type path_input =
   | Chain_ID
   | Block_hash
@@ -287,7 +287,7 @@ module RPC_Index = struct
     let proto_url = url_prefix ^ "chains/main/blocks/head?recurse=yes" in
     let mempool_url = url_prefix ^ "chains/main/mempool?recurse=yes" in
     let urls = [shell_url; proto_url; mempool_url] in
-    let* (envs, endpts) = Lwt.(get_endpoints port urls >|= List.split) in
+    let* envs, endpts = Lwt.(get_endpoints port urls >|= List.split) in
     let env = Convert.merge_env_list envs in
     return @@ parse_endpoints env endpts
 end
@@ -340,9 +340,9 @@ module Gen = struct
 
   let rec take n xs : 'a list =
     match (n, xs) with
-    | (0, _) -> []
-    | (_, []) -> []
-    | (n, y :: ys) -> y :: take (n - 1) ys
+    | 0, _ -> []
+    | _, [] -> []
+    | n, y :: ys -> y :: take (n - 1) ys
 
   let pick_some_elems xs : 'a list t =
     let open QCheck.Gen in
@@ -497,7 +497,7 @@ module Test = struct
     (* Log description of RPC *)
     let () = Log.info "%s\n\n" rpc_description.description in
     (* Start node and client *)
-    let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+    let* node, client = Client.init_with_protocol `Client ~protocol () in
     (* Generate and test instances *)
     let* () =
       rpc_description |> Gen.instance_gen

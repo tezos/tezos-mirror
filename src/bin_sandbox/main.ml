@@ -42,7 +42,7 @@ module Small_utilities = struct
   let netstat_ports ~pp_error () =
     let open Cmdliner in
     let open Term in
-    let (term, info) =
+    let term, info =
       Test_command_line.Run_command.make
         ~pp_error
         (const (fun state ->

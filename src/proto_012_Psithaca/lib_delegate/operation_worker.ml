@@ -241,7 +241,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
 
 let make_initial_state ?(monitor_node_operations = true) () =
   let qc_event_stream =
-    let (stream, push) = Lwt_stream.create () in
+    let stream, push = Lwt_stream.create () in
     {stream; push}
   in
   let canceler = Lwt_canceler.create () in
@@ -280,7 +280,7 @@ let update_monitoring ?(should_lock = true) state ops =
            _;
          } as proposal_watched)) ->
       let preendorsements = Operation_pool.filter_preendorsements ops in
-      let (preendorsements_count, voting_power) =
+      let preendorsements_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.preendorsement Operation.t) ->
             let {
@@ -340,7 +340,7 @@ let update_monitoring ?(should_lock = true) state ops =
            _;
          } as proposal_watched)) ->
       let endorsements = Operation_pool.filter_endorsements ops in
-      let (endorsements_count, voting_power) =
+      let endorsements_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.endorsement Operation.t) ->
             let {

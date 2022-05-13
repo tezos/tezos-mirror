@@ -37,8 +37,8 @@ include Compare.Make (struct
 
   let compare l1 l2 =
     match (l1, l2) with
-    | (Contract k1, Contract k2) -> Contract_repr.compare k1 k2
-    | (Tx_rollup k1, Tx_rollup k2) -> Tx_rollup_repr.compare k1 k2
+    | Contract k1, Contract k2 -> Contract_repr.compare k1 k2
+    | Tx_rollup k1, Tx_rollup k2 -> Tx_rollup_repr.compare k1 k2
     (* This function is used by the Michelson interpreter to compare
        addresses. It is of significant importance to remember that in
        Michelson, address comparison is used to distinguish between
@@ -46,8 +46,8 @@ include Compare.Make (struct
        KT1 < others], which the two following lines ensure. The
        wildcards are therefore here for a reason, and should not be
        modified when new constructors are added to [t]. *)
-    | (Contract _, _) -> -1
-    | (_, Contract _) -> 1
+    | Contract _, _ -> -1
+    | _, Contract _ -> 1
 end)
 
 let to_b58check = function

@@ -534,14 +534,14 @@ let get_script c contract =
   Storage.Contract.Code.find c contract >>=? fun (c, code) ->
   Storage.Contract.Storage.find c contract >>=? fun (c, storage) ->
   match (code, storage) with
-  | (None, None) -> return (c, None)
-  | (Some code, Some storage) -> return (c, Some {Script_repr.code; storage})
-  | (None, Some _) | (Some _, None) -> failwith "get_script"
+  | None, None -> return (c, None)
+  | Some code, Some storage -> return (c, Some {Script_repr.code; storage})
+  | None, Some _ | Some _, None -> failwith "get_script"
 
 let get_storage ctxt contract =
   Storage.Contract.Storage.find ctxt contract >>=? function
-  | (ctxt, None) -> return (ctxt, None)
-  | (ctxt, Some storage) ->
+  | ctxt, None -> return (ctxt, None)
+  | ctxt, Some storage ->
       Raw_context.consume_gas ctxt (Script_repr.force_decode_cost storage)
       >>?= fun ctxt ->
       Script_repr.force_decode storage >>?= fun storage ->

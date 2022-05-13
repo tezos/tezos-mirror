@@ -107,7 +107,6 @@ end
    A module of this signature is typically obtained through an adapter
    (see Lift functors in environment definitions) of the Main module
    (which complies with the [Updater] signature).
-
 *)
 module type PROTOCOL = sig
   include

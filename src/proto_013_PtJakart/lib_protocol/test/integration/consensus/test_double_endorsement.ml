@@ -50,7 +50,7 @@ let block_fork b =
 (****************************************************************)
 
 let get_first_2_accounts_contracts contracts =
-  let ((contract1, account1), (contract2, account2)) =
+  let (contract1, account1), (contract2, account2) =
     match contracts with
     | [a1; a2] ->
         ( ( a1,
@@ -74,7 +74,7 @@ let order_endorsements ~correct_order op1 op2 =
   else (op1, op2)
 
 let double_endorsement ctxt ?(correct_order = true) op1 op2 =
-  let (e1, e2) = order_endorsements ~correct_order op1 op2 in
+  let e1, e2 = order_endorsements ~correct_order op1 op2 in
   Op.double_endorsement ctxt e1 e2
 
 (** This test verifies that when a "cheater" double endorses and
@@ -252,7 +252,7 @@ let test_different_delegates () =
   Context.get_endorser (B blk_a) >>=? fun (endorser_a, a_slots) ->
   Context.get_first_different_endorsers (B blk_b)
   >>=? fun (endorser_b1c, endorser_b2c) ->
-  let (endorser_b, b_slots) =
+  let endorser_b, b_slots =
     if Signature.Public_key_hash.( = ) endorser_a endorser_b1c.delegate then
       (endorser_b2c.delegate, endorser_b2c.slots)
     else (endorser_b1c.delegate, endorser_b1c.slots)
@@ -290,7 +290,7 @@ let test_wrong_delegate () =
   >>=? fun endorsement_a ->
   Context.get_endorser_n (B blk_b) 0 >>=? fun (endorser0, slots0) ->
   Context.get_endorser_n (B blk_b) 1 >>=? fun (endorser1, slots1) ->
-  let (endorser_b, b_slots) =
+  let endorser_b, b_slots =
     if Signature.Public_key_hash.equal endorser_a endorser0 then
       (endorser1, slots1)
     else (endorser0, slots0)
@@ -363,7 +363,7 @@ let test_freeze_more_with_low_balance =
       }
     in
     Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-    let ((_contract1, account1), (_contract2, account2)) =
+    let (_contract1, account1), (_contract2, account2) =
       get_first_2_accounts_contracts contracts
     in
     (* we empty the available balance of [account1]. *)

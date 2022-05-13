@@ -99,7 +99,7 @@ let tezos_reorg state ~old_head_hash ~new_head_hash =
       let old_level = old_head.header.shell.level in
       let new_level = new_head.header.shell.level in
       let diff = Int32.sub new_level old_level in
-      let (old_chain, new_chain, old, new_) =
+      let old_chain, new_chain, old, new_ =
         if diff = 0l then
           (* Heads at same level *)
           let new_chain = new_head :: new_chain in
@@ -212,14 +212,14 @@ let rollup_reorg state ~old_head ~new_head =
   in
   let rec loop old_chain new_chain old_head new_head =
     match (old_head, new_head) with
-    | (None, _) | (_, None) ->
+    | None, _ | _, None ->
         return
           {
             ancestor = None;
             old_chain = List.rev old_chain;
             new_chain = List.rev new_chain;
           }
-    | (Some old_head, Some new_head) ->
+    | Some old_head, Some new_head ->
         if L2block.Hash.(old_head.L2block.hash = new_head.L2block.hash) then
           return
             {
@@ -233,7 +233,7 @@ let rollup_reorg state ~old_head ~new_head =
               old_head.L2block.header.level
               new_head.L2block.header.level
           in
-          let* (old_chain, new_chain, old, new_) =
+          let* old_chain, new_chain, old, new_ =
             if diff = 0l then
               (* Heads at same level *)
               let new_chain = new_head :: new_chain in
@@ -392,7 +392,7 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
   let*! stores =
     Stores.init ~data_dir ~readonly ~blocks_cache_size:l2_blocks_cache_size
   in
-  let* (rollup_info, context_index) =
+  let* rollup_info, context_index =
     both
       (init_rollup_info stores ?origination_level rollup_id)
       (init_context ~data_dir)
