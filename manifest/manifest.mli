@@ -763,8 +763,8 @@ val private_exes : string list maker
 
 (** Register and return an internal test.
 
-    - [runtest]: if true, setup runtest aliases for the given
-      test. If unspecified, [runtest] is set true.
+    - [alias]: if non-empty, an alias is set up for the given test, named [alias].
+      Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
 
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.
@@ -775,16 +775,16 @@ val private_exes : string list maker
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
 val test :
+  ?alias:string ->
   ?dep_files:string list ->
   ?dep_globs:string list ->
-  ?runtest:bool ->
   string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
 val tests :
+  ?alias:string ->
   ?dep_files:string list ->
   ?dep_globs:string list ->
-  ?runtest:bool ->
   string list maker
 
 (** Make an external vendored library, for use in internal target dependencies.

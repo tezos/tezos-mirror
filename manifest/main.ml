@@ -1276,7 +1276,7 @@ let _tezos_tooling_opam_file_format =
 let _tezos_tooling_opam_lint =
   test
     "opam_lint"
-    ~runtest:false
+    ~alias:""
     ~path:"src/tooling/opam-lint"
     ~opam:"tezos-tooling"
     ~deps:[_tezos_tooling_opam_file_format; unix]
@@ -1332,7 +1332,7 @@ let _tezos_p2p_tests =
         astring;
       ]
     ~linkall:true
-    ~runtest:false
+    ~alias:""
     ~dune:
       Dune.(
         (* At the termination of the tests, or if an unexpected
@@ -3167,7 +3167,7 @@ end = struct
           "main"
           ~path:(path // "lib_protocol/test/unit")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
-          ~runtest:false
+          ~alias:""
           ~deps:
             [
               tezos_base |> open_ ~m:"TzPervasives"
@@ -3936,7 +3936,7 @@ include Tezos_raw_protocol_%s.Main
       some_if (active && N.(number >= 013)) @@ fun () ->
       test
         "tenderbrute_main"
-        ~runtest:false
+        ~alias:""
         ~path:(path // "lib_delegate/test/tenderbrute")
         ~opam:(sf "tezos-baking-%s" name_dash)
         ~deps:
@@ -4347,7 +4347,7 @@ include Tezos_raw_protocol_%s.Main
             alcotest_lwt;
             prbnmcn_stats;
           ]
-        ~runtest:false
+        ~alias:""
         ~dune:
           Dune.
             [
@@ -4519,7 +4519,7 @@ let _tezos_store_tests =
         tezos_test_helpers;
         tezos_test_helpers_extra;
       ]
-    ~runtest:false
+    ~alias:""
     ~dune:
       (* [test_slow_manual] is a very long test, running a huge
          combination of tests that are useful for local testing for a
