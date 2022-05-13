@@ -1,15 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
  (name main)
- (libraries str
-            tezt-tezos
-            data-encoding
-            tezos-base
-            tezos-base.unix
-            tezos-stdlib-unix
-            tezos-protocol-alpha)
+ (libraries
+  tezt
+  str
+  tezt-tezos
+  data-encoding
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  tezos-protocol-alpha)
  (flags
-  (:standard
-   -open Tezt
-   -open Tezt_tezos
-   -open Tezt_tezos.Runnable.Syntax
-   -open Tezt.Base)))
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax))

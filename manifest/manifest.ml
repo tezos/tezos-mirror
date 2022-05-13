@@ -1536,6 +1536,71 @@ let if_ condition target = if condition then target else None
 
 type release = {version : string; url : Opam.url}
 
+type tezt_target = {
+  opam : string;
+  deps : target list;
+  dep_globs : string list;
+  modules : string list;
+}
+
+let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
+
+let tezt ~opam ~path ?(deps = []) ?(dep_globs = []) modules =
+  if String_map.mem path !tezt_targets_by_path then
+    invalid_arg
+      ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
+  let tezt_target = {opam; deps; dep_globs; modules} in
+  tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
+
+let register_tezt_targets ~make_tezt_exe =
+  let tezt_test_libs = ref [] in
+  let register_path path {opam; deps; dep_globs; modules} =
+    let path_with_underscores =
+      String.map (function '-' | '/' -> '_' | c -> c) path
+    in
+    let lib =
+      (* [linkall] is used to ensure that the test executable is linked with
+         [module_name] and [tezt]. *)
+      Target.private_lib
+        (path_with_underscores ^ "_tezt_lib")
+        ~path
+        ~opam:""
+        ~deps
+        ~modules
+        ~linkall:true
+    in
+    tezt_test_libs := lib :: !tezt_test_libs ;
+    let exe_name = "main" in
+    let _exe =
+      (* Alias is "runtezt" and not "runtest" to make sure that the test is
+         not run in the CI twice (once with [dune @src/.../runtest] and once
+         with [dune exec tezt/tests/main.exe]). *)
+      Target.test
+        exe_name
+        ~alias:"runtezt"
+        ~path
+        ~opam
+        ~deps:[lib]
+        ~dep_globs
+        ~modules:[exe_name]
+        ~dune:
+          Dune.
+            [
+              targets_rule
+                [exe_name ^ ".ml"]
+                ~action:
+                  [
+                    S "with-stdout-to";
+                    S "%{targets}";
+                    [S "echo"; S "let () = Tezt.Test.run ()"];
+                  ];
+            ]
+    in
+    ()
+  in
+  String_map.iter register_path !tezt_targets_by_path ;
+  make_tezt_exe !tezt_test_libs
+
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
@@ -2721,9 +2786,10 @@ let generate_opam_ci () =
            delayed_by
            package_name)
 
-let generate () =
+let generate ~make_tezt_exe =
   Printexc.record_backtrace true ;
   try
+    register_tezt_targets ~make_tezt_exe ;
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;

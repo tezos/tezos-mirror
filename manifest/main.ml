@@ -24,6 +24,12 @@
 (*****************************************************************************)
 
 open Manifest
+
+let tezt_without_tezt_lib_dependency = tezt
+
+(* Prevent using [tezt] until we define [tezt_lib]. *)
+let tezt = () [@@warning "-unused-value-declaration"]
+
 module V = Version
 
 let sf = Printf.sprintf
@@ -2655,6 +2661,15 @@ let tezt_lib =
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm]
 
+let tezt ~opam ~path ?(deps = []) ?dep_globs l =
+  tezt_without_tezt_lib_dependency
+    ~opam
+    ~path
+    ~deps:((tezt_lib |> open_ |> open_ ~m:"Base") :: deps)
+    ?dep_globs
+    l
+  [@@warning "-unused-value-declaration"]
+
 let tezt_performance_regression =
   public_lib
     "tezt-performance-regression"
@@ -5056,12 +5071,29 @@ let exclude filename =
   | "tezt" :: "records" :: _ -> true
   | "tezt" :: "remote_tests" :: _ -> true
   | "tezt" :: "snoop" :: _ -> true
-  | "tezt" :: "tests" :: _ -> true
   | "tezt" :: "vesting_contract_test" :: _ -> true
   | _ -> false
 
-(* Generate dune and opam files. *)
-let () = generate ()
+let () =
+  (* [make_tezt_exe] makes the global executable that contains all tests.
+     [generate] gives it the list of libraries that register Tezt tests
+     so that it can link all of them. *)
+  let make_tezt_exe test_libs =
+    let deps =
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        str;
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        data_encoding;
+        tezos_base;
+        tezos_base_unix;
+        tezos_stdlib_unix;
+        Protocol.(main alpha);
+      ]
+    in
+    test "main" ~alias:"" ~path:"tezt/tests" ~opam:"" ~deps:(deps @ test_libs)
+  in
+  generate ~make_tezt_exe
 
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =

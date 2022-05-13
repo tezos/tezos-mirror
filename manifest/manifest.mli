@@ -787,6 +787,33 @@ val tests :
   ?dep_globs:string list ->
   string list maker
 
+(** Register a Tezt test.
+
+    Usage: [tezt module_names]
+
+    This declares:
+    - a library [PACKAGE_tezt_lib] in [path] where [PACKAGE] is the name of the
+      opam package denoted by [opam];
+    - an executable [main] in [path] that links with [PACKAGE_tezt_lib]
+      and runs [Tezt.Test.run].
+
+    [module_names] is the list of modules to link in [PACKAGE_tezt_lib].
+    Those should be files in [path] that call [Tezt.Test.register].
+
+    Note that a wrapper in [main.ml] adds a dependency to the [tezt] library
+    and [-open]s modules [Tezt] and [Tezt.Base] when compiling [module_names].
+
+    Additionally, the library [PACKAGE_tezt_lib] is also linked in [tezt/tests/main.exe]
+    so that this executable can be used to run all tests with auto-balancing
+    and other Tezt features. *)
+val tezt :
+  opam:string ->
+  path:string ->
+  ?deps:target list ->
+  ?dep_globs:string list ->
+  string list ->
+  unit
+
 (** Make an external vendored library, for use in internal target dependencies.
 
     [main_module] is the name of the main module provided by the library (see [open_]).
@@ -952,8 +979,11 @@ val name_for_errors : target -> string
 (** Generate dune and opam files.
 
     Call this after you declared all your targets with functions such as
-    [public_lib], [test], etc. *)
-val generate : unit -> unit
+    [public_lib], [test], etc.
+
+    [make_tezt_exe] is given the list of libraries that register Tezt tests
+    and shall create a test executable that links all of them. *)
+val generate : make_tezt_exe:(target list -> target) -> unit
 
 (** Run various checks.
 
