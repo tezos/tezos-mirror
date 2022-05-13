@@ -297,52 +297,50 @@ end = struct
       let open Lwt_syntax in
       let i = i + 1 in
       if i mod 5000 = 0 then Format.printf "%d@." i ;
-      match P.Contract.is_implicit contract with
-      | Some _key_hash -> Lwt.return (m, i)
-      | None -> (
-          let* code_opt =
-            Storage_helpers.get_lazy_expr
-              ~what:"contract code"
-              ~getter:P.Contract.get_code
-              ~pp:P.Contract.pp
-              ctxt
-              contract
-          in
-          match code_opt with
-          | None -> Lwt.return (m, i) (* Should not happen *)
-          | Some code ->
-              let+ add_storage =
-                if Config.(collect_lambdas || collect_storage) then
-                  let+ storage_opt =
-                    Storage_helpers.get_lazy_expr
-                      ~what:"contract storage"
-                      ~getter:P.Contract.get_storage
-                      ~pp:P.Contract.pp
-                      ctxt
-                      contract
+      if P.Contract.is_implicit contract then Lwt.return (m, i)
+      else
+        let* code_opt =
+          Storage_helpers.get_lazy_expr
+            ~what:"contract code"
+            ~getter:P.Contract.get_code
+            ~pp:P.Contract.pp
+            ctxt
+            contract
+        in
+        match code_opt with
+        | None -> Lwt.return (m, i) (* Should not happen *)
+        | Some code ->
+            let+ add_storage =
+              if Config.(collect_lambdas || collect_storage) then
+                let+ storage_opt =
+                  Storage_helpers.get_lazy_expr
+                    ~what:"contract storage"
+                    ~getter:P.Contract.get_storage
+                    ~pp:P.Contract.pp
+                    ctxt
+                    contract
+                in
+                match storage_opt with
+                | None -> fun x -> x
+                | Some storage ->
+                    let key = hash_expr storage in
+                    fun storages -> ExprMap.add key storage storages
+              else Lwt.return (fun x -> x)
+            in
+            let key = hash_expr code in
+            ( ExprMap.update
+                key
+                (fun existing ->
+                  let contracts, storages =
+                    match existing with
+                    | Some (_code, contracts, storages) -> (contracts, storages)
+                    | None -> ([], ExprMap.empty)
                   in
-                  match storage_opt with
-                  | None -> fun x -> x
-                  | Some storage ->
-                      let key = hash_expr storage in
-                      fun storages -> ExprMap.add key storage storages
-                else Lwt.return (fun x -> x)
-              in
-              let key = hash_expr code in
-              ( ExprMap.update
-                  key
-                  (fun existing ->
-                    let contracts, storages =
-                      match existing with
-                      | Some (_code, contracts, storages) ->
-                          (contracts, storages)
-                      | None -> ([], ExprMap.empty)
-                    in
-                    let contracts = contract :: contracts in
-                    let storages = add_storage storages in
-                    Some (code, contracts, storages))
-                  m,
-                i ))
+                  let contracts = contract :: contracts in
+                  let storages = add_storage storages in
+                  Some (code, contracts, storages))
+                m,
+              i )
   end
 
   let big_map_fold :

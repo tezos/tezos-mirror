@@ -42,8 +42,8 @@ module Proto = struct
     let pp = Contract_repr.pp
 
     let is_implicit = function
-      | Contract_repr.Implicit pkh -> Some pkh
-      | Contract_repr.Originated _ -> None
+      | Contract_repr.Implicit _ -> true
+      | Contract_repr.Originated _ -> false
 
     let get_code ctxt contract =
       Lwt.map wrap_tzresult @@ Storage.Contract.Code.get ctxt contract

@@ -67,7 +67,7 @@ module type PROTOCOL = sig
   module Contract : sig
     type repr
 
-    val is_implicit : repr -> Signature.Public_key_hash.t option
+    val is_implicit : repr -> bool
 
     val pp : Format.formatter -> repr -> unit
 
