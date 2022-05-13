@@ -129,6 +129,10 @@ type t = {
      [sc_rollup_commitment_period_in_blocks] to prevent the cost
      of a staker's commitments' storage being greater than their deposit. *)
   sc_rollup_max_lookahead_in_blocks : int32;
+  (* Maximum number of active outbox levels allowed. An outbox level is active
+     if it has an associated record of applied messages. *)
+  sc_rollup_max_active_outbox_levels : int32;
+  sc_rollup_max_outbox_messages_per_level : int;
 }
 
 val encoding : t Data_encoding.encoding

@@ -950,8 +950,7 @@ let prepare_first_block ~level ~timestamp ctxt =
               c.tx_rollup_rejection_max_proof_size;
             tx_rollup_sunset_level = c.tx_rollup_sunset_level;
             sc_rollup_enable = false;
-            (* The following value is chosen to prevent spam. *)
-            sc_rollup_origination_size = 6_314;
+            sc_rollup_origination_size = c.sc_rollup_origination_size;
             sc_rollup_challenge_window_in_blocks = 20_160;
             (* The following value is chosen to limit the maximal
                length of an inbox refutation proof. *)
@@ -967,6 +966,15 @@ let prepare_first_block ~level ~timestamp ctxt =
                + 0 for Staker_count_update entry *)
             sc_rollup_commitment_storage_size_in_bytes = 84;
             sc_rollup_max_lookahead_in_blocks = 30_000l;
+            (* Number of active levels kept for executing outbox messages.
+               WARNING: Changing this value impacts the storage charge for
+               applying messages from the outbox. It also requires migration for
+               remapping existing active outbox levels to new indices. *)
+            sc_rollup_max_active_outbox_levels = 20_160l;
+            (* Maximum number of outbox messages per level.
+               WARNING: changing this value impacts the storage cost charged
+               for applying messages from the outbox. *)
+            sc_rollup_max_outbox_messages_per_level = 100;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)

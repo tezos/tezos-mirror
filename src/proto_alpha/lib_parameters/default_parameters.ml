@@ -29,6 +29,25 @@ open Protocol.Alpha_context
 
 let tx_rollup_finality_period = 40_000
 
+(** The challenge window is about a week with 30s block-time (604800s / 30s).
+    WARNING: changing this value also impacts
+    [sc_rollup_max_active_outbox_levels]. See below. *)
+let sc_rollup_challenge_window_in_blocks = 20_160
+
+(** Number of active levels kept for executing outbox messages.
+
+    WARNING: Changing this value impacts the storage charge for
+    applying messages from the outbox. It also requires migration for
+    remapping existing active outbox levels to new indices. *)
+let sc_rollup_max_active_outbox_levels =
+  Int32.of_int sc_rollup_challenge_window_in_blocks
+
+(** Maximum number of outbox messages per level.
+
+    WARNING: changing this value impacts the storage size a rollup has to
+    pay for at origination time. *)
+let sc_rollup_max_outbox_messages_per_level = 100
+
 let constants_mainnet =
   let consensus_committee_size = 7000 in
   let block_time = 30 in
@@ -150,8 +169,7 @@ let constants_mainnet =
     sc_rollup_enable = false;
     (* The following value is chosen to prevent spam. *)
     sc_rollup_origination_size = 6_314;
-    (* The challenge window is about a week with 30s block-time (604800s / 30s). *)
-    sc_rollup_challenge_window_in_blocks = 20_160;
+    sc_rollup_challenge_window_in_blocks;
     (* The following value is chosen to limit the length of inbox refutation proofs. *)
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
        The follow constants need to be refined. *)
@@ -162,6 +180,8 @@ let constants_mainnet =
     sc_rollup_commitment_period_in_blocks = 30;
     sc_rollup_commitment_storage_size_in_bytes = 84;
     sc_rollup_max_lookahead_in_blocks = 30_000l;
+    sc_rollup_max_active_outbox_levels;
+    sc_rollup_max_outbox_messages_per_level;
   }
 
 let constants_sandbox =

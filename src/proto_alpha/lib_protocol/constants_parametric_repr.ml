@@ -95,6 +95,8 @@ type t = {
   sc_rollup_commitment_period_in_blocks : int;
   sc_rollup_commitment_storage_size_in_bytes : int;
   sc_rollup_max_lookahead_in_blocks : int32;
+  sc_rollup_max_active_outbox_levels : int32;
+  sc_rollup_max_outbox_messages_per_level : int;
 }
 
 let encoding =
@@ -159,7 +161,9 @@ let encoding =
                     c.sc_rollup_stake_amount_in_mutez,
                     c.sc_rollup_commitment_period_in_blocks,
                     c.sc_rollup_commitment_storage_size_in_bytes,
-                    c.sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ))
+                    c.sc_rollup_max_lookahead_in_blocks,
+                    c.sc_rollup_max_active_outbox_levels,
+                    c.sc_rollup_max_outbox_messages_per_level ) ) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -218,7 +222,9 @@ let encoding =
                        sc_rollup_stake_amount_in_mutez,
                        sc_rollup_commitment_period_in_blocks,
                        sc_rollup_commitment_storage_size_in_bytes,
-                       sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ) ->
+                       sc_rollup_max_lookahead_in_blocks,
+                       sc_rollup_max_active_outbox_levels,
+                       sc_rollup_max_outbox_messages_per_level ) ) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -279,6 +285,8 @@ let encoding =
         sc_rollup_commitment_period_in_blocks;
         sc_rollup_commitment_storage_size_in_bytes;
         sc_rollup_max_lookahead_in_blocks;
+        sc_rollup_max_active_outbox_levels;
+        sc_rollup_max_outbox_messages_per_level;
       })
     (merge_objs
        (obj9
@@ -351,7 +359,7 @@ let encoding =
                             (req "tx_rollup_max_ticket_payload_size" int31)
                             (req "tx_rollup_rejection_max_proof_size" int31)
                             (req "tx_rollup_sunset_level" int32)))
-                      (obj8
+                      (obj10
                          (req "sc_rollup_enable" bool)
                          (req "sc_rollup_origination_size" int31)
                          (req "sc_rollup_challenge_window_in_blocks" int31)
@@ -361,4 +369,6 @@ let encoding =
                          (req
                             "sc_rollup_commitment_storage_size_in_bytes"
                             int31)
-                         (req "sc_rollup_max_lookahead_in_blocks" int32))))))))
+                         (req "sc_rollup_max_lookahead_in_blocks" int32)
+                         (req "sc_rollup_max_active_outbox_levels" int32)
+                         (req "sc_rollup_max_outbox_messages_per_level" int31))))))))
