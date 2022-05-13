@@ -114,17 +114,9 @@ echo ']' >> $dummy_opam
 
 # Opam < 2.1 requires opam-depext as a plugin, later versions include it
 # natively:
-extra_warning=""
 case $(opam --version) in
     2.0.* ) opam_depext_dep="opam-depext," ;;
-    * )
-        opam_depext_dep=""
-        extra_warning="
-WARNING you are using opam $(opam --version), your patch
-is potentially removing the opam 2.0.x dependency 'opam-depext', please
-make sure you are not removing it (for instance by editing the patch,
-fixing the resulting merge-request, or re-running with opam 2.0.x)."
-        ;;
+    * )     opam_depext_dep="" ;;
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
@@ -144,13 +136,37 @@ for opam in $opams; do
 done
 rm -r "$tmp_dir"/packages/$dummy_pkg
 
-## Adding safer hashes
-opam admin add-hashes sha256 sha512
-
 ## Generating the diff!
 git remote add tezos $opam_repository_git
 git fetch --depth 1 tezos "$opam_repository_tag"
 git reset "$opam_repository_tag"
+
+## opam.2.1 will try to delete opam-depext, we should restore it.
+if [ ! -d packages/opam-depext ]; then
+    git checkout HEAD -- packages/opam-depext
+fi
+
+## Adding safer hashes
+cp -rf packages packages.bak
+
+# Work around a bug in opam admin 2.1 https://github.com/ocaml/opam/issues/5116,
+# manually add hash for ocaml-base-compiler.
+# This will no longer be necessary after we switch to ocaml.4.14.
+# Indeed, the bug is triggered by the extra-source in
+# https://github.com/ocaml/opam-repository/blob/master/packages/ocaml-base-compiler/ocaml-base-compiler.4.12.0/opam
+# which is not present on 4.14.
+sed 's/"sha256=59de25b95409c1927c4b607fb4b1218ff7623fca45474448c8e114a42853e3ad"/[\n   "sha256=59de25b95409c1927c4b607fb4b1218ff7623fca45474448c8e114a42853e3ad"\n   "sha512=19c7d19be804110e968866b4355871cdeb23bd4d56c18288bc0040d59702b7ee541e8bb6d49f64fa3b5a1232b50821efb50cd17544d3a2d20d760dece69e67c7"]/' -i packages/ocaml-base-compiler/ocaml-base-compiler.4.12.1/opam
+
+opam admin add-hashes sha256 sha512
+
+(cd "$src_dir" && dune build src/tooling/opam-lint/opam_lint.exe)
+for i in $(cd packages && find ./ -name opam);
+do
+    "$src_dir/_build/default/src/tooling/opam-lint/opam_lint.exe" "packages/$i" "packages.bak/$i"
+done
+rm -rf packages.bak
+
+##
 git add packages
 git diff HEAD -- packages > "$target"
 
@@ -158,5 +174,4 @@ echo
 echo "Wrote proposed update in: $target."
 echo 'Please add this patch to: `https://gitlab.com/tezos/opam-repository`'
 echo 'And update accordingly the commit hash in: `.gitlab/ci/templates.yml` and `scripts/version.sh`'
-echo "$extra_warning"
 echo

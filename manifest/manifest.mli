@@ -186,9 +186,15 @@ module Dune : sig
 
   (** Make an [ocamllex] stanza.
 
-      Example: [ocamllex "lexer"] results in [(ocamllex parser)], which tells dune
+      Example: [ocamllex "lexer"] results in [(ocamllex lexer)], which tells dune
       that [lexer.ml] can be obtained from [lexer.mll] using ocamllex. *)
   val ocamllex : string -> s_expr
+
+  (** Make an [ocamlyacc] stanza.
+
+      Example: [ocamlyacc "parser"] results in [(ocamlyacc parser)], which tells dune
+      that [parser.ml] and [parser.mli] can be obtained from [parser.mly] using ocamlyacc. *)
+  val ocamlyacc : string -> s_expr
 
   (** Make an [include] stanza.
 
