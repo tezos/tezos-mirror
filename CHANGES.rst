@@ -34,6 +34,8 @@ Node
 - Added a protocol specific metrics, head_cycle, head_consumed_gas and
   head_round.
 
+- Added a store metric to expose the number of blocks considered as invalid.
+
 Client
 ------
 
