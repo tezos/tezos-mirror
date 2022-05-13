@@ -50,7 +50,7 @@ type caps = cost_caps purposed
 type t = {
   data_dir : string;
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t option;
+  origination_level : int32 option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
   mode : mode;
@@ -268,7 +268,7 @@ let encoding =
     (fun {
            data_dir;
            rollup_id;
-           rollup_genesis;
+           origination_level;
            rpc_addr;
            reconnection_delay;
            mode;
@@ -280,7 +280,7 @@ let encoding =
          } ->
       ( ( Some data_dir,
           rollup_id,
-          rollup_genesis,
+          origination_level,
           rpc_addr,
           reconnection_delay,
           mode,
@@ -291,7 +291,7 @@ let encoding =
         batch_burn_limit ))
     (fun ( ( data_dir_opt,
              rollup_id,
-             rollup_genesis,
+             origination_level,
              rpc_addr,
              reconnection_delay,
              mode,
@@ -308,7 +308,7 @@ let encoding =
       {
         data_dir;
         rollup_id;
-        rollup_genesis;
+        origination_level;
         rpc_addr;
         reconnection_delay;
         mode;
@@ -331,9 +331,9 @@ let encoding =
              "rollup_id"
              Protocol.Alpha_context.Tx_rollup.encoding)
           (opt
-             ~description:"Hash of the block where the rollup was created"
-             "origination_block"
-             Block_hash.encoding)
+             ~description:"Level of the block where the rollup was originated"
+             "origination_level"
+             int32)
           (dft
              ~description:"RPC address on which the rollup node listens"
              "rpc_addr"

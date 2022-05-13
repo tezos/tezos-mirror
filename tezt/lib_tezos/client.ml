@@ -1316,25 +1316,37 @@ let sign_block client block_hex ~delegate =
 
 module Tx_rollup = struct
   let originate ?(wait = "none") ?(burn_cap = Tez.of_int 9_999_999)
-      ?(storage_limit = 60_000) ?hooks ~src client =
+      ?(storage_limit = 60_000) ?fee ?hooks ~src client =
     let process =
       spawn_command
         ?hooks
         client
-        [
-          "--wait";
-          wait;
-          "originate";
-          "tx";
-          "rollup";
-          "from";
-          src;
-          "--burn-cap";
-          Tez.to_string burn_cap;
-          "--storage-limit";
-          string_of_int storage_limit;
-        ]
+        ([
+           "--wait";
+           wait;
+           "originate";
+           "tx";
+           "rollup";
+           "from";
+           src;
+           "--burn-cap";
+           Tez.to_string burn_cap;
+           "--storage-limit";
+           string_of_int storage_limit;
+         ]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun f ->
+              [
+                "--fee";
+                Tez.to_string f;
+                "--force-low-fee";
+                "--fee-cap";
+                Tez.to_string f;
+              ])
+            fee)
     in
+
     let parse process =
       let* output = Process.check_and_read_stdout process in
       output

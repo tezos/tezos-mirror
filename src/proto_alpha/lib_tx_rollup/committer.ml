@@ -32,17 +32,16 @@ let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
     List.map Tx_rollup_message_result_hash.hash_uncarbonated message_results
   in
   let inbox_merkle_root = Inbox.merkle_root inbox in
-  let predecessor = predecessor.L2block.header.commitment in
+  let predecessor =
+    Option.map (fun b -> b.L2block.header.commitment) predecessor
+  in
   Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
 
 let commit_block ~operator tx_rollup block =
-  let open Lwt_result_syntax in
-  match block.L2block.commitment with
-  | None -> return_unit
-  | Some commitment ->
-      let manager_operation =
-        Manager (Tx_rollup_commit {tx_rollup; commitment})
-      in
-      let hash = L1_operation.hash_manager_operation manager_operation in
-      Injector.add_pending_operation
-        {L1_operation.hash; source = operator; manager_operation}
+  let manager_operation =
+    Manager
+      (Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment})
+  in
+  let hash = L1_operation.hash_manager_operation manager_operation in
+  Injector.add_pending_operation
+    {L1_operation.hash; source = operator; manager_operation}

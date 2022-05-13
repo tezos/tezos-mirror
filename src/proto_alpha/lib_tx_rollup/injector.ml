@@ -635,22 +635,21 @@ let requeue_reverted_operation state op =
       (* TODO: check if rejected commitment in still in main chain *)
       return_true
   | Tx_rollup_commit {commitment; _} -> (
-      let level = L2block.Rollup_level commitment.level in
+      let level = commitment.level in
       let* l2_block = State.get_level_l2_block state.rollup_node_state level in
       match l2_block with
       | None ->
           (* We don't know this L2 block, should not happen *)
           let+ () = Debug_events.(emit should_not_happen) __LOC__ in
           false
-      | Some l2_block -> (
-          match l2_block.L2block.header.commitment with
-          | None -> return_false
-          | Some c ->
-              let commit_hash =
-                Tx_rollup_commitment.(Compact.hash (Full.compact commitment))
-              in
-              (* Do not re-queue if commitment for this level has changed *)
-              return Tx_rollup_commitment_hash.(c = commit_hash)))
+      | Some l2_block ->
+          let commit_hash =
+            Tx_rollup_commitment.(Compact.hash (Full.compact commitment))
+          in
+          (* Do not re-queue if commitment for this level has changed *)
+          return
+            Tx_rollup_commitment_hash.(
+              l2_block.L2block.header.commitment = commit_hash))
   | _ -> return_true
 
 (** [revert_included_operations state block] marks the known (by this injector)

@@ -27,7 +27,7 @@ open Protocol.Alpha_context
 
 (** Build the commitment for an inbox. *)
 val commitment_of_inbox :
-  predecessor:L2block.t ->
+  predecessor:L2block.t option ->
   Tx_rollup_level.t ->
   Inbox.t ->
   Tx_rollup_commitment.Full.t

@@ -40,7 +40,7 @@ val create :
   ?name:string ->
   mode ->
   rollup_id:string ->
-  rollup_genesis:string ->
+  ?origination_level:int ->
   ?operator:string ->
   ?batch_signer:string ->
   ?finalize_commitment_signer:string ->

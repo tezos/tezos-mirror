@@ -163,8 +163,7 @@ module Tezos_head_store : SINGLETON_STORE with type value := Block_hash.t
 (** Type for on disk information about a rollup *)
 type rollup_info = {
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 (** A store composed of a single file on disk to store the rollup

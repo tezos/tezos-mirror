@@ -35,11 +35,7 @@ module Hash : S.HASH
 type hash = Hash.t
 
 (** The level of an L2 block  *)
-type level =
-  | Genesis
-      (** When the rollup has not received any inbox, it is at level Genesis  *)
-  | Rollup_level of Tx_rollup_level.t
-      (** When the rollup has had at least one inbox *)
+type level = Tx_rollup_level.t
 
 (** Type of L2 block headers *)
 type header = {
@@ -47,10 +43,10 @@ type header = {
   tezos_block : Block_hash.t;
       (** The Tezos block on which this L2 block in anchored, i.e. the Tezos block
       in which the inbox was sent *)
-  predecessor : hash;  (** The hash predecessor L2 block *)
+  predecessor : hash option;  (** The hash predecessor L2 block *)
   context : Tx_rollup_l2_context_hash.t;
       (** The hash of the context resulting of the application of the L2 block's inbox *)
-  commitment : Tx_rollup_commitment_hash.t option;
+  commitment : Tx_rollup_commitment_hash.t;
       (** The hash of the commitment for the inbox of this block *)
 }
 
@@ -61,7 +57,7 @@ type t = {
   hash : hash;
   header : header;
   inbox : Inbox.t;
-  commitment : Tx_rollup_commitment.Full.t option;
+  commitment : Tx_rollup_commitment.Full.t;
 }
 
 type commitment_included_info = {
@@ -76,9 +72,6 @@ type metadata = {
   finalized : bool;
       (** Flag to signal if the commitment for this block is finalized on L1 *)
 }
-
-(** Build the genesis block  *)
-val genesis_block : Context.t -> Tx_rollup.t -> Block_hash.t -> t Lwt.t
 
 (**  {2 Encoding} *)
 

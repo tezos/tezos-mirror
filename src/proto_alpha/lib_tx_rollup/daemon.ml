@@ -235,15 +235,6 @@ let extract_messages_from_block block_info rollup_id =
       in
       (List.rev rev_messages, new_tickets)
 
-let create_genesis_block state tezos_block =
-  let open Lwt_syntax in
-  let* ctxt = Context.init_context state.State.context_index in
-  let* genesis_block =
-    L2block.genesis_block ctxt state.rollup_info.rollup_id tezos_block
-  in
-  let+ _block_hash = State.save_block state genesis_block in
-  (genesis_block, ctxt)
-
 let check_inbox state tezos_block level inbox =
   let open Lwt_result_syntax in
   trace (Error.Tx_rollup_cannot_check_inbox level)
@@ -271,18 +262,24 @@ let commit_block_on_l1 state block =
   | Some operator ->
       Committer.commit_block ~operator state.State.rollup_info.rollup_id block
 
-let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
-    ?predecessor_context block_info rollup_id =
+let process_messages_and_inboxes (state : State.t)
+    ~(predecessor : L2block.t option) ?predecessor_context block_info =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
   let*? (messages, new_tickets) =
-    extract_messages_from_block block_info rollup_id
+    extract_messages_from_block block_info state.State.rollup_info.rollup_id
   in
   let*! () = Event.(emit messages_application) (List.length messages) in
   let* predecessor_context =
     match predecessor_context with
-    | None -> Context.checkout state.context_index predecessor.header.context
     | Some context -> return context
+    | None -> (
+        match predecessor with
+        | None ->
+            let*! ctxt = Context.init_context state.context_index in
+            return ctxt
+        | Some predecessor ->
+            Context.checkout state.context_index predecessor.header.context)
   in
   let parameters =
     Protocol.Tx_rollup_l2_apply.
@@ -320,33 +317,34 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
   match contents with
   | None ->
       (* No inbox at this block *)
-      return (`Old, predecessor, predecessor_context)
+      return (`Old predecessor, predecessor_context)
   | Some inbox ->
       let*! context_hash = Context.commit context in
-      let level =
-        match predecessor.header.level with
-        | Genesis -> Tx_rollup_level.root
-        | Rollup_level l -> Tx_rollup_level.succ l
+      let (level, predecessor_hash) =
+        match predecessor with
+        | None -> (Tx_rollup_level.root, None)
+        | Some {hash; header = {level; _}; _} ->
+            (Tx_rollup_level.succ level, Some hash)
       in
       let* () = check_inbox state current_hash level inbox in
       let commitment = Committer.commitment_of_inbox ~predecessor level inbox in
       let header : L2block.header =
         {
-          level = Rollup_level level;
+          level;
           tezos_block = current_hash;
-          predecessor = predecessor.hash;
+          predecessor = predecessor_hash;
           context = context_hash;
           commitment =
-            Some Tx_rollup_commitment.(Compact.hash (Full.compact commitment));
+            Tx_rollup_commitment.(Compact.hash (Full.compact commitment));
         }
       in
       let hash = L2block.hash_header header in
-      let block = L2block.{hash; header; inbox; commitment = Some commitment} in
+      let block = L2block.{hash; header; inbox; commitment} in
       let*! () = State.save_block state block in
       let*! () =
         Event.(emit rollup_block) (header.level, hash, header.tezos_block)
       in
-      return (`New, block, context)
+      return (`New block, context)
 
 let set_head state head =
   let open Lwt_result_syntax in
@@ -357,65 +355,110 @@ let set_head state head =
   | Ok () -> return_unit
   | Error _ as res -> Lwt.return res
 
-let rec process_block state current_hash rollup_id =
+let originated_in_block rollup_id block =
+  let check_origination_content_result : type kind. kind contents_result -> bool
+      = function
+    | Manager_operation_result
+        {
+          operation_result =
+            Applied (Tx_rollup_origination_result {originated_tx_rollup; _});
+          _;
+        } ->
+        Tx_rollup.(originated_tx_rollup = rollup_id)
+    | _ -> false
+  in
+  let rec check_origination_content_result_list :
+      type kind. kind contents_result_list -> bool = function
+    | Single_result x -> check_origination_content_result x
+    | Cons_result (x, xs) ->
+        check_origination_content_result x
+        || check_origination_content_result_list xs
+  in
+  let manager_operations =
+    List.nth_opt
+      block.Alpha_block_services.operations
+      State.rollup_operation_index
+  in
+  let has_rollup_origination operation =
+    match operation.Alpha_block_services.receipt with
+    | Receipt (Operation_metadata {contents}) ->
+        check_origination_content_result_list contents
+    | Receipt No_operation_metadata | Empty | Too_large -> false
+  in
+  match manager_operations with
+  | None -> false
+  | Some ops -> List.exists has_rollup_origination ops
+
+let rec process_block state current_hash =
   let open Lwt_result_syntax in
-  if Block_hash.equal state.State.rollup_info.origination_block current_hash
-  then
-    (* This is the rollup origination block, create L2 genesis block *)
-    let*! (genesis_block, genesis_ctxt) =
-      create_genesis_block state current_hash
-    in
-    return (genesis_block, Some genesis_ctxt, [])
-  else
-    let*! l2_block = State.get_tezos_l2_block state current_hash in
-    match l2_block with
-    | Some l2_block ->
-        (* Already processed *)
-        let*! () = Event.(emit block_already_processed) current_hash in
-        let* () = set_head state l2_block in
-        return (l2_block, None, [])
-    | None ->
-        let* block_info = State.fetch_tezos_block state current_hash in
-        let predecessor_hash = block_info.header.shell.predecessor in
-        let block_level = block_info.header.shell.level in
-        let* () =
-          fail_when
-            (block_level < state.State.rollup_info.origination_level)
-            Tx_rollup_originated_in_fork
-        in
-        (* Handle predecessor Tezos block first *)
-        let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
-        let* (l2_predecessor_header, predecessor_context, blocks_to_commit) =
-          process_block state predecessor_hash rollup_id
-        in
-        let*! () =
-          Event.(emit processing_block) (current_hash, predecessor_hash)
-        in
-        let* (is_new_block, l2_block, context) =
-          process_messages_and_inboxes
-            state
-            ~predecessor:l2_predecessor_header
-            ?predecessor_context
-            block_info
-            rollup_id
-        in
-        let*! () =
-          State.save_tezos_block_info
-            state
-            current_hash
-            l2_block.hash
-            ~level:block_info.header.shell.level
-            ~predecessor:block_info.header.shell.predecessor
-        in
-        let blocks_to_commit =
-          match is_new_block with
-          | `Old -> blocks_to_commit
-          | `New -> l2_block :: blocks_to_commit
-        in
-        let* () = set_head state l2_block in
-        let*! () = Event.(emit new_tezos_head) current_hash in
-        let*! () = Event.(emit block_processed) (current_hash, block_level) in
-        return (l2_block, Some context, blocks_to_commit)
+  let rollup_id = state.State.rollup_info.rollup_id in
+  let*! l2_block = State.get_tezos_l2_block state current_hash in
+  match l2_block with
+  | Some l2_block ->
+      (* Already processed *)
+      let*! () = Event.(emit block_already_processed) current_hash in
+      let* () = set_head state l2_block in
+      return (Some l2_block, None, [])
+  | None ->
+      let* block_info = State.fetch_tezos_block state current_hash in
+      let predecessor_hash = block_info.header.shell.predecessor in
+      let block_level = block_info.header.shell.level in
+      let* () =
+        match state.State.rollup_info.origination_level with
+        | Some origination_level when block_level < origination_level ->
+            tzfail Tx_rollup_originated_in_fork
+        | _ -> return_unit
+      in
+      (* Handle predecessor Tezos block first *)
+      let*! () =
+        Event.(emit processing_block_predecessor)
+          (predecessor_hash, Int32.pred block_level)
+      in
+      let* (l2_predecessor, predecessor_context, blocks_to_commit) =
+        if originated_in_block rollup_id block_info then
+          let*! () =
+            Event.(emit detected_origination) (rollup_id, current_hash)
+          in
+          let* () =
+            State.set_rollup_info state rollup_id ~origination_level:block_level
+          in
+          return (None, None, [])
+        else process_block state predecessor_hash
+      in
+      let*! () =
+        Event.(emit processing_block) (current_hash, predecessor_hash)
+      in
+      let* (l2_block, context) =
+        process_messages_and_inboxes
+          state
+          ~predecessor:l2_predecessor
+          ?predecessor_context
+          block_info
+      in
+      let blocks_to_commit =
+        match l2_block with
+        | `Old _ -> blocks_to_commit
+        | `New l2_block -> l2_block :: blocks_to_commit
+      in
+      let* l2_block =
+        match l2_block with
+        | `Old None -> return_none
+        | `Old (Some l2_block) | `New l2_block ->
+            let*! () =
+              State.save_tezos_block_info
+                state
+                current_hash
+                l2_block.hash
+                ~level:block_info.header.shell.level
+                ~predecessor:block_info.header.shell.predecessor
+            in
+            let* () = set_head state l2_block in
+            return_some l2_block
+      in
+      let*! () =
+        Event.(emit tezos_block_processed) (current_hash, block_level)
+      in
+      return (l2_block, Some context, blocks_to_commit)
 
 let batch () = if Batcher.active () then Batcher.batch () else return_unit
 
@@ -502,9 +545,7 @@ let dispatch_withdrawals_on_l1 state level =
   match state.State.signers.dispatch_withdrawals with
   | None -> return_unit
   | Some source -> (
-      let*! block =
-        State.get_level_l2_block state (L2block.Rollup_level level)
-      in
+      let*! block = State.get_level_l2_block state level in
       match block with
       | None -> return_unit
       | Some block -> Dispatcher.dispatch_withdrawals ~source state block)
@@ -695,10 +736,10 @@ let handle_l1_reorg state acc reorg =
   in
   return acc
 
-let process_head state (current_hash, current_header) rollup_id =
+let process_head state (current_hash, current_header) =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* (_, _, blocks_to_commit) = process_block state current_hash rollup_id in
+  let* (_, _, blocks_to_commit) = process_block state current_hash in
   let* l1_reorg = State.set_tezos_head state current_hash in
   let* () = handle_l1_reorg state () l1_reorg in
   let* () = List.iter_es (commit_block_on_l1 state) blocks_to_commit in
@@ -711,7 +752,6 @@ let process_head state (current_hash, current_header) rollup_id =
 let catch_up_on_commitments state =
   let open Lwt_result_syntax in
   let*! () = Event.(emit catch_up_commitments) () in
-  let head = State.get_head state in
   let* proto_rollup_state =
     Protocol.Tx_rollup_services.state
       state.State.cctxt
@@ -748,15 +788,11 @@ let catch_up_on_commitments state =
   match next_commitment_level with
   | None -> return_unit
   | Some next_commitment_level ->
-      let rec missing_commitments to_commit block_hash =
+      let rec missing_commitments to_commit block =
         let open Lwt_syntax in
-        let* b = State.get_block state block_hash in
-        match b with
+        match block with
         | None -> return to_commit
-        | Some {header = {level = Genesis; _}; _} ->
-            (* No commitments for genesis block *)
-            return to_commit
-        | Some ({header = {level = Rollup_level level; _}; _} as block) ->
+        | Some ({L2block.header = {level; _}; _} as block) ->
             if
               Tx_rollup_level.to_int32 level
               < Tx_rollup_level_repr.to_int32 next_commitment_level
@@ -764,9 +800,15 @@ let catch_up_on_commitments state =
               (* We have iterated over all missing commitments *)
               return to_commit
             else
-              missing_commitments (block :: to_commit) block.header.predecessor
+              let*! predecessor =
+                Option.filter_map_s
+                  (State.get_block state)
+                  block.header.predecessor
+              in
+              missing_commitments (block :: to_commit) predecessor
       in
-      let*! to_commit = missing_commitments [] head.hash in
+      let head = State.get_head state in
+      let*! to_commit = missing_commitments [] head in
       List.iter_es (commit_block_on_l1 state) to_commit
 
 let catch_up state = catch_up_on_commitments state
@@ -882,7 +924,7 @@ let run configuration cctxt =
           let*! () =
             Lwt_stream.iter_s
               (fun head ->
-                let*! r = process_head state head rollup_id in
+                let*! r = process_head state head in
                 match r with
                 | Ok _ -> Lwt.return ()
                 | Error trace when is_connection_error trace ->

@@ -38,15 +38,14 @@ module Tezos_blocks_cache :
 (** Information about the rollup that is kept in the state. *)
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 type t = private {
   stores : Stores.t;
   cctxt : Protocol_client_context.full;
   context_index : Context.index;
-  mutable head : L2block.t;
+  mutable head : L2block.t option;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
@@ -71,7 +70,7 @@ val init :
 
 (** Retrieve the current head of the rollup. Note that the current head can go
     in the past or change in case of reorganisations at the L1 layer.  *)
-val get_head : t -> L2block.t
+val get_head : t -> L2block.t option
 
 (** Retrieve an L2 block by its hash *)
 val get_block : t -> L2block.hash -> L2block.t option Lwt.t
@@ -168,6 +167,10 @@ val set_finalized_level : t -> Tx_rollup_level.t -> unit tzresult Lwt.t
 
 (** Delete the last finalized (on L1) rollup level. *)
 val delete_finalized_level : t -> unit Lwt.t
+
+(** Register the origination level of the rollup for this node. *)
+val set_rollup_info :
+  t -> Tx_rollup.t -> origination_level:int32 -> unit tzresult Lwt.t
 
 (** {2 Misc}  *)
 

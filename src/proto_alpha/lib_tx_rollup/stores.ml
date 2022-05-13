@@ -330,18 +330,11 @@ end
 module L2_level_key = struct
   type t = L2block.level
 
-  let to_int32 = function
-    | L2block.Genesis -> -1l
-    | Rollup_level l -> Protocol.Alpha_context.Tx_rollup_level.to_int32 l
+  let to_int32 = Protocol.Alpha_context.Tx_rollup_level.to_int32
 
   let of_int32 l =
-    if l < 0l then L2block.Genesis
-    else
-      let l =
-        WithExceptions.Result.get_ok ~loc:__LOC__
-        @@ Protocol.Alpha_context.Tx_rollup_level.of_int32 l
-      in
-      Rollup_level l
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Protocol.Alpha_context.Tx_rollup_level.of_int32 l
 
   let t =
     let open Repr in
@@ -406,7 +399,7 @@ module L2_block_info = struct
   type t = {
     offset : int;
     (* subset of L2 block header for efficiency *)
-    predecessor : L2block.hash;
+    predecessor : L2block.hash option;
     context : Protocol.Tx_rollup_l2_context_hash.t;
   }
 
@@ -423,14 +416,18 @@ module L2_block_info = struct
   let t =
     let open Repr in
     map
-      (triple int L2_block_key.t l2_context_hash_repr)
+      (triple int (option L2_block_key.t) l2_context_hash_repr)
       (fun (offset, predecessor, context) -> {offset; predecessor; context})
       (fun {offset; predecessor; context} -> (offset, predecessor, context))
 
   let encode v =
     let dst = Bytes.create encoded_size in
     let offset = bytes_set_int64 ~src:(Int64.of_int v.offset) ~dst 0 in
-    let pred_bytes = L2block.Hash.to_bytes v.predecessor in
+    let pred_bytes =
+      match v.predecessor with
+      | None -> L2block.Hash.(to_bytes zero)
+      | Some b -> L2block.Hash.to_bytes b
+    in
     let offset = blit ~src:pred_bytes ~dst offset in
     let _ =
       blit
@@ -444,6 +441,9 @@ module L2_block_info = struct
     let (file_offset, offset) = read_int64 str offset in
     let (predecessor, offset) =
       read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
+    in
+    let predecessor =
+      if L2block.Hash.(predecessor = zero) then None else Some predecessor
     in
     let (context, _) =
       read_str
@@ -610,7 +610,7 @@ module L2_block_store = struct
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
     try
       let {predecessor; _} = L2_block_index.find store.index hash in
-      Lwt.return_some predecessor
+      Lwt.return predecessor
     with Not_found -> Lwt.return_none
 
   let context store hash =
@@ -711,8 +711,7 @@ end)
 
 type rollup_info = {
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 module Rollup_info_store = Make_singleton (struct
@@ -723,14 +722,11 @@ module Rollup_info_store = Make_singleton (struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {rollup_id; origination_block; origination_level} ->
-        (rollup_id, origination_block, origination_level))
-      (fun (rollup_id, origination_block, origination_level) ->
-        {rollup_id; origination_block; origination_level})
-    @@ obj3
+      (fun {rollup_id; origination_level} -> (rollup_id, origination_level))
+      (fun (rollup_id, origination_level) -> {rollup_id; origination_level})
+    @@ obj2
          (req "rollup_id" Protocol.Alpha_context.Tx_rollup.encoding)
-         (req "origination_block" Block_hash.encoding)
-         (req "origination_level" int32)
+         (opt "origination_level" int32)
 end)
 
 module Finalized_level_store = Make_singleton (struct

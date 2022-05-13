@@ -63,9 +63,7 @@ let rejectable_commitment (state : State.t)
       in
       return `Don't_reject
   | _ -> (
-      let*! block =
-        State.get_level_l2_block state (L2block.Rollup_level commitment.level)
-      in
+      let*! block = State.get_level_l2_block state commitment.level in
       match block with
       | None ->
           (* Should not happen. We have no block for that level, so we cannot
@@ -73,9 +71,7 @@ let rejectable_commitment (state : State.t)
           let*! () = Debug_events.(emit should_not_happen) __LOC__ in
           tzfail (Error.Tx_rollup_internal __LOC__)
       | Some block -> (
-          let our_commitment =
-            WithExceptions.Option.get ~loc:__LOC__ block.commitment
-          in
+          let our_commitment = block.commitment in
           let* () =
             if
               eq_merkle_roots
@@ -112,13 +108,7 @@ let rejectable_commitment (state : State.t)
                 (fun position m1 m2 ->
                   if Tx_rollup_message_result_hash.(m1 = m2) then
                     Ok (position + 1)
-                  else
-                    let path =
-                      let open Tx_rollup_commitment.Merkle in
-                      let tree = List.fold_left snoc nil commitment.messages in
-                      compute_path tree position
-                    in
-                    Error (Some (position, m1, path)))
+                  else Error (Some position))
                 0
                 commitment.messages
                 our_commitment.messages
@@ -128,14 +118,116 @@ let rejectable_commitment (state : State.t)
                 (* Should not happen if the inboxes are the same *)
                 let*! () = Debug_events.(emit should_not_happen) __LOC__ in
                 tzfail (Error.Tx_rollup_internal __LOC__)
-            | Error (Some (position, message_result, message_path)) ->
+            | Error (Some position) ->
                 (* We found a bad commitment *)
                 let*! () =
                   Event.(emit Accuser.bad_commitment)
                     (commitment.level, position)
                 in
-                return (`Reject (position, message_result, message_path, block))
-          ))
+                return (`Reject (position, block))))
+
+let build_rejection state ~(reject_commitment : Tx_rollup_commitment.Full.t)
+    (block : L2block.t) ~position =
+  let open Lwt_result_syntax in
+  let inbox_message =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth block.inbox position
+  in
+  let message = inbox_message.message in
+  let message_result_hash =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth reject_commitment.messages position
+  in
+  let*? message_result_path =
+    let open Tx_rollup_commitment.Merkle in
+    let tree = List.fold_left snoc nil reject_commitment.messages in
+    Environment.wrap_tzresult @@ compute_path tree position
+  in
+  let* (previous_message_result, previous_message_result_path, previous_context)
+      =
+    match (block.header.predecessor, position) with
+    | (None, 0) ->
+        (* Rejecting first message of first level, no predecessor *)
+        let*! context = Context.init_context state.State.context_index in
+        return
+          ( Tx_rollup_message_result.init,
+            Tx_rollup_commitment.Merkle.dummy_path,
+            context )
+    | (predecessor, _) ->
+        let* (inbox_of_previous_message, previous_message_position) =
+          match (predecessor, position) with
+          | (None, 0) -> assert false (* handled above *)
+          | (Some predecessor_hash, 0) ->
+              let*! predecessor = State.get_block state predecessor_hash in
+              let*? predecessor =
+                Result.of_option
+                  predecessor
+                  ~error:[Tx_rollup_missing_block predecessor_hash]
+              in
+              return (predecessor.inbox, List.length predecessor.inbox - 1)
+          | _ -> return (block.inbox, position - 1)
+        in
+        let previous_message_results =
+          Inbox.proto_message_results inbox_of_previous_message
+        in
+        let previous_message_results_hashes =
+          List.map
+            Tx_rollup_message_result_hash.hash_uncarbonated
+            previous_message_results
+        in
+        let previous_message_result =
+          WithExceptions.Option.get ~loc:__LOC__
+          @@ List.nth previous_message_results previous_message_position
+        in
+        let*? previous_message_result_path =
+          let open Tx_rollup_commitment.Merkle in
+          let tree = List.fold_left snoc nil previous_message_results_hashes in
+          Environment.wrap_tzresult
+          @@ compute_path tree previous_message_position
+        in
+        let previous_message =
+          WithExceptions.Option.get ~loc:__LOC__
+          @@ List.nth inbox_of_previous_message previous_message_position
+        in
+        let+ previous_context =
+          Context.checkout
+            state.context_index
+            previous_message.l2_context_hash.irmin_hash
+        in
+        (previous_message_result, previous_message_result_path, previous_context)
+  in
+  let message_hashes =
+    List.map
+      (fun Inbox.{message; _} ->
+        Tx_rollup_message_hash.hash_uncarbonated message)
+      block.inbox
+  in
+  let*? message_path =
+    Environment.wrap_tzresult
+    @@ Tx_rollup_inbox.Merkle.compute_path message_hashes position
+  in
+  let l2_parameters =
+    Protocol.Tx_rollup_l2_apply.
+      {
+        tx_rollup_max_withdrawals_per_batch =
+          state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
+      }
+  in
+  let+ (proof, _) =
+    Prover_apply.apply_message previous_context l2_parameters message
+  in
+  Tx_rollup_rejection
+    {
+      tx_rollup = state.rollup_info.rollup_id;
+      level = block.commitment.level;
+      message;
+      message_position = position;
+      message_path;
+      message_result_hash;
+      message_result_path;
+      previous_message_result;
+      previous_message_result_path;
+      proof;
+    }
 
 let reject_bad_commitment ~source (state : State.t)
     (commitment : Tx_rollup_commitment.Full.t) =
@@ -143,108 +235,11 @@ let reject_bad_commitment ~source (state : State.t)
   let* rejectable = rejectable_commitment state commitment in
   match rejectable with
   | `Don't_reject -> return_unit
-  | `Reject (position, message_result_hash, message_result_path, block) ->
+  | `Reject (position, block) ->
       (* This commitment is bad, because of message result at [position], we
          should inject a rejection *)
-      let*? message_result_path =
-        Environment.wrap_tzresult @@ message_result_path
-      in
-      let* ( previous_message_result,
-             previous_message_result_path,
-             previous_context ) =
-        if position = 0 && Tx_rollup_level.(commitment.level = root) then
-          (* Rejecting first message of first level, no predecessor *)
-          let*! context = Context.init_context state.context_index in
-          return
-            ( Tx_rollup_message_result.init,
-              Tx_rollup_commitment.Merkle.dummy_path,
-              context )
-        else
-          let* (inbox_of_previous_message, previous_message_position) =
-            match position with
-            | 0 ->
-                let*! predecessor =
-                  State.get_block state block.header.predecessor
-                in
-                let*? predecessor =
-                  Result.of_option
-                    predecessor
-                    ~error:[Tx_rollup_missing_block block.header.predecessor]
-                in
-                return (predecessor.inbox, List.length predecessor.inbox - 1)
-            | _ -> return (block.inbox, position - 1)
-          in
-          let previous_message_results =
-            Inbox.proto_message_results inbox_of_previous_message
-          in
-          let previous_message_results_hashes =
-            List.map
-              Tx_rollup_message_result_hash.hash_uncarbonated
-              previous_message_results
-          in
-          let previous_message_result =
-            WithExceptions.Option.get ~loc:__LOC__
-            @@ List.nth previous_message_results previous_message_position
-          in
-          let*? previous_message_result_path =
-            let open Tx_rollup_commitment.Merkle in
-            let tree =
-              List.fold_left snoc nil previous_message_results_hashes
-            in
-            Environment.wrap_tzresult
-            @@ compute_path tree previous_message_position
-          in
-          let previous_message =
-            WithExceptions.Option.get ~loc:__LOC__
-            @@ List.nth inbox_of_previous_message previous_message_position
-          in
-          let+ previous_context =
-            Context.checkout
-              state.context_index
-              previous_message.l2_context_hash.irmin_hash
-          in
-          ( previous_message_result,
-            previous_message_result_path,
-            previous_context )
-      in
-      let inbox_message =
-        WithExceptions.Option.get ~loc:__LOC__ @@ List.nth block.inbox position
-      in
-      let message = inbox_message.message in
-      let message_hashes =
-        List.map
-          (fun Inbox.{message; _} ->
-            Tx_rollup_message_hash.hash_uncarbonated message)
-          block.inbox
-      in
-      let*? message_path =
-        Environment.wrap_tzresult
-        @@ Tx_rollup_inbox.Merkle.compute_path message_hashes position
-      in
-      let l2_parameters =
-        Protocol.Tx_rollup_l2_apply.
-          {
-            tx_rollup_max_withdrawals_per_batch =
-              state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
-          }
-      in
-      let* (proof, _) =
-        Prover_apply.apply_message previous_context l2_parameters message
-      in
-      let rejection_operation =
-        Tx_rollup_rejection
-          {
-            tx_rollup = state.rollup_info.rollup_id;
-            level = commitment.level;
-            message;
-            message_position = position;
-            message_path;
-            message_result_hash;
-            message_result_path;
-            previous_message_result;
-            previous_message_result_path;
-            proof;
-          }
+      let* rejection_operation =
+        build_rejection state block ~reject_commitment:commitment ~position
       in
       let manager_operation = Manager rejection_operation in
       let hash = L1_operation.hash_manager_operation manager_operation in

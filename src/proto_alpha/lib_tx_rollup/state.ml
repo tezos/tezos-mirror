@@ -26,7 +26,6 @@
 (*****************************************************************************)
 
 open Protocol.Alpha_context
-open Protocol.Apply_results
 open Protocol_client_context
 open Common
 
@@ -38,15 +37,14 @@ module Tezos_blocks_cache =
 
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 type t = {
   stores : Stores.t;
   cctxt : Protocol_client_context.full;
   context_index : Context.index;
-  mutable head : L2block.t;
+  mutable head : L2block.t option;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
@@ -62,6 +60,7 @@ let get_head state = state.head
 
 let fetch_tezos_block state hash =
   let open Lwt_syntax in
+  let errors = ref [] in
   let fetch hash =
     let+ block =
       Alpha_block_services.info
@@ -70,12 +69,17 @@ let fetch_tezos_block state hash =
         ~block:(`Hash (hash, 0))
         ()
     in
-    Result.to_option block
+    match block with
+    | Error errs ->
+        errors := errs ;
+        None
+    | Ok block -> Some block
   in
   let+ block =
     Tezos_blocks_cache.find_or_replace state.tezos_blocks_cache hash fetch
   in
-  Result.of_option ~error:[Error.Tx_rollup_cannot_fetch_tezos_block hash] block
+  Result.of_option ~error:!errors block
+  |> record_trace (Error.Tx_rollup_cannot_fetch_tezos_block hash)
 
 (* Compute the reorganization of L1 blocks from the chain whose head is
    [old_head_hash] and the chain whose head [new_head_hash]. *)
@@ -195,16 +199,17 @@ let save_block state (block : L2block.t) =
   join [save_level state block.header.level block.hash; save_block state block]
 
 let distance_l2_levels l1 l2 =
-  let to_int32 = function
-    | L2block.Genesis -> -1l
-    | Rollup_level l -> Tx_rollup_level.to_int32 l
-  in
-  Int32.sub (to_int32 l2) (to_int32 l1)
+  Int32.sub (Tx_rollup_level.to_int32 l2) (Tx_rollup_level.to_int32 l1)
 
 (* Compute the reorganization of L2 blocks from the chain whose head is
    [old_head_hash] and the chain whose head [new_head_hash]. *)
 let rollup_reorg state ~old_head ~new_head =
   let open Lwt_syntax in
+  let get_pred b =
+    match b.L2block.header.predecessor with
+    | None -> Lwt.return_none
+    | Some b -> get_block state b
+  in
   let rec loop old_chain new_chain old_head new_head =
     match (old_head, new_head) with
     | (None, _) | (_, None) ->
@@ -233,26 +238,18 @@ let rollup_reorg state ~old_head ~new_head =
               (* Heads at same level *)
               let new_chain = new_head :: new_chain in
               let old_chain = old_head :: old_chain in
-              let* new_head =
-                get_block state new_head.L2block.header.predecessor
-              in
-              let+ old_head =
-                get_block state old_head.L2block.header.predecessor
-              in
+              let* new_head = get_pred new_head in
+              let+ old_head = get_pred old_head in
               (old_chain, new_chain, old_head, new_head)
             else if diff > 0l then
               (* New chain is longer *)
               let new_chain = new_head :: new_chain in
-              let+ new_head =
-                get_block state new_head.L2block.header.predecessor
-              in
+              let+ new_head = get_pred new_head in
               (old_chain, new_chain, Some old_head, new_head)
             else
               (* Old chain was longer *)
               let old_chain = old_head :: old_chain in
-              let+ old_head =
-                get_block state old_head.L2block.header.predecessor
-              in
+              let+ old_head = get_pred old_head in
               (old_chain, new_chain, old_head, Some new_head)
           in
           loop old_chain new_chain old new_
@@ -273,7 +270,7 @@ let patch_l2_levels state (reorg : L2block.t reorg) =
 
 let set_head state head =
   let open Lwt_result_syntax in
-  state.head <- head ;
+  state.head <- Some head ;
   let*! old_head = Stores.Head_store.read state.stores.head in
   let hash = head.L2block.hash in
   let* () = Stores.Head_store.write state.stores.head hash in
@@ -324,19 +321,12 @@ let delete_finalized_level state =
 
 let get_block_metadata state (header : L2block.header) =
   let open Lwt_syntax in
-  let* commitment_included =
-    match header.commitment with
-    | None -> return_none
-    | Some c -> get_included_commitment state c
-  in
+  let* commitment_included = get_included_commitment state header.commitment in
   let+ finalized_level = get_finalized_level state in
   let finalized =
     match finalized_level with
     | None -> false
-    | Some l -> (
-        match header.level with
-        | Genesis -> false
-        | Rollup_level level -> Tx_rollup_level.(level >= l))
+    | Some l -> Tx_rollup_level.(header.level >= l)
   in
   L2block.{commitment_included; finalized}
 
@@ -349,77 +339,20 @@ let get_block_and_metadata state hash =
       let* metadata = get_block_metadata state block.header in
       return_some (block, metadata)
 
-let check_origination_in_block_info rollup block_info =
-  let extract_originated_tx_rollup :
-      type kind. kind manager_operation_result -> Tx_rollup.t option = function
-    | Applied (Tx_rollup_origination_result {originated_tx_rollup; _}) ->
-        Some originated_tx_rollup
-    | _ -> None
-  in
-  let check_origination_content_result : type kind. kind contents_result -> bool
-      = function
-    | Manager_operation_result {operation_result; _} ->
-        operation_result |> extract_originated_tx_rollup
-        |> Option.fold ~none:false ~some:(Tx_rollup.equal rollup)
-    | _ -> false
-  in
-  let rec check_origination_content_result_list :
-      type kind. kind contents_result_list -> bool = function
-    | Single_result x -> check_origination_content_result x
-    | Cons_result (x, xs) ->
-        check_origination_content_result x
-        || check_origination_content_result_list xs
-  in
-  let managed_operation =
-    List.nth_opt
-      block_info.Alpha_block_services.operations
-      rollup_operation_index
-  in
-  let check_receipt operation =
-    match operation.Alpha_block_services.receipt with
-    | Receipt (Operation_metadata {contents}) ->
-        check_origination_content_result_list contents
-    | Receipt No_operation_metadata | Empty | Too_large -> false
-  in
-  match Option.bind managed_operation @@ List.find_opt check_receipt with
-  | Some _ -> return_unit
-  | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
+let set_rollup_info state rollup_id ~origination_level =
+  let rollup_info = {rollup_id; origination_level = Some origination_level} in
+  Stores.Rollup_info_store.write state.stores.Stores.rollup_info rollup_info
 
-let init_rollup_info cctxt stores ?rollup_genesis rollup =
+let init_rollup_info stores ?origination_level rollup_id =
   let open Lwt_result_syntax in
-  let*! rollup_info = Stores.Rollup_info_store.read stores.Stores.rollup_info in
+  let*! stored_info = Stores.Rollup_info_store.read stores.Stores.rollup_info in
   let* rollup_info =
-    match (rollup_info, rollup_genesis) with
-    | (None, None) ->
-        fail
-          [Error.Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given]
-    | (Some stored, __) when Tx_rollup.(stored.rollup_id <> rollup) ->
+    match stored_info with
+    | Some stored when Tx_rollup.(stored.rollup_id <> rollup_id) ->
         fail [Error.Tx_rollup_mismatch]
-    | (Some stored, Some genesis)
-      when Block_hash.(stored.origination_block <> genesis) ->
-        fail
-          [
-            Error
-            .Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
-              {
-                disk_rollup_origination = stored.origination_block;
-                given_rollup_genesis = genesis;
-              };
-          ]
-    | (Some stored, _) -> return stored
-    | (None, Some rollup_genesis) ->
-        let block = `Hash (rollup_genesis, 0) in
-        let* block_info =
-          Alpha_block_services.info cctxt ~chain:cctxt#chain ~block ()
-        in
-        let* () = check_origination_in_block_info rollup block_info in
-        let rollup_info =
-          {
-            rollup_id = rollup;
-            origination_block = rollup_genesis;
-            origination_level = block_info.header.shell.level;
-          }
-        in
+    | Some stored -> return stored
+    | None ->
+        let rollup_info = {rollup_id; origination_level} in
         let* () =
           Stores.Rollup_info_store.write stores.rollup_info rollup_info
         in
@@ -432,19 +365,12 @@ let init_context ~data_dir =
   let*! index = Context.init (Node_data.context_dir data_dir) in
   return index
 
-let init_head (stores : Stores.t) context_index rollup rollup_info =
+let read_head (stores : Stores.t) =
   let open Lwt_syntax in
   let* hash = Stores.Head_store.read stores.head in
-  let* head =
-    match hash with
-    | None -> return_none
-    | Some hash -> get_block_store stores hash
-  in
-  match head with
-  | Some head -> return head
-  | None ->
-      let* ctxt = Context.init_context context_index in
-      L2block.genesis_block ctxt rollup rollup_info.origination_block
+  match hash with
+  | None -> return_none
+  | Some hash -> get_block_store stores hash
 
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
@@ -455,7 +381,7 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
   let {
     Node_config.data_dir;
     rollup_id;
-    rollup_genesis;
+    origination_level;
     signers;
     l2_blocks_cache_size;
     caps;
@@ -468,11 +394,11 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
   in
   let* (rollup_info, context_index) =
     both
-      (init_rollup_info cctxt stores ?rollup_genesis rollup_id)
+      (init_rollup_info stores ?origination_level rollup_id)
       (init_context ~data_dir)
     |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in
-  let*! head = init_head stores context_index rollup_id rollup_info in
+  let*! head = read_head stores in
   let* constants = retrieve_constants cctxt in
   (* L1 blocks are cached to handle reorganizations efficiently *)
   let tezos_blocks_cache = Tezos_blocks_cache.create 32 in
