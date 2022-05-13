@@ -24,10 +24,7 @@
 (*****************************************************************************)
 
 module Proto = struct
-  open Tezos_raw_protocol_012_Psithaca
-
-  let wrap_tzresult =
-    Tezos_protocol_environment_012_Psithaca.Environment.wrap_tzresult
+  let wrap_tzresult = Environment.wrap_tzresult
 
   module Context = struct
     type t = Raw_context.t
@@ -60,7 +57,7 @@ module Proto = struct
     include Alpha_context.Script
     module Hash = Script_expr_hash
 
-    let print_expr = Tezos_client_012_Psithaca.Michelson_v1_printer.print_expr
+    let print_expr = Michelson_v1_printer.print_expr
   end
 
   module Translator = struct
