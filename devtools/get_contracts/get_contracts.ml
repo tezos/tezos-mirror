@@ -51,9 +51,10 @@ module Config = struct
     }
 end
 
-module Make (P : Sigs.PROTOCOL) : sig
-  val main : unit -> unit
-end = struct
+let mkdir dirname =
+  try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
+
+module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   module ExprMap = Map.Make (P.Script.Hash)
 
   module File_helpers = struct
@@ -77,10 +78,6 @@ end = struct
               close_in input_chan ;
               if file_length < 2 then err ())
         fmt
-
-    let mkdir dirname =
-      try Unix.mkdir dirname 0o775
-      with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
 
     let print_legacy_file ~dirname ~ext ~hash_string flag =
       let filename = Filename.concat dirname (hash_string ^ ext) in
@@ -356,54 +353,16 @@ end = struct
     let* _ctxt, values = P.Storage.list_values ctxt_i in
     List.fold_left_es (fun acc v -> f v acc) init values
 
-  let ensure_target_dir_exists () =
-    let dir = try Sys.argv.(2) with Invalid_argument _ -> "." in
-    try
-      if Sys.is_directory dir then dir
-      else (
-        Printf.printf "Given path: %s points to a file; directory expected!" dir ;
-        exit 1)
-    with Sys_error _ -> (
-      Printf.printf "Directory %s does not exists. Create? [Y/n] " dir ;
-      let response = read_line () in
-      match response with
-      | "" | "y" | "Y" ->
-          File_helpers.mkdir dir ;
-          dir
-      | _ -> exit 0)
-
-  let main () : unit tzresult Lwt.t =
+  let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let data_dir = Sys.argv.(1) in
-    let target_dir = ensure_target_dir_exists () in
-    Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
-    let* store =
-      Tezos_store.Store.init
-        ~store_dir:(Filename.concat data_dir "store")
-        ~context_dir:(Filename.concat data_dir "context")
-        ~allow_testchains:true
-        ~readonly:true
-        Config.mainnet_genesis
-    in
-    Printf.printf "Getting main chain storage and head...\n%!" ;
-    let chain_store = Tezos_store.Store.main_chain_store store in
-    let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
-    Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
-    let*! head = Tezos_store.Store.Chain.current_head chain_store in
     let head_hash, head_level = Tezos_store.Store.Block.descriptor head in
     Format.printf "Head is %a, level %ld\n%!" Block_hash.pp head_hash head_level ;
-    let* proto_hash = Tezos_store.Store.Block.protocol_hash chain_store head in
-    Format.printf "Protocol is %a\n%!" Protocol_hash.pp proto_hash ;
-    let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
-    print_endline "Pre-preparing raw context..." ;
-    let ctxt = Tezos_shell_context.Shell_context.wrap_disk_context ctxt in
-    let open P in
     let predecessor_timestamp = Tezos_store.Store.Block.timestamp head in
     let fitness = Tezos_store.Store.Block.fitness head in
     let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
     print_endline "Preparing raw context..." ;
     let* ctxt =
-      Context.prepare
+      P.Context.prepare
         ~level:head_level
         ~predecessor_timestamp
         ~timestamp
@@ -412,7 +371,7 @@ end = struct
     in
     print_endline "Listing addresses..." ;
     let*! contract_map, _ =
-      Contract.fold
+      P.Contract.fold
         ctxt
         ~init:(ExprMap.empty, 0)
         ~f:Michelson_helpers.(add_expr_to_map ctxt)
@@ -453,7 +412,7 @@ end = struct
         in
         print_endline "Listing big maps..." ;
         let* exprs, _ =
-          Storage.fold
+          P.Storage.fold
             ctxt
             ~init:(Ok (exprs, 0))
             ~f:(fun id exprs_i ->
@@ -464,7 +423,7 @@ end = struct
                 Storage_helpers.get_value
                   ~what:"big map value type"
                   ~getter:P.Storage.get
-                  ~pp:(fun fmt id -> Z.pp_print fmt (Storage.id_to_z id))
+                  ~pp:(fun fmt id -> Z.pp_print fmt (P.Storage.id_to_z id))
                   ctxt
                   id
               in
@@ -500,14 +459,14 @@ end = struct
       (fun hash (script, contracts, storages) ->
         let hash_string = P.Script.Hash.to_b58check hash in
         File_helpers.print_expr_file
-          ~dirname:target_dir
+          ~dirname:output_dir
           ~ext:".tz"
           ~hash_string
           script ;
         let filename =
           Printf.sprintf
             "%s%s%s.addresses"
-            target_dir
+            output_dir
             Filename.dir_sep
             hash_string
         in
@@ -518,7 +477,7 @@ end = struct
           contracts ;
         if Config.collect_storage then
           let dirname =
-            Printf.sprintf "%s/%s.storages" target_dir hash_string
+            Printf.sprintf "%s/%s.storages" output_dir hash_string
           in
           File_helpers.print_expr_dir ~dirname ~ext:".storage" storages
         else ())
@@ -527,7 +486,7 @@ end = struct
     let () =
       if not (ExprMap.is_empty lambda_map) then (
         print_endline "Writing lambda files..." ;
-        let dirname = Printf.sprintf "%s/lambdas" target_dir in
+        let dirname = Printf.sprintf "%s/lambdas" output_dir in
         File_helpers.print_expr_dir ~dirname ~ext:".tz" lambda_map ;
         File_helpers.print_expr_dir ~dirname ~ext:".ty" lambda_ty_map ;
         File_helpers.print_legacy_dir
@@ -538,10 +497,50 @@ end = struct
       else ()
     in
     return ()
-
-  let main () =
-    match Lwt_main.run (main ()) with
-    | Ok () -> ()
-    | Error trace ->
-        Format.printf "ERROR: %a%!" Error_monad.pp_print_trace trace
 end
+
+let ensure_target_dir_exists () =
+  let dir = try Sys.argv.(2) with Invalid_argument _ -> "." in
+  try
+    if Sys.is_directory dir then dir
+    else (
+      Printf.printf "Given path: %s points to a file; directory expected!" dir ;
+      exit 1)
+  with Sys_error _ -> (
+    Printf.printf "Directory %s does not exists. Create? [Y/n] " dir ;
+    let response = read_line () in
+    match response with
+    | "" | "y" | "Y" ->
+        mkdir dir ;
+        dir
+    | _ -> exit 0)
+
+let run (module Main : Sigs.MAIN) =
+  let open Lwt_result_syntax in
+  let data_dir = Sys.argv.(1) in
+  let output_dir = ensure_target_dir_exists () in
+  Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
+  let* store =
+    Tezos_store.Store.init
+      ~store_dir:(Filename.concat data_dir "store")
+      ~context_dir:(Filename.concat data_dir "context")
+      ~allow_testchains:true
+      ~readonly:true
+      Config.mainnet_genesis
+  in
+  Printf.printf "Getting main chain storage and head...\n%!" ;
+  let chain_store = Tezos_store.Store.main_chain_store store in
+  let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
+  Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
+  let*! head = Tezos_store.Store.Chain.current_head chain_store in
+  let* proto_hash = Tezos_store.Store.Block.protocol_hash chain_store head in
+  Format.printf "Protocol is %a\n%!" Protocol_hash.pp proto_hash ;
+  let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
+  print_endline "Pre-preparing raw context..." ;
+  let ctxt = Tezos_shell_context.Shell_context.wrap_disk_context ctxt in
+  Main.main ~output_dir ctxt ~head
+
+let main (module Main : Sigs.MAIN) =
+  match Lwt_main.run (run (module Main)) with
+  | Ok () -> ()
+  | Error trace -> Format.printf "ERROR: %a%!" Error_monad.pp_print_trace trace
