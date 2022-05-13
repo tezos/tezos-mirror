@@ -7,6 +7,9 @@ type t = {
 }
 
 let of_string_exn ?filename s =
+  let filename_prefix =
+    match filename with None -> "" | Some fn -> Printf.sprintf "%s: " fn
+  in
   let string = function `String x -> Ok x | _ -> Error ["Expected string"] in
   let float = function `Float x -> Ok x | _ -> Error ["Expected float"] in
   let all_result l =
@@ -39,15 +42,10 @@ let of_string_exn ?filename s =
         |> function
         | Ok x -> x
         | Error es ->
-            let file =
-              match filename with
-              | None -> ""
-              | Some fn -> Printf.sprintf "%s: " fn
-            in
             failwith
               (Printf.sprintf
                  "%sError(s) on %s:\n%s"
-                 file
+                 filename_prefix
                  key
                  (String.concat "\n" (List.map (fun x -> " - " ^ x) es)))
       in
@@ -59,7 +57,7 @@ let of_string_exn ?filename s =
         |> Option.map Float.to_int
       in
       {hash; modules; expected_env_version}
-  | _ -> failwith "Expected object"
+  | _ -> failwith (Printf.sprintf "%sExpected object" filename_prefix)
 
 let of_file_exn filename =
   let contents =
