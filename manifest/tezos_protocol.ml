@@ -7,53 +7,35 @@ type t = {
 }
 
 let of_string_exn ?filename s =
-  let filename_prefix =
-    match filename with None -> "" | Some fn -> Printf.sprintf "%s: " fn
+  let die msg =
+    let error_prefix =
+      match filename with
+      | None -> "Error"
+      | Some fn -> Printf.sprintf "Error in %s" fn
+    in
+    failwith (Printf.sprintf "%s: %s" error_prefix msg)
   in
-  let string = function `String x -> Ok x | _ -> Error ["Expected string"] in
-  let float = function `Float x -> Ok x | _ -> Error ["Expected float"] in
-  let all_result l =
-    List.fold_right
-      (fun x acc ->
-        match (x, acc) with
-        | (Error x, Error xs) -> Error (x @ xs)
-        | (Ok _, Error xs) -> Error xs
-        | (Error x, Ok _) -> Error x
-        | (Ok x, Ok xs) -> Ok (x :: xs))
-      l
-      (Ok [])
-  in
+  let string = function `String x -> x | _ -> die "Expected string" in
+  let float = function `Float x -> x | #JSON_AST.t -> die "Expected float" in
   let listed f = function
-    | `A x -> List.map f x |> all_result
-    | _ -> Error ["Expected list"]
+    | `A x -> List.map f x
+    | #JSON_AST.t -> die "Expected list"
   in
-  let optional f = function
-    | None -> Ok None
-    | Some x -> f x |> Result.map (fun x -> Some x)
+  let optional f t = Option.map f t in
+  let required f t =
+    match optional f t with Some x -> x | None -> die "Required"
   in
-  let required f = function None -> Error ["Required"] | Some x -> f x in
   match JSON_parser.json JSON_lexer.token (Lexing.from_string s) with
   | `O assoc ->
-      let lookup key type_ =
-        assoc |> List.assoc_opt key |> type_ |> function
-        | Ok x -> x
-        | Error es ->
-            failwith
-              (Printf.sprintf
-                 "%sError(s) on %s:\n%s"
-                 filename_prefix
-                 key
-                 (String.concat "\n" (List.map (fun x -> " - " ^ x) es)))
-      in
-
-      let hash = lookup "hash" (required string) in
-      let modules = lookup "modules" (required (listed string)) in
+      let lookup key f = f (List.assoc_opt key assoc) in
       let expected_env_version =
         lookup "expected_env_version" (optional float)
-        |> Option.map Float.to_int
+        |> Option.map Int.of_float
       in
+      let hash = lookup "hash" (required string) in
+      let modules = lookup "modules" (required (listed string)) in
       {hash; modules; expected_env_version}
-  | _ -> failwith (Printf.sprintf "%sExpected object" filename_prefix)
+  | #JSON_AST.t -> die "Expected object"
 
 let of_file_exn filename =
   let contents =
