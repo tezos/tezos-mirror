@@ -29,7 +29,7 @@ module Proto = struct
   module Context = struct
     type t = Raw_context.t
 
-    let prepare ~level ~predecessor_timestamp ~timestamp ~fitness:_ ctxt =
+    let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
       Lwt.map wrap_tzresult
       @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
   end

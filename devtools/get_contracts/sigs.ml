@@ -41,7 +41,6 @@ module type PROTOCOL = sig
       level:Int32.t ->
       predecessor_timestamp:Time.t ->
       timestamp:Time.t ->
-      fitness:bytes list ->
       Environment_context.Context.t ->
       t tzresult Lwt.t
   end

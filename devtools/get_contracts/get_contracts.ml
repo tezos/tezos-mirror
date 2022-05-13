@@ -358,16 +358,10 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     let head_hash, head_level = Tezos_store.Store.Block.descriptor head in
     Format.printf "Head is %a, level %ld\n%!" Block_hash.pp head_hash head_level ;
     let predecessor_timestamp = Tezos_store.Store.Block.timestamp head in
-    let fitness = Tezos_store.Store.Block.fitness head in
     let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
     print_endline "Preparing raw context..." ;
     let* ctxt =
-      P.Context.prepare
-        ~level:head_level
-        ~predecessor_timestamp
-        ~timestamp
-        ~fitness
-        ctxt
+      P.Context.prepare ~level:head_level ~predecessor_timestamp ~timestamp ctxt
     in
     print_endline "Listing addresses..." ;
     let*! contract_map, _ =
