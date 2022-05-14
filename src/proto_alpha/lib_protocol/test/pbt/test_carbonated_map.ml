@@ -504,6 +504,7 @@ let tests =
     test_find_non_existing;
     test_find_existing;
     test_update_add;
+    test_update_replace;
     test_update_merge;
     test_update_delete;
     test_map;

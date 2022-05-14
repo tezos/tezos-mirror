@@ -193,6 +193,7 @@ let () =
         [
           ("capacity (create n) = n", `Quick, test_create);
           ("replace", `Quick, test_replace);
+          ("replace_incr_length", `Quick, test_replace_incr_length);
           ("replace_existing", `Quick, test_replace_existing);
           ("peek", `Quick, test_peek);
           ("peek_empty", `Quick, test_peek_empty);
