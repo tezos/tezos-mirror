@@ -256,6 +256,4 @@ let sc_rollup_commands () =
 let select_commands _ _ =
   return (sc_rollup_commands () @ Client_helpers_commands.commands ())
 
-let main () = ()
-
 let () = Client_main_run.run (module Client_config) ~select_commands

@@ -40,8 +40,6 @@ let splitted_error_encoding =
 
 type error += Foo
 
-let msg error = Obj.Extension_constructor.(name @@ of_val error)
-
 let test_unregistered_binary () =
   (* The error was declared but not registered so we expect all encoding
      attempts to fail. *)

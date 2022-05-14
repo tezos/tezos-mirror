@@ -70,8 +70,6 @@ module Decimal = struct
     include Big_int
 
     let ( * ) = mult_big_int
-
-    let ( + ) = add_big_int
   end
 
   (* A decimal is represented by its value without decimals (an integer), and
@@ -81,8 +79,6 @@ module Decimal = struct
   let of_int i = {value = Big_int.big_int_of_int i; decimals = 0}
 
   let zero = of_int 0
-
-  let one = of_int 1
 
   (* [scale r1 r2] returns a triple [(r1', r2', decimals)] where [r1'] (resp.
      [r2']) is mathematically equal to [r1] ([r2]), and [r1'] and [r2'] have
@@ -108,14 +104,6 @@ module Decimal = struct
   let opp r = {r with value = Big_int.minus_big_int r.value}
 
   let sub r1 r2 = add r1 (opp r2)
-
-  let mul r1 r2 =
-    let {value = value1; decimals = decimals1} = r1 in
-    let {value = value2; decimals = decimals2} = r2 in
-    {
-      value = Big_int.mult_big_int value1 value2;
-      decimals = decimals1 + decimals2;
-    }
 
   let ge r1 r2 =
     let value1, value2, _decimals = scale r1 r2 in
@@ -154,13 +142,7 @@ module Decimal = struct
 
   let ( - ) = sub
 
-  let ( * ) = mul
-
   let ( >= ) = ge
-
-  let ( > ) = gt
-
-  let max r1 r2 = if r1 >= r2 then r1 else r2
 
   (* [pct v ref_v] returns the percentage represented by [v] with regards to the
      reference value [ref_v], close to the lower percent. *)

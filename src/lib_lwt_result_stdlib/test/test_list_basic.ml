@@ -23,28 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Support.Lib.Monad
-
-let assert_eq_s pa pb =
-  let open Lwt_syntax in
-  let* a = pa and* b = pb in
-  assert (a = b) ;
-  return_unit
-
-let assert_err e = e = Error ()
-
-let assert_err_s e =
-  let open Lwt_syntax in
-  let* e = e in
-  assert (e = Error ()) ;
-  return_unit
-
-let assert_err_p e =
-  let open Lwt_syntax in
-  let* e = e in
-  assert (e = Error (Support.Test_trace.make ())) ;
-  return_unit
-
 module ListGen = struct
   include Support.Lib.List
 

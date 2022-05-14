@@ -48,8 +48,6 @@ let assert_err_p e =
 module ListGen = struct
   include Support.Lib.List
 
-  let rec down n : int t = if n < 0 then [] else n :: down (pred n)
-
   let rec up n i : int t = if i > n then [] else i :: up n (succ i)
 
   let up n = up n 0
