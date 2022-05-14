@@ -475,13 +475,15 @@ let get_commitment_stake_count ctxt rollup node =
 let set_commitment_added ctxt rollup node new_value =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Commitment_added.find (ctxt, rollup) node in
-  let new_value =
-    match res with None -> new_value | Some old_value -> old_value
-  in
-  let* ctxt, size_diff, _was_bound =
-    Store.Commitment_added.add (ctxt, rollup) node new_value
-  in
-  return (size_diff, new_value, ctxt)
+  match res with
+  | Some old_value ->
+      (* No need to re-add the read value *)
+      return (0, old_value, ctxt)
+  | None ->
+      let* ctxt, size_diff, _was_bound =
+        Store.Commitment_added.add (ctxt, rollup) node new_value
+      in
+      return (size_diff, new_value, ctxt)
 
 let deallocate ctxt rollup node =
   let open Lwt_tzresult_syntax in
