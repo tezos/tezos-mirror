@@ -2083,8 +2083,19 @@ let generate_dune_project_files () =
   Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
-  ( Target.iter_internal_by_opam @@ fun package _internals ->
-    Format.fprintf fmt "(package (name %s))@." package ) ;
+  ( Target.iter_internal_by_opam @@ fun package internals ->
+    let has_public_target =
+      List.exists
+        (fun (i : Target.internal) ->
+          match i.kind with
+          | Public_library _ | Public_executable _ -> true
+          | Private_library _ -> false
+          | Private_executable _ -> false
+          | Test_executable _ -> false)
+        internals
+    in
+    let allow_empty = if not has_public_target then "(allow_empty)" else "" in
+    Format.fprintf fmt "(package (name %s)%s)@." package allow_empty ) ;
   Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
