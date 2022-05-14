@@ -797,28 +797,34 @@ let get_conflict_point ctxt rollup staker1 staker2 =
      We use this fact in the following to efficiently traverse both commitment histories towards
      the conflict points. *)
   let rec traverse_in_parallel ctxt commit1 commit2 =
-    if Commitment_hash.(commit1 = commit2) then
-      (* This case will most dominantly happen when either commit is part of the other's history.
-         It occurs when the commit that is farther ahead gets dereferenced to its predecessor often
-         enough to land at the other commit. *)
-      fail Sc_rollup_no_conflict
+    (* We know that commit1 <> commit2 at the first call and during recursive calls
+       as well. *)
+    let* commit1_info, ctxt = get_commitment_internal ctxt rollup commit1 in
+    let* commit2_info, ctxt = get_commitment_internal ctxt rollup commit2 in
+    (* This assert should hold because:
+       - We call function [traverse_in_parallel] with two initial commitments
+       whose levels are equal to [target_inbox_level],
+       - In recursive calls, the commitments are replaced by their respective
+       predecessors, and we know that successive commitments in a branch are
+       spaced by [sc_rollup_commitment_period_in_blocks] *)
+    assert (Raw_level_repr.(commit1_info.inbox_level = commit2_info.inbox_level)) ;
+    if Commitment_hash.(commit1_info.predecessor = commit2_info.predecessor)
+    then
+      (* Same predecessor means we've found the conflict points. *)
+      return ((commit1, commit2), ctxt)
     else
-      let* commit1_info, ctxt = get_commitment_internal ctxt rollup commit1 in
-      let* commit2_info, ctxt = get_commitment_internal ctxt rollup commit2 in
-      assert (
-        Raw_level_repr.(commit1_info.inbox_level = commit2_info.inbox_level)) ;
-      if Commitment_hash.(commit1_info.predecessor = commit2_info.predecessor)
-      then
-        (* Same predecessor means we've found the conflict points. *)
-        return ((commit1, commit2), ctxt)
-      else
-        (* Different predecessors means they run in parallel. *)
-        (traverse_in_parallel [@ocaml.tailcall])
-          ctxt
-          commit1_info.predecessor
-          commit2_info.predecessor
+      (* Different predecessors means they run in parallel. *)
+      (traverse_in_parallel [@ocaml.tailcall])
+        ctxt
+        commit1_info.predecessor
+        commit2_info.predecessor
   in
-  traverse_in_parallel ctxt commit1 commit2
+  if Commitment_hash.(commit1 = commit2) then
+    (* This case will most dominantly happen when either commit is part of the other's history.
+       It occurs when the commit that is farther ahead gets dereferenced to its predecessor often
+       enough to land at the other commit. *)
+    fail Sc_rollup_no_conflict
+  else traverse_in_parallel ctxt commit1 commit2
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in
