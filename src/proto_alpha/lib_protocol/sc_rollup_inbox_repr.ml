@@ -410,7 +410,7 @@ module MakeHashingScheme (Tree : TREE) :
   let add_message inbox payload messages =
     let open Lwt_syntax in
     let message_index = inbox.message_counter in
-    let message_counter = Z.succ inbox.message_counter in
+    let message_counter = Z.succ message_index in
     let key = key_of_message message_index in
     let nb_available_messages = Int64.succ inbox.nb_available_messages in
     let* messages =

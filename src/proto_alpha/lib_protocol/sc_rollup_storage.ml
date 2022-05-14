@@ -578,15 +578,13 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
 *)
 let assert_commitment_period ctxt rollup commitment =
   let open Lwt_tzresult_syntax in
-  let pred = Commitment.(commitment.predecessor) in
+  let pred_hash = Commitment.(commitment.predecessor) in
   let* ctxt, pred_level =
-    if Commitment_hash.(pred = zero) then
+    if Commitment_hash.(pred_hash = zero) then
       let* level = Store.Initial_level.get ctxt rollup in
       return (ctxt, level)
     else
-      let* pred, ctxt =
-        get_commitment_internal ctxt rollup commitment.predecessor
-      in
+      let* pred, ctxt = get_commitment_internal ctxt rollup pred_hash in
       return (ctxt, Commitment.(pred.inbox_level))
   in
   (* We want to check the following inequalities on [commitment.inbox_level],
