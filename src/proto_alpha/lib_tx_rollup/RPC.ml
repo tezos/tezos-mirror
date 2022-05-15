@@ -167,15 +167,63 @@ module Encodings = struct
     let open Data_encoding in
     merge_objs (obj1 (req "hash" L2block.Hash.encoding)) L2block.header_encoding
 
-  let block =
+  type any_block = Raw of L2block.t | Fancy of Fancy_l2block.t
+
+  let block block_encoding =
     let open Data_encoding in
-    merge_objs
-      Fancy_l2block.encoding
-      (obj1 (req "metadata" L2block.metadata_encoding))
+    merge_objs block_encoding (obj1 (req "metadata" L2block.metadata_encoding))
+
+  let raw_block = block L2block.encoding
+
+  let any_block =
+    let open Data_encoding in
+    block
+    @@ union
+         [
+           case
+             ~title:"raw"
+             (Tag 0)
+             L2block.encoding
+             (function Raw b -> Some b | _ -> None)
+             (fun b -> Raw b);
+           case
+             ~title:"fancy"
+             (Tag 1)
+             Fancy_l2block.encoding
+             (function Fancy b -> Some b | _ -> None)
+             (fun b -> Fancy b);
+         ]
+
+  let block = block Fancy_l2block.encoding
 end
 
 module Block = struct
   open Lwt_result_syntax
+
+  let format_query =
+    let open RPC_query in
+    query (fun format -> format)
+    |+ field
+         ~descr:
+           "Whether to return the L2 block in raw format (raw) or as a more \
+            human readable version (fancy, default)."
+         "format"
+         (RPC_arg.make
+            ~name:"format"
+            ~destruct:(function
+              | "raw" -> Ok `Raw
+              | "fancy" -> Ok `Fancy
+              | s ->
+                  Error
+                    (Printf.sprintf
+                       "Invalid value (%s) for parameter format, possible \
+                        values are: raw, fancy."
+                       s))
+            ~construct:(function `Raw -> "raw" | `Fancy -> "fancy")
+            ())
+         `Fancy
+         (fun format -> format)
+    |> seal
 
   let path : (unit * block_id) RPC_path.context = RPC_path.(open_root)
 
@@ -198,8 +246,8 @@ module Block = struct
   let block =
     RPC_service.get_service
       ~description:"Get the L2 block in the tx-rollup-node"
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option Encodings.block)
+      ~query:format_query
+      ~output:(Data_encoding.option Encodings.any_block)
       path
 
   let header =
@@ -233,21 +281,29 @@ module Block = struct
       RPC_path.(path / "proof" / "message" /: RPC_arg.int)
 
   let () =
-    register0 block @@ fun (state, block_id) () () ->
+    register0 block @@ fun (state, block_id) style () ->
     let*! block = block_of_id state block_id in
     match block with
     | None -> return_none
     | Some block -> (
-        let hash = block.hash in
-        let*! ctxt_hash_opt = context_of_l2_block state hash in
-        match ctxt_hash_opt with
-        | Some ctxt_hash ->
-            let*! ctxt = Context.checkout_exn state.context_index ctxt_hash in
-            let*! fancy_block = Fancy_l2block.of_l2block ctxt block in
-            let*! metadata = State.get_block_metadata state block.header in
-            return_some (fancy_block, metadata)
-        | None ->
-            failwith "The block %a can not be retrieved" L2block.Hash.pp hash)
+        let*! metadata = State.get_block_metadata state block.header in
+        match style with
+        | `Raw -> return_some (Encodings.Raw block, metadata)
+        | `Fancy -> (
+            let hash = block.hash in
+            let*! ctxt_hash_opt = context_of_l2_block state hash in
+            match ctxt_hash_opt with
+            | Some ctxt_hash ->
+                let*! ctxt =
+                  Context.checkout_exn state.context_index ctxt_hash
+                in
+                let*! fancy_block = Fancy_l2block.of_l2block ctxt block in
+                return_some (Encodings.Fancy fancy_block, metadata)
+            | None ->
+                failwith
+                  "The block %a can not be retrieved"
+                  L2block.Hash.pp
+                  hash))
 
   let () =
     register0 header @@ fun (state, block_id) () () ->
@@ -675,8 +731,24 @@ let counter ctxt (block : block_id) tz4 =
 let inbox ctxt block =
   RPC_context.make_call1 Block.(export_service inbox) ctxt block () ()
 
+let raw_block ctxt block =
+  let open Lwt_result_syntax in
+  let+ raw_block =
+    RPC_context.make_call1 Block.(export_service block) ctxt block `Raw ()
+  in
+  Option.map
+    (function Encodings.Raw b, metadata -> (b, metadata) | _ -> assert false)
+    raw_block
+
 let block ctxt block =
-  RPC_context.make_call1 Block.(export_service block) ctxt block () ()
+  let open Lwt_result_syntax in
+  let+ raw_block =
+    RPC_context.make_call1 Block.(export_service block) ctxt block `Fancy ()
+  in
+  Option.map
+    (function
+      | Encodings.Fancy b, metadata -> (b, metadata) | _ -> assert false)
+    raw_block
 
 let get_queue ctxt =
   RPC_context.make_call Injection.(export_service get_queue) ctxt () () ()

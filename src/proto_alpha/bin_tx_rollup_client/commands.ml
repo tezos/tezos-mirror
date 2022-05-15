@@ -252,18 +252,40 @@ let get_tx_inbox () =
       let*! () = cctxt#message "@[%s@]" (Data_encoding.Json.to_string json) in
       return_unit)
 
+let format_flag =
+  default_arg
+    ~doc:
+      "Whether to return the L2 block in raw format (raw) or as a more  human \
+       readable version (fancy, default).\n"
+    ~long:"format"
+    ~placeholder:"FORMAT"
+    ~default:"fancy"
+    (parameter (fun (cctxt : #Client_context.printer) format ->
+         match format with
+         | "fancy" -> Lwt.return_ok `Fancy
+         | "raw" -> Lwt.return_ok `Raw
+         | _ ->
+             cctxt#error
+               "Cannot decode --format argument, use 'raw' or 'fancy'."))
+
 let get_tx_block () =
   command
     ~desc:"returns the tx rollup block for a given block identifier"
-    no_options
+    (args1 format_flag)
     (prefixes ["get"; "block"]
     @@ param ~name:"block" ~desc:"block requested" block_id_param
     @@ stop)
-    (fun () block (cctxt : #Configuration.tx_client_context) ->
+    (fun format block (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
-      let* block = RPC.block cctxt block in
-      let json =
-        Data_encoding.(Json.construct (option RPC.Encodings.block)) block
+      let* json =
+        match format with
+        | `Fancy ->
+            let+ block = RPC.block cctxt block in
+            Data_encoding.(Json.construct (option RPC.Encodings.block)) block
+        | `Raw ->
+            let+ block = RPC.raw_block cctxt block in
+            Data_encoding.(Json.construct (option RPC.Encodings.raw_block))
+              block
       in
       let*! () = cctxt#message "@[%s@]" (Data_encoding.Json.to_string json) in
       return_unit)

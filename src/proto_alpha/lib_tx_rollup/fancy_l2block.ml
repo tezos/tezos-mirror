@@ -127,7 +127,7 @@ let fancy_message_of_message ctxt Inbox.{message; result; l2_context_hash} =
   let open Lwt_syntax in
   let* (l2_message : l2_message) =
     match (message, result) with
-    | (Batch s, Discarded tztrace) -> (
+    | Batch s, Discarded tztrace -> (
         let batch_opt =
           Data_encoding.Binary.of_string_opt Tx_rollup_l2_batch.encoding s
         in
@@ -147,7 +147,7 @@ let fancy_message_of_message ctxt Inbox.{message; result; l2_context_hash} =
         let (V1 batch) =
           Data_encoding.Binary.of_string_exn Tx_rollup_l2_batch.encoding s
         in
-        let (_, results) = List.split results in
+        let _, results = List.split results in
         let* transactions =
           List.map_s (transaction_replace_indexes ctxt) batch.contents
         in
@@ -162,7 +162,7 @@ let fancy_message_of_message ctxt Inbox.{message; result; l2_context_hash} =
                indexes;
                aggregated_signature = batch.aggregated_signature;
              })
-    | (Deposit _, Interpreted (Deposit_result (Deposit_success indexes), _)) ->
+    | Deposit _, Interpreted (Deposit_result (Deposit_success indexes), _) ->
         return (Ok_deposit (message, indexes))
     | ( Deposit _,
         Interpreted (Deposit_result (Deposit_failure error), [withdrawal]) ) ->

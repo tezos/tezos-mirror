@@ -44,7 +44,7 @@ val get_balance :
 
 val get_inbox : ?block:string -> t -> string Lwt.t
 
-val get_block : t -> block:string -> string Lwt.t
+val get_block : ?style:[`Fancy | `Raw] -> t -> block:string -> string Lwt.t
 
 val craft_tx_transaction :
   t ->
