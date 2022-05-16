@@ -889,13 +889,13 @@ let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
   Client_proto_contracts.ContractAlias.find_destination
     cctxt
     transfer.token_contract
-  >>=? fun (_, token) ->
+  >>=? fun token ->
   contract_has_fa12_interface cctxt ~chain ~block ~contract:token ()
   >>=? fun () ->
   Client_proto_contracts.ContractAlias.find_destination
     cctxt
     transfer.destination
-  >>=? fun (_, dest) ->
+  >>=? fun dest ->
   tez_of_opt_string_exn index "tez_amount" transfer.tez_amount
   >>?= fun tez_amount ->
   tez_of_opt_string_exn index "fee" transfer.fee >>?= fun transfer_fee ->

@@ -276,9 +276,6 @@ let commands () =
            storage
            input
            cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
-        let self = Option.map snd self in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let show_source = not no_print_source in
@@ -961,11 +958,9 @@ let commands () =
       @@ stop)
       (fun (source, payer, gas, unparsing_mode, now, level)
            entrypoint
-           (_, contract)
+           contract
            input
            cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
         Client_proto_programs.run_view
           cctxt
           ~chain:cctxt#chain
@@ -997,10 +992,8 @@ let commands () =
       @@ stop)
       (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
-           (_, contract)
+           contract
            cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
         Micheline_parser.no_parsing_error
         @@ Michelson_v1_parser.parse_expression "Unit"
         >>?= fun input ->
@@ -1041,11 +1034,9 @@ let commands () =
       @@ stop)
       (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
-           (_, contract)
+           contract
            input
            cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
         Client_proto_programs.run_script_view
           cctxt
           ~chain:cctxt#chain

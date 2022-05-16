@@ -174,7 +174,7 @@ let originate_command =
          ~name:"src"
          ~desc:"name of the source contract"
     @@ stop)
-    (fun () (_, source) (cctxt : Protocol_client_context.full) ->
+    (fun () source (cctxt : Protocol_client_context.full) ->
       match source with
       | Originated _ ->
           failwith "only implicit accounts can be the source of an origination"

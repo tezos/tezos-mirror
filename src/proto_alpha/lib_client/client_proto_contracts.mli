@@ -40,19 +40,19 @@ module ContractAlias : sig
     (Contract.t -> 'a, 'wallet) params
 
   val find_destination :
-    #Client_context.wallet -> string -> (string * Contract.t) tzresult Lwt.t
+    #Client_context.wallet -> string -> Contract.t tzresult Lwt.t
 
   val destination_param :
     ?name:string ->
     ?desc:string ->
     ('a, (#Client_context.wallet as 'wallet)) params ->
-    (string * Contract.t -> 'a, 'wallet) params
+    (Contract.t -> 'a, 'wallet) params
 
   val destination_arg :
     ?name:string ->
     ?doc:string ->
     unit ->
-    ((string * Contract.t) option, #Client_context.wallet) Clic.arg
+    (Contract.t option, #Client_context.wallet) Clic.arg
 
   val rev_find :
     #Client_context.wallet -> Contract.t -> string option tzresult Lwt.t

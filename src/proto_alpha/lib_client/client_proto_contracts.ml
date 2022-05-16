@@ -44,10 +44,10 @@ module RawContractAlias = Client_aliases.Alias (ContractEntity)
 module ContractAlias = struct
   let find cctxt s =
     RawContractAlias.find_opt cctxt s >>=? function
-    | Some v -> return (s, v)
+    | Some v -> return v
     | None -> (
         Client_keys.Public_key_hash.find_opt cctxt s >>=? function
-        | Some v -> return (s, Contract.Implicit v)
+        | Some v -> return (Contract.Implicit v)
         | None -> failwith "no contract or key named %s" s)
 
   let find_key cctxt name =
@@ -65,7 +65,7 @@ module ContractAlias = struct
   let get_contract cctxt s =
     match String.split ~limit:1 ':' s with
     | ["key"; key] -> find_key cctxt key
-    | _ -> find cctxt s >|=? snd
+    | _ -> find cctxt s
 
   let autocomplete cctxt =
     Client_keys.Public_key_hash.autocomplete cctxt >>=? fun keys ->
@@ -85,14 +85,14 @@ module ContractAlias = struct
     | ["alias"; alias] -> find cctxt alias
     | ["key"; text] ->
         Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
-        return (s, Contract.Implicit v)
-    | ["text"; text] -> ContractEntity.of_source text >|=? fun c -> (s, c)
+        return (Contract.Implicit v)
+    | ["text"; text] -> ContractEntity.of_source text
     | _ -> (
         find cctxt s >>= function
         | Ok v -> return v
         | Error k_errs -> (
             ContractEntity.of_source s >>= function
-            | Ok v -> return (s, v)
+            | Ok v -> return v
             | Error c_errs -> Lwt.return_error (k_errs @ c_errs)))
 
   let destination_parameter () =
