@@ -68,26 +68,25 @@ let get ctxt key (Big_map {key_type; _} as map) =
   hash_comparable_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
   get_by_hash ctxt key_hash map
 
-let update_by_hash ctxt key_hash key value (Big_map map) =
+let update_by_hash key_hash key value (Big_map map) =
   let contains = Big_map_overlay.mem key_hash map.diff.map in
-  return
-    ( Big_map
+  Big_map
+    {
+      map with
+      diff =
         {
-          map with
-          diff =
-            {
-              map = Big_map_overlay.add key_hash (key, value) map.diff.map;
-              size = (if contains then map.diff.size else map.diff.size + 1);
-            };
-        },
-      ctxt )
+          map = Big_map_overlay.add key_hash (key, value) map.diff.map;
+          size = (if contains then map.diff.size else map.diff.size + 1);
+        };
+    }
 
 let update ctxt key value (Big_map {key_type; _} as map) =
   hash_comparable_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
-  update_by_hash ctxt key_hash key value map
+  let map = update_by_hash key_hash key value map in
+  return (map, ctxt)
 
 let get_and_update ctxt key value (Big_map {key_type; _} as map) =
   hash_comparable_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
-  update_by_hash ctxt key_hash key value map >>=? fun (map', ctxt) ->
+  let new_map = update_by_hash key_hash key value map in
   get_by_hash ctxt key_hash map >>=? fun (old_value, ctxt) ->
-  return ((old_value, map'), ctxt)
+  return ((old_value, new_map), ctxt)
