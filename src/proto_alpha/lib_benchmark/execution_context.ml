@@ -74,20 +74,6 @@ let make ~rng_state =
           level;
         }
       in
-      return (block, step_constants)
-  | `Disk_block (block, source) ->
-      let step_constants =
-        {
-          source;
-          payer = source;
-          self = source;
-          amount;
-          balance = Alpha_context.Tez.of_mutez_exn initial_balance;
-          chain_id;
-          now;
-          level;
-        }
-      in
       return (block, step_constants))
   >>=? fun (block, step_constants) ->
   Context.get_constants (B block) >>=? fun csts ->
