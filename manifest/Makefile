@@ -1,11 +1,17 @@
 # To be able to bootstrap this, we don't use any tool to build (not dune in particular).
 # This allows to run this before make build-deps as long as OCaml is installed.
 
-SOURCE=manifest.mli manifest.ml main.mli main.ml
+SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml tezos_protocol.ml manifest.mli manifest.ml main.mli main.ml
 
 .PHONY: all
 all: manifest
 	./manifest
+
+_build/JSON_parser.ml _build/JSON_parser.mli: _build/JSON_parser.mly
+	ocamlyacc $^
+	
+_build/JSON_lexer.ml: _build/JSON_lexer.mll
+	ocamllex $^
 
 # We compile files in the _build directory.
 # But we prepend them with an OCaml compiler directive that ensures
