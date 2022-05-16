@@ -130,7 +130,7 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
         @@ token_contract_param ()
         @@ prefixes ["implements"; "fa1.2"]
         @@ stop)
-        (fun () (_, contract) (cctxt : #Protocol_client_context.full) ->
+        (fun () contract (cctxt : #Protocol_client_context.full) ->
           Client_proto_fa12.contract_has_fa12_interface
             cctxt
             ~chain:cctxt#chain
@@ -157,13 +157,12 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
                 contract)"
         @@ stop)
         (fun (gas, payer, unparsing_mode)
-             (_, contract)
-             (_, addr)
+             contract
+             addr
              (cctxt : #Protocol_client_context.full) ->
           let action =
             Client_proto_fa12.Get_balance (addr, (dummy_callback, None))
           in
-          let payer = Option.map snd payer in
           Client_proto_fa12.run_view_action
             cctxt
             ~chain:cctxt#chain
@@ -192,15 +191,14 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
              ~desc:"name or address of the account receiving the allowance"
         @@ stop)
         (fun (gas, payer, unparsing_mode)
-             (_, contract)
-             (_, source)
-             (_, destination)
+             contract
+             source
+             destination
              (cctxt : #Protocol_client_context.full) ->
           let action =
             Client_proto_fa12.Get_allowance
               (source, destination, (dummy_callback, None))
           in
-          let payer = Option.map snd payer in
           Client_proto_fa12.run_view_action
             cctxt
             ~chain:cctxt#chain
@@ -222,12 +220,11 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["get"; "total"; "supply"]
         @@ stop)
         (fun (gas, payer, unparsing_mode)
-             (_, contract)
+             contract
              (cctxt : #Protocol_client_context.full) ->
           let action =
             Client_proto_fa12.Get_total_supply (dummy_callback, None)
           in
-          let payer = Option.map snd payer in
           Client_proto_fa12.run_view_action
             cctxt
             ~chain:cctxt#chain
@@ -266,9 +263,9 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, contract)
-             (_, addr)
-             (_, callback)
+             contract
+             addr
+             callback
              (cctxt : #Protocol_client_context.full) ->
           get_contract_caller_keys cctxt addr
           >>=? fun (source, src_pk, src_sk) ->
@@ -328,10 +325,10 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, contract)
-             (_, src)
-             (_, dst)
-             (_, callback)
+             contract
+             src
+             dst
+             callback
              (cctxt : #Protocol_client_context.full) ->
           get_contract_caller_keys cctxt src
           >>=? fun (source, src_pk, src_sk) ->
@@ -389,9 +386,9 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, contract)
-             (_, addr)
-             (_, callback)
+             contract
+             addr
+             callback
              (cctxt : #Protocol_client_context.full) ->
           get_contract_caller_keys cctxt addr
           >>=? fun (source, src_pk, src_sk) ->
@@ -456,15 +453,15 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, contract)
+             contract
              amount
              src
-             (_, dst)
+             dst
              (cctxt : #Protocol_client_context.full) ->
-          let _, caller = Option.value ~default:src as_address in
+          let caller = Option.value ~default:src as_address in
           get_contract_caller_keys cctxt caller
           >>=? fun (source, caller_pk, caller_sk) ->
-          let action = Client_proto_fa12.Transfer (snd src, dst, amount) in
+          let action = Client_proto_fa12.Transfer (src, dst, amount) in
           Client_proto_fa12.call_contract
             cctxt
             ~chain:cctxt#chain
@@ -510,10 +507,10 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, contract)
-             (_, source)
+             contract
+             source
              amount
-             (_, dst)
+             dst
              (cctxt : #Protocol_client_context.full) ->
           get_contract_caller_keys cctxt source
           >>=? fun (source, src_pk, src_sk) ->
@@ -590,7 +587,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              src
              operations_json
              cctxt ->
-          let _, caller = Option.value ~default:src as_address in
+          let caller = Option.value ~default:src as_address in
           match
             Data_encoding.Json.destruct
               (Data_encoding.list Client_proto_fa12.token_transfer_encoding)
@@ -607,7 +604,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                 ?confirmations:cctxt#confirmations
                 ~dry_run
                 ~verbose_signing
-                ~sender:(snd src)
+                ~sender:src
                 ~source
                 ~src_pk
                 ~src_sk

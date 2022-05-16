@@ -96,7 +96,7 @@ class type full =
 
     (** Base interface provided to call RPCs, i.e., communication
         with the node. A client context is defined by mapping all
-        RPCs protocol-generic to a specific procotol. *)
+        RPCs protocol-generic to a specific protocol. *)
     inherit
       [Shell_services.chain * Shell_services.block] Protocol.Environment
                                                     .RPC_context

@@ -44,15 +44,15 @@ module RawContractAlias = Client_aliases.Alias (ContractEntity)
 module ContractAlias = struct
   let find cctxt s =
     RawContractAlias.find_opt cctxt s >>=? function
-    | Some v -> return (s, v)
+    | Some v -> return v
     | None -> (
         Client_keys.Public_key_hash.find_opt cctxt s >>=? function
-        | Some v -> return (s, Contract.Implicit v)
+        | Some v -> return (Contract.Implicit v)
         | None -> failwith "no contract or key named %s" s)
 
   let find_key cctxt name =
     Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
-    return (name, Contract.Implicit v)
+    return (Contract.Implicit v)
 
   let rev_find cctxt (c : Contract.t) =
     match c with
@@ -78,25 +78,21 @@ module ContractAlias = struct
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
          Use 'key:name' to force the later."
     in
-    Clic.(
-      param
-        ~name
-        ~desc
-        (parameter ~autocomplete (fun cctxt p -> get_contract cctxt p))
-        next)
+    Clic.(param ~name ~desc (parameter ~autocomplete get_contract) next)
 
   let find_destination cctxt s =
     match String.split ~limit:1 ':' s with
     | ["alias"; alias] -> find cctxt alias
     | ["key"; text] ->
         Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
-        return (s, Contract.Implicit v)
+        return (Contract.Implicit v)
+    | ["text"; text] -> ContractEntity.of_source text
     | _ -> (
         find cctxt s >>= function
         | Ok v -> return v
         | Error k_errs -> (
             ContractEntity.of_source s >>= function
-            | Ok v -> return (s, v)
+            | Ok v -> return v
             | Error c_errs -> Lwt.return_error (k_errs @ c_errs)))
 
   let destination_parameter () =
@@ -139,8 +135,7 @@ end
 
 let list_contracts cctxt =
   RawContractAlias.load cctxt >>=? fun raw_contracts ->
-  List.map_s (fun (n, v) -> Lwt.return ("", n, v)) raw_contracts
-  >>= fun contracts ->
+  let contracts = List.map (fun (n, v) -> ("", n, v)) raw_contracts in
   Client_keys.Public_key_hash.load cctxt >>=? fun keys ->
   (* List accounts (implicit contracts of identities) *)
   List.map_es

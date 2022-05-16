@@ -233,7 +233,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | Some src_sk ->
       let watermark =
         match contents with
-        (* TODO-TB sign endosrement? *)
+        (* TODO-TB sign endorsement? *)
         | _ -> Signature.Generic_operation
       in
       (if verbose_signing then
@@ -575,7 +575,7 @@ let safety_guard = Gas.Arith.(integral_of_int_exn 100)
         do specify their limit
    2. the algorithm retrieves the effectively consumed gas and storage from the
       receipt
-   3. the algorithm assigns slight overapproximations to the operation
+   3. the algorithm assigns slight over-approximations to the operation
    4. a default fee is computed and set
 
 *)

@@ -197,7 +197,7 @@ let commands_ro () =
       (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         contract_rank cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun rank ->
         match rank with
@@ -233,7 +233,7 @@ let commands_ro () =
       (prefixes ["get"; "balance"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun amount ->
         cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
@@ -245,7 +245,7 @@ let commands_ro () =
       (prefixes ["get"; "contract"; "storage"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun unparsing_mode contract (cctxt : Protocol_client_context.full) ->
         get_storage
           cctxt
           ~chain:cctxt#chain
@@ -270,7 +270,7 @@ let commands_ro () =
       @@ prefix "in"
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () key key_type contract (cctxt : Protocol_client_context.full) ->
         get_contract_big_map_value
           cctxt
           ~chain:cctxt#chain
@@ -317,7 +317,7 @@ let commands_ro () =
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun (unparsing_mode, normalize_types)
-           (_, contract)
+           contract
            (cctxt : Protocol_client_context.full) ->
         get_script
           cctxt
@@ -344,7 +344,7 @@ let commands_ro () =
       (prefixes ["get"; "contract"; "script"; "hash"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         get_script_hash cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>= function
         | Error errs -> cctxt#error "%a" pp_print_trace errs
@@ -364,7 +364,7 @@ let commands_ro () =
       @@ stop)
       (fun normalize_types
            entrypoint
-           (_, contract)
+           contract
            (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.contract_entrypoint_type
           cctxt
@@ -385,7 +385,7 @@ let commands_ro () =
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun normalize_types (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun normalize_types contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_entrypoints
           cctxt
           ~chain:cctxt#chain
@@ -403,7 +403,7 @@ let commands_ro () =
       (prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_unreachables
           cctxt
           ~chain:cctxt#chain
@@ -420,7 +420,7 @@ let commands_ro () =
       (prefixes ["get"; "delegate"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         Client_proto_contracts.get_delegate
           cctxt
           ~chain:cctxt#chain
@@ -592,7 +592,7 @@ let commands_ro () =
       (prefixes ["get"; "deposits"; "limit"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source delegate"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         match contract with
         | Originated _ ->
             cctxt#error
@@ -764,7 +764,7 @@ let transfer_command amount (source : Contract.t) destination
 let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
     ?entrypoint (source : Contract.t) index batch =
   Client_proto_contracts.ContractAlias.find_destination cctxt batch.destination
-  >>=? fun (_, destination) ->
+  >>=? fun destination ->
   tez_of_string_exn index "amount" batch.amount >>=? fun amount ->
   tez_of_opt_string_exn index "fee" batch.fee >>=? fun batch_fee ->
   let fee = Option.either batch_fee fee in
@@ -898,7 +898,7 @@ let commands_rw () =
            ~desc:"new delegate of the contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           (_, contract)
+           contract
            delegate
            (cctxt : Protocol_client_context.full) ->
         match contract with
@@ -953,7 +953,7 @@ let commands_rw () =
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter)
-           (_, contract)
+           contract
            (cctxt : Protocol_client_context.full) ->
         match contract with
         | Originated _ ->
@@ -1040,7 +1040,7 @@ let commands_rw () =
              fee_parameter )
            alias_name
            balance
-           (_, source)
+           source
            program
            (cctxt : Protocol_client_context.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
@@ -1130,7 +1130,7 @@ let commands_rw () =
              fee_parameter,
              entrypoint,
              replace_by_fees )
-           (_, source)
+           source
            operations_json
            cctxt ->
         let prepare i =
@@ -1259,8 +1259,8 @@ let commands_rw () =
              replace_by_fees,
              successor_level )
            amount
-           (_, source)
-           (_, destination)
+           source
+           destination
            cctxt ->
         transfer_command
           amount
@@ -1311,7 +1311,7 @@ let commands_rw () =
              storage_limit,
              counter )
            global_constant_str
-           (_, source)
+           source
            cctxt ->
         match source with
         | Originated _ ->
@@ -1383,8 +1383,8 @@ let commands_rw () =
              entrypoint,
              replace_by_fees,
              successor_level )
-           (_, destination)
-           (_, source)
+           destination
+           source
            cctxt ->
         let amount = Tez.zero in
         transfer_command
@@ -1415,7 +1415,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter) (_, source) cctxt ->
+      (fun (fee, dry_run, verbose_signing, fee_parameter) source cctxt ->
         match source with
         | Originated _ -> failwith "only implicit accounts can be revealed"
         | Implicit source ->
@@ -1531,7 +1531,7 @@ let commands_rw () =
                        Error_monad.failwith "Invalid proposal hash: '%s'" x
                    | Some hash -> return hash))))
       (fun (dry_run, verbose_signing, force)
-           (_name, source)
+           source
            proposals
            (cctxt : Protocol_client_context.full) ->
         match source with
@@ -1713,7 +1713,7 @@ let commands_rw () =
                 | s -> failwith "Invalid ballot: '%s'" s))
       @@ stop)
       (fun (verbose_signing, dry_run, force)
-           (_name, source)
+           source
            proposal
            ballot
            (cctxt : Protocol_client_context.full) ->
@@ -1798,7 +1798,7 @@ let commands_rw () =
            ~desc:"the maximum amount of frozen deposits"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           (_, contract)
+           contract
            limit
            (cctxt : Protocol_client_context.full) ->
         match contract with
@@ -1839,7 +1839,7 @@ let commands_rw () =
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
-           (_, contract)
+           contract
            (cctxt : Protocol_client_context.full) ->
         match contract with
         | Originated _ ->
@@ -1890,7 +1890,7 @@ let commands_rw () =
              fee_parameter,
              storage_limit,
              counter )
-           (_, source)
+           source
            cctxt ->
         match source with
         | Originated _ ->
@@ -1938,7 +1938,7 @@ let commands_rw () =
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"Account submiting the transaction rollup batches."
+           ~desc:"Account submitting the transaction rollup batches."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -1949,7 +1949,7 @@ let commands_rw () =
              counter )
            content
            tx_rollup
-           (_, source)
+           source
            cctxt ->
         match source with
         | Originated _ ->
@@ -2001,7 +2001,7 @@ let commands_rw () =
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"Account commiting to the transaction rollup."
+           ~desc:"Account committing to the transaction rollup."
       @@ prefixes ["for"; "level"]
       @@ Tx_rollup.level_param ~usage:"Level used for the commitment."
       @@ prefixes ["with"; "inbox"; "hash"]
@@ -2021,7 +2021,7 @@ let commands_rw () =
              counter,
              predecessor )
            tx_rollup
-           (_, source)
+           source
            level
            inbox_merkle_root
            messages
@@ -2081,7 +2081,7 @@ let commands_rw () =
              simulation,
              counter )
            tx_rollup
-           (_, source)
+           source
            cctxt ->
         match source with
         | Originated _ ->
@@ -2131,7 +2131,7 @@ let commands_rw () =
              fee_parameter,
              storage_limit,
              counter )
-           (_, source)
+           source
            tx_rollup
            cctxt ->
         match source with
@@ -2184,7 +2184,7 @@ let commands_rw () =
              storage_limit,
              counter )
            tx_rollup
-           (_, source)
+           source
            cctxt ->
         match source with
         | Originated _ ->
@@ -2283,14 +2283,14 @@ let commands_rw () =
            level
            rejected_message_result_hash
            rejected_message_result_path
-           confliting_message_position
-           confliting_message
-           confliting_message_path
+           conflicting_message_position
+           conflicting_message
+           conflicting_message_path
            previous_context_hash
            previous_withdraw_list_hash
            previous_message_result_path
            proof
-           (_, source)
+           source
            cctxt ->
         match source with
         | Originated _ ->
@@ -2316,9 +2316,9 @@ let commands_rw () =
               ~fee_parameter
               ~tx_rollup
               ~level
-              ~message:confliting_message
-              ~message_position:confliting_message_position
-              ~message_path:confliting_message_path
+              ~message:conflicting_message
+              ~message_position:conflicting_message_position
+              ~message_path:conflicting_message_path
               ~message_result_hash:rejected_message_result_hash
               ~message_result_path:rejected_message_result_path
               ~proof
@@ -2383,7 +2383,7 @@ let commands_rw () =
              storage_limit,
              counter )
            tx_rollup
-           (_, source)
+           source
            level
            message_position
            context_hash
@@ -2469,12 +2469,12 @@ let commands_rw () =
              storage_limit,
              counter )
            amount
-           (_, source)
-           (_, destination)
+           source
+           destination
            entrypoint
            contents
            ty
-           (_, ticketer)
+           ticketer
            cctxt ->
         match source with
         | Originated _ ->
@@ -2537,7 +2537,7 @@ let commands_rw () =
              fee_parameter,
              storage_limit,
              counter )
-           (_, source)
+           source
            pvm
            boot_sector
            cctxt ->
@@ -2605,7 +2605,7 @@ let commands_rw () =
              storage_limit,
              counter )
            messages
-           (_, source)
+           source
            rollup
            cctxt ->
         (match source with

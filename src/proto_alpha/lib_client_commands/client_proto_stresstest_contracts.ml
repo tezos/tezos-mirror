@@ -126,7 +126,7 @@ let init (cctxt : Protocol_client_context.full)
   >>=? fun () ->
   let init_one (alias, params) =
     Client_proto_contracts.ContractAlias.get_contract cctxt alias
-    >>=? fun (_, contract) ->
+    >>=? fun contract ->
     (match List.find (fun x -> String.equal alias x.alias) all_contracts with
     | None -> failwith "unknown smart contract alias: %s" alias
     | Some x -> return x)
@@ -174,7 +174,7 @@ let originate_command =
          ~name:"src"
          ~desc:"name of the source contract"
     @@ stop)
-    (fun () (_, source) (cctxt : Protocol_client_context.full) ->
+    (fun () source (cctxt : Protocol_client_context.full) ->
       match source with
       | Originated _ ->
           failwith "only implicit accounts can be the source of an origination"

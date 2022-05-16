@@ -62,7 +62,7 @@ val action_of_expr :
   (_, Script.prim) Tezos_micheline.Micheline.node ->
   action tzresult
 
-(** [convert_wrapped_parameter_into_action ccctx ~chain ~block
+(** [convert_wrapped_parameter_into_action cctxt ~chain ~block
    ~contract parameter] converts a wrapped FA1.2 contract [parameter]
    into the corresponding FA1.2 [action].
 

@@ -225,7 +225,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                verbose_signing )
              alias_name
              balance
-             (_, source)
+             source
              threshold
              keys
              (cctxt : #Protocol_client_context.full) ->
@@ -299,9 +299,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["using"; "secret"; "key"]
         @@ secret_key_param () @@ stop)
         (fun (parameter, entrypoint)
-             (_, multisig_contract)
+             multisig_contract
              amount
-             (_, destination)
+             destination
              sk
              (cctxt : #Protocol_client_context.full) ->
           let entrypoint =
@@ -338,7 +338,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["using"; "secret"; "key"]
         @@ secret_key_param () @@ stop)
         (fun ()
-             (_, multisig_contract)
+             multisig_contract
              lambda
              sk
              (cctxt : #Protocol_client_context.full) ->
@@ -370,7 +370,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["using"; "secret"; "key"]
         @@ secret_key_param () @@ stop)
         (fun ()
-             (_, multisig_contract)
+             multisig_contract
              delegate
              sk
              (cctxt : #Protocol_client_context.full) ->
@@ -395,10 +395,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["withdrawing"; "delegate"]
         @@ prefixes ["using"; "secret"; "key"]
         @@ secret_key_param () @@ stop)
-        (fun ()
-             (_, multisig_contract)
-             sk
-             (cctxt : #Protocol_client_context.full) ->
+        (fun () multisig_contract sk (cctxt : #Protocol_client_context.full) ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
             ~chain:cctxt#chain
@@ -425,7 +422,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["and"; "public"; "keys"; "to"]
         @@ seq_of_param (public_key_param ()))
         (fun ()
-             (_, multisig_contract)
+             multisig_contract
              sk
              new_threshold
              new_keys
@@ -477,10 +474,10 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                no_print_source,
                fee_parameter,
                entrypoint )
-             (_, multisig_contract)
+             multisig_contract
              amount
-             (_, destination)
-             (_, source)
+             destination
+             source
              signatures
              (cctxt : #Protocol_client_context.full) ->
           let entrypoint =
@@ -557,9 +554,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, multisig_contract)
+             multisig_contract
              lambda
-             (_, source)
+             source
              signatures
              (cctxt : #Protocol_client_context.full) ->
           match source with
@@ -624,9 +621,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, multisig_contract)
+             multisig_contract
              delegate
-             (_, source)
+             source
              signatures
              (cctxt : #Protocol_client_context.full) ->
           match source with
@@ -684,8 +681,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, multisig_contract)
-             (_, source)
+             multisig_contract
+             source
              signatures
              (cctxt : #Protocol_client_context.full) ->
           match source with
@@ -745,10 +742,10 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                counter,
                no_print_source,
                fee_parameter )
-             (_, multisig_contract)
+             multisig_contract
              new_threshold
              new_keys
-             (_, source)
+             source
              signatures
              (cctxt : #Protocol_client_context.full) ->
           match source with
@@ -824,8 +821,8 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                no_print_source,
                fee_parameter )
              bytes
-             (_, multisig_contract)
-             (_, source)
+             multisig_contract
+             source
              signatures
              (cctxt : #Protocol_client_context.full) ->
           match source with
@@ -881,9 +878,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              ~desc:"name/literal of the destination contract"
         @@ stop)
         (fun (bytes_only, parameter, entrypoint)
-             (_, multisig_contract)
+             multisig_contract
              amount
-             (_, destination)
+             destination
              (cctxt : #Protocol_client_context.full) ->
           let entrypoint =
             Option.value ~default:Entrypoint.default entrypoint
@@ -918,7 +915,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["running"; "lambda"]
         @@ lambda_param () @@ stop)
         (fun bytes_only
-             (_, multisig_contract)
+             multisig_contract
              lambda
              (cctxt : #Protocol_client_context.full) ->
           Lwt.return @@ Micheline_parser.no_parsing_error
@@ -949,7 +946,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              ~desc:"new delegate of the new multisig contract"
         @@ stop)
         (fun bytes_only
-             (_, multisig_contract)
+             multisig_contract
              new_delegate
              (cctxt : #Protocol_client_context.full) ->
           Client_proto_multisig.prepare_multisig_transaction
@@ -974,7 +971,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["withdrawing"; "delegate"]
         @@ stop)
         (fun bytes_only
-             (_, multisig_contract)
+             multisig_contract
              (cctxt : #Protocol_client_context.full) ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
@@ -1000,7 +997,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["and"; "public"; "keys"; "to"]
         @@ seq_of_param (public_key_param ()))
         (fun bytes_only
-             (_, multisig_contract)
+             multisig_contract
              new_threshold
              new_keys
              (cctxt : #Protocol_client_context.full) ->

@@ -382,7 +382,7 @@ code
           {
             UNPAIR ;
             # pair the payload with the current contract address, to ensure signatures
-            # can't be replayed accross different contracts if a key is reused.
+            # can't be replayed across different contracts if a key is reused.
             DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;
             PACK ; # form the binary payload that we expect to be signed
             DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP

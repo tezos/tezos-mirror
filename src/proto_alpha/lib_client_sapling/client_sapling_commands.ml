@@ -180,9 +180,9 @@ let shield_cmd =
            fee_parameter,
            message )
          amount
-         (_, source)
+         source
          sapling_dst
-         (_contract_name, contract_dst)
+         contract_dst
          cctxt ->
       keys_of_implicit_account cctxt source >>=? fun (pkh, src_pk, src_sk) ->
       let open Context in
@@ -270,8 +270,8 @@ let unshield_cmd =
            fee_parameter )
          amount
          (name, _sapling_uri)
-         (_, tz_dst)
-         (_contract_name, contract_dst)
+         tz_dst
+         contract_dst
          cctxt ->
       let open Context in
       let stez = Shielded_tez.of_tez amount in
@@ -376,7 +376,7 @@ let forge_shielded_cmd =
          amount
          (name, _sapling_uri)
          destination
-         (_contract_name, contract_dst)
+         contract_dst
          cctxt ->
       let open Context in
       let stez = Shielded_tez.of_tez amount in
@@ -440,13 +440,15 @@ let submit_shielded_cmd =
            fee_parameter,
            use_json_format )
          filename
-         (_, source)
-         (contract_name, destination)
+         source
+         destination
          (cctxt : Protocol_client_context.full) ->
+      let open Protocol.Alpha_context in
       cctxt#message
-        "Reading forge transaction from file %s -- sending it to %s@."
+        "Reading forge transaction from file %s -- sending it to %a@."
         filename
-        contract_name
+        Contract.pp
+        destination
       >>= fun () ->
       let open Context in
       (if use_json_format then
@@ -466,7 +468,6 @@ let submit_shielded_cmd =
       return (sapling_transaction_as_arg transaction) >>=? fun contract_input ->
       let chain = cctxt#chain and block = cctxt#block in
       keys_of_implicit_account cctxt source >>=? fun (source, src_pk, src_sk) ->
-      let open Protocol.Alpha_context in
       Client_proto_context.transfer
         cctxt
         ~chain
@@ -545,7 +546,7 @@ let use_key_for_contract_cmd =
     @@ stop)
     (fun default_memo_size
          (name, _sapling_uri)
-         (_contract_name, contract)
+         contract
          (cctxt : Protocol_client_context.full) ->
       Wallet.find_vk cctxt name >>=? fun vk ->
       Context.Client_state.register
@@ -645,7 +646,7 @@ let commands () =
           path
         >>= fun () ->
         (* TODO must pass contract address for now *)
-        let _, contract = WithExceptions.Option.get ~loc:__LOC__ contract_opt in
+        let contract = WithExceptions.Option.get ~loc:__LOC__ contract_opt in
         Context.Client_state.register
           cctxt
           ~default_memo_size
@@ -702,7 +703,7 @@ let commands () =
       @@ stop)
       (fun verbose
            (name, _sapling_uri)
-           (_contract_name, contract)
+           contract
            (cctxt : Protocol_client_context.full) ->
         Wallet.find_vk cctxt name >>= function
         | Error _ -> cctxt#error "Account %s not found" name
