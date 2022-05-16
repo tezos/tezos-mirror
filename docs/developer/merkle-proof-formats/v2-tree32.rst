@@ -27,7 +27,7 @@ Tree Proof
 Tree
 ~~~~
 
-Value of Tree
+value of tree
 ^^^^^^^^^^^^^
 
 Let ``p`` be the byte length of ``length``. If length < (1<<8) then p =
@@ -47,7 +47,7 @@ p = 3 now)
 | value                 | (length) bytes        | bytes                 |
 +-----------------------+-----------------------+-----------------------+
 
-Blinded_value of Tree
+blinded_value of tree
 ^^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ==========
@@ -57,7 +57,7 @@ tag  1 byte   0b11001000
 hash 32 bytes hash
 ==== ======== ==========
 
-Node of Tree
+node of tree
 ^^^^^^^^^^^^
 
 =================== ======== ======================================================
@@ -67,7 +67,7 @@ tag + length        1 byte   0b10yyyyyy where yyyyyy is length of list below (<=
 (step \* tree) list variable sequence of (`Step <#step>`__ \* `Tree <#tree>`__)
 =================== ======== ======================================================
 
-Blinded_node of Tree
+blinded_node of tree
 ^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ==========
@@ -77,11 +77,11 @@ tag  1 byte   0b11010000
 hash 32 bytes hash
 ==== ======== ==========
 
-Inode of Tree (Sparse Case)
+inode of tree (sparse case)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When proofs have **less than 15** trees, Sparse Case is selected.
-Otherwise, Dense Case is selected.
+When proofs have **less than 15** trees, sparse case is selected.
+Otherwise, dense case is selected.
 
 +-----------------------+-----------------------+-----------------------+
 | Name                  | Size                  | Contents              |
@@ -101,7 +101,7 @@ Otherwise, Dense Case is selected.
 |                       |                       | ree>`__)              |
 +-----------------------+-----------------------+-----------------------+
 
-Inode of Tree (Dense Case)
+inode of tree (dense case)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -122,7 +122,7 @@ Inode of Tree (Dense Case)
 |                       |                       | inode_tree is 32)     |
 +-----------------------+-----------------------+-----------------------+
 
-Extender of Tree
+extender of tree
 ^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -145,7 +145,7 @@ Extender of Tree
 Inode_tree
 ~~~~~~~~~~
 
-Blinded_inode of Inode_tree
+blinded_inode of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ==========
@@ -155,7 +155,7 @@ tag  1 byte   0b11000000
 hash 32 bytes hash
 ==== ======== ==========
 
-Inode_values of Inode_tree
+inode_values of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 =================== ======== ======================================================
@@ -165,7 +165,7 @@ tag+length          1 byte   0b10yyyyyy where yyyyyy is length of list below (<=
 (step \* tree) list variable sequence of (`Step <#step>`__ \* `Tree <#tree>`__)
 =================== ======== ======================================================
 
-Inode_trees of Inode_tree (Sparse Case)
+inode_trees of inode_tree (sparse case)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -186,7 +186,7 @@ Inode_trees of Inode_tree (Sparse Case)
 |                       |                       | ree>`__)              |
 +-----------------------+-----------------------+-----------------------+
 
-Inode_trees of Inode_tree (Dense Case)
+inode_trees of inode_tree (dense case)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -207,7 +207,7 @@ Inode_trees of Inode_tree (Dense Case)
 |                       |                       | inode_tree is 32)     |
 +-----------------------+-----------------------+-----------------------+
 
-Inode_extender of Inode_tree
+inode_extender of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -227,12 +227,12 @@ Inode_extender of Inode_tree
 |                       |                       | ree>`__               |
 +-----------------------+-----------------------+-----------------------+
 
-None of Inode_tree
+none of inode_tree
 ^^^^^^^^^^^^^^^^^^
 
-Used in proofs in `Inode of Tree (Dense
-Case) <#inode-of-tree-dense-case>`__ and `Inode_trees of Inode_tree
-(Dense Case) <#inode-trees-of-inode-tree-dense-case>`__
+Used in proofs in `inode of tree (dense
+case) <#inode-of-tree-dense-case>`__ and `inode_trees of inode_tree
+(dense case) <#inode-trees-of-inode-tree-dense-case>`__
 
 ==== ====== ==========
 Name Size   Contents
@@ -269,7 +269,7 @@ Stream Proof
 Elt
 ~~~
 
-Value of Elt
+value of elt
 ^^^^^^^^^^^^
 
 Let ``p`` be the byte length of ``length``. If length < (1<<8) then p =
@@ -289,7 +289,7 @@ p = 3 now)
 | value                 | (length) bytes        | bytes                 |
 +-----------------------+-----------------------+-----------------------+
 
-Node of Elt
+node of elt
 ^^^^^^^^^^^
 
 ========================== ======== ================================================================
@@ -299,12 +299,12 @@ tag + length               1 byte   0b10yyyyyy where yyyyyy is length of list be
 (step \* kinded_hash) list variable sequence of (`Step <#step>`__ \* `Kinded_hash <#kinded-hash>`__)
 ========================== ======== ================================================================
 
-Inode of Elt (Sparse Case)
+inode of elt (sparse case)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When proofs have **less than 15** hashes, Sparse Case is selected.
-Otherwise, Dense Case is selected. Hashes that ``proof`` contains are encoded
-as `Optional_hash <#optional-hash>`__ (`Some Case <#some-case>`__ is always selected).
+When proofs have **less than 15** hashes, sparse case is selected.
+Otherwise, dense case is selected. Hashes that ``proof`` contains are encoded
+as `Optional_hash <#optional-hash>`__ (`some_case <#some-case>`__ is always selected).
 
 +-----------------------+-----------------------+-----------------------+
 | Name                  | Size                  | Contents              |
@@ -324,7 +324,7 @@ as `Optional_hash <#optional-hash>`__ (`Some Case <#some-case>`__ is always sele
 |                       |                       | onal-hash>`__)        |
 +-----------------------+-----------------------+-----------------------+
 
-Inode of Elt (Dense Case)
+inode of elt (dense case)
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -345,7 +345,7 @@ Inode of Elt (Dense Case)
 |                       |                       | is 32)                |
 +-----------------------+-----------------------+-----------------------+
 
-Inode_extender of Elt
+inode_extender of elt
 ^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -419,7 +419,7 @@ content (length) bytes 5bit integers with terminal
 Optional_hash
 ~~~~~~~~~~~~~
 
-None Case
+none case
 ^^^^^^^^^
 
 ==== ====== ==========
@@ -428,7 +428,7 @@ Name Size   Contents
 tag  1 byte 0b00000000
 ==== ====== ==========
 
-Some Case
+some case
 ^^^^^^^^^
 
 ==== ======== ==========

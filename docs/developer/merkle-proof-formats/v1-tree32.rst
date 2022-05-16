@@ -26,7 +26,7 @@ hash 32 bytes hash
 Tree
 ~~~~
 
-Value of Tree
+value of tree
 ^^^^^^^^^^^^^
 
 ===== ======== ==================
@@ -36,7 +36,7 @@ tag   1 byte   0x00
 value variable `Bytes <#bytes>`__
 ===== ======== ==================
 
-Blinded_value of Tree
+blinded_value of tree
 ^^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ========
@@ -46,7 +46,7 @@ tag  1 byte   0x01
 hash 32 bytes hash
 ==== ======== ========
 
-Node of Tree
+node of tree
 ^^^^^^^^^^^^
 
 =================== ============== ==================================================
@@ -57,7 +57,7 @@ length              4 bytes        byte length of below list
 (step \* tree) list (length) bytes sequence of (`Step <#step>`__ \* `Tree <#tree>`__)
 =================== ============== ==================================================
 
-Blinded_node of Tree
+blinded_node of tree
 ^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ========
@@ -67,7 +67,7 @@ tag  1 byte   0x03
 hash 32 bytes hash
 ==== ======== ========
 
-Inode of Tree
+inode of tree
 ^^^^^^^^^^^^^
 
 ====== ======== ================================
@@ -78,7 +78,7 @@ length 8 bytes  uint64
 proofs variable `Inode_proofs <#inode-proofs>`__
 ====== ======== ================================
 
-Extender of Tree
+extender of tree
 ^^^^^^^^^^^^^^^^
 
 ======= ======== ============================
@@ -93,7 +93,7 @@ proof   variable `Inode_tree <#inode-tree>`__
 Inode_tree
 ~~~~~~~~~~
 
-Blinded_inode of Inode_tree
+blinded_inode of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ========
@@ -103,7 +103,7 @@ tag  1 byte   0x00
 hash 32 bytes hash
 ==== ======== ========
 
-Inode_values of Inode_tree
+inode_values of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 =================== ============== ==================================================
@@ -114,7 +114,7 @@ length              4 bytes        byte length of below list
 (step \* tree) list (length) bytes sequence of (`Step <#step>`__ \* `Tree <#tree>`__)
 =================== ============== ==================================================
 
-Inode_trees of Inode_tree
+inode_trees of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ====== ======== ================================
@@ -125,7 +125,7 @@ length 8 bytes  uint64
 proofs variable `Inode_proofs <#inode-proofs>`__
 ====== ======== ================================
 
-Inode_extender of Inode_tree
+inode_extender of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ======= ======== ============================
@@ -137,10 +137,10 @@ segment variable `Segment <#segment>`__
 proof   variable `Inode_tree <#inode-tree>`__
 ======= ======== ============================
 
-None of Inode_tree
+none of inode_tree
 ^^^^^^^^^^^^^^^^^^
 
-Used in `Dense Case of Inode_proofs <#dense-case-of-inode-proofs>`__
+Used in `dense case of inode_proofs <#dense-case-of-inode-proofs>`__
 below
 
 ==== ====== ========
@@ -152,10 +152,10 @@ tag  1 byte 0x04
 Inode_proofs
 ~~~~~~~~~~~~
 
-When Inode_proofs has less than 16 trees, Sparse Case is selected.
-Otherwise, Dense Case is selected.
+When Inode_proofs has less than 16 trees, sparse case is selected.
+Otherwise, dense case is selected.
 
-Sparse Case of Inode_proofs
+sparse case of inode_proofs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ========================== ============== ===================================================
@@ -166,7 +166,7 @@ length                     4 bytes        byte length of below list
 (index \* inode_tree) list (length) bytes sequense of (uint8 \* `inode-tree <#inode-tree>`__)
 ========================== ============== ===================================================
 
-Dense Case of Inode_proofs
+dense case of inode_proofs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -197,7 +197,7 @@ state   (length) bytes sequence of `Elt <#elt>`__
 Elt
 ~~~
 
-Value of Elt
+value of elt
 ^^^^^^^^^^^^
 
 ===== ======== ==================
@@ -207,7 +207,7 @@ tag   1 byte   0x00
 value variable `Bytes <#bytes>`__
 ===== ======== ==================
 
-Node of Elt
+node of elt
 ^^^^^^^^^^^
 
 ========================== ============== ================================================================
@@ -218,7 +218,7 @@ length                     4 bytes        byte length of below list
 (step \* kinded_hash) list (length) bytes sequence of (`Step <#step>`__ \* `Kinded_hash <#kinded-hash>`__)
 ========================== ============== ================================================================
 
-Inode of Elt
+inode of elt
 ^^^^^^^^^^^^
 
 ====== ======== ================================================
@@ -229,7 +229,7 @@ length 8 bytes  uint64
 proofs variable `Inode_proofs_of_hash <#inode-proofs-of-hash>`__
 ====== ======== ================================================
 
-Inode_extender of Elt
+inode_extender of elt
 ^^^^^^^^^^^^^^^^^^^^^
 
 ======= ======== ======================
@@ -244,10 +244,10 @@ hash    32 bytes hash
 Inode_proofs_of_hash
 ~~~~~~~~~~~~~~~~~~~~
 
-When Inode_proofs_of_hash has less than 16 trees, Sparse Case is
-selected. Otherwise, Dense Case is selected.
+When Inode_proofs_of_hash has less than 16 trees, sparse case is
+selected. Otherwise, dense case is selected.
 
-Sparse Case of Inode_proofs_of_hash
+sparse case of inode_proofs_of_hash
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ==================== ============== =========================================================
@@ -258,7 +258,7 @@ length               4 bytes        byte length of below list
 (index \* hash) list (length) bytes sequense of (uint8 \* `Optional_hash <#optional-hash>`__)
 ==================== ============== =========================================================
 
-Dense Case of Inode_proofs_hash
+dense case of inode_proofs_hash
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -326,7 +326,7 @@ content (length) bytes 5bit integers with termination
 Optional_hash
 ~~~~~~~~~~~~~
 
-None Case
+none case
 ^^^^^^^^^
 
 ==== ====== ========
@@ -335,7 +335,7 @@ Name Size   Contents
 tag  1 byte 0x00
 ==== ====== ========
 
-Some Case
+some case
 ^^^^^^^^^
 
 ==== ======== ========

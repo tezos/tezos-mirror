@@ -2,9 +2,9 @@ V2 for Tree2
 ============
 
 Same as :doc:`./v2-tree32`
-except `Inode of Tree <#inode-of-tree>`__, `Inode_trees of
-Inode_tree <#inode-trees-of-inode-tree>`__, `Inode of
-Elt <#inode-of-elt>`__ and `Segment <#segment>`__
+except `inode of tree <#inode-of-tree>`__, `inode_trees of
+inode_tree <#inode-trees-of-inode-tree>`__, `inode of
+elt <#inode-of-elt>`__ and `Segment <#segment>`__
 
 Tree Proof
 ----------
@@ -32,7 +32,7 @@ Tree Proof
 Tree
 ~~~~
 
-Value of Tree
+value of tree
 ^^^^^^^^^^^^^
 
 Let ``p`` be the byte length of ``length``. If length < (1<<8) then p =
@@ -52,7 +52,7 @@ p = 3 now)
 | value                 | (length) bytes        | bytes                 |
 +-----------------------+-----------------------+-----------------------+
 
-Blinded_value of Tree
+blinded_value of tree
 ^^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ==========
@@ -62,7 +62,7 @@ tag  1 byte   0b11001000
 hash 32 bytes hash
 ==== ======== ==========
 
-Node of Tree
+node of tree
 ^^^^^^^^^^^^
 
 =================== ======== ==================================================
@@ -72,7 +72,7 @@ tag + length        1 byte   0b100000yy where yy is length of list below (<=2)
 (step \* tree) list variable sequence of (`Step <#step>`__ \* `Tree <#tree>`__)
 =================== ======== ==================================================
 
-Blinded_node of Tree
+blinded_node of tree
 ^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ==========
@@ -82,7 +82,7 @@ tag  1 byte   0b11010000
 hash 32 bytes hash
 ==== ======== ==========
 
-Inode of Tree
+inode of tree
 ^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -105,7 +105,7 @@ Inode of Tree
 |                       |                       | ree>`__               |
 +-----------------------+-----------------------+-----------------------+
 
-Extender of Tree
+extender of tree
 ^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -128,7 +128,7 @@ Extender of Tree
 Inode_tree
 ~~~~~~~~~~
 
-Blinded_inode of Inode_tree
+blinded_inode of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ==== ======== ==========
@@ -138,7 +138,7 @@ tag  1 byte   0b11000000
 hash 32 bytes hash
 ==== ======== ==========
 
-Inode_values of Inode_tree
+inode_values of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 =================== ======== ==================================================
@@ -148,7 +148,7 @@ tag + length        1 byte   0b100000yy where yy is length of list below (<=2)
 (step \* tree) list variable sequence of (`Step <#step>`__ \* `Tree <#tree>`__)
 =================== ======== ==================================================
 
-Inode_trees of Inode_tree
+inode_trees of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -171,7 +171,7 @@ Inode_trees of Inode_tree
 |                       |                       | ree>`__               |
 +-----------------------+-----------------------+-----------------------+
 
-Inode_extender of Inode_tree
+inode_extender of inode_tree
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -191,11 +191,11 @@ Inode_extender of Inode_tree
 |                       |                       | ree>`__               |
 +-----------------------+-----------------------+-----------------------+
 
-None of Inode_tree
+none of inode_tree
 ^^^^^^^^^^^^^^^^^^
 
-Used in proofs in `Inode of Tree <#inode-of-tree>`__ and `Inode_trees of
-Inode_tree <#inode-trees-of-inode-tree>`__
+Used in proofs in `inode of tree <#inode-of-tree>`__ and `inode_trees of
+inode_tree <#inode-trees-of-inode-tree>`__
 
 ==== ====== ==========
 Name Size   Contents
@@ -233,7 +233,7 @@ Stream Proof
 Elt
 ~~~
 
-Value of Elt
+value of elt
 ^^^^^^^^^^^^
 
 Let ``p`` be the byte length of ``length``. If length < (1<<8) then p =
@@ -253,7 +253,7 @@ p = 3 now)
 | value                 | (length) bytes        | bytes                 |
 +-----------------------+-----------------------+-----------------------+
 
-Node of Elt
+node of elt
 ^^^^^^^^^^^
 
 ========================== ======== ================================================================
@@ -263,7 +263,7 @@ tag + length               1 byte   0b100000yy where yy is length of list below 
 (step \* kinded_hash) list variable sequence of (`Step <#step>`__ \* `Kinded_hash <#kinded-hash>`__)
 ========================== ======== ================================================================
 
-Inode of Elt
+inode of elt
 ^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
@@ -286,7 +286,7 @@ Inode of Elt
 |                       |                       | (same as above)       |
 +-----------------------+-----------------------+-----------------------+
 
-Inode_extender of Elt
+inode_extender of elt
 ^^^^^^^^^^^^^^^^^^^^^
 
 +-----------------------+-----------------------+-----------------------+
