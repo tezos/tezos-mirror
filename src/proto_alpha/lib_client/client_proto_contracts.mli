@@ -31,7 +31,7 @@ module RawContractAlias : Client_aliases.Alias with type t = Contract.t
 
 module ContractAlias : sig
   val get_contract :
-    #Client_context.wallet -> string -> (string * Contract.t) tzresult Lwt.t
+    #Client_context.wallet -> string -> Contract.t tzresult Lwt.t
 
   val alias_param :
     ?name:string ->

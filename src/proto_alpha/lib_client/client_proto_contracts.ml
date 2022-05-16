@@ -52,7 +52,7 @@ module ContractAlias = struct
 
   let find_key cctxt name =
     Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
-    return (name, Contract.Implicit v)
+    return (Contract.Implicit v)
 
   let rev_find cctxt (c : Contract.t) =
     match c with
@@ -65,7 +65,7 @@ module ContractAlias = struct
   let get_contract cctxt s =
     match String.split ~limit:1 ':' s with
     | ["key"; key] -> find_key cctxt key
-    | _ -> find cctxt s
+    | _ -> find cctxt s >|=? snd
 
   let autocomplete cctxt =
     Client_keys.Public_key_hash.autocomplete cctxt >>=? fun keys ->
@@ -78,12 +78,7 @@ module ContractAlias = struct
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
          Use 'key:name' to force the later."
     in
-    Clic.(
-      param
-        ~name
-        ~desc
-        (parameter ~autocomplete (fun cctxt p -> get_contract cctxt p >|=? snd))
-        next)
+    Clic.(param ~name ~desc (parameter ~autocomplete get_contract) next)
 
   let find_destination cctxt s =
     match String.split ~limit:1 ':' s with

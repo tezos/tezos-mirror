@@ -126,7 +126,7 @@ let init (cctxt : Protocol_client_context.full)
   >>=? fun () ->
   let init_one (alias, params) =
     Client_proto_contracts.ContractAlias.get_contract cctxt alias
-    >>=? fun (_, contract) ->
+    >>=? fun contract ->
     (match List.find (fun x -> String.equal alias x.alias) all_contracts with
     | None -> failwith "unknown smart contract alias: %s" alias
     | Some x -> return x)
