@@ -42,13 +42,9 @@ module type PROTOCOL_SERVICES = sig
   val endorsing_rights : wrap_full -> Int32.t -> endorsing_rights tzresult Lwt.t
 
   val couple_ops_to_rights :
-    (Operation_kind.t * error trace option * Ptime.t * Int32.t option * int)
-    list ->
+    (int * 'a) list ->
     endorsing_rights ->
-    (Signature.public_key_hash
-    * (Operation_kind.t * Int32.t option * error trace option * Ptime.t) list)
-    list
-    * Signature.public_key_hash list
+    (Signature.public_key_hash * 'a) list * Signature.public_key_hash list
 
   type block_id
 
@@ -101,20 +97,26 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
     let () = Archiver.add_received ?unaccurate level endorsements in
     return_unit
 
+  let rec pack_by_slot i e = function
+    | ((i', l) as x) :: t ->
+        if Int.equal i i' then (i, e :: l) :: t else x :: pack_by_slot i e t
+    | [] -> [(i, [e])]
+
   let endorsements_recorder cctxt current_level =
     let* (op_stream, _stopper) =
       Protocol_services.consensus_operation_stream cctxt
     in
     let*! out =
       Lwt_stream.fold
-        (fun ((_hash, ((block, level, op_kind, round), news)), errors) acc ->
+        (fun ((_hash, ((block, level, op_kind, round), slot)), errors) acc ->
           let delay = Time.System.now () in
           Protocol_services.BlockIdMap.update
             block
             (function
               | Some (_, l) ->
-                  Some (level, (op_kind, errors, delay, round, news) :: l)
-              | None -> Some (level, [(op_kind, errors, delay, round, news)]))
+                  Some
+                    (level, pack_by_slot slot (op_kind, round, errors, delay) l)
+              | None -> Some (level, [(slot, [(op_kind, round, errors, delay)])]))
             acc)
         op_stream
         Protocol_services.BlockIdMap.empty

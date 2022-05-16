@@ -67,24 +67,13 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let couple_ops_to_rights ops rights =
     let (items, missing) =
       List.fold_left
-        (fun (acc, remaining_rights) (op_kind, errors, delay, round, slot) ->
+        (fun (acc, remaining_rights) (slot, ops) ->
           match
             List.partition (fun right -> same_slot slot right) remaining_rights
           with
-          | (_ :: _ :: _, _) -> assert false
+          | (([] | _ :: _ :: _), _) -> assert false
           | ([right], rights') ->
-              ( ( right.Plugin.RPC.Endorsing_rights.delegate,
-                  [(op_kind, round, errors, delay)] )
-                :: acc,
-                rights' )
-          | ([], _) -> (
-              match List.find (fun right -> same_slot slot right) rights with
-              | None -> assert false
-              | Some right ->
-                  ( ( right.Plugin.RPC.Endorsing_rights.delegate,
-                      [(op_kind, round, errors, delay)] )
-                    :: acc,
-                    remaining_rights )))
+              ((right.Plugin.RPC.Endorsing_rights.delegate, ops) :: acc, rights'))
         ([], rights)
         ops
     in

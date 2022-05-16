@@ -47,13 +47,9 @@ module type PROTOCOL_SERVICES = sig
      TODO: it might be clearer to use a map instead of an association
      list for [participating]. *)
   val couple_ops_to_rights :
-    (Operation_kind.t * error trace option * Ptime.t * Int32.t option * int)
-    list ->
+    (int * 'a) list ->
     endorsing_rights ->
-    (Signature.public_key_hash
-    * (Operation_kind.t * Int32.t option * error trace option * Ptime.t) list)
-    list
-    * Signature.public_key_hash list
+    (Signature.public_key_hash * 'a) list * Signature.public_key_hash list
 
   type block_id
 
