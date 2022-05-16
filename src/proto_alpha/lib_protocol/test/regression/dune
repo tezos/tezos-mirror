@@ -1,0 +1,20 @@
+(test
+ (name main)
+ (package tezos-protocol-alpha-tests)
+ (deps (glob_files contracts/*)
+       (glob_files tezt/_regressions/*))
+ (libraries tezt
+            tezos-base
+            tezos-protocol-alpha
+            tezos-protocol-alpha-parameters
+            tezos-protocol-plugin-alpha
+            tezos-base-test-helpers
+            tezos-alpha-test-helpers
+            tezos-micheline)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha
+                   -open Tezos_protocol_plugin_alpha
+                   -open Tezos_client_alpha
+                   -open Tezos_alpha_test_helpers
+                   -open Tezos_base_test_helpers
+                   -open Tezos_micheline)))

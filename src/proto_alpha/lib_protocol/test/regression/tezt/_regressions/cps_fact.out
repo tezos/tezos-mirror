@@ -1,0 +1,269 @@
+cps_fact.out
+
+trace
+  - UNPAIR (interp) @ location: 7
+    [ (Pair 2 60) ]
+  - UNPAIR (entry) @ location: 7
+    [ (Pair 2 60) ]
+    - log/DIP (exit) @ location: 7
+      [ 2
+        60 ]
+  - DIP (entry) @ location: 8
+    [ 2
+      60 ]
+    - log/SELF (exit) @ location: 8
+      [ 60 ]
+  - SELF (entry) @ location: 10
+    [ 60 ]
+    - log/ADDRESS (exit) @ location: 10
+      [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+        60 ]
+  - ADDRESS (entry) @ location: 11
+    [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+      60 ]
+    - log/SENDER (exit) @ location: 11
+      [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+        60 ]
+  - SENDER (entry) @ location: 12
+    [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+      60 ]
+    - log/COMPARE (exit) @ location: 12
+      [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+        "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+        60 ]
+  - COMPARE (entry) @ location: 14
+    [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+      "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+      60 ]
+    - log/EQ (exit) @ location: 14
+      [ 0
+        60 ]
+  - EQ (entry) @ location: 15
+    [ 0
+      60 ]
+    - log/IF (exit) @ location: 15
+      [ True
+        60 ]
+  - IF (entry) @ location: 16
+    [ True
+      60 ]
+    - log/[halt] (exit) @ location: 16
+      [ 60 ]
+  - [halt] (entry) @ location: 9
+    [ 60 ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 16
+      [ 60 ]
+  - [halt] (entry) @ location: 9
+    [ 60 ]
+    - control: KUndip
+    - control: KCons
+    - log/DUP (exit) @ location: 8
+      [ 2
+        60 ]
+  - DUP (entry) @ location: 23
+    [ 2
+      60 ]
+    - log/CONST (exit) @ location: 23
+      [ 2
+        2
+        60 ]
+  - CONST (entry) @ location: 24
+    [ 2
+      2
+      60 ]
+    - log/COMPARE (exit) @ location: 24
+      [ 1
+        2
+        2
+        60 ]
+  - COMPARE (entry) @ location: 28
+    [ 1
+      2
+      2
+      60 ]
+    - log/GE (exit) @ location: 28
+      [ -1
+        2
+        60 ]
+  - GE (entry) @ location: 29
+    [ -1
+      2
+      60 ]
+    - log/IF (exit) @ location: 29
+      [ False
+        2
+        60 ]
+  - IF (entry) @ location: 30
+    [ False
+      2
+      60 ]
+    - log/CONST (exit) @ location: 30
+      [ 2
+        60 ]
+  - CONST (entry) @ location: 37
+    [ 2
+      60 ]
+    - log/SWAP (exit) @ location: 37
+      [ 1
+        2
+        60 ]
+  - SWAP (entry) @ location: 40
+    [ 1
+      2
+      60 ]
+    - log/SUB (exit) @ location: 40
+      [ 2
+        1
+        60 ]
+  - SUB (entry) @ location: 41
+    [ 2
+      1
+      60 ]
+    - log/ISNAT (exit) @ location: 41
+      [ 1
+        60 ]
+  - ISNAT (entry) @ location: 42
+    [ 1
+      60 ]
+    - log/IF_NONE (exit) @ location: 42
+      [ (Some 1)
+        60 ]
+  - IF_NONE (entry) @ location: 43
+    [ (Some 1)
+      60 ]
+    - log/DUP (exit) @ location: 43
+      [ 1
+        60 ]
+  - DUP (entry) @ location: 49
+    [ 1
+      60 ]
+    - log/DIP (exit) @ location: 49
+      [ 1
+        1
+        60 ]
+  - DIP (entry) @ location: 50
+    [ 1
+      1
+      60 ]
+    - log/CONST (exit) @ location: 50
+      [ 1
+        60 ]
+  - CONST (entry) @ location: 52
+    [ 1
+      60 ]
+    - log/ADD (exit) @ location: 52
+      [ 1
+        1
+        60 ]
+  - ADD (entry) @ location: 55
+    [ 1
+      1
+      60 ]
+    - log/MUL (exit) @ location: 55
+      [ 2
+        60 ]
+  - MUL (entry) @ location: 56
+    [ 2
+      60 ]
+    - log/[halt] (exit) @ location: 56
+      [ 120 ]
+  - [halt] (entry) @ location: 51
+    [ 120 ]
+    - control: KUndip
+    - control: KCons
+    - log/SWAP (exit) @ location: 50
+      [ 1
+        120 ]
+  - SWAP (entry) @ location: 57
+    [ 1
+      120 ]
+    - log/DIP (exit) @ location: 57
+      [ 120
+        1 ]
+  - DIP (entry) @ location: 58
+    [ 120
+      1 ]
+    - log/DIP (exit) @ location: 58
+      [ 1 ]
+  - DIP (entry) @ location: 60
+    [ 1 ]
+    - log/SELF (exit) @ location: 60
+      [  ]
+  - SELF (entry) @ location: 62
+    [  ]
+    - log/CONST (exit) @ location: 62
+      [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" ]
+  - CONST (entry) @ location: 63
+    [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" ]
+    - log/[halt] (exit) @ location: 63
+      [ 0
+        "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" ]
+  - [halt] (entry) @ location: 61
+    [ 0
+      "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" ]
+    - control: KUndip
+    - control: KCons
+    - log/TRANSFER_TOKENS (exit) @ location: 60
+      [ 1
+        0
+        "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" ]
+  - TRANSFER_TOKENS (entry) @ location: 66
+    [ 1
+      0
+      "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" ]
+    - log/NIL (exit) @ location: 66
+      [ 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 ]
+  - NIL (entry) @ location: 67
+    [ 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 ]
+    - log/SWAP (exit) @ location: 67
+      [ {}
+        0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 ]
+  - SWAP (entry) @ location: 69
+    [ {}
+      0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 ]
+    - log/CONS (exit) @ location: 69
+      [ 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001
+        {} ]
+  - CONS (entry) @ location: 70
+    [ 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001
+      {} ]
+    - log/[halt] (exit) @ location: 70
+      [ { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 } ]
+  - [halt] (entry) @ location: 59
+    [ { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 } ]
+    - control: KUndip
+    - control: KCons
+    - log/SWAP (exit) @ location: 58
+      [ 120
+        { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 } ]
+  - SWAP (entry) @ location: 71
+    [ 120
+      { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 } ]
+    - log/PAIR (exit) @ location: 71
+      [ { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+        120 ]
+  - PAIR (entry) @ location: 72
+    [ { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+      120 ]
+    - log/[halt] (exit) @ location: 72
+      [ (Pair { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+              120) ]
+  - [halt] (entry) @ location: 6
+    [ (Pair { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+            120) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 43
+      [ (Pair { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+              120) ]
+  - [halt] (entry) @ location: 6
+    [ (Pair { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+            120) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 30
+      [ (Pair { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+              120) ]
+  - [halt] (entry) @ location: 6
+    [ (Pair { 0x000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000ff00000000020001 }
+            120) ]
+    - control: KNil

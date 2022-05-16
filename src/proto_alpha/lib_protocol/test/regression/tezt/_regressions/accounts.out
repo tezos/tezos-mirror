@@ -1,0 +1,167 @@
+accounts.out
+
+trace
+  - DUP (interp) @ location: 15
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - DUP (entry) @ location: 15
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - log/CAR (exit) @ location: 15
+      [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {})
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - CAR (entry) @ location: 16
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {})
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - log/IF_LEFT (exit) @ location: 16
+      [ (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - IF_LEFT (entry) @ location: 17
+    [ (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - log/DUP (exit) @ location: 17
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - DUP (entry) @ location: 19
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - log/DIP (exit) @ location: 19
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - DIP (entry) @ location: 20
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - log/CDR (exit) @ location: 20
+      [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - CDR (entry) @ location: 23
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - log/DUP (exit) @ location: 23
+      [ {} ]
+  - DUP (entry) @ location: 24
+    [ {} ]
+    - log/[halt] (exit) @ location: 24
+      [ {}
+        {} ]
+  - [halt] (entry) @ location: 22
+    [ {}
+      {} ]
+    - control: KCons
+    - CONST (entry) @ location: 20
+      [ {}
+        {} ]
+      - log/CONST (exit) @ location: 20
+        [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+          {}
+          {} ]
+    - CONST (entry) @ location: 20
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        {} ]
+      - log/log/log/DIP (exit) @ location: 20
+        [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+          "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+          {}
+          {} ]
+    - log/DIP (exit) @ location: 20
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        {} ]
+  - DIP (entry) @ location: 25
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {}
+      {} ]
+    - log/SWAP (exit) @ location: 25
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        {} ]
+  - SWAP (entry) @ location: 27
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {}
+      {} ]
+    - log/[halt] (exit) @ location: 27
+      [ {}
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - [halt] (entry) @ location: 27
+    [ {}
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - control: KUndip
+    - control: KCons
+    - log/GET (exit) @ location: 25
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - GET (entry) @ location: 28
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {}
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - log/IF_NONE (exit) @ location: 28
+      [ None
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - IF_NONE (entry) @ location: 30
+    [ None
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - log/DIP (exit) @ location: 30
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - DIP (entry) @ location: 32
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - log/AMOUNT (exit) @ location: 32
+      [ {} ]
+  - AMOUNT (entry) @ location: 34
+    [ {} ]
+    - log/SOME (exit) @ location: 34
+      [ 0
+        {} ]
+  - SOME (entry) @ location: 35
+    [ 0
+      {} ]
+    - log/[halt] (exit) @ location: 35
+      [ (Some 0)
+        {} ]
+  - [halt] (entry) @ location: 33
+    [ (Some 0)
+      {} ]
+    - control: KUndip
+    - control: KCons
+    - log/UPDATE (exit) @ location: 32
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        (Some 0)
+        {} ]
+  - UPDATE (entry) @ location: 36
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Some 0)
+      {} ]
+    - log/NIL (exit) @ location: 36
+      [ { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+  - NIL (entry) @ location: 37
+    [ { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+    - log/PAIR (exit) @ location: 37
+      [ {}
+        { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+  - PAIR (entry) @ location: 39
+    [ {}
+      { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+    - log/[halt] (exit) @ location: 39
+      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+  - [halt] (entry) @ location: 14
+    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 30
+      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+  - [halt] (entry) @ location: 14
+    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 17
+      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+  - [halt] (entry) @ location: 14
+    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    - control: KNil
