@@ -731,6 +731,37 @@ module Constants : sig
 
     val dal_encoding : dal Data_encoding.t
 
+    type tx_rollup = {
+      enable : bool;
+      origination_size : int;
+      hard_size_limit_per_inbox : int;
+      hard_size_limit_per_message : int;
+      commitment_bond : Tez.t;
+      finality_period : int;
+      withdraw_period : int;
+      max_inboxes_count : int;
+      max_messages_per_inbox : int;
+      max_commitments_count : int;
+      cost_per_byte_ema_factor : int;
+      max_ticket_payload_size : int;
+      max_withdrawals_per_batch : int;
+      rejection_max_proof_size : int;
+      sunset_level : int32;
+    }
+
+    type sc_rollup = {
+      enable : bool;
+      origination_size : int;
+      challenge_window_in_blocks : int;
+      max_available_messages : int;
+      stake_amount : Tez.t;
+      commitment_period_in_blocks : int;
+      commitment_storage_size_in_bytes : int;
+      max_lookahead_in_blocks : int32;
+      max_active_outbox_levels : int32;
+      max_outbox_messages_per_level : int;
+    }
+
     type t = {
       preserved_cycles : int;
       blocks_per_cycle : int32;
@@ -768,32 +799,9 @@ module Constants : sig
       cache_script_size : int;
       cache_stake_distribution_cycles : int;
       cache_sampler_state_cycles : int;
-      tx_rollup_enable : bool;
-      tx_rollup_origination_size : int;
-      tx_rollup_hard_size_limit_per_inbox : int;
-      tx_rollup_hard_size_limit_per_message : int;
-      tx_rollup_commitment_bond : Tez.t;
-      tx_rollup_finality_period : int;
-      tx_rollup_withdraw_period : int;
-      tx_rollup_max_inboxes_count : int;
-      tx_rollup_max_messages_per_inbox : int;
-      tx_rollup_max_commitments_count : int;
-      tx_rollup_cost_per_byte_ema_factor : int;
-      tx_rollup_max_ticket_payload_size : int;
-      tx_rollup_max_withdrawals_per_batch : int;
-      tx_rollup_rejection_max_proof_size : int;
-      tx_rollup_sunset_level : int32;
+      tx_rollup : tx_rollup;
       dal : dal;
-      sc_rollup_enable : bool;
-      sc_rollup_origination_size : int;
-      sc_rollup_challenge_window_in_blocks : int;
-      sc_rollup_max_available_messages : int;
-      sc_rollup_stake_amount : Tez.t;
-      sc_rollup_commitment_period_in_blocks : int;
-      sc_rollup_commitment_storage_size_in_bytes : int;
-      sc_rollup_max_lookahead_in_blocks : int32;
-      sc_rollup_max_active_outbox_levels : int32;
-      sc_rollup_max_outbox_messages_per_level : int;
+      sc_rollup : sc_rollup;
     }
 
     val encoding : t Data_encoding.t

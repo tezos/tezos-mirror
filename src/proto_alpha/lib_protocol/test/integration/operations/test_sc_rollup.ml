@@ -70,9 +70,13 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10) tup =
     tup
     {
       Context.default_test_constants with
-      sc_rollup_enable = true;
       consensus_threshold = 0;
-      sc_rollup_challenge_window_in_blocks;
+      sc_rollup =
+        {
+          Context.default_test_constants.sc_rollup with
+          enable = true;
+          challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+        };
     }
 
 (** [test_disable_feature_flag ()] tries to originate a smart contract
@@ -200,7 +204,7 @@ let test_publish_and_cement () =
   let* b = Incremental.finalize_block i in
   let* constants = Context.get_constants (B b) in
   let* b =
-    Block.bake_n constants.parametric.sc_rollup_challenge_window_in_blocks b
+    Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
   let hash = Sc_rollup.Commitment.hash c in
@@ -258,7 +262,7 @@ let test_cement_fails_on_conflict () =
   let* b = Incremental.finalize_block i in
   let* constants = Context.get_constants (B b) in
   let* b =
-    Block.bake_n constants.parametric.sc_rollup_challenge_window_in_blocks b
+    Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
   let hash = Sc_rollup.Commitment.hash commitment1 in
@@ -408,7 +412,7 @@ let test_atomic_batch_fails () =
   let* b = Incremental.finalize_block i in
   let* constants = Context.get_constants (B b) in
   let* b =
-    Block.bake_n constants.parametric.sc_rollup_challenge_window_in_blocks b
+    Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
   let hash = Sc_rollup.Commitment.hash c in

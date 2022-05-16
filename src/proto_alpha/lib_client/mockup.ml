@@ -35,6 +35,37 @@ module Protocol_constants_overrides = struct
   (** Equivalent of [Constants.parametric] with additionally [chain_id] and [timestamp] but each field is wrapped in an [option].
       [Some] is an override, [None] means "Use the default value".
   *)
+  type tx_rollup = {
+    enable : bool option;
+    origination_size : int option;
+    hard_size_limit_per_inbox : int option;
+    hard_size_limit_per_message : int option;
+    max_withdrawals_per_batch : int option;
+    commitment_bond : Tez.t option;
+    finality_period : int option;
+    max_inboxes_count : int option;
+    withdraw_period : int option;
+    max_messages_per_inbox : int option;
+    max_commitments_count : int option;
+    cost_per_byte_ema_factor : int option;
+    max_ticket_payload_size : int option;
+    rejection_max_proof_size : int option;
+    sunset_level : int32 option;
+  }
+
+  type sc_rollup = {
+    enable : bool option;
+    origination_size : int option;
+    challenge_window_in_blocks : int option;
+    max_available_messages : int option;
+    stake_amount : Tez.t option;
+    commitment_period_in_blocks : int option;
+    commitment_storage_size_in_bytes : int option;
+    max_lookahead_in_blocks : int32 option;
+    max_active_outbox_levels : int32 option;
+    max_outbox_messages_per_level : int option;
+  }
+
   type t = {
     preserved_cycles : int option;
     blocks_per_cycle : int32 option;
@@ -71,39 +102,136 @@ module Protocol_constants_overrides = struct
     cache_script_size : int option;
     cache_stake_distribution_cycles : int option;
     cache_sampler_state_cycles : int option;
-    tx_rollup_enable : bool option;
-    tx_rollup_origination_size : int option;
-    tx_rollup_hard_size_limit_per_inbox : int option;
-    tx_rollup_hard_size_limit_per_message : int option;
-    tx_rollup_max_withdrawals_per_batch : int option;
-    tx_rollup_commitment_bond : Tez.t option;
-    tx_rollup_finality_period : int option;
-    tx_rollup_max_inboxes_count : int option;
-    tx_rollup_withdraw_period : int option;
-    tx_rollup_max_messages_per_inbox : int option;
-    tx_rollup_max_commitments_count : int option;
-    tx_rollup_cost_per_byte_ema_factor : int option;
-    tx_rollup_max_ticket_payload_size : int option;
-    tx_rollup_rejection_max_proof_size : int option;
-    tx_rollup_sunset_level : int32 option;
+    tx_rollup : tx_rollup;
     dal : Constants.Parametric.dal option;
-    sc_rollup_enable : bool option;
-    sc_rollup_origination_size : int option;
-    sc_rollup_challenge_window_in_blocks : int option;
-    sc_rollup_max_available_messages : int option;
-    sc_rollup_stake_amount : Tez.t option;
-    sc_rollup_commitment_period_in_blocks : int option;
-    sc_rollup_commitment_storage_size_in_bytes : int option;
-    sc_rollup_max_lookahead_in_blocks : int32 option;
-    sc_rollup_max_active_outbox_levels : int32 option;
-    sc_rollup_max_outbox_messages_per_level : int option;
+    sc_rollup : sc_rollup;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
     initial_seed : State_hash.t option option;
   }
 
-  (** Shamefully copied from [Constants_repr.parametric_encoding] and adapted ([opt] instead of [req]). *)
+  (** Shamefully copied from [Constants_parametric_repr.encoding] and adapted ([opt] instead of [req]). *)
+  let tx_rollup_encoding =
+    let open Data_encoding in
+    conv
+      (fun (c : tx_rollup) ->
+        ( ( c.enable,
+            c.origination_size,
+            c.hard_size_limit_per_inbox,
+            c.hard_size_limit_per_message,
+            c.max_withdrawals_per_batch,
+            c.commitment_bond,
+            c.finality_period,
+            c.withdraw_period,
+            c.max_inboxes_count,
+            c.max_messages_per_inbox ),
+          ( c.max_commitments_count,
+            c.cost_per_byte_ema_factor,
+            c.max_ticket_payload_size,
+            c.rejection_max_proof_size,
+            c.sunset_level ) ))
+      (fun ( ( tx_rollup_enable,
+               tx_rollup_origination_size,
+               tx_rollup_hard_size_limit_per_inbox,
+               tx_rollup_hard_size_limit_per_message,
+               tx_rollup_max_withdrawals_per_batch,
+               tx_rollup_commitment_bond,
+               tx_rollup_finality_period,
+               tx_rollup_withdraw_period,
+               tx_rollup_max_inboxes_count,
+               tx_rollup_max_messages_per_inbox ),
+             ( tx_rollup_max_commitments_count,
+               tx_rollup_cost_per_byte_ema_factor,
+               tx_rollup_max_ticket_payload_size,
+               tx_rollup_rejection_max_proof_size,
+               tx_rollup_sunset_level ) ) ->
+        {
+          enable = tx_rollup_enable;
+          origination_size = tx_rollup_origination_size;
+          hard_size_limit_per_inbox = tx_rollup_hard_size_limit_per_inbox;
+          hard_size_limit_per_message = tx_rollup_hard_size_limit_per_message;
+          max_withdrawals_per_batch = tx_rollup_max_withdrawals_per_batch;
+          commitment_bond = tx_rollup_commitment_bond;
+          finality_period = tx_rollup_finality_period;
+          withdraw_period = tx_rollup_withdraw_period;
+          max_inboxes_count = tx_rollup_max_inboxes_count;
+          max_messages_per_inbox = tx_rollup_max_messages_per_inbox;
+          max_commitments_count = tx_rollup_max_commitments_count;
+          cost_per_byte_ema_factor = tx_rollup_cost_per_byte_ema_factor;
+          max_ticket_payload_size = tx_rollup_max_ticket_payload_size;
+          rejection_max_proof_size = tx_rollup_rejection_max_proof_size;
+          sunset_level = tx_rollup_sunset_level;
+        })
+      (merge_objs
+         (obj10
+            (opt "tx_rollup_enable" bool)
+            (opt "tx_rollup_origination_size" int31)
+            (opt "tx_rollup_hard_size_limit_per_inbox" int31)
+            (opt "tx_rollup_hard_size_limit_per_message" int31)
+            (opt "tx_rollup_max_withdrawals_per_batch" int31)
+            (opt "tx_rollup_commitment_bond" Tez.encoding)
+            (opt "tx_rollup_finality_period" int31)
+            (opt "tx_rollup_withdraw_period" int31)
+            (opt "tx_rollup_max_inboxes_count" int31)
+            (opt "tx_rollup_max_messages_per_inbox" int31))
+         (obj5
+            (opt "tx_rollup_max_commitments_count" int31)
+            (opt "tx_rollup_cost_per_byte_ema_factor" int31)
+            (opt "tx_rollup_max_ticket_payload_size" int31)
+            (opt "tx_rollup_rejection_max_proof_size" int31)
+            (opt "tx_rollup_sunset_level" int32)))
+
+  let sc_rollup_encoding =
+    let open Data_encoding in
+    conv
+      (fun (c : sc_rollup) ->
+        ( c.enable,
+          c.origination_size,
+          c.challenge_window_in_blocks,
+          c.max_available_messages,
+          c.stake_amount,
+          c.commitment_period_in_blocks,
+          c.commitment_storage_size_in_bytes,
+          c.max_lookahead_in_blocks,
+          c.max_active_outbox_levels,
+          c.max_outbox_messages_per_level ))
+      (fun ( sc_rollup_enable,
+             sc_rollup_origination_size,
+             sc_rollup_challenge_window_in_blocks,
+             sc_rollup_max_available_messages,
+             sc_rollup_stake_amount,
+             sc_rollup_commitment_period_in_blocks,
+             sc_rollup_commitment_storage_size_in_bytes,
+             sc_rollup_max_lookahead_in_blocks,
+             sc_rollup_max_active_outbox_levels,
+             sc_rollup_max_outbox_messages_per_level ) ->
+        {
+          enable = sc_rollup_enable;
+          origination_size = sc_rollup_origination_size;
+          challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+          max_available_messages = sc_rollup_max_available_messages;
+          stake_amount = sc_rollup_stake_amount;
+          commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
+          commitment_storage_size_in_bytes =
+            sc_rollup_commitment_storage_size_in_bytes;
+          max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
+          max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
+          max_outbox_messages_per_level =
+            sc_rollup_max_outbox_messages_per_level;
+        })
+      (obj10
+         (opt "sc_rollup_enable" bool)
+         (opt "sc_rollup_origination_size" int31)
+         (opt "sc_rollup_challenge_window_in_blocks" int31)
+         (opt "sc_rollup_max_available_messages" int31)
+         (opt "sc_rollup_stake_amount" Tez.encoding)
+         (opt "sc_rollup_commitment_period_in_blocks" int31)
+         (opt "sc_rollup_commitment_storage_size_in_bytes" int31)
+         (opt "sc_rollup_max_lookahead_in_blocks" int32)
+         (opt "sc_rollup_max_active_outbox_levels" int32)
+         (opt "sc_rollup_max_outbox_messages_per_level" int31))
+
   let encoding =
     let open Data_encoding in
     conv
@@ -146,33 +274,7 @@ module Protocol_constants_overrides = struct
                 ( ( c.cache_script_size,
                     c.cache_stake_distribution_cycles,
                     c.cache_sampler_state_cycles ),
-                  ( ( ( c.tx_rollup_enable,
-                        c.tx_rollup_origination_size,
-                        c.tx_rollup_hard_size_limit_per_inbox,
-                        c.tx_rollup_hard_size_limit_per_message,
-                        c.tx_rollup_max_withdrawals_per_batch,
-                        c.tx_rollup_commitment_bond,
-                        c.tx_rollup_finality_period,
-                        c.tx_rollup_max_inboxes_count,
-                        c.tx_rollup_withdraw_period,
-                        c.tx_rollup_max_messages_per_inbox ),
-                      ( c.tx_rollup_max_commitments_count,
-                        c.tx_rollup_cost_per_byte_ema_factor,
-                        c.tx_rollup_max_ticket_payload_size,
-                        c.tx_rollup_rejection_max_proof_size,
-                        c.tx_rollup_sunset_level ) ),
-                    ( c.dal,
-                      ( c.sc_rollup_enable,
-                        c.sc_rollup_origination_size,
-                        c.sc_rollup_challenge_window_in_blocks,
-                        c.sc_rollup_max_available_messages,
-                        c.sc_rollup_stake_amount,
-                        c.sc_rollup_commitment_period_in_blocks,
-                        c.sc_rollup_commitment_storage_size_in_bytes,
-                        c.sc_rollup_max_lookahead_in_blocks,
-                        c.sc_rollup_max_active_outbox_levels,
-                        c.sc_rollup_max_outbox_messages_per_level ) ) ) ) ) ) )
-        ))
+                  (c.tx_rollup, (c.dal, c.sc_rollup)) ) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -211,33 +313,7 @@ module Protocol_constants_overrides = struct
                    ( ( cache_script_size,
                        cache_stake_distribution_cycles,
                        cache_sampler_state_cycles ),
-                     ( ( ( tx_rollup_enable,
-                           tx_rollup_origination_size,
-                           tx_rollup_hard_size_limit_per_inbox,
-                           tx_rollup_hard_size_limit_per_message,
-                           tx_rollup_max_withdrawals_per_batch,
-                           tx_rollup_commitment_bond,
-                           tx_rollup_finality_period,
-                           tx_rollup_max_inboxes_count,
-                           tx_rollup_withdraw_period,
-                           tx_rollup_max_messages_per_inbox ),
-                         ( tx_rollup_max_commitments_count,
-                           tx_rollup_cost_per_byte_ema_factor,
-                           tx_rollup_max_ticket_payload_size,
-                           tx_rollup_rejection_max_proof_size,
-                           tx_rollup_sunset_level ) ),
-                       ( dal,
-                         ( sc_rollup_enable,
-                           sc_rollup_origination_size,
-                           sc_rollup_challenge_window_in_blocks,
-                           sc_rollup_max_available_messages,
-                           sc_rollup_stake_amount,
-                           sc_rollup_commitment_period_in_blocks,
-                           sc_rollup_commitment_storage_size_in_bytes,
-                           sc_rollup_max_lookahead_in_blocks,
-                           sc_rollup_max_active_outbox_levels,
-                           sc_rollup_max_outbox_messages_per_level ) ) ) ) ) )
-             ) ) ->
+                     (tx_rollup, (dal, sc_rollup)) ) ) ) ) ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -266,40 +342,17 @@ module Protocol_constants_overrides = struct
           delay_increment_per_round;
           minimal_participation_ratio;
           max_slashing_period;
-          frozen_deposits_percentage;
           consensus_committee_size;
           consensus_threshold;
+          frozen_deposits_percentage;
           double_baking_punishment;
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
           cache_script_size;
           cache_stake_distribution_cycles;
           cache_sampler_state_cycles;
-          tx_rollup_enable;
-          tx_rollup_origination_size;
-          tx_rollup_hard_size_limit_per_inbox;
-          tx_rollup_hard_size_limit_per_message;
-          tx_rollup_max_withdrawals_per_batch;
-          tx_rollup_commitment_bond;
-          tx_rollup_finality_period;
-          tx_rollup_max_inboxes_count;
-          tx_rollup_withdraw_period;
-          tx_rollup_max_messages_per_inbox;
-          tx_rollup_max_commitments_count;
-          tx_rollup_cost_per_byte_ema_factor;
-          tx_rollup_max_ticket_payload_size;
-          tx_rollup_rejection_max_proof_size;
-          tx_rollup_sunset_level;
+          tx_rollup;
           dal;
-          sc_rollup_enable;
-          sc_rollup_origination_size;
-          sc_rollup_challenge_window_in_blocks;
-          sc_rollup_max_available_messages;
-          sc_rollup_stake_amount;
-          sc_rollup_commitment_period_in_blocks;
-          sc_rollup_commitment_storage_size_in_bytes;
-          sc_rollup_max_lookahead_in_blocks;
-          sc_rollup_max_active_outbox_levels;
-          sc_rollup_max_outbox_messages_per_level;
+          sc_rollup;
           chain_id;
           timestamp;
           initial_seed;
@@ -355,48 +408,13 @@ module Protocol_constants_overrides = struct
                         (opt "cache_stake_distribution_cycles" int8)
                         (opt "cache_sampler_state_cycles" int8))
                      (merge_objs
-                        (merge_objs
-                           (obj10
-                              (opt "tx_rollup_enable" Data_encoding.bool)
-                              (opt "tx_rollup_origination_size" int31)
-                              (opt "tx_rollup_hard_size_limit_per_inbox" int31)
-                              (opt
-                                 "tx_rollup_hard_size_limit_per_message"
-                                 int31)
-                              (opt "tx_rollup_max_withdrawals_per_batch" int31)
-                              (opt "tx_rollup_commitment_bond" Tez.encoding)
-                              (opt "tx_rollup_finality_period" int31)
-                              (opt "tx_rollup_max_inboxes_count" int31)
-                              (opt "tx_rollup_withdraw_period" int31)
-                              (opt "tx_rollup_max_messages_per_inbox" int31))
-                           (obj5
-                              (opt "tx_rollup_max_commitments_count" int31)
-                              (opt "tx_rollup_cost_per_byte_ema_factor" int31)
-                              (opt "tx_rollup_max_ticket_payload_size" int31)
-                              (opt "tx_rollup_rejection_max_proof_size" int31)
-                              (opt "tx_rollup_sunset_level" int32)))
+                        tx_rollup_encoding
                         (merge_objs
                            (obj1
                               (opt
                                  "dal_parametric"
                                  Constants.Parametric.dal_encoding))
-                           (obj10
-                              (opt "sc_rollup_enable" bool)
-                              (opt "sc_rollup_origination_size" int31)
-                              (opt "sc_rollup_challenge_window_in_blocks" int31)
-                              (opt "sc_rollup_max_available_messages" int31)
-                              (opt "sc_rollup_stake_amount" Tez.encoding)
-                              (opt
-                                 "sc_rollup_commitment_period_in_blocks"
-                                 int31)
-                              (opt
-                                 "sc_rollup_commitment_storage_size_in_bytes"
-                                 int31)
-                              (opt "sc_rollup_max_lookahead_in_blocks" int32)
-                              (opt "sc_rollup_max_active_outbox_levels" int32)
-                              (opt
-                                 "sc_rollup_max_outbox_messages_per_level"
-                                 int31)))))))))
+                           sc_rollup_encoding)))))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -459,48 +477,53 @@ module Protocol_constants_overrides = struct
         cache_stake_distribution_cycles =
           Some parametric.cache_stake_distribution_cycles;
         cache_sampler_state_cycles = Some parametric.cache_sampler_state_cycles;
-        tx_rollup_enable = Some parametric.tx_rollup_enable;
-        tx_rollup_origination_size = Some parametric.tx_rollup_origination_size;
-        tx_rollup_hard_size_limit_per_inbox =
-          Some parametric.tx_rollup_hard_size_limit_per_inbox;
-        tx_rollup_hard_size_limit_per_message =
-          Some parametric.tx_rollup_hard_size_limit_per_message;
-        tx_rollup_max_withdrawals_per_batch =
-          Some parametric.tx_rollup_max_withdrawals_per_batch;
-        tx_rollup_commitment_bond = Some parametric.tx_rollup_commitment_bond;
-        tx_rollup_finality_period = Some parametric.tx_rollup_finality_period;
-        tx_rollup_max_inboxes_count =
-          Some parametric.tx_rollup_max_inboxes_count;
-        tx_rollup_withdraw_period = Some parametric.tx_rollup_withdraw_period;
-        tx_rollup_max_messages_per_inbox =
-          Some parametric.tx_rollup_max_messages_per_inbox;
-        tx_rollup_max_commitments_count =
-          Some parametric.tx_rollup_max_commitments_count;
-        tx_rollup_cost_per_byte_ema_factor =
-          Some parametric.tx_rollup_cost_per_byte_ema_factor;
-        tx_rollup_max_ticket_payload_size =
-          Some parametric.tx_rollup_max_ticket_payload_size;
-        tx_rollup_rejection_max_proof_size =
-          Some parametric.tx_rollup_rejection_max_proof_size;
-        tx_rollup_sunset_level = Some parametric.tx_rollup_sunset_level;
+        sc_rollup =
+          {
+            enable = Some parametric.sc_rollup.enable;
+            origination_size = Some parametric.sc_rollup.origination_size;
+            challenge_window_in_blocks =
+              Some parametric.sc_rollup.challenge_window_in_blocks;
+            max_available_messages =
+              Some parametric.sc_rollup.max_available_messages;
+            stake_amount = Some parametric.sc_rollup.stake_amount;
+            commitment_period_in_blocks =
+              Some parametric.sc_rollup.commitment_period_in_blocks;
+            commitment_storage_size_in_bytes =
+              Some parametric.sc_rollup.commitment_storage_size_in_bytes;
+            max_lookahead_in_blocks =
+              Some parametric.sc_rollup.max_lookahead_in_blocks;
+            max_active_outbox_levels =
+              Some parametric.sc_rollup.max_active_outbox_levels;
+            max_outbox_messages_per_level =
+              Some parametric.sc_rollup.max_outbox_messages_per_level;
+          };
         dal = Some parametric.dal;
-        sc_rollup_enable = Some parametric.sc_rollup_enable;
-        sc_rollup_origination_size = Some parametric.sc_rollup_origination_size;
-        sc_rollup_challenge_window_in_blocks =
-          Some parametric.sc_rollup_challenge_window_in_blocks;
-        sc_rollup_max_available_messages =
-          Some parametric.sc_rollup_max_available_messages;
-        sc_rollup_stake_amount = Some parametric.sc_rollup_stake_amount;
-        sc_rollup_commitment_period_in_blocks =
-          Some parametric.sc_rollup_commitment_period_in_blocks;
-        sc_rollup_commitment_storage_size_in_bytes =
-          Some parametric.sc_rollup_commitment_storage_size_in_bytes;
-        sc_rollup_max_lookahead_in_blocks =
-          Some parametric.sc_rollup_max_lookahead_in_blocks;
-        sc_rollup_max_active_outbox_levels =
-          Some parametric.sc_rollup_max_active_outbox_levels;
-        sc_rollup_max_outbox_messages_per_level =
-          Some parametric.sc_rollup_max_outbox_messages_per_level;
+        tx_rollup =
+          {
+            enable = Some parametric.tx_rollup.enable;
+            origination_size = Some parametric.tx_rollup.origination_size;
+            hard_size_limit_per_inbox =
+              Some parametric.tx_rollup.hard_size_limit_per_inbox;
+            hard_size_limit_per_message =
+              Some parametric.tx_rollup.hard_size_limit_per_message;
+            max_withdrawals_per_batch =
+              Some parametric.tx_rollup.max_withdrawals_per_batch;
+            commitment_bond = Some parametric.tx_rollup.commitment_bond;
+            finality_period = Some parametric.tx_rollup.finality_period;
+            max_inboxes_count = Some parametric.tx_rollup.max_inboxes_count;
+            withdraw_period = Some parametric.tx_rollup.withdraw_period;
+            max_messages_per_inbox =
+              Some parametric.tx_rollup.max_messages_per_inbox;
+            max_commitments_count =
+              Some parametric.tx_rollup.max_commitments_count;
+            cost_per_byte_ema_factor =
+              Some parametric.tx_rollup.cost_per_byte_ema_factor;
+            max_ticket_payload_size =
+              Some parametric.tx_rollup.max_ticket_payload_size;
+            rejection_max_proof_size =
+              Some parametric.tx_rollup.rejection_max_proof_size;
+            sunset_level = Some parametric.tx_rollup.sunset_level;
+          };
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
@@ -546,32 +569,38 @@ module Protocol_constants_overrides = struct
       cache_script_size = None;
       cache_stake_distribution_cycles = None;
       cache_sampler_state_cycles = None;
-      tx_rollup_enable = None;
-      tx_rollup_origination_size = None;
-      tx_rollup_hard_size_limit_per_inbox = None;
-      tx_rollup_hard_size_limit_per_message = None;
-      tx_rollup_max_withdrawals_per_batch = None;
-      tx_rollup_commitment_bond = None;
-      tx_rollup_finality_period = None;
-      tx_rollup_max_inboxes_count = None;
-      tx_rollup_withdraw_period = None;
-      tx_rollup_max_messages_per_inbox = None;
-      tx_rollup_max_commitments_count = None;
-      tx_rollup_cost_per_byte_ema_factor = None;
-      tx_rollup_max_ticket_payload_size = None;
-      tx_rollup_rejection_max_proof_size = None;
-      tx_rollup_sunset_level = None;
+      sc_rollup =
+        {
+          enable = None;
+          origination_size = None;
+          challenge_window_in_blocks = None;
+          max_available_messages = None;
+          stake_amount = None;
+          commitment_period_in_blocks = None;
+          commitment_storage_size_in_bytes = None;
+          max_lookahead_in_blocks = None;
+          max_active_outbox_levels = None;
+          max_outbox_messages_per_level = None;
+        };
       dal = None;
-      sc_rollup_enable = None;
-      sc_rollup_origination_size = None;
-      sc_rollup_challenge_window_in_blocks = None;
-      sc_rollup_max_available_messages = None;
-      sc_rollup_stake_amount = None;
-      sc_rollup_commitment_period_in_blocks = None;
-      sc_rollup_commitment_storage_size_in_bytes = None;
-      sc_rollup_max_lookahead_in_blocks = None;
-      sc_rollup_max_active_outbox_levels = None;
-      sc_rollup_max_outbox_messages_per_level = None;
+      tx_rollup =
+        {
+          enable = None;
+          origination_size = None;
+          hard_size_limit_per_inbox = None;
+          hard_size_limit_per_message = None;
+          max_withdrawals_per_batch = None;
+          commitment_bond = None;
+          finality_period = None;
+          max_inboxes_count = None;
+          withdraw_period = None;
+          max_messages_per_inbox = None;
+          max_commitments_count = None;
+          cost_per_byte_ema_factor = None;
+          max_ticket_payload_size = None;
+          rejection_max_proof_size = None;
+          sunset_level = None;
+        };
       chain_id = None;
       timestamp = None;
       initial_seed = None;
@@ -788,19 +817,19 @@ module Protocol_constants_overrides = struct
         O
           {
             name = "sc_rollup_enable";
-            override_value = o.sc_rollup_enable;
+            override_value = o.sc_rollup.enable;
             pp = pp_print_bool;
           };
         O
           {
             name = "sc_rollup_origination_size";
-            override_value = o.sc_rollup_origination_size;
+            override_value = o.sc_rollup.origination_size;
             pp = pp_print_int;
           };
         O
           {
             name = "sc_rollup_challenge_window_in_blocks";
-            override_value = o.sc_rollup_challenge_window_in_blocks;
+            override_value = o.sc_rollup.challenge_window_in_blocks;
             pp = pp_print_int;
           };
         O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
@@ -813,49 +842,49 @@ module Protocol_constants_overrides = struct
         O
           {
             name = "tx_rollup_enable";
-            override_value = o.tx_rollup_enable;
+            override_value = o.tx_rollup.enable;
             pp = pp_print_bool;
           };
         O
           {
             name = "tx_rollup_origination_size";
-            override_value = o.tx_rollup_origination_size;
+            override_value = o.tx_rollup.origination_size;
             pp = pp_print_int;
           };
         O
           {
             name = "tx_rollup_hard_size_limit_per_inbox";
-            override_value = o.tx_rollup_hard_size_limit_per_inbox;
+            override_value = o.tx_rollup.hard_size_limit_per_inbox;
             pp = pp_print_int;
           };
         O
           {
             name = "tx_rollup_hard_size_limit_per_message";
-            override_value = o.tx_rollup_hard_size_limit_per_message;
+            override_value = o.tx_rollup.hard_size_limit_per_message;
             pp = pp_print_int;
           };
         O
           {
             name = "tx_rollup_commitment_bond";
-            override_value = o.tx_rollup_commitment_bond;
+            override_value = o.tx_rollup.commitment_bond;
             pp = Tez.pp;
           };
         O
           {
             name = "tx_rollup_cost_per_byte_ema_factor";
-            override_value = o.tx_rollup_cost_per_byte_ema_factor;
+            override_value = o.tx_rollup.cost_per_byte_ema_factor;
             pp = pp_print_int;
           };
         O
           {
             name = "tx_rollup_rejection_max_proof_size";
-            override_value = o.tx_rollup_rejection_max_proof_size;
+            override_value = o.tx_rollup.rejection_max_proof_size;
             pp = pp_print_int;
           };
         O
           {
             name = "tx_rollup_sunset_level";
-            override_value = o.tx_rollup_sunset_level;
+            override_value = o.tx_rollup.sunset_level;
             pp = pp_print_int32;
           };
       ]
@@ -988,103 +1017,107 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.cache_sampler_state_cycles
              o.cache_sampler_state_cycles;
-         tx_rollup_enable =
-           Option.value ~default:c.tx_rollup_enable o.tx_rollup_enable;
-         tx_rollup_origination_size =
-           Option.value
-             ~default:c.tx_rollup_origination_size
-             o.tx_rollup_origination_size;
-         tx_rollup_hard_size_limit_per_inbox =
-           Option.value
-             ~default:c.tx_rollup_hard_size_limit_per_inbox
-             o.tx_rollup_hard_size_limit_per_inbox;
-         tx_rollup_hard_size_limit_per_message =
-           Option.value
-             ~default:c.tx_rollup_hard_size_limit_per_message
-             o.tx_rollup_hard_size_limit_per_message;
-         tx_rollup_max_withdrawals_per_batch =
-           Option.value
-             ~default:c.tx_rollup_max_withdrawals_per_batch
-             o.tx_rollup_max_withdrawals_per_batch;
-         tx_rollup_commitment_bond =
-           Option.value
-             ~default:c.tx_rollup_commitment_bond
-             o.tx_rollup_commitment_bond;
-         tx_rollup_finality_period =
-           Option.value
-             ~default:c.tx_rollup_finality_period
-             o.tx_rollup_finality_period;
-         tx_rollup_max_inboxes_count =
-           Option.value
-             ~default:c.tx_rollup_max_inboxes_count
-             o.tx_rollup_max_inboxes_count;
-         tx_rollup_withdraw_period =
-           Option.value
-             ~default:c.tx_rollup_withdraw_period
-             o.tx_rollup_withdraw_period;
-         tx_rollup_max_messages_per_inbox =
-           Option.value
-             ~default:c.tx_rollup_max_messages_per_inbox
-             o.tx_rollup_max_messages_per_inbox;
-         tx_rollup_max_commitments_count =
-           Option.value
-             ~default:c.tx_rollup_max_commitments_count
-             o.tx_rollup_max_commitments_count;
-         tx_rollup_cost_per_byte_ema_factor =
-           Option.value
-             ~default:c.tx_rollup_cost_per_byte_ema_factor
-             o.tx_rollup_cost_per_byte_ema_factor;
-         tx_rollup_max_ticket_payload_size =
-           Option.value
-             ~default:c.tx_rollup_max_ticket_payload_size
-             o.tx_rollup_max_ticket_payload_size;
-         tx_rollup_rejection_max_proof_size =
-           Option.value
-             ~default:c.tx_rollup_rejection_max_proof_size
-             o.tx_rollup_rejection_max_proof_size;
-         tx_rollup_sunset_level =
-           Option.value
-             ~default:c.tx_rollup_sunset_level
-             o.tx_rollup_sunset_level;
+         sc_rollup =
+           {
+             enable = Option.value ~default:c.sc_rollup.enable o.sc_rollup.enable;
+             origination_size =
+               Option.value
+                 ~default:c.sc_rollup.origination_size
+                 o.sc_rollup.origination_size;
+             challenge_window_in_blocks =
+               Option.value
+                 ~default:c.sc_rollup.challenge_window_in_blocks
+                 o.sc_rollup.challenge_window_in_blocks;
+             max_available_messages =
+               Option.value
+                 ~default:c.sc_rollup.max_available_messages
+                 o.sc_rollup.max_available_messages;
+             stake_amount =
+               Option.value
+                 ~default:c.sc_rollup.stake_amount
+                 o.sc_rollup.stake_amount;
+             commitment_period_in_blocks =
+               Option.value
+                 ~default:c.sc_rollup.commitment_period_in_blocks
+                 o.sc_rollup.commitment_period_in_blocks;
+             commitment_storage_size_in_bytes =
+               Option.value
+                 ~default:c.sc_rollup.commitment_storage_size_in_bytes
+                 o.sc_rollup.commitment_storage_size_in_bytes;
+             max_lookahead_in_blocks =
+               Option.value
+                 ~default:c.sc_rollup.max_lookahead_in_blocks
+                 o.sc_rollup.max_lookahead_in_blocks;
+             max_active_outbox_levels =
+               Option.value
+                 ~default:c.sc_rollup.max_active_outbox_levels
+                 o.sc_rollup.max_active_outbox_levels;
+             max_outbox_messages_per_level =
+               Option.value
+                 ~default:c.sc_rollup.max_outbox_messages_per_level
+                 o.sc_rollup.max_outbox_messages_per_level;
+           };
          dal = Option.value ~default:c.dal o.dal;
-         sc_rollup_enable =
-           Option.value ~default:c.sc_rollup_enable o.sc_rollup_enable;
-         sc_rollup_origination_size =
-           Option.value
-             ~default:c.sc_rollup_origination_size
-             o.sc_rollup_origination_size;
-         sc_rollup_challenge_window_in_blocks =
-           Option.value
-             ~default:c.sc_rollup_challenge_window_in_blocks
-             o.sc_rollup_challenge_window_in_blocks;
-         sc_rollup_max_available_messages =
-           Option.value
-             ~default:c.sc_rollup_max_available_messages
-             o.sc_rollup_max_available_messages;
-         sc_rollup_stake_amount =
-           Option.value
-             ~default:c.sc_rollup_stake_amount
-             o.sc_rollup_stake_amount;
-         sc_rollup_commitment_period_in_blocks =
-           Option.value
-             ~default:c.sc_rollup_commitment_period_in_blocks
-             o.sc_rollup_commitment_period_in_blocks;
-         sc_rollup_commitment_storage_size_in_bytes =
-           Option.value
-             ~default:c.sc_rollup_commitment_storage_size_in_bytes
-             o.sc_rollup_commitment_storage_size_in_bytes;
-         sc_rollup_max_lookahead_in_blocks =
-           Option.value
-             ~default:c.sc_rollup_max_lookahead_in_blocks
-             o.sc_rollup_max_lookahead_in_blocks;
-         sc_rollup_max_active_outbox_levels =
-           Option.value
-             ~default:c.sc_rollup_max_active_outbox_levels
-             o.sc_rollup_max_active_outbox_levels;
-         sc_rollup_max_outbox_messages_per_level =
-           Option.value
-             ~default:c.sc_rollup_max_outbox_messages_per_level
-             o.sc_rollup_max_outbox_messages_per_level;
+         tx_rollup =
+           {
+             enable = Option.value ~default:c.tx_rollup.enable o.tx_rollup.enable;
+             origination_size =
+               Option.value
+                 ~default:c.tx_rollup.origination_size
+                 o.tx_rollup.origination_size;
+             hard_size_limit_per_inbox =
+               Option.value
+                 ~default:c.tx_rollup.hard_size_limit_per_inbox
+                 o.tx_rollup.hard_size_limit_per_inbox;
+             hard_size_limit_per_message =
+               Option.value
+                 ~default:c.tx_rollup.hard_size_limit_per_message
+                 o.tx_rollup.hard_size_limit_per_message;
+             max_withdrawals_per_batch =
+               Option.value
+                 ~default:c.tx_rollup.max_withdrawals_per_batch
+                 o.tx_rollup.max_withdrawals_per_batch;
+             commitment_bond =
+               Option.value
+                 ~default:c.tx_rollup.commitment_bond
+                 o.tx_rollup.commitment_bond;
+             finality_period =
+               Option.value
+                 ~default:c.tx_rollup.finality_period
+                 o.tx_rollup.finality_period;
+             max_inboxes_count =
+               Option.value
+                 ~default:c.tx_rollup.max_inboxes_count
+                 o.tx_rollup.max_inboxes_count;
+             withdraw_period =
+               Option.value
+                 ~default:c.tx_rollup.withdraw_period
+                 o.tx_rollup.withdraw_period;
+             max_messages_per_inbox =
+               Option.value
+                 ~default:c.tx_rollup.max_messages_per_inbox
+                 o.tx_rollup.max_messages_per_inbox;
+             max_commitments_count =
+               Option.value
+                 ~default:c.tx_rollup.max_commitments_count
+                 o.tx_rollup.max_commitments_count;
+             cost_per_byte_ema_factor =
+               Option.value
+                 ~default:c.tx_rollup.cost_per_byte_ema_factor
+                 o.tx_rollup.cost_per_byte_ema_factor;
+             max_ticket_payload_size =
+               Option.value
+                 ~default:c.tx_rollup.max_ticket_payload_size
+                 o.tx_rollup.max_ticket_payload_size;
+             rejection_max_proof_size =
+               Option.value
+                 ~default:c.tx_rollup.rejection_max_proof_size
+                 o.tx_rollup.rejection_max_proof_size;
+             sunset_level =
+               Option.value
+                 ~default:c.tx_rollup.sunset_level
+                 o.tx_rollup.sunset_level;
+           };
        }
         : Constants.Parametric.t)
 end

@@ -1965,8 +1965,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.Parametric.
             {
-              tx_rollup_max_messages_per_inbox;
-              tx_rollup_max_withdrawals_per_batch;
+              tx_rollup = {max_messages_per_inbox; max_withdrawals_per_batch; _};
               _;
             } =
         Constants.parametric ctxt
@@ -1974,15 +1973,14 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       Tx_rollup_errors.check_path_depth
         `Commitment
         (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-        ~count_limit:tx_rollup_max_messages_per_inbox
+        ~count_limit:max_messages_per_inbox
       >>?= fun () ->
       error_when
         Compare.List_length_with.(tickets_info = 0)
         Tx_rollup_errors.No_withdrawals_to_dispatch
       >>?= fun () ->
       error_when
-        Compare.List_length_with.(
-          tickets_info > tx_rollup_max_withdrawals_per_batch)
+        Compare.List_length_with.(tickets_info > max_withdrawals_per_batch)
         Tx_rollup_errors.Too_many_withdrawals
       >>?= fun () ->
       record_trace Gas_quota_exceeded_init_deserialize
@@ -2002,23 +2000,23 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_rejection
       {message_path; message_result_path; previous_message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      let Constants.Parametric.{tx_rollup_max_messages_per_inbox; _} =
+      let Constants.Parametric.{tx_rollup = {max_messages_per_inbox; _}; _} =
         Constants.parametric ctxt
       in
       Tx_rollup_errors.check_path_depth
         `Inbox
         (Tx_rollup_inbox.Merkle.path_depth message_path)
-        ~count_limit:tx_rollup_max_messages_per_inbox
+        ~count_limit:max_messages_per_inbox
       >>?= fun () ->
       Tx_rollup_errors.check_path_depth
         `Commitment
         (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-        ~count_limit:tx_rollup_max_messages_per_inbox
+        ~count_limit:max_messages_per_inbox
       >>?= fun () ->
       Tx_rollup_errors.check_path_depth
         `Commitment
         (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
-        ~count_limit:tx_rollup_max_messages_per_inbox
+        ~count_limit:max_messages_per_inbox
       >>?= fun () -> return ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
   | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _

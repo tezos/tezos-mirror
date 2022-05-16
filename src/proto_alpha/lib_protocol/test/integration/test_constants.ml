@@ -67,9 +67,9 @@ let test_max_operations_ttl () =
     the throughput of the rollup. *)
 let test_sc_rollup_challenge_window_lt_max_lookahead () =
   let constants = Default_parameters.constants_mainnet in
-  let max_lookahead = constants.sc_rollup_max_lookahead_in_blocks in
+  let max_lookahead = constants.sc_rollup.max_lookahead_in_blocks in
   let challenge_window =
-    Int32.of_int constants.sc_rollup_challenge_window_in_blocks
+    Int32.of_int constants.sc_rollup.challenge_window_in_blocks
   in
   Assert.lt_int32 ~loc:__LOC__ challenge_window max_lookahead
 
@@ -86,26 +86,26 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
     Alpha_context.Tez.to_mutez constants.cost_per_byte
   in
   let commitment_storage_size =
-    Int64.of_int constants.sc_rollup_commitment_storage_size_in_bytes
+    Int64.of_int constants.sc_rollup.commitment_storage_size_in_bytes
   in
   let commitment_storage_cost =
     Int64.mul cost_per_byte_mutez commitment_storage_size
   in
   let max_lookahead =
-    Int64.of_int32 constants.sc_rollup_max_lookahead_in_blocks
+    Int64.of_int32 constants.sc_rollup.max_lookahead_in_blocks
   in
   let commitment_period =
-    Int64.of_int constants.sc_rollup_commitment_period_in_blocks
+    Int64.of_int constants.sc_rollup.commitment_period_in_blocks
   in
-  let stake_amount_in_mutez =
-    Alpha_context.Tez.to_mutez constants.sc_rollup_stake_amount
+  let stake_amount =
+    Alpha_context.Tez.to_mutez constants.sc_rollup.stake_amount
   in
   Assert.leq_int64
     ~loc:__LOC__
     (Int64.mul
        commitment_storage_cost
        (Int64.div max_lookahead commitment_period))
-    stake_amount_in_mutez
+    stake_amount
 
 (* Check that
    [sc_rollup_commitment_storage_size_in_bytes = commitments_entry_size +
@@ -152,7 +152,7 @@ let test_sc_rollup_commitment_storage_size () =
   in
   Assert.equal_int
     ~loc:__LOC__
-    constants.sc_rollup_commitment_storage_size_in_bytes
+    constants.sc_rollup.commitment_storage_size_in_bytes
     (Bytes.length commitment_bytes
     + Bytes.length level_bytes
     + Bytes.length commitment_stake_count_bytes)

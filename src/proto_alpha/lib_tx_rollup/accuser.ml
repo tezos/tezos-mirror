@@ -208,7 +208,7 @@ let build_rejection state ~(reject_commitment : Tx_rollup_commitment.Full.t)
     Protocol.Tx_rollup_l2_apply.
       {
         tx_rollup_max_withdrawals_per_batch =
-          state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
+          state.constants.parametric.tx_rollup.max_withdrawals_per_batch;
       }
   in
   let+ proof, _ =

@@ -467,20 +467,20 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     Option.value ~default:constants.consensus_threshold consensus_threshold
   in
   let tx_rollup_enable =
-    Option.value ~default:constants.tx_rollup_enable tx_rollup_enable
+    Option.value ~default:constants.tx_rollup.enable tx_rollup_enable
   in
   let tx_rollup_sunset_level =
     Option.value
-      ~default:constants.tx_rollup_sunset_level
+      ~default:constants.tx_rollup.sunset_level
       tx_rollup_sunset_level
   in
   let tx_rollup_origination_size =
     Option.value
-      ~default:constants.tx_rollup_origination_size
+      ~default:constants.tx_rollup.origination_size
       tx_rollup_origination_size
   in
   let sc_rollup_enable =
-    Option.value ~default:constants.sc_rollup_enable sc_rollup_enable
+    Option.value ~default:constants.sc_rollup.enable sc_rollup_enable
   in
   let constants =
     {
@@ -495,10 +495,14 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       cost_per_byte;
       liquidity_baking_subsidy;
       consensus_threshold;
-      tx_rollup_enable;
-      tx_rollup_sunset_level;
-      tx_rollup_origination_size;
-      sc_rollup_enable;
+      tx_rollup =
+        {
+          constants.tx_rollup with
+          enable = tx_rollup_enable;
+          sunset_level = tx_rollup_sunset_level;
+          origination_size = tx_rollup_origination_size;
+        };
+      sc_rollup = {constants.sc_rollup with enable = sc_rollup_enable};
     }
   in
   (* Check there is at least one roll *)

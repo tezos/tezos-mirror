@@ -148,63 +148,63 @@ let double_baking_punishment c =
 
 let tx_rollup_enable c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_enable
+  constants.tx_rollup.enable
 
 let tx_rollup_sunset_level c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_sunset_level
+  constants.tx_rollup.sunset_level
 
 let tx_rollup_origination_size c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_origination_size
+  constants.tx_rollup.origination_size
 
 let tx_rollup_hard_size_limit_per_inbox c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_hard_size_limit_per_inbox
+  constants.tx_rollup.hard_size_limit_per_inbox
 
 let tx_rollup_hard_size_limit_per_message c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_hard_size_limit_per_message
+  constants.tx_rollup.hard_size_limit_per_message
 
 let tx_rollup_max_withdrawals_per_batch c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_max_withdrawals_per_batch
+  constants.tx_rollup.max_withdrawals_per_batch
 
 let tx_rollup_commitment_bond c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_commitment_bond
+  constants.tx_rollup.commitment_bond
 
 let tx_rollup_finality_period c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_finality_period
+  constants.tx_rollup.finality_period
 
 let tx_rollup_withdraw_period c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_withdraw_period
+  constants.tx_rollup.withdraw_period
 
 let tx_rollup_max_inboxes_count c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_max_inboxes_count
+  constants.tx_rollup.max_inboxes_count
 
 let tx_rollup_max_messages_per_inbox c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_max_messages_per_inbox
+  constants.tx_rollup.max_messages_per_inbox
 
 let tx_rollup_max_commitments_count c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_max_commitments_count
+  constants.tx_rollup.max_commitments_count
 
 let tx_rollup_cost_per_byte_ema_factor c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_cost_per_byte_ema_factor
+  constants.tx_rollup.cost_per_byte_ema_factor
 
 let tx_rollup_max_ticket_payload_size c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_max_ticket_payload_size
+  constants.tx_rollup.max_ticket_payload_size
 
 let tx_rollup_rejection_max_proof_size c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_rejection_max_proof_size
+  constants.tx_rollup.rejection_max_proof_size
 
 let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
@@ -212,40 +212,40 @@ let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
 
 let sc_rollup_enable c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_enable
+  constants.sc_rollup.enable
 
 let sc_rollup_origination_size c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_origination_size
+  constants.sc_rollup.origination_size
 
 let sc_rollup_challenge_window_in_blocks c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_challenge_window_in_blocks
+  constants.sc_rollup.challenge_window_in_blocks
 
 let sc_rollup_max_available_messages c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_max_available_messages
+  constants.sc_rollup.max_available_messages
 
 let sc_rollup_stake_amount c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_stake_amount
+  constants.sc_rollup.stake_amount
 
 let sc_rollup_commitment_period_in_blocks c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_commitment_period_in_blocks
+  constants.sc_rollup.commitment_period_in_blocks
 
 let sc_rollup_commitment_storage_size_in_bytes c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_commitment_storage_size_in_bytes
+  constants.sc_rollup.commitment_storage_size_in_bytes
 
 let sc_rollup_max_lookahead_in_blocks c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_max_lookahead_in_blocks
+  constants.sc_rollup.max_lookahead_in_blocks
 
 let sc_rollup_max_active_outbox_levels c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_max_active_outbox_levels
+  constants.sc_rollup.max_active_outbox_levels
 
 let sc_rollup_max_outbox_messages_per_level c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_max_outbox_messages_per_level
+  constants.sc_rollup.max_outbox_messages_per_level

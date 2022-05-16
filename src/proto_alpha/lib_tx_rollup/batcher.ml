@@ -63,11 +63,11 @@ let inject_batches state batches =
     criteria:
 
     The proof produced by the batch interpretation must be smaller than
-    [constants.parametric.tx_rollup_rejection_max_proof_size]. Otherwise, the
+    [constants.parametric.tx_rollup.rejection_max_proof_size]. Otherwise, the
     associated commitment can be rejected because of the size.
 
     The batch exceeds the
-    [constants.parametric.tx_rollup_hard_size_limit_per_message], the submit
+    [constants.parametric.tx_rollup.hard_size_limit_per_message], the submit
     batch operation will fail.  *)
 let is_batch_valid ctxt (constants : Constants.t) batch =
   let open Lwt_result_syntax in
@@ -76,14 +76,14 @@ let is_batch_valid ctxt (constants : Constants.t) batch =
      2. The batch is small enough *)
   let batch_size_ok =
     let size = Data_encoding.Binary.length Tx_rollup_l2_batch.encoding batch in
-    size <= constants.parametric.tx_rollup_hard_size_limit_per_message
+    size <= constants.parametric.tx_rollup.hard_size_limit_per_message
   in
   if batch_size_ok then
     let parameters =
       Tx_rollup_l2_apply.
         {
           tx_rollup_max_withdrawals_per_batch =
-            constants.parametric.tx_rollup_max_withdrawals_per_batch;
+            constants.parametric.tx_rollup.max_withdrawals_per_batch;
         }
     in
     let*! res_interp =
@@ -91,7 +91,7 @@ let is_batch_valid ctxt (constants : Constants.t) batch =
         ctxt
         parameters
         ~rejection_max_proof_size:
-          constants.parametric.tx_rollup_rejection_max_proof_size
+          constants.parametric.tx_rollup.rejection_max_proof_size
         batch
     in
     let b_proof_size = Result.is_ok res_interp in
@@ -172,12 +172,12 @@ let on_register state ~apply (tr : L2_transaction.t) =
   let* () =
     fail_when
       (msg_size
-     >= state.constants.parametric.tx_rollup_hard_size_limit_per_message)
+     >= state.constants.parametric.tx_rollup.hard_size_limit_per_message)
       (Error.Transaction_too_large
          {
            actual = msg_size;
            limit =
-             state.constants.parametric.tx_rollup_hard_size_limit_per_message;
+             state.constants.parametric.tx_rollup.hard_size_limit_per_message;
          })
   in
   let context = state.incr_context in
@@ -189,7 +189,7 @@ let on_register state ~apply (tr : L2_transaction.t) =
           Tx_rollup_l2_apply.
             {
               tx_rollup_max_withdrawals_per_batch =
-                state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
+                state.constants.parametric.tx_rollup.max_withdrawals_per_batch;
             }
         in
         L2_apply.Batch_V1.apply_batch context parameters batch

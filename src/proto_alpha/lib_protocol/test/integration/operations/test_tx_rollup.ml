@@ -71,7 +71,10 @@ let check_runtime_error e = function
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
   Context.init_with_constants1
-    {Context.default_test_constants with tx_rollup_enable = false}
+    {
+      Context.default_test_constants with
+      tx_rollup = {Context.default_test_constants.tx_rollup with enable = false};
+    }
   >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
@@ -87,8 +90,12 @@ let test_sunset () =
   Context.init_with_constants1
     {
       Context.default_test_constants with
-      tx_rollup_enable = true;
-      tx_rollup_sunset_level = 0l;
+      tx_rollup =
+        {
+          Context.default_test_constants.tx_rollup with
+          enable = true;
+          sunset_level = 0l;
+        };
     }
   >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
@@ -206,19 +213,23 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     {
       Context.default_test_constants with
       consensus_threshold = 0;
-      tx_rollup_enable = true;
-      tx_rollup_sunset_level = Int32.max_int;
-      tx_rollup_finality_period;
-      tx_rollup_withdraw_period = 2;
-      tx_rollup_max_commitments_count = 3;
-      tx_rollup_origination_size;
-      tx_rollup_rejection_max_proof_size;
-      tx_rollup_max_inboxes_count;
-      tx_rollup_hard_size_limit_per_message;
+      tx_rollup =
+        {
+          Context.default_test_constants.tx_rollup with
+          enable = true;
+          sunset_level = Int32.max_int;
+          withdraw_period = 2;
+          max_commitments_count = 3;
+          finality_period = tx_rollup_finality_period;
+          origination_size = tx_rollup_origination_size;
+          rejection_max_proof_size = tx_rollup_rejection_max_proof_size;
+          max_inboxes_count = tx_rollup_max_inboxes_count;
+          hard_size_limit_per_message = tx_rollup_hard_size_limit_per_message;
+          max_ticket_payload_size = tx_rollup_max_ticket_payload_size;
+        };
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
-      tx_rollup_max_ticket_payload_size;
       cost_per_byte;
     }
 
@@ -277,7 +288,7 @@ let l2_parameters : Context.t -> Tx_rollup_l2_apply.parameters tzresult Lwt.t =
  fun ctxt ->
   Context.get_constants ctxt >>=? fun constants ->
   let tx_rollup_max_withdrawals_per_batch =
-    constants.parametric.tx_rollup_max_withdrawals_per_batch
+    constants.parametric.tx_rollup.max_withdrawals_per_batch
   in
   return Tx_rollup_l2_apply.{tx_rollup_max_withdrawals_per_batch}
 
@@ -609,13 +620,16 @@ let test_origination () =
   Context.init1 ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int ()
   >>=? fun (b, contract) ->
   Context.get_constants (B b)
-  >>=? fun {parametric = {tx_rollup_origination_size; cost_per_byte; _}; _} ->
+  >>=? fun {
+             parametric = {tx_rollup = {origination_size; _}; cost_per_byte; _};
+             _;
+           } ->
   Context.Contract.balance (B b) contract >>=? fun balance ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, tx_rollup) ->
   Incremental.add_operation i op >>=? fun i ->
   check_tx_rollup_exists (I i) tx_rollup >>=? fun () ->
-  cost_per_byte *? Int64.of_int tx_rollup_origination_size
+  cost_per_byte *? Int64.of_int origination_size
   >>?= fun tx_rollup_origination_burn ->
   Assert.balance_was_debited
     ~loc:__LOC__
@@ -889,7 +903,7 @@ let test_batch_too_big () =
   Context.get_constants (B b) >>=? fun constant ->
   let contents =
     String.make
-      (constant.parametric.tx_rollup_hard_size_limit_per_message + 1)
+      (constant.parametric.tx_rollup.hard_size_limit_per_message + 1)
       'd'
   in
   Incremental.begin_construction b >>=? fun i ->
@@ -911,7 +925,7 @@ let fill_inbox b tx_rollup contract contents k =
   let message_size = String.length contents in
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_inbox_limit =
-    constant.parametric.tx_rollup_hard_size_limit_per_inbox
+    constant.parametric.tx_rollup.hard_size_limit_per_inbox
   in
   Context.Contract.counter (B b) contract >>=? fun counter ->
   Incremental.begin_construction b >>=? fun i ->
@@ -941,7 +955,7 @@ let test_inbox_size_too_big () =
   context_init1 () >>=? fun (b, contract) ->
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_batch_limit =
-    constant.parametric.tx_rollup_hard_size_limit_per_message - 1
+    constant.parametric.tx_rollup.hard_size_limit_per_message - 1
   in
   let contents = String.make tx_rollup_batch_limit 'd' in
   originate b contract >>=? fun (b, tx_rollup) ->
@@ -960,7 +974,7 @@ let test_inbox_count_too_big () =
   context_init1 () >>=? fun (b, contract) ->
   let _, _, pkh = gen_l2_account () in
   Context.get_constants (B b) >>=? fun constant ->
-  let message_count = constant.parametric.tx_rollup_max_messages_per_inbox in
+  let message_count = constant.parametric.tx_rollup.max_messages_per_inbox in
   let contents = "some contents" in
   originate b contract >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
@@ -1190,7 +1204,7 @@ let test_invalid_deposit_too_big_ticket () =
   context_init1 () >>=? fun (b, account) ->
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_max_ticket_payload_size =
-    constant.parametric.tx_rollup_max_ticket_payload_size
+    constant.parametric.tx_rollup.max_ticket_payload_size
   in
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
@@ -1241,7 +1255,7 @@ let test_invalid_deposit_too_big_ticket_type () =
   context_init1 () >>=? fun (b, account) ->
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_max_ticket_payload_size =
-    constant.parametric.tx_rollup_max_ticket_payload_size
+    constant.parametric.tx_rollup.max_ticket_payload_size
   in
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
@@ -1298,7 +1312,7 @@ let test_valid_deposit_big_ticket () =
   context_init1 () >>=? fun (b, account) ->
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_max_ticket_payload_size =
-    constant.parametric.tx_rollup_max_ticket_payload_size
+    constant.parametric.tx_rollup.max_ticket_payload_size
   in
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
@@ -1444,7 +1458,7 @@ let test_finalization () =
   let filler = contract in
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.get_constants (B b)
-  >>=? fun {parametric = {tx_rollup_hard_size_limit_per_inbox; _}; _} ->
+  >>=? fun {parametric = {tx_rollup = {hard_size_limit_per_inbox; _}; _}; _} ->
   (* Get the initial burn_per_byte. *)
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   burn_per_byte state >>?= fun cost ->
@@ -1452,7 +1466,7 @@ let test_finalization () =
   (* Fill the inbox. *)
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_batch_limit =
-    constant.parametric.tx_rollup_hard_size_limit_per_message - 1
+    constant.parametric.tx_rollup.hard_size_limit_per_message - 1
   in
   let contents = String.make tx_rollup_batch_limit 'd' in
   (* Repeating fill inbox and finalize block to increase EMA
@@ -1464,7 +1478,7 @@ let test_finalization () =
     let inbox_ema =
       Alpha_context.Tx_rollup_state.Internal_for_tests.get_inbox_ema state
     in
-    if tx_rollup_hard_size_limit_per_inbox * 91 / 100 < inbox_ema then
+    if hard_size_limit_per_inbox * 91 / 100 < inbox_ema then
       return (b, n, inbox_size)
     else increase_ema (n + 1) b tx_rollup f
   in
@@ -1481,7 +1495,7 @@ let test_finalization () =
           ~elapsed
           ~factor
           ~final_size:inbox_size
-          ~hard_limit:tx_rollup_hard_size_limit_per_inbox
+          ~hard_limit:hard_size_limit_per_inbox
       in
       update_burn_per_byte_n_time (n - 1) state
     else state
@@ -1566,7 +1580,7 @@ let test_commitment_duplication () =
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.get_constants (I i) >>=? fun constants ->
-  let cost = constants.parametric.tx_rollup_commitment_bond in
+  let cost = constants.parametric.tx_rollup.commitment_bond in
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance cost
   >>=? fun () ->
   (* Successfully fail to submit a duplicate commitment *)
@@ -1905,9 +1919,15 @@ let test_full_inbox () =
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
-      tx_rollup_enable = true;
-      tx_rollup_sunset_level = Int32.max_int;
-      tx_rollup_max_inboxes_count = 15;
+      tx_rollup =
+        {
+          Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+            .tx_rollup
+          with
+          enable = true;
+          sunset_level = Int32.max_int;
+          max_inboxes_count = 15;
+        };
     }
   in
   Context.init_with_constants1 constants >>=? fun (b, contract) ->
@@ -1940,7 +1960,7 @@ let test_bond_finalization () =
   (* Let’s try to remove the bond *)
   Incremental.begin_construction b >>=? fun i ->
   Context.get_constants (I i) >>=? fun constants ->
-  let bond = constants.parametric.tx_rollup_commitment_bond in
+  let bond = constants.parametric.tx_rollup.commitment_bond in
   Op.tx_rollup_return_bond (I i) contract1 tx_rollup >>=? fun op ->
   Incremental.add_operation
     i
@@ -2622,7 +2642,7 @@ module Rejection = struct
     make_invalid_commitment i level1 Context_hash.zero
     >>=? fun (i, commitment1) ->
     Context.get_constants (I i) >>=? fun constants ->
-    let bond_cost = constants.parametric.tx_rollup_commitment_bond in
+    let bond_cost = constants.parametric.tx_rollup.commitment_bond in
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance bond_cost
     >>=? fun () ->
     check_frozen ~loc:__LOC__ i bond_cost >>=? fun () ->
@@ -3469,7 +3489,7 @@ module Rejection = struct
     Op.tx_rollup_submit_batch (I i) account tx_rollup batch_bytes
     >>=? fun op2 ->
     let message_count =
-      constant.parametric.tx_rollup_max_messages_per_inbox - 2
+      constant.parametric.tx_rollup.max_messages_per_inbox - 2
     in
     (* Fill the inbox at tx_level 0. Trying to reject a commitment for a full
        inbox has the benefit of having large message paths. Thus, making the
@@ -3768,7 +3788,7 @@ let test_state () =
     (B b)
     account2
     before_slashing
-    constants.parametric.tx_rollup_commitment_bond
+    constants.parametric.tx_rollup.commitment_bond
   >>=? fun () ->
   (*
      Inboxes:    [  ] - [  ] - [  ]
