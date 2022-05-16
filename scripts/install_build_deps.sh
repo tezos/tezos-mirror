@@ -74,7 +74,7 @@ if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
     # while they will probably be updated (and at least reinstalled)
     # by the next steps of the script
     opam remove -a --yes
-    opam install --yes --unlock-base "ocaml-base-compiler.$ocaml_version"
+    OPAMCLI=2.0 opam install --yes --unlock-base "ocaml-base-compiler.$ocaml_version"
 fi
 
 # Must be done before install_build_deps.raw.sh because install_build_deps.raw.sh installs
