@@ -58,3 +58,21 @@ val get_block : ?chain:string -> ?block:string -> unit -> JSON.t t
     [block] defaults to ["head"].
 *)
 val get_block_metadata : ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** A level and its hash *)
+type block_descriptor = {block_hash : string; level : int}
+
+(** RPC: [GET /chain/[chain]/levels/checkpoint]
+
+    [chain] defaults to ["main"]. *)
+val get_checkpoint : ?chain:string -> unit -> block_descriptor t
+
+(** RPC: [GET /chain/[chain]/levels/savepoint]
+
+    [chain] defaults to ["main"]. *)
+val get_savepoint : ?chain:string -> unit -> block_descriptor t
+
+(** RPC: [GET /chain/[chain]/levels/caboose]
+
+    [chain] defaults to ["main"]. *)
+val get_caboose : ?chain:string -> unit -> block_descriptor t

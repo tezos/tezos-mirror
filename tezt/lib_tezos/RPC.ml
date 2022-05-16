@@ -54,3 +54,21 @@ let get_block ?(chain = "main") ?(block = "head") () =
 
 let get_block_metadata ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
+
+type block_descriptor = {block_hash : string; level : int}
+
+let parse_block_descriptor json =
+  JSON.
+    {
+      block_hash = json |-> "block_hash" |> as_string;
+      level = json |-> "level" |> as_int;
+    }
+
+let get_checkpoint ?(chain = "main") () =
+  make GET ["chains"; chain; "levels"; "checkpoint"] parse_block_descriptor
+
+let get_savepoint ?(chain = "main") () =
+  make GET ["chains"; chain; "levels"; "savepoint"] parse_block_descriptor
+
+let get_caboose ?(chain = "main") () =
+  make GET ["chains"; chain; "levels"; "caboose"] parse_block_descriptor
