@@ -14,7 +14,8 @@ opam_repository=${opam_repository:?}
 
 create_opam_switch() {
     [ -n "$1" ] || { echo "create_opam_switch expects a non-empty argument"; return 1; }
-    opam switch create "$1" --repositories=tezos "ocaml-base-compiler.$ocaml_version"
+    opam switch create "$1" --empty --repositories=tezos
+    opam install "ocaml-base-compiler.$ocaml_version"
 }
 
 if [ "$1" = "--dev" ]; then
@@ -102,7 +103,7 @@ if [ -n "$dev" ]; then
     # enough (for [ppx_yojson_conv_lib] in particular), so we add a
     # minimal bound to ensure it won’t be picked by opam.
     # utop is constrained to avoid reinstalling in all the times.
-    opam install --yes merlin ometrics.0.1.3 utop.2.9.0 odoc ocp-indent "ocaml-lsp-server>=1.6.1" js_of_ocaml-compiler --criteria="-changed,-removed"
+    opam install --yes merlin ometrics.0.1.3 utop.2.9.0 odoc ocp-indent "ocaml-lsp-server>=1.6.1" js_of_ocaml-compiler merge-fmt --criteria="-changed,-removed"
 fi
 
 "$script_dir"/install_sapling_parameters.sh

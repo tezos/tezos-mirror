@@ -11,7 +11,7 @@ if [ "$1" = "--tps" ]; then
 else
     # The TPS evaluation tool requires some extra dependencies that we want to hide from the end user that
     # builds Octez. As such we're not building it by default.
-    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -not -path "$src_dir/src/bin_tps_evaluation/*" -print)
+    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -not -name tezos-tps-evaluation.opam -print)
 fi
 
 
