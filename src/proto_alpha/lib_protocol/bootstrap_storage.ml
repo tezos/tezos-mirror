@@ -47,7 +47,8 @@ let init_account (ctxt, balance_updates)
 let init_contract ~typecheck (ctxt, balance_updates)
     ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
   Contract_storage.fresh_contract_from_current_nonce ctxt
-  >>?= fun (ctxt, contract) ->
+  >>?= fun (ctxt, contract_hash) ->
+  let contract = Contract_repr.Originated contract_hash in
   typecheck ctxt script >>=? fun (script, ctxt) ->
   Contract_storage.raw_originate
     ctxt

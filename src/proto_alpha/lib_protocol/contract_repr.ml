@@ -181,11 +181,7 @@ let () =
     (function Invalid_contract_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_contract_notation loc)
 
-let originated_contract nonce =
-  let data =
-    Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce
-  in
-  Originated (Contract_hash.hash_bytes [data])
+let originated_contract nonce = Originated (Contract_hash.of_nonce nonce)
 
 let originated_contracts
     ~since:

@@ -2427,8 +2427,9 @@ module RPC = struct
     let register () =
       let originate_dummy_contract ctxt script balance =
         let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
-        Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
-        >>=? fun (ctxt, dummy_contract) ->
+        Contract.fresh_contract_from_current_nonce ctxt
+        >>?= fun (ctxt, dummy_contract_hash) ->
+        let dummy_contract = Contract.Originated dummy_contract_hash in
         Contract.raw_originate
           ctxt
           ~prepaid_bootstrap_storage:false

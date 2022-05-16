@@ -53,7 +53,8 @@ let null_address =
   Bytes.of_string
     "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
 
-let mainnet_tzBTC_address = "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
+let mainnet_tzBTC_address =
+  Contract_hash.of_b58check_exn "KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"
 
 (** If token_pool, xtz_pool, or lqt_total are ever zero the CPMM will be
     permanently broken. Therefore, we initialize it with the null address
@@ -110,7 +111,8 @@ let test_fa12_init_storage manager =
             ],
             [] )))
 
-let originate ctxt address ~balance script =
+let originate ctxt address_hash ~balance script =
+  let address = Contract_repr.Originated address_hash in
   Contract_storage.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:true
@@ -174,11 +176,11 @@ let first_bootstrap_account =
        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")
 
 let check_tzBTC ~typecheck current_level ctxt f =
-  Contract_repr.of_b58check mainnet_tzBTC_address >>?= fun tzBTC ->
-  Contract_storage.exists ctxt tzBTC >>= function
+  Contract_storage.exists ctxt (Contract_repr.Originated mainnet_tzBTC_address)
+  >>= function
   | true ->
       (* If tzBTC exists, we're on mainnet and we use it as the token address in the CPMM. *)
-      f ctxt tzBTC []
+      f ctxt mainnet_tzBTC_address []
   | false ->
       (* If the tzBTC contract does not exist, we originate a test FA1.2 contract using the same script as the LQT. This is so that we can test the contracts after performing the same protocol migration that will be done on mainnet.
 
@@ -216,8 +218,8 @@ let init ctxt ~typecheck =
             code = Script_repr.lazy_expr Liquidity_baking_cpmm.script;
             storage =
               cpmm_init_storage
-                ~token_address:(Contract_repr.to_b58check token_address)
-                ~lqt_address:(Contract_repr.to_b58check lqt_address);
+                ~token_address:(Contract_hash.to_b58check token_address)
+                ~lqt_address:(Contract_hash.to_b58check lqt_address);
           }
       in
       typecheck ctxt cpmm_script >>=? fun (cpmm_script, ctxt) ->
@@ -225,7 +227,7 @@ let init ctxt ~typecheck =
         Script_repr.
           {
             code = Script_repr.lazy_expr Liquidity_baking_lqt.script;
-            storage = lqt_init_storage (Contract_repr.to_b58check cpmm_address);
+            storage = lqt_init_storage (Contract_hash.to_b58check cpmm_address);
           }
       in
       typecheck ctxt lqt_script >>=? fun (lqt_script, ctxt) ->

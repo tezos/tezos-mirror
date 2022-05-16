@@ -63,9 +63,7 @@ module Sapling = Sapling_services
 
 module Liquidity_baking : sig
   val get_cpmm_address :
-    'a #RPC_context.simple ->
-    'a ->
-    Alpha_context.Contract.t shell_tzresult Lwt.t
+    'a #RPC_context.simple -> 'a -> Contract_hash.t shell_tzresult Lwt.t
 end
 
 module Cache : sig

@@ -35,10 +35,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    state_hash.mli state_hash.ml
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
+   origination_nonce.mli origination_nonce.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
-   origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
    bitset.mli bitset.ml
@@ -225,10 +225,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    state_hash.mli state_hash.ml
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
+   origination_nonce.mli origination_nonce.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
-   origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
    bitset.mli bitset.ml
@@ -415,10 +415,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    state_hash.mli state_hash.ml
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
+   origination_nonce.mli origination_nonce.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
-   origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
    bitset.mli bitset.ml
@@ -627,10 +627,10 @@ include Tezos_raw_protocol_alpha.Main
    State_hash
    Nonce_hash
    Script_expr_hash
+   Origination_nonce
    Contract_hash
    Blinded_public_key_hash
    Block_payload_hash
-   Origination_nonce
    Tx_rollup_prefixes
    Merkle_list
    Bitset
@@ -858,10 +858,10 @@ include Tezos_raw_protocol_alpha.Main
    state_hash.mli state_hash.ml
    nonce_hash.mli nonce_hash.ml
    script_expr_hash.mli script_expr_hash.ml
+   origination_nonce.mli origination_nonce.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
-   origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
    bitset.mli bitset.ml

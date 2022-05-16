@@ -27,3 +27,6 @@
 (** A specialized Blake2B implementation for hashing contract identifiers. *)
 
 include S.HASH
+
+(** [of_nonce nonce] is the contract address originated from [nonce]. *)
+val of_nonce : Origination_nonce.t -> t

@@ -34,7 +34,8 @@ let get_toggle_ema ctxt =
 
 let on_cpmm_exists ctxt f =
   get_cpmm_address ctxt >>=? fun cpmm_contract ->
-  Contract_storage.exists ctxt cpmm_contract >>= function
+  Contract_storage.exists ctxt (Contract_repr.Originated cpmm_contract)
+  >>= function
   | false ->
       (* do nothing if the cpmm is not found *)
       return (ctxt, [])

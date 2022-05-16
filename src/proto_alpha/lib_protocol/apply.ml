@@ -1414,7 +1414,8 @@ let apply_external_manager_operation_content :
          so that the script can use it immediately.
          The address of external originations is generated here. *)
       Contract.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, contract) ->
+      >>?= fun (ctxt, contract_hash) ->
+      let contract = Contract.Originated contract_hash in
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
@@ -3107,7 +3108,10 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
   Liquidity_baking.on_subsidy_allowed
     ctxt
     ~toggle_vote
-    (fun ctxt liquidity_baking_cpmm_contract ->
+    (fun ctxt liquidity_baking_cpmm_contract_hash ->
+      let liquidity_baking_cpmm_contract =
+        Contract.Originated liquidity_baking_cpmm_contract_hash
+      in
       let ctxt =
         (* We set a gas limit of 1/20th the block limit, which is ~10x
            actual usage here in Granada. Gas consumed is reported in
