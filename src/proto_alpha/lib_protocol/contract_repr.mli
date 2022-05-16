@@ -75,6 +75,14 @@ val pp_short : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t
 
+(** [implicit_encoding] is an encoding for public key hashes that is
+    compatible with the [encoding] of contracts for implicit accounts. *)
+val implicit_encoding : Signature.Public_key_hash.t Data_encoding.t
+
+(** [originated_encoding] is an encoding for contract hashes that is
+    compatible with the [encoding] of contracts for originated accounts. *)
+val originated_encoding : Contract_hash.t Data_encoding.t
+
 (** [cases f g] exports the {!Data_encoding.cases} used to define {!encoding}.
 
     The only reason why we export that is to let {!Destination_repr.encoding}
