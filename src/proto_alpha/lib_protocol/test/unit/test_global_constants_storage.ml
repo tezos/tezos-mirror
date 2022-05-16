@@ -36,8 +36,8 @@ open Protocol
 open Alpha_context
 open Tztest
 open Micheline
-open QCheck
-open Lib_test.Qcheck_helpers
+open QCheck2
+open Lib_test.Qcheck2_helpers
 open Michelson_v1_primitives
 open Michelson_v1_printer
 open Test_global_constants
@@ -45,11 +45,11 @@ open Test_global_constants
 (** [get] on a nonexistent global constant
     returns an error. *)
 let test_get_on_nonexistent_fails =
-  tztest_qcheck
+  tztest_qcheck2
     ~name:"get on a nonexistent global constants fails"
-    (pair
-       (Generators.context_arbitrary ())
-       (Generators.canonical_without_constant_arbitrary ()))
+    (Gen.pair
+       (Generators.context_gen ())
+       (Generators.canonical_without_constant_gen ()))
     (fun (context, expr) ->
       expr_to_hash expr |> Environment.wrap_tzresult >>?= fun hash ->
       Global_constants_storage.get context hash
@@ -59,11 +59,11 @@ let test_get_on_nonexistent_fails =
 (** If registering an expression yields a hash [h] and context [c],
     then [get c h] should yield the original expression. *)
 let test_get_always_returns_registered_expr =
-  tztest_qcheck
+  tztest_qcheck2
     ~name:"get always returned the registered constant"
-    (pair
-       (Generators.context_arbitrary ())
-       (Generators.canonical_without_constant_arbitrary ()))
+    (Gen.pair
+       (Generators.context_gen ())
+       (Generators.canonical_without_constant_gen ()))
     (fun (context, expr) ->
       Global_constants_storage.register context expr
       >|= Environment.wrap_tzresult
@@ -89,11 +89,11 @@ let test_register_fails_with_unregistered_references =
 (** Same test as [test_register_fails_with_unregistered_references]
     but with random values. *)
 let test_register_fails_with_unregistered_references_pbt =
-  tztest_qcheck
+  tztest_qcheck2
     ~name:"register: fails with unregistered references pbt"
-    (pair
-       (Generators.context_arbitrary ())
-       (Generators.canonical_with_constant_arbitrary ()))
+    (Gen.pair
+       (Generators.context_gen ())
+       (Generators.canonical_with_constant_gen ()))
     (fun (context, (_, expr, _)) ->
       assume_expr_not_too_large expr ;
       Global_constants_storage.register context expr
@@ -122,12 +122,12 @@ let test_register_fails_if_too_deep =
 (** [expand] on an expression containing a nonexistent global
     constant returns an error. *)
 let test_expand_nonexistent_fails =
-  tztest_qcheck
+  tztest_qcheck2
     ~name:
       "expand on an expression containing a nonexistent global constant fails"
-    (pair
-       (Generators.context_arbitrary ())
-       (Generators.canonical_with_constant_arbitrary ()))
+    (Gen.pair
+       (Generators.context_gen ())
+       (Generators.canonical_with_constant_gen ()))
   @@ fun (context, (_, expr, _)) ->
   assume_expr_not_too_large expr ;
   Global_constants_storage.expand context expr
@@ -146,12 +146,12 @@ let test_expand_no_constants =
 
 (** Similar to [test_expand_no_constants], but random. *)
 let test_register_and_expand_orthogonal =
-  tztest_qcheck
+  tztest_qcheck2
     ~name:"register and expand are orthogonal"
-    (triple
-       (Generators.context_arbitrary ())
-       (Generators.canonical_without_constant_arbitrary ())
-       (Generators.canonical_without_constant_arbitrary ()))
+    (Gen.triple
+       (Generators.context_gen ())
+       (Generators.canonical_without_constant_gen ())
+       (Generators.canonical_without_constant_gen ()))
     (fun (context, expr1, expr2) ->
       assume_expr_not_too_large expr1 ;
       assume_expr_not_too_large expr2 ;
@@ -169,7 +169,7 @@ let test_register_and_expand_orthogonal =
 let test_expand_deep_constants =
   tztest "expand: deep constants" `Quick (fun () ->
       (* Should hold for any n, but this test is very slow,
-         hence we don't do QCheck. *)
+         hence we don't do QCheck2. *)
       let n = 1000 in
       let expr1 = Expr.from_string "{}" in
       create_context () >>=? fun context ->
@@ -344,11 +344,11 @@ let test_expand_instr_example =
     original expression [e]*)
 let test_expand_pbt =
   let open Michelson_v1_printer in
-  tztest_qcheck
+  tztest_qcheck2
     ~name:"expand: random"
-    (pair
-       (Generators.context_arbitrary ())
-       (Generators.canonical_with_constant_arbitrary ()))
+    (Gen.pair
+       (Generators.context_gen ())
+       (Generators.canonical_with_constant_gen ()))
     (fun (context, (full_expr, expr_with_constant, sub_expr)) ->
       assume_expr_not_too_large full_expr ;
       assume_expr_not_too_large expr_with_constant ;
@@ -362,11 +362,11 @@ let test_expand_pbt =
       qcheck_eq ~pp:print_expr full_expr result_expr)
 
 let test_expand_is_idempotent =
-  tztest_qcheck
+  tztest_qcheck2
     ~name:"expand is idempotent"
-    (pair
-       (Generators.context_arbitrary ())
-       (Generators.canonical_with_constant_arbitrary ()))
+    (Gen.pair
+       (Generators.context_gen ())
+       (Generators.canonical_with_constant_gen ()))
     (fun (context, (full_expr, expr_with_constant, sub_expr)) ->
       assume_expr_not_too_large full_expr ;
       Global_constants_storage.register context sub_expr

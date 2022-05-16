@@ -164,25 +164,21 @@ let test_skip_list_nat_check_invalid_path (basis, i) =
 
 let tests =
   [
-    Tztest.tztest_qcheck
+    Tztest.tztest_qcheck2
       ~name:"Skip list: check produced paths for multiple basis."
       ~count:10
-      QCheck.(
-        make
-          Gen.(
-            let* basis = 2 -- 73 in
-            let* i = 0 -- 100 in
-            let* j = 0 -- i in
-            return (basis, i, j)))
+      QCheck2.Gen.(
+        let* basis = 2 -- 73 in
+        let* i = 0 -- 100 in
+        let* j = 0 -- i in
+        return (basis, i, j))
       test_skip_list_nat_check_path;
-    Tztest.tztest_qcheck
+    Tztest.tztest_qcheck2
       ~name:"Skip list: reject invalid paths for multiple basis."
       ~count:10
-      QCheck.(
-        make
-          Gen.(
-            let* basis = 2 -- 73 in
-            let* i = 0 -- 100 in
-            return (basis, i)))
+      QCheck2.Gen.(
+        let* basis = 2 -- 73 in
+        let* i = 0 -- 100 in
+        return (basis, i))
       test_skip_list_nat_check_invalid_path;
   ]
