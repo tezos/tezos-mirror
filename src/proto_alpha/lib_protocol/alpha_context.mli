@@ -1477,6 +1477,8 @@ module Contract : sig
     | Implicit of Signature.Public_key_hash.t
     | Originated of Contract_hash.t
 
+  type error += Non_existing_contract of t
+
   include BASIC_DATA with type t := t
 
   val originated_encoding : Contract_hash.t Data_encoding.t

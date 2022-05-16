@@ -855,8 +855,7 @@ let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~script_ir
-    ~script ~parameter ~cache_key ~balance_updates
-    ~allocated_destination_contract =
+    ~script ~parameter ~cache_key ~balance_updates =
   (* Token.transfer which is being called before already loads this value into
      the Irmin cache, so no need to burn gas for it. *)
   Contract.get_balance ctxt contract >>=? fun balance ->
@@ -931,35 +930,52 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
                storage_size = new_size;
                paid_storage_size_diff =
                  Z.add contract_paid_storage_size_diff ticket_paid_storage_diff;
-               allocated_destination_contract;
+               allocated_destination_contract = false;
              })
       in
       (ctxt, result, operations) )
 
 let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
-  (match contract with
-  | Originated _ ->
-      (if Tez.(amount = zero) then
-       (* Detect potential call to non existent contract. *)
-       Contract.must_exist ctxt contract
-      else return_unit)
-      >>=? fun () ->
+  match contract with
+  | Originated _ -> (
       (* Since the contract is originated, nothing will be allocated
-         or the next transfer of tokens will fail. *)
-      return_false
+         or this transfer of tokens will fail.
+         Calls to non-existing contracts are detected by [Script_cache.find]
+         returning [None] because [Token.transfer] will succeed on non-existing
+         contracts if the amount is zero.
+      *)
+      Token.transfer ctxt (`Contract source) (`Contract contract) amount
+      >>=? fun (ctxt, balance_updates) ->
+      Script_cache.find ctxt contract >>=? fun (ctxt, cache_key, script) ->
+      match script with
+      | None -> fail (Contract.Non_existing_contract contract)
+      | Some (script, script_ir) ->
+          apply_transaction_to_smart_contract
+            ~ctxt
+            ~source
+            ~contract
+            ~amount
+            ~entrypoint
+            ~before_operation
+            ~payer
+            ~chain_id
+            ~mode
+            ~internal
+            ~script_ir
+            ~script
+            ~parameter
+            ~cache_key
+            ~balance_updates)
   | Implicit _ ->
       (* Transfers of zero to implicit accounts are forbidden. *)
       error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
       (* If the implicit contract is not yet allocated at this point then
          the next transfer of tokens will allocate it. *)
-      Contract.allocated ctxt contract >|= ok >|=? not)
-  >>=? fun allocated_destination_contract ->
-  Token.transfer ctxt (`Contract source) (`Contract contract) amount
-  >>=? fun (ctxt, balance_updates) ->
-  Script_cache.find ctxt contract >>=? fun (ctxt, cache_key, script) ->
-  match script with
-  | None ->
+      Contract.allocated ctxt contract >>= fun already_allocated ->
+      Token.transfer ctxt (`Contract source) (`Contract contract) amount
+      >>=? fun (ctxt, balance_updates) ->
+      let allocated_destination_contract = not already_allocated in
       apply_transaction_to_implicit
         ~ctxt
         ~contract
@@ -969,24 +985,6 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
         ~balance_updates
         ~allocated_destination_contract
       >>?= fun (ctxt, result) -> return (ctxt, result, [])
-  | Some (script, script_ir) ->
-      apply_transaction_to_smart_contract
-        ~ctxt
-        ~source
-        ~contract
-        ~amount
-        ~entrypoint
-        ~before_operation
-        ~payer
-        ~chain_id
-        ~mode
-        ~internal
-        ~script_ir
-        ~script
-        ~parameter
-        ~cache_key
-        ~balance_updates
-        ~allocated_destination_contract
 
 let ex_ticket_size :
     context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
@@ -1157,18 +1155,17 @@ let apply_internal_manager_operation_content :
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
-    gas_consumed_in_precheck:Gas.cost option ->
     kind Script_typed_ir.manager_operation ->
     (context
     * kind successful_manager_operation_result
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id ~gas_consumed_in_precheck operation ->
+ fun ctxt mode ~payer ~source ~chain_id operation ->
   prepare_apply_manager_operation_content
     ~ctxt
     ~source
-    ~gas_consumed_in_precheck
+    ~gas_consumed_in_precheck:None
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
   | Transaction_to_contract
@@ -1181,22 +1178,19 @@ let apply_internal_manager_operation_content :
         parameters_ty;
         parameters = typed_parameters;
       } ->
-      apply_transaction
-        ~ctxt
-        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
-        ~source
-        ~contract:destination
-        ~amount
-        ~entrypoint
-        ~before_operation
-        ~payer
-        ~chain_id
-        ~mode
-        ~internal:true
-      >|=? fun (ctxt, manager_result, operations) ->
-      ( ctxt,
-        (manager_result : kind successful_manager_operation_result),
-        operations )
+      (apply_transaction
+         ~ctxt
+         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
+         ~source
+         ~contract:destination
+         ~amount
+         ~entrypoint
+         ~before_operation
+         ~payer
+         ~chain_id
+         ~mode
+         ~internal:true
+        : (_ * kind successful_manager_operation_result * _) tzresult Lwt.t)
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       apply_transaction_to_tx_rollup
@@ -1797,7 +1791,6 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             ~source
             ~payer
             ~chain_id
-            ~gas_consumed_in_precheck:None
             operation)
         >>= function
         | Error errors ->

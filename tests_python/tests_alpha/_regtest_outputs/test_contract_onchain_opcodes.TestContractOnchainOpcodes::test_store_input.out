@@ -1,7 +1,7 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_store_input
 
 Node is bootstrapped.
-Estimated gas: 1450.040 units (will add 0 for safety)
+Estimated gas: 1000.040 units (will add 0 for safety)
 Estimated storage: 257 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,19 +12,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000399
+    Fee to the baker: ꜩ0.000354
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1451
+    Gas limit: 1001
     Storage limit: 277 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000399
-      payload fees(the block proposer) ....... +ꜩ0.000399
+      [CONTRACT_HASH] ... -ꜩ0.000354
+      payload fees(the block proposer) ....... +ꜩ0.000354
     Transaction:
       Amount: ꜩ1000
       From: [CONTRACT_HASH]
       To: [CONTRACT_HASH]
       This transaction was successfully applied
-      Consumed gas: 1450.040
+      Consumed gas: 1000.040
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ1000
         [CONTRACT_HASH] ... +ꜩ1000
@@ -33,7 +33,7 @@ This sequence of operations was run:
 
 Injected block at minimal timestamp
 Node is bootstrapped.
-Estimated gas: 1450.040 units (will add 0 for safety)
+Estimated gas: 1000.040 units (will add 0 for safety)
 Estimated storage: 257 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -44,19 +44,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000399
+    Fee to the baker: ꜩ0.000354
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1451
+    Gas limit: 1001
     Storage limit: 277 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000399
-      payload fees(the block proposer) ....... +ꜩ0.000399
+      [CONTRACT_HASH] ... -ꜩ0.000354
+      payload fees(the block proposer) ....... +ꜩ0.000354
     Transaction:
       Amount: ꜩ2000
       From: [CONTRACT_HASH]
       To: [CONTRACT_HASH]
       This transaction was successfully applied
-      Consumed gas: 1450.040
+      Consumed gas: 1000.040
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ2000
         [CONTRACT_HASH] ... +ꜩ2000
