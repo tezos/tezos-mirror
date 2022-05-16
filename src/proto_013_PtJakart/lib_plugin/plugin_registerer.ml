@@ -28,4 +28,12 @@ module Plugin = struct
   include Plugin
 end
 
+module MetricsPlugin = struct
+  include Metrics_plugin
+
+  let hash = Registerer.Registered.hash
+end
+
 let () = Prevalidator_filters.register (module Plugin)
+
+let () = Shell_metrics.Proto_plugin.register_plugin (module MetricsPlugin)
