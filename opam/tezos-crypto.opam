@@ -17,7 +17,7 @@ depends: [
   "secp256k1-internal" { >= "0.3.0" }
   "tezos-error-monad"
   "tezos-rpc"
-  "ringo" { = "0.8" }
+  "ringo" { >= "0.9" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "bls12-381" { >= "3.0.0" & < "3.1.0" }

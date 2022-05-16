@@ -27,8 +27,8 @@ depends: [
   "data-encoding" { >= "0.5.3" & < "0.6" }
   "irmin-pack" { >= "3.2.0" & < "3.3.0" }
   "irmin" { >= "3.2.0" & < "3.3.0" }
-  "ringo" { = "0.8" }
-  "ringo-lwt" { = "0.8" }
+  "ringo" { >= "0.9" }
+  "ringo-lwt" { >= "0.9" }
 ]
 build: [
   ["rm" "-r" "vendors"]
