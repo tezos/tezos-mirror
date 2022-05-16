@@ -135,8 +135,7 @@ end
 
 let list_contracts cctxt =
   RawContractAlias.load cctxt >>=? fun raw_contracts ->
-  List.map_s (fun (n, v) -> Lwt.return ("", n, v)) raw_contracts
-  >>= fun contracts ->
+  let contracts = List.map (fun (n, v) -> ("", n, v)) raw_contracts in
   Client_keys.Public_key_hash.load cctxt >>=? fun keys ->
   (* List accounts (implicit contracts of identities) *)
   List.map_es
