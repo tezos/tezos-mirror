@@ -91,6 +91,7 @@ module ContractAlias = struct
     | ["key"; text] ->
         Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
         return (s, Contract.Implicit v)
+    | ["text"; text] -> ContractEntity.of_source text >|=? fun c -> (s, c)
     | _ -> (
         find cctxt s >>= function
         | Ok v -> return v
