@@ -397,7 +397,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
               return_unit)
           (fun exn ->
             Error_monad.failwith
-              "An exception occured on a function bound on new heads : %s@."
+              "An exception occurred on a function bound on new heads : %s@."
               (Printexc.to_string exn))
   in
   let promise = loop () in
@@ -1232,13 +1232,13 @@ let estimate_transaction_cost ?smart_contracts
   >>=? fun (src, dst) ->
   let chain = cctxt#chain in
   let block = cctxt#block in
-  let selected_smart_constract =
+  let selected_smart_contract =
     Option.bind smart_contracts (fun smart_contracts ->
         sample_smart_contracts smart_contracts rng_state)
   in
   let dst, fee, gas_limit =
     Option.value
-      selected_smart_constract
+      selected_smart_contract
       ~default:
         ( Implicit dst.source.pkh,
           default_parameters.regular_transfer_fee,

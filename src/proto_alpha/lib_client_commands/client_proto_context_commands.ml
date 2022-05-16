@@ -1938,7 +1938,7 @@ let commands_rw () =
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"Account submiting the transaction rollup batches."
+           ~desc:"Account submitting the transaction rollup batches."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2001,7 +2001,7 @@ let commands_rw () =
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"Account commiting to the transaction rollup."
+           ~desc:"Account committing to the transaction rollup."
       @@ prefixes ["for"; "level"]
       @@ Tx_rollup.level_param ~usage:"Level used for the commitment."
       @@ prefixes ["with"; "inbox"; "hash"]
@@ -2283,9 +2283,9 @@ let commands_rw () =
            level
            rejected_message_result_hash
            rejected_message_result_path
-           confliting_message_position
-           confliting_message
-           confliting_message_path
+           conflicting_message_position
+           conflicting_message
+           conflicting_message_path
            previous_context_hash
            previous_withdraw_list_hash
            previous_message_result_path
@@ -2316,9 +2316,9 @@ let commands_rw () =
               ~fee_parameter
               ~tx_rollup
               ~level
-              ~message:confliting_message
-              ~message_position:confliting_message_position
-              ~message_path:confliting_message_path
+              ~message:conflicting_message
+              ~message_position:conflicting_message_position
+              ~message_path:conflicting_message_path
               ~message_result_hash:rejected_message_result_hash
               ~message_result_path:rejected_message_result_path
               ~proof
