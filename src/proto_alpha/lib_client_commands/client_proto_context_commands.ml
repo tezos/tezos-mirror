@@ -1415,7 +1415,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, fee_parameter) (_, source) cctxt ->
+      (fun (fee, dry_run, verbose_signing, fee_parameter) source cctxt ->
         match source with
         | Originated _ -> failwith "only implicit accounts can be revealed"
         | Implicit source ->

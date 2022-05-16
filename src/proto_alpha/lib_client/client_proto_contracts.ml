@@ -82,7 +82,7 @@ module ContractAlias = struct
       param
         ~name
         ~desc
-        (parameter ~autocomplete (fun cctxt p -> get_contract cctxt p))
+        (parameter ~autocomplete (fun cctxt p -> get_contract cctxt p >|=? snd))
         next)
 
   let find_destination cctxt s =
