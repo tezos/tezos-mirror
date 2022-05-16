@@ -640,34 +640,34 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks res stack
       (* Big map operations *)
       | IEmpty_big_map (_, tk, tv, k) ->
-          let ebm = Script_ir_translator.empty_big_map tk tv in
+          let ebm = Script_big_map.empty tk tv in
           (step [@ocaml.tailcall]) g gas k ks ebm (accu, stack)
       | IBig_map_mem (_, k) ->
           let map, stack = stack in
           let key = accu in
           ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
-            Script_ir_translator.big_map_mem ctxt key map )
+            Script_big_map.mem ctxt key map )
           >>=? fun (res, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | IBig_map_get (_, k) ->
           let map, stack = stack in
           let key = accu in
           ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
-            Script_ir_translator.big_map_get ctxt key map )
+            Script_big_map.get ctxt key map )
           >>=? fun (res, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | IBig_map_update (_, k) ->
           let key = accu in
           let maybe_value, (map, stack) = stack in
           ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
-            Script_ir_translator.big_map_update ctxt key maybe_value map )
+            Script_big_map.update ctxt key maybe_value map )
           >>=? fun (big_map, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks big_map stack
       | IBig_map_get_and_update (_, k) ->
           let key = accu in
           let v, (map, stack) = stack in
           ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
-            Script_ir_translator.big_map_get_and_update ctxt key v map )
+            Script_big_map.get_and_update ctxt key v map )
           >>=? fun ((v', map'), ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks v' (map', stack)
       (* timestamp operations *)

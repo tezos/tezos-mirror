@@ -175,44 +175,6 @@ type type_logger =
   stack_ty_after:Script.expr list ->
   unit
 
-(** Create an empty big_map *)
-val empty_big_map :
-  'a Script_typed_ir.comparable_ty ->
-  ('b, _) Script_typed_ir.ty ->
-  ('a, 'b) Script_typed_ir.big_map
-
-val big_map_mem :
-  context ->
-  'key ->
-  ('key, 'value) Script_typed_ir.big_map ->
-  (bool * context) tzresult Lwt.t
-
-val big_map_get :
-  context ->
-  'key ->
-  ('key, 'value) Script_typed_ir.big_map ->
-  ('value option * context) tzresult Lwt.t
-
-(** Update a big map. See {!big_map_get_and_update} for details. *)
-val big_map_update :
-  context ->
-  'key ->
-  'value option ->
-  ('key, 'value) Script_typed_ir.big_map ->
-  (('key, 'value) Script_typed_ir.big_map * context) tzresult Lwt.t
-
-(** Update a big map, returning the old value of the given key and the new map.
-
-    This does {i not} modify the underlying storage, only the diff table.
- *)
-val big_map_get_and_update :
-  context ->
-  'key ->
-  'value option ->
-  ('key, 'value) Script_typed_ir.big_map ->
-  (('value option * ('key, 'value) Script_typed_ir.big_map) * context) tzresult
-  Lwt.t
-
 val ty_eq :
   error_details:(Script.location, 'error_trace) error_details ->
   ('a, 'ac) Script_typed_ir.ty ->
