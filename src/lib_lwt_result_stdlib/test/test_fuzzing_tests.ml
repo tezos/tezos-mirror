@@ -47,24 +47,29 @@ module type Test = sig
 end
 
 module Make = struct
-  (* Custom Test.make helpers to reduce boilerplate *)
+  (* Custom make' helpers to reduce boilerplate *)
   open QCheck2
 
+  (* Default test count is 100, we reduce it for performance reasons *)
+  let count = 50
+
+  let make' = Test.make ~count
+
   let concat_map ?name law =
-    Test.make
+    make'
       ?name
       (Gen.quad Test_fuzzing_helpers.Fn.arith one one many)
       (fun (Fun (_, fn), consta, constb, input) ->
         law (fn, consta, constb, input))
 
   let iter ?name law =
-    Test.make
+    make'
       ?name
       (Gen.triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) -> law (fn, init, input))
 
   let iter_monotonic ?name law =
-    Test.make
+    make'
       ?name
       (Gen.quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (init, Fun (_, fn), const, input) -> law (init, fn, const, input))
@@ -75,15 +80,13 @@ module Make = struct
 
   let fold_map ?name law =
     let accum = fun2 Observable.int Observable.int Gen.(pair int int) in
-    Test.make
-      ?name
-      (Gen.triple accum one many)
-      (fun (Fun (_, fn), init, input) -> law (fn, init, input))
+    make' ?name (Gen.triple accum one many) (fun (Fun (_, fn), init, input) ->
+        law (fn, init, input))
 
   let fold_monotonic = iter_monotonic
 
   let exists ?name law =
-    Test.make
+    make'
       ?name
       ~print:PredPrint.print3_one_many
       (Gen.triple Test_fuzzing_helpers.Fn.pred one many)
@@ -94,14 +97,14 @@ module Make = struct
   let filter = exists
 
   let filteri ?name law =
-    Test.make
+    make'
       ?name
       ~print:PredPrint.print2_many
       (Gen.pair Test_fuzzing_helpers.Fn.pred many)
       (fun ((_, fn), input) -> law (fn, input))
 
   let filter_map ?name law =
-    Test.make
+    make'
       ?name
       ~print:PredPrint.print4_arith_one_many
       (Gen.quad
@@ -115,7 +118,7 @@ module Make = struct
   let find = exists
 
   let find_map ?name law =
-    Test.make
+    make'
       ?name
       (Gen.triple Test_fuzzing_helpers.Fn.predarith one many)
       (fun (Fun (_, fn), const, input) -> law (fn, const, input))
@@ -125,32 +128,32 @@ module Make = struct
   let partition_map = filter_map
 
   let iter_double ?name law =
-    Test.make
+    make'
       ?name
       (Gen.triple Test_fuzzing_helpers.Fn.arith one manymany)
       (fun (Fun (_, fn), init, (left, right)) -> law (fn, init, (left, right)))
 
   let iter_double_e ?name =
-    Test.make ?name (Gen.triple Test_fuzzing_helpers.Fn.arith_e one manymany)
+    make' ?name (Gen.triple Test_fuzzing_helpers.Fn.arith_e one manymany)
 
   let iter_double_s ?name =
-    Test.make ?name (Gen.triple Test_fuzzing_helpers.Fn.arith_s one manymany)
+    make' ?name (Gen.triple Test_fuzzing_helpers.Fn.arith_s one manymany)
 
   let map_double ?name law =
-    Test.make
+    make'
       ?name
       (Gen.pair Test_fuzzing_helpers.Fn.arith manymany)
       (fun (Fun (_, fn), input) -> law (fn, input))
 
   let map_double_e ?name =
-    Test.make ?name (Gen.pair Test_fuzzing_helpers.Fn.arith_e manymany)
+    make' ?name (Gen.pair Test_fuzzing_helpers.Fn.arith_e manymany)
 
   let fold_double = iter_double
 
   let fold_double_e = iter_double_e
 
   let exists_double ?name law =
-    Test.make
+    make'
       ?name
       ~print:PredPrint.print2_manymany
       (Gen.pair Test_fuzzing_helpers.Fn.pred manymany)
@@ -170,6 +173,7 @@ end) : Test = struct
 
   let iter_fold_left =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{iter,fold_left}" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
@@ -182,6 +186,7 @@ end) : Test = struct
 
   let iter_fold_left_e =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{iter,fold_left}_e" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_e one many)
       (fun (fn, init, input) ->
@@ -195,6 +200,7 @@ end) : Test = struct
 
   let iter_fold_left_s =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{iter,fold_left}_s" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_s one many)
       (fun (fn, init, input) ->
@@ -208,6 +214,7 @@ end) : Test = struct
 
   let iter_fold_left_es =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{iter,fold_left}_es" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_es one many)
       (fun (fn, init, input) ->
@@ -236,6 +243,7 @@ end) : Test = struct
 
   let rev_map =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{rev map,rev_map}" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), const, input) ->
@@ -248,6 +256,7 @@ end) : Test = struct
 
   let rev_map_e =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{rev map,rev_map}_e" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_e one many)
       (fun (fn, const, input) ->
@@ -261,6 +270,7 @@ end) : Test = struct
 
   let rev_map_s =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{rev map,rev_map}_s" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_s one many)
       (fun (fn, const, input) ->
@@ -274,6 +284,7 @@ end) : Test = struct
 
   let rev_map_es =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{rev map,rev_map}_es" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_es one many)
       (fun (fn, const, input) ->
@@ -287,6 +298,7 @@ end) : Test = struct
 
   let rev_map_p =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{rev map,rev_map}_p" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_s one many)
       (fun (fn, const, input) ->
@@ -300,6 +312,7 @@ end) : Test = struct
 
   let rev_map_ep =
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.{rev map,rev_map}_ep" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_es one many)
       (fun (fn, const, input) ->
@@ -2115,6 +2128,7 @@ end) : Test = struct
   let fold_right_es =
     let open QCheck2 in
     Test.make
+      ~count:Make.count
       ~name:(Format.asprintf "%s.fold_right{2,}_es" M.name)
       (Gen.triple Test_fuzzing_helpers.Fn.arith_es one manymany)
       (fun (fn, init, (left, right)) ->
