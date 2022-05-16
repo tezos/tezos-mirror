@@ -441,12 +441,14 @@ let submit_shielded_cmd =
            use_json_format )
          filename
          (_, source)
-         (contract_name, destination)
+         (_contract_name, destination)
          (cctxt : Protocol_client_context.full) ->
+      let open Protocol.Alpha_context in
       cctxt#message
-        "Reading forge transaction from file %s -- sending it to %s@."
+        "Reading forge transaction from file %s -- sending it to %a@."
         filename
-        contract_name
+        Contract.pp
+        destination
       >>= fun () ->
       let open Context in
       (if use_json_format then
@@ -466,7 +468,6 @@ let submit_shielded_cmd =
       return (sapling_transaction_as_arg transaction) >>=? fun contract_input ->
       let chain = cctxt#chain and block = cctxt#block in
       keys_of_implicit_account cctxt source >>=? fun (source, src_pk, src_sk) ->
-      let open Protocol.Alpha_context in
       Client_proto_context.transfer
         cctxt
         ~chain
