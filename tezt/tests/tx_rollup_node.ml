@@ -2539,7 +2539,7 @@ let test_withdraw_command =
           tx_client
           ~source:bls_key_1.aggregate_alias
           ~qty:1L
-          ~dest:Constant.bootstrap2.public_key_hash
+          ~dest:Constant.bootstrap2.alias
           ~ticket:ticket_id
       in
       let* _ =
