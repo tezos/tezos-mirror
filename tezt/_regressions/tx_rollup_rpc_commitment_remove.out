@@ -120,8 +120,8 @@ This simulation failed:
     Gas limit: 1040000
     Storage limit: 60000 bytes
     Tx rollup finalize commitment:[TX_ROLLUP_HASH] 
-    From: [PUBLIC_KEY_HASH]
-    This operation FAILED.
+      From: [PUBLIC_KEY_HASH]
+      This operation FAILED.
 
 Error:
   { "id": "proto.alpha.tx_rollup_no_commitment_to_finalize",
@@ -148,12 +148,12 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000505
       payload fees(the block proposer) ....... +ꜩ0.000505
     Tx rollup finalize commitment:[TX_ROLLUP_HASH] 
-    From: [PUBLIC_KEY_HASH]
-    This tx rollup finalize operation was successfully applied
-    Balance updates:
-      
-    Consumed gas: 2501.420@finalized level:
-      0
+      From: [PUBLIC_KEY_HASH]
+      This tx rollup finalize operation was successfully applied
+      Balance updates:
+        
+      Consumed gas: 2501.420@finalized level:
+        0
 
 
 ./tezos-client --wait none remove commitment of tx rollup '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'

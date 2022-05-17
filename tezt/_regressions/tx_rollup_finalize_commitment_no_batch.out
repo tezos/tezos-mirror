@@ -40,8 +40,8 @@ This simulation failed:
     Gas limit: 1040000
     Storage limit: 60000 bytes
     Tx rollup finalize commitment:[TX_ROLLUP_HASH] 
-    From: [PUBLIC_KEY_HASH]
-    This operation FAILED.
+      From: [PUBLIC_KEY_HASH]
+      This operation FAILED.
 
 Error:
   { "id": "proto.alpha.tx_rollup_no_commitment_to_finalize",
