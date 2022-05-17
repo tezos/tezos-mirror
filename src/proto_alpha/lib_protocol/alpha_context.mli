@@ -2712,7 +2712,10 @@ end
 
 (** This simply re-exports {!Destination_repr}. *)
 module Destination : sig
-  type t = Contract of Contract.t | Tx_rollup of Tx_rollup.t
+  type t =
+    | Contract of Contract.t
+    | Tx_rollup of Tx_rollup.t
+    | Sc_rollup of Sc_rollup.t
 
   val encoding : t Data_encoding.t
 

@@ -2058,6 +2058,8 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
     match destination with
     | Destination.Tx_rollup _ when not (Constants.tx_rollup_enable ctxt) ->
         error @@ Tx_rollup_addresses_disabled loc
+    | Destination.Sc_rollup _ when not (Constants.sc_rollup_enable ctxt) ->
+        error @@ Sc_rollup_disabled loc
     | _ -> Ok ({destination; entrypoint}, ctxt)
   in
   function
@@ -2434,7 +2436,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         >>=? fun (({destination; entrypoint = _}, (contents, amount)), ctxt) ->
         match destination with
         | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
-        | Tx_rollup _ -> fail (Unexpected_ticket_owner destination)
+        | Tx_rollup _ | Sc_rollup _ ->
+            fail (Unexpected_ticket_owner destination)
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
   | Set_t (t, _ty_name), (Seq (loc, vs) as expr) ->
@@ -4858,6 +4861,10 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
             fail
             @@ Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg)
       else fail (No_such_entrypoint entrypoint)
+  | Sc_rollup _ ->
+      (* TODO #2800
+         Implement typechecking of sc rollup deposits. *)
+      fail (No_such_entrypoint entrypoint)
 
 and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
   function
@@ -5068,6 +5075,7 @@ let parse_contract_for_script :
               (ctxt, Some (Typed_contract {arg_ty = arg; address}))
           | ctxt, None -> (ctxt, None))
       | _ -> return (ctxt, None))
+  | Sc_rollup _ -> return (ctxt, None)
 
 let view_size view =
   let open Script_typed_ir_size in

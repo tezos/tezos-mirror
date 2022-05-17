@@ -76,6 +76,10 @@ type error += Tx_rollup_invalid_ticket_amount of Z.t
 
 type error += Tx_rollup_addresses_disabled of Script.location
 
+(* Smart-contract rollup errors *)
+
+type error += Sc_rollup_disabled of Script.location
+
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
 
