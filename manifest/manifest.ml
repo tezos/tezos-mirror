@@ -1832,18 +1832,27 @@ let generate_dune_files () =
    If [fix_version] is [true], require [target]'s version to be
    exactly the same as [for_package]'s version, but only if [target] is internal. *)
 let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
-    (target : Target.t) : Opam.dependency option =
+    (target : Target.t) : Opam.dependency list =
   match target with
-  | Internal {opam = None; _} | External {opam = None; _} -> None
+  | External {opam = None; _} -> []
   | Internal {opam = Some package; _} ->
-      if package = for_package then None
+      if package = for_package then []
       else
         let version =
           if fix_version then Version.(Exactly Version) else Version.True
         in
-        Some {Opam.package; version; with_test; optional = false}
+        [{Opam.package; version; with_test; optional = false}]
+  | Internal ({opam = None; _} as internal) ->
+      (* If a target depends on a global "private" target, we must include its dependencies as well *)
+      let deps =
+        List.map (fun (Target.PPS (target, _)) -> target) internal.preprocess
+        @ internal.deps @ internal.opam_only_deps
+      in
+      List.concat_map
+        (as_opam_dependency ~fix_version ~for_package ~with_test)
+        deps
   | Vendored {name = package; _} ->
-      Some {Opam.package; version = True; with_test; optional = false}
+      [{Opam.package; version = True; with_test; optional = false}]
   | External {opam = Some opam; version; _}
   | Opam_only {name = opam; version; _} ->
       let version =
@@ -1859,9 +1868,9 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
         then Version.(Exactly Version)
         else version
       in
-      Some {Opam.package = opam; version; with_test; optional = false}
+      [{Opam.package = opam; version; with_test; optional = false}]
   | Optional target | Select {package = target; _} ->
-      Option.map
+      List.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
         (as_opam_dependency ~fix_version ~for_package ~with_test target)
   | Open (target, _) ->
@@ -1881,20 +1890,19 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     let with_test =
       match internal.kind with Test_executable _ -> true | _ -> false
     in
-    let deps = internal.deps @ internal.opam_only_deps in
+    let deps =
+      List.map (fun (Target.PPS (target, _)) -> target) internal.preprocess
+      @ internal.deps @ internal.opam_only_deps
+    in
     let x_opam_monorepo_opam_provided =
       List.filter_map as_opam_monorepo_opam_provided deps
     in
     let deps =
-      List.filter_map
+      List.concat_map
         (as_opam_dependency ~fix_version:for_release ~for_package ~with_test)
         deps
     in
-    let get_preprocess_dep (Target.PPS (target, _)) =
-      as_opam_dependency ~fix_version:for_release ~for_package ~with_test target
-    in
-    ( List.filter_map get_preprocess_dep internal.preprocess @ deps,
-      x_opam_monorepo_opam_provided )
+    (deps, x_opam_monorepo_opam_provided)
   in
   let depends = List.flatten depends in
   let x_opam_monorepo_opam_provided =
@@ -1938,7 +1946,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let conflicts =
     List.flatten @@ map internals
     @@ fun internal ->
-    List.filter_map
+    List.concat_map
       (as_opam_dependency ~fix_version:false ~for_package ~with_test:false)
       internal.conflicts
   in
