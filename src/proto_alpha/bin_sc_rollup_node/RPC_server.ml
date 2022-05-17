@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3001
+   Distinguish between local and global endpoints in endpoint paths. *)
+
 open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server

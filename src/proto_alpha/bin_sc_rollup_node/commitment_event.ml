@@ -66,6 +66,24 @@ module Simple = struct
       ("number_of_messages", Sc_rollup.Number_of_messages.encoding)
       ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
 
+  let commitment_will_not_be_published =
+    declare_6
+      ~section
+      ~name:"sc_rollup_node_commitment_will_not_be_published"
+      ~msg:
+        "Commitment will not be published: its inbox level is less or equal \
+         than the last cemented commitment level {lcc_level} - predecessor: \
+         {predecessor}, inbox_level: {inbox_level}, compressed_state: \
+         {compressed_state}, number_of_messages: {number_of_messages}, \
+         number_of_ticks: {number_of_ticks}"
+      ~level:Notice
+      ("lcc_level", Raw_level.encoding)
+      ("predecessor", Sc_rollup.Commitment_hash.encoding)
+      ("inbox_level", Raw_level.encoding)
+      ("compressed_state", Sc_rollup.State_hash.encoding)
+      ("number_of_messages", Sc_rollup.Number_of_messages.encoding)
+      ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
+
   let commitment_published =
     declare_5
       ~section
@@ -130,6 +148,17 @@ module Simple = struct
       ("number_of_messages", Sc_rollup.Number_of_messages.encoding)
       ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
 
+  let last_cemented_commitment_updated =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_lcc_updated"
+      ~msg:
+        "Last cemented commitment was updated to hash {hash} at inbox level \
+         {level}"
+      ~level:Notice
+      ("hash", Sc_rollup.Commitment_hash.encoding)
+      ("level", Raw_level.encoding)
+
   let compute_commitment =
     declare_2
       ~section
@@ -139,6 +168,21 @@ module Simple = struct
       ~level:Notice
       ("head", Block_hash.encoding)
       ("level", Raw_level.encoding)
+
+  let commitment_parent_is_not_lcc =
+    declare_3
+      ~section
+      ~name:"sc_rollup_commitment_parent_is_not_lcc"
+      ~msg:
+        "Trying to publish a commitment at inbox level {level} whose parent is \
+         the last cemented commitment, but the commitment's predecessor hash \
+         {predecessor_hash} differs from the last cemented commitment hash \
+         {lcc_hash}. This is a critical error, and the rollup node will be \
+         terminated."
+      ~level:Fatal
+      ("level", Raw_level.encoding)
+      ("predecessor_hash", Sc_rollup.Commitment_hash.encoding)
+      ("lcc_hash", Sc_rollup.Commitment_hash.encoding)
 end
 
 let starting = Simple.(emit starting)
@@ -159,6 +203,24 @@ let commitment_stored
     emit
       commitment_stored
       ( predecessor,
+        inbox_level,
+        compressed_state,
+        number_of_messages,
+        number_of_ticks ))
+
+let commitment_will_not_be_published lcc_level
+    {
+      predecessor;
+      inbox_level;
+      compressed_state;
+      number_of_messages;
+      number_of_ticks;
+    } =
+  Simple.(
+    emit
+      commitment_will_not_be_published
+      ( lcc_level,
+        predecessor,
         inbox_level,
         compressed_state,
         number_of_messages,
@@ -232,5 +294,11 @@ let commitment_failed
         number_of_messages,
         number_of_ticks ))
 
+let last_cemented_commitment_updated head level =
+  Simple.(emit last_cemented_commitment_updated (head, level))
+
 let compute_commitment head level =
   Simple.(emit compute_commitment (head, level))
+
+let commitment_parent_is_not_lcc level predecessor_hash lcc_hash =
+  Simple.(emit commitment_parent_is_not_lcc (level, predecessor_hash, lcc_hash))
