@@ -77,7 +77,8 @@ let dummy_account =
 
 let default_initial_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
-let generate_accounts ?rng_state ?(initial_balances = []) n : (t * Tez.t) list =
+let generate_accounts ?rng_state ?(initial_balances = []) ?bootstrap_delegations
+    n : (t * Tez.t * Signature.Public_key_hash.t option) list =
   Signature.Public_key_hash.Table.clear known_accounts ;
   let amount i =
     match List.nth_opt initial_balances i with
@@ -89,6 +90,15 @@ let generate_accounts ?rng_state ?(initial_balances = []) n : (t * Tez.t) list =
     | None -> Random.State.make_self_init ()
     | Some state -> state
   in
+  let delegate_to account =
+    Option.filter_map
+      (fun bootstrap_delegations ->
+        List.find_map
+          (fun (from_pkh, to_pkh) ->
+            if from_pkh = account then Some to_pkh else None)
+          bootstrap_delegations)
+      bootstrap_delegations
+  in
   List.map
     (fun i ->
       let pkh, pk, sk =
@@ -96,7 +106,7 @@ let generate_accounts ?rng_state ?(initial_balances = []) n : (t * Tez.t) list =
       in
       let account = {pkh; pk; sk} in
       Signature.Public_key_hash.Table.add known_accounts pkh account ;
-      (account, amount i))
+      (account, amount i, delegate_to pkh))
     (0 -- (n - 1))
 
 let commitment_secret =

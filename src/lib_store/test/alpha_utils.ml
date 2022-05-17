@@ -108,9 +108,10 @@ module Account = struct
 
   let dummy_account = new_account ()
 
-  let account_to_bootstrap ({pkh; pk; _}, amount) =
+  let account_to_bootstrap ({pkh; pk; _}, amount, delegate_to) =
     let open Parameters in
-    ({public_key_hash = pkh; public_key = Some pk; amount} : bootstrap_account)
+    ({public_key_hash = pkh; public_key = Some pk; amount; delegate_to}
+      : bootstrap_account)
 
   let commitment_secret =
     Blinded_public_key_hash.activation_code_of_hex
@@ -409,7 +410,7 @@ let default_accounts =
   let accounts = List.map to_account initial_accounts in
   List.iter Account.add_account accounts ;
   List.map
-    (fun acc -> Account.account_to_bootstrap (acc, default_amount))
+    (fun acc -> Account.account_to_bootstrap (acc, default_amount, None))
     accounts
 
 let default_genesis_parameters =

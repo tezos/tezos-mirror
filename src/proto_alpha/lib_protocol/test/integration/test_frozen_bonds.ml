@@ -66,7 +66,7 @@ let create_context () =
   let accounts = Account.generate_accounts 1 in
   Block.alpha_context accounts >>=? fun ctxt ->
   match accounts with
-  | [({pkh; _}, _)] -> return (ctxt, pkh)
+  | [({pkh; _}, _, _)] -> return (ctxt, pkh)
   | _ -> (* Exactly one account has been generated. *) assert false
 
 (** Creates a context, a user contract, and a delegate.

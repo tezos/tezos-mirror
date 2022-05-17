@@ -394,16 +394,23 @@ let tup_get : type a r. (a, r) tup -> a list -> r =
   | _ -> assert false
 
 let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
-    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts ?level
-    ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
-    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable () =
+    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts
+    ?bootstrap_delegations ?level ?cost_per_byte ?liquidity_baking_subsidy
+    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
+    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
+    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
+    ?tx_rollup_origination_size ?sc_rollup_enable () =
   let n = tup_n tup in
-  let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
+  let accounts =
+    Account.generate_accounts
+      ?rng_state
+      ~initial_balances
+      ?bootstrap_delegations
+      n
+  in
   let contracts =
     List.map
-      (fun (a, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
+      (fun (a, _, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
       accounts
   in
   Block.genesis
@@ -440,15 +447,15 @@ let init_with_constants_gen tup constants =
   let accounts = Account.generate_accounts n in
   let contracts =
     List.map
-      (fun (a, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
+      (fun (a, _, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
       accounts
   in
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
-      (fun (acc, tez) ->
+      (fun (acc, tez, delegate_to) ->
         Default_parameters.make_bootstrap_account
-          (acc.Account.pkh, acc.Account.pk, tez))
+          (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
       accounts
   in
   let parameters =
@@ -470,8 +477,8 @@ let default_raw_context () =
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
-      (fun (Account.{pk; pkh; _}, amount) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount))
+      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
+        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
       initial_accounts
   in
   Block.prepare_initial_context_params initial_accounts

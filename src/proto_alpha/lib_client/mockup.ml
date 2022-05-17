@@ -1080,7 +1080,12 @@ module Parsed_account = struct
     let public_key_hash = Signature.Public_key.hash public_key in
     return
       Parameters.
-        {public_key_hash; public_key = Some public_key; amount = repr.amount}
+        {
+          public_key_hash;
+          public_key = Some public_key;
+          amount = repr.amount;
+          delegate_to = None;
+        }
 
   let default_to_json (cctxt : Tezos_client_base.Client_context.full) :
       string tzresult Lwt.t =
@@ -1131,15 +1136,37 @@ module Bootstrap_account = struct
   let encoding : Parameters.bootstrap_account Data_encoding.t =
     let open Data_encoding in
     let open Parameters in
-    conv
-      (fun {public_key_hash; public_key; amount} ->
-        (public_key_hash, public_key, amount))
-      (fun (public_key_hash, public_key, amount) ->
-        {public_key_hash; public_key; amount})
-      (obj3
-         (req "public_key_hash" Signature.Public_key_hash.encoding)
-         (opt "public_key" Signature.Public_key.encoding)
-         (req "amount" Tez.encoding))
+    union
+      [
+        case
+          ~title:"No delegate"
+          (Tag 0)
+          (obj3
+             (req "public_key_hash" Signature.Public_key_hash.encoding)
+             (opt "public_key" Signature.Public_key.encoding)
+             (req "amount" Tez.encoding))
+          (function
+            | {public_key_hash; public_key; amount; delegate_to = None} ->
+                Some (public_key_hash, public_key, amount)
+            | _ -> None)
+          (fun (public_key_hash, public_key, amount) ->
+            {public_key_hash; public_key; amount; delegate_to = None});
+        case
+          ~title:"With delegate"
+          (Tag 1)
+          (obj4
+             (req "public_key_hash" Signature.Public_key_hash.encoding)
+             (opt "public_key" Signature.Public_key.encoding)
+             (req "amount" Tez.encoding)
+             (req "delegate_to" Signature.Public_key_hash.encoding))
+          (function
+            | {public_key_hash; public_key; amount; delegate_to = Some delegate}
+              ->
+                Some (public_key_hash, public_key, amount, delegate)
+            | _ -> None)
+          (fun (public_key_hash, public_key, amount, delegate) ->
+            {public_key_hash; public_key; amount; delegate_to = Some delegate});
+      ]
 end
 
 module Bootstrap_contract = struct
@@ -1213,6 +1240,7 @@ let lib_parameters_json_encoding =
           Parameters.public_key = Some pk;
           public_key_hash = Signature.Public_key.hash pk;
           amount;
+          delegate_to = None;
         })
       (tup2 Signature.Public_key.encoding Tez.encoding)
   in

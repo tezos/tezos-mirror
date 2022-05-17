@@ -645,7 +645,7 @@ module Interpreter_tests = struct
     (let pkh = Context.Contract.pkh src1 in
      (* dummy context used only for pack_data *)
      Block.alpha_context
-       [(Account.activator_account, Tez.of_mutez_exn 100_000_000_000L)]
+       [(Account.activator_account, Tez.of_mutez_exn 100_000_000_000L, None)]
      >>=? fun ctx ->
      Script_ir_translator.pack_data ctx Script_typed_ir.key_hash_t pkh >>= wrap)
     >>=? fun (bound_data, _) ->

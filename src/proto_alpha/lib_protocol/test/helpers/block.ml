@@ -275,8 +275,8 @@ let prepare_main_init_params ?bootstrap_contracts commitments constants
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
-      (fun (Account.{pk; pkh; _}, amount) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount))
+      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
+        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
       initial_accounts
   in
   let parameters =
@@ -392,7 +392,9 @@ let genesis_with_parameters parameters =
     context;
   }
 
-let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
+let validate_initial_accounts
+    (initial_accounts :
+      (Account.t * Tez.t * Signature.Public_key_hash.t option) list)
     tokens_per_roll =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
@@ -400,7 +402,7 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
   Lwt.catch
     (fun () ->
       List.fold_left_es
-        (fun acc (_, amount) ->
+        (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
           if acc >= tokens_per_roll then raise Exit else return acc)
         Tez.zero
@@ -496,7 +498,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   Lwt.catch
     (fun () ->
       List.fold_left_es
-        (fun acc (_, amount) ->
+        (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
           if acc >= constants.tokens_per_roll then raise Exit else return acc)
         Tez.zero
@@ -538,7 +540,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
     ?tx_rollup_origination_size ?sc_rollup_enable
-    (initial_accounts : (Account.t * Tez.t) list) =
+    (initial_accounts :
+      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
@@ -579,7 +582,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   }
 
 let alpha_context ?commitments ?min_proposal_quorum
-    (initial_accounts : (Account.t * Tez.t) list) =
+    (initial_accounts :
+      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
   prepare_initial_context_params ?min_proposal_quorum initial_accounts
   >>=? fun (constants, shell, _hash) ->
   initial_alpha_context ?commitments constants shell initial_accounts

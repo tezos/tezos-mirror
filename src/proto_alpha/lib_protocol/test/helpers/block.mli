@@ -125,7 +125,7 @@ val genesis :
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
-  (Account.t * Tez.tez) list ->
+  (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
   block tzresult Lwt.t
 
 val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
@@ -137,7 +137,7 @@ val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
 val alpha_context :
   ?commitments:Commitment.t list ->
   ?min_proposal_quorum:int32 ->
-  (Account.t * Tez.tez) list ->
+  (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
   Alpha_context.t tzresult Lwt.t
 
 (**
@@ -266,7 +266,7 @@ val prepare_initial_context_params :
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
-  (Account.t * Tez.t) list ->
+  (Account.t * Tez.t * Signature.Public_key_hash.t option) list ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )
   result

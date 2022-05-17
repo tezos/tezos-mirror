@@ -32,6 +32,7 @@ type bootstrap_account = {
   public_key_hash : Signature.Public_key_hash.t;
   public_key : Signature.Public_key.t option;
   amount : Tez_repr.t;
+  delegate_to : Signature.Public_key_hash.t option;
 }
 
 (** An originated contract initially existing on a chain since genesis. *)

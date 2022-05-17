@@ -226,6 +226,8 @@ type 'accounts init :=
   ?consensus_threshold:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?bootstrap_delegations:
+    (Signature.Public_key_hash.t * Signature.Public_key_hash.t) list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
   ?liquidity_baking_subsidy:Tez.t ->
