@@ -112,6 +112,8 @@ module type T = sig
 
   module Timelock : [%sig "v6/timelock.mli"] [@@coq_plain_module]
 
+  module Vdf : [%sig "v6/vdf.mli"] [@@coq_plain_module]
+
   module Micheline : [%sig "v6/micheline.mli"] [@@coq_plain_module]
 
   module Block_header : [%sig "v6/block_header.mli"] [@@coq_plain_module]

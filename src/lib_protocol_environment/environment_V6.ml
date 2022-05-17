@@ -285,6 +285,7 @@ struct
   module Signature = Signature
   module Pvss_secp256k1 = Pvss_secp256k1
   module Timelock = Timelock
+  module Vdf = Class_group_vdf.Vdf_self_contained
 
   module S = struct
     module type T = Tezos_base.S.T
