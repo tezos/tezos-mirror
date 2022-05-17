@@ -1115,7 +1115,22 @@ module Target = struct
                 | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' -> true
                 | _ -> false)
               opam
-          then x
+          then (
+            (match kind with
+            | Public_library {public_name; _} -> (
+                (* We allow an opam package on public_library even if
+                   it's not necessary.  We just need to make sure
+                   [package] agrees with [public_name] *)
+                match String.split_on_char '.' public_name with
+                | [] -> assert false
+                | first :: _ ->
+                    if first <> opam then
+                      error
+                        "Mismatch between public_name %S and opam package %S\n"
+                        public_name
+                        opam)
+            | _ -> ()) ;
+            x)
           else
             invalid_argf
               "%s is not a valid opam package name: should be of the form \
@@ -1636,9 +1651,31 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   in
   let package =
     match (internal.kind, internal.opam) with
-    | Public_executable _, Some opam -> Some opam
-    | _ -> None
+    | Public_executable _, None ->
+        (* Prevented by [Target.internal]. *)
+        assert false
+    | Public_executable _, (Some _ as opam) -> opam
+    | Private_executable _, None -> None
+    | Private_executable _, Some _opam ->
+        (* private executable can't have a package stanza, but we still want the manifest to know about the package *)
+        None
+    | Public_library _, None ->
+        (* Prevented by [Target.internal]. *)
+        assert false
+    | Public_library _, Some _ -> None
+    | Private_library _, opam ->
+        (* Private library can have an optional package.
+           - No package means: global to the entire repo
+           - A package means: private for the [opam] package only *)
+        opam
+    | Test_executable _, Some _ ->
+        (* private executable can't have a package stanza, but we still want the manifest to know about the package *)
+        None
+    | Test_executable _, None ->
+        (* Prevented by [Target.internal]. *)
+        assert false
   in
+
   let instrumentation =
     let bisect_ppx =
       if internal.bisect_ppx then Some (Dune.backend "bisect_ppx") else None
