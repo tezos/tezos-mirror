@@ -25,13 +25,18 @@ Configuration file
 Parameters in the configuration file can be specified in two different ways:
 
 - by creating and updating the configuration file using the ``config`` command of ``tezos-node``. This covers a subset of the CLI of the ``run`` command of ``tezos-node`` mentioned above.
+
+  The list of parameters configurable via the ``config`` command can be obtained using the following command::
+
+    tezos-node config update --help
+
 - by directly editing the configuration file. This allows to specify all the available configuration parameters, including some that cannot be set using the options of the ``config`` and ``run`` commands of ``tezos-node``, for example network parameters such as connection or authentication timeouts.
 
-The list of configurable options and parameters for the node can be obtained using the following command::
+  The list of configurable parameters in the configuration file can be obtained using the following command::
 
     tezos-node config --help
 
-This command also explains the role of each option and parameter and the range of possible values.
+  This command also explains the role of each option and parameter and the range of possible values.
 
 The config command
 ~~~~~~~~~~~~~~~~~~
@@ -45,18 +50,25 @@ This will initialize a configuration file for the node in
 specifies that the node will listen to incoming connections on socket
 address ``[::]:9732``.
 
+.. warning::
+   In most of the cases, the default configuration file is sufficient as is, or slightly adjusted.
+   The following instructions detail how to adjust the node parameters, but you are advised to only change parameters that you fully understand.
+   Don't blindly use the values in the examples below; they are just examples!
+
 The easiest way to amend this default configuration is to use
 
 ::
 
-   # Update the config file
-   ./tezos-node config update <…>
-   # Start from an empty cfg file
-   ./tezos-node config reset <…>
+   # Update the config file:
+   tezos-node config update <…>
+   # Check your new values:
+   tezos-node config show
+   # If you want to restart from an empty cfg file:
+   tezos-node config reset <…>
 
 However, note that the ``network`` configuration parameter, needed to run the node on a network other than the default one (Mainnet), can only be defined when the configuration file is initialized (using ``init``), and cannot be updated later (using ``update``). See the instructions for :ref:`running the node in test networks <multinetwork>`.
 
-For example, the following script initializes and fills a configuration file using many command-line options:
+For example, the following script initializes and fills a configuration file using several command-line options:
 
 .. literalinclude:: node-config.sh
     :language: shell
@@ -65,24 +77,23 @@ For example, the following script initializes and fills a configuration file usi
 Editing the configuration file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-All blockchain data is stored under ``$HOME/.tezos-node/``.  You can
-change this by doing `./tezos-node config update --data-dir
-</somewhere/in/your/disk>`.
+All blockchain data is stored under ``$HOME/.tezos-node/`` by default.
+You can
+change this by doing ``./tezos-node config update --data-dir
+</somewhere/in/your/disk>``.
 
 To run multiple nodes on the same machine, you can duplicate and edit
 ``$HOME/.tezos-node/config.json`` while making sure they don't share
 the same ``data-dir``. Then run your node with ``./tezos-node
 run --config-file=</path/to/alternate_cfg>``.
 
-Here is an example configuration file with many parameters specified.
-Most of the time it uses default values, except for cases where the
-default is not explanatory enough (i.e. ``bootstrap-peers`` is an empty
-list by default). Comments are not allowed in JSON, so this
-configuration file would not parse. They are just provided here to help
-writing your own configuration file if needed.
+Here is an example configuration file with several parameters specified.
+Incidentally, it is exactly the one resulting from the command sequence above.
 
 .. literalinclude:: node-config.json
    :language: javascript
+
+Thus, you can start with the initial configuration file, and eventually modify it using ``config update`` commands and/or using a text editor, to define any set of node parameters that are suitable for you (recall that the former covers a subset of parameters, while the latter covers the full set).
 
 The rest of this page provides more details about the use of some selected
 configuration options/parameters.
