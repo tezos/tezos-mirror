@@ -91,13 +91,3 @@ module type TYPES = sig
   (** The parameters provided when launching a new worker. *)
   type parameters
 end
-
-module type LOGGER = sig
-  module Event : EVENT
-
-  module Request : VIEW
-
-  type t = (Event.t * Internal_event.level) Time.System.stamped
-
-  module LogEvent : Internal_event.EVENT with type t = t
-end

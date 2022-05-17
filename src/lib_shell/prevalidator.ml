@@ -75,12 +75,6 @@ module Dummy_event = struct
   let level () = Internal_event.Debug
 end
 
-module Logger =
-  Worker_logger.Make (Dummy_event) (Request)
-    (struct
-      let worker_name = "node_prevalidator"
-    end)
-
 module Classification = Prevalidator_classification
 
 (** This module encapsulates pending operations to maintain them in two
@@ -1079,7 +1073,6 @@ end
 
 module WorkerGroup =
   Worker.MakeGroup (Name) (Dummy_event) (Prevalidator_worker_state.Request)
-    (Logger)
 
 (** The functor that is not tested, in other words used only in production.
     This functor's code is not tested (contrary to functor {!Make_s} above),

@@ -187,12 +187,6 @@ module type T = sig
   (** Triggers a worker termination. *)
   val trigger_shutdown : _ t -> unit
 
-  (** Record an event in the backlog. *)
-  val record_event : _ t -> Event.t -> unit
-
-  (** Record an event and make sure it is logged. *)
-  val log_event : _ t -> Event.t -> unit Lwt.t
-
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
 
@@ -226,9 +220,6 @@ module Make_internal
     (Event : Worker_intf.EVENT)
     (Request : Worker_intf.REQUEST)
     (Types : Worker_intf.TYPES)
-    (Logger : Worker_intf.LOGGER
-                with module Event = Event
-                 and type Request.view = Request.view)
     (Worker_events : Worker_events.S
                        with type view = Request.view
                         and type critical_error = tztrace) =
@@ -237,7 +228,6 @@ struct
   module Event = Event
   module Request = Request
   module Types = Types
-  module Logger = Logger
 
   module Nametbl = Hashtbl.MakeSeeded (struct
     type t = Name.t
@@ -299,7 +289,6 @@ struct
     mutable status : Worker_types.worker_status;
     mutable current_request :
       (Time.System.t * Time.System.t * Request.view) option;
-    logEvent : (module Internal_event.EVENT with type t = Logger.t);
     table : 'kind table;
   }
 
@@ -511,26 +500,6 @@ struct
 
   let canceler {canceler; _} = canceler
 
-  let lwt_emit w evt =
-    let (module LogEvent) = w.logEvent in
-    let time = Time.System.now () in
-    Lwt.bind
-      (LogEvent.emit
-         ~section:(Internal_event.Section.make_sanitized Name.base)
-         (fun () -> Time.System.stamp ~time evt))
-      (function
-        | Ok () -> Lwt.return_unit
-        | Error el ->
-            Format.kasprintf
-              Lwt.fail_with
-              "Worker_event.emit: %a"
-              pp_print_trace
-              el)
-
-  let log_event w evt = lwt_emit w (evt, Event.level evt)
-
-  let record_event w evt = Lwt.ignore_result (log_event w evt)
-
   module type HANDLERS = sig
     type self
 
@@ -736,7 +705,6 @@ struct
           worker = Lwt.return_unit;
           timeout;
           current_request = None;
-          logEvent = (module Logger.LogEvent);
           status = Launching (Time.System.now ());
         }
       in
@@ -824,10 +792,7 @@ end
 module MakeGroup
     (Name : Worker_intf.NAME)
     (Event : Worker_intf.EVENT)
-    (Request : Worker_intf.REQUEST)
-    (Logger : Worker_intf.LOGGER
-                with module Event = Event
-                 and type Request.view = Request.view) =
+    (Request : Worker_intf.REQUEST) =
 struct
   module Events =
     Worker_events.Make (Name) (Request)
@@ -840,7 +805,7 @@ struct
       end)
 
   module MakeWorker (Types : Worker_intf.TYPES) = struct
-    include Make_internal (Name) (Event) (Request) (Types) (Logger) (Events)
+    include Make_internal (Name) (Event) (Request) (Types) (Events)
   end
 end
 
@@ -848,11 +813,8 @@ module MakeSingle
     (Name : Worker_intf.NAME)
     (Event : Worker_intf.EVENT)
     (Request : Worker_intf.REQUEST)
-    (Types : Worker_intf.TYPES)
-    (Logger : Worker_intf.LOGGER
-                with module Event = Event
-                 and type Request.view = Request.view) =
+    (Types : Worker_intf.TYPES) =
 struct
-  module WG = MakeGroup (Name) (Event) (Request) (Logger)
+  module WG = MakeGroup (Name) (Event) (Request)
   include WG.MakeWorker (Types)
 end

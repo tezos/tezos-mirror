@@ -118,14 +118,7 @@ module Request = struct
 end
 
 module Events = Block_validator_events
-
-module Logger =
-  Worker_logger.Make (Event) (Request)
-    (struct
-      let worker_name = "node_block_validator"
-    end)
-
-module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types) (Logger)
+module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types)
 
 type t = Worker.infinite Worker.queue Worker.t
 

@@ -103,14 +103,8 @@ module Types = struct
       state.synchronisation_state
 end
 
-module Logger =
-  Worker_logger.Make (Event) (Request)
-    (struct
-      let worker_name = "node_chain_validator"
-    end)
-
-module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types) (Logger)
 module Events = Chain_validator_events
+module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types)
 open Types
 
 type t = Worker.infinite Worker.queue Worker.t
