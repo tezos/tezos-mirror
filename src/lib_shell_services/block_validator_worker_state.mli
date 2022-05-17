@@ -36,6 +36,8 @@ module Request : sig
     | Validation of validation_view
     | Preapplication of preapplication_view
 
+  val validation_view_encoding : validation_view Data_encoding.encoding
+
   val encoding : view Data_encoding.encoding
 
   val pp : Format.formatter -> view -> unit
