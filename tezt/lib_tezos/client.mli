@@ -1222,6 +1222,28 @@ module Sc_rollup : sig
     dst:string ->
     t ->
     Process.t
+
+  (** Run [tezos-client cemment commitment <hash> from <src> for sc rollup <rollup>]. *)
+  val cement_commitment :
+    ?hooks:Process.hooks ->
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    hash:string ->
+    src:string ->
+    dst:string ->
+    t ->
+    unit Lwt.t
+
+  (** Same as [cement_commitment], but do not wait for the process to exit. *)
+  val spawn_cement_commitment :
+    ?hooks:Process.hooks ->
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    hash:string ->
+    src:string ->
+    dst:string ->
+    t ->
+    Process.t
 end
 
 (** {2 High-Level Functions} *)
