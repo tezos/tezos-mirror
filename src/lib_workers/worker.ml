@@ -236,6 +236,16 @@ struct
   module Types = Types
   module Logger = Logger
 
+  module Worker_events =
+    Worker_events.Make (Name) (Request)
+      (struct
+        type t = tztrace
+
+        let encoding = Error_monad.trace_encoding
+
+        let pp = Error_monad.pp_print_trace
+      end)
+
   module Nametbl = Hashtbl.MakeSeeded (struct
     type t = Name.t
 
@@ -508,13 +518,13 @@ struct
 
   let canceler {canceler; _} = canceler
 
-  let lwt_emit w (status : Logger.status) =
+  let lwt_emit w evt =
     let (module LogEvent) = w.logEvent in
     let time = Time.System.now () in
     Lwt.bind
       (LogEvent.emit
          ~section:(Internal_event.Section.make_sanitized Name.base)
-         (fun () -> Time.System.stamp ~time status))
+         (fun () -> Time.System.stamp ~time evt))
       (function
         | Ok () -> Lwt.return_unit
         | Error el ->
@@ -524,7 +534,7 @@ struct
               pp_print_trace
               el)
 
-  let log_event w evt = lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
+  let log_event w evt = lwt_emit w (evt, Event.level evt)
 
   let record_event w evt = Lwt.ignore_result (log_event w evt)
 
@@ -624,7 +634,8 @@ struct
                     let status = Worker_types.{pushed; treated; completed} in
                     let*! () = Handlers.on_completion w request res status in
                     let*! () =
-                      lwt_emit w (Request (current_request, status, None))
+                      Worker_events.(emit request_no_errors)
+                        (current_request, status)
                     in
                     return_unit)
             | Some u -> (
@@ -645,7 +656,8 @@ struct
                     w.current_request <- None ;
                     let* () = Handlers.on_completion w request res status in
                     let* () =
-                      lwt_emit w (Request (current_request, status, None))
+                      Worker_events.(emit request_no_errors)
+                        (current_request, status)
                     in
                     return (Ok ()))
           in
@@ -667,17 +679,17 @@ struct
               match r with
               | Ok () -> loop ()
               | Error errs ->
-                  let* () = lwt_emit w (Crashed errs) in
+                  let* () = Worker_events.(emit crashed) errs in
                   close handlers w (Some errs)))
     in
     let* r = protect_result ~canceler:w.canceler (fun () -> loop ()) in
     match r with
     | Ok () -> Lwt.return_unit
     | Error Lwt.Canceled | Error Lwt_pipe.Closed | Error Lwt_dropbox.Closed ->
-        let* () = lwt_emit w Terminated in
+        let* () = Worker_events.(emit terminated) () in
         close handlers w None
     | Error exn ->
-        let* () = lwt_emit w (Crashed [Exn exn]) in
+        let* () = Worker_events.(emit crashed) [Exn exn] in
         raise exn
 
   let launch :
@@ -737,8 +749,10 @@ struct
       in
       Nametbl.add table.instances name w ;
       let open Lwt_result_syntax in
-      let started = if id_name = base_name then None else Some name_s in
-      let*! () = lwt_emit w (Started started) in
+      let*! () =
+        if id_name = base_name then Worker_events.(emit started) ()
+        else Worker_events.(emit started_for) name_s
+      in
       let* state = Handlers.on_launch w name parameters in
       w.status <- Running (Time.System.now ()) ;
       w.state <- Some state ;
@@ -756,7 +770,7 @@ struct
        worker ([w.worker]) resolves only once the ongoing request has resolved
        (if any) and some clean-up operations have completed. *)
     let open Lwt_syntax in
-    let* () = lwt_emit w Triggering_shutdown in
+    let* () = Worker_events.(emit triggering_shutdown) () in
     let* () = Error_monad.cancel_with_exceptions w.canceler in
     w.worker
 

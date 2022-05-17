@@ -26,8 +26,6 @@
 
 (** {2 Parameters to build a worker group} *)
 
-open Error_monad
-
 (** The name of the group of workers corresponding to an instantiation
     of {!Make}, as well as the name of each worker in that group. *)
 module type NAME = sig
@@ -99,18 +97,7 @@ module type LOGGER = sig
 
   module Request : VIEW
 
-  type status =
-    | WorkerEvent of (Event.t * Internal_event.level)
-    | Request of
-        (Request.view * Worker_types.request_status * error list option)
-    | Terminated
-    | Timeout
-    | Crashed of error list
-    | Started of string option
-    | Triggering_shutdown
-    | Duplicate of string
-
-  type t = status Time.System.stamped
+  type t = (Event.t * Internal_event.level) Time.System.stamped
 
   module LogEvent : Internal_event.EVENT with type t = t
 end
