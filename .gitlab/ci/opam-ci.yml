@@ -217,7 +217,7 @@ opam:tezos-012-Psithaca-test-helpers:
 opam:tezos-013-PtJakart-test-helpers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-013-PtJakart-test-helpers
 
@@ -245,7 +245,7 @@ opam:tezos-accuser-alpha:
 opam:tezos-alpha-test-helpers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-alpha-test-helpers
 
@@ -1232,14 +1232,14 @@ opam:tezos-sc-rollup-client-alpha:
 opam:tezos-sc-rollup-node-013-PtJakart:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: tezos-sc-rollup-node-013-PtJakart
 
 opam:tezos-sc-rollup-node-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: tezos-sc-rollup-node-alpha
 

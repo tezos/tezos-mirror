@@ -28,7 +28,8 @@
   irmin-pack.unix
   irmin
   ringo
-  ringo-lwt)
+  ringo-lwt
+  tezos-injector-alpha)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
@@ -46,4 +47,5 @@
   -open Tezos_protocol_alpha_parameters
   -open Tezos_rpc
   -open Tezos_shell_services
-  -open Tezos_sc_rollup_alpha))
+  -open Tezos_sc_rollup_alpha
+  -open Tezos_injector_alpha))

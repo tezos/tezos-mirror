@@ -28,6 +28,7 @@ depends: [
   "irmin" { >= "3.2.2" & < "3.3.0" }
   "ringo" { >= "0.9" }
   "ringo-lwt" { >= "0.9" }
+  "tezos-injector-013-PtJakart"
 ]
 build: [
   ["rm" "-r" "vendors"]
