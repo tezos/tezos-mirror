@@ -169,6 +169,7 @@ module Anomaly = struct
 
   type t = {
     level : Int32.t;
+    round : Int32.t option;
     delegate : Signature.Public_key_hash.t;
     delegate_alias : string option;
     problem : problem;
@@ -186,12 +187,13 @@ module Anomaly = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; delegate; delegate_alias; problem} ->
-        (level, delegate, delegate_alias, problem))
-      (fun (level, delegate, delegate_alias, problem) ->
-        {level; delegate; delegate_alias; problem})
-      (obj4
+      (fun {level; round; delegate; delegate_alias; problem} ->
+        (level, round, delegate, delegate_alias, problem))
+      (fun (level, round, delegate, delegate_alias, problem) ->
+        {level; round; delegate; delegate_alias; problem})
+      (obj5
          (req "level" int32)
+         (opt "round" int32)
          (req "delegate" Signature.Public_key_hash.encoding)
          (opt "delegate_alias" string)
          (req "problem" problem_encoding))
@@ -306,12 +308,13 @@ let extract_anomalies path level infos =
           List.fold_left
             (fun acc
                  Delegate_operations.
-                   {kind; round = _; reception_time; errors; block_inclusion} ->
+                   {kind; round; reception_time; errors; block_inclusion} ->
               match errors with
               | Some (_ :: _) ->
                   Anomaly.
                     {
                       level;
+                      round;
                       delegate;
                       delegate_alias;
                       problem = Anomaly.Incorrect;
@@ -323,6 +326,7 @@ let extract_anomalies path level infos =
                       Anomaly.
                         {
                           level;
+                          round;
                           delegate;
                           delegate_alias;
                           problem = Anomaly.Missed;
@@ -332,6 +336,7 @@ let extract_anomalies path level infos =
                       Anomaly.
                         {
                           level;
+                          round;
                           delegate;
                           delegate_alias;
                           problem = Anomaly.Forgotten;
@@ -341,6 +346,7 @@ let extract_anomalies path level infos =
                       Anomaly.
                         {
                           level;
+                          round;
                           delegate;
                           delegate_alias;
                           problem = Anomaly.Sequestered;
