@@ -29,8 +29,82 @@ open Apply_results
 
 let tez_sym = "\xEA\x9C\xA9"
 
+let pp_internal_operation ppf (Apply_results.Internal_contents op) =
+  let {operation; source; _} = op in
+  (* For now, try to use the same format as in [pp_manager_operation_content]. *)
+  Format.fprintf ppf "@[<v 0>@[<v 2>Internal " ;
+  (match operation with
+  | Transaction {destination; amount; parameters; entrypoint} ->
+      Format.fprintf
+        ppf
+        "Transaction:@,Amount: %s%a@,From: %a@,To: %a"
+        tez_sym
+        Tez.pp
+        amount
+        Contract.pp
+        source
+        Destination.pp
+        destination ;
+      if not (Entrypoint.is_default entrypoint) then
+        Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;
+      if not (Script_repr.is_unit_parameter parameters) then
+        let expr =
+          WithExceptions.Option.to_exn
+            ~none:(Failure "ill-serialized argument")
+            (Data_encoding.force_decode parameters)
+        in
+        Format.fprintf
+          ppf
+          "@,Parameter: @[<v 0>%a@]"
+          Michelson_v1_printer.print_expr
+          expr
+  | Origination {delegate; credit; script = {code; storage}} -> (
+      Format.fprintf
+        ppf
+        "Origination:@,From: %a@,Credit: %s%a"
+        Contract.pp
+        source
+        tez_sym
+        Tez.pp
+        credit ;
+      let code =
+        WithExceptions.Option.to_exn
+          ~none:(Failure "ill-serialized code")
+          (Data_encoding.force_decode code)
+      and storage =
+        WithExceptions.Option.to_exn
+          ~none:(Failure "ill-serialized storage")
+          (Data_encoding.force_decode storage)
+      in
+      let {Michelson_v1_parser.source; _} =
+        Michelson_v1_printer.unparse_toplevel code
+      in
+      Format.fprintf
+        ppf
+        "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]"
+        Format.pp_print_text
+        source
+        Michelson_v1_printer.print_expr
+        storage ;
+      match delegate with
+      | None -> Format.fprintf ppf "@,No delegate for this contract"
+      | Some delegate ->
+          Format.fprintf
+            ppf
+            "@,Delegate: %a"
+            Signature.Public_key_hash.pp
+            delegate)
+  | Delegation delegate_opt -> (
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
+      match delegate_opt with
+      | None -> Format.pp_print_string ppf "nobody"
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)) ;
+
+  Format.fprintf ppf "@]@]"
+
 let pp_manager_operation_content (type kind) source internal pp_result ppf
     ((operation, result) : kind manager_operation * _) =
+  (* For now, try to keep formatting in sync with [pp_internal_operation]. *)
   Format.fprintf ppf "@[<v 0>" ;
   (match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
@@ -1154,12 +1228,3 @@ let pp_operation_result ppf
   let contents_and_result_list = Apply_results.pack_contents_list op res in
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
-
-let pp_internal_operation ppf (Apply_results.Internal_contents op) =
-  let operation = manager_operation_of_internal_operation op.operation in
-  pp_manager_operation_content
-    op.source
-    true
-    (fun _ppf () -> ())
-    ppf
-    (operation, ())
