@@ -1063,15 +1063,11 @@ let pp_manager_operation_contents_and_result ppf
         "@,@[<v 2>Internal operations:@ %a@]"
         (Format.pp_print_list
            (fun ppf (Internal_manager_operation_result (op, res)) ->
-             let operation =
-               manager_operation_of_internal_operation op.operation
-             in
-             pp_manager_operation_content
-               op.source
-               false
-               pp_result
+             pp_internal_operation_result
                ppf
-               (operation, res)))
+               (Internal_contents op)
+               pp_result
+               res))
         internal_operation_results) ;
   Format.fprintf ppf "@]"
 
