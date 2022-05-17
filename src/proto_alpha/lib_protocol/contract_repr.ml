@@ -234,3 +234,7 @@ module Index = struct
 
   let compare = compare
 end
+
+(* Renamed exports. *)
+
+let of_b58data = contract_of_b58data
