@@ -68,7 +68,7 @@ module type Mutable_value = sig
   val find : t -> value option Lwt.t
 end
 
-module Make_append_only_map (P : sig
+module type KeyValue = sig
   val path : path
 
   val keep_last_n_entries_in_memory : int
@@ -80,8 +80,9 @@ module Make_append_only_map (P : sig
   type value
 
   val value_encoding : value Data_encoding.t
-end) =
-struct
+end
+
+module Make_map (P : KeyValue) = struct
   (* Ignored for now. *)
   let _ = P.keep_last_n_entries_in_memory
 
@@ -109,6 +110,21 @@ struct
     let open Lwt_syntax in
     let* exists = mem store key in
     if exists then get store key else return (on_default ())
+end
+
+module Make_updatable_map (P : KeyValue) = struct
+  include Make_map (P)
+
+  let add store key value =
+    let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
+    let encode v = Data_encoding.Binary.to_bytes_exn P.value_encoding v in
+    let encoded_value = encode value in
+    let info () = info full_path in
+    IStore.set_exn ~info store (make_key key) encoded_value
+end
+
+module Make_append_only_map (P : KeyValue) = struct
+  include Make_map (P)
 
   let add store key value =
     let open Lwt_syntax in
@@ -234,7 +250,11 @@ module MessageTrees = struct
       message_tree
 end
 
-type state_info = {num_messages : Z.t; num_ticks : Z.t}
+type state_info = {
+  num_messages : Z.t;
+  num_ticks : Z.t;
+  initial_tick : Sc_rollup.Tick.t;
+}
 
 (** Extraneous state information for the PVM *)
 module StateInfo = Make_append_only_map (struct
@@ -251,12 +271,78 @@ module StateInfo = Make_append_only_map (struct
   let value_encoding =
     let open Data_encoding in
     conv
-      (fun {num_messages; num_ticks} -> (num_messages, num_ticks))
-      (fun (num_messages, num_ticks) -> {num_messages; num_ticks})
-      (obj2
+      (fun {num_messages; num_ticks; initial_tick} ->
+        (num_messages, num_ticks, initial_tick))
+      (fun (num_messages, num_ticks, initial_tick) ->
+        {num_messages; num_ticks; initial_tick})
+      (obj3
          (req "num_messages" Data_encoding.z)
-         (req "num_ticks" Data_encoding.z))
+         (req "num_ticks" Data_encoding.z)
+         (req "initial_tick" Sc_rollup.Tick.encoding))
 end)
+
+module StateHistoryRepr = struct
+  let path = ["state_history"]
+
+  type event = {
+    tick : Sc_rollup.Tick.t;
+    block_hash : Block_hash.t;
+    predecessor_hash : Block_hash.t;
+    level : Raw_level.t;
+  }
+
+  module TickMap = Map.Make (Sc_rollup.Tick)
+
+  type value = event TickMap.t
+
+  let event_encoding =
+    let open Data_encoding in
+    conv
+      (fun {tick; block_hash; predecessor_hash; level} ->
+        (tick, block_hash, predecessor_hash, level))
+      (fun (tick, block_hash, predecessor_hash, level) ->
+        {tick; block_hash; predecessor_hash; level})
+      (obj4
+         (req "tick" Sc_rollup.Tick.encoding)
+         (req "block_hash" Block_hash.encoding)
+         (req "predecessor_hash" Block_hash.encoding)
+         (req "level" Raw_level.encoding))
+
+  let value_encoding =
+    let open Data_encoding in
+    conv
+      TickMap.bindings
+      (fun bindings -> TickMap.of_seq (List.to_seq bindings))
+      (Data_encoding.list (tup2 Sc_rollup.Tick.encoding event_encoding))
+end
+
+module StateHistory = struct
+  include Make_mutable_value (StateHistoryRepr)
+
+  let insert store event =
+    let open Lwt_result_syntax in
+    let open StateHistoryRepr in
+    let*! history = find store in
+    let history =
+      match history with
+      | None -> StateHistoryRepr.TickMap.empty
+      | Some history -> history
+    in
+    set store (TickMap.add event.tick event history)
+
+  let event_of_largest_tick_before store tick =
+    let open Lwt_result_syntax in
+    let open StateHistoryRepr in
+    let*! history = find store in
+    match history with
+    | None -> return_none
+    | Some history -> (
+        let events_before, opt_value, _ = TickMap.split tick history in
+        match opt_value with
+        | Some event -> return (Some event)
+        | None ->
+            return @@ Option.map snd @@ TickMap.max_binding_opt events_before)
+end
 
 (** Unaggregated messages per block *)
 module Messages = Make_append_only_map (struct
@@ -268,6 +354,11 @@ module Messages = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3199
+     For the moment, the rollup node ignores L1 to L2 messages.
+     When internal messages will also be considered, the following
+     should probably be changed into [Sc_rollup.Inbox.message list].
+  *)
   type value = string list
 
   let value_encoding = Data_encoding.(list string)

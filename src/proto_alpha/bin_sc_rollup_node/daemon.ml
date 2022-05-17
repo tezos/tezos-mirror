@@ -73,18 +73,19 @@ module Make (PVM : Pvm.S) = struct
     let {finalized; seen_before; head} = head_state in
     let* () =
       let*! () = emit_head_processing_event head_state in
+      (* Avoid processing inbox again if it has been processed before for this head *)
       if seen_before then return_unit
       else
+        let* () = Inbox.process_head node_ctxt store head in
+        (* Avoid storing and publishing commitments if the head is not final *)
+        (* Avoid triggering the pvm execution if this has been done before for this head *)
+        let* () = Components.Interpreter.process_head node_ctxt store head in
+
         (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3166
 
            If the rollup is subscribed to at least one slot, then the inbox for
            this block will be downloaded after lag levels have passed and the
            dal slots have been declared available. *)
-        (* Avoid processing inbox again if it has been processed before for this head *)
-        let* () = Inbox.process_head node_ctxt store head in
-        (* Avoid storing and publishing commitments if the head is not final *)
-        (* Avoid triggering the pvm execution if this has been done before for this head *)
-        let* () = Components.Interpreter.process_head node_ctxt store head in
         Dal_slots_tracker.process_head node_ctxt store head
     in
     let* () =

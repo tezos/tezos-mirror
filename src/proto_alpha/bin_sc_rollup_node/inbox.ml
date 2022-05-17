@@ -73,24 +73,29 @@ end
 let get_messages l1_ctxt head rollup =
   let open Lwt_result_syntax in
   let+ block = Layer1.fetch_tezos_block l1_ctxt head in
-  let is_add_message = function
-    | Contents
-        (Manager_operation
-          {operation = Sc_rollup_add_messages {rollup = rollup'; messages}; _})
+  let apply (type kind) accu ~source:_ (operation : kind manager_operation)
+      _result =
+    match operation with
+    | Sc_rollup_add_messages {rollup = rollup'; messages}
       when Sc_rollup.Address.(rollup' = rollup) ->
-        messages
-    | _ -> []
+        List.rev_append messages accu
+    | _ -> accu
   in
-  let process_contents
-      Protocol_client_context.Alpha_block_services.
-        {protocol_data = Operation_data {contents; _}; _} =
-    let operations = Operation.to_list (Contents_list contents) in
-    List.concat_map is_add_message operations
+  let apply_internal (type kind) accu ~source:_
+      (_operation : kind Apply_internal_results.internal_manager_operation)
+      (_result :
+        kind Apply_internal_results.successful_internal_manager_operation_result)
+      =
+    accu
   in
-  let process_operations operations =
-    List.concat_map process_contents operations
+  let messages =
+    Layer1_services.(
+      process_applied_manager_operations
+        []
+        block.operations
+        {apply; apply_internal})
   in
-  List.concat_map process_operations block.operations
+  return (List.rev messages)
 
 let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
     Layer1.(Head {level; hash = head_hash} as head) =
