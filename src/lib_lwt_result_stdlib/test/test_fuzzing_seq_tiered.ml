@@ -66,13 +66,13 @@ module TieredSeq : TIER with type t = int Seq.t = struct
 end
 
 module TestIter (Tier : TIER) = struct
-  open QCheck
+  open QCheck2
   open Monad
 
   let test_iter =
     Test.make
       ~name:(Format.asprintf "Seq{,_%s}.iter" Tier.suffix)
-      (triple Test_fuzzing_helpers.Fn.arith one many)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
         let open Lwt_result_syntax in
         eq_es
@@ -88,7 +88,7 @@ module TestIter (Tier : TIER) = struct
   let test_iter_e =
     Test.make
       ~name:(Format.asprintf "Seq{,%s}.iter_e" Tier.suffix)
-      (triple Test_fuzzing_helpers.Fn.arith one many)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
         let open Lwt_result_syntax in
         eq_es
@@ -104,7 +104,7 @@ module TestIter (Tier : TIER) = struct
   let test_iter_s =
     Test.make
       ~name:(Format.asprintf "Seq{,%s}.iter_s" Tier.suffix)
-      (triple Test_fuzzing_helpers.Fn.arith one many)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
         let open Lwt_result_syntax in
         eq_es
@@ -120,7 +120,7 @@ module TestIter (Tier : TIER) = struct
   let test_iter_es =
     Test.make
       ~name:(Format.asprintf "Seq{,%s}.iter_es" Tier.suffix)
-      (triple Test_fuzzing_helpers.Fn.arith one many)
+      (Gen.triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
         let open Lwt_result_syntax in
         eq_es
@@ -179,10 +179,10 @@ module TestedSeq_es = TestIter (TieredSeq_es)
 (* testing iter_ep is equivalent in two separate tiers
    NOTE: only for [Seq_s] *)
 let iter_ep =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:(Format.asprintf "Seq{,_s}.iter_ep")
-    (quad Test_fuzzing_helpers.Fn.arith one one many)
+    (Gen.quad Test_fuzzing_helpers.Fn.arith one one many)
     (fun (Fun (_, fn), const, init, input) ->
       let open Monad.Lwt_result_syntax in
       eq_es
@@ -200,10 +200,10 @@ let iter_ep =
          return !acc))
 
 let iter_p =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:(Format.asprintf "Seq{,_s}.iter_p")
-    (quad Test_fuzzing_helpers.Fn.arith one one many)
+    (Gen.quad Test_fuzzing_helpers.Fn.arith one one many)
     (fun (Fun (_, fn), const, init, input) ->
       let open Monad.Lwt_syntax in
       eq_es

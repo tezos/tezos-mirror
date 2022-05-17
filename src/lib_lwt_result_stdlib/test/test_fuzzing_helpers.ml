@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open QCheck2.Gen
 open Support.Lib.Monad
 open Lib_test.Qcheck_helpers
 
@@ -38,52 +39,45 @@ let rec log_pause n =
 (* Function generators *)
 
 module Fn = struct
-  let lambda s l =
-    let open QCheck in
-    make ~print:(fun _ -> s) (Gen.return l)
-
   let pred =
-    QCheck.oneof
+    oneof
       [
-        lambda "(fun x _ -> x > 0)" (fun x _ -> x > 0);
-        lambda "(fun _ y -> y < 0)" (fun _ y -> y < 0);
-        lambda "(fun _ _ -> false)" (fun _ _ -> false);
-        lambda "(fun _ _ -> true)" (fun _ _ -> true);
-        lambda "(fun x y -> x < y)" (fun x y -> x < y);
+        return ("(fun x _ -> x > 0)", fun x _ -> x > 0);
+        return ("(fun _ y -> y < 0)", fun _ y -> y < 0);
+        return ("(fun _ _ -> false)", fun _ _ -> false);
+        return ("(fun _ _ -> true)", fun _ _ -> true);
+        return ("(fun x y -> x < y)", fun x y -> x < y);
       ]
 
-  let basic_int =
-    QCheck.(oneof [int; Gen.return 0 |> make; Gen.return 1 |> make])
+  let basic_int = oneof [int; return 0; return 1]
 
   let arith =
-    let open QCheck in
+    let open QCheck2 in
     fun2 Observable.int Observable.int int
 
   let predarith =
-    let open QCheck in
-    fun2 Observable.int Observable.int (option int)
+    let open QCheck2 in
+    fun2 Observable.int Observable.int (opt int)
 
   (* combinators *)
-  let e (cond, QCheck.Fun (_, ok), QCheck.Fun (_, error)) x y =
+  let e ((_, cond), QCheck2.Fun (_, ok), QCheck2.Fun (_, error)) x y =
     if cond x y then Ok (ok x y) else Error (error x y)
 
-  let arith_e = QCheck.(map e (triple pred arith arith))
+  let arith_e = map e (triple pred arith arith)
 
-  let s (QCheck.Fun (_, pauses), QCheck.Fun (_, fn)) x y =
+  let s (QCheck2.Fun (_, pauses), QCheck2.Fun (_, fn)) x y =
     let open Lwt_syntax in
     let+ () = log_pause (pauses x y) in
     fn x y
 
-  let arith_s = QCheck.(map s (pair arith arith))
+  let arith_s = map s (pair arith arith)
 
-  let es
-      (cond, QCheck.Fun (_, pauses), QCheck.Fun (_, ok), QCheck.Fun (_, error))
-      x y =
+  let es QCheck2.((_, cond), Fun (_, pauses), Fun (_, ok), Fun (_, error)) x y =
     let open Lwt_syntax in
     let+ () = log_pause (pauses x y) in
     if cond x y then Ok (ok x y) else Error (error x y)
 
-  let arith_es = QCheck.(map es (quad pred arith arith arith))
+  let arith_es = map es (quad pred arith arith arith)
 end
 
 (* Wrappers for generated functions *)
@@ -539,19 +533,15 @@ end
 
 (* Data generators (we use lists of integers) *)
 
-let one = QCheck.int
+let one = int
 
-let many = QCheck.(list int)
+let many = list int
 
-let maybe = QCheck.(option int)
+let maybe = opt int
 
 let manymany =
-  let open QCheck in
   oneof
-    [
-      map ~rev:(fun (input, _) -> input) (fun input -> (input, input)) (list int);
-      pair (list int) (list int);
-    ]
+    [map (fun input -> (input, input)) (list int); pair (list int) (list int)]
 
 (* equality and lwt/error variants *)
 
@@ -610,13 +600,13 @@ let eq_es_ep ?pp es ep =
         in
         if trace_ep_has_error_es then true
         else
-          QCheck.Test.fail_reportf
+          QCheck2.Test.fail_reportf
             "%d not in %a"
             error_es
             (Support.Test_trace.pp Format.pp_print_int)
             trace_ep
-    | Ok _, Error _ -> QCheck.Test.fail_report "Ok _ is not Error _"
-    | Error _, Ok _ -> QCheck.Test.fail_report "Error _ is not Ok _")
+    | Ok _, Error _ -> QCheck2.Test.fail_report "Ok _ is not Error _"
+    | Error _, Ok _ -> QCheck2.Test.fail_report "Error _ is not Ok _")
 
 let eq_ep ?pp a b =
   Lwt_main.run
@@ -626,8 +616,8 @@ let eq_ep ?pp a b =
     | Ok ok_es, Ok ok_ep -> eq ?pp ok_es ok_ep
     | Error _, Error _ ->
         true (* Not as precise as we could be, but precise enough *)
-    | Ok _, Error _ -> QCheck.Test.fail_report "Ok _ is not Error _"
-    | Error _, Ok _ -> QCheck.Test.fail_report "Error _ is not Ok _")
+    | Ok _, Error _ -> QCheck2.Test.fail_report "Ok _ is not Error _"
+    | Error _, Ok _ -> QCheck2.Test.fail_report "Error _ is not Ok _")
 
 module PP = struct
   let int = Format.pp_print_int
@@ -641,4 +631,35 @@ module PP = struct
   let bool = Format.pp_print_bool
 
   let trace = Support.Test_trace.pp
+end
+
+module PredPrint = struct
+  (* This module contains helpers to print tuples containing Fn.pred values *)
+  let print_pred (s, (_ : int -> int -> bool)) = QCheck2.Print.string s
+
+  let print_arith (f : (int -> int -> int) QCheck2.fun_) = QCheck2.Fn.print f
+
+  let print2_many =
+    let open QCheck2.Print in
+    pair print_pred (list int)
+
+  let print2_manymany =
+    let open QCheck2.Print in
+    pair print_pred (pair (list int) (list int))
+
+  let print3_one_many =
+    let open QCheck2.Print in
+    triple print_pred int (list int)
+
+  let print3_one_maybe =
+    let open QCheck2.Print in
+    triple print_pred int (option int)
+
+  let print4_arith_one_many =
+    let open QCheck2.Print in
+    quad print_pred print_arith int (list int)
+
+  let print4_arith_one_maybe =
+    let open QCheck2.Print in
+    quad print_pred print_arith int (option int)
 end
