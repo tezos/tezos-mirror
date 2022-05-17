@@ -41,7 +41,6 @@ type error +=
   | Gas_quota_exceeded_init_deserialize
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
-  | Tx_rollup_non_internal_transaction
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
   | Forbidden_zero_ticket_quantity

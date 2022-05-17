@@ -96,7 +96,6 @@ type error +=
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
-  | Tx_rollup_non_internal_transaction
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
@@ -521,17 +520,6 @@ let () =
     Data_encoding.unit
     (function Cannot_transfer_ticket_to_implicit -> Some () | _ -> None)
     (fun () -> Cannot_transfer_ticket_to_implicit) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"operation.tx_rollup_non_internal_transaction"
-    ~title:"Non-internal transaction to a transaction rollup"
-    ~description:"Non-internal transactions to a tx rollup are forbidden."
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Transaction to a transaction rollup must be internal.")
-    Data_encoding.unit
-    (function Tx_rollup_non_internal_transaction -> Some () | _ -> None)
-    (fun () -> Tx_rollup_non_internal_transaction) ;
 
   let description =
     "Smart contract rollups will be enabled in a future proposal."
