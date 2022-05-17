@@ -141,12 +141,12 @@ module ContractAlias = struct
         return (Contract.Implicit v)
     | ["text"; text] -> ContractEntity.of_source text
     | _ -> (
-        find cctxt s >>= function
+        ContractEntity.of_source s >>= function
         | Ok v -> return v
-        | Error k_errs -> (
-            ContractEntity.of_source s >>= function
+        | Error c_errs -> (
+            find cctxt s >>= function
             | Ok v -> return v
-            | Error c_errs -> Lwt.return_error (k_errs @ c_errs)))
+            | Error k_errs -> Lwt.return_error (c_errs @ k_errs)))
 
   let destination_parameter () =
     Clic.parameter
@@ -162,7 +162,7 @@ module ContractAlias = struct
         "\n"
         [
           desc;
-          "Can be an alias, a key, or a literal (autodetected in order).\n\
+          "Can be a literal, an alias, or a key (autodetected in order).\n\
            Use 'text:literal', 'alias:name', 'key:name' to force.";
         ]
     in
@@ -174,7 +174,7 @@ module ContractAlias = struct
         "\n"
         [
           doc;
-          "Can be an alias, a key, or a literal (autodetected in order).\n\
+          "Can be a literal, an alias, or a key (autodetected in order).\n\
            Use 'text:literal', 'alias:name', 'key:name' to force.";
         ]
     in
