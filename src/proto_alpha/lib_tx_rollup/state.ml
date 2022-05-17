@@ -116,7 +116,7 @@ let save_tezos_block_info state block l2_block ~level ~predecessor =
 let get_tezos_l2_block_hash state block =
   let open Lwt_syntax in
   let+ info = Stores.Tezos_block_store.find state.stores.tezos_blocks block in
-  Option.map (fun i -> i.Stores.Tezos_block_store.l2_block) info
+  Option.bind info (fun i -> i.Stores.Tezos_block_store.l2_block)
 
 let get_block_store stores hash =
   Stores.L2_block_store.read_block stores.Stores.blocks hash
@@ -245,10 +245,15 @@ let set_head state head =
   let*! () = patch_l2_levels state l2_reorg in
   return l2_reorg
 
-let tezos_block_already_processed state hash =
+let tezos_block_already_processed state block =
   let open Lwt_syntax in
-  let+ info = get_tezos_l2_block_hash state hash in
-  Option.is_some info
+  let* info = Stores.Tezos_block_store.find state.stores.tezos_blocks block in
+  match info with
+  | None -> return `Unknown
+  | Some {l2_block = None; _} -> return (`Known None)
+  | Some {l2_block = Some l2_hash; _} ->
+      let+ block = get_block state l2_hash in
+      `Known block
 
 let get_included_commitment state commitment_hash =
   let open Lwt_syntax in

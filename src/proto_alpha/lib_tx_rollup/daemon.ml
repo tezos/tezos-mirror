@@ -416,14 +416,18 @@ let originated_in_block rollup_id block =
 let rec process_block state current_hash =
   let open Lwt_result_syntax in
   let rollup_id = state.State.rollup_info.rollup_id in
-  let*! l2_block = State.get_tezos_l2_block state current_hash in
+  let*! l2_block = State.tezos_block_already_processed state current_hash in
   match l2_block with
-  | Some l2_block ->
+  | `Known maybe_l2_block ->
       (* Already processed *)
       let*! () = Event.(emit block_already_processed) current_hash in
-      let* () = set_head state l2_block in
-      return (Some l2_block, None, [])
-  | None ->
+      let* () =
+        match maybe_l2_block with
+        | Some l2_block -> set_head state l2_block
+        | None -> return_unit
+      in
+      return (maybe_l2_block, None, [])
+  | `Unknown ->
       state.State.sync.synchronized <- false ;
       let* block_info = State.fetch_tezos_block state current_hash in
       let predecessor_hash = block_info.header.shell.predecessor in
@@ -465,18 +469,23 @@ let rec process_block state current_hash =
         | `Old _ -> blocks_to_commit
         | `New l2_block -> l2_block :: blocks_to_commit
       in
+      let*! () =
+        let maybe_l2_block_hash =
+          match l2_block with
+          | `Old None -> None
+          | `Old (Some l2_block) | `New l2_block -> Some l2_block.hash
+        in
+        State.save_tezos_block_info
+          state
+          current_hash
+          maybe_l2_block_hash
+          ~level:block_info.header.shell.level
+          ~predecessor:block_info.header.shell.predecessor
+      in
       let* l2_block =
         match l2_block with
         | `Old None -> return_none
         | `Old (Some l2_block) | `New l2_block ->
-            let*! () =
-              State.save_tezos_block_info
-                state
-                current_hash
-                l2_block.hash
-                ~level:block_info.header.shell.level
-                ~predecessor:block_info.header.shell.predecessor
-            in
             let* () = set_head state l2_block in
             return_some l2_block
       in

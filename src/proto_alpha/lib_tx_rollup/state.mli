@@ -112,8 +112,12 @@ val get_level_l2_block_header :
 (** Same as {!get_level} but retrieves the associated L2 block at the same time. *)
 val get_level_l2_block : t -> L2block.level -> L2block.t option Lwt.t
 
-(** Returns [true] if the Tezos block was already processed by the rollup node. *)
-val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
+(** Returns [`Known block] if the Tezos block was already processed by the
+    rollup node where [block] is either [Some l2_block], when there is an L2
+    block for the Tezos block, or [None] otherwise. It returns [`Unknown] when
+    the Tezos block has never been processed. *)
+val tezos_block_already_processed :
+  t -> Block_hash.t -> [> `Known of L2block.t option | `Unknown] Lwt.t
 
 (** Returns the inclusion info for a commitment. *)
 val get_included_commitment :
@@ -156,7 +160,7 @@ val save_level : t -> L2block.level -> L2block.hash -> unit Lwt.t
 val save_tezos_block_info :
   t ->
   Block_hash.t ->
-  L2block.hash ->
+  L2block.hash option ->
   level:int32 ->
   predecessor:Block_hash.t ->
   unit Lwt.t
