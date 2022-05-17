@@ -111,8 +111,6 @@ end
 
 type t = Address.t
 
-module Staker = Signature.Public_key_hash
-
 let description =
   "A smart contract rollup is identified by a base58 address starting with "
   ^ Address.prefix
@@ -163,6 +161,8 @@ let rpc_arg =
     ~construct
     ~destruct
     ()
+
+module Staker = Signature.Public_key_hash
 
 module Index = struct
   type t = Address.t
