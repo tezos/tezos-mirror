@@ -109,12 +109,12 @@ let pp_internal_operation ppf op =
 let pp_manager_operation_content (type kind) source pp_result ppf
     ((operation, result) : kind manager_operation * _) =
   (* For now, try to keep formatting in sync with [pp_internal_operation_result]. *)
-  Format.fprintf ppf "@[<v 0>" ;
+  Format.fprintf ppf "@[<v 0>@[<v 2>" ;
   (match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
       Format.fprintf
         ppf
-        "@[<v 2>Transaction:@,Amount: %s%a@,From: %a@,To: %a"
+        "Transaction:@,Amount: %s%a@,From: %a@,To: %a"
         tez_sym
         Tez.pp
         amount
@@ -140,7 +140,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Origination {delegate; credit; script = {code; storage}} ->
       Format.fprintf
         ppf
-        "@[<v 2>Origination:@,From: %a@,Credit: %s%a"
+        "Origination:@,From: %a@,Credit: %s%a"
         Contract.pp
         source
         tez_sym
@@ -178,7 +178,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Reveal key ->
       Format.fprintf
         ppf
-        "@[<v 2>Revelation of manager public key:@,Contract: %a@,Key: %a%a@]"
+        "Revelation of manager public key:@,Contract: %a@,Key: %a%a@]"
         Contract.pp
         source
         Signature.Public_key.pp
@@ -188,7 +188,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Delegation None ->
       Format.fprintf
         ppf
-        "@[<v 2>Delegation:@,Contract: %a@,To: nobody%a@]"
+        "Delegation:@,Contract: %a@,To: nobody%a@]"
         Contract.pp
         source
         pp_result
@@ -196,7 +196,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Delegation (Some delegate) ->
       Format.fprintf
         ppf
-        "@[<v 2>Delegation:@,Contract: %a@,To: %a%a@]"
+        "Delegation:@,Contract: %a@,To: %a%a@]"
         Contract.pp
         source
         Signature.Public_key_hash.pp
@@ -211,7 +211,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       in
       Format.fprintf
         ppf
-        "Register Global:@,@[<v 2>  Value: %a%a@]"
+        "Register Global:@,Value: %a%a@]"
         Michelson_v1_printer.print_expr
         value
         pp_result
@@ -219,7 +219,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Set_deposits_limit None ->
       Format.fprintf
         ppf
-        "@[<v 2>Set deposits limit:@,Delegate: %a@,Unlimited deposits%a@]"
+        "Set deposits limit:@,Delegate: %a@,Unlimited deposits%a@]"
         Contract.pp
         source
         pp_result
@@ -227,7 +227,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Set_deposits_limit (Some limit) ->
       Format.fprintf
         ppf
-        "@[<v 2>Set deposits limit:@,Delegate: %a@,Limit: %a%a@]"
+        "Set deposits limit:@,Delegate: %a@,Limit: %a%a@]"
         Contract.pp
         source
         Tez.pp
@@ -237,7 +237,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_origination ->
       Format.fprintf
         ppf
-        "@[<v 2>Tx rollup origination:@,From: %a%a@]"
+        "Tx rollup origination:@,From: %a%a@]"
         Contract.pp
         source
         pp_result
@@ -245,7 +245,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
       Format.fprintf
         ppf
-        "@[<v 2>Tx rollup transaction:%a, %d bytes, From: %a%a@]"
+        "Tx rollup transaction:%a, %d bytes, From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         (String.length content)
@@ -256,7 +256,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_commit {tx_rollup; commitment} ->
       Format.fprintf
         ppf
-        "@[<v 2>Tx rollup commitment:%a, %a@,From: %a%a@]"
+        "Tx rollup commitment:%a, %a@,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Tx_rollup_commitment.Full.pp
@@ -268,7 +268,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_return_bond {tx_rollup} ->
       Format.fprintf
         ppf
-        "@[<v 2>Tx rollup return commitment bond:%a @,From: %a%a@]"
+        "Tx rollup return commitment bond:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -278,7 +278,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Format.fprintf
         ppf
-        "@[<v >Tx rollup finalize commitment:%a @,From: %a%a@]"
+        "Tx rollup finalize commitment:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -288,7 +288,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_remove_commitment {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "@[<v 2>Tx rollup remove commitment:%a @,From: %a%a@]"
+        "Tx rollup remove commitment:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -299,7 +299,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       (* FIXME/TORU *)
       Format.fprintf
         ppf
-        "@[<v 2>Tx rollup rejection:%a @,From: %a%a@]"
+        "Tx rollup rejection:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -309,7 +309,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "@[<v 2>Tx rollup dispatch tickets:%a@,From: %a%a@]"
+        "Tx rollup dispatch tickets:%a@,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -319,7 +319,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Transfer_ticket _ ->
       Format.fprintf
         ppf
-        "@[<v 2>Transfer tickets:@,From: %a%a@]"
+        "Transfer tickets:@,From: %a%a@]"
         Contract.pp
         source
         pp_result
@@ -328,8 +328,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
       Format.fprintf
         ppf
-        "@[<v 2>Originate smart contract rollup of kind %s with boot sector \
-         '%a'%a@]"
+        "Originate smart contract rollup of kind %s with boot sector '%a'%a@]"
         R.name
         R.pp_boot_sector
         boot_sector
@@ -338,8 +337,8 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Sc_rollup_add_messages {rollup; messages = _} ->
       Format.fprintf
         ppf
-        "@[<v 2>Add a message to the inbox of the smart contract rollup at \
-         address %a%a@]"
+        "Add a message to the inbox of the smart contract rollup at address \
+         %a%a@]"
         Sc_rollup.Address.pp
         rollup
         pp_result
@@ -347,8 +346,8 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Sc_rollup_cement {rollup; commitment} ->
       Format.fprintf
         ppf
-        "@[<v 2>Cement the commitment %a in the smart contract rollup at \
-         address %a%a@]"
+        "Cement the commitment %a in the smart contract rollup at address \
+         %a%a@]"
         Sc_rollup.Commitment_hash.pp
         commitment
         Sc_rollup.Address.pp
@@ -358,8 +357,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Sc_rollup_publish {rollup; commitment} ->
       Format.fprintf
         ppf
-        "@[<v 2>Publish commitment %a in the smart contract rollup at address \
-         %a%a@]"
+        "Publish commitment %a in the smart contract rollup at address %a%a@]"
         Sc_rollup.Commitment.pp
         commitment
         Sc_rollup.Address.pp
@@ -369,8 +367,8 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Sc_rollup_refute {rollup; opponent; refutation} ->
       Format.fprintf
         ppf
-        "@[<v 2>Refute staker %a in the smart contract rollup at address %a \
-         using refutation %a%a@]"
+        "Refute staker %a in the smart contract rollup at address %a using \
+         refutation %a%a@]"
         Sc_rollup.Staker.pp
         opponent
         Sc_rollup.Address.pp
@@ -382,8 +380,8 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Sc_rollup_timeout {rollup; stakers} ->
       Format.fprintf
         ppf
-        "@[<v 2>Punish one of the two stakers %a and %a by timeout in the \
-         smart contract rollup at address %a%a@]"
+        "Punish one of the two stakers %a and %a by timeout in the smart \
+         contract rollup at address %a%a@]"
         Sc_rollup.Staker.pp
         (fst stakers)
         Sc_rollup.Staker.pp
