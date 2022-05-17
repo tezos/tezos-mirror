@@ -32,17 +32,19 @@ module Request : sig
   val pp : Format.formatter -> view -> unit
 end
 
+type synchronisation_status =
+  | Synchronised of {is_chain_stuck : bool}
+  | Not_synchronised
+
+val sync_status_encoding : synchronisation_status Data_encoding.t
+
+val sync_status_pp : Format.formatter -> synchronisation_status -> unit
+
+type update = Ignored_head | Branch_switch | Head_increment
+
+val update_encoding : update Data_encoding.t
+
 module Event : sig
-  type update = Ignored_head | Branch_switch | Head_increment
-
-  val update_encoding : update Data_encoding.t
-
-  type synchronisation_status =
-    | Synchronised of {is_chain_stuck : bool}
-    | Not_synchronised
-
-  val sync_status_encoding : synchronisation_status Data_encoding.t
-
   type t =
     | Processed_block of {
         request : Request.view;

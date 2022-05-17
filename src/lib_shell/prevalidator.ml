@@ -1434,7 +1434,7 @@ module Make
              Rebase the advertisement instead. *)
           let* block = pv.shell.parameters.tools.read_block hash in
           let handle_branch_refused =
-            Chain_validator_worker_state.Event.(
+            Chain_validator_worker_state.(
               match event with
               | Head_increment | Ignored_head -> false
               | Branch_switch -> true)

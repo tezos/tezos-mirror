@@ -460,7 +460,7 @@ module Chain_validator = struct
     else Gauge.set metrics.is_bootstrapped 0.
 
   let update_sync_status ~metrics event =
-    let open Chain_validator_worker_state.Event in
+    let open Chain_validator_worker_state in
     match event with
     | Not_synchronised -> Gauge.set metrics.sync_status 0.
     | Synchronised {is_chain_stuck = false} -> Gauge.set metrics.sync_status 1.

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type status = Chain_validator_worker_state.Event.synchronisation_status =
+type status = Chain_validator_worker_state.synchronisation_status =
   | Synchronised of {is_chain_stuck : bool}
   | Not_synchronised
 

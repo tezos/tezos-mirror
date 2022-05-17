@@ -47,7 +47,7 @@ module Request = struct
         (* The peer who sent the block if it was not injected locally. *)
         block : Store.Block.t;
       }
-        -> (Event.update, error trace) t
+        -> (update, error trace) t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
     | Notify_head :
         P2p_peer.Id.t * Block_hash.t * Block_header.t * Mempool.t
@@ -443,14 +443,14 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   let head_fitness = head_header.shell.fitness in
   let new_fitness = block_header.shell.fitness in
   let accepted_head = Fitness.(new_fitness > head_fitness) in
-  if not accepted_head then return Event.Ignored_head
+  if not accepted_head then return Ignored_head
   else
     let* o = Store.Chain.set_head chain_store block in
     match o with
     | None ->
         (* None means that the given head is below a new_head and
            therefore it must not be broadcasted *)
-        return Event.Ignored_head
+        return Ignored_head
     | Some previous ->
         let*! () = broadcast_head w ~previous block in
         let* () = may_update_protocol_level chain_store ~block in
@@ -464,7 +464,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
           Block_hash.equal head_hash block_header.shell.predecessor
         in
         let event =
-          if is_branch_switch then Event.Head_increment else Event.Branch_switch
+          if is_branch_switch then Head_increment else Branch_switch
         in
         let* () =
           if is_branch_switch then
@@ -621,9 +621,9 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
           nv.parameters.metrics.worker_timestamps
           request_status ;
         match update with
-        | Event.Ignored_head ->
+        | Ignored_head ->
             Prometheus.Counter.inc_one nv.parameters.metrics.ignored_head_count
-        | Event.Branch_switch ->
+        | Branch_switch ->
             Prometheus.Counter.inc_one nv.parameters.metrics.branch_switch_count ;
             Prometheus.Gauge.set
               nv.parameters.metrics.head_level
@@ -632,7 +632,7 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
                 collect_proto
                   ~metrics:nv.parameters.metrics
                   (nv.parameters.chain_store, block))
-        | Event.Head_increment ->
+        | Head_increment ->
             Prometheus.Counter.inc_one
               nv.parameters.metrics.head_increment_count ;
             Prometheus.Gauge.set

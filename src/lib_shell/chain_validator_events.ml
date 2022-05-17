@@ -89,7 +89,8 @@ let synchronisation_status =
     ~name:"synchronisation_status"
     ~msg:"synchronisation status: {status}"
     ~level:Notice
-    ("status", Chain_validator_worker_state.Event.sync_status_encoding)
+    ~pp1:Chain_validator_worker_state.sync_status_pp
+    ("status", Chain_validator_worker_state.sync_status_encoding)
 
 let could_not_switch_testchain =
   declare_1
