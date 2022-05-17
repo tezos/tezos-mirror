@@ -246,7 +246,7 @@ val transfer :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  destination:Destination.t ->
+  destination:Contract.t ->
   ?entrypoint:Entrypoint.t ->
   ?arg:string ->
   amount:Tez.t ->

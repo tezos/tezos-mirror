@@ -752,7 +752,6 @@ let transfer_command amount (source : Contract.t) destination
         ()
   | Implicit source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-      let destination : Alpha_context.Destination.t = Contract destination in
       transfer
         cctxt
         ~chain:cctxt#chain
