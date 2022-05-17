@@ -124,20 +124,18 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         destination ;
       if not (Entrypoint.is_default entrypoint) then
         Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;
-      (if not (Script_repr.is_unit_parameter parameters) then
-       let expr =
-         WithExceptions.Option.to_exn
-           ~none:(Failure "ill-serialized argument")
-           (Data_encoding.force_decode parameters)
-       in
-       Format.fprintf
-         ppf
-         "@,Parameter: @[<v 0>%a@]"
-         Michelson_v1_printer.print_expr
-         expr) ;
-      pp_result ppf result ;
-      Format.fprintf ppf "@]"
-  | Origination {delegate; credit; script = {code; storage}} ->
+      if not (Script_repr.is_unit_parameter parameters) then
+        let expr =
+          WithExceptions.Option.to_exn
+            ~none:(Failure "ill-serialized argument")
+            (Data_encoding.force_decode parameters)
+        in
+        Format.fprintf
+          ppf
+          "@,Parameter: @[<v 0>%a@]"
+          Michelson_v1_printer.print_expr
+          expr
+  | Origination {delegate; credit; script = {code; storage}} -> (
       Format.fprintf
         ppf
         "Origination:@,From: %a@,Credit: %s%a"
@@ -165,44 +163,36 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         source
         Michelson_v1_printer.print_expr
         storage ;
-      (match delegate with
+      match delegate with
       | None -> Format.fprintf ppf "@,No delegate for this contract"
       | Some delegate ->
           Format.fprintf
             ppf
             "@,Delegate: %a"
             Signature.Public_key_hash.pp
-            delegate) ;
-      pp_result ppf result ;
-      Format.fprintf ppf "@]"
+            delegate)
   | Reveal key ->
       Format.fprintf
         ppf
-        "Revelation of manager public key:@,Contract: %a@,Key: %a%a@]"
+        "Revelation of manager public key:@,Contract: %a@,Key: %a"
         Contract.pp
         source
         Signature.Public_key.pp
         key
-        pp_result
-        result
   | Delegation None ->
       Format.fprintf
         ppf
-        "Delegation:@,Contract: %a@,To: nobody%a@]"
+        "Delegation:@,Contract: %a@,To: nobody"
         Contract.pp
         source
-        pp_result
-        result
   | Delegation (Some delegate) ->
       Format.fprintf
         ppf
-        "Delegation:@,Contract: %a@,To: %a%a@]"
+        "Delegation:@,Contract: %a@,To: %a"
         Contract.pp
         source
         Signature.Public_key_hash.pp
         delegate
-        pp_result
-        result
   | Register_global_constant {value = lazy_value} ->
       let value =
         WithExceptions.Option.to_exn
@@ -211,187 +201,141 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       in
       Format.fprintf
         ppf
-        "Register Global:@,Value: %a%a@]"
+        "Register Global:@,Value: %a"
         Michelson_v1_printer.print_expr
         value
-        pp_result
-        result
   | Set_deposits_limit None ->
       Format.fprintf
         ppf
-        "Set deposits limit:@,Delegate: %a@,Unlimited deposits%a@]"
+        "Set deposits limit:@,Delegate: %a@,Unlimited deposits"
         Contract.pp
         source
-        pp_result
-        result
   | Set_deposits_limit (Some limit) ->
       Format.fprintf
         ppf
-        "Set deposits limit:@,Delegate: %a@,Limit: %a%a@]"
+        "Set deposits limit:@,Delegate: %a@,Limit: %a"
         Contract.pp
         source
         Tez.pp
         limit
-        pp_result
-        result
   | Tx_rollup_origination ->
-      Format.fprintf
-        ppf
-        "Tx rollup origination:@,From: %a%a@]"
-        Contract.pp
-        source
-        pp_result
-        result
+      Format.fprintf ppf "Tx rollup origination:@,From: %a" Contract.pp source
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
       Format.fprintf
         ppf
-        "Tx rollup transaction:%a, %d bytes, From: %a%a@]"
+        "Tx rollup transaction:%a, %d bytes, From: %a"
         Tx_rollup.pp
         tx_rollup
         (String.length content)
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_commit {tx_rollup; commitment} ->
       Format.fprintf
         ppf
-        "Tx rollup commitment:%a, %a@,From: %a%a@]"
+        "Tx rollup commitment:%a, %a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Tx_rollup_commitment.Full.pp
         commitment
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_return_bond {tx_rollup} ->
       Format.fprintf
         ppf
-        "Tx rollup return commitment bond:%a @,From: %a%a@]"
+        "Tx rollup return commitment bond:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Format.fprintf
         ppf
-        "Tx rollup finalize commitment:%a @,From: %a%a@]"
+        "Tx rollup finalize commitment:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_remove_commitment {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "Tx rollup remove commitment:%a @,From: %a%a@]"
+        "Tx rollup remove commitment:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_rejection {tx_rollup; _} ->
       (* FIXME/TORU *)
       Format.fprintf
         ppf
-        "Tx rollup rejection:%a @,From: %a%a@]"
+        "Tx rollup rejection:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "Tx rollup dispatch tickets:%a@,From: %a%a@]"
+        "Tx rollup dispatch tickets:%a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Transfer_ticket _ ->
-      Format.fprintf
-        ppf
-        "Transfer tickets:@,From: %a%a@]"
-        Contract.pp
-        source
-        pp_result
-        result
+      Format.fprintf ppf "Transfer tickets:@,From: %a" Contract.pp source
   | Sc_rollup_originate {kind; boot_sector} ->
       let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
       Format.fprintf
         ppf
-        "Originate smart contract rollup of kind %s with boot sector '%a'%a@]"
+        "Originate smart contract rollup of kind %s with boot sector '%a'"
         R.name
         R.pp_boot_sector
         boot_sector
-        pp_result
-        result
   | Sc_rollup_add_messages {rollup; messages = _} ->
       Format.fprintf
         ppf
-        "Add a message to the inbox of the smart contract rollup at address \
-         %a%a@]"
+        "Add a message to the inbox of the smart contract rollup at address %a"
         Sc_rollup.Address.pp
         rollup
-        pp_result
-        result
   | Sc_rollup_cement {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Cement the commitment %a in the smart contract rollup at address \
-         %a%a@]"
+        "Cement the commitment %a in the smart contract rollup at address %a"
         Sc_rollup.Commitment_hash.pp
         commitment
         Sc_rollup.Address.pp
         rollup
-        pp_result
-        result
   | Sc_rollup_publish {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Publish commitment %a in the smart contract rollup at address %a%a@]"
+        "Publish commitment %a in the smart contract rollup at address %a"
         Sc_rollup.Commitment.pp
         commitment
         Sc_rollup.Address.pp
         rollup
-        pp_result
-        result
   | Sc_rollup_refute {rollup; opponent; refutation} ->
       Format.fprintf
         ppf
         "Refute staker %a in the smart contract rollup at address %a using \
-         refutation %a%a@]"
+         refutation %a"
         Sc_rollup.Staker.pp
         opponent
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Game.pp_refutation
         refutation
-        pp_result
-        result
   | Sc_rollup_timeout {rollup; stakers} ->
       Format.fprintf
         ppf
         "Punish one of the two stakers %a and %a by timeout in the smart \
-         contract rollup at address %a%a@]"
+         contract rollup at address %a"
         Sc_rollup.Staker.pp
         (fst stakers)
         Sc_rollup.Staker.pp
         (snd stakers)
         Sc_rollup.Address.pp
-        rollup
-        pp_result
-        result) ;
+        rollup) ;
 
-  Format.fprintf ppf "@]"
+  Format.fprintf ppf "%a@]@]" pp_result result
 
 let pp_balance_updates ppf = function
   | [] -> ()
