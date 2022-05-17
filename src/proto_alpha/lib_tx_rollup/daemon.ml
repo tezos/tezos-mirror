@@ -609,6 +609,8 @@ let fail_when_slashed (type kind) state l1_operation
   match state.State.signers.operator with
   | None -> return_unit
   | Some operator -> (
+      (* This function handles external operations only. Internal operations have
+         to be handled in [handle] in [handle_l1_operation] below. *)
       match result with
       | Applied result ->
           let balance_updates =
@@ -646,6 +648,8 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
   in
   let* () = fail_when_slashed state l1_operation result in
+  (* This function handles external operations only. Internal operations have
+     to be handled in [handle] in [handle_l1_operation] below. *)
   match (op, result) with
   | ( Tx_rollup_commit {commitment; tx_rollup},
       Applied (Tx_rollup_commit_result _) )
@@ -676,6 +680,8 @@ let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
   let is_my_rollup tx_rollup =
     Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
   in
+  (* This function handles external operations only. Internal operations have
+     to be handled in [handle] in [handle_l1_operation] below. *)
   match (op, result) with
   | ( Tx_rollup_commit {commitment; tx_rollup},
       Applied (Tx_rollup_commit_result _) )
@@ -701,7 +707,7 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
   let handle_op =
     match direction with `Rollback -> rollback_op | `Process -> process_op
   in
-  let rec handle :
+  let handle :
       type kind.
       source:public_key_hash ->
       kind manager_operation ->
@@ -709,17 +715,9 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
       packed_internal_manager_operation_result list ->
       'acc ->
       'acc tzresult Lwt.t =
-   fun ~source op result internal_operation_results acc ->
-    let* acc =
-      handle_op state ~source block.hash operation.hash op result acc
-    in
-    (* Add messages from internal operations *)
-    List.fold_left_es
-      (fun acc (Internal_manager_operation_result ({operation; _}, result)) ->
-        let operation = manager_operation_of_internal_operation operation in
-        handle ~source operation result [] acc)
-      acc
-      internal_operation_results
+   fun ~source op result _internal_operation_results acc ->
+    handle_op state ~source block.hash operation.hash op result acc
+   (* There are no messages to handle for internal operations for now. *)
   in
   let rec handle_list :
       type kind. 'acc -> kind contents_and_result_list -> 'acc tzresult Lwt.t =
