@@ -3,7 +3,7 @@ tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_o
 storage
   (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")
 emitted operations
-  Internal origination:
+  Internal Origination:
     From: KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi
     Credit: ꜩ0.05
     Script:

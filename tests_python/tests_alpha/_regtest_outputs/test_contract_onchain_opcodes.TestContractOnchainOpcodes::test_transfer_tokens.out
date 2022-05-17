@@ -174,7 +174,7 @@ This sequence of operations was run:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100
     Internal operations:
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ100
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
@@ -222,7 +222,7 @@ This sequence of operations was run:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100
     Internal operations:
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ100
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]

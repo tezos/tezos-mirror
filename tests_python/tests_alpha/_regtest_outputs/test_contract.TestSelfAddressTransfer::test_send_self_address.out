@@ -29,7 +29,7 @@ This sequence of operations was run:
       Storage size: 82 bytes
       Consumed gas: 3490.352
     Internal operations:
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ0
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]

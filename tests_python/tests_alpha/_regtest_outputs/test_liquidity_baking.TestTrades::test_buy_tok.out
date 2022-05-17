@@ -41,7 +41,7 @@ This sequence of operations was run:
         [CONTRACT_HASH] ... -ꜩ9001
         [CONTRACT_HASH] ... +ꜩ9001
     Internal operations:
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ0
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
@@ -60,7 +60,7 @@ This sequence of operations was run:
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.017
           storage fees ........................... +ꜩ0.017
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ9.001
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
