@@ -123,7 +123,43 @@ let extract_messages_from_block block_info rollup_id =
     in
     (msg :: messages, tickets)
   in
-  let rec get_messages :
+  let get_messages_of_internal_operation ~source messages_tickets
+      (Internal_manager_operation_result
+        ( {
+            operation;
+            source = _use_the_source_of_the_external_operation;
+            nonce = _;
+          },
+          result )) =
+    match (operation, result) with
+    | ( Transaction
+          {amount = _; parameters; destination = Tx_rollup dst; entrypoint},
+        Applied
+          (Transaction_result
+            (Transaction_to_tx_rollup_result {ticket_hash; _})) )
+      when Tx_rollup.equal dst rollup_id
+           && Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) ->
+        (* Deposit message *)
+        ( Option.bind (Data_encoding.force_decode parameters)
+        @@ fun parameters ->
+          parse_tx_rollup_deposit_parameters parameters |> Result.to_option )
+        |> Option.fold
+             ~none:messages_tickets
+             ~some:(fun (ticketer, ty, contents, amount, destination) ->
+               let deposit =
+                 Tx_rollup_message.make_deposit
+                   source
+                   destination
+                   ticket_hash
+                   amount
+               in
+               add_message_ticket
+                 deposit
+                 (Some Ticket.{ticketer; ty; contents; hash = ticket_hash})
+                 messages_tickets)
+    | _ -> messages_tickets
+  in
+  let get_messages :
       type kind.
       source:public_key_hash ->
       kind manager_operation ->
@@ -142,38 +178,11 @@ let extract_messages_from_block block_info rollup_id =
             (Tx_rollup_message.make_batch content)
             None
             messages_tickets
-      | ( Transaction
-            {amount = _; parameters; destination = Tx_rollup dst; entrypoint},
-          Applied
-            (Transaction_result
-              (Transaction_to_tx_rollup_result {ticket_hash; _})) )
-        when Tx_rollup.equal dst rollup_id
-             && Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) ->
-          (* Deposit message *)
-          ( Option.bind (Data_encoding.force_decode parameters)
-          @@ fun parameters ->
-            parse_tx_rollup_deposit_parameters parameters |> Result.to_option )
-          |> Option.fold
-               ~none:messages_tickets
-               ~some:(fun (ticketer, ty, contents, amount, destination) ->
-                 let deposit =
-                   Tx_rollup_message.make_deposit
-                     source
-                     destination
-                     ticket_hash
-                     amount
-                 in
-                 add_message_ticket
-                   deposit
-                   (Some Ticket.{ticketer; ty; contents; hash = ticket_hash})
-                   messages_tickets)
       | _, _ -> messages_tickets
     in
     (* Add messages from internal operations *)
     List.fold_left
-      (fun acc (Internal_manager_operation_result ({operation; _}, result)) ->
-        let operation = manager_operation_of_internal_operation operation in
-        get_messages ~source operation result [] acc)
+      (get_messages_of_internal_operation ~source)
       acc
       internal_operation_results
   in
