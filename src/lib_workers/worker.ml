@@ -31,8 +31,6 @@ type worker_name = {base : string; name : string}
 module type T = sig
   module Name : Worker_intf.NAME
 
-  module Event : Worker_intf.EVENT
-
   module Request : Worker_intf.REQUEST
 
   module Types : Worker_intf.TYPES
@@ -217,7 +215,6 @@ end
 
 module Make_internal
     (Name : Worker_intf.NAME)
-    (Event : Worker_intf.EVENT)
     (Request : Worker_intf.REQUEST)
     (Types : Worker_intf.TYPES)
     (Worker_events : Worker_events.S
@@ -225,7 +222,6 @@ module Make_internal
                         and type critical_error = tztrace) =
 struct
   module Name = Name
-  module Event = Event
   module Request = Request
   module Types = Types
 
@@ -789,10 +785,7 @@ struct
       (Internal_event.Section.make_sanitized Name.base)
 end
 
-module MakeGroup
-    (Name : Worker_intf.NAME)
-    (Event : Worker_intf.EVENT)
-    (Request : Worker_intf.REQUEST) =
+module MakeGroup (Name : Worker_intf.NAME) (Request : Worker_intf.REQUEST) =
 struct
   module Events =
     Worker_events.Make (Name) (Request)
@@ -805,16 +798,15 @@ struct
       end)
 
   module MakeWorker (Types : Worker_intf.TYPES) = struct
-    include Make_internal (Name) (Event) (Request) (Types) (Events)
+    include Make_internal (Name) (Request) (Types) (Events)
   end
 end
 
 module MakeSingle
     (Name : Worker_intf.NAME)
-    (Event : Worker_intf.EVENT)
     (Request : Worker_intf.REQUEST)
     (Types : Worker_intf.TYPES) =
 struct
-  module WG = MakeGroup (Name) (Event) (Request)
+  module WG = MakeGroup (Name) (Request)
   include WG.MakeWorker (Types)
 end

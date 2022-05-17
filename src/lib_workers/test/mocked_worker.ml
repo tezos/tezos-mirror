@@ -105,4 +105,4 @@ module Types = struct
   type state = string list ref
 end
 
-module Worker = Worker.MakeSingle (Name) (Dummy_event) (Request) (Types)
+module Worker = Worker.MakeSingle (Name) (Request) (Types)

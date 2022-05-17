@@ -44,43 +44,6 @@ type update = Ignored_head | Branch_switch | Head_increment
 
 val update_encoding : update Data_encoding.t
 
-module Event : sig
-  type t =
-    | Processed_block of {
-        request : Request.view;
-        request_status : Worker_types.request_status;
-        update : update;
-        fitness : Fitness.t;
-        level : Int32.t;
-        timestamp : Time.Protocol.t;
-      }
-    | Notify_branch of P2p_peer.Id.t
-    | Notify_head of P2p_peer.Id.t
-    | Connection of P2p_peer.Id.t
-    | Disconnection of P2p_peer.Id.t
-    | Could_not_switch_testchain of error trace
-    | Bootstrapped
-    | Sync_status of synchronisation_status
-    | Bootstrap_active_peers of {active : int; needed : int}
-    | Bootstrap_active_peers_heads_time of {
-        min_head_time : Time.Protocol.t;
-        max_head_time : Time.Protocol.t;
-        most_recent_validation : Time.Protocol.t;
-      }
-    | Request_failure of
-        Request.view * Worker_types.request_status * error trace
-
-  type view = t
-
-  val view : t -> view
-
-  val level : t -> Internal_event.level
-
-  val encoding : t Data_encoding.encoding
-
-  val pp : Format.formatter -> t -> unit
-end
-
 module Distributed_db_state : sig
   type table_scheduler = {table_length : int; scheduler_length : int}
 

@@ -52,22 +52,6 @@ module type VIEW = sig
   val pp : Format.formatter -> view -> unit
 end
 
-(** Events that are used for logging and introspection.
-    Events are pretty printed immediately in the log, and stored in
-    the worker's event backlog for introspection. *)
-module type EVENT = sig
-  (** The type of an event. *)
-  type t
-
-  include VIEW with type view := t
-
-  (** Assigns a logging level to each event.
-      Events can be ignored for logging w.r.t. the global node configuration.
-      Events can be ignored for introspection w.r.t. to the worker's
-      {!Worker_types.limits}. *)
-  val level : t -> Internal_event.level
-end
-
 (** The type of messages that are fed to the worker's event loop. *)
 module type REQUEST = sig
   (** The type of events.

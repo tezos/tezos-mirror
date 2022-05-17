@@ -65,16 +65,6 @@ module Name = struct
     Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
 end
 
-module Dummy_event = struct
-  type t = unit
-
-  let pp = Format.pp_print_cut
-
-  let encoding = Data_encoding.unit
-
-  let level () = Internal_event.Debug
-end
-
 module Classification = Prevalidator_classification
 
 (** This module encapsulates pending operations to maintain them in two
@@ -299,8 +289,7 @@ module type T = sig
 
   module Worker :
     Worker.T
-      with type Event.t = Dummy_event.t
-       and type ('a, 'b) Request.t = ('a, 'b) Request.t
+      with type ('a, 'b) Request.t = ('a, 'b) Request.t
        and type Request.view = Request.view
        and type Types.state = types_state
 
@@ -1071,8 +1060,7 @@ module type ARG = sig
   val chain_id : Chain_id.t
 end
 
-module WorkerGroup =
-  Worker.MakeGroup (Name) (Dummy_event) (Prevalidator_worker_state.Request)
+module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
 
 (** The functor that is not tested, in other words used only in production.
     This functor's code is not tested (contrary to functor {!Make_s} above),
@@ -1107,7 +1095,6 @@ module Make
   module Worker :
     Worker.T
       with type Name.t = Name.t
-       and type Event.t = Dummy_event.t
        and type ('a, 'b) Request.t = ('a, 'b) Request.t
        and type Request.view = Request.view
        and type Types.state = Types.state

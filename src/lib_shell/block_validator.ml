@@ -118,7 +118,7 @@ module Request = struct
 end
 
 module Events = Block_validator_events
-module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types)
+module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type t = Worker.infinite Worker.queue Worker.t
 
