@@ -155,14 +155,11 @@ end
 
 let deposit_entrypoint = Entrypoint_repr.of_string_strict_exn "deposit"
 
-module Set = Set.Make (struct
-  type t = tx_rollup
+module Cmp = struct
+  type nonrec t = t
 
-  include Compare_impl
-end)
+  let compare = compare
+end
 
-module Map = Map.Make (struct
-  type t = tx_rollup
-
-  include Compare_impl
-end)
+module Set = Set.Make (Cmp)
+module Map = Map.Make (Cmp)
