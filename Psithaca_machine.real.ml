@@ -142,6 +142,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Plugin.RPC.Baking_rights.get
         ?levels:None
         ~max_round:priority
+        ~all:true
         cctxt
         (cctxt#chain, `Hash (hash, 0))
     in
