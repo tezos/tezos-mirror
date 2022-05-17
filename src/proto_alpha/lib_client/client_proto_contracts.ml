@@ -41,6 +41,59 @@ end
 
 module RawContractAlias = Client_aliases.Alias (ContractEntity)
 
+module OriginatedContractAlias = struct
+  let find cctxt s =
+    RawContractAlias.find_opt cctxt s >>=? function
+    | Some (Contract.Originated v) -> return v
+    | Some (Implicit _) -> failwith "contract %s is an implicit account" s
+    | None -> failwith "no contract named %s" s
+
+  let of_literal s =
+    ContractEntity.of_source s >>= function
+    | Ok (Contract.Originated v) -> return v
+    | Ok (Implicit _) -> failwith "contract %s is an implicit account" s
+    | Error _ as err -> Lwt.return err
+
+  let find_destination cctxt s =
+    match String.split ~limit:1 ':' s with
+    | ["alias"; alias] -> find cctxt alias
+    | ["text"; text] -> of_literal text
+    | _ -> (
+        of_literal s >>= function
+        | Ok _ as ok_v -> Lwt.return ok_v
+        | Error k_errs -> (
+            find cctxt s >|= function
+            | Ok _ as ok_v -> ok_v
+            | Error c_errs -> Error (c_errs @ k_errs)))
+
+  let destination_parameter () =
+    Clic.parameter ~autocomplete:RawContractAlias.autocomplete find_destination
+
+  let destination_param ?(name = "dst") ?(desc = "destination contract") next =
+    let desc =
+      String.concat
+        "\n"
+        [
+          desc;
+          "Can be a literal or an alias (autodetected in order).\n\
+           Use 'text:literal' or 'alias:name' to force.";
+        ]
+    in
+    Clic.param ~name ~desc (destination_parameter ()) next
+
+  let destination_arg ?(name = "dst") ?(doc = "destination contract") () =
+    let doc =
+      String.concat
+        "\n"
+        [
+          doc;
+          "Can be a literal or an alias (autodetected in order).\n\
+           Use 'text:literal' or 'alias:name' to force.";
+        ]
+    in
+    Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
+end
+
 module ContractAlias = struct
   let find cctxt s =
     RawContractAlias.find_opt cctxt s >>=? function

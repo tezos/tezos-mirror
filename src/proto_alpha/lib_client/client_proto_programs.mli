@@ -46,14 +46,14 @@ type simulation_params = {
 (* Parameters specific to simulations of TZIP4 views *)
 type run_view_params = {
   shared_params : simulation_params;
-  contract : Contract.t;
+  contract : Contract_hash.t;
   entrypoint : Entrypoint.t;
 }
 
 (* Parameters specific to simulations of Michelson views *)
 type run_script_view_params = {
   shared_params : simulation_params;
-  contract : Contract.t;
+  contract : Contract_hash.t;
   view : string;
   unlimited_gas : bool;
 }

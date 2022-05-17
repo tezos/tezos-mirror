@@ -28,13 +28,13 @@ open Protocol
 open Alpha_context
 open Michelson_v1_helpers
 
-type error += Contract_has_no_script of Contract.t
+type error += Contract_has_no_script of Contract_hash.t
 
 type error += Not_a_supported_multisig_contract of Script_expr_hash.t
 
-type error += Contract_has_no_storage of Contract.t
+type error += Contract_has_no_storage of Contract_hash.t
 
-type error += Contract_has_unexpected_storage of Contract.t
+type error += Contract_has_unexpected_storage of Contract_hash.t
 
 type error += Invalid_signature of signature
 
@@ -44,7 +44,7 @@ type error += Action_deserialisation_error of Script.expr
 
 type error += Bytes_deserialisation_error of Bytes.t
 
-type error += Bad_deserialized_contract of (Contract.t * Contract.t)
+type error += Bad_deserialized_contract of (Contract_hash.t * Contract_hash.t)
 
 type error += Bad_deserialized_counter of (counter * counter)
 
@@ -73,8 +73,8 @@ let () =
       "A multisig command has referenced a scriptless smart contract instead \
        of a multisig smart contract."
     ~pp:(fun ppf contract ->
-      Format.fprintf ppf "Contract has no script %a." Contract.pp contract)
-    Data_encoding.(obj1 (req "contract" Contract.encoding))
+      Format.fprintf ppf "Contract has no script %a." Contract_hash.pp contract)
+    Data_encoding.(obj1 (req "contract" Contract.originated_encoding))
     (function Contract_has_no_script c -> Some c | _ -> None)
     (fun c -> Contract_has_no_script c) ;
   register_error_kind
@@ -104,8 +104,8 @@ let () =
       "A multisig command has referenced a smart contract without storage \
        instead of a multisig smart contract."
     ~pp:(fun ppf contract ->
-      Format.fprintf ppf "Contract has no storage %a." Contract.pp contract)
-    Data_encoding.(obj1 (req "contract" Contract.encoding))
+      Format.fprintf ppf "Contract has no storage %a." Contract_hash.pp contract)
+    Data_encoding.(obj1 (req "contract" Contract.originated_encoding))
     (function Contract_has_no_storage c -> Some c | _ -> None)
     (fun c -> Contract_has_no_storage c) ;
   register_error_kind
@@ -121,9 +121,9 @@ let () =
       Format.fprintf
         ppf
         "Contract has unexpected storage %a."
-        Contract.pp
+        Contract_hash.pp
         contract)
-    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    Data_encoding.(obj1 (req "contract" Contract.originated_encoding))
     (function Contract_has_unexpected_storage c -> Some c | _ -> None)
     (fun c -> Contract_has_unexpected_storage c) ;
   register_error_kind
@@ -199,12 +199,15 @@ let () =
       Format.fprintf
         ppf
         "Bad deserialized contract, received %a expected %a."
-        Contract.pp
+        Contract_hash.pp
         received
-        Contract.pp
+        Contract_hash.pp
         expected)
     Data_encoding.(
-      obj1 (req "received_expected" (tup2 Contract.encoding Contract.encoding)))
+      obj1
+        (req
+           "received_expected"
+           (tup2 Contract.originated_encoding Contract.originated_encoding)))
     (function Bad_deserialized_contract b -> Some b | _ -> None)
     (fun b -> Bad_deserialized_contract b) ;
   register_error_kind
@@ -621,7 +624,7 @@ let action_to_expr_generic ~loc = function
                ~destination
                ~amount
           >|? left ~loc
-      | Originated _ ->
+      | Originated destination ->
           lambda_from_string
           @@ Managed_contract.build_lambda_for_transfer_to_originated
                ~destination
@@ -1013,6 +1016,7 @@ let prepare_multisig_transaction (cctxt : #Protocol_client_context.full) ~chain
   multisig_get_information cctxt ~chain ~block contract
   >>=? fun {counter; threshold; keys} ->
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let contract = Contract.Originated contract in
   multisig_bytes ~counter ~action ~contract ~descr ~chain_id ()
   >>=? fun bytes ->
   Client_proto_context.get_balance
@@ -1092,7 +1096,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ~source
     ~src_pk
     ~src_sk
-    ~destination:(Contract multisig_contract)
+    ~destination:(Contract (Originated multisig_contract))
     ?entrypoint
     ~parameters
     ~amount
@@ -1128,10 +1132,12 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
               [] )
           when not descr.requires_chain_id ->
             let contract =
-              Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
+              Data_encoding.Binary.of_bytes_exn
+                Contract.originated_encoding
+                contract_bytes
             in
             if counter = stored_counter then
-              if Contract.(multisig_contract = contract) then
+              if Contract_hash.(multisig_contract = contract) then
                 action_of_expr ~generic:descr.generic e
               else
                 fail (Bad_deserialized_contract (contract, multisig_contract))
@@ -1157,7 +1163,9 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
               [] )
           when descr.requires_chain_id ->
             let contract =
-              Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
+              Data_encoding.Binary.of_bytes_exn
+                Contract.originated_encoding
+                contract_bytes
             in
             let cid =
               Data_encoding.Binary.of_bytes_exn Chain_id.encoding chain_id_bytes

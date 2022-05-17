@@ -196,9 +196,9 @@ let test_run_view_fail_generic ~protocol ~view ~contract ~input ~msg () =
   let failed_command = Client.spawn_run_view ~view ~contract ?input client in
   Process.check_error ~exit_code:1 ~msg failed_command
 
-(* Runs view `add_v` on an implict account and fails *)
+(* Runs view `add_v` on an implicit account and fails *)
 let test_run_view_implicit_account ~protocol () =
-  let msg = rex "A view was called on a contract with no script." in
+  let msg = rex "Erroneous command line argument 6 \\(tz1" in
   test_run_view_fail_generic
     ~protocol
     ~view:"add_v"

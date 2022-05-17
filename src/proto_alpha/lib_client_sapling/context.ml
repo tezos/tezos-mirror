@@ -327,7 +327,7 @@ module Contract_state = struct
 end
 
 module Client_state = struct
-  module Map = Map.Make (Protocol.Alpha_context.Contract)
+  module Map = Map.Make (Protocol.Contract_hash)
 
   type t = Contract_state.t Map.t
 
@@ -338,7 +338,7 @@ module Client_state = struct
       (List.fold_left (fun m (k, v) -> Map.add k v m) Map.empty)
       (list
          (obj2
-            (req "contract" Protocol.Alpha_context.Contract.encoding)
+            (req "contract" Protocol.Alpha_context.Contract.originated_encoding)
             (req "state" Contract_state.encoding)))
 
   let filename = "sapling_state"
@@ -356,7 +356,7 @@ module Client_state = struct
             failwith
               "Unknown memo size for contract %s and none was provided in \
                options"
-            @@ Protocol.Alpha_context.Contract.to_b58check contract
+            @@ Protocol.Contract_hash.to_b58check contract
         | Some memo_size ->
             let contract_state = Contract_state.empty ~memo_size in
             let client_state = Map.add contract contract_state client_state in
@@ -376,11 +376,12 @@ module Client_state = struct
     | None ->
         cctxt#error
           "Contract %s not found"
-          (Protocol.Alpha_context.Contract.to_b58check contract)
+          (Protocol.Contract_hash.to_b58check contract)
     | Some v -> return v
 
   (** Call the node RPC to obtain the storage diff of a contract *)
   let get_diff cctxt contract offset_commitment offset_nullifier =
+    let contract = Protocol.Alpha_context.Contract.Originated contract in
     Protocol.Alpha_services.Contract.single_sapling_get_diff
       cctxt
       (cctxt#chain, cctxt#block)

@@ -153,7 +153,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
        ~parameters
        ~entrypoint
        ?fee
-       (Contract contract))
+       (Contract (Originated contract)))
 
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~fee_parameter ?fee ~source ~src_pk
@@ -198,7 +198,7 @@ let build_lambda_for_transfer_to_implicit ~destination ~amount =
 let build_lambda_for_transfer_to_originated ~destination ~entrypoint ~amount
     ~parameter_type ~parameter =
   let destination =
-    Data_encoding.Binary.to_bytes_exn Contract.encoding destination
+    Data_encoding.Binary.to_bytes_exn Contract.originated_encoding destination
   in
   let amount = Tez.to_mutez amount in
   let (`Hex destination) = Hex.of_bytes destination in
@@ -240,7 +240,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
         entrypoint
         Contract.pp
         destination
-  | Originated _ ->
+  | Originated destination ->
       (Michelson_v1_entrypoints.contract_entrypoint_type
          cctxt
          ~chain
@@ -252,7 +252,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
        | None ->
            cctxt#error
              "Contract %a has no entrypoint named %a"
-             Contract.pp
+             Contract_hash.pp
              destination
              Entrypoint.pp
              entrypoint

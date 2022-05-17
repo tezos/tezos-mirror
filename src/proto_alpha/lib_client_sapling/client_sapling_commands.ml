@@ -61,7 +61,7 @@ let viewing_key_of_string s =
 let anti_replay cctxt contract =
   Tezos_shell_services.Chain_services.chain_id cctxt ~chain:cctxt#chain ()
   >>=? fun chain_id ->
-  let address = Protocol.Alpha_context.Contract.to_b58check contract in
+  let address = Protocol.Contract_hash.to_b58check contract in
   let chain_id = Chain_id.to_b58check chain_id in
   return (address ^ chain_id)
 
@@ -166,7 +166,7 @@ let shield_cmd =
     @@ prefix "to"
     @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ OriginatedContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop)
@@ -205,7 +205,7 @@ let shield_cmd =
         ~amount
         ~src_pk
         ~src_sk
-        ~destination:(Contract contract_dst)
+        ~destination:(Contract (Originated contract_dst))
         ~source:pkh
         ~arg
         ?confirmations:cctxt#confirmations
@@ -256,7 +256,7 @@ let unshield_cmd =
          ~name:"dst-tz"
          ~desc:"Transparent destination account."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ OriginatedContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop)
@@ -294,7 +294,7 @@ let unshield_cmd =
         ~amount:Tez.zero
         ~src_sk
         ~src_pk
-        ~destination:(Contract contract_dst)
+        ~destination:(Contract (Originated contract_dst))
         ~source
         ~arg
         ?confirmations:cctxt#confirmations
@@ -358,7 +358,7 @@ let forge_shielded_cmd =
     @@ prefix "to"
     @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ OriginatedContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop)
@@ -426,7 +426,7 @@ let submit_shielded_cmd =
          ~name:"alias-tz"
          ~desc:"Transparent account paying the fees."
     @@ prefix "using"
-    @@ ContractAlias.destination_param
+    @@ OriginatedContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
     @@ stop)
@@ -443,11 +443,10 @@ let submit_shielded_cmd =
          source
          destination
          (cctxt : Protocol_client_context.full) ->
-      let open Protocol.Alpha_context in
       cctxt#message
         "Reading forge transaction from file %s -- sending it to %a@."
         filename
-        Contract.pp
+        Protocol.Contract_hash.pp
         destination
       >>= fun () ->
       let open Context in
@@ -476,7 +475,7 @@ let submit_shielded_cmd =
         ~amount:Tez.zero
         ~src_pk
         ~src_sk
-        ~destination:(Contract destination)
+        ~destination:(Contract (Originated destination))
         ~source
         ~arg:contract_input
         ?confirmations:cctxt#confirmations
@@ -498,7 +497,7 @@ let submit_shielded_cmd =
       | Some (_res, _contracts) -> return_unit)
 
 let for_contract_arg =
-  Client_proto_contracts.ContractAlias.destination_arg
+  Client_proto_contracts.OriginatedContractAlias.destination_arg
     ~name:"for-contract"
     ~doc:"name of the contract to associate new key with"
     ()
@@ -540,7 +539,7 @@ let use_key_for_contract_cmd =
          ~name:"sapling-key"
          ~desc:"Sapling key to use for the contract."
     @@ prefixes ["for"; "contract"]
-    @@ Client_proto_contracts.ContractAlias.destination_param
+    @@ Client_proto_contracts.OriginatedContractAlias.destination_param
          ~name:"contract"
          ~desc:"Contract the key will be used on."
     @@ stop)
@@ -697,7 +696,7 @@ let commands () =
            ~name:"sapling-key"
            ~desc:"Sapling key we get balance for."
       @@ prefixes ["in"; "contract"]
-      @@ Client_proto_contracts.ContractAlias.destination_param
+      @@ Client_proto_contracts.OriginatedContractAlias.destination_param
            ~name:"contract"
            ~desc:"Contract we get balance from."
       @@ stop)

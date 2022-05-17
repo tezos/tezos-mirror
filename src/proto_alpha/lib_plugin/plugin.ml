@@ -1402,8 +1402,8 @@ module View_helpers = struct
         obj2
           (req "entrypoint" Entrypoint.simple_encoding)
           (req "callback" Contract.encoding))
-      (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
-      (fun (e, c) -> View_never_returns (e, c)) ;
+      (function View_unexpected_return (e, c) -> Some (e, c) | _ -> None)
+      (fun (e, c) -> View_unexpected_return (e, c)) ;
     Environment.Error_monad.register_error_kind
       `Permanent
       ~id:"viewNotFound"
@@ -1741,7 +1741,7 @@ module RPC = struct
       let run_tzip4_view_encoding =
         let open Data_encoding in
         obj10
-          (req "contract" Contract.encoding)
+          (req "contract" Contract.originated_encoding)
           (req "entrypoint" Entrypoint.simple_encoding)
           (req "input" Script.expr_encoding)
           (req "chain_id" Chain_id.encoding)
@@ -1756,7 +1756,7 @@ module RPC = struct
         let open Data_encoding in
         merge_objs
           (obj10
-             (req "contract" Contract.encoding)
+             (req "contract" Contract.originated_encoding)
              (req "view" string)
              (req "input" Script.expr_encoding)
              (dft "unlimited_gas" bool false)
@@ -2442,14 +2442,15 @@ module RPC = struct
           `Minted
           (`Contract dummy_contract)
           balance
-        >>=? fun (ctxt, _) -> return (ctxt, dummy_contract)
+        >>=? fun (ctxt, _) -> return (ctxt, dummy_contract_hash)
       in
       let configure_contracts ctxt script balance ~src_opt ~pay_opt ~self_opt =
         (match self_opt with
         | None ->
             let balance = Option.value ~default:default_balance balance in
             originate_dummy_contract ctxt script balance
-            >>=? fun (ctxt, addr) -> return (ctxt, addr, balance)
+            >>=? fun (ctxt, addr) ->
+            return (ctxt, Contract.Originated addr, balance)
         | Some addr ->
             default_from_context
               ctxt
@@ -2656,6 +2657,7 @@ module RPC = struct
             now,
             level )
         ->
+          let contract = Contract.Originated contract in
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
             ~some:ok
@@ -2713,7 +2715,7 @@ module RPC = struct
           let parameter =
             View_helpers.make_view_parameter
               (Micheline.root input)
-              viewer_contract
+              (Contract.Originated viewer_contract)
           in
           Script_interpreter.execute
             ctxt
@@ -2737,7 +2739,7 @@ module RPC = struct
             (View_helpers.extract_parameter_from_operations
                entrypoint
                operations
-               viewer_contract)) ;
+               (Contract.Originated viewer_contract))) ;
       Registration.register0
         ~chunked:true
         S.run_script_view
@@ -2756,6 +2758,7 @@ module RPC = struct
               now ),
             level )
         ->
+          let contract = Contract.Originated contract in
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
             ~some:ok
@@ -3229,7 +3232,7 @@ module RPC = struct
         S.get_storage_normalized
         ctxt
         block
-        contract
+        (Contract.Originated contract)
         ()
         unparsing_mode
 

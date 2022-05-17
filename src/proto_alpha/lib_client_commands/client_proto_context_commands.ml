@@ -204,9 +204,10 @@ let commands_ro () =
       ~desc:"Get the key rank of a cache key."
       no_options
       (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"contract"
+      @@ OriginatedContractAlias.destination_param ~name:"src" ~desc:"contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
+        let contract = Contract.Originated contract in
         contract_rank cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun rank ->
         match rank with
@@ -252,7 +253,9 @@ let commands_ro () =
       ~desc:"Get the storage of a contract."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "contract"; "storage"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun unparsing_mode contract (cctxt : Protocol_client_context.full) ->
         get_storage
@@ -277,7 +280,9 @@ let commands_ro () =
       @@ prefixes ["of"; "type"]
       @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun () key key_type contract (cctxt : Protocol_client_context.full) ->
         get_contract_big_map_value
@@ -351,7 +356,9 @@ let commands_ro () =
       ~desc:"Get the `BLAKE2B` script hash of a contract."
       no_options
       (prefixes ["get"; "contract"; "script"; "hash"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         get_script_hash cctxt ~chain:cctxt#chain ~block:cctxt#block contract
@@ -369,7 +376,9 @@ let commands_ro () =
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
       @@ prefixes ["for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun normalize_types
            entrypoint
@@ -392,7 +401,9 @@ let commands_ro () =
       ~desc:"Get the entrypoint list of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun normalize_types contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_entrypoints
@@ -410,7 +421,9 @@ let commands_ro () =
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       (prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_unreachables
@@ -708,9 +721,10 @@ let transfer_command amount (source : Contract.t) destination
   else Lwt.return_unit)
   >>= fun () ->
   (match source with
-  | Originated _ ->
+  | Originated contract_hash ->
       let contract = source in
-      Managed_contract.get_contract_manager cctxt source >>=? fun source ->
+      Managed_contract.get_contract_manager cctxt contract_hash
+      >>=? fun source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       Managed_contract.transfer
         cctxt
@@ -911,7 +925,7 @@ let commands_rw () =
            delegate
            (cctxt : Protocol_client_context.full) ->
         match contract with
-        | Originated _ ->
+        | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -965,7 +979,7 @@ let commands_rw () =
            contract
            (cctxt : Protocol_client_context.full) ->
         match contract with
-        | Originated _ ->
+        | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -1162,8 +1176,8 @@ let commands_rw () =
         | [] -> failwith "Empty operation list"
         | operations ->
             (match source with
-            | Originated _ ->
-                Managed_contract.get_contract_manager cctxt source
+            | Originated contract ->
+                Managed_contract.get_contract_manager cctxt contract
                 >>=? fun source ->
                 Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
                 return (source, src_pk, src_sk)

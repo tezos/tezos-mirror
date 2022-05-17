@@ -36,7 +36,7 @@ let group =
 let alias_param = Client_proto_contracts.ContractAlias.destination_param
 
 let token_contract_param () =
-  alias_param
+  Client_proto_contracts.OriginatedContractAlias.destination_param
     ~name:"contract"
     ~desc:"name or address of the FA1.2-compatible contract"
 
@@ -140,7 +140,7 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           >>=? fun _ ->
           Format.printf
             "Contract %a has an FA1.2 interface.\n%!"
-            Contract.pp
+            Contract_hash.pp
             contract ;
           return_unit);
       command

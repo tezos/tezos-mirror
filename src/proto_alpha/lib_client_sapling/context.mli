@@ -78,7 +78,7 @@ module Client_state : sig
 
   val find :
     Protocol_client_context.full ->
-    Protocol.Alpha_context.Contract.t ->
+    Protocol.Contract_hash.t ->
     t ->
     Contract_state.t tzresult Lwt.t
 
@@ -86,7 +86,7 @@ module Client_state : sig
     Protocol_client_context.full ->
     force:bool ->
     default_memo_size:int option ->
-    Protocol.Alpha_context.Contract.t ->
+    Protocol.Contract_hash.t ->
     Viewing_key.t ->
     unit tzresult Lwt.t
 
@@ -98,7 +98,7 @@ module Client_state : sig
    **)
   val sync_and_scan :
     Protocol_client_context.full ->
-    Protocol.Alpha_context.Contract.t ->
+    Protocol.Contract_hash.t ->
     Contract_state.t tzresult Lwt.t
 end
 

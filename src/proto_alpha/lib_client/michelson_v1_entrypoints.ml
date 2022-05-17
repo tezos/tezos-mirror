@@ -66,7 +66,7 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
   Alpha_services.Contract.entrypoint_type
     cctxt
     (chain, block)
-    contract
+    (Contract.Originated contract)
     entrypoint
     ~normalize_types
   >>= function
@@ -99,7 +99,7 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
         Entrypoint.pp
         entrypoint
         (Format.pp_print_option (fun ppf ->
-             Format.fprintf ppf " for contract %a" Contract.pp))
+             Format.fprintf ppf " for contract %a" Contract_hash.pp))
         contract
         (Format.pp_print_option (fun ppf -> Format.fprintf ppf " for script %s"))
         script_name
@@ -111,7 +111,7 @@ let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
   Alpha_services.Contract.list_entrypoints
     cctxt
     (chain, block)
-    contract
+    (Contract.Originated contract)
     ~normalize_types
 
 let list_contract_unreachables cctxt ~chain ~block ~contract =
@@ -189,7 +189,7 @@ let print_entrypoints_list (cctxt : #Client_context.printer)
         cctxt#message
           "@[<v 2>Entrypoints%a%a: @,%a@]@."
           (Format.pp_print_option (fun ppf ->
-               Format.fprintf ppf " for contract %a" Contract.pp))
+               Format.fprintf ppf " for contract %a" Contract_hash.pp))
           contract
           (Format.pp_print_option (fun ppf ->
                Format.fprintf ppf " for script %s"))
@@ -231,7 +231,7 @@ let print_unreachables (cctxt : #Client_context.printer)
             cctxt#message
               "@[<v 2>Unreachable paths in the argument%a%a: @[%a@]@."
               (Format.pp_print_option (fun ppf ->
-                   Format.fprintf ppf " of contract %a" Contract.pp))
+                   Format.fprintf ppf " of contract %a" Contract_hash.pp))
               contract
               (Format.pp_print_option (fun ppf ->
                    Format.fprintf ppf " of script %s"))
