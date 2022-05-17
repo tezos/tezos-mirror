@@ -109,14 +109,12 @@ let pp_internal_operation ppf op =
 let pp_manager_operation_content (type kind) source pp_result ppf
     ((operation, result) : kind manager_operation * _) =
   (* For now, try to keep formatting in sync with [pp_internal_operation_result]. *)
-  let internal = false in
   Format.fprintf ppf "@[<v 0>" ;
   (match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,Amount: %s%a@,From: %a@,To: %a"
-        (if internal then "Internal transaction" else "Transaction")
+        "@[<v 2>Transaction:@,Amount: %s%a@,From: %a@,To: %a"
         tez_sym
         Tez.pp
         amount
@@ -142,8 +140,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Origination {delegate; credit; script = {code; storage}} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,From: %a@,Credit: %s%a"
-        (if internal then "Internal origination" else "Origination")
+        "@[<v 2>Origination:@,From: %a@,Credit: %s%a"
         Contract.pp
         source
         tez_sym
@@ -181,8 +178,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Reveal key ->
       Format.fprintf
         ppf
-        "@[<v 2>%s of manager public key:@,Contract: %a@,Key: %a%a@]"
-        (if internal then "Internal revelation" else "Revelation")
+        "@[<v 2>Revelation of manager public key:@,Contract: %a@,Key: %a%a@]"
         Contract.pp
         source
         Signature.Public_key.pp
@@ -192,8 +188,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Delegation None ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,Contract: %a@,To: nobody%a@]"
-        (if internal then "Internal Delegation" else "Delegation")
+        "@[<v 2>Delegation:@,Contract: %a@,To: nobody%a@]"
         Contract.pp
         source
         pp_result
@@ -201,8 +196,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Delegation (Some delegate) ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,Contract: %a@,To: %a%a@]"
-        (if internal then "Internal Delegation" else "Delegation")
+        "@[<v 2>Delegation:@,Contract: %a@,To: %a%a@]"
         Contract.pp
         source
         Signature.Public_key_hash.pp
@@ -225,9 +219,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Set_deposits_limit None ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,Delegate: %a@,Unlimited deposits%a@]"
-        (if internal then "Internal set deposits limit"
-        else "Set deposits limit")
+        "@[<v 2>Set deposits limit:@,Delegate: %a@,Unlimited deposits%a@]"
         Contract.pp
         source
         pp_result
@@ -235,9 +227,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Set_deposits_limit (Some limit) ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,Delegate: %a@,Limit: %a%a@]"
-        (if internal then "Internal set deposits limit"
-        else "Set deposits limit")
+        "@[<v 2>Set deposits limit:@,Delegate: %a@,Limit: %a%a@]"
         Contract.pp
         source
         Tez.pp
@@ -247,9 +237,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_origination ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,From: %a%a@]"
-        (if internal then "Internal tx rollup origination"
-        else "Tx rollup origination")
+        "@[<v 2>Tx rollup origination:@,From: %a%a@]"
         Contract.pp
         source
         pp_result
@@ -257,9 +245,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a, %d bytes, From: %a%a@]"
-        (if internal then "Internal tx rollup transaction"
-        else "Tx rollup transaction")
+        "@[<v 2>Tx rollup transaction:%a, %d bytes, From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         (String.length content)
@@ -270,9 +256,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_commit {tx_rollup; commitment} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a, %a@,From: %a%a@]"
-        (if internal then "Internal tx rollup commitment"
-        else "Tx rollup commitment")
+        "@[<v 2>Tx rollup commitment:%a, %a@,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Tx_rollup_commitment.Full.pp
@@ -284,9 +268,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_return_bond {tx_rollup} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup return commitment bond"
-        else "Tx rollup return commitment bond")
+        "@[<v 2>Tx rollup return commitment bond:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -296,9 +278,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Format.fprintf
         ppf
-        "@[<v >%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup finalize commitment"
-        else "Tx rollup finalize commitment")
+        "@[<v >Tx rollup finalize commitment:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -308,9 +288,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_remove_commitment {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup remove commitment"
-        else "Tx rollup remove commitment")
+        "@[<v 2>Tx rollup remove commitment:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -321,9 +299,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       (* FIXME/TORU *)
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup rejection"
-        else "Tx rollup rejection")
+        "@[<v 2>Tx rollup rejection:%a @,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -333,9 +309,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a@,From: %a%a@]"
-        (if internal then "Internal tx rollup dispatch tickets"
-        else "Tx rollup dispatch tickets")
+        "@[<v 2>Tx rollup dispatch tickets:%a@,From: %a%a@]"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -345,8 +319,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Transfer_ticket _ ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,From: %a%a@]"
-        (if internal then "Internal transfer ticket" else "Transfer ticket")
+        "@[<v 2>Transfer tickets:@,From: %a%a@]"
         Contract.pp
         source
         pp_result
