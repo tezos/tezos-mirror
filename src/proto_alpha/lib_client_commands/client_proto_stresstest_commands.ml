@@ -513,7 +513,7 @@ let manager_op_of_transfer parameters
       | Implicit _ -> Entrypoint.default
       | Originated x -> x.entrypoint
     in
-    let destination = Destination.Contract (destination_to_contract dst) in
+    let destination = destination_to_contract dst in
     Transaction {amount; parameters; entrypoint; destination}
   in
   match counter with

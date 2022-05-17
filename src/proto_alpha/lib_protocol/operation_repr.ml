@@ -289,7 +289,7 @@ and _ manager_operation =
       amount : Tez_repr.tez;
       parameters : Script_repr.lazy_expr;
       entrypoint : Entrypoint_repr.t;
-      destination : Destination_repr.t;
+      destination : Contract_repr.t;
     }
       -> Kind.transaction manager_operation
   | Origination : origination -> Kind.origination manager_operation
@@ -549,7 +549,7 @@ module Encoding = struct
           encoding =
             obj3
               (req "amount" Tez_repr.encoding)
-              (req "destination" Destination_repr.encoding)
+              (req "destination" Contract_repr.encoding)
               (opt
                  "parameters"
                  (obj2

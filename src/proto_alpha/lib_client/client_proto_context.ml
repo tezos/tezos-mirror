@@ -100,7 +100,6 @@ let parse_arg_transfer arg =
 let build_transaction_operation ~amount ~parameters
     ?(entrypoint = Entrypoint.default) ?fee ?gas_limit ?storage_limit
     destination =
-  let destination = Destination.Contract destination in
   let operation = Transaction {amount; parameters; destination; entrypoint} in
   Injection.prepare_manager_operation
     ~fee:(Limit.of_option fee)

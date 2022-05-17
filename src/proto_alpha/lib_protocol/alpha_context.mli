@@ -3062,7 +3062,7 @@ and _ manager_operation =
       amount : Tez.tez;
       parameters : Script.lazy_expr;
       entrypoint : Entrypoint.t;
-      destination : Destination.t;
+      destination : Contract.t;
     }
       -> Kind.transaction manager_operation
   | Origination : origination -> Kind.origination manager_operation

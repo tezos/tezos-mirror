@@ -870,7 +870,6 @@ let build_transaction_operation ?(tez_amount = Tez.zero) ?fee ?gas_limit
   let parameters =
     Script.lazy_expr (Micheline.strip_locations (action_to_expr ~loc:() action))
   in
-  let token = Destination.Contract token in
   let operation =
     Transaction
       {amount = tez_amount; parameters; destination = token; entrypoint}

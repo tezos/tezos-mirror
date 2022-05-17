@@ -319,7 +319,7 @@ and _ manager_operation =
       amount : Tez_repr.tez;
       parameters : Script_repr.lazy_expr;
       entrypoint : Entrypoint_repr.t;
-      destination : Destination_repr.t;
+      destination : Contract_repr.t;
     }
       -> Kind.transaction manager_operation
   (* [Origination] of a contract using a smart-contract [script] and
