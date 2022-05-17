@@ -1,11 +1,3 @@
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3021
-   We would like to shadow this module with our own implementation in a smarter
-   way.
-*)
-include Partial_table
-
-(*
-
 open Types
 open Values
 
@@ -13,7 +5,9 @@ type size = int32
 type index = int32
 type count = int32
 
-type table = {mutable ty : table_type; mutable content : ref_ array}
+module Map = Lazy_map.Mutable.Make (Int32)
+
+type table = {mutable ty : table_type; mutable content : ref_ Map.t}
 type t = table
 
 exception Type
@@ -28,7 +22,7 @@ let valid_limits {min; max} =
   | Some m -> I32.le_u min m
 
 let create size r =
-  try Lib.Array32.make size r
+  try Map.create ~produce_value:(fun _ -> r) size
   with Out_of_memory | Invalid_argument _ -> raise OutOfMemory
 
 let alloc (TableType (lim, _) as ty) r =
@@ -36,7 +30,7 @@ let alloc (TableType (lim, _) as ty) r =
   {ty; content = create lim.min r}
 
 let size tab =
-  Lib.Array32.length tab.content
+  Map.num_elements tab.content
 
 let type_of tab =
   tab.ty
@@ -49,22 +43,17 @@ let grow tab delta r =
   if I32.gt_u old_size new_size then raise SizeOverflow else
   let lim' = {lim with min = new_size} in
   if not (valid_limits lim') then raise SizeLimit else
-  let after = create new_size r in
-  Array.blit tab.content 0 after 0 (Array.length tab.content);
+  Map.grow delta ~produce_value:(fun _ -> r) tab.content;
   tab.ty <- TableType (lim', t);
-  tab.content <- after
+  ()
 
 let load tab i =
-  try Lib.Array32.get tab.content i with Invalid_argument _ -> raise Bounds
+  try Map.get i tab.content with Lazy_map.OutOfBounds -> raise Bounds
 
 let store tab i r =
   let TableType (lim, t) = tab.ty in
   if type_of_ref r <> t then raise Type;
-  try Lib.Array32.set tab.content i r with Invalid_argument _ -> raise Bounds
+  try Map.set i r tab.content with Lazy_map.OutOfBounds -> raise Bounds
 
 let blit tab offset rs =
-  let data = Array.of_list rs in
-  try Lib.Array32.blit data 0l tab.content offset (Lib.Array32.length data)
-  with Invalid_argument _ -> raise Bounds
-
-*)
+  List.iteri (fun i r -> store tab Int32.(of_int i |> add offset) r) rs
