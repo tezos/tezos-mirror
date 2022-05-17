@@ -179,20 +179,11 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         source
         Signature.Public_key.pp
         key
-  | Delegation None ->
-      Format.fprintf
-        ppf
-        "Delegation:@,Contract: %a@,To: nobody"
-        Contract.pp
-        source
-  | Delegation (Some delegate) ->
-      Format.fprintf
-        ppf
-        "Delegation:@,Contract: %a@,To: %a"
-        Contract.pp
-        source
-        Signature.Public_key_hash.pp
-        delegate
+  | Delegation delegate_opt -> (
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
+      match delegate_opt with
+      | None -> Format.pp_print_string ppf "nobody"
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
   | Register_global_constant {value = lazy_value} ->
       let value =
         WithExceptions.Option.to_exn
@@ -204,20 +195,15 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         "Register Global:@,Value: %a"
         Michelson_v1_printer.print_expr
         value
-  | Set_deposits_limit None ->
+  | Set_deposits_limit limit_opt -> (
       Format.fprintf
         ppf
-        "Set deposits limit:@,Delegate: %a@,Unlimited deposits"
+        "Set deposits limit:@,Delegate: %a@,"
         Contract.pp
-        source
-  | Set_deposits_limit (Some limit) ->
-      Format.fprintf
-        ppf
-        "Set deposits limit:@,Delegate: %a@,Limit: %a"
-        Contract.pp
-        source
-        Tez.pp
-        limit
+        source ;
+      match limit_opt with
+      | None -> Format.pp_print_string ppf "Unlimited deposits"
+      | Some limit -> Format.fprintf ppf "Limit: %a" Tez.pp limit)
   | Tx_rollup_origination ->
       Format.fprintf ppf "Tx rollup origination:@,From: %a" Contract.pp source
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
