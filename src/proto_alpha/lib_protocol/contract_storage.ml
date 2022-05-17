@@ -403,12 +403,9 @@ let update_script_lazy_storage c = function
   | None -> return (c, Z.zero)
   | Some diffs -> Lazy_storage_diff.apply c diffs
 
-let create_base c contract ~balance =
-  Storage.Contract.Spendable_balance.init c contract balance
-
 let raw_originate c ~prepaid_bootstrap_storage
     (* Free space for bootstrap contracts *) contract ~script =
-  create_base c contract ~balance:Tez_repr.zero >>=? fun c ->
+  Storage.Contract.Spendable_balance.init c contract Tez_repr.zero >>=? fun c ->
   let {Script_repr.code; storage}, lazy_storage_diff = script in
   Storage.Contract.Code.init c contract code >>=? fun (c, code_size) ->
   Storage.Contract.Storage.init c contract storage >>=? fun (c, storage_size) ->
@@ -428,7 +425,7 @@ let create_implicit c manager ~balance =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Global_counter.get c >>=? fun counter ->
   Storage.Contract.Counter.init c contract counter >>=? fun c ->
-  create_base c contract ~balance >>=? fun c ->
+  Storage.Contract.Spendable_balance.init c contract balance >>=? fun c ->
   Contract_manager_storage.init c contract (Manager_repr.Hash manager)
 
 let delete c contract =
