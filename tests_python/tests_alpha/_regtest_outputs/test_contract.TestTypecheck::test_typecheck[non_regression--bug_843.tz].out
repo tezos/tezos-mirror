@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[non_regression/bug_843.tz]
 
 Well typed
-Gas remaining: 1039990.549 units remaining
+Gas remaining: 1039993.849 units remaining
 { parameter never ;
   storage (pair address (lambda unit unit)) ;
   code { CAR
