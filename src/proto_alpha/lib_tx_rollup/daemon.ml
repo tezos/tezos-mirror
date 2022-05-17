@@ -471,21 +471,21 @@ let notify_head state head reorg =
 let queue_gc_operations state =
   let open Lwt_result_syntax in
   let tx_rollup = state.State.rollup_info.rollup_id in
-  let inject source op =
-    let manager_operation = Manager op in
-    let hash = L1_operation.hash_manager_operation manager_operation in
-    Injector.add_pending_operation
-      {L1_operation.hash; source; manager_operation}
-  in
   let queue_finalize_commitment state =
     match state.State.signers.finalize_commitment with
     | None -> return_unit
-    | Some source -> inject source (Tx_rollup_finalize_commitment {tx_rollup})
+    | Some source ->
+        Injector.add_pending_operation
+          ~source
+          (Tx_rollup_finalize_commitment {tx_rollup})
   in
   let queue_remove_commitment state =
     match state.State.signers.remove_commitment with
     | None -> return_unit
-    | Some source -> inject source (Tx_rollup_remove_commitment {tx_rollup})
+    | Some source ->
+        Injector.add_pending_operation
+          ~source
+          (Tx_rollup_remove_commitment {tx_rollup})
   in
   let* () = queue_finalize_commitment state in
   queue_remove_commitment state
@@ -531,14 +531,14 @@ let trigger_injection state header =
     let* () =
       if delay <= 0. then return_unit
       else
-        let* () = Event.(emit Injector.wait) delay in
+        let* () = Event.(emit inject_wait) delay in
         Lwt_unix.sleep delay
     in
-    Injector.inject ~strategy:Injector.Delay_block ()
+    Injector.inject ~strategy:`Delay_block ()
   in
   ignore promise ;
   (* Queue request for injection of operation that must be injected each block *)
-  Injector.inject ~strategy:Injector.Each_block ()
+  Injector.inject ~strategy:`Each_block ()
 
 let dispatch_withdrawals_on_l1 state level =
   let open Lwt_result_syntax in
@@ -878,6 +878,7 @@ let run configuration cctxt =
   let* () = check_operator_deposit state configuration in
   let* () =
     Injector.init
+      state.cctxt
       state
       ~signers:
         (List.filter_map
@@ -885,15 +886,15 @@ let run configuration cctxt =
              | None, _, _ -> None
              | Some x, strategy, tags -> Some (x, strategy, tags))
            [
-             (signers.operator, Injector.Each_block, [`Commitment]);
+             (signers.operator, `Each_block, [Injector.Commitment]);
              (* Batches of L2 operations are submitted with a delay after each
                 block, to allow for more operations to arrive and be included in
                 the following block. *)
-             (signers.submit_batch, Delay_block, [`Submit_batch]);
-             (signers.finalize_commitment, Each_block, [`Finalize_commitment]);
-             (signers.remove_commitment, Each_block, [`Remove_commitment]);
-             (signers.rejection, Each_block, [`Rejection]);
-             (signers.dispatch_withdrawals, Each_block, [`Dispatch_withdrawals]);
+             (signers.submit_batch, `Delay_block, [Submit_batch]);
+             (signers.finalize_commitment, `Each_block, [Finalize_commitment]);
+             (signers.remove_commitment, `Each_block, [Remove_commitment]);
+             (signers.rejection, `Each_block, [Rejection]);
+             (signers.dispatch_withdrawals, `Each_block, [Dispatch_withdrawals]);
            ])
   in
   let* () =

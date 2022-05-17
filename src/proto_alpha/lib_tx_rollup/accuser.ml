@@ -240,7 +240,4 @@ let reject_bad_commitment ~source (state : State.t)
       let* rejection_operation =
         build_rejection state block ~reject_commitment:commitment ~position
       in
-      let manager_operation = Manager rejection_operation in
-      let hash = L1_operation.hash_manager_operation manager_operation in
-      Injector.add_pending_operation
-        {L1_operation.hash; source; manager_operation}
+      Injector.add_pending_operation ~source rejection_operation

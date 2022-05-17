@@ -23,22 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+type error += No_worker_for_source of Signature.Public_key_hash.t
 
-let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
-  let message_results = Inbox.proto_message_results inbox in
-  let messages =
-    List.map Tx_rollup_message_result_hash.hash_uncarbonated message_results
-  in
-  let inbox_merkle_root = Inbox.merkle_root inbox in
-  let predecessor =
-    Option.map (fun b -> b.L2block.header.commitment) predecessor
-  in
-  Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
-
-let commit_block ~operator tx_rollup block =
-  let commit_operation =
-    Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment}
-  in
-  Injector.add_pending_operation ~source:operator commit_operation
+let () =
+  register_error_kind
+    ~id:"rollups.injector.no_worker_for_source"
+    ~title:"No injecting queue for source"
+    ~description:
+      "An L1 operation could not be queued because its source has no worker."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "No worker for source %a"
+        Signature.Public_key_hash.pp
+        s)
+    `Permanent
+    Data_encoding.(obj1 (req "source" Signature.Public_key_hash.encoding))
+    (function No_worker_for_source s -> Some s | _ -> None)
+    (fun s -> No_worker_for_source s)

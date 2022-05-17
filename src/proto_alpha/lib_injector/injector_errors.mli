@@ -23,45 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
-open Protocol
-open Alpha_context
-open Common
-
-type tag =
-  [ `Commitment
-  | `Submit_batch
-  | `Finalize_commitment
-  | `Remove_commitment
-  | `Rejection
-  | `Dispatch_withdrawals ]
-
-module Tags : Set.S with type elt = tag
-
-type tags = Tags.t
-
-val tags_encoding : tags Data_encoding.t
-
-val pp_tags : Format.formatter -> tags -> unit
-
-module Request : sig
-  type 'a t =
-    | Add_pending : L1_operation.t -> unit t
-    | New_tezos_head :
-        Alpha_block_services.block_info * Alpha_block_services.block_info reorg
-        -> unit t
-    | Inject : unit t
-
-  type view = View : _ t -> view
-
-  include Worker_intf.REQUEST with type 'a t := 'a t and type view := view
-end
-
-module Name : Worker_intf.NAME with type t = public_key_hash
-
-module Dummy_event : Worker_intf.EVENT with type t = unit
-
-module Logger :
-  Worker_intf.LOGGER
-    with module Event = Dummy_event
-     and type Request.view = Request.view
+(** Error when the injector has no worker for the source which must inject an
+    operation. *)
+type error += No_worker_for_source of Signature.Public_key_hash.t

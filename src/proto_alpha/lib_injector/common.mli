@@ -23,22 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Protocol_client_context
 
-let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
-  let message_results = Inbox.proto_message_results inbox in
-  let messages =
-    List.map Tx_rollup_message_result_hash.hash_uncarbonated message_results
-  in
-  let inbox_merkle_root = Inbox.merkle_root inbox in
-  let predecessor =
-    Option.map (fun b -> b.L2block.header.commitment) predecessor
-  in
-  Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
+(** The type of signers for operations injected by the injector *)
+type signer = {
+  alias : string;
+  pkh : Signature.public_key_hash;
+  pk : Signature.public_key;
+  sk : Client_keys.sk_uri;
+}
 
-let commit_block ~operator tx_rollup block =
-  let commit_operation =
-    Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment}
-  in
-  Injector.add_pending_operation ~source:operator commit_operation
+(** Type of chain reorganizations. *)
+type 'block reorg = {
+  old_chain : 'block list;
+      (** The blocks that were in the old chain and which are not in the new one. *)
+  new_chain : 'block list;
+      (** The blocks that are now in the new chain. The length of [old_chain] and
+      [new_chain] may be different. *)
+}
+
+(** Retrieve a signer from the client wallet. *)
+val get_signer :
+  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
+
+val no_reorg : 'a reorg
+
+val reorg_encoding : 'a Data_encoding.t -> 'a reorg Data_encoding.t
+
+type block_info := Alpha_block_services.block_info
+
+(** [fetch_tezos_block ~find_in_cache cctxt hash] returns a block info given a
+    block hash. Looks for the block using [find_in_cache] first, and fetches
+    it from the L1 node otherwise. *)
+val fetch_tezos_block :
+  find_in_cache:
+    (Block_hash.t ->
+    (Block_hash.t -> block_info tzresult Lwt.t) ->
+    block_info tzresult Lwt.t) ->
+  #full ->
+  Block_hash.t ->
+  block_info tzresult Lwt.t
+
+(** [tezos_reorg fetch ~old_head_hash ~new_head_hash] computes the
+    reorganization of L1 blocks from the chain whose head is [old_head_hash] and
+    the chain whose head [new_head_hash]. *)
+val tezos_reorg :
+  (Block_hash.t -> block_info tzresult Lwt.t) ->
+  old_head_hash:Block_hash.t ->
+  new_head_hash:Block_hash.t ->
+  block_info reorg tzresult Lwt.t

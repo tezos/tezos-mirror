@@ -166,35 +166,31 @@ let () = Base58.check_encoded_prefix Hash.b58check_encoding "mop" 53
 
 type hash = Hash.t
 
-type t = {
-  hash : hash;
-  source : public_key_hash;
-  manager_operation : packed_manager_operation;
-}
+type t = {hash : hash; manager_operation : packed_manager_operation}
 
 let hash_manager_operation op =
   Hash.hash_bytes
     [Data_encoding.Binary.to_bytes_exn Manager_operation.encoding op]
 
-let hash op =
-  (* Hashing only manager operation *)
-  hash_manager_operation op.manager_operation
+let make manager_operation =
+  let manager_operation = Manager manager_operation in
+  let hash = hash_manager_operation manager_operation in
+  {hash; manager_operation}
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {hash; source; manager_operation} -> (hash, source, manager_operation))
-    (fun (hash, source, manager_operation) -> {hash; source; manager_operation})
-  @@ obj3
+    (fun {hash; manager_operation} -> (hash, manager_operation))
+    (fun (hash, manager_operation) -> {hash; manager_operation})
+  @@ obj2
        (req "hash" Hash.encoding)
-       (req "source" Signature.Public_key_hash.encoding)
        (req "manager_operation" Manager_operation.encoding)
 
-let pp ppf op =
+let pp ppf {hash; manager_operation} =
   Format.fprintf
     ppf
     "%a (%a)"
     Manager_operation.pp
-    op.manager_operation
+    manager_operation
     Hash.pp
-    op.hash
+    hash

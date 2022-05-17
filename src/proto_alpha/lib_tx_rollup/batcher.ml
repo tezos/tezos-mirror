@@ -48,29 +48,19 @@ let encode_batch batch =
 
 let inject_batches state batches =
   let open Lwt_result_syntax in
-  let*? operations =
-    List.map_e
-      (fun batch ->
-        let open Result_syntax in
-        let+ batch_content = encode_batch batch in
-        let manager_operation =
-          Manager
-            (Tx_rollup_submit_batch
-               {
-                 tx_rollup = state.rollup;
-                 content = batch_content;
-                 burn_limit = state.batch_burn_limit;
-               })
-        in
-        {
-          L1_operation.hash =
-            L1_operation.hash_manager_operation manager_operation;
-          source = state.signer;
-          manager_operation;
-        })
-      batches
-  in
-  Injector.add_pending_operations operations
+  List.iter_es
+    (fun batch ->
+      let*? batch_content = encode_batch batch in
+      let batch_operation =
+        Tx_rollup_submit_batch
+          {
+            tx_rollup = state.rollup;
+            content = batch_content;
+            burn_limit = state.batch_burn_limit;
+          }
+      in
+      Injector.add_pending_operation ~source:state.signer batch_operation)
+    batches
 
 (** [is_batch_valid] returns whether the batch is valid or not based on two
     criteria:

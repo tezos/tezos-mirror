@@ -10,31 +10,18 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" & < "3.0" }
   "ppx_inline_test"
-  "index" { >= "1.6.0" & < "1.7.0" }
   "tezos-base"
   "tezos-crypto"
-  "tezos-protocol-alpha"
-  "tezos-client-alpha"
-  "tezos-client-commands"
-  "tezos-context"
-  "tezos-baking-alpha-commands"
-  "tezos-stdlib-unix"
-  "tezos-rpc"
-  "tezos-rpc-http"
-  "tezos-rpc-http-client-unix"
-  "tezos-rpc-http-server"
+  "tezos-protocol-013-PtJakart"
   "tezos-micheline"
+  "tezos-client-013-PtJakart"
   "tezos-client-base"
-  "tezos-client-base-unix"
-  "tezos-shell"
-  "tezos-store"
   "tezos-workers"
-  "tezos-protocol-plugin-alpha"
-  "tezos-injector-alpha"
+  "tezos-shell"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol specific library for `tezos-tx-rollup`"
+synopsis: "Tezos/Protocol: protocol specific library building injectors"

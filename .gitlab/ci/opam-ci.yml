@@ -481,6 +481,16 @@ opam:tezos-hacl:
   variables:
     package: tezos-hacl
 
+opam:tezos-injector-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-injector-013-PtJakart
+
+opam:tezos-injector-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-injector-alpha
+
 opam:tezos-lwt-result-stdlib:
   extends: .opam_template
   variables:

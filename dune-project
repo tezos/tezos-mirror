@@ -86,6 +86,8 @@
 (package (name tezos-event-logging))
 (package (name tezos-event-logging-test-helpers))
 (package (name tezos-hacl))
+(package (name tezos-injector-013-PtJakart))
+(package (name tezos-injector-alpha))
 (package (name tezos-lwt-result-stdlib))
 (package (name tezos-micheline))
 (package (name tezos-micheline-rewriting))

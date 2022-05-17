@@ -23,22 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol_client_context
 open Protocol
 open Alpha_context
+open Common
 
-let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
-  let message_results = Inbox.proto_message_results inbox in
-  let messages =
-    List.map Tx_rollup_message_result_hash.hash_uncarbonated message_results
-  in
-  let inbox_merkle_root = Inbox.merkle_root inbox in
-  let predecessor =
-    Option.map (fun b -> b.L2block.header.commitment) predecessor
-  in
-  Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
+module Request : sig
+  type 'a t =
+    | Add_pending : L1_operation.t -> unit t
+    | New_tezos_head :
+        Alpha_block_services.block_info * Alpha_block_services.block_info reorg
+        -> unit t
+    | Inject : unit t
 
-let commit_block ~operator tx_rollup block =
-  let commit_operation =
-    Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment}
-  in
-  Injector.add_pending_operation ~source:operator commit_operation
+  type view = View : _ t -> view
+
+  include Worker_intf.REQUEST with type 'a t := 'a t and type view := view
+end
+
+module Name : Worker_intf.NAME with type t = public_key_hash
+
+module Dummy_event : Worker_intf.EVENT with type t = unit
+
+module Logger :
+  Worker_intf.LOGGER
+    with module Event = Dummy_event
+     and type Request.view = Request.view

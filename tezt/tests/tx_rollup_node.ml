@@ -1859,6 +1859,7 @@ let test_reject_bad_commitment =
           client
       in
       let* () = Client.bake_for_and_wait client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       let* {
              proof;
              message;
@@ -1960,11 +1961,11 @@ let test_committer =
       Log.info "Sending some L2 transactions" ;
       let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:1000L () in
       let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:2L () in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* () = check_commitments_inclusion ~tx_node [("0", true)] in
       let* () =
-        check_injection tx_node "commitment" @@ Client.bake_for client
+        check_injection tx_node "commitment" @@ Client.bake_for_and_wait client
       in
       let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
@@ -1975,7 +1976,7 @@ let test_committer =
       Log.info "Sending some more L2 transactions" ;
       let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:3L () in
       let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:4L () in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 1 ;
@@ -1986,7 +1987,7 @@ let test_committer =
       let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:5L () in
       let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:6L () in
       let* () =
-        check_injection tx_node "commitment" @@ Client.bake_for client
+        check_injection tx_node "commitment" @@ Client.bake_for_and_wait client
       in
       let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
@@ -1997,7 +1998,7 @@ let test_committer =
           [("0", true); ("1", true); ("2", false)]
       in
       let* () =
-        check_injection tx_node "commitment" @@ Client.bake_for client
+        check_injection tx_node "commitment" @@ Client.bake_for_and_wait client
       in
       let* _tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
@@ -2101,8 +2102,8 @@ let test_tickets_context =
           ~qty:5L
       in
       Log.info "Waiting for new L2 block" ;
-      let* () = Client.bake_for client in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
+      let* () = Client.bake_for_and_wait client in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       check_inbox_success inbox ;

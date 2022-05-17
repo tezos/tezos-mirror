@@ -23,22 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** Make a set of tags given a module for tags. *)
+module Make (Tag : Injector_sigs.TAG) : sig
+  include Set.S with type elt = Tag.t
 
-let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
-  let message_results = Inbox.proto_message_results inbox in
-  let messages =
-    List.map Tx_rollup_message_result_hash.hash_uncarbonated message_results
-  in
-  let inbox_merkle_root = Inbox.merkle_root inbox in
-  let predecessor =
-    Option.map (fun b -> b.L2block.header.commitment) predecessor
-  in
-  Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
+  (** Pretty print a set of tags *)
+  val pp : Format.formatter -> t -> unit
 
-let commit_block ~operator tx_rollup block =
-  let commit_operation =
-    Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment}
-  in
-  Injector.add_pending_operation ~source:operator commit_operation
+  (** Encoding for sets of tags  *)
+  val encoding : t Data_encoding.t
+end

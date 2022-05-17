@@ -23,32 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
-}
+open Injector_sigs
 
-let get_signer cctxt pkh =
-  let open Lwt_result_syntax in
-  let* alias, pk, sk = Client_keys.get_key cctxt pkh in
-  return {alias; pkh; pk; sk}
-
-type 'block reorg = {
-  ancestor : 'block option;
-  old_chain : 'block list;
-  new_chain : 'block list;
-}
-
-let no_reorg = {ancestor = None; old_chain = []; new_chain = []}
-
-let reorg_encoding block_encoding =
-  let open Data_encoding in
-  conv
-    (fun {ancestor; old_chain; new_chain} -> (ancestor, old_chain, new_chain))
-    (fun (ancestor, old_chain, new_chain) -> {ancestor; old_chain; new_chain})
-  @@ obj3
-       (opt "ancestor" block_encoding)
-       (req "old_chain" (list block_encoding))
-       (req "new_chain" (list block_encoding))
+module Make (P : PARAMETERS) :
+  S with type rollup_node_state := P.rollup_node_state and type tag := P.Tag.t

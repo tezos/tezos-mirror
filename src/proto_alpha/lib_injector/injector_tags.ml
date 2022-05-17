@@ -23,30 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of signers for operations injected by the Tx rollup node  *)
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
-}
+module Make (Tag : Injector_sigs.TAG) = struct
+  include Set.Make (Tag)
 
-(** Type of chain reorganizations. *)
-type 'block reorg = {
-  ancestor : 'block option;
-      (** The common ancestor of the two chains. Can be [None] if the chains have no
-          common ancestor, in which case all the blocks are changed *)
-  old_chain : 'block list;
-      (** The blocks that were in the old chain and which are not in the new one. *)
-  new_chain : 'block list;
-      (** The blocks that are now in the new chain. The length of [old_chain] and
-      [new_chain] may be different. *)
-}
+  let pp ppf tags =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+      Tag.pp
+      ppf
+      (elements tags)
 
-(** Retrieve a signer from the client wallet. *)
-val get_signer :
-  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
-
-val no_reorg : 'a reorg
-
-val reorg_encoding : 'a Data_encoding.t -> 'a reorg Data_encoding.t
+  let encoding =
+    let open Data_encoding in
+    conv elements of_list (list Tag.encoding)
+end
