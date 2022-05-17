@@ -1115,7 +1115,8 @@ module Make
        and type Request.view = Request.view
        and type Types.state = Types.state
        and type Types.parameters = Types.parameters =
-    Worker.Make (Name) (Dummy_event) (Prevalidator_worker_state.Request) (Types)
+    Worker.MakeSingle (Name) (Dummy_event) (Prevalidator_worker_state.Request)
+      (Types)
       (Logger)
 
   open Types

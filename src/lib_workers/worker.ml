@@ -221,30 +221,23 @@ module type T = sig
   val find_opt : 'a table -> Name.t -> 'a t option
 end
 
-module Make
+module Make_internal
     (Name : Worker_intf.NAME)
     (Event : Worker_intf.EVENT)
     (Request : Worker_intf.REQUEST)
     (Types : Worker_intf.TYPES)
     (Logger : Worker_intf.LOGGER
                 with module Event = Event
-                 and type Request.view = Request.view) =
+                 and type Request.view = Request.view)
+    (Worker_events : Worker_events.S
+                       with type view = Request.view
+                        and type critical_error = tztrace) =
 struct
   module Name = Name
   module Event = Event
   module Request = Request
   module Types = Types
   module Logger = Logger
-
-  module Worker_events =
-    Worker_events.Make (Name) (Request)
-      (struct
-        type t = tztrace
-
-        let encoding = Error_monad.trace_encoding
-
-        let pp = Error_monad.pp_print_trace
-      end)
 
   module Nametbl = Hashtbl.MakeSeeded (struct
     type t = Name.t
@@ -826,4 +819,40 @@ struct
   let () =
     Internal_event.register_section
       (Internal_event.Section.make_sanitized Name.base)
+end
+
+module MakeGroup
+    (Name : Worker_intf.NAME)
+    (Event : Worker_intf.EVENT)
+    (Request : Worker_intf.REQUEST)
+    (Logger : Worker_intf.LOGGER
+                with module Event = Event
+                 and type Request.view = Request.view) =
+struct
+  module Events =
+    Worker_events.Make (Name) (Request)
+      (struct
+        type t = tztrace
+
+        let encoding = Error_monad.trace_encoding
+
+        let pp = Error_monad.pp_print_trace
+      end)
+
+  module MakeWorker (Types : Worker_intf.TYPES) = struct
+    include Make_internal (Name) (Event) (Request) (Types) (Logger) (Events)
+  end
+end
+
+module MakeSingle
+    (Name : Worker_intf.NAME)
+    (Event : Worker_intf.EVENT)
+    (Request : Worker_intf.REQUEST)
+    (Types : Worker_intf.TYPES)
+    (Logger : Worker_intf.LOGGER
+                with module Event = Event
+                 and type Request.view = Request.view) =
+struct
+  module WG = MakeGroup (Name) (Event) (Request) (Logger)
+  include WG.MakeWorker (Types)
 end

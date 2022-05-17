@@ -111,4 +111,5 @@ module Logger =
       let worker_name = "mocked_worker"
     end)
 
-module Worker = Worker.Make (Name) (Dummy_event) (Request) (Types) (Logger)
+module Worker =
+  Worker.MakeSingle (Name) (Dummy_event) (Request) (Types) (Logger)

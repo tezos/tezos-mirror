@@ -109,7 +109,7 @@ module Logger =
       let worker_name = "node_chain_validator"
     end)
 
-module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
+module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types) (Logger)
 open Types
 
 type t = Worker.infinite Worker.queue Worker.t

@@ -846,7 +846,8 @@ module Make (Rollup : PARAMETERS) = struct
   end
 
   (* The worker for the injector. *)
-  module Worker = Worker.Make (Name) (Dummy_event) (Request) (Types) (Logger)
+  module Worker =
+    Worker.MakeSingle (Name) (Dummy_event) (Request) (Types) (Logger)
 
   (* The queue for the requests to the injector worker is infinite. *)
   type worker = Worker.infinite Worker.queue Worker.t
