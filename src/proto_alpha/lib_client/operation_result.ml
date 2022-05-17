@@ -1155,7 +1155,7 @@ let pp_operation_result ppf
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
 
-let pp_internal_operation_result ppf (Apply_results.Internal_contents op) =
+let pp_internal_operation ppf (Apply_results.Internal_contents op) =
   let operation = manager_operation_of_internal_operation op.operation in
   pp_manager_operation_content
     op.source

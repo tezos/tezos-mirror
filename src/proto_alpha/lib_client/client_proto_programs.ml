@@ -86,7 +86,7 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
          %a@]@]@."
         print_expr
         storage
-        (Format.pp_print_list Operation_result.pp_internal_operation_result)
+        (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
         (fun ppf -> function
           | None -> ()
@@ -109,7 +109,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
          %a@]@]@."
         print_expr
         storage
-        (Format.pp_print_list Operation_result.pp_internal_operation_result)
+        (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
         (fun ppf -> function
           | None -> ()
