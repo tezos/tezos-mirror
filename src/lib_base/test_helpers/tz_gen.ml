@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com> *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lib_test.Qcheck_helpers
-open QCheck
+open Lib_test.Qcheck2_helpers
+open QCheck2.Gen
 
-let ipv4 =
-  map ~rev:Ipaddr.V4.to_int32 Ipaddr.V4.of_int32 int32
-  |> set_print Ipaddr.V4.to_string
+let ipv4 = map Ipaddr.V4.of_int32 int32
 
-let ipv6 =
-  map ~rev:Ipaddr.V6.to_int64 Ipaddr.V6.of_int64 (pair int64 int64)
-  |> set_print Ipaddr.V6.to_string
+let ipv6 = map Ipaddr.V6.of_int64 (pair int64 int64)
 
-let ipv4_as_v6 =
-  let open QCheck in
-  map Ipaddr.v6_of_v4 ipv4 |> set_print Ipaddr.V6.to_string
+let ipv4_as_v6 = map Ipaddr.v6_of_v4 ipv4
 
 let addr_port_id =
-  let gen =
-    let open Gen in
-    let open P2p_point.Id in
-    let* addr = map Ipaddr.V4.to_string @@ gen ipv4
-    and* port = opt @@ gen Lib_test.Qcheck_helpers.uint16 in
-    pure {addr; port; peer_id = None}
-  in
-  make gen ~print:P2p_point.Id.addr_port_id_to_string
+  let open P2p_point.Id in
+  let* addr = map Ipaddr.V4.to_string ipv4
+  and* port = opt Lib_test.Qcheck2_helpers.uint16 in
+  pure {addr; port; peer_id = None}
 
 let port = uint16
 
-let port_opt = QCheck.option port
+let port_opt = opt port
 
 (* could not craft a [p2p_identity QCheck.gen], we use instead a
    constant [unit -> p2p_identity] which will be applied at each
    testing points. *)
 
-let peer_id =
-  QCheck.option QCheck.(map P2p_identity.generate_with_pow_target_0 unit)
+let peer_id = opt (map P2p_identity.generate_with_pow_target_0 unit)
 
-let ip = QCheck.choose [ipv4_as_v6; ipv6]
+let ip = oneof [ipv4_as_v6; ipv6]
 
-let ipv4_as_v6_or_v6 = QCheck.choose [ipv4_as_v6; ipv6]
+let ipv4_as_v6_or_v6 = oneof [ipv4_as_v6; ipv6]
 
-let ipv4t = QCheck.triple ipv4 port_opt peer_id
+let ipv4t = triple ipv4 port_opt peer_id
 
-let ipv6t = QCheck.triple ipv6 port_opt peer_id
+let ipv6t = triple ipv6 port_opt peer_id
 
-let p2p_point_id_t = QCheck.pair ip port
+let p2p_point_id_t = pair ip port

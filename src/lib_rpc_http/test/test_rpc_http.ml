@@ -33,67 +33,64 @@
                   RPC HTTP server.
 *)
 
-module Arbitrary = struct
-  open QCheck
+module Generator = struct
+  open QCheck2
   open RPC_server.Acl
-  open Tz_arbitrary
+  open Tz_gen
 
-  let meth_matcher : meth_matcher arbitrary =
-    oneofl
+  let meth_matcher : meth_matcher Gen.t =
+    Gen.oneofl
       [Any; Exact `GET; Exact `PUT; Exact `POST; Exact `PATCH; Exact `DELETE]
 
-  let chunk_matcher : chunk_matcher arbitrary =
+  let chunk_matcher : chunk_matcher Gen.t =
+    let open Gen in
     let of_string s = Literal s in
     let gen =
-      let open Gen in
       oneof [char_range '0' '9'; char_range 'A' 'Z'; char_range 'a' 'z']
     in
-    let chunk = make Gen.(string_size ~gen (1 -- 32)) in
-    choose [always Wildcard; map of_string chunk]
+    let chunk = string_size ~gen (1 -- 32) in
+    oneof [return Wildcard; map of_string chunk]
 
-  let path_matcher : path_matcher arbitrary =
-    let cm = list_of_size Gen.(1 -- 5) chunk_matcher in
-    choose
+  let path_matcher : path_matcher Gen.t =
+    let open Gen in
+    let cm = list_size (1 -- 5) chunk_matcher in
+    oneof
       [
         map (fun l -> FollowedByAnySuffix l) cm;
         map (fun l : path_matcher -> Exact l) cm;
       ]
 
-  let matcher : matcher arbitrary =
-    pair meth_matcher path_matcher
-    |> map (fun (meth, path) -> {meth; path})
-    |> set_print matcher_to_string
+  let matcher : matcher Gen.t =
+    let open Gen in
+    pair meth_matcher path_matcher |> map (fun (meth, path) -> {meth; path})
 
   let pp_matchers =
     let open Format in
     pp_print_list (fun ppf m -> Format.fprintf ppf "%s" (matcher_to_string m))
 
-  let acl : t arbitrary =
-    let m = list_of_size Gen.(1 -- 10) matcher in
-    choose
+  let acl : t Gen.t =
+    let open Gen in
+    let m = list_size (1 -- 10) matcher in
+    oneof
       [
         map (fun m -> Deny_all {except = m}) m;
         map (fun m -> Allow_all {except = m}) m;
       ]
-    |> set_print (function
-           | Allow_all {except} ->
-               Format.asprintf "Blacklist: [%a]" pp_matchers except
-           | Deny_all {except} ->
-               Format.asprintf "Whitelist: [%a]" pp_matchers except)
 
-  let policy : policy arbitrary =
+  let acl_to_string = function
+    | Allow_all {except} -> Format.asprintf "Blacklist: [%a]" pp_matchers except
+    | Deny_all {except} -> Format.asprintf "Whitelist: [%a]" pp_matchers except
+
+  let policy : policy Gen.t =
     let open Gen in
     let rec add_to_policy policy n =
       if n > 0 then
-        let* acl = gen acl and* endpoint = gen addr_port_id in
+        let* acl = acl and* endpoint = addr_port_id in
         add_to_policy (put_policy (endpoint, acl) policy) (n - 1)
       else pure policy
     in
-    let gen_policy =
-      let* n = 1 -- 5 in
-      add_to_policy empty_policy n
-    in
-    make gen_policy ~print:policy_to_string
+    let* n = 1 -- 5 in
+    add_to_policy empty_policy n
 
   (* We test the property that if [searched_for] was found in some
      [policy], then it also must be found in [put_policy added_one
@@ -107,24 +104,28 @@ module Arbitrary = struct
     added_entry : P2p_point.Id.addr_port_id * t;
   }
 
-  let find_policy_setup : find_policy_setup arbitrary =
-    let open QCheck in
+  let find_policy_setup_to_string {policy; searched_for; added_entry} =
+    let endpoint, acl = added_entry in
+    Format.asprintf
+      "{\n%s\n%s\n(%s, %s)\n}"
+      (RPC_server.Acl.policy_to_string policy)
+      (P2p_point.Id.addr_port_id_to_string searched_for)
+      (P2p_point.Id.addr_port_id_to_string endpoint)
+      (acl_to_string acl)
+
+  let find_policy_setup : find_policy_setup Gen.t =
+    let open Gen in
     let generate_entry =
-      let open Gen in
-      let* endpoint = gen addr_port_id and* acl = gen acl in
+      let* endpoint = addr_port_id and* acl = acl in
       pure (endpoint, acl)
     in
-    let generate =
-      let open Gen in
-      let* p = gen policy
-      and* searched_for, searched_acl = generate_entry
-      and* added_entry = generate_entry in
-      let* policy =
-        oneofl [p; RPC_server.Acl.put_policy (searched_for, searched_acl) p]
-      in
-      pure {policy; searched_for; added_entry}
+    let* p = policy
+    and* searched_for, searched_acl = generate_entry
+    and* added_entry = generate_entry in
+    let* policy =
+      oneofl [p; RPC_server.Acl.put_policy (searched_for, searched_acl) p]
     in
-    make generate
+    pure {policy; searched_for; added_entry}
 end
 
 let resolve_domain_name =
@@ -202,10 +203,11 @@ let pp_policy ppf policy =
   Format.fprintf ppf "%s" (RPC_server.Acl.policy_to_string policy)
 
 let test_codec_identity =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:"Encoding and decoding an ACL is an identity function."
-    Arbitrary.policy
+    ~print:RPC_server.Acl.policy_to_string
+    Generator.policy
     (fun policy ->
       let json =
         Data_encoding.Json.construct RPC_server.Acl.policy_encoding policy
@@ -225,13 +227,14 @@ let test_codec_identity =
    returns [true] if the comparison is satisfactory or [false]
    otherwise. *)
 let check_find_policy =
-  let open QCheck in
+  let open QCheck2 in
   let assert_results_satisfactory before_put after_put =
     match (before_put, after_put) with Some _, None -> false | _, _ -> true
   in
   Test.make
     ~name:"put_policy preserves existing entries."
-    Arbitrary.find_policy_setup
+    ~print:Generator.find_policy_setup_to_string
+    Generator.find_policy_setup
     (fun {policy; searched_for = {addr; port; _}; added_entry} ->
       let open RPC_server.Acl in
       let before = find_policy policy (addr, port) in
@@ -284,10 +287,11 @@ let test_finding_policy =
         ("localhost", Some 8732))
 
 let ensure_default_policy_parses =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:"default policy parses and is of correct type"
-    Tz_arbitrary.ipv6
+    ~print:Ipaddr.V6.to_string
+    Tz_gen.ipv6
     (fun ip_addr ->
       let expected =
         let open Ipaddr.V6 in
@@ -390,7 +394,7 @@ let test_media_type_pp_parse =
         inputs)
 
 let () =
-  let open Qcheck_helpers in
+  let open Qcheck2_helpers in
   Alcotest.run
     "tezos-rpc-http"
     [

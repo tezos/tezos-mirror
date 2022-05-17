@@ -33,7 +33,7 @@
 open Lib_test.Qcheck2_helpers
 
 (* Note, this is a duplicate of some functions from
-   Tezos_base_test_helpers.Tz_arbitrary. Unfortunately it's impossible to
+   Tezos_base_test_helpers.Tz_gen. Unfortunately it's impossible to
    reuse them, because that would introduce a cyclic dependency between
    tezos-base-test-helpers and tezos-base packages, which opam would not
    allow. *)
