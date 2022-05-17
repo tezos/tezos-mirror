@@ -29,7 +29,8 @@ open Apply_results
 
 let tez_sym = "\xEA\x9C\xA9"
 
-let pp_internal_operation ppf (Apply_results.Internal_contents op) =
+let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
+    pp_result res =
   let {operation; source; _} = op in
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
   Format.fprintf ppf "@[<v 0>@[<v 2>Internal " ;
@@ -100,11 +101,14 @@ let pp_internal_operation ppf (Apply_results.Internal_contents op) =
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Signature.Public_key_hash.pp ppf delegate)) ;
 
-  Format.fprintf ppf "@]@]"
+  Format.fprintf ppf "%a@]@]" pp_result res
+
+let pp_internal_operation ppf op =
+  pp_internal_operation_result ppf op (fun (_ : Format.formatter) () -> ()) ()
 
 let pp_manager_operation_content (type kind) source internal pp_result ppf
     ((operation, result) : kind manager_operation * _) =
-  (* For now, try to keep formatting in sync with [pp_internal_operation]. *)
+  (* For now, try to keep formatting in sync with [pp_internal_operation_result]. *)
   Format.fprintf ppf "@[<v 0>" ;
   (match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
