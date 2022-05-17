@@ -106,9 +106,10 @@ let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
 let pp_internal_operation ppf op =
   pp_internal_operation_result ppf op (fun (_ : Format.formatter) () -> ()) ()
 
-let pp_manager_operation_content (type kind) source internal pp_result ppf
+let pp_manager_operation_content (type kind) source pp_result ppf
     ((operation, result) : kind manager_operation * _) =
   (* For now, try to keep formatting in sync with [pp_internal_operation_result]. *)
+  let internal = false in
   Format.fprintf ppf "@[<v 0>" ;
   (match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
@@ -1053,7 +1054,7 @@ let pp_manager_operation_contents_and_result ppf
   Format.fprintf
     ppf
     "@,%a"
-    (pp_manager_operation_content (Contract.Implicit source) false pp_result)
+    (pp_manager_operation_content (Contract.Implicit source) pp_result)
     (operation, operation_result) ;
   (match internal_operation_results with
   | [] -> ()
