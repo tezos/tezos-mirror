@@ -54,6 +54,17 @@ module Simple = struct
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
+
+  let processing_heads_iteration =
+    declare_2
+      ~section
+      ~name:"sc_rollup_daemon_processing_heads"
+      ~msg:
+        "A new iteration of process_heads has been triggered: processing heads \
+         from level {from} to level {to}"
+      ~level:Notice
+      ("from", Data_encoding.int32)
+      ("to", Data_encoding.int32)
 end
 
 let head_processing hash level finalized seen_before =
@@ -61,3 +72,20 @@ let head_processing hash level finalized seen_before =
 
 let not_finalized_head hash level =
   Simple.(emit not_finalized_head (hash, level))
+
+let processing_heads_iteration old_heads new_heads =
+  let maybe_level = Option.map (fun (Layer1.Head {level; _}) -> level) in
+  let from_level =
+    match maybe_level @@ List.hd old_heads with
+    | None -> maybe_level @@ List.hd new_heads
+    | Some level -> Some level
+  in
+  let to_level =
+    match maybe_level @@ List.last_opt new_heads with
+    | None -> maybe_level @@ List.hd old_heads
+    | Some level -> Some level
+  in
+  match (from_level, to_level) with
+  | Some from_level, Some to_level ->
+      Simple.(emit processing_heads_iteration (from_level, to_level))
+  | _ -> Lwt.return_unit

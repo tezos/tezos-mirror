@@ -1614,6 +1614,21 @@ module Sc_rollup = struct
       spawn_send_message ?hooks ?wait ?burn_cap ~msg ~src ~dst client
     in
     Process.check process
+
+  let spawn_cement_commitment ?hooks ?(wait = "none") ?burn_cap ~hash ~src ~dst
+      client =
+    spawn_command
+      ?hooks
+      client
+      (["--wait"; wait]
+      @ ["cement"; "commitment"; hash; "from"; src; "for"; "sc"; "rollup"; dst]
+      @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+
+  let cement_commitment ?hooks ?wait ?burn_cap ~hash ~src ~dst client =
+    let process =
+      spawn_cement_commitment ?hooks ?wait ?burn_cap ~hash ~src ~dst client
+    in
+    Process.check process
 end
 
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =

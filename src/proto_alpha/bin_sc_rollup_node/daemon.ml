@@ -72,9 +72,9 @@ module Make (PVM : Pvm.S) = struct
     let open Lwt_result_syntax in
     let {finalized; seen_before; head} = head_state in
     let* () =
+      let*! () = emit_head_processing_event head_state in
       if seen_before then return_unit
       else
-        let*! () = emit_head_processing_event head_state in
         (* Avoid processing inbox again if it has been processed before for this head *)
         let* () = Inbox.process_head node_ctxt store head in
         (* Avoid storing and publishing commitments if the head is not final *)
@@ -107,9 +107,22 @@ module Make (PVM : Pvm.S) = struct
   let on_layer_1_chain_event node_ctxt store chain_event old_heads =
     let open Lwt_result_syntax in
     let open Layer1 in
+    let* () =
+      (* Get information about the last cemented commitment to determine the
+         commitment (if any) to publish next. We do this only once per
+         chain event to avoid spamming the layer1 node. *)
+      Components.Commitment.get_last_cemented_commitment_hash_with_level
+        node_ctxt
+        store
+    in
     let* non_final_heads =
       match chain_event with
       | SameBranch {new_head; intermediate_heads} ->
+          let*! () =
+            Daemon_event.processing_heads_iteration
+              old_heads
+              (intermediate_heads @ [new_head])
+          in
           let head_states =
             categorise_heads
               node_ctxt

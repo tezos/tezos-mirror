@@ -45,9 +45,11 @@ module type Mutable_level_store =
   Store.Mutable_value with type value = Raw_level.t
 
 (** [last_commitment (module Last_level_module: Mutable_level_store) store]
-      returns the last commitment (if any) stored according to the value of
-      level indicated by [module Last_level_module]. Two possible implementations
-      for the latter are [Store.Last_published_commitment_level] and
+      returns the last commitment stored according to the value of
+      level indicated by [module Last_level_module]. If no commitment has been 
+      stored for the level indicated by [module Last_level_module], then None 
+      is returned. Two possible implementations for [module Last_level_module] 
+      are [Store.Last_published_commitment_level] and 
       [Store.Last_stored_commitment_level].
   *)
 
@@ -67,11 +69,30 @@ module type S = sig
   val process_head :
     Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
 
-  (** [publish_commitment node_ctxt store] publishes the earliest
-      commitment stored in [store] that has not been published yet.
-      It uses [node_ctxt.cctxt] to make the RPC call to the Layer1 node.
-  *)
+  (** [get_last_cemented_commitment_hash_with_level node_ctxt store] 
+      fetches and stores information about the last cemeneted commitment 
+      in the layer1 chain.
+    *)
+  val get_last_cemented_commitment_hash_with_level :
+    Node_context.t -> Store.t -> unit tzresult Lwt.t
 
+  (** [publish_commitment node_ctxt store] publishes the earliest commitment
+      stored in [store] that has not been published yet, unless its inbox level
+      is below or equal to the inbox level of the last cemented commitment in
+      the layer1 chain. In this case, the rollup node checks whether it has
+      computed a commitment whose inbox level is
+      [sc_rollup_commitment_frequency] levels after the inbox level of the last
+      cemented commitment: 
+      {ul
+      {li if the commitment is found and its predecessor hash coincides with
+       the hash of the LCC, the rollup node will try to publish that commitment
+      instead; }
+      {li if the commitment is found but its predecessor hash differs from the
+        hash of the LCC, the rollup node will stop its execution;}
+      {li if no commitment is found, no action is taken by the rollup node;
+        in particular, no commitment is published.}
+    }
+  *)
   val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
 
   (** [start ()] only emits the event that the commitment manager

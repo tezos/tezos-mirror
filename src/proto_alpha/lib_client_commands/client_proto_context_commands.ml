@@ -111,6 +111,15 @@ let messages_param =
   | ["file"; path] -> from_path path
   | _ -> if Sys.file_exists p then from_path p else from_text p
 
+let commitment_hash_param =
+  Clic.parameter (fun _ commitment_hash ->
+      match Sc_rollup.Commitment_hash.of_b58check_opt commitment_hash with
+      | None ->
+          failwith
+            "Parameter '%s' is not a valid B58-encoded rollup commitment hash"
+            commitment_hash
+      | Some hash -> return hash)
+
 let rollup_address_param =
   Clic.parameter (fun _ name ->
       match Sc_rollup.Address.of_b58check_opt name with
@@ -2637,6 +2646,70 @@ let commands_rw () =
           ~source
           ~rollup
           ~messages
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Cement a commitment for a sc rollup."
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         storage_limit_arg
+         counter_arg
+         fee_parameter_args)
+      (prefixes ["cement"; "commitment"]
+      @@ param
+           ~name:"commitment"
+           ~desc:"the hash of the commitment to be cemented for a sc rollup"
+           commitment_hash_param
+      @@ prefixes ["from"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ param
+           ~name:"sc_rollup"
+           ~desc:
+             "the address of the sc rollup where the commitment will be \
+              cemented"
+           rollup_address_param
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             storage_limit,
+             counter,
+             fee_parameter )
+           commitment
+           source
+           rollup
+           cctxt ->
+        (match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can cement commitments"
+        | Implicit source -> return source)
+        >>=? fun source ->
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        sc_rollup_cement
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~rollup
+          ~commitment
           ~src_pk
           ~src_sk
           ~fee_parameter
