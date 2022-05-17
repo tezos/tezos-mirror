@@ -43,8 +43,10 @@ type t = {node : Node.t; client : Client.t; rollup : string}
 
 let assert_some res = match res with Some r -> r | None -> assert false
 
+let counter = ref 0
+
 let init_with_tx_rollup ?additional_bootstrap_account_count
-    ?(parameters = Parameters.default) ~protocol () =
+    ?(parameters = Parameters.default) ?alias ~protocol () =
   let* parameter_file = Parameters.parameter_file ~parameters protocol in
   let* node, client =
     Client.init_with_protocol
@@ -54,12 +56,14 @@ let init_with_tx_rollup ?additional_bootstrap_account_count
       ~protocol
       ()
   in
+
   (* We originate a dumb rollup to be able to generate a paths for
      tx_rollups related RPCs. *)
   let*! rollup =
     Client.Tx_rollup.originate
       ~hooks
       ~src:Constant.bootstrap1.public_key_hash
+      ?alias
       client
   in
   let* () = Client.bake_for_and_wait client in
@@ -766,6 +770,7 @@ let test_submit_batches_in_several_blocks =
     Client.Tx_rollup.originate
       ~hooks
       ~src:Constant.bootstrap1.public_key_hash
+      ~alias:"tx_rollup"
       client
   in
   let* () = Client.bake_for_and_wait client in
@@ -868,7 +873,10 @@ let test_submit_from_originated_source =
   let* () = Client.bake_for_and_wait client in
   (* We originate a tx_rollup using an implicit account *)
   let*! rollup =
-    Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
+    Client.Tx_rollup.originate
+      ~src:Constant.bootstrap1.public_key_hash
+      ~alias:"tx_rollup"
+      client
   in
   let* () = Client.bake_for_and_wait client in
   let (`Batch content) = Rollup.Tx_rollup.make_batch "tezos" in

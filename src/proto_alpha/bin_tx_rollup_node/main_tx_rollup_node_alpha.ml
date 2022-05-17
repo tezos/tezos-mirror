@@ -88,10 +88,19 @@ let dispatch_withdrawals_signer_arg =
     ()
 
 let rollup_id_param =
-  Clic.parameter (fun _ s ->
-      match Protocol.Alpha_context.Tx_rollup.of_b58check s with
-      | Ok x -> return x
-      | Error _ -> failwith "Invalid Rollup Id")
+  let open Client_proto_rollups in
+  Clic.parameter ~autocomplete:TxRollupAlias.autocomplete (fun cctxt s ->
+      let open Lwt_result_syntax in
+      let from_alias s = TxRollupAlias.find cctxt s in
+      let from_key s =
+        match Protocol.Alpha_context.Tx_rollup.of_b58check s with
+        | Ok x -> return x
+        | Error _ ->
+            failwith "Cannot parse %s as a transaction rollup address" s
+      in
+      Client_aliases.parse_alternatives
+        [("alias", from_alias); ("key", from_key)]
+        s)
 
 let rollup_id_arg =
   Clic.arg

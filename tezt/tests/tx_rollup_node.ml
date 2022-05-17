@@ -2691,6 +2691,7 @@ let test_origination_deposit_same_block =
             (* High fee to ensure the origination appears in the block before the
                deposit *)
           ~src:originator
+          ~alias:"tx_rollup"
           client
       in
       (* Do not bake after origination, we will also inject deposit *)
