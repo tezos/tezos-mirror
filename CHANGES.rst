@@ -36,6 +36,10 @@ Node
 
 - Added a store metric to expose the number of blocks considered as invalid.
 
+- Fixed the `tezos-node config reset` command which did not actually reset
+  the configuration file to its default values.
+
+
 Client
 ------
 
