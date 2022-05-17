@@ -1609,30 +1609,27 @@ end
 module Tx_rollup : sig
   include BASIC_DATA
 
-  type tx_rollup = t
+  val rpc_arg : t RPC_arg.arg
 
-  val rpc_arg : tx_rollup RPC_arg.arg
+  val to_b58check : t -> string
 
-  val to_b58check : tx_rollup -> string
+  val of_b58check : string -> t tzresult
 
-  val of_b58check : string -> tx_rollup tzresult
+  val of_b58check_opt : string -> t option
 
-  val of_b58check_opt : string -> tx_rollup option
+  val pp : Format.formatter -> t -> unit
 
-  val pp : Format.formatter -> tx_rollup -> unit
-
-  val encoding : tx_rollup Data_encoding.t
+  val encoding : t Data_encoding.t
 
   val deposit_entrypoint : Entrypoint.t
 
-  val originate : context -> (context * tx_rollup) tzresult Lwt.t
+  val originate : context -> (context * t) tzresult Lwt.t
 
-  module Set : Set.S with type elt = tx_rollup
+  module Set : Set.S with type elt = t
 
   module Internal_for_tests : sig
     (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
-    val originated_tx_rollup :
-      Origination_nonce.Internal_for_tests.t -> tx_rollup
+    val originated_tx_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
 end
 

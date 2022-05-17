@@ -38,8 +38,6 @@ end
 
 type t = private Hash.t
 
-type tx_rollup = t
-
 include Compare.S with type t := t
 
 (** [in_memory_size tx_rollup] returns the number of bytes [tx_rollup]
@@ -68,6 +66,6 @@ module Index : Storage_description.INDEX with type t = t
     into a transaction rollup. *)
 val deposit_entrypoint : Entrypoint_repr.t
 
-module Set : Set.S with type elt = tx_rollup
+module Set : Set.S with type elt = t
 
-module Map : Map.S with type key = tx_rollup
+module Map : Map.S with type key = t

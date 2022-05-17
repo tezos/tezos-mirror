@@ -65,8 +65,6 @@ end
 
 type t = Hash.t
 
-type tx_rollup = t
-
 module Compare_impl = Compare.Make (struct
   type nonrec t = t
 
@@ -130,7 +128,7 @@ let rpc_arg =
     ()
 
 module Index = struct
-  type t = tx_rollup
+  type nonrec t = t
 
   let path_length = 1
 
