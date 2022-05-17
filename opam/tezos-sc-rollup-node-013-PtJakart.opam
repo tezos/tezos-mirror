@@ -25,8 +25,8 @@ depends: [
   "tezos-shell-services"
   "tezos-sc-rollup-013-PtJakart"
   "data-encoding" { >= "0.5.3" & < "0.6" }
-  "irmin-pack" { >= "3.2.0" & < "3.3.0" }
-  "irmin" { >= "3.2.0" & < "3.3.0" }
+  "irmin-pack" { >= "3.2.2" & < "3.3.0" }
+  "irmin" { >= "3.2.2" & < "3.3.0" }
   "ringo" { >= "0.9" }
   "ringo-lwt" { >= "0.9" }
 ]
