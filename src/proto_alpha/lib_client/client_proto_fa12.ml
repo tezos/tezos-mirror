@@ -870,6 +870,7 @@ let build_transaction_operation ?(tez_amount = Tez.zero) ?fee ?gas_limit
   let parameters =
     Script.lazy_expr (Micheline.strip_locations (action_to_expr ~loc:() action))
   in
+  let token = Destination.Contract token in
   let operation =
     Transaction
       {amount = tez_amount; parameters; destination = token; entrypoint}
@@ -907,7 +908,7 @@ let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
       ?fee
       ?gas_limit
       ?storage_limit
-      (Contract (Originated token))
+      (Originated token)
       action
   in
   return (Annotated_manager_operation.Annotated_manager_operation operation)

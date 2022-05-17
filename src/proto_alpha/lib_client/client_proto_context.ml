@@ -100,6 +100,7 @@ let parse_arg_transfer arg =
 let build_transaction_operation ~amount ~parameters
     ?(entrypoint = Entrypoint.default) ?fee ?gas_limit ?storage_limit
     destination =
+  let destination = Destination.Contract destination in
   let operation = Transaction {amount; parameters; destination; entrypoint} in
   Injection.prepare_manager_operation
     ~fee:(Limit.of_option fee)
@@ -120,7 +121,7 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ?fee
       ?gas_limit
       ?storage_limit
-      (Contract destination)
+      destination
   in
   let contents = Annotated_manager_operation.Single_manager contents in
   Injection.inject_manager_operation

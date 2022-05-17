@@ -198,7 +198,7 @@ val build_transaction_operation :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  Destination.t ->
+  Contract.t ->
   Kind.transaction Annotated_manager_operation.t
 
 (** Same as {!transfer}, but takes parameters as {!Script.lazy_expr} instead of

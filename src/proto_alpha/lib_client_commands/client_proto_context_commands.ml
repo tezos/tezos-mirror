@@ -820,7 +820,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
            ?fee
            ?gas_limit
            ?storage_limit
-           (Contract destination)))
+           destination))
   >>=? fun operation ->
   return (Annotated_manager_operation.Annotated_manager_operation operation)
 
