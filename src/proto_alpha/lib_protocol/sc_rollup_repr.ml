@@ -162,6 +162,10 @@ let rpc_arg =
     ~destruct
     ()
 
+let in_memory_size (_ : t) =
+  let open Cache_memory_helpers in
+  h1w +! string_size_gen Address.size
+
 module Staker = Signature.Public_key_hash
 
 module Index = struct
