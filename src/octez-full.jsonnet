@@ -14,20 +14,23 @@ local delegate_hardware = import './delegate_hardware.jsonnet';
 local workers = import './workers.jsonnet';
 local logs = import './logs.jsonnet';
 
-local boardtitle = 'Tezos basic dashboard - branch: ' + std.extVar('branch');
+local boardtitle = 'Tezos full dashboard - branch: ' + std.extVar('branch');
 
 
 #Position variables
-local p2p_y = 39;
-local worker_y = 56;
-local misc_y = 81;
+local node_hardware_y = 47;
+local p2p_y = 72;
+local worker_y = 89;
+local misc_y = 114;
+local delegate_hardware_y = 123;
+local logs_y = 132;
 
 //###
 // Grafana main stuffs
 //##
 dashboard.new(
   title=boardtitle,
-  tags=['tezos','octez'],
+  tags=['tezos','octez','hardware','logs'],
   schemaVersion=18,
   editable=true,
   time_from='now-3h',
@@ -60,12 +63,30 @@ dashboard.new(
     p2p.privateConnections   + {gridPos: {h: 3, w: 2, x: 2, y: 19}},
     node.headHistory         + {gridPos: {h: 10, w: 10, x: 4, y: 4}},
     node.blocksValidationTime+ {gridPos: {h: 8, w: 10, x: 4, y: 14 }},
-    node.headOperations      + {gridPos: {h: 8, w: 14, x: 0, y: 22 }},
-    node.gasConsumedHistory  + {gridPos: {h: 8, w: 14, x: 0, y: 30 }},
-    node.invalidBlocksHistory+ {gridPos: {h: 9, w: 10, x: 14, y: 1}},
-    node.roundHistory        + {gridPos: {h: 9, w: 10, x: 14, y: 10}},
-    node.writtenBlockSize    + {gridPos: {h: 10, w: 10, x: 14, y: 19}},
-    node.storeMergeTime      + {gridPos: {h: 9, w: 10, x: 14, y: 29}},
+    logs.nodelogs            + {gridPos: {h: 21, w: 10, x: 14, y: 0}},
+    node.headOperations      + {gridPos: {h: 8, w: 14, x: 0, y: 22 } },
+    node.invalidBlocksHistory+ {gridPos: {h: 8, w: 10, x: 14, y: 22}},
+    node.gasConsumedHistory  + {gridPos: {h: 8, w: 14, x: 0, y: 30 } },
+    node.roundHistory        + {gridPos: {h: 8, w: 10, x: 14, y: 30}},
+    node.storeMergeTime      + {gridPos: {h: 8, w: 14, x: 0, y: 38}},
+    node.writtenBlockSize    + {gridPos: {h: 8, w: 10, x: 14, y: 38}},
+
+    //#######
+    row.new(
+      title='Node Hardware stats',
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: node_hardware_y } },
+    node_hardware.cpu { gridPos: { h: 8, w: 12, x: 0, y: node_hardware_y } },
+    node_hardware.memory { gridPos: { h: 8, w: 12, x: 12, y: node_hardware_y } },
+
+
+    node_hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: node_hardware_y + 8 } },
+    node_hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: node_hardware_y + 8 } },
+    node_hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: node_hardware_y + 8 } },
+
+    node_hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: node_hardware_y + 16 } },
+    node_hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: node_hardware_y + 16 } },
 
     //#######
     row.new(
@@ -99,6 +120,27 @@ dashboard.new(
     ) + { gridPos: { h: 8, w: 8, x: 0, y: misc_y } },
     node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: misc_y } },
     node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: misc_y } },
+
+    //#######
+    row.new(
+      title='Delegates Hardware stats',
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: delegate_hardware_y } },
+    delegate_hardware.cpu { gridPos: { h: 8, w: 8, x: 0, y: delegate_hardware_y } },
+    delegate_hardware.memory { gridPos: { h: 8, w: 8, x: 8, y: delegate_hardware_y } },
+    delegate_hardware.ios { gridPos: { h: 8, w: 8, x: 16, y: delegate_hardware_y } },
+
+    //#######
+    row.new(
+      title='Logs',
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: logs_y } },
+    logs.nodelogs {gridPos: {h: 10, w: 8, x: 0, y: logs_y}},
+    logs.bakerlogs {gridPos: {h: 10, w: 8, x: 8, y: logs_y}},
+    logs.accuserlogs {gridPos: {h: 10, w: 8, x: 16, y: logs_y}},
+    logs.systemlogs {gridPos: {h: 14, w: 12, x: 0, y: logs_y + 10 }},
 
   ]
 )
