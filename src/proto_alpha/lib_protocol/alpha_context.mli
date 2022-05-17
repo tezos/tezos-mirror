@@ -2144,27 +2144,6 @@ module Bond_id : sig
   end
 end
 
-(** This simply re-exports {!Destination_repr}. *)
-module Destination : sig
-  type t = Contract of Contract.t | Tx_rollup of Tx_rollup.t
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  val compare : t -> t -> int
-
-  val equal : t -> t -> bool
-
-  val to_b58check : t -> string
-
-  val of_b58check : string -> t tzresult
-
-  val in_memory_size : t -> Cache_memory_helpers.sint
-
-  type error += Invalid_destination_b58check of string
-end
-
 module Receipt : sig
   type balance =
     | Contract of Contract.t
@@ -2729,6 +2708,27 @@ module Sc_rollup : sig
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
+end
+
+(** This simply re-exports {!Destination_repr}. *)
+module Destination : sig
+  type t = Contract of Contract.t | Tx_rollup of Tx_rollup.t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val to_b58check : t -> string
+
+  val of_b58check : string -> t tzresult
+
+  val in_memory_size : t -> Cache_memory_helpers.sint
+
+  type error += Invalid_destination_b58check of string
 end
 
 module Block_payload : sig
