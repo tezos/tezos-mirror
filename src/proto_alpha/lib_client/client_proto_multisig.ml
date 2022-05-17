@@ -1096,7 +1096,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ~source
     ~src_pk
     ~src_sk
-    ~destination:(Contract (Originated multisig_contract))
+    ~destination:(Originated multisig_contract)
     ?entrypoint
     ~parameters
     ~amount

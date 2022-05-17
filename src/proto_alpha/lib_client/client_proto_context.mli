@@ -218,7 +218,7 @@ val transfer_with_script :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  destination:Destination.t ->
+  destination:Contract.t ->
   ?entrypoint:Entrypoint.t ->
   parameters:Script.lazy_expr ->
   amount:Tez.t ->

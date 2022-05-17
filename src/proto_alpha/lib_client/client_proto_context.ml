@@ -120,7 +120,7 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ?fee
       ?gas_limit
       ?storage_limit
-      destination
+      (Contract destination)
   in
   let contents = Annotated_manager_operation.Single_manager contents in
   Injection.inject_manager_operation
@@ -170,7 +170,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~source
     ~src_pk
     ~src_sk
-    ~destination:(Contract destination)
+    ~destination
     ?entrypoint
     ~parameters
     ~amount
