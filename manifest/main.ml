@@ -188,9 +188,7 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2860
-   Disabled until compatible with ocaml 4.14 *)
-(* let ometrics = opam_only "ometrics" V.(at_least "0.1.3") *)
+let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
 let parsexp = external_lib ~js_compatible:true "parsexp" V.True
 
@@ -1136,10 +1134,8 @@ let _tezos_tooling =
         bisect_ppx;
         (* These next are only used in the CI, we add this dependency so that
            it is added to tezos/opam-repository. *)
-        ocamlformat
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2860
-           Disabled until compatible with ocaml 4.14 *)
-        (* ometrics; *);
+        ocamlformat;
+        ometrics;
       ]
 
 let _tezos_tooling_js_inline_tests =
