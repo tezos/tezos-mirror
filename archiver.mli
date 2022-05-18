@@ -27,13 +27,11 @@ val launch : #Tezos_client_base.Client_context.wallet -> string -> unit Lwt.t
 
 val stop : unit -> unit
 
-(* [add_received ?unaccurate level ops] adds informations about the
-   list of received consensus operations [ops], all at level
-   [level]. [unaccurate] is true iff the [level] is the same as the
-   current head's level. [endorsements] is an association list of
-   tuples [(delegate, ops)], where [ops] is a list of tuples
-   [(op_kind, round_opt, errors_opt, reception_time)], all signed by
-   [delegate]. *)
+(* [add_received ?unaccurate level ops] adds information about the list of
+   received consensus operations [ops], all at level [level]. [unaccurate] is
+   true iff the [level] is the same as the current head's level. [ops] is an
+   association list of tuples [(delegate, ops)], where [ops] is a list of
+   operations all produced by [delegate]. *)
 val add_received :
   ?unaccurate:bool -> Int32.t -> Consensus_ops.delegate_ops -> unit
 

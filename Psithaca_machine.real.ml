@@ -169,6 +169,13 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         | Single (Endorsement {round; _}) -> round
         | _ -> assert false)
 
+  let get_preendorsement_round protocol_data =
+    match protocol_data with
+    | Protocol.Alpha_context.Operation_data {contents; _} -> (
+        match contents with
+        | Single (Preendorsement {round; _}) -> round
+        | _ -> assert false)
+
   let consensus_ops_info_of_block cctxt hash =
     let* ops =
       Block_services.Operations.operations_in_pass
@@ -177,11 +184,24 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ~block:(`Hash (hash, 0))
         0
     in
-    let round = ref None in
-    let pks =
-      List.filter_map
-        (fun Block_services.{receipt; protocol_data; _} ->
+    let preendorsements_round = ref None in
+    let endorsements_round = ref None in
+    let (preendorsers, endorsers) =
+      List.fold_left
+        (fun (preendorsers, endorsers)
+             Block_services.{receipt; protocol_data; _} ->
           match receipt with
+          | Receipt
+              (Protocol.Apply_results.Operation_metadata
+                {
+                  contents =
+                    Single_result
+                      (Protocol.Apply_results.Preendorsement_result
+                        {delegate; _});
+                }) ->
+              preendorsements_round :=
+                Some (get_preendorsement_round protocol_data) ;
+              (delegate :: preendorsers, endorsers)
           | Receipt
               (Protocol.Apply_results.Operation_metadata
                 {
@@ -189,19 +209,23 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     Single_result
                       (Protocol.Apply_results.Endorsement_result {delegate; _});
                 }) ->
-              round := Some (get_endorsement_round protocol_data) ;
-              Some delegate
-          | _ -> None)
+              endorsements_round := Some (get_endorsement_round protocol_data) ;
+              (preendorsers, delegate :: endorsers)
+          | _ -> (preendorsers, endorsers))
+        ([], [])
         ops
     in
     return
       Consensus_ops.
         {
-          endorsers = pks;
+          endorsers;
+          preendorsers = (if preendorsers = [] then None else Some preendorsers);
           endorsements_round =
-            Option.map Protocol.Alpha_context.Round.to_int32 !round;
-          preendorsers = None;
-          preendorsements_round = None;
+            Option.map Protocol.Alpha_context.Round.to_int32 !endorsements_round;
+          preendorsements_round =
+            Option.map
+              Protocol.Alpha_context.Round.to_int32
+              !preendorsements_round;
         }
 end
 
