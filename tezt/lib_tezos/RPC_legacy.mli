@@ -24,6 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Legacy node RPCs. *)
+
+(** THIS MODULE IS DEPRECATED: ITS FUNCTIONS SHOULD BE PORTED TO THE NEW RPC
+    ENGINE (IN [rpc.ml], USING MODULE [RPC_core]). *)
+
 (** In all RPCs, default [chain] is "main" and default [block] is
    "head~2" to pick the finalized branch for Tenderbake. *)
 
