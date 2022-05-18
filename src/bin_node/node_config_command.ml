@@ -49,7 +49,7 @@ let reset (args : Node_shared_arg.t) =
       Format.eprintf
         "Ignoring previous configuration file: %s.@."
         args.config_file ;
-    let* config = Node_shared_arg.read_and_patch_config_file args in
+    let* config = Node_shared_arg.patch_config args in
     let* () = Node_config_validation.check config in
     Node_config_file.write args.config_file config
   in

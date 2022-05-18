@@ -93,6 +93,33 @@ val read_config_file : t -> Node_config_file.t tzresult Lwt.t
 
 val read_data_dir : t -> string tzresult Lwt.t
 
+(** Modify a node configuration.
+
+    This returns [cfg] modified according to command-line arguments.
+    Default value for [cfg] is [Node_config_file.default_config].
+
+    [may_override_network] specifies whether the network parameter is overridden,
+    if already configured.
+    Default value for [may_override_network] is false.
+    [ignore_bootstrap_peers] specifies whether the bootstrap peers,
+    from [cfg], are ignored or not.
+    Default value for [ignore_bootstrap_peers] is false.
+*)
+val patch_config :
+  ?may_override_network:bool ->
+  ?ignore_bootstrap_peers:bool ->
+  ?cfg:Node_config_file.t ->
+  t ->
+  (Node_config_file.t, tztrace) result Lwt.t
+
+(** [read_and_patch_config_file ~may_override_network ~ignore_bootstrap_peers args]
+    Read the current config file and modify it accordingly to [args].
+
+    [may_override_network] specifies whether the network parameter is overridden,
+    if already configured.
+    [ignore_bootstrap_peers] specifies whether the bootstrap peers,
+    from the current config file, are ignored or not.
+*)
 val read_and_patch_config_file :
   ?may_override_network:bool ->
   ?ignore_bootstrap_peers:bool ->

@@ -1,0 +1,20 @@
+config.out
+
+./tezos-node config show
+{ "p2p":
+    { "bootstrap-peers":
+        [ "boot.tzbeta.net", "116.202.172.21", "95.216.45.62" ],
+      "listen-addr": "[::]:9732" } }
+
+./tezos-node config show
+{ "rpc": { "listen-addrs": [ ":1234" ] },
+  "p2p":
+    { "bootstrap-peers":
+        [ "boot.tzbeta.net", "116.202.172.21", "95.216.45.62" ],
+      "listen-addr": "[::]:9732" } }
+
+./tezos-node config show
+{ "p2p":
+    { "bootstrap-peers":
+        [ "boot.tzbeta.net", "116.202.172.21", "95.216.45.62" ],
+      "listen-addr": "[::]:9732" } }

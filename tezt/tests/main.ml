@@ -125,5 +125,6 @@ let () =
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
   Client_run_view.register ~protocols:[Alpha] ;
+  Config.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
