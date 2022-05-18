@@ -403,64 +403,30 @@ let update_script_lazy_storage c = function
   | None -> return (c, Z.zero)
   | Some diffs -> Lazy_storage_diff.apply c diffs
 
-let create_base c ~prepaid_bootstrap_storage
-    (* Free space for bootstrap contracts *)
-      contract ~balance ~manager ?script () =
-  (match contract with
-  | Contract_repr.Originated _ -> return c
-  | Implicit _ ->
-      Storage.Contract.Global_counter.get c >>=? fun counter ->
-      Storage.Contract.Counter.init c contract counter)
-  >>=? fun c ->
-  Storage.Contract.Spendable_balance.init c contract balance >>=? fun c ->
-  (match manager with
-  | Some manager ->
-      Contract_manager_storage.init c contract (Manager_repr.Hash manager)
-  | None -> return c)
-  >>=? fun c ->
-  match script with
-  | Some ({Script_repr.code; storage}, lazy_storage_diff) ->
-      Storage.Contract.Code.init c contract code >>=? fun (c, code_size) ->
-      Storage.Contract.Storage.init c contract storage
-      >>=? fun (c, storage_size) ->
-      update_script_lazy_storage c lazy_storage_diff
-      >>=? fun (c, lazy_storage_size) ->
-      let total_size =
-        Z.add
-          (Z.add (Z.of_int code_size) (Z.of_int storage_size))
-          lazy_storage_size
-      in
-      assert (Compare.Z.(total_size >= Z.zero)) ;
-      let prepaid_bootstrap_storage =
-        if prepaid_bootstrap_storage then total_size else Z.zero
-      in
-      Storage.Contract.Paid_storage_space.init
-        c
-        contract
-        prepaid_bootstrap_storage
-      >>=? fun c ->
-      Storage.Contract.Used_storage_space.init c contract total_size
-  | None -> return c
-
-let raw_originate c ~prepaid_bootstrap_storage contract ~script =
-  create_base
-    c
-    ~prepaid_bootstrap_storage
-    contract
-    ~balance:Tez_repr.zero
-    ~manager:None
-    ~script
-    ()
+let raw_originate c ~prepaid_bootstrap_storage
+    (* Free space for bootstrap contracts *) contract ~script =
+  Storage.Contract.Spendable_balance.init c contract Tez_repr.zero >>=? fun c ->
+  let {Script_repr.code; storage}, lazy_storage_diff = script in
+  Storage.Contract.Code.init c contract code >>=? fun (c, code_size) ->
+  Storage.Contract.Storage.init c contract storage >>=? fun (c, storage_size) ->
+  update_script_lazy_storage c lazy_storage_diff
+  >>=? fun (c, lazy_storage_size) ->
+  let total_size =
+    Z.add (Z.add (Z.of_int code_size) (Z.of_int storage_size)) lazy_storage_size
+  in
+  assert (Compare.Z.(total_size >= Z.zero)) ;
+  let prepaid_bootstrap_storage =
+    if prepaid_bootstrap_storage then total_size else Z.zero
+  in
+  Storage.Contract.Paid_storage_space.init c contract prepaid_bootstrap_storage
+  >>=? fun c -> Storage.Contract.Used_storage_space.init c contract total_size
 
 let create_implicit c manager ~balance =
-  create_base
-    c
-    ~prepaid_bootstrap_storage:false
-    (Contract_repr.Implicit manager)
-    ~balance
-    ~manager:(Some manager)
-    ?script:None
-    ()
+  let contract = Contract_repr.Implicit manager in
+  Storage.Contract.Global_counter.get c >>=? fun counter ->
+  Storage.Contract.Counter.init c contract counter >>=? fun c ->
+  Storage.Contract.Spendable_balance.init c contract balance >>=? fun c ->
+  Contract_manager_storage.init c contract (Manager_repr.Hash manager)
 
 let delete c contract =
   match contract with
