@@ -22,10 +22,12 @@ echo "Running test \"dune build ${COVERAGE_OPTIONS:-} $*\" ..."
 START=$(date +%s.%N)
 
 EXITCODE=0
+# TODO: https://gitlab.com/tezos/tezos/-/issues/3018
+# Disable verbose once the log file bug in Alcotest is fixed.
 # If set, COVERAGE_OPTIONS will typically contain "--instrument-with bisect_ppx".
 # We need this to be word split for the arguments to be properly parsed by dune.
 # shellcheck disable=SC2086
-dune build ${COVERAGE_OPTIONS:-} "$@" > "test_results/$name.log" 2>&1 \
+ALCOTEST_VERBOSE=yes dune build ${COVERAGE_OPTIONS:-} "$@" > "test_results/$name.log" 2>&1 \
     || EXITCODE=$?
 
 END=$(date +%s.%N)

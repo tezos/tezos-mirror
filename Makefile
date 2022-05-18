@@ -199,9 +199,11 @@ test-python-tenderbake: all
 test-flextesa:
 	@$(MAKE) -f sandbox.Makefile
 
+# TODO: https://gitlab.com/tezos/tezos/-/issues/3018
+# Disable verbose once the log file bug in Alcotest is fixed.
 .PHONY: test-js
 test-js:
-	@dune build @runtest_js
+	@ALCOTEST_VERBOSE=yes dune build @runtest_js
 	@dune exec ./src/tooling/run_js_inline_tests.exe
 
 .PHONY: build-tezt
