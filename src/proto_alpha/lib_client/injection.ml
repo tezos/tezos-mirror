@@ -348,10 +348,54 @@ let estimated_gas_single (type kind)
     | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
+  let internal_consumed_gas (type kind)
+      (result : kind internal_manager_operation_result) =
+    match result with
+    | Applied
+        (Transaction_result (Transaction_to_contract_result {consumed_gas; _}))
+    | Applied
+        (Transaction_result (Transaction_to_tx_rollup_result {consumed_gas; _}))
+      ->
+        Ok consumed_gas
+    | Applied (Origination_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Reveal_result {consumed_gas}) -> Ok consumed_gas
+    | Applied (Delegation_result {consumed_gas}) -> Ok consumed_gas
+    | Applied (Register_global_constant_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Set_deposits_limit_result {consumed_gas}) -> Ok consumed_gas
+    | Applied (Tx_rollup_origination_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Tx_rollup_submit_batch_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Tx_rollup_commit_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Tx_rollup_return_bond_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Tx_rollup_finalize_commitment_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Tx_rollup_remove_commitment_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Tx_rollup_rejection_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Tx_rollup_dispatch_tickets_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Transfer_ticket_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_originate_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_add_messages_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Sc_rollup_cement_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_publish_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_refute_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_timeout_result {consumed_gas; _}) -> Ok consumed_gas
+    | Skipped _ ->
+        Ok Gas.Arith.zero (* there must be another error for this to happen *)
+    | Backtracked (_, None) ->
+        Ok Gas.Arith.zero (* there must be another error for this to happen *)
+    | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
+    | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
+  in
   consumed_gas operation_result >>? fun gas ->
   List.fold_left_e
     (fun acc (Internal_manager_operation_result (_, r)) ->
-      consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
+      internal_consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
     gas
     internal_operation_results
 
@@ -414,10 +458,64 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
     | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
+  let internal_storage_size_diff (type kind)
+      (result : kind internal_manager_operation_result) =
+    match result with
+    | Applied
+        (Transaction_result
+          (Transaction_to_contract_result
+            {paid_storage_size_diff; allocated_destination_contract; _})) ->
+        if allocated_destination_contract then
+          Ok (Z.add paid_storage_size_diff origination_size)
+        else Ok paid_storage_size_diff
+    | Applied (Transaction_result (Transaction_to_tx_rollup_result _)) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
+           Storage fees for transaction rollup.
+           We need to charge for newly allocated storage (as we do for
+           Michelson’s big map). *)
+        Ok Z.zero
+    | Applied (Origination_result {paid_storage_size_diff; _}) ->
+        Ok (Z.add paid_storage_size_diff origination_size)
+    | Applied (Reveal_result _) -> Ok Z.zero
+    | Applied (Delegation_result _) -> Ok Z.zero
+    | Applied (Register_global_constant_result {size_of_constant; _}) ->
+        Ok size_of_constant
+    | Applied (Set_deposits_limit_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_origination_result _) -> Ok tx_rollup_origination_size
+    | Applied (Tx_rollup_submit_batch_result {paid_storage_size_diff; _}) ->
+        Ok paid_storage_size_diff
+    | Applied (Tx_rollup_commit_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_return_bond_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_finalize_commitment_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_remove_commitment_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_rejection_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}) ->
+        Ok paid_storage_size_diff
+    | Applied (Transfer_ticket_result {paid_storage_size_diff; _}) ->
+        Ok paid_storage_size_diff
+    | Applied (Sc_rollup_originate_result {size; _}) -> Ok size
+    | Applied (Sc_rollup_add_messages_result _) -> Ok Z.zero
+    (* The following Sc_rollup operations have zero storage cost because we
+       consider them to be paid in the stake deposit.
+
+       TODO: https://gitlab.com/tezos/tezos/-/issues/2686
+       Document why this is safe.
+    *)
+    | Applied (Sc_rollup_cement_result _) -> Ok Z.zero
+    | Applied (Sc_rollup_publish_result _) -> Ok Z.zero
+    | Applied (Sc_rollup_refute_result _) -> Ok Z.zero
+    | Applied (Sc_rollup_timeout_result _) -> Ok Z.zero
+    | Skipped _ ->
+        Ok Z.zero (* there must be another error for this to happen *)
+    | Backtracked (_, None) ->
+        Ok Z.zero (* there must be another error for this to happen *)
+    | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
+    | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
+  in
   storage_size_diff operation_result >>? fun storage ->
   List.fold_left_e
     (fun acc (Internal_manager_operation_result (_, r)) ->
-      storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
+      internal_storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
     storage
     internal_operation_results
 
@@ -480,11 +578,46 @@ let originated_contracts_single (type kind)
     | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
+  let internal_originated_contracts (type kind)
+      (result : kind internal_manager_operation_result) =
+    match result with
+    | Applied
+        (Transaction_result
+          (Transaction_to_contract_result {originated_contracts; _})) ->
+        Ok originated_contracts
+    | Applied (Transaction_result (Transaction_to_tx_rollup_result _)) -> Ok []
+    | Applied (Origination_result {originated_contracts; _}) ->
+        Ok originated_contracts
+    | Applied (Register_global_constant_result _) -> Ok []
+    | Applied (Reveal_result _) -> Ok []
+    | Applied (Delegation_result _) -> Ok []
+    | Applied (Set_deposits_limit_result _) -> Ok []
+    | Applied (Tx_rollup_origination_result _) -> Ok []
+    | Applied (Tx_rollup_submit_batch_result _) -> Ok []
+    | Applied (Tx_rollup_commit_result _) -> Ok []
+    | Applied (Tx_rollup_return_bond_result _) -> Ok []
+    | Applied (Tx_rollup_finalize_commitment_result _) -> Ok []
+    | Applied (Tx_rollup_remove_commitment_result _) -> Ok []
+    | Applied (Tx_rollup_rejection_result _) -> Ok []
+    | Applied (Tx_rollup_dispatch_tickets_result _) -> Ok []
+    | Applied (Transfer_ticket_result _) -> Ok []
+    | Applied (Sc_rollup_originate_result _) -> Ok []
+    | Applied (Sc_rollup_add_messages_result _) -> Ok []
+    | Applied (Sc_rollup_cement_result _) -> Ok []
+    | Applied (Sc_rollup_publish_result _) -> Ok []
+    | Applied (Sc_rollup_refute_result _) -> Ok []
+    | Applied (Sc_rollup_timeout_result _) -> Ok []
+    | Skipped _ -> Ok [] (* there must be another error for this to happen *)
+    | Backtracked (_, None) ->
+        Ok [] (* there must be another error for this to happen *)
+    | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
+    | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
+  in
   originated_contracts operation_result >>? fun contracts ->
   let contracts = List.rev contracts in
   List.fold_left_e
     (fun acc (Internal_manager_operation_result (_, r)) ->
-      originated_contracts r >>? fun contracts ->
+      internal_originated_contracts r >>? fun contracts ->
       Ok (List.rev_append contracts acc))
     contracts
     internal_operation_results
@@ -530,7 +663,7 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
            {operation_result; internal_operation_results; _} :
           kind Kind.manager contents_result) =
       let detect_script_failure (type kind)
-          (result : kind manager_operation_result) =
+          (result : (kind, _, _) operation_result) =
         match result with
         | Applied _ -> Ok ()
         | Skipped _ -> assert false
