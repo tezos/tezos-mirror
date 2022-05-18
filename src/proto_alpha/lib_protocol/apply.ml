@@ -835,20 +835,43 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
         else error (Script_interpreter.Bad_contract_parameter contract) )
     >|? fun ctxt ->
       let result =
-        Transaction_result
-          (Transaction_to_contract_result
-             {
-               storage = None;
-               lazy_storage_diff = None;
-               balance_updates;
-               originated_contracts = [];
-               consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-               storage_size = Z.zero;
-               paid_storage_size_diff = Z.zero;
-               allocated_destination_contract = not already_allocated;
-             })
+        Transaction_to_contract_result
+          {
+            storage = None;
+            lazy_storage_diff = None;
+            balance_updates;
+            originated_contracts = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            storage_size = Z.zero;
+            paid_storage_size_diff = Z.zero;
+            allocated_destination_contract = not already_allocated;
+          }
       in
       (ctxt, result, []) )
+
+let apply_internal_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
+    ~entrypoint ~before_operation =
+  apply_transaction_to_implicit
+    ~ctxt
+    ~source
+    ~amount
+    ~pkh
+    ~parameter
+    ~entrypoint
+    ~before_operation
+  >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
+
+let apply_manager_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
+    ~entrypoint ~before_operation =
+  apply_transaction_to_implicit
+    ~ctxt
+    ~source
+    ~amount
+    ~pkh
+    ~parameter
+    ~entrypoint
+    ~before_operation
+  >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~parameter =
@@ -938,24 +961,54 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
             updated_size
         >|? fun ctxt ->
           let result =
-            Transaction_result
-              (Transaction_to_contract_result
-                 {
-                   storage = Some storage;
-                   lazy_storage_diff;
-                   balance_updates;
-                   originated_contracts;
-                   consumed_gas =
-                     Gas.consumed ~since:before_operation ~until:ctxt;
-                   storage_size = new_size;
-                   paid_storage_size_diff =
-                     Z.add
-                       contract_paid_storage_size_diff
-                       ticket_paid_storage_diff;
-                   allocated_destination_contract = false;
-                 })
+            Transaction_to_contract_result
+              {
+                storage = Some storage;
+                lazy_storage_diff;
+                balance_updates;
+                originated_contracts;
+                consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+                storage_size = new_size;
+                paid_storage_size_diff =
+                  Z.add contract_paid_storage_size_diff ticket_paid_storage_diff;
+                allocated_destination_contract = false;
+              }
           in
           (ctxt, result, operations) )
+
+let apply_internal_transaction_to_smart_contract ~ctxt ~source ~contract_hash
+    ~amount ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal
+    ~parameter =
+  apply_transaction_to_smart_contract
+    ~ctxt
+    ~source
+    ~contract_hash
+    ~amount
+    ~entrypoint
+    ~before_operation
+    ~payer
+    ~chain_id
+    ~mode
+    ~internal
+    ~parameter
+  >>=? fun (ctxt, res, ops) -> return (ctxt, Transaction_result res, ops)
+
+let apply_manager_transaction_to_smart_contract ~ctxt ~source ~contract_hash
+    ~amount ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal
+    ~parameter =
+  apply_transaction_to_smart_contract
+    ~ctxt
+    ~source
+    ~contract_hash
+    ~amount
+    ~entrypoint
+    ~before_operation
+    ~payer
+    ~chain_id
+    ~mode
+    ~internal
+    ~parameter
+  >>=? fun (ctxt, res, ops) -> return (ctxt, Transaction_result res, ops)
 
 let ex_ticket_size :
     context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
@@ -1150,7 +1203,7 @@ let apply_internal_manager_operation_content :
         parameters_ty;
         parameters = typed_parameters;
       } ->
-      (apply_transaction_to_implicit
+      (apply_internal_transaction_to_implicit
          ~ctxt
          ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
          ~source
@@ -1169,7 +1222,7 @@ let apply_internal_manager_operation_content :
         parameters = typed_parameters;
         unparsed_parameters = _;
       } ->
-      apply_transaction_to_smart_contract
+      apply_internal_transaction_to_smart_contract
         ~ctxt
         ~source
         ~contract_hash
@@ -1250,7 +1303,7 @@ let apply_external_manager_operation_content :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      apply_transaction_to_implicit
+      apply_manager_transaction_to_implicit
         ~ctxt
         ~source:source_contract
         ~amount
@@ -1266,7 +1319,7 @@ let apply_external_manager_operation_content :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      apply_transaction_to_smart_contract
+      apply_manager_transaction_to_smart_contract
         ~ctxt
         ~source:source_contract
         ~contract_hash
