@@ -1107,7 +1107,26 @@ module Target = struct
     in
     let opam =
       match opam with
-      | Some "" -> None
+      | Some "" -> (
+          match kind with
+          | Test_executable {names = name, _; run = true; _} ->
+              invalid_argf
+                "for targets which provide test executables such as %S, you \
+                 must specify a non-empty ~opam or have it not run by default \
+                 with ~runtest:false"
+                name
+          | Public_library {public_name; _} ->
+              invalid_argf
+                "public_library %s cannot have ~opam set to empty string (\"\")"
+                public_name
+          | Public_executable ({public_name; _}, _) ->
+              invalid_argf
+                "for targets which provide public executables such as %S, you \
+                 cannot have ~opam set to empty string (\"\")"
+                public_name
+          | Test_executable {run = false; _}
+          | Private_library _ | Private_executable _ ->
+              None)
       | Some opam as x ->
           if
             string_for_all
@@ -1675,7 +1694,8 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     | Test_executable _, Some _ ->
         (* private executable can't have a package stanza, but we still want the manifest to know about the package *)
         None
-    | Test_executable _, None ->
+    | Test_executable {run = false; _}, None -> None
+    | Test_executable {run = true; _}, None ->
         (* Prevented by [Target.internal]. *)
         assert false
   in
