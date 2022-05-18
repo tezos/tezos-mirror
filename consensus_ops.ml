@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,40 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val launch : #Tezos_client_base.Client_context.wallet -> string -> unit Lwt.t
+type operation_kind = Endorsement | Preendorsement
 
-val stop : unit -> unit
+let operation_kind_encoding =
+  let open Data_encoding in
+  string_enum [("Endorsement", Endorsement); ("Preendorsement", Preendorsement)]
 
-(* [add_received ?unaccurate level ops] adds informations about the
-   list of received consensus operations [ops], all at level
-   [level]. [unaccurate] is true iff the [level] is the same as the
-   current head's level. [endorsements] is an association list of
-   tuples [(delegate, ops)], where [ops] is a list of tuples
-   [(op_kind, round_opt, errors_opt, reception_time)], all signed by
-   [delegate]. *)
-val add_received :
-  ?unaccurate:bool ->
-  Int32.t ->
-  (Signature.Public_key_hash.t
-  * (Consensus_ops.operation_kind
-    * Int32.t option
-    * error list option
-    * Time.System.t)
-    list)
-  list ->
-  unit
-
-(* [add_block level hash round ts reception_time baker pkhs] adds
-   information about a newly received block: its level, hash, round,
-   its timestamp, its reception time, its baker, and its endorsers
-   (the ones whose endorsements are actually included). *)
-val add_block :
-  level:Int32.t ->
-  Block_hash.t ->
-  round:Int32.t ->
-  Time.Protocol.t ->
-  Time.System.t ->
-  Signature.Public_key_hash.t ->
-  ?endorsements_round:Int32.t ->
-  Signature.Public_key_hash.t list ->
-  unit
+let pp_operation_kind ppf kind =
+  match kind with
+  | Endorsement -> Format.fprintf ppf "Endorsement"
+  | Preendorsement -> Format.fprintf ppf "Preendorsement"

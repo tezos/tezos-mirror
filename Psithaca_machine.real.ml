@@ -97,7 +97,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( block_payload_hash,
               Protocol.Alpha_context.Raw_level.to_int32 level,
-              Operation_kind.Endorsement,
+              Consensus_ops.Endorsement,
               Some (Protocol.Alpha_context.Round.to_int32 round) ),
             slot_to_int slot )
     | {
@@ -113,7 +113,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( block_payload_hash,
               Protocol.Alpha_context.Raw_level.to_int32 level,
-              Operation_kind.Preendorsement,
+              Consensus_ops.Preendorsement,
               Some (Protocol.Alpha_context.Round.to_int32 round) ),
             slot_to_int slot )
     | _ -> None

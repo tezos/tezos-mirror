@@ -28,7 +28,7 @@ let levels_per_folder = 4096l
 
 module Delegate_operations = struct
   type operation = {
-    kind : Operation_kind.t;
+    kind : Consensus_ops.operation_kind;
     round : Int32.t option;
     reception_time : Time.System.t option;
     errors : error list option;
@@ -43,7 +43,10 @@ module Delegate_operations = struct
       (fun (kind, round, reception_time, errors, block_inclusion) ->
         {kind; round; reception_time; errors; block_inclusion})
       (obj5
-         (dft "kind" Operation_kind.encoding Operation_kind.Endorsement)
+         (dft
+            "kind"
+            Consensus_ops.operation_kind_encoding
+            Consensus_ops.Endorsement)
          (opt "round" int32)
          (req "reception_time" (option Time.System.encoding))
          (opt "errors" (list error_encoding))
@@ -369,7 +372,7 @@ let extract_anomalies path level infos =
 
    Therefore, [add_to_operations block_hash ops] adds the
    endorsements in ops, which were included in block [block_hash], to
-   the list of operations already known for operation's producer.  *)
+   the list of operations already known for operation's producer. *)
 let add_to_operations block_hash ?endorsements_round operations =
   match
     List.partition
@@ -662,7 +665,7 @@ type chunk =
       bool option
       * Int32.t (* level *)
       * (Signature.Public_key_hash.t
-        * (Operation_kind.t
+        * (Consensus_ops.operation_kind
           * Int32.t option
           * error list option
           * Time.System.t)

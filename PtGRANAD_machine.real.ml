@@ -106,7 +106,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( branch,
               Protocol.Alpha_context.Raw_level.to_int32 level,
-              Operation_kind.Endorsement,
+              Consensus_ops.Endorsement,
               None ),
             slot )
     | _ -> None

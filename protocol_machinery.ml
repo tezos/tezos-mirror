@@ -53,7 +53,8 @@ module type PROTOCOL_SERVICES = sig
   val consensus_operation_stream :
     wrap_full ->
     (((Operation_hash.t
-      * ((block_id * Int32.t * Operation_kind.t * Int32.t option) * int))
+      * ((block_id * Int32.t * Consensus_ops.operation_kind * Int32.t option)
+        * int))
      * error trace option)
      Lwt_stream.t
     * RPC_context.stopper)

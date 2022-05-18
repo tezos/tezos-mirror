@@ -23,13 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Endorsement | Preendorsement
+type operation_kind = Endorsement | Preendorsement
 
-let encoding =
-  let open Data_encoding in
-  string_enum [("Endorsement", Endorsement); ("Preendorsement", Preendorsement)]
+val operation_kind_encoding : operation_kind Data_encoding.encoding
 
-let pp ppf kind =
-  match kind with
-  | Endorsement -> Format.fprintf ppf "Endorsement"
-  | Preendorsement -> Format.fprintf ppf "Preendorsement"
+val pp_operation_kind : Format.formatter -> operation_kind -> unit
