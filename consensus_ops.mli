@@ -28,3 +28,12 @@ type operation_kind = Endorsement | Preendorsement
 val operation_kind_encoding : operation_kind Data_encoding.encoding
 
 val pp_operation_kind : Format.formatter -> operation_kind -> unit
+
+type received_operation = {
+  kind : operation_kind;
+  round : Int32.t option;
+  reception_time : Time.System.t;
+  errors : error list option;
+}
+
+type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list

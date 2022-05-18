@@ -543,7 +543,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
            err)
 
 let merge_operations =
-  List.fold_left (fun acc (kind, round, errors, reception_time) ->
+  List.fold_left (fun acc Consensus_ops.{kind; round; errors; reception_time} ->
       match
         List.partition
           (fun Delegate_operations.{round = r; kind = k; _} ->
@@ -618,9 +618,10 @@ let dump_received cctxt path ?unaccurate level items =
                          delegate_alias = Wallet.alias_of_pkh aliases delegate;
                          operations =
                            List.rev_map
-                             (fun (op_kind, round, errors, reception_time) ->
+                             (fun Consensus_ops.
+                                    {kind; round; errors; reception_time} ->
                                {
-                                 kind = op_kind;
+                                 kind;
                                  round;
                                  errors;
                                  reception_time = Some reception_time;
@@ -661,16 +662,7 @@ type chunk =
       * Signature.Public_key_hash.t
       * Int32.t option
       * Signature.Public_key_hash.t list
-  | Mempool of
-      bool option
-      * Int32.t (* level *)
-      * (Signature.Public_key_hash.t
-        * (Consensus_ops.operation_kind
-          * Int32.t option
-          * error list option
-          * Time.System.t)
-          list)
-        list
+  | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
 

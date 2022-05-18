@@ -33,3 +33,12 @@ let pp_operation_kind ppf kind =
   match kind with
   | Endorsement -> Format.fprintf ppf "Endorsement"
   | Preendorsement -> Format.fprintf ppf "Preendorsement"
+
+type received_operation = {
+  kind : operation_kind;
+  round : Int32.t option;
+  reception_time : Time.System.t;
+  errors : error list option;
+}
+
+type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list

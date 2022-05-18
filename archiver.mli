@@ -35,16 +35,7 @@ val stop : unit -> unit
    [(op_kind, round_opt, errors_opt, reception_time)], all signed by
    [delegate]. *)
 val add_received :
-  ?unaccurate:bool ->
-  Int32.t ->
-  (Signature.Public_key_hash.t
-  * (Consensus_ops.operation_kind
-    * Int32.t option
-    * error list option
-    * Time.System.t)
-    list)
-  list ->
-  unit
+  ?unaccurate:bool -> Int32.t -> Consensus_ops.delegate_ops -> unit
 
 (* [add_block level hash round ts reception_time baker pkhs] adds
    information about a newly received block: its level, hash, round,
