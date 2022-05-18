@@ -1453,7 +1453,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.mutez"
                               },
                               "destination": {
-                                "$ref": "#/definitions/alpha.transaction_destination"
+                                "$ref": "#/definitions/alpha.contract_id"
                               },
                               "parameters": {
                                 "type": "object",
@@ -3556,11 +3556,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "alpha.transaction_destination": {
-                        "title": "A destination of a transaction",
-                        "description": "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, or a base58 originated transaction rollup.",
-                        "$ref": "#/definitions/unistring"
-                      },
                       "alpha.tx_rollup_id": {
                         "title": "A tx rollup handle",
                         "description": "A tx rollup notation as given to an RPC or inside scripts, is a base58 tx rollup hash",
@@ -4531,7 +4526,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "destination",
                                   "layout": {
-                                    "name": "alpha.transaction_destination",
+                                    "name": "alpha.contract_id",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -7518,7 +7513,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "alpha.transaction_destination"
+                          "title": "alpha.contract_id"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -7596,46 +7591,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Originated"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Rollup_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "padding",
-                                  "layout": {
-                                    "kind": "Padding"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Tx_rollup"
                             }
                           ]
                         }
@@ -9711,90 +9666,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "alpha.contract_id"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 22,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Signature.Public_key_hash",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Implicit"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Contract_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "padding",
-                                  "layout": {
-                                    "kind": "Padding"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Originated"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
                           "title": "X_9"
                         },
                         "encoding": {
@@ -11736,7 +11607,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.mutez"
                               },
                               "destination": {
-                                "$ref": "#/definitions/alpha.transaction_destination"
+                                "$ref": "#/definitions/alpha.contract_id"
                               },
                               "parameters": {
                                 "type": "object",
@@ -13838,11 +13709,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "code"
                         ],
                         "additionalProperties": false
-                      },
-                      "alpha.transaction_destination": {
-                        "title": "A destination of a transaction",
-                        "description": "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, or a base58 originated transaction rollup.",
-                        "$ref": "#/definitions/unistring"
                       },
                       "alpha.tx_rollup_id": {
                         "title": "A tx rollup handle",
