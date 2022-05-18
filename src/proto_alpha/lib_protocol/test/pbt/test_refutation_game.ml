@@ -472,14 +472,18 @@ struct
   *)
   let execute_until tick state pred =
     let rec loop state tick =
-      if pred tick state then Lwt.return (tick, state)
-      else
-        let* s = PVM.eval state in
-        let* hash1 = PVM.state_hash state in
-        let* hash2 = PVM.state_hash s in
+      let* isinp = PVM.is_input_state state in
+      match isinp with
+      | Some _ -> Lwt.return (tick, state)
+      | None ->
+          if pred tick state then Lwt.return (tick, state)
+          else
+            let* s = PVM.eval state in
+            let* hash1 = PVM.state_hash state in
+            let* hash2 = PVM.state_hash s in
 
-        if State_hash.equal hash1 hash2 then Lwt.return (tick, state)
-        else loop s (Sc_rollup_tick_repr.next tick)
+            if State_hash.equal hash1 hash2 then Lwt.return (tick, state)
+            else loop s (Sc_rollup_tick_repr.next tick)
     in
     loop state tick
 
@@ -595,7 +599,6 @@ struct
             Lwt.return
               Sc_rollup_game_repr.{loser = game.turn; reason = Invalid_move}
         | Some move -> (
-            Format.printf "move =%a\n" Sc_rollup_game_repr.pp_refutation move ;
             play game move |> function
             | Either.Left outcome -> Lwt.return outcome
             | Either.Right game -> loop game)
@@ -684,7 +687,7 @@ struct
 
   (** there are two kinds of strategies, random and machine dirrected by a
   params and a checkpoint*)
-  type strategy = Random | MachineDirected of checkpoint
+  type strategy = Random | MachineDirected
 
   (**
   [find_conflict dissection] finds the section (if it exists) in a dissection that 
@@ -765,8 +768,8 @@ struct
     let start_state = PVM.Utils.default_state in
     let initial =
       let* stop_at, stop_state =
-        execute_until Sc_rollup_tick_repr.initial start_state @@ fun tick _ ->
-        pred tick
+        execute_until Sc_rollup_tick_repr.initial start_state @@ fun _ _ ->
+        false
       in
       let* stop_hash = PVM.state_hash stop_state in
       Lwt.return (Some (stop_at, stop_hash))
@@ -799,7 +802,6 @@ struct
   let defender_from_strategy = function
     | Random ->
         let initial =
-          (* let length = 1 + Random.int 20 in *)
           let random_state = PVM.Utils.default_state in
           let* stop_hash = PVM.state_hash random_state in
           let random_tick = random_tick ~from:1 () in
@@ -807,7 +809,7 @@ struct
         in
 
         {initial; next_move = (fun game -> random_decision game.dissection)}
-    | MachineDirected checkpoint -> machine_directed_defender checkpoint
+    | MachineDirected -> machine_directed_defender
 
   (** This builds a refuter client from a strategy.
     If the strategy is MachineDirected it uses the above constructions.
@@ -820,7 +822,7 @@ struct
           initial = Lwt.return None;
           next_move = (fun game -> random_decision game.dissection);
         }
-    | MachineDirected _ -> machine_directed_refuter
+    | MachineDirected -> machine_directed_refuter
 
   (** [test_strategies defender_strategy refuter_strategy expectation]
     runs a game based oin the two given strategies and checks that the
@@ -829,19 +831,14 @@ struct
     let defender_client = defender_from_strategy defender_strategy in
     let refuter_client = refuter_from_strategy refuter_strategy in
     let outcome = run ~inbox ~defender_client ~refuter_client in
-    Format.printf "%a" Sc_rollup_game_repr.pp_outcome (Lwt_main.run outcome) ;
     expectation outcome
 
   (** This is a commuter client having a perfect strategy*)
-  let perfect_defender =
-    MachineDirected
-      (fun tick ->
-        let t0 = 20 + Random.int 100 in
-        assume_some (Sc_rollup_tick_repr.to_int tick) @@ fun tick -> tick >= t0)
+  let perfect_defender = MachineDirected
 
   (** This is a refuter client having a perfect strategy*)
 
-  let perfect_refuter = MachineDirected (fun _ -> assert false)
+  let perfect_refuter = MachineDirected
 
   (** This is a commuter client having a strategy that forgets a tick*)
 
@@ -932,7 +929,8 @@ let testing_arith (f : (module TestPVM) -> Sc_rollup_inbox_repr.t -> bool Lwt.t)
     ~name
     Gen.(pair gen_list small_int)
     (fun (inputs, evals) ->
-      assume (evals > 1 && evals < List.length inputs - 1) ;
+      assume
+        (List.length inputs < 500 && evals > 1 && evals < List.length inputs - 1) ;
       let rollup = Sc_rollup_repr.Address.hash_string [""] in
       let level =
         Raw_level_repr.of_int32 0l |> function Ok x -> x | _ -> assert false
@@ -951,7 +949,10 @@ let test_random_dissection (module P : TestPVM) start_at length =
   let open P in
   let module S = Strategies (P) in
   let section_start_state = Utils.default_state in
-  let stop_hash = Some (random_hash ()) in
+  let rec aux hash =
+    let new_hash = random_hash () in
+    if hash = new_hash then aux hash else new_hash
+  in
   let section_stop_at =
     match Sc_rollup_tick_repr.of_int (start_at + length) with
     | None -> assert false
@@ -974,26 +975,7 @@ let test_random_dissection (module P : TestPVM) start_at length =
     | Some x -> x
   in
   let* start = state_hash section_start_state in
-  if
-    not
-      (Result.to_option
-       @@ Sc_rollup_game_repr.check_dissection
-            (Some (of_PVM_state_hash start))
-            section_start_at
-            stop_hash
-            section_stop_at
-            dissection
-      = Some ())
-  then
-    Format.printf
-      "start %a \n stop %a \n dissection : %a"
-      Sc_rollup_tick_repr.pp
-      section_start_at
-      Sc_rollup_tick_repr.pp
-      section_stop_at
-      Sc_rollup_game_repr.pp_dissection
-      dissection ;
-
+  let stop_hash = Some (aux @@ of_PVM_state_hash start) in
   Lwt.return
     (Result.to_option
      @@ Sc_rollup_game_repr.check_dissection
@@ -1062,26 +1044,11 @@ let testRandomDissection =
           let dissection =
             match dissection_opt with None -> assert false | Some d -> d
           in
-          let new_hash = Some (random_hash ()) in
-          if
-            not
-              (Result.to_option
-               @@ Sc_rollup_game_repr.check_dissection
-                    start_hash
-                    start_at
-                    new_hash
-                    stop_at
-                    dissection
-              = Some ())
-          then
-            Format.printf
-              "start %a  \n stop %a  \n dissection : %a"
-              Sc_rollup_tick_repr.pp
-              start_at
-              Sc_rollup_tick_repr.pp
-              stop_at
-              Sc_rollup_game_repr.pp_dissection
-              dissection ;
+          let rec aux hash =
+            let new_hash = Some (random_hash ()) in
+            if hash = new_hash then aux hash else new_hash
+          in
+          let new_hash = aux stop_hash in
           Lwt.return
             (Result.to_option
              @@ Sc_rollup_game_repr.check_dissection
