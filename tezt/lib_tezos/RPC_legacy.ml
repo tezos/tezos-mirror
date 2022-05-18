@@ -24,15 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_connections ?endpoint ?hooks ?peer_id client =
-  match peer_id with
-  | None ->
-      let path = ["network"; "connections"] in
-      Client.rpc ?endpoint ?hooks GET path client
-  | Some peer_id ->
-      let path = ["network"; "connections"; peer_id] in
-      Client.rpc ?endpoint ?hooks GET path client
-
 let get_greylist_ips ?hooks client =
   let path = ["network"; "greylist"; "ips"] in
   Client.rpc ?hooks GET path client

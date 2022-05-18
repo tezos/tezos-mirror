@@ -168,32 +168,18 @@ let rec wait_pred ~pred ~arg =
   let* cond = pred arg in
   if not cond then wait_pred ~pred ~arg else Lwt.return_unit
 
-(* [get_connections_points ~client] returns the list of active connections
-   point of the node linked to [client]. *)
-let get_connections_points ~client =
-  let* connections = RPC.get_connections client in
-  let connections = JSON.as_list connections in
-  return
-  @@
-  let open JSON in
-  List.map
-    (fun conn_info ->
-      ( as_string (conn_info |-> "id_point" |-> "addr"),
-        as_int (conn_info |-> "id_point" |-> "port") ))
-    connections
-
 (* [get_nb_connections ~client] returns the number of active connections of the
    node  to [client]. *)
-let get_nb_connections ~client =
-  let* ports = get_connections_points ~client in
+let get_nb_connections node =
+  let* ports = RPC.call node RPC.get_connections in
   return @@ List.length ports
 
 (* [wait_connections ~client n] waits until the node related to [client] has at
    least [n] active connections. *)
-let wait_connections ~client nb_conns_target =
+let wait_connections node nb_conns_target =
   wait_pred
     ~pred:(fun () ->
-      let* nb_conns = get_nb_connections ~client in
+      let* nb_conns = get_nb_connections node in
       return @@ (nb_conns >= nb_conns_target))
     ~arg:()
 
@@ -253,11 +239,11 @@ module Maintenance = struct
       Client.Admin.connect_address target_client ~peer:(List.hd nodes)
     in
     Log.info "Target is connected to the network." ;
-    let* () = wait_connections ~client:target_client min_target in
+    let* () = wait_connections target_node min_target in
     Log.info "Enough connections has been established." ;
     let* () = maintenance_ended_promise in
     Log.info "The maintenance ended." ;
-    let* nb_active_connections = get_nb_connections ~client:target_client in
+    let* nb_active_connections = get_nb_connections target_node in
     if nb_active_connections > max_target then
       Test.fail
         "There are too many active connections (actual: %d, expected less than \

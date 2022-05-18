@@ -32,13 +32,13 @@ let get_caboose ?endpoint client =
   let* json = RPC.get_caboose ?endpoint client in
   return JSON.(json |-> "level" |> as_int)
 
-let is_connected ?endpoint client ~peer_id =
-  let* connections = RPC.get_connections ?endpoint client in
-  let open JSON in
-  return
-  @@ List.exists
-       (fun peer -> peer |-> "peer_id" |> as_string = peer_id)
-       (connections |> as_list)
+let is_connected node ~peer_id =
+  let* response = RPC.get_connection peer_id |> RPC.call_raw node in
+  match response.code with
+  | 200 -> return true
+  | 404 -> return false
+  | code ->
+      Test.fail "unexpected response code in Bootstrap.is_connected: %d" code
 
 let wait_for_unknown_ancestor node =
   let filter json =
@@ -292,10 +292,10 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   (* Check whether the nodes are still connected. *)
   match hmode1 with
   | Full _ | Archive ->
-      let* b = is_connected client ~peer_id:node2_identity in
+      let* b = is_connected node_1 ~peer_id:node2_identity in
       if not b then Test.fail "expected the two nodes to be connected" else unit
   | Rolling _ ->
-      let* b = is_connected client ~peer_id:node2_identity in
+      let* b = is_connected node_1 ~peer_id:node2_identity in
       if b then Test.fail "expected the two nodes NOT to be connected" else unit
 
 let check_rpc_force_bootstrapped () =

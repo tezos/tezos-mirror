@@ -25,3 +25,17 @@
 
 include RPC_core
 include RPC_legacy
+
+let get_connections =
+  make GET ["network"; "connections"] @@ fun json ->
+  let decode_connection json =
+    let id_point = JSON.(json |-> "id_point") in
+    ( JSON.(id_point |-> "addr" |> as_string),
+      JSON.(id_point |-> "port" |> as_int) )
+  in
+  List.map decode_connection (JSON.as_list json)
+
+let get_connection peer_id =
+  make GET ["network"; "connections"; peer_id] @@ fun json ->
+  let id_point = JSON.(json |-> "id_point") in
+  (JSON.(id_point |-> "addr" |> as_string), JSON.(id_point |-> "port" |> as_int))

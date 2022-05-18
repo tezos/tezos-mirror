@@ -24,4 +24,16 @@
 (*****************************************************************************)
 
 include module type of RPC_core
+
 include module type of RPC_legacy
+
+(** RPC: [GET /network/connections]
+
+    Result is a list of [(address, port)] pairs. *)
+val get_connections : (string * int) list t
+
+(** RPC: [GET /network/connections/<peer_id>]
+
+    Result is the address and port of the given peer ID if connected.
+    This RPC returns 404 Not Found if the peer ID is not connected. *)
+val get_connection : string -> (string * int) t

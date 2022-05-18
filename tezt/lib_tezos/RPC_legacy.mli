@@ -34,15 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /network/connections if [peer_id] is [None].
-    Call RPC /network/connections/[peer_id] otherwise. *)
-val get_connections :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?peer_id:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /network/greylist/ips *)
 val get_greylist_ips : ?hooks:Process.hooks -> Client.t -> JSON.t Lwt.t
 
