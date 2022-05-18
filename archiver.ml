@@ -361,10 +361,10 @@ let extract_anomalies path level infos =
    that we add information for endorsements, not for
    preendorsements.
 
-   Therefore, [add_to_operations block_hash block_round ops] adds the
+   Therefore, [add_to_operations block_hash ops] adds the
    endorsements in ops, which were included in block [block_hash], to
    the list of operations already known for operation's producer.  *)
-let add_to_operations block_hash block_round ?endorsements_round operations =
+let add_to_operations block_hash ?endorsements_round operations =
   match
     List.partition
       (fun Delegate_operations.{kind; round; _} ->
@@ -383,7 +383,7 @@ let add_to_operations block_hash block_round ?endorsements_round operations =
       Delegate_operations.
         {
           kind;
-          round = Some block_round;
+          round = endorsements_round;
           errors;
           reception_time;
           block_inclusion = block_hash :: block_inclusion;
@@ -433,7 +433,6 @@ let dump_included_in_block cctxt path block_level block_hash block_round
                        operations =
                          add_to_operations
                            block_hash
-                           block_round
                            ?endorsements_round
                            operations;
                      }
