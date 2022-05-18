@@ -333,7 +333,7 @@ type 'kind manager_operation_result =
 type 'kind internal_manager_operation_result =
   ( 'kind,
     'kind Kind.manager,
-    'kind successful_manager_operation_result )
+    'kind successful_internal_manager_operation_result )
   operation_result
 
 type packed_internal_manager_operation_result =
@@ -1298,10 +1298,10 @@ module Internal_manager_result = struct
         encoding : 'a Data_encoding.t;
         kind : 'kind Kind.manager;
         select :
-          packed_successful_manager_operation_result ->
-          'kind successful_manager_operation_result option;
-        proj : 'kind successful_manager_operation_result -> 'a;
-        inj : 'a -> 'kind successful_manager_operation_result;
+          packed_successful_internal_manager_operation_result ->
+          'kind successful_internal_manager_operation_result option;
+        proj : 'kind successful_internal_manager_operation_result -> 'a;
+        inj : 'a -> 'kind successful_internal_manager_operation_result;
         t : 'kind internal_manager_operation_result Data_encoding.t;
       }
         -> 'kind case
@@ -1321,7 +1321,7 @@ module Internal_manager_result = struct
                  match o with
                  | Skipped _ | Failed _ | Backtracked _ -> None
                  | Applied o -> (
-                     match select (Successful_manager_result o) with
+                     match select (Successful_internal_manager_result o) with
                      | None -> None
                      | Some o -> Some ((), proj o)))
                (fun ((), x) -> Applied (inj x));
@@ -1351,7 +1351,7 @@ module Internal_manager_result = struct
                  match o with
                  | Skipped _ | Failed _ | Applied _ -> None
                  | Backtracked (o, errs) -> (
-                     match select (Successful_manager_result o) with
+                     match select (Successful_internal_manager_result o) with
                      | None -> None
                      | Some o -> Some (((), errs), proj o)))
                (fun (((), errs), x) -> Backtracked (inj x, errs));
@@ -1364,11 +1364,12 @@ module Internal_manager_result = struct
       ~op_case:Internal_result.transaction_case
       ~encoding:Manager_result.transaction_contract_variant_cases
       ~select:(function
-        | Successful_manager_result (Transaction_result _ as op) -> Some op
+        | Successful_internal_manager_result (ITransaction_result _ as op) ->
+            Some op
         | _ -> None)
       ~kind:Kind.Transaction_manager_kind
-      ~proj:(function Transaction_result x -> x)
-      ~inj:(fun x -> Transaction_result x)
+      ~proj:(function ITransaction_result x -> x)
+      ~inj:(fun x -> ITransaction_result x)
 
   let[@coq_axiom_with_reason "gadt"] origination_case =
     make
@@ -1383,10 +1384,11 @@ module Internal_manager_result = struct
            (dft "paid_storage_size_diff" z Z.zero)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~select:(function
-        | Successful_manager_result (Origination_result _ as op) -> Some op
+        | Successful_internal_manager_result (IOrigination_result _ as op) ->
+            Some op
         | _ -> None)
       ~proj:(function
-        | Origination_result
+        | IOrigination_result
             {
               lazy_storage_diff;
               balance_updates;
@@ -1417,7 +1419,7 @@ module Internal_manager_result = struct
                paid_storage_size_diff,
                lazy_storage_diff ) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Origination_result
+        IOrigination_result
           {
             lazy_storage_diff;
             balance_updates;
@@ -1436,15 +1438,16 @@ module Internal_manager_result = struct
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
-        | Successful_manager_result (Delegation_result _ as op) -> Some op
+        | Successful_internal_manager_result (IDelegation_result _ as op) ->
+            Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
       ~proj:(function[@coq_match_with_default]
-        | Delegation_result {consumed_gas} ->
+        | IDelegation_result {consumed_gas} ->
             (Gas.Arith.ceil consumed_gas, consumed_gas))
       ~inj:(fun (consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Delegation_result {consumed_gas = consumed_milligas})
+        IDelegation_result {consumed_gas = consumed_milligas})
 end
 
 let internal_manager_operation_result_encoding :

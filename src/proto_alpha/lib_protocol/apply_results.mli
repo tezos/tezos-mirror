@@ -157,7 +157,7 @@ and 'kind manager_operation_result =
 and 'kind internal_manager_operation_result =
   ( 'kind,
     'kind Kind.manager,
-    'kind successful_manager_operation_result )
+    'kind successful_internal_manager_operation_result )
   operation_result
 
 (** Result of applying a transaction, either internal or external. *)

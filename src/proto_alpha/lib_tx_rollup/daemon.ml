@@ -135,7 +135,7 @@ let extract_messages_from_block block_info rollup_id =
     | ( Transaction
           {amount = _; parameters; destination = Tx_rollup dst; entrypoint},
         Applied
-          (Transaction_result
+          (ITransaction_result
             (Transaction_to_tx_rollup_result {ticket_hash; _})) )
       when Tx_rollup.equal dst rollup_id
            && Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) ->

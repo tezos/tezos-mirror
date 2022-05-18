@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -352,39 +352,13 @@ let estimated_gas_single (type kind)
       (result : kind internal_manager_operation_result) =
     match result with
     | Applied
-        (Transaction_result (Transaction_to_contract_result {consumed_gas; _}))
+        (ITransaction_result (Transaction_to_contract_result {consumed_gas; _}))
     | Applied
-        (Transaction_result (Transaction_to_tx_rollup_result {consumed_gas; _}))
-      ->
+        (ITransaction_result
+          (Transaction_to_tx_rollup_result {consumed_gas; _})) ->
         Ok consumed_gas
-    | Applied (Origination_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Reveal_result {consumed_gas}) -> Ok consumed_gas
-    | Applied (Delegation_result {consumed_gas}) -> Ok consumed_gas
-    | Applied (Register_global_constant_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Set_deposits_limit_result {consumed_gas}) -> Ok consumed_gas
-    | Applied (Tx_rollup_origination_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_submit_batch_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_commit_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Tx_rollup_return_bond_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_finalize_commitment_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_remove_commitment_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_rejection_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Tx_rollup_dispatch_tickets_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Transfer_ticket_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_originate_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_add_messages_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Sc_rollup_cement_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_publish_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_refute_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_timeout_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (IOrigination_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (IDelegation_result {consumed_gas}) -> Ok consumed_gas
     | Skipped _ ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Backtracked (_, None) ->
@@ -462,49 +436,21 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
       (result : kind internal_manager_operation_result) =
     match result with
     | Applied
-        (Transaction_result
+        (ITransaction_result
           (Transaction_to_contract_result
             {paid_storage_size_diff; allocated_destination_contract; _})) ->
         if allocated_destination_contract then
           Ok (Z.add paid_storage_size_diff origination_size)
         else Ok paid_storage_size_diff
-    | Applied (Transaction_result (Transaction_to_tx_rollup_result _)) ->
+    | Applied (ITransaction_result (Transaction_to_tx_rollup_result _)) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
            Storage fees for transaction rollup.
            We need to charge for newly allocated storage (as we do for
            Michelson’s big map). *)
         Ok Z.zero
-    | Applied (Origination_result {paid_storage_size_diff; _}) ->
+    | Applied (IOrigination_result {paid_storage_size_diff; _}) ->
         Ok (Z.add paid_storage_size_diff origination_size)
-    | Applied (Reveal_result _) -> Ok Z.zero
-    | Applied (Delegation_result _) -> Ok Z.zero
-    | Applied (Register_global_constant_result {size_of_constant; _}) ->
-        Ok size_of_constant
-    | Applied (Set_deposits_limit_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_origination_result _) -> Ok tx_rollup_origination_size
-    | Applied (Tx_rollup_submit_batch_result {paid_storage_size_diff; _}) ->
-        Ok paid_storage_size_diff
-    | Applied (Tx_rollup_commit_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_return_bond_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_finalize_commitment_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_remove_commitment_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_rejection_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}) ->
-        Ok paid_storage_size_diff
-    | Applied (Transfer_ticket_result {paid_storage_size_diff; _}) ->
-        Ok paid_storage_size_diff
-    | Applied (Sc_rollup_originate_result {size; _}) -> Ok size
-    | Applied (Sc_rollup_add_messages_result _) -> Ok Z.zero
-    (* The following Sc_rollup operations have zero storage cost because we
-       consider them to be paid in the stake deposit.
-
-       TODO: https://gitlab.com/tezos/tezos/-/issues/2686
-       Document why this is safe.
-    *)
-    | Applied (Sc_rollup_cement_result _) -> Ok Z.zero
-    | Applied (Sc_rollup_publish_result _) -> Ok Z.zero
-    | Applied (Sc_rollup_refute_result _) -> Ok Z.zero
-    | Applied (Sc_rollup_timeout_result _) -> Ok Z.zero
+    | Applied (IDelegation_result _) -> Ok Z.zero
     | Skipped _ ->
         Ok Z.zero (* there must be another error for this to happen *)
     | Backtracked (_, None) ->
@@ -582,31 +528,13 @@ let originated_contracts_single (type kind)
       (result : kind internal_manager_operation_result) =
     match result with
     | Applied
-        (Transaction_result
+        (ITransaction_result
           (Transaction_to_contract_result {originated_contracts; _})) ->
         Ok originated_contracts
-    | Applied (Transaction_result (Transaction_to_tx_rollup_result _)) -> Ok []
-    | Applied (Origination_result {originated_contracts; _}) ->
+    | Applied (ITransaction_result (Transaction_to_tx_rollup_result _)) -> Ok []
+    | Applied (IOrigination_result {originated_contracts; _}) ->
         Ok originated_contracts
-    | Applied (Register_global_constant_result _) -> Ok []
-    | Applied (Reveal_result _) -> Ok []
-    | Applied (Delegation_result _) -> Ok []
-    | Applied (Set_deposits_limit_result _) -> Ok []
-    | Applied (Tx_rollup_origination_result _) -> Ok []
-    | Applied (Tx_rollup_submit_batch_result _) -> Ok []
-    | Applied (Tx_rollup_commit_result _) -> Ok []
-    | Applied (Tx_rollup_return_bond_result _) -> Ok []
-    | Applied (Tx_rollup_finalize_commitment_result _) -> Ok []
-    | Applied (Tx_rollup_remove_commitment_result _) -> Ok []
-    | Applied (Tx_rollup_rejection_result _) -> Ok []
-    | Applied (Tx_rollup_dispatch_tickets_result _) -> Ok []
-    | Applied (Transfer_ticket_result _) -> Ok []
-    | Applied (Sc_rollup_originate_result _) -> Ok []
-    | Applied (Sc_rollup_add_messages_result _) -> Ok []
-    | Applied (Sc_rollup_cement_result _) -> Ok []
-    | Applied (Sc_rollup_publish_result _) -> Ok []
-    | Applied (Sc_rollup_refute_result _) -> Ok []
-    | Applied (Sc_rollup_timeout_result _) -> Ok []
+    | Applied (IDelegation_result _) -> Ok []
     | Skipped _ -> Ok [] (* there must be another error for this to happen *)
     | Backtracked (_, None) ->
         Ok [] (* there must be another error for this to happen *)
