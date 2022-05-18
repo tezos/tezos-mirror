@@ -1750,9 +1750,11 @@ let apply_external_manager_operation_content :
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
       Sc_rollup.publish_commitment ctxt rollup source commitment
-      >>=? fun (staked_hash, ctxt) ->
+      >>=? fun (staked_hash, published_at_level, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
-      let result = Sc_rollup_publish_result {staked_hash; consumed_gas} in
+      let result =
+        Sc_rollup_publish_result {staked_hash; consumed_gas; published_at_level}
+      in
       return (ctxt, result, [])
   | Sc_rollup_refute {rollup; opponent; refutation} ->
       Sc_rollup.update_game ctxt rollup ~player:source ~opponent refutation

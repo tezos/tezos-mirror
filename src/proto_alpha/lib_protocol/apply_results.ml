@@ -237,6 +237,7 @@ type _ successful_manager_operation_result =
   | Sc_rollup_publish_result : {
       consumed_gas : Gas.Arith.fp;
       staked_hash : Sc_rollup.Commitment_hash.t;
+      published_at_level : Raw_level.t;
     }
       -> Kind.sc_rollup_publish successful_manager_operation_result
   | Sc_rollup_refute_result : {
@@ -956,21 +957,28 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_publish_case
       ~encoding:
-        (obj3
+        (obj4
            (req "consumed_gas" Gas.Arith.n_integral_encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "staked_hash" Sc_rollup.Commitment_hash.encoding))
+           (req "staked_hash" Sc_rollup.Commitment_hash.encoding)
+           (req "published_at_level" Raw_level.encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_publish_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_publish_result {consumed_gas; staked_hash} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas, staked_hash))
+        | Sc_rollup_publish_result
+            {consumed_gas; staked_hash; published_at_level} ->
+            ( Gas.Arith.ceil consumed_gas,
+              consumed_gas,
+              staked_hash,
+              published_at_level ))
       ~kind:Kind.Sc_rollup_publish_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas, staked_hash) ->
+      ~inj:
+        (fun (consumed_gas, consumed_milligas, staked_hash, published_at_level) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_publish_result {consumed_gas = consumed_milligas; staked_hash})
+        Sc_rollup_publish_result
+          {consumed_gas = consumed_milligas; staked_hash; published_at_level})
 
   let sc_rollup_refute_case =
     make

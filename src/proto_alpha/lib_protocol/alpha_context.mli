@@ -2660,14 +2660,14 @@ module Sc_rollup : sig
     t ->
     Staker.t ->
     Commitment.t ->
-    (Commitment_hash.t * context) tzresult Lwt.t
+    (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
 
   val publish_commitment :
     context ->
     t ->
     Staker.t ->
     Commitment.t ->
-    (Commitment_hash.t * context) tzresult Lwt.t
+    (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
 
   val cement_commitment :
     context -> t -> Commitment_hash.t -> context tzresult Lwt.t

@@ -433,7 +433,7 @@ let set_commitment_added ctxt rollup node new_value =
   let* ctxt, size_diff, _was_bound =
     Store.Commitment_added.add (ctxt, rollup) node new_value
   in
-  return (size_diff, ctxt)
+  return (size_diff, new_value, ctxt)
 
 let deallocate ctxt rollup node =
   let open Lwt_tzresult_syntax in
@@ -598,7 +598,7 @@ let refine_stake ctxt rollup staker commitment =
         Store.Commitments.add (ctxt, rollup) new_hash commitment
       in
       let level = (Raw_context.current_level ctxt).level in
-      let* commitment_added_size_diff, ctxt =
+      let* commitment_added_size_diff, commitment_added_level, ctxt =
         set_commitment_added ctxt rollup new_hash level
       in
       let* ctxt, staker_count_diff =
@@ -621,7 +621,7 @@ let refine_stake ctxt rollup staker commitment =
       (* First submission adds [sc_rollup_commitment_storage_size_in_bytes] to storage.
          Later submission adds 0 due to content-addressing. *)
       assert (Compare.Int.(size_diff = 0 || size_diff = expected_size_diff)) ;
-      return (new_hash, ctxt)
+      return (new_hash, commitment_added_level, ctxt)
       (* See WARNING above. *))
     else if Commitment_hash.(node = lcc) then
       (* We reached the LCC, but [staker] is not staked directly on it.

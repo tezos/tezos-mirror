@@ -686,13 +686,19 @@ let pp_manager_operation_contents_and_result ppf
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
   let pp_sc_rollup_publish_result
-      (Sc_rollup_publish_result {consumed_gas; staked_hash}) =
+      (Sc_rollup_publish_result {consumed_gas; staked_hash; published_at_level})
+      =
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     Format.fprintf
       ppf
       "@,Hash of commit: %a"
       Sc_rollup.Commitment_hash.pp
-      staked_hash
+      staked_hash ;
+    Format.fprintf
+      ppf
+      "@,Commitment published at level: %a"
+      Raw_level.pp
+      published_at_level
   in
   let pp_sc_rollup_refute_result
       (Sc_rollup_refute_result {consumed_gas; status}) =

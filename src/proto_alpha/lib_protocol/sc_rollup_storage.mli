@@ -278,7 +278,8 @@ val refine_stake :
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
   Sc_rollup_repr.Commitment.t ->
-  (Sc_rollup_repr.Commitment_hash.t * Raw_context.t) tzresult Lwt.t
+  (Sc_rollup_repr.Commitment_hash.t * Raw_level_repr.t * Raw_context.t) tzresult
+  Lwt.t
 
 (** This is a wrapper around [deposit_stake] and [refine_stake] that
     deposits a stake and then refines it to the specified commitment,
@@ -301,7 +302,8 @@ val refine_stake :
         to cover the deposit}
     }
 
-    Returns the hash of the given commitment.
+    Returns the hash of the given commitment, and the level when the commitment
+    was first published by some staker.
 
     This function does not authenticate the staker. *)
 val publish_commitment :
@@ -309,7 +311,8 @@ val publish_commitment :
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
   Sc_rollup_repr.Commitment.t ->
-  (Sc_rollup_repr.Commitment_hash.t * Raw_context.t) tzresult Lwt.t
+  (Sc_rollup_repr.Commitment_hash.t * Raw_level_repr.t * Raw_context.t) tzresult
+  Lwt.t
 
 (** [last_cemented_commitment context rollup] returns the last cemented
     commitment of the rollup.
