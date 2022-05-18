@@ -17,8 +17,8 @@ depends: [
   "bls12-381" { >= "3.0.0" & < "3.1.0" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
-  "ringo" { = "0.8" }
-  "ringo-lwt" { = "0.8" }
+  "ringo" { >= "0.9" }
+  "ringo-lwt" { >= "0.9" }
   "tezos-base"
   "tezos-sapling"
   "tezos-micheline"

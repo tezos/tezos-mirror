@@ -36,7 +36,7 @@ type metrics = {
 let namespace = Tezos_version.Node_version.namespace
 
 let metrics =
-  let subsystem = Some (String.concat "_" ["node"; "store"]) in
+  let subsystem = Some "store" in
   let checkpoint_level =
     let help = "Current checkpoint level" in
     Prometheus.Gauge.v ~help ~namespace ?subsystem "checkpoint_level"

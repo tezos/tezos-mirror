@@ -213,7 +213,7 @@ module Distributed_db = struct
   type t = {table_length : Prometheus.Gauge.t}
 
   let init =
-    let subsystem = String.concat "_" ["node"; "distributed_db"; "requester"] in
+    let subsystem = String.concat "_" ["distributed_db"; "requester"] in
     let labels = ["requester_kind"; "entry_type"] in
     let table_length =
       let help = "Number of entries (to grab) from the network present" in
@@ -401,7 +401,7 @@ module Chain_validator = struct
     let subsystem = Some (String.concat "_" name) in
     let label_name = "chain_id" in
     let head_level =
-      let help = "Current level of the node's head" in
+      let help = "Level of the current node's head" in
       Prometheus.Gauge.v_label
         ~label_name
         ~help
@@ -443,7 +443,7 @@ module Chain_validator = struct
         "head_increment_count"
     in
     let head_cycle =
-      let help = "Current cycle" in
+      let help = "Cycle of the current node's head" in
       Prometheus.Gauge.v_label
         ~label_name
         ~help
@@ -452,16 +452,16 @@ module Chain_validator = struct
         "head_cycle"
     in
     let consumed_gas =
-      let help = "Consumed Gas" in
+      let help = "Gas consumed in the current node's head" in
       Prometheus.Gauge.v_label
         ~label_name
         ~help
         ~namespace
         ?subsystem
-        "consumed_gas"
+        "head_consumed_gas"
     in
     let head_round =
-      let help = "Current Round" in
+      let help = "Round of the current node's head" in
       Prometheus.Gauge.v_label
         ~label_name
         ~help
