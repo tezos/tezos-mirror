@@ -26,15 +26,15 @@ open Protocol
 open Alpha_context
 
 module Request = struct
-  type 'a t =
+  type ('a, 'b) t =
     | Register : {
         tr : L2_transaction.t;
         apply : bool;
         eager_batch : bool;
       }
-        -> L2_transaction.hash t
-    | New_head : L2block.t -> unit t
-    | Batch : unit t
+        -> (L2_transaction.hash, error trace) t
+    | New_head : L2block.t -> (unit, error trace) t
+    | Batch : (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -114,7 +114,7 @@ module Dummy_event = struct
 end
 
 module Logger =
-  Tezos_shell.Worker_logger.Make (Dummy_event) (Request)
+  Worker_logger.Make (Dummy_event) (Request)
     (struct
       let worker_name = "tx_rollup_batcher"
     end)
