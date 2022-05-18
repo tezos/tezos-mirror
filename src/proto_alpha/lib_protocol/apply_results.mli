@@ -131,14 +131,28 @@ and packed_contents_result =
   | Contents_result : 'kind contents_result -> packed_contents_result
 
 (** The result of an operation in the queue. [Skipped] ones should
-    always be at the tail, and after a single [Failed]. *)
-and 'kind manager_operation_result =
-  | Applied of 'kind successful_manager_operation_result
-  | Backtracked of
-      'kind successful_manager_operation_result * error trace option
-  | Failed : 'kind Kind.manager * error trace -> 'kind manager_operation_result
-  | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
+    always be at the tail, and after a single [Failed].
+    * The ['kind] parameter is the operation kind (a transaction, an
+      origination, etc.).
+    * The ['manager] parameter is the type of manager kinds.
+    * The ['successful] parameter is the type of successful operations.
+    The ['kind] parameter is used to make the type a GADT, but ['manager] and
+    ['successful] are used to share [operation_result] between internal and
+    external operation results, and are instantiated for each case. *)
+and ('kind, 'manager, 'successful) operation_result =
+  | Applied of 'successful
+  | Backtracked of 'successful * error trace option
+  | Failed :
+      'manager * error trace
+      -> ('kind, 'manager, 'successful) operation_result
+  | Skipped : 'manager -> ('kind, 'manager, 'successful) operation_result
 [@@coq_force_gadt]
+
+and 'kind manager_operation_result =
+  ( 'kind,
+    'kind Kind.manager,
+    'kind successful_manager_operation_result )
+  operation_result
 
 (** Result of applying a transaction, either internal or external. *)
 and successful_transaction_result =
