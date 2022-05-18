@@ -50,6 +50,8 @@ module Address : sig
 
   (** [encoded_size] is the number of bytes needed to represent an address. *)
   val encoded_size : int
+
+  val of_b58data : Base58.data -> t option
 end
 
 module Internal_for_tests : sig

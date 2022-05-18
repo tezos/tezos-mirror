@@ -70,6 +70,8 @@ module Address = struct
     |> function
     | None -> error Error_sc_rollup_address_generation
     | Some nonce -> ok @@ hash_bytes [nonce]
+
+  let of_b58data = function H.Data h -> Some h | _ -> None
 end
 
 module Internal_for_tests = struct
