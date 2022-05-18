@@ -1654,7 +1654,7 @@ module Cost_of = struct
     let contract_optimized = key_hash_optimized
 
     (* Reasonable approximation *)
-    let contract_readable = Gas.(S.safe_int 2 *@ key_hash_readable)
+    let contract_readable = key_hash_readable
 
     let bls12_381_g1 = atomic_step_cost cost_DECODING_BLS_G1
 

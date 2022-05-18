@@ -68,13 +68,19 @@ let () =
     (function Invalid_destination_b58check x -> Some x | _ -> None)
     (fun x -> Invalid_destination_b58check x)
 
+let of_b58data data =
+  match Contract_repr.of_b58data data with
+  | Some c -> Some (Contract c)
+  | None ->
+      Tx_rollup_repr.of_b58data data
+      |> Option.map (fun tx_rollup -> Tx_rollup tx_rollup)
+
+let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
+
 let of_b58check s =
-  match Contract_repr.of_b58check s with
-  | Ok s -> Ok (Contract s)
-  | Error _ -> (
-      match Tx_rollup_repr.of_b58check s with
-      | Ok s -> Ok (Tx_rollup s)
-      | Error _ -> error (Invalid_destination_b58check s))
+  match of_b58check_opt s with
+  | None -> error (Invalid_destination_b58check s)
+  | Some dest -> Ok dest
 
 let encoding =
   let open Data_encoding in

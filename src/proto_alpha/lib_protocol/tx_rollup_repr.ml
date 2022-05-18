@@ -65,8 +65,6 @@ end
 
 type t = Hash.t
 
-type tx_rollup = t
-
 module Compare_impl = Compare.Make (struct
   type nonrec t = t
 
@@ -82,8 +80,9 @@ let in_memory_size _ =
 
 let to_b58check rollup = Hash.to_b58check rollup
 
-let of_b58check_opt s =
-  match Base58.decode s with Some (Hash.Data hash) -> Some hash | _ -> None
+let of_b58data = function Hash.Data hash -> Some hash | _ -> None
+
+let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
 
 let of_b58check s =
   match of_b58check_opt s with
@@ -130,7 +129,7 @@ let rpc_arg =
     ()
 
 module Index = struct
-  type t = tx_rollup
+  type nonrec t = t
 
   let path_length = 1
 
@@ -155,14 +154,11 @@ end
 
 let deposit_entrypoint = Entrypoint_repr.of_string_strict_exn "deposit"
 
-module Set = Set.Make (struct
-  type t = tx_rollup
+module Cmp = struct
+  type nonrec t = t
 
-  include Compare_impl
-end)
+  let compare = compare
+end
 
-module Map = Map.Make (struct
-  type t = tx_rollup
-
-  include Compare_impl
-end)
+module Set = Set.Make (Cmp)
+module Map = Map.Make (Cmp)

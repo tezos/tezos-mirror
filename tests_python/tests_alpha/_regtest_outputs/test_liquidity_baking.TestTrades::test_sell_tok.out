@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestTrades::test_sell_tok
 
 Node is bootstrapped.
-Estimated gas: 7016.814 units (will add 100 for safety)
+Estimated gas: 7013.514 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.001057
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 7117
+    Gas limit: 7114
     Storage limit: 0 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.001057
@@ -33,7 +33,7 @@ This sequence of operations was run:
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4633 bytes
-      Consumed gas: 1751.089
+      Consumed gas: 1747.789
     Internal operations:
       Transaction:
         Amount: ꜩ0

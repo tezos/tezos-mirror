@@ -67,6 +67,8 @@ val to_b58check : t -> string
 
 val of_b58check : string -> t tzresult
 
+val of_b58data : Base58.data -> t option
+
 val pp : Format.formatter -> t -> unit
 
 val pp_short : Format.formatter -> t -> unit
