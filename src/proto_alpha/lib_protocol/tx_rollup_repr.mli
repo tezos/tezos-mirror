@@ -46,6 +46,8 @@ val in_memory_size : t -> Cache_memory_helpers.sint
 
 val to_b58check : t -> string
 
+val of_b58data : Base58.data -> t option
+
 val of_b58check : string -> t tzresult
 
 val of_b58check_opt : string -> t option
