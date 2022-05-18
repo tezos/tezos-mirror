@@ -1131,17 +1131,46 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   Fees.record_paid_storage_space ctxt contract
   >|=? fun (ctxt, size, paid_storage_size_diff) ->
   let result =
-    Origination_result
-      {
-        lazy_storage_diff;
-        balance_updates;
-        originated_contracts = [contract_hash];
-        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-        storage_size = size;
-        paid_storage_size_diff;
-      }
+    {
+      lazy_storage_diff;
+      balance_updates;
+      originated_contracts = [contract_hash];
+      consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+      storage_size = size;
+      paid_storage_size_diff;
+    }
   in
   (ctxt, result, [])
+
+let apply_internal_origination ~ctxt ~storage_type ~storage ~unparsed_code
+    ~contract ~delegate ~source ~credit ~before_operation =
+  apply_origination
+    ~ctxt
+    ~storage_type
+    ~storage
+    ~unparsed_code
+    ~contract
+    ~delegate
+    ~source
+    ~credit
+    ~before_operation
+  >|=? fun (ctxt, origination_result, ops) ->
+  (ctxt, Origination_result origination_result, ops)
+
+let apply_manager_origination ~ctxt ~storage_type ~storage ~unparsed_code
+    ~contract ~delegate ~source ~credit ~before_operation =
+  apply_origination
+    ~ctxt
+    ~storage_type
+    ~storage
+    ~unparsed_code
+    ~contract
+    ~delegate
+    ~source
+    ~credit
+    ~before_operation
+  >|=? fun (ctxt, origination_result, ops) ->
+  (ctxt, Origination_result origination_result, ops)
 
 (**
 
@@ -1255,7 +1284,7 @@ let apply_internal_manager_operation_content :
         ctxt
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
-      apply_origination
+      apply_internal_origination
         ~ctxt
         ~storage_type
         ~storage
@@ -1489,7 +1518,7 @@ let apply_external_manager_operation_content :
         (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
         views_result
       >>=? fun (_typed_views, ctxt) ->
-      apply_origination
+      apply_manager_origination
         ~ctxt
         ~storage_type
         ~storage
