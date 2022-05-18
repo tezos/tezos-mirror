@@ -50,6 +50,9 @@ Client
 - Client allows to simulate failing operations with ``--simulation
   --force``, and report errors without specifying limits.
 
+- Added `--ignore-case` option to the `tezos-client gen vanity keys` command
+  to allow case-insensitive search for the given pattern.
+
 Accuser
 -------
 
