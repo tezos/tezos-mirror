@@ -1453,6 +1453,10 @@ module Target = struct
     | None -> None
     | Some package ->
         Some (Select {package; source_if_present; source_if_absent; target})
+
+  let all_internal_deps internal =
+    List.map (fun (PPS (target, _)) -> target) internal.preprocess
+    @ internal.deps @ internal.opam_only_deps
 end
 
 type target = Target.t option
@@ -1844,10 +1848,7 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
         [{Opam.package; version; with_test; optional = false}]
   | Internal ({opam = None; _} as internal) ->
       (* If a target depends on a global "private" target, we must include its dependencies as well *)
-      let deps =
-        List.map (fun (Target.PPS (target, _)) -> target) internal.preprocess
-        @ internal.deps @ internal.opam_only_deps
-      in
+      let deps = Target.all_internal_deps internal in
       List.concat_map
         (as_opam_dependency ~fix_version ~for_package ~with_test)
         deps
@@ -1890,10 +1891,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     let with_test =
       match internal.kind with Test_executable _ -> true | _ -> false
     in
-    let deps =
-      List.map (fun (Target.PPS (target, _)) -> target) internal.preprocess
-      @ internal.deps @ internal.opam_only_deps
-    in
+    let deps = Target.all_internal_deps internal in
     let x_opam_monorepo_opam_provided =
       List.filter_map as_opam_monorepo_opam_provided deps
     in
@@ -2307,12 +2305,7 @@ let check_circular_opam_deps () =
   let list_iter l f = List.iter f l in
   let name i = Target.name_for_errors (Internal i) in
   let deps_of (t : Target.internal) =
-    let pp =
-      List.map (function Target.PPS (target, _) -> target) t.preprocess
-    in
-    List.concat_map
-      (List.filter_map Target.get_internal)
-      [t.deps; t.opam_only_deps; pp]
+    List.filter_map Target.get_internal (Target.all_internal_deps t)
   in
   Target.iter_internal_by_opam @@ fun this_package internals ->
   let error_header = ref true in
