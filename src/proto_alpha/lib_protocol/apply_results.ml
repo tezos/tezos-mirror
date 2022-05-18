@@ -127,6 +127,15 @@ type successful_transaction_result =
       paid_storage_size_diff : Z.t;
     }
 
+type successful_origination_result = {
+  lazy_storage_diff : Lazy_storage.diffs option;
+  balance_updates : Receipt.balance_updates;
+  originated_contracts : Contract_hash.t list;
+  consumed_gas : Gas.Arith.fp;
+  storage_size : Z.t;
+  paid_storage_size_diff : Z.t;
+}
+
 type _ successful_manager_operation_result =
   | Reveal_result : {
       consumed_gas : Gas.Arith.fp;
@@ -135,14 +144,8 @@ type _ successful_manager_operation_result =
   | Transaction_result :
       successful_transaction_result
       -> Kind.transaction successful_manager_operation_result
-  | Origination_result : {
-      lazy_storage_diff : Lazy_storage.diffs option;
-      balance_updates : Receipt.balance_updates;
-      originated_contracts : Contract_hash.t list;
-      consumed_gas : Gas.Arith.fp;
-      storage_size : Z.t;
-      paid_storage_size_diff : Z.t;
-    }
+  | Origination_result :
+      successful_origination_result
       -> Kind.origination successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Gas.Arith.fp;

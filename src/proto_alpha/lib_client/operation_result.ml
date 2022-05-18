@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -511,15 +512,14 @@ let pp_manager_operation_contents_and_result ppf
   in
 
   let pp_origination_result
-      (Origination_result
-        {
-          lazy_storage_diff;
-          balance_updates;
-          consumed_gas;
-          originated_contracts;
-          storage_size;
-          paid_storage_size_diff;
-        }) =
+      {
+        lazy_storage_diff;
+        balance_updates;
+        consumed_gas;
+        originated_contracts;
+        storage_size;
+        paid_storage_size_diff;
+      } =
     (match originated_contracts with
     | [] -> ()
     | contracts ->
@@ -744,15 +744,15 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This transaction was BACKTRACKED, its expected effects (as \
            follow) were NOT applied.@]" ;
         pp_transaction_result tx
-    | Applied (Origination_result _ as op) ->
+    | Applied (Origination_result op_res) ->
         Format.fprintf ppf "This origination was successfully applied" ;
-        pp_origination_result op
-    | Backtracked ((Origination_result _ as op), _errs) ->
+        pp_origination_result op_res
+    | Backtracked (Origination_result op_res, _errs) ->
         Format.fprintf
           ppf
           "@[<v 0>This origination was BACKTRACKED, its expected effects (as \
            follow) were NOT applied.@]" ;
-        pp_origination_result op
+        pp_origination_result op_res
     | Applied (Register_global_constant_result _ as op) ->
         Format.fprintf
           ppf

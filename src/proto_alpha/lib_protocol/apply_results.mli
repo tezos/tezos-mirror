@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -135,7 +136,7 @@ and 'kind manager_operation_result =
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 [@@coq_force_gadt]
 
-(** Result of applying a transaction, either internal or external *)
+(** Result of applying a transaction, either internal or external. *)
 and successful_transaction_result =
   | Transaction_to_contract_result of {
       storage : Script.expr option;
@@ -154,6 +155,16 @@ and successful_transaction_result =
       paid_storage_size_diff : Z.t;
     }
 
+(** Result of applying an origination, either internal or external. *)
+and successful_origination_result = {
+  lazy_storage_diff : Lazy_storage.diffs option;
+  balance_updates : Receipt.balance_updates;
+  originated_contracts : Contract_hash.t list;
+  consumed_gas : Gas.Arith.fp;
+  storage_size : Z.t;
+  paid_storage_size_diff : Z.t;
+}
+
 (** Result of applying a {!manager_operation_content}, either internal
     or external. *)
 and _ successful_manager_operation_result =
@@ -164,14 +175,8 @@ and _ successful_manager_operation_result =
   | Transaction_result :
       successful_transaction_result
       -> Kind.transaction successful_manager_operation_result
-  | Origination_result : {
-      lazy_storage_diff : Lazy_storage.diffs option;
-      balance_updates : Receipt.balance_updates;
-      originated_contracts : Contract_hash.t list;
-      consumed_gas : Gas.Arith.fp;
-      storage_size : Z.t;
-      paid_storage_size_diff : Z.t;
-    }
+  | Origination_result :
+      successful_origination_result
       -> Kind.origination successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Gas.Arith.fp;
