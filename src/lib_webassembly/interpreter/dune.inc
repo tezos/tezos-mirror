@@ -18,7 +18,7 @@
 (env
  (_
   (flags
-   (-w +a-4-27-42-44-45 -warn-error +a-3))))
+   (-w +a-4-27-42-44-45-69-70 -warn-error +a-3))))
 
 (rule
  ; Run the WebAssembly core tests.
