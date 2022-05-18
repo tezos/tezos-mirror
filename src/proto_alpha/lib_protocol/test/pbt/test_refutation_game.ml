@@ -75,41 +75,6 @@ let check pred =
   let open Result_syntax in
   if pred then return () else error ()
 
-let check_dissection start_tick stop_tick dissection =
-  let length = List.length dissection in
-  let all_but_last = List.take_n (length - 1) dissection in
-  let tail = List.drop_n 1 dissection in
-  let length_check =
-    if List.length dissection > 32 then true
-    else
-      match
-        List.for_all2
-          ~when_different_lengths:"different"
-          (fun (_, a) (_, b) -> Sc_rollup_tick_repr.(next a = b))
-          all_but_last
-          tail
-      with
-      | Ok a -> a
-      | _ -> assert false
-  in
-
-  let ends =
-    match (List.hd dissection, List.last_opt dissection) with
-    | Some (_, a_tick), Some (_, b_tick) ->
-        Sc_rollup_tick_repr.(a_tick = start_tick && b_tick = stop_tick)
-    | _ -> false
-  in
-  let rec traverse states =
-    match states with
-    | (Some _, tick) :: (next_state, next_tick) :: others ->
-        if Sc_rollup_tick_repr.(tick < next_tick) then
-          traverse ((next_state, next_tick) :: others)
-        else false
-    | (None, _) :: _ :: _ -> true
-    | _ -> true
-  in
-  length_check && ends && traverse dissection
-
 let number_of_messages_exn n =
   match Sc_rollup_repr.Number_of_messages.of_int32 n with
   | Some x -> x
