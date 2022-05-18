@@ -1781,15 +1781,27 @@ let record ctxt rollup level message_index =
     (Raw_level_repr.of_int32_exn @@ Int32.of_int level)
     ~message_index
 
+(* Recreating the indexing logic to make sure messages are applied. *)
 let assert_is_already_applied ~loc ctxt rollup level message_index =
-  let res =
-    Sc_rollup_storage.Outbox.record_applied_message
-      ctxt
-      rollup
-      (Raw_level_repr.of_int32_exn @@ Int32.of_int level)
-      ~message_index
+  let level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
+  let level_index =
+    let max_active_levels =
+      Constants_storage.sc_rollup_max_active_outbox_levels ctxt
+    in
+    Int32.rem (Raw_level_repr.to_int32 level) max_active_levels
   in
-  assert_fails_with ~loc res "Outbox message already applied"
+  let* _ctxt, level_and_bitset_opt =
+    lift
+    @@ Storage.Sc_rollup.Applied_outbox_messages.find (ctxt, rollup) level_index
+  in
+  match level_and_bitset_opt with
+  | Some (existing_level, bitset) when Raw_level_repr.(existing_level = level)
+    ->
+      let*? is_set =
+        Environment.wrap_tzresult @@ Bitset.mem bitset message_index
+      in
+      Assert.equal_bool ~loc is_set true
+  | _ -> Stdlib.failwith "Expected a bitset and a matching level."
 
 (** Test outbox for applied messages. *)
 let test_storage_outbox () =
@@ -1813,7 +1825,7 @@ let test_storage_outbox () =
   let* _size_diff, ctxt = lift @@ record ctxt rollup1 level2 47 in
   let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level2 47 in
   let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 1 in
-  (* Record for a new rollup *)
+  (* Record for a new rollup. *)
   let* rollup2, ctxt = lift @@ new_sc_rollup ctxt in
   let* _size_diff, ctxt = lift @@ record ctxt rollup2 level1 1 in
   let* _size_diff, ctxt = lift @@ record ctxt rollup2 level1 3 in
@@ -1862,8 +1874,20 @@ let test_storage_outbox_exceed_limits () =
   in
   return ()
 
-(** Test storage outbox size diff. *)
+(** Test storage outbox size diff. Note that these tests depend on the constant.
+    [sc_rollup_max_outbox_messages_per_level] which controls the maximum size
+    of bitsets required to store applied messages per level.
+
+    Here's a breakdown of the size for applied-outbox-messages storage:
+    - [size_of_level = 4]
+    - [max_size_per_level < (2 * (sc_rollup_max_outbox_messages_per_level / 8))]
+    - [max_size_per_level < size_of_level + size_of_bitset]
+    - [total_size < sc_rollup_max_active_outbox_levels * max_size_per_level]
+  *)
 let test_storage_outbox_size_diff () =
+  (* This is the maximum additional storage space required to store one message.
+     It depends on [sc_rollup_max_outbox_messages_per_level]. *)
+  let max_size_diff = 19 in
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
   let level = 15 in
@@ -1890,7 +1914,7 @@ let test_storage_outbox_size_diff () =
   let* size_diff, ctxt =
     lift @@ record ctxt rollup (level + 1) max_message_index
   in
-  let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 19 in
+  let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) max_size_diff in
   (* Record a new message for a level that resets an index. This replaces the
      bitset with a smaller one. Hence we get a negative size diff. *)
   let* size_diff, _ctxt =
