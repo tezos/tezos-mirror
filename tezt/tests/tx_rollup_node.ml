@@ -2066,6 +2066,9 @@ let test_tickets_context =
                ("ticketer", `String contract_id);
                ("ty", `O [("prim", `String "string")]);
                ("contents", `O [("string", `String "toru")]);
+               ( "hash",
+                 `String
+                   "exprv19N2bE6WdMUXKMP81oYAvrKQK6MbLGDfRDHtRNZXEc5HseEKW" );
              ]
       in
       Check.(ticket = expected_ticket)

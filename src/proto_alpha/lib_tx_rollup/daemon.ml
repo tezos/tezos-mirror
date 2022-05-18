@@ -31,7 +31,6 @@ open Protocol_client_context
 open Protocol
 open Alpha_context
 open Error
-module Ticket_hash_map = Map.Make (Ticket_hash)
 
 let parse_tx_rollup_l2_address :
     Script.node -> Protocol.Tx_rollup_l2_address.Indexable.value tzresult =
@@ -65,7 +64,9 @@ let parse_ticketer : Script.node -> Contract.t tzresult =
 
 let parse_tx_rollup_deposit_parameters :
     Script.expr ->
-    (Ticket.t
+    (Contract.t
+    * Script.expr
+    * Script.expr
     * Protocol.Tx_rollup_l2_qty.t
     * Protocol.Script_typed_ir.tx_rollup_l2_address)
     tzresult =
@@ -107,7 +108,7 @@ let parse_tx_rollup_deposit_parameters :
       let* ticketer = parse_ticketer ticketer in
       let ty = strip_locations ty in
       let contents = strip_locations contents in
-      return (Ticket.{ticketer; ty; contents}, amount, destination)
+      return (ticketer, ty, contents, amount, destination)
   | _expr -> error Error.Tx_rollup_invalid_deposit
 
 let extract_messages_from_block block_info rollup_id =
@@ -122,8 +123,8 @@ let extract_messages_from_block block_info rollup_id =
       kind manager_operation ->
       kind manager_operation_result ->
       packed_internal_manager_operation_result list ->
-      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t ->
-      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t =
+      Tx_rollup_message.t list * Ticket.t list ->
+      Tx_rollup_message.t list * Ticket.t list =
    fun ~source op result internal_operation_results (messages, tickets) ->
     let message_size_ticket =
       match (op, result) with
@@ -144,7 +145,7 @@ let extract_messages_from_block block_info rollup_id =
           @@ fun parameters ->
           parse_tx_rollup_deposit_parameters parameters
           |> Result.to_option
-          |> Option.map @@ fun (ticket, amount, destination) ->
+          |> Option.map @@ fun (ticketer, ty, contents, amount, destination) ->
              let deposit =
                Tx_rollup_message.make_deposit
                  source
@@ -152,7 +153,7 @@ let extract_messages_from_block block_info rollup_id =
                  ticket_hash
                  amount
              in
-             (deposit, Some (ticket_hash, ticket))
+             (deposit, Some Ticket.{ticketer; ty; contents; hash = ticket_hash})
       | _, _ -> None
     in
     let acc =
@@ -162,8 +163,7 @@ let extract_messages_from_block block_info rollup_id =
           let tickets =
             match new_ticket with
             | None -> tickets
-            | Some (ticket_hash, ticket) ->
-                Ticket_hash_map.add ticket_hash ticket tickets
+            | Some ticket -> ticket :: tickets
           in
           (msg :: messages, tickets)
     in
@@ -177,9 +177,9 @@ let extract_messages_from_block block_info rollup_id =
   in
   let rec get_related_messages :
       type kind.
-      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t ->
+      Tx_rollup_message.t list * Ticket.t list ->
       kind contents_and_result_list ->
-      Tx_rollup_message.t list * Ticket.t Ticket_hash_map.t =
+      Tx_rollup_message.t list * Ticket.t list =
    fun acc -> function
     | Single_and_result
         ( Manager_operation {operation; source; _},
@@ -224,14 +224,11 @@ let extract_messages_from_block block_info rollup_id =
         error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with
-  | None -> ok ([], Ticket_hash_map.empty)
+  | None -> ok ([], [])
   | Some managed_operations ->
       let open Result_syntax in
       let+ rev_messages, new_tickets =
-        List.fold_left_e
-          finalize_receipt
-          ([], Ticket_hash_map.empty)
-          managed_operations
+        List.fold_left_e finalize_receipt ([], []) managed_operations
       in
       (List.rev rev_messages, new_tickets)
 
@@ -261,6 +258,30 @@ let commit_block_on_l1 state block =
   | None -> return_unit
   | Some operator ->
       Committer.commit_block ~operator state.State.rollup_info.rollup_id block
+
+let store_indexes ctxt contents =
+  let open Lwt_syntax in
+  let register_indexes_from_result ctxt result =
+    let indexes =
+      let open Protocol.Tx_rollup_l2_apply.Message_result in
+      match result with
+      | Deposit_result (Deposit_success indexes) -> indexes
+      | Batch_V1_result (Batch_result {indexes; _}) -> indexes
+      | _ -> assert false
+    in
+    List.fold_left_s
+      (fun ctxt (address, index) -> Context.register_address ctxt index address)
+      ctxt
+      indexes.address_indexes
+  in
+
+  List.fold_left_s
+    (fun ctxt Inbox.{result; _} ->
+      match result with
+      | Interpreted (result, _) -> register_indexes_from_result ctxt result
+      | Discarded _ -> return ctxt)
+    ctxt
+    contents
 
 let process_messages_and_inboxes (state : State.t)
     ~(predecessor : L2block.t option) ?predecessor_context block_info =
@@ -298,9 +319,11 @@ let process_messages_and_inboxes (state : State.t)
       messages
   in
   let* context =
-    Ticket_hash_map.fold_es
-      (fun ticket_hash ticket context ->
-        let* ticket_index = Context.Ticket_index.get context ticket_hash in
+    List.fold_left_es
+      (fun context ticket ->
+        let* ticket_index =
+          Context.Ticket_index.get context ticket.Ticket.hash
+        in
         match ticket_index with
         | None ->
             (* Can only happen if the interpretation of the corresponding deposit
@@ -311,14 +334,15 @@ let process_messages_and_inboxes (state : State.t)
               Context.register_ticket context ticket_index ticket
             in
             return context)
-      new_tickets
       context
+      new_tickets
   in
   match contents with
   | None ->
       (* No inbox at this block *)
       return (`Old predecessor, predecessor_context)
   | Some inbox ->
+      let*! context = store_indexes context inbox in
       let*! context_hash = Context.commit context in
       let level, predecessor_hash =
         match predecessor with

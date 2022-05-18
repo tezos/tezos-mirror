@@ -25,6 +25,11 @@
 
 open Protocol.Alpha_context
 
-type t = {ticketer : Contract.t; ty : Script.expr; contents : Script.expr}
+type t = {
+  ticketer : Contract.t;
+  ty : Script.expr;
+  contents : Script.expr;
+  hash : Ticket_hash.t;
+}
 
 val encoding : t Data_encoding.encoding

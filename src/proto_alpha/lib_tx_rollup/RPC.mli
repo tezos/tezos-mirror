@@ -40,7 +40,13 @@ type context_id = [block_id | `Context of Tx_rollup_l2_context_hash.t]
 module Encodings : sig
   val header : (L2block.hash * L2block.header) Data_encoding.t
 
-  val block : (L2block.t * L2block.metadata) Data_encoding.t
+  type any_block = Raw of L2block.t | Fancy of Fancy_l2block.t
+
+  val block : (Fancy_l2block.t * L2block.metadata) Data_encoding.t
+
+  val raw_block : (L2block.t * L2block.metadata) Data_encoding.t
+
+  val any_block : (any_block * L2block.metadata) Data_encoding.t
 end
 
 (** Starts the RPC server of the tx_rollup_node. *)
@@ -65,11 +71,17 @@ val counter :
 val inbox :
   #RPC_context.simple -> block_id -> Inbox.t option Error_monad.tzresult Lwt.t
 
+(** Returns the L2 block in the tx-rollup-node in the raw format. *)
+val raw_block :
+  #RPC_context.simple ->
+  block_id ->
+  (L2block.t * L2block.metadata) option Error_monad.tzresult Lwt.t
+
 (** Returns the L2 block in the tx-rollup-node. *)
 val block :
   #RPC_context.simple ->
   block_id ->
-  (L2block.t * L2block.metadata) option Error_monad.tzresult Lwt.t
+  (Fancy_l2block.t * L2block.metadata) option Error_monad.tzresult Lwt.t
 
 (** Returns the whole queue of L2 transactions. *)
 val get_queue :

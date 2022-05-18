@@ -49,7 +49,7 @@ let withdawals_reveals_of_message_result ctxt msg =
           ticket_index
       in
       let*! ticket = Context.get_ticket ctxt ticket_index in
-      let*? Ticket.{ticketer; contents; ty} =
+      let*? Ticket.{ticketer; contents; ty; hash = _} =
         Result.of_option
           ~error:
             [

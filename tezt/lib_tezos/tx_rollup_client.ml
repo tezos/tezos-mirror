@@ -96,9 +96,10 @@ let get_inbox ?(block = "head") tx_client =
   in
   Lwt.return out
 
-let get_block tx_client ~block =
+let get_block ?(style = `Fancy) tx_client ~block =
+  let style = match style with `Raw -> ["--raw"] | `Fancy -> [] in
   let* out =
-    spawn_command tx_client ["get"; "block"; block]
+    spawn_command tx_client (["get"; "block"; block] @ style)
     |> Process.check_and_read_stdout
   in
   Lwt.return out
