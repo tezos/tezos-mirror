@@ -273,7 +273,7 @@ module Test_map_instr_on_options = struct
     | Prim (_, D_Pair, [Prim (_, D_Some, [Int (_, prev)], _); Int (_, total)], _)
       ->
         {prev = Some (Z.to_int prev); total = Z.to_int total}
-    | _ -> QCheck.assume_fail ()
+    | _ -> QCheck2.assume_fail ()
 
   let assertions storage_before storage_after = function
     | None ->
@@ -308,13 +308,10 @@ let tests =
       `Quick
       test_multiplication_close_to_overflow_passes;
     Tztest.tztest "test stack overflow error" `Slow test_stack_overflow;
-    Tztest.tztest_qcheck
+    Tztest.tztest_qcheck2
       ~name:"test map instr against options"
-      QCheck.(
-        triple
-          (option small_signed_int)
-          (option small_signed_int)
-          small_signed_int)
+      QCheck2.Gen.(
+        triple (opt small_signed_int) (opt small_signed_int) small_signed_int)
       Test_map_instr_on_options.test_mapping;
   ]
   @ error_encoding_tests
