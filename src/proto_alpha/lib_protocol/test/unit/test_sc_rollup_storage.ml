@@ -260,7 +260,7 @@ let test_deposit_then_refine () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* _node, ctxt =
+     let* _node, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker commitment
      in
      assert_true ctxt
@@ -305,10 +305,45 @@ let test_publish () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* _node, ctxt =
+     let* _node, _level, ctxt =
        Sc_rollup_storage.publish_commitment ctxt rollup staker commitment
      in
      assert_true ctxt
+
+let test_publish_returns_oldest_publish_level () =
+  let* ctxt, rollup, staker1, staker2 =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        inbox_level = valid_inbox_level ctxt 1l;
+        number_of_messages = number_of_messages_exn 5l;
+        number_of_ticks = number_of_ticks_exn 152231l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _node, level1, ctxt =
+    lift @@ Sc_rollup_storage.publish_commitment ctxt rollup staker1 commitment
+  in
+  let current_level =
+    Raw_level_repr.to_int32 (Raw_context.current_level ctxt).level
+  in
+  let* () =
+    Assert.equal_int32
+      ~loc:__LOC__
+      (Raw_level_repr.to_int32 level1)
+      current_level
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
+  let* _node, level2, _ctxt =
+    lift @@ Sc_rollup_storage.publish_commitment ctxt rollup staker2 commitment
+  in
+  Assert.equal_int32
+    ~loc:__LOC__
+    (Raw_level_repr.to_int32 level1)
+    (Raw_level_repr.to_int32 level2)
 
 let test_withdraw_and_cement () =
   let* ctxt, rollup, staker1, staker2 =
@@ -327,7 +362,7 @@ let test_withdraw_and_cement () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
   in
   let* ctxt = lift @@ Sc_rollup_storage.withdraw_stake ctxt rollup staker2 in
@@ -354,7 +389,7 @@ let test_deposit_then_publish () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* _node, ctxt =
+     let* _node, _level, ctxt =
        Sc_rollup_storage.publish_commitment ctxt rollup staker commitment
      in
      assert_true ctxt
@@ -398,7 +433,7 @@ let test_cement () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* c1, ctxt =
+     let* c1, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker commitment
      in
      let ctxt =
@@ -432,7 +467,7 @@ let test_cement_three_commitments () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let commitment =
@@ -445,7 +480,7 @@ let test_cement_three_commitments () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c2, ctxt =
+  let* c2, _level, ctxt =
     Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let commitment =
@@ -458,7 +493,7 @@ let test_cement_three_commitments () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c3, ctxt =
+  let* c3, _level, ctxt =
     Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
@@ -487,7 +522,7 @@ let test_cement_then_remove () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
@@ -523,7 +558,7 @@ let test_cement_consumes_available_messages () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
@@ -584,7 +619,7 @@ let test_cement_with_zero_stakers_fails () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
@@ -616,7 +651,7 @@ let test_cement_fail_too_recent () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let* () =
@@ -650,7 +685,7 @@ let test_cement_deadline_uses_oldest_add_time () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
   in
   let challenge_window =
@@ -658,7 +693,7 @@ let test_cement_deadline_uses_oldest_add_time () =
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
 
-  let* c2, ctxt =
+  let* c2, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment
   in
   let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
@@ -685,7 +720,7 @@ let test_last_cemented_commitment_hash_with_level () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
@@ -717,7 +752,7 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _node, ctxt =
+  let* _node, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   assert_fails_with
@@ -751,10 +786,10 @@ let test_stake_on_existing_node () =
       }
   in
   lift
-  @@ let* _node, ctxt =
+  @@ let* _node, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
      in
-     let* _node, ctxt =
+     let* _node, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment
      in
      assert_true ctxt
@@ -775,7 +810,7 @@ let test_cement_with_two_stakers () =
       }
   in
   lift
-  @@ let* c1, ctxt =
+  @@ let* c1, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
      in
      let commitment2 =
@@ -788,7 +823,7 @@ let test_cement_with_two_stakers () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* _node, ctxt =
+     let* _node, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
      in
      let challenge_window =
@@ -817,7 +852,7 @@ let test_can_remove_staker () =
       }
   in
   lift
-  @@ let* c1, ctxt =
+  @@ let* c1, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
      in
      let commitment2 =
@@ -830,7 +865,7 @@ let test_can_remove_staker () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* _node, ctxt =
+     let* _node, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
      in
      let* ctxt = Sc_rollup_storage.remove_staker ctxt rollup staker1 in
@@ -859,7 +894,7 @@ let test_can_remove_staker2 () =
       }
   in
   lift
-  @@ let* c1, ctxt =
+  @@ let* c1, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
      in
      let commitment2 =
@@ -872,7 +907,7 @@ let test_can_remove_staker2 () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* _node, ctxt =
+     let* _node, _level, ctxt =
        Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
      in
      let* ctxt = Sc_rollup_storage.remove_staker ctxt rollup staker2 in
@@ -901,7 +936,7 @@ let test_removed_staker_can_not_withdraw () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -914,7 +949,7 @@ let test_removed_staker_can_not_withdraw () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _node, ctxt =
+  let* _node, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
   in
   let* ctxt = lift @@ Sc_rollup_storage.remove_staker ctxt rollup staker2 in
@@ -938,7 +973,7 @@ let test_no_cement_on_conflict () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -951,7 +986,7 @@ let test_no_cement_on_conflict () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _node, ctxt =
+  let* _node, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt 5000 in
@@ -980,7 +1015,7 @@ let test_no_cement_with_one_staker_at_zero_commitment () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let challenge_window =
@@ -1007,7 +1042,7 @@ let test_non_cemented_parent () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -1020,7 +1055,7 @@ let test_non_cemented_parent () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c2, ctxt =
+  let* c2, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
   in
   let challenge_window =
@@ -1047,7 +1082,7 @@ let test_finds_conflict_point_at_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -1060,7 +1095,7 @@ let test_finds_conflict_point_at_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _c2, ctxt =
+  let* _c2, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
   in
   let* (left, _right), ctxt =
@@ -1083,7 +1118,7 @@ let test_finds_conflict_point_beneath_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -1096,7 +1131,7 @@ let test_finds_conflict_point_beneath_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c2, ctxt =
+  let* c2, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment2
   in
   let commitment3 =
@@ -1109,7 +1144,7 @@ let test_finds_conflict_point_beneath_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c3, ctxt =
+  let* c3, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment3
   in
   let* (left, right), ctxt =
@@ -1133,7 +1168,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -1146,7 +1181,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c2, ctxt =
+  let* c2, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment2
   in
   let commitment3 =
@@ -1159,7 +1194,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c3, ctxt =
+  let* c3, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment3
   in
   let commitment4 =
@@ -1172,7 +1207,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _c4, ctxt =
+  let* _c4, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment4
   in
   let* (left, right), ctxt =
@@ -1206,10 +1241,10 @@ let test_conflict_point_computation_fits_in_gas_limit () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* root_commitment_hash, ctxt =
+  let* root_commitment_hash, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 root_commitment
   in
-  let* _, ctxt =
+  let* _node, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 root_commitment
   in
   let rec branch ctxt staker_id staker predecessor i max acc =
@@ -1223,7 +1258,7 @@ let test_conflict_point_computation_fits_in_gas_limit () =
           compressed_state = Sc_rollup_repr.State_hash.zero;
         }
     in
-    let* commitment_hash, ctxt =
+    let* commitment_hash, _level, ctxt =
       lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
     in
     if i = max then
@@ -1269,7 +1304,7 @@ let test_no_conflict_point_one_staker_at_lcc_preboot () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _, ctxt =
+  let* _, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
   in
   assert_fails_with
@@ -1301,7 +1336,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -1314,7 +1349,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _node, ctxt =
+  let* _node, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
   in
   let challenge_window =
@@ -1341,10 +1376,10 @@ let test_no_conflict_point_both_stakers_at_lcc () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
-  let* _node, ctxt =
+  let* _node, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment1
   in
   let challenge_window =
@@ -1375,7 +1410,7 @@ let test_staker_cannot_backtrack () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment1
   in
   let commitment2 =
@@ -1388,7 +1423,7 @@ let test_staker_cannot_backtrack () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _, ctxt =
+  let* _, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment2
   in
   assert_fails_with
@@ -1411,7 +1446,7 @@ let test_staker_cannot_change_branch () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, ctxt =
+  let* c1, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
@@ -1424,7 +1459,7 @@ let test_staker_cannot_change_branch () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c2, ctxt =
+  let* c2, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment2
   in
   let commitment3 =
@@ -1438,7 +1473,7 @@ let test_staker_cannot_change_branch () =
       }
   in
 
-  let* _c3, ctxt =
+  let* _c3, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment3
   in
   let commitment4 =
@@ -1451,7 +1486,7 @@ let test_staker_cannot_change_branch () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _c4, ctxt =
+  let* _c4, _level, ctxt =
     lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment4
   in
   assert_fails_with
@@ -1563,20 +1598,20 @@ let test_concurrent_refinement_point_of_conflict () =
   in
   let* (c1, c2), _ctxt =
     lift
-    @@ let* _c1, ctxt =
+    @@ let* _c1, _level, ctxt =
          Sc_rollup_storage.refine_stake before_ctxt rollup staker1 commitment1
        in
-       let* _c2, ctxt =
+       let* _c2, _level, ctxt =
          Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
        in
        Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
   in
   let* (c1', c2'), ctxt =
     lift
-    @@ let* _c2, ctxt =
+    @@ let* _c2, _level, ctxt =
          Sc_rollup_storage.refine_stake before_ctxt rollup staker2 commitment2
        in
-       let* _c1, ctxt =
+       let* _c1, _level, ctxt =
          Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
        in
        Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
@@ -1600,10 +1635,10 @@ let test_concurrent_refinement_cement () =
   in
   let* c1, _ctxt =
     lift
-    @@ let* c1, ctxt =
+    @@ let* c1, _level, ctxt =
          Sc_rollup_storage.refine_stake before_ctxt rollup staker1 commitment
        in
-       let* _c2, ctxt =
+       let* _c2, _level, ctxt =
          Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment
        in
        let challenge_window =
@@ -1617,10 +1652,10 @@ let test_concurrent_refinement_cement () =
   in
   let* c2, ctxt =
     lift
-    @@ let* c2, ctxt =
+    @@ let* c2, _level, ctxt =
          Sc_rollup_storage.refine_stake before_ctxt rollup staker2 commitment
        in
-       let* _c1, ctxt =
+       let* _c1, _level, ctxt =
          Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
        in
        let challenge_window =
@@ -1726,6 +1761,10 @@ let tests =
       test_deposit_then_refine_bad_inbox;
     Tztest.tztest "stake on existing node" `Quick test_stake_on_existing_node;
     Tztest.tztest "publish commitment" `Quick test_publish;
+    Tztest.tztest
+      "publish commitment returns level when commitment was first published"
+      `Quick
+      test_publish_returns_oldest_publish_level;
     Tztest.tztest
       "withdraw stake of another staker before cementing"
       `Quick

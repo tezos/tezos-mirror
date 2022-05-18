@@ -273,6 +273,7 @@ and _ successful_manager_operation_result =
   | Sc_rollup_publish_result : {
       consumed_gas : Gas.Arith.fp;
       staked_hash : Sc_rollup.Commitment_hash.t;
+      published_at_level : Raw_level.t;
     }
       -> Kind.sc_rollup_publish successful_manager_operation_result
   | Sc_rollup_refute_result : {
