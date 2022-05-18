@@ -364,6 +364,61 @@ let signer_to_address : Tx_rollup_l2_batch.signer -> Tx_rollup_l2_address.t =
   | Bls_pk pk -> Tx_rollup_l2_address.of_bls_pk pk
   | L2_addr addr -> addr
 
+let wait_for_synchronized ?(quiet = false)
+    (ctxt : Configuration.tx_client_context) =
+  let open Lwt_result_syntax in
+  let display = ref false in
+  let first_sync_block = ref None in
+  Lwt.dont_wait
+    (fun () ->
+      if (not !display) && not quiet then (
+        let*! () =
+          ctxt#message "Waiting for the rollup node to be synchronized...\n"
+        in
+        display := true ;
+        Lwt.return_unit)
+      else Lwt.return_unit)
+    (fun exc ->
+      let (_ : unit Lwt.t) =
+        let*! () =
+          ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
+        in
+        ctxt#error "Progress not monitored anymore\n%!"
+      in
+      ()) ;
+  let* stream, _stop = RPC.monitor_synchronized ctxt in
+  let*! () =
+    Lwt_stream.iter_s
+      (fun sync_status ->
+        match sync_status with
+        | `Synchronizing State.{processed_tezos_level; known_tezos_level}
+          when !display ->
+            let first_sync_block =
+              Option.value_f !first_sync_block ~default:(fun () ->
+                  first_sync_block := Some processed_tezos_level ;
+                  processed_tezos_level)
+            in
+            let total_blocks = Int32.sub known_tezos_level first_sync_block in
+            let synced_blocks =
+              Int32.sub processed_tezos_level first_sync_block
+            in
+            let progress =
+              if total_blocks < 0l || synced_blocks > total_blocks then 1.0
+              else Int32.to_float synced_blocks /. Int32.to_float total_blocks
+            in
+            ctxt#message
+              "\027[A\027[G%a (%ld/%ld)"
+              (Progress_bar.pp ~width:40)
+              progress
+              processed_tezos_level
+              known_tezos_level
+        | `Synchronized when !display ->
+            ctxt#message "Rollup node is synchronized."
+        | _ -> Lwt.return_unit)
+      stream
+  in
+  return_unit
+
 let signer_next_counter cctxt signer counter =
   let open Lwt_result_syntax in
   match counter with
@@ -434,6 +489,7 @@ let craft_tx_transfers () =
                   Alpha_context.Ticket_hash.of_b58check_exn ticket ))
               transfers
           in
+          let* () = wait_for_synchronized ~quiet:true cctxt in
           let* counter = signer_next_counter cctxt signer counter in
           let op = craft_transfers ~counter ~signer transfers in
           let json =
@@ -441,7 +497,7 @@ let craft_tx_transfers () =
               Tx_rollup_l2_batch.V1.transaction_encoding
               [op]
           in
-          let*! () = cctxt#message "@[%a@]" Data_encoding.Json.pp json in
+          let*! () = cctxt#answer "@[%a@]" Data_encoding.Json.pp json in
           return_unit)
 
 let craft_tx_transaction () =
@@ -472,6 +528,7 @@ let craft_tx_transaction () =
          ticket_hash
          (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
+      let* () = wait_for_synchronized ~quiet:true cctxt in
       let* counter = signer_next_counter cctxt signer counter in
       let op = craft_tx ~counter ~signer ~destination ~ticket_hash ~qty in
       let json =
@@ -479,7 +536,7 @@ let craft_tx_transaction () =
           Tx_rollup_l2_batch.V1.transaction_encoding
           [op]
       in
-      let*! () = cctxt#message "@[%a@]" Data_encoding.Json.pp json in
+      let*! () = cctxt#answer "@[%a@]" Data_encoding.Json.pp json in
       return_unit)
 
 let craft_tx_withdrawal () =
@@ -513,6 +570,7 @@ let craft_tx_withdrawal () =
          ticket_hash
          (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
+      let* () = wait_for_synchronized ~quiet:true cctxt in
       let* counter = signer_next_counter cctxt signer counter in
       let op = craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty in
       let json =
@@ -520,7 +578,7 @@ let craft_tx_withdrawal () =
           Tx_rollup_l2_batch.V1.transaction_encoding
           [op]
       in
-      let*! () = cctxt#message "@[%a@]" Data_encoding.Json.pp json in
+      let*! () = cctxt#answer "@[%a@]" Data_encoding.Json.pp json in
       return_unit)
 
 let craft_tx_batch () =
@@ -615,6 +673,7 @@ let prepare_operation_parameters cctxt signer counter =
     | None -> error_with "missing signer public key in the wallet"
   in
   let signer_addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
+  let* () = wait_for_synchronized cctxt in
   let* counter =
     match counter with
     | Some counter -> return counter

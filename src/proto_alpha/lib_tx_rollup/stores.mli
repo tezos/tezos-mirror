@@ -122,7 +122,7 @@ end
     associate to it the L2 block of its predecessor. *)
 module Tezos_block_store : sig
   type value = {
-    l2_block : L2block.hash;
+    l2_block : L2block.hash option;
     level : int32;
     predecessor : Block_hash.t;
   }

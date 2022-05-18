@@ -458,12 +458,16 @@ module L2_block_info = struct
 end
 
 module Tezos_block_info = struct
-  type t = {l2_block : L2block.hash; level : int32; predecessor : Block_hash.t}
+  type t = {
+    l2_block : L2block.hash option;
+    level : int32;
+    predecessor : Block_hash.t;
+  }
 
   let t =
     let open Repr in
     map
-      (triple L2_block_key.t int32 Tezos_store.Block_key.t)
+      (triple (option L2_block_key.t) int32 Tezos_store.Block_key.t)
       (fun (l2_block, level, predecessor) -> {l2_block; level; predecessor})
       (fun {l2_block; level; predecessor} -> (l2_block, level, predecessor))
 
@@ -471,14 +475,21 @@ module Tezos_block_info = struct
 
   let encode v =
     let dst = Bytes.create encoded_size in
-    let offset = blit ~src:(L2block.Hash.to_bytes v.l2_block) ~dst 0 in
+    let l2_block_bytes =
+      match v.l2_block with
+      | Some b -> L2block.Hash.to_bytes b
+      | None -> L2block.Hash.(to_bytes zero)
+    in
+    let offset = blit ~src:l2_block_bytes ~dst 0 in
     let offset = bytes_set_int32 ~dst ~src:v.level offset in
     let _ = blit ~src:(Block_hash.to_bytes v.predecessor) ~dst offset in
     Bytes.unsafe_to_string dst
 
   let decode str offset =
     let l2_block, offset =
-      read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
+      read_str str ~offset ~len:L2block.Hash.size @@ fun s ->
+      let block_hash = L2block.Hash.of_string_exn s in
+      if L2block.Hash.(block_hash = zero) then None else Some block_hash
     in
     let level, offset = read_int32 str offset in
     let predecessor, _ =
@@ -517,7 +528,7 @@ end
 
 module Tezos_block_store = struct
   type value = Tezos_block_info.t = {
-    l2_block : L2block.hash;
+    l2_block : L2block.hash option;
     level : int32;
     predecessor : Block_hash.t;
   }

@@ -40,6 +40,15 @@ type rollup_info = Stores.rollup_info = {
   origination_level : int32 option;
 }
 
+type sync_levels = {processed_tezos_level : int32; known_tezos_level : int32}
+
+type sync_info = {
+  mutable synchronized : bool;
+  on_synchronized : unit Lwt_condition.t;
+  mutable current_levels : sync_levels;
+  sync_level_input : sync_levels Lwt_watcher.input;
+}
+
 type t = {
   stores : Stores.t;
   cctxt : Protocol_client_context.full;
@@ -50,6 +59,7 @@ type t = {
   constants : Constants.t;
   signers : Node_config.signers;
   caps : Node_config.caps;
+  sync : sync_info;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
@@ -106,7 +116,7 @@ let save_tezos_block_info state block l2_block ~level ~predecessor =
 let get_tezos_l2_block_hash state block =
   let open Lwt_syntax in
   let+ info = Stores.Tezos_block_store.find state.stores.tezos_blocks block in
-  Option.map (fun i -> i.Stores.Tezos_block_store.l2_block) info
+  Option.bind info (fun i -> i.Stores.Tezos_block_store.l2_block)
 
 let get_block_store stores hash =
   Stores.L2_block_store.read_block stores.Stores.blocks hash
@@ -235,10 +245,15 @@ let set_head state head =
   let*! () = patch_l2_levels state l2_reorg in
   return l2_reorg
 
-let tezos_block_already_processed state hash =
+let tezos_block_already_processed state block =
   let open Lwt_syntax in
-  let+ info = get_tezos_l2_block_hash state hash in
-  Option.is_some info
+  let* info = Stores.Tezos_block_store.find state.stores.tezos_blocks block in
+  match info with
+  | None -> return `Unknown
+  | Some {l2_block = None; _} -> return (`Known None)
+  | Some {l2_block = Some l2_hash; _} ->
+      let+ block = get_block state l2_hash in
+      `Known block
 
 let get_included_commitment state commitment_hash =
   let open Lwt_syntax in
@@ -351,6 +366,14 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
   let* constants = retrieve_constants cctxt in
   (* L1 blocks are cached to handle reorganizations efficiently *)
   let tezos_blocks_cache = Tezos_blocks_cache.create 32 in
+  let sync =
+    {
+      synchronized = false;
+      on_synchronized = Lwt_condition.create ();
+      current_levels = {processed_tezos_level = 0l; known_tezos_level = 0l};
+      sync_level_input = Lwt_watcher.create_input ();
+    }
+  in
   return
     {
       stores;
@@ -362,4 +385,18 @@ let init (cctxt : #Protocol_client_context.full) ?(readonly = false)
       constants;
       signers;
       caps;
+      sync;
     }
+
+let notify_processed_tezos_level state processed_tezos_level =
+  state.sync.current_levels <-
+    {state.sync.current_levels with processed_tezos_level} ;
+  Lwt_watcher.notify state.sync.sync_level_input state.sync.current_levels
+
+let set_known_tezos_level state known_tezos_level =
+  state.sync.current_levels <-
+    {state.sync.current_levels with known_tezos_level}
+
+let synchronized state =
+  if state.sync.synchronized then Lwt.return_unit
+  else Lwt_condition.wait state.sync.on_synchronized
