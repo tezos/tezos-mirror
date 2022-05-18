@@ -2624,10 +2624,17 @@ let mark_backtracked results =
   and mark_internal_operation_results
       (Internal_manager_operation_result (kind, result)) =
     Internal_manager_operation_result
-      (kind, mark_manager_operation_result result)
+      (kind, mark_internal_manager_operation_result result)
   and mark_manager_operation_result :
       type kind. kind manager_operation_result -> kind manager_operation_result
       = function
+    | (Failed _ | Skipped _ | Backtracked _) as result -> result
+    | Applied (Reveal_result _) as result -> result
+    | Applied result -> Backtracked (result, None)
+  and mark_internal_manager_operation_result :
+      type kind.
+      kind internal_manager_operation_result ->
+      kind internal_manager_operation_result = function
     | (Failed _ | Skipped _ | Backtracked _) as result -> result
     | Applied (Reveal_result _) as result -> result
     | Applied result -> Backtracked (result, None)

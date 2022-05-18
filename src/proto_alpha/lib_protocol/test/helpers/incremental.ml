@@ -130,7 +130,7 @@ let detect_script_failure :
            {operation_result; internal_operation_results; _} :
           kind Kind.manager Apply_results.contents_result) =
       let detect_script_failure (type kind)
-          (result : kind manager_operation_result) =
+          (result : (kind, _, _) operation_result) =
         match result with
         | Applied _ -> Ok ()
         | Skipped _ -> assert false

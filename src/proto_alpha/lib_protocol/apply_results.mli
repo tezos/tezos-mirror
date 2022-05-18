@@ -154,6 +154,12 @@ and 'kind manager_operation_result =
     'kind successful_manager_operation_result )
   operation_result
 
+and 'kind internal_manager_operation_result =
+  ( 'kind,
+    'kind Kind.manager,
+    'kind successful_manager_operation_result )
+  operation_result
+
 (** Result of applying a transaction, either internal or external. *)
 and successful_transaction_result =
   | Transaction_to_contract_result of {
@@ -327,7 +333,7 @@ and packed_successful_manager_operation_result =
 
 and packed_internal_manager_operation_result =
   | Internal_manager_operation_result :
-      'kind internal_contents * 'kind manager_operation_result
+      'kind internal_contents * 'kind internal_manager_operation_result
       -> packed_internal_manager_operation_result
 
 val contents_of_internal_operation :
@@ -335,7 +341,7 @@ val contents_of_internal_operation :
 
 val pack_internal_manager_operation_result :
   'kind Script_typed_ir.internal_operation ->
-  'kind manager_operation_result ->
+  'kind internal_manager_operation_result ->
   packed_internal_manager_operation_result
 
 val internal_contents_encoding : packed_internal_contents Data_encoding.t

@@ -313,14 +313,20 @@ type 'kind manager_operation_result =
     'kind successful_manager_operation_result )
   operation_result
 
+type 'kind internal_manager_operation_result =
+  ( 'kind,
+    'kind Kind.manager,
+    'kind successful_manager_operation_result )
+  operation_result
+
 type packed_internal_manager_operation_result =
   | Internal_manager_operation_result :
-      'kind internal_contents * 'kind manager_operation_result
+      'kind internal_contents * 'kind internal_manager_operation_result
       -> packed_internal_manager_operation_result
 
 let pack_internal_manager_operation_result (type kind)
     (internal_op : kind Script_typed_ir.internal_operation)
-    (manager_op : kind manager_operation_result) =
+    (manager_op : kind internal_manager_operation_result) =
   let internal_op = contents_of_internal_operation internal_op in
   Internal_manager_operation_result (internal_op, manager_op)
 
@@ -1122,7 +1128,7 @@ end
 
 type 'kind iselect =
   packed_internal_manager_operation_result ->
-  ('kind internal_contents * 'kind manager_operation_result) option
+  ('kind internal_contents * 'kind internal_manager_operation_result) option
 
 module Internal_result = struct
   open Data_encoding
@@ -1279,7 +1285,7 @@ module Internal_manager_result = struct
           'kind successful_manager_operation_result option;
         proj : 'kind successful_manager_operation_result -> 'a;
         inj : 'a -> 'kind successful_manager_operation_result;
-        t : 'kind manager_operation_result Data_encoding.t;
+        t : 'kind internal_manager_operation_result Data_encoding.t;
       }
         -> 'kind case
 
