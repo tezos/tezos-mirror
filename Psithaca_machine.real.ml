@@ -137,19 +137,19 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           op_stream,
         stopper )
 
-  let baking_right cctxt hash priority =
+  let baking_right cctxt hash round =
     let* baking_rights =
       Plugin.RPC.Baking_rights.get
         ?levels:None
-        ~max_round:priority
+        ~max_round:round
         ~all:true
         cctxt
         (cctxt#chain, `Hash (hash, 0))
     in
     match List.last_opt baking_rights with
     | None -> fail_with_exn Not_found
-    | Some {delegate; round = p; timestamp; _} ->
-        let () = assert (Compare.Int.equal priority p) in
+    | Some {delegate; round = r; timestamp; _} ->
+        assert (round = r) ;
         return (delegate, timestamp)
 
   let block_round (header : Block_header.t) =
