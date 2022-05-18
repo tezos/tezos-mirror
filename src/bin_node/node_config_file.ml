@@ -816,10 +816,11 @@ let p2p =
        (dft
           "enable_testchain"
           ~description:
-            "If set to [true], the node will spawn a testchain during the \
-             protocol's testing voting period. Default value is [false]. It is \
-             disabled to decrease the node storage usage and computation by \
-             dropping the validation of the test network blocks."
+            "DEPRECATED. If set to [true], the node will spawn a testchain \
+             during the protocol's testing voting period. Default value is \
+             [false]. It is disabled to decrease the node storage usage and \
+             computation by dropping the validation of the test network \
+             blocks."
           bool
           false)
        (let open P2p_point_state.Info in

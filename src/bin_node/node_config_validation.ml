@@ -34,6 +34,9 @@ module E : sig
 
   val event : 'a t -> 'a Internal_event.Simple.t
 
+  val declare_0 :
+    name:string -> msg:string -> level:Internal_event.level -> unit -> unit t
+
   val declare_1 :
     name:string ->
     msg:string ->
@@ -69,6 +72,13 @@ end = struct
 
   let prefix_with_level level msg =
     Format.sprintf "%s: %s" (Internal_event.Level.to_string level) msg
+
+  let declare_0 ~name ~msg ~level x =
+    let msg = prefix_with_level level msg in
+    {
+      level;
+      event = Internal_event.Simple.declare_0 ~section ~name ~msg ~level x;
+    }
 
   let declare_1 ~name ~msg ~level x =
     let msg = prefix_with_level level msg in
@@ -443,10 +453,28 @@ let validate_connections (config : Node_config_file.t) =
   in
   Lwt.return_ok validated_connections
 
+(* Deprecated argument *)
+
+let testchain_is_deprecated =
+  E.declare_0
+    ~level:Warning
+    ~name:"enable_testchain_is_deprecated_in_configuration_file"
+    ~msg:"The option `p2p.enable_testchain` is deprecated."
+    ()
+
+let warn_deprecated_fields (config : Node_config_file.t) =
+  when_ config.p2p.enable_testchain ~event:testchain_is_deprecated ~payload:()
+  |> Lwt_result.return
+
 (* Main validation passes. *)
 
 let validation_passes =
-  [validate_expected_pow; validate_addresses; validate_connections]
+  [
+    validate_expected_pow;
+    validate_addresses;
+    validate_connections;
+    warn_deprecated_fields;
+  ]
 
 let validate_passes config =
   List.concat_map_es (fun f -> f config) validation_passes
