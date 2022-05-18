@@ -2510,6 +2510,7 @@ let tezt_tezos =
         hex;
         tezos_base;
         tezos_base_unix;
+        cohttp_lwt_unix;
       ]
     ~cram:true
 
