@@ -660,8 +660,7 @@ type chunk =
       * Time.Protocol.t
       * Time.System.t
       * Signature.Public_key_hash.t
-      * Int32.t option
-      * Signature.Public_key_hash.t list
+      * Consensus_ops.block_info
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
@@ -676,8 +675,7 @@ let launch cctxt prefix =
             timestamp,
             reception_time,
             baker,
-            endorsements_round,
-            endorsers_pkhs ) ->
+            block_info ) ->
           dump_included_in_block
             cctxt
             prefix
@@ -687,8 +685,8 @@ let launch cctxt prefix =
             timestamp
             reception_time
             baker
-            ?endorsements_round
-            endorsers_pkhs
+            ?endorsements_round:block_info.Consensus_ops.endorsements_round
+            block_info.Consensus_ops.endorsers
       | Mempool (unaccurate, level, items) ->
           dump_received cctxt prefix ?unaccurate level items)
     chunk_stream
@@ -698,8 +696,8 @@ let stop () = chunk_feeder None
 let add_received ?unaccurate level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block ~level block_hash ~round timestamp reception_time baker
-    ?endorsements_round pkhs =
+let add_block ~level block_hash ~round timestamp reception_time baker block_info
+    =
   chunk_feeder
     (Some
        (Block
@@ -709,5 +707,4 @@ let add_block ~level block_hash ~round timestamp reception_time baker
             timestamp,
             reception_time,
             baker,
-            endorsements_round,
-            pkhs )))
+            block_info )))

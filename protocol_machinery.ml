@@ -25,11 +25,6 @@
 
 open Lwt_result_syntax
 
-type block_endorsements_info = {
-  endorsers : Signature.public_key_hash list;
-  round : Int32.t option;
-}
-
 module type PROTOCOL_SERVICES = sig
   val hash : Protocol_hash.t
 
@@ -69,8 +64,8 @@ module type PROTOCOL_SERVICES = sig
 
   val block_round : Block_header.t -> int tzresult
 
-  val endorsements_info_of_block :
-    wrap_full -> Block_hash.t -> block_endorsements_info tzresult Lwt.t
+  val consensus_ops_info_of_block :
+    wrap_full -> Block_hash.t -> Consensus_ops.block_info tzresult Lwt.t
 end
 
 module type S = sig
@@ -158,14 +153,14 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
             | Error e ->
                 Lwt.return (Error_monad.pp_print_trace Format.err_formatter e)
             | Ok round -> (
-                let*! endorsements_info =
-                  Protocol_services.endorsements_info_of_block cctxt' hash
+                let*! consensus_ops =
+                  Protocol_services.consensus_ops_info_of_block cctxt' hash
                 in
-                match endorsements_info with
+                match consensus_ops with
                 | Error e ->
                     Lwt.return
                       (Error_monad.pp_print_trace Format.err_formatter e)
-                | Ok endorsements_info -> (
+                | Ok consensus_ops -> (
                     let*! baking_rights =
                       Protocol_services.baking_right cctxt' hash round
                     in
@@ -184,8 +179,7 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
                           timestamp
                           reception_time
                           baker
-                          ?endorsements_round:endorsements_info.round
-                          endorsements_info.endorsers ;
+                          consensus_ops ;
                         Lwt.return_unit)))
           block_stream
 

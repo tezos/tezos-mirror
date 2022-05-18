@@ -169,7 +169,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         | Single (Endorsement {round; _}) -> round
         | _ -> assert false)
 
-  let endorsements_info_of_block cctxt hash =
+  let consensus_ops_info_of_block cctxt hash =
     let* ops =
       Block_services.Operations.operations_in_pass
         cctxt
@@ -195,10 +195,13 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ops
     in
     return
-      Protocol_machinery.
+      Consensus_ops.
         {
           endorsers = pks;
-          round = Option.map Protocol.Alpha_context.Round.to_int32 !round;
+          endorsements_round =
+            Option.map Protocol.Alpha_context.Round.to_int32 !round;
+          preendorsers = None;
+          preendorsements_round = None;
         }
 end
 

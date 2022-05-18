@@ -42,3 +42,10 @@ type received_operation = {
 }
 
 type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list
+
+type block_info = {
+  endorsers : Signature.public_key_hash list;
+  endorsements_round : Int32.t option;
+  preendorsers : Signature.public_key_hash list option;
+  preendorsements_round : Int32.t option;
+}
