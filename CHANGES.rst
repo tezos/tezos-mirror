@@ -39,6 +39,8 @@ Node
 - Fixed the `tezos-node config reset` command which did not actually reset
   the configuration file to its default values.
 
+- Added metrics to observe the bootstrapped and synchronisation
+  status.
 
 Client
 ------
