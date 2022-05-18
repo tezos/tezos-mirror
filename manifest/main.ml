@@ -229,6 +229,8 @@ let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
+let plonk = external_lib "tezos-plonk" V.(at_least "0.1.0")
+
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
 let ppx_deriving = external_lib "ppx_deriving" V.True
@@ -1771,6 +1773,7 @@ let tezos_protocol_environment_structs =
         tezos_scoru_wasm;
         data_encoding;
         bls12_381;
+        plonk;
       ]
 
 let tezos_protocol_environment =
@@ -1795,6 +1798,7 @@ protocols.|}
         zarith;
         zarith_stubs_js;
         bls12_381;
+        plonk;
         ringo;
         ringo_lwt;
         tezos_base |> open_ ~m:"TzPervasives";

@@ -99,6 +99,11 @@ module type V6 = sig
        and type Bls_signature.pk = Bls12_381.Signature.MinPk.pk
        and type Bls_signature.signature = Bls12_381.Signature.MinPk.signature
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
+       and type Bls12_381.Fr.t = Bls12_381.Fr.t
+       and type Plonk.transcript = Plonk.Main_protocol.transcript
+       and type Plonk.proof = Plonk.Main_protocol.proof
+       and type Plonk.verifier_public_parameters =
+        Plonk.Main_protocol.verifier_public_parameters
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -1457,4 +1462,5 @@ struct
     end
 
   module Equality_witness = Environment_context.Equality_witness
+  module Plonk = Tezos_protocol_environment_structs.V6.Plonk
 end
