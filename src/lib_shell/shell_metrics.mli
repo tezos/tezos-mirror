@@ -113,7 +113,16 @@ module Chain_validator : sig
     validation_worker_metrics : Worker.t;
     head_cycle : Prometheus.Gauge.t;
     consumed_gas : Prometheus.Gauge.t;
+    is_bootstrapped : Prometheus.Gauge.t;
+    sync_status : Prometheus.Gauge.t;
   }
+
+  val update_bootstrapped : metrics:t -> bool -> unit
+
+  val update_sync_status :
+    metrics:t ->
+    Chain_validator_worker_state.Event.synchronisation_status ->
+    unit
 
   val init : string trace -> Chain_id.t -> t
 

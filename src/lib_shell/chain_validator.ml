@@ -678,6 +678,9 @@ let on_launch w _ parameters =
   let prevalidator = ref None in
   let when_status_changes status =
     let*! () = Worker.log_event w (Event.Sync_status status) in
+    Shell_metrics.Chain_validator.update_sync_status
+      ~metrics:parameters.metrics
+      status ;
     match status with
     | Synchronisation_heuristic.Synchronised _ ->
         if parameters.start_prevalidator then
@@ -692,8 +695,12 @@ let on_launch w _ parameters =
   in
   let synchronisation_state =
     Synchronisation_heuristic.Bootstrapping.create
-      ~when_bootstrapped_changes:(fun b ->
-        if b then Worker.log_event w Event.Bootstrapped else Lwt.return_unit)
+      ~when_bootstrapped_changes:(fun is_bootstrapped ->
+        Shell_metrics.Chain_validator.update_bootstrapped
+          ~metrics:parameters.metrics
+          is_bootstrapped ;
+        if is_bootstrapped then Worker.log_event w Event.Bootstrapped
+        else Lwt.return_unit)
       ~when_status_changes
       ~threshold:parameters.limits.synchronisation.threshold
       ~latency:parameters.limits.synchronisation.latency

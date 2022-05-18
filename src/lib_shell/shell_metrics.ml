@@ -395,7 +395,22 @@ module Chain_validator = struct
     validation_worker_metrics : Worker.t;
     head_cycle : Prometheus.Gauge.t;
     consumed_gas : Prometheus.Gauge.t;
+    is_bootstrapped : Prometheus.Gauge.t;
+    sync_status : Prometheus.Gauge.t;
   }
+
+  let update_bootstrapped ~metrics b =
+    if b then Prometheus.Gauge.set metrics.is_bootstrapped 1.
+    else Prometheus.Gauge.set metrics.is_bootstrapped 0.
+
+  let update_sync_status ~metrics event =
+    let open Chain_validator_worker_state.Event in
+    match event with
+    | Not_synchronised -> Prometheus.Gauge.set metrics.sync_status 0.
+    | Synchronised {is_chain_stuck = false} ->
+        Prometheus.Gauge.set metrics.sync_status 1.
+    | Synchronised {is_chain_stuck = true} ->
+        Prometheus.Gauge.set metrics.sync_status 2.
 
   let init name =
     let subsystem = Some (String.concat "_" name) in
@@ -469,7 +484,27 @@ module Chain_validator = struct
         ?subsystem
         "head_round"
     in
-
+    let is_bootstrapped =
+      let help = "Returns 1 if the node has bootstrapped, 0 otherwise." in
+      Prometheus.Gauge.v_label
+        ~label_name
+        ~help
+        ~namespace
+        ?subsystem
+        "is_bootstrapped"
+    in
+    let sync_status =
+      let help =
+        "Returns 0 if the node is unsynchronised, 1 if the node is \
+         synchronised, 2 if the node is stuck."
+      in
+      Prometheus.Gauge.v_label
+        ~label_name
+        ~help
+        ~namespace
+        ?subsystem
+        "synchronisation_status"
+    in
     let validation_worker_metrics =
       Worker.declare ~label_names:[label_name] ~namespace ?subsystem ()
     in
@@ -484,6 +519,8 @@ module Chain_validator = struct
         validation_worker_metrics = validation_worker_metrics [label];
         head_cycle = head_cycle label;
         consumed_gas = consumed_gas label;
+        is_bootstrapped = is_bootstrapped label;
+        sync_status = sync_status label;
       }
 
   let update_proto_metrics_callback ~metrics ~cycle ~consumed_gas ~round =
