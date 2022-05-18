@@ -94,6 +94,8 @@ let wallet_param ?(name = "an alias for a tz4 address")
     ?(desc = "an alias for a tz4 address") =
   param ~name ~desc @@ wallet_parameter ()
 
+let tezos_pkh_param = Client_keys.Public_key_hash.source_param
+
 let bls_pkh_parameter () =
   parameter
     ~autocomplete:Client_keys.Aggregate_alias.Public_key_hash.autocomplete
@@ -701,10 +703,7 @@ let withdraw () =
     @@ prefix "from"
     @@ wallet_param ~name:"source" ~desc:"An alias for a tz4 address"
     @@ prefix "to"
-    @@ param
-         ~name:"destination"
-         ~desc:"A L1 public key hash"
-         l1_destination_parameter
+    @@ tezos_pkh_param ~name:"destination" ~desc:"A L1 public key hash"
     @@ stop)
     (fun counter qty ticket_hash signer destination cctxt ->
       let open Lwt_result_syntax in
