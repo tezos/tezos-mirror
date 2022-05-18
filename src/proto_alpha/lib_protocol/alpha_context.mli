@@ -819,6 +819,8 @@ module Constants : sig
       max_number_of_stored_cemented_commitments : int;
     }
 
+    type zk_rollup = {enable : bool}
+
     type t = {
       preserved_cycles : int;
       blocks_per_cycle : int32;
@@ -862,6 +864,7 @@ module Constants : sig
       tx_rollup : tx_rollup;
       dal : dal;
       sc_rollup : sc_rollup;
+      zk_rollup : zk_rollup;
     }
 
     val encoding : t Data_encoding.t
@@ -1005,6 +1008,8 @@ module Constants : sig
   val sc_rollup_number_of_sections_in_dissection : context -> int
 
   val max_number_of_stored_cemented_commitments : context -> int
+
+  val zk_rollup_enable : context -> bool
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}

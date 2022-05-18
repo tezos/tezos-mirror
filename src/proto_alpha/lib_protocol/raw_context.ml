@@ -302,6 +302,8 @@ let[@inline] tx_rollup ctxt = ctxt.back.constants.tx_rollup
 
 let[@inline] sc_rollup ctxt = ctxt.back.constants.sc_rollup
 
+let[@inline] zk_rollup ctxt = ctxt.back.constants.zk_rollup
+
 let[@inline] recover ctxt = ctxt.back.context
 
 let[@inline] fees ctxt = ctxt.back.fees
@@ -990,6 +992,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             max_number_of_stored_cemented_commitments = 5;
           }
       in
+      let zk_rollup = Constants_parametric_repr.{enable = false} in
       let constants =
         Constants_parametric_repr.
           {
@@ -1039,6 +1042,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             tx_rollup;
             dal;
             sc_rollup;
+            zk_rollup;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)

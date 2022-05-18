@@ -127,6 +127,8 @@ type sc_rollup = {
   max_number_of_stored_cemented_commitments : int;
 }
 
+type zk_rollup = {enable : bool}
+
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -172,6 +174,7 @@ type t = {
   tx_rollup : tx_rollup;
   dal : dal;
   sc_rollup : sc_rollup;
+  zk_rollup : zk_rollup;
 }
 
 let tx_rollup_encoding =
@@ -305,6 +308,13 @@ let sc_rollup_encoding =
           (req "sc_rollup_timeout_period_in_blocks" int31)
           (req "sc_rollup_max_number_of_cemented_commitments" int31)))
 
+let zk_rollup_encoding =
+  let open Data_encoding in
+  conv
+    (fun (c : zk_rollup) -> c.enable)
+    (fun zk_rollup_enable -> {enable = zk_rollup_enable})
+    (obj1 (req "zk_rollup_enable" bool))
+
 let encoding =
   let open Data_encoding in
   conv
@@ -348,7 +358,7 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.tx_rollup, (c.dal, c.sc_rollup)) ) ) ) ) ))
+                (c.tx_rollup, (c.dal, (c.sc_rollup, c.zk_rollup))) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -388,7 +398,7 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (tx_rollup, (dal, sc_rollup)) ) ) ) ) ) ->
+                   (tx_rollup, (dal, (sc_rollup, zk_rollup))) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -432,6 +442,7 @@ let encoding =
         tx_rollup;
         dal;
         sc_rollup;
+        zk_rollup;
       })
     (merge_objs
        (obj10
@@ -492,4 +503,4 @@ let encoding =
                       tx_rollup_encoding
                       (merge_objs
                          (obj1 (req "dal_parametric" dal_encoding))
-                         sc_rollup_encoding)))))))
+                         (merge_objs sc_rollup_encoding zk_rollup_encoding))))))))
