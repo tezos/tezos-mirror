@@ -259,6 +259,23 @@ type _ successful_manager_operation_result =
     }
       -> Kind.sc_rollup_atomic_batch successful_manager_operation_result
 
+type _ successful_internal_manager_operation_result =
+  | ITransaction_result :
+      successful_transaction_result
+      -> Kind.transaction successful_internal_manager_operation_result
+  | IOrigination_result :
+      successful_origination_result
+      -> Kind.origination successful_internal_manager_operation_result
+  | IDelegation_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.delegation successful_internal_manager_operation_result
+
+type packed_successful_internal_manager_operation_result =
+  | Successful_internal_manager_result :
+      'kind successful_internal_manager_operation_result
+      -> packed_successful_internal_manager_operation_result
+
 let migration_origination_result_to_successful_manager_operation_result
     ({
        balance_updates;

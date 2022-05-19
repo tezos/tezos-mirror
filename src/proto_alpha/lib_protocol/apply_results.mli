@@ -189,8 +189,7 @@ and successful_origination_result = {
   paid_storage_size_diff : Z.t;
 }
 
-(** Result of applying a {!manager_operation_content}, either internal
-    or external. *)
+(** Result of applying an external {!manager_operation_content}. *)
 and _ successful_manager_operation_result =
   | Reveal_result : {
       consumed_gas : Gas.Arith.fp;
@@ -325,6 +324,19 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.sc_rollup_atomic_batch successful_manager_operation_result
+
+(** Result of applying a {!Script_typed_ir.internal_operation}. *)
+and _ successful_internal_manager_operation_result =
+  | ITransaction_result :
+      successful_transaction_result
+      -> Kind.transaction successful_internal_manager_operation_result
+  | IOrigination_result :
+      successful_origination_result
+      -> Kind.origination successful_internal_manager_operation_result
+  | IDelegation_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.delegation successful_internal_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :
