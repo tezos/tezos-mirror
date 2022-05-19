@@ -229,12 +229,18 @@ let test_node_configuration =
       (* Originate a rollup with a given operator *)
       let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
       let* () =
-        Rollup_node.create Operator ~rollup_id:tx_rollup_hash client node
+        Rollup_node.create
+          ~protocol
+          Operator
+          ~rollup_id:tx_rollup_hash
+          client
+          node
         |> Rollup_node.spawn_init_config
         |> Process.check_error ~exit_code:1 ~msg:(rex "Missing signers")
       in
       let tx_rollup_node =
         Rollup_node.create
+          ~protocol
           Observer
           ~rollup_id:tx_rollup_hash
           ~allow_deposit:true
@@ -259,7 +265,7 @@ let test_node_configuration =
       in
       unit)
 
-let init_and_run_rollup_node ~originator ?operator ?batch_signer
+let init_and_run_rollup_node ~protocol ~originator ?operator ?batch_signer
     ?finalize_commitment_signer ?remove_commitment_signer
     ?dispatch_withdrawals_signer ?rejection_signer
     ?(allow_deposit = operator <> None) ?(bake_origination = true) node client =
@@ -270,6 +276,7 @@ let init_and_run_rollup_node ~originator ?operator ?batch_signer
   Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
   let tx_node =
     Rollup_node.create
+      ~protocol
       Custom
       ~rollup_id:tx_rollup_hash
       ?operator
@@ -301,7 +308,9 @@ let test_tx_node_origination =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
-      let* _tx_node = init_and_run_rollup_node ~originator node client in
+      let* _tx_node =
+        init_and_run_rollup_node ~protocol ~originator node client
+      in
       unit)
 
 let test_not_allow_deposit =
@@ -324,6 +333,7 @@ let test_not_allow_deposit =
       Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
       let tx_node =
         Rollup_node.create
+          ~protocol
           Custom
           ~rollup_id:tx_rollup_hash
           ~operator
@@ -363,6 +373,7 @@ let test_allow_deposit =
       let operator = Constant.bootstrap2.public_key_hash in
       let* _tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~operator
           ~allow_deposit:true
@@ -418,6 +429,7 @@ let test_tx_node_store_inbox =
       let* () = Client.bake_for_and_wait client in
       let tx_node =
         Rollup_node.create
+          ~protocol
           Observer
           ~rollup_id:rollup
           ~allow_deposit:true
@@ -427,7 +439,10 @@ let test_tx_node_store_inbox =
       let* _ = Rollup_node.init_config tx_node in
       let* () = Rollup_node.run tx_node in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       (* Submit a batch *)
       let (`Batch content) = Rollup.make_batch "tezos_l2_batch_1" in
@@ -511,7 +526,13 @@ let test_node_cannot_connect =
   Log.info "Stopping Tezos node" ;
   let* () = Node.terminate node in
   let tx_node =
-    Rollup_node.create Custom ~rollup_id ~allow_deposit:false client node
+    Rollup_node.create
+      ~protocol
+      Custom
+      ~rollup_id
+      ~allow_deposit:false
+      client
+      node
   in
   let* _ = Rollup_node.init_config tx_node in
   let* () = Rollup_node.run tx_node in
@@ -542,7 +563,9 @@ let test_node_disconnect =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let originator = Constant.bootstrap1.public_key_hash in
-  let* rollup, tx_node = init_and_run_rollup_node ~originator node client in
+  let* rollup, tx_node =
+    init_and_run_rollup_node ~protocol ~originator node client
+  in
   (* Submit a batch *)
   let (`Batch content) = Rollup.make_batch "tezos_l2_batch_1" in
   let*! () =
@@ -837,10 +860,13 @@ let test_ticket_deposit_from_l1_to_l2 =
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let* tx_rollup_hash, tx_node =
-        init_and_run_rollup_node ~originator:operator node client
+        init_and_run_rollup_node ~protocol ~originator:operator node client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       let* contract_id =
         Client.originate_contract
@@ -1001,10 +1027,13 @@ let test_l2_to_l2_transaction =
       in
       let originator = Constant.bootstrap1.public_key_hash in
       let* tx_rollup_hash, tx_node =
-        init_and_run_rollup_node ~originator node client
+        init_and_run_rollup_node ~protocol ~originator node client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       let* contract_id =
         Client.originate_contract
@@ -1153,8 +1182,19 @@ let tx_client_inject_transaction ~tx_client ?failswith transaction signature =
         Test.fail "Transaction injection failed with: %s" (JSON.encode json))
   | Some expected_id ->
       let error_id = stderr =~* rex "\"id\": \"([^\"]+)" in
-      Check.((error_id = Some expected_id) (option string))
-        ~error_msg:"Injection should have failed with %R but failed with %L" ;
+      let error_id =
+        match error_id with
+        | None ->
+            Test.fail
+              "Injection should have failed with *%s* but didn't fail"
+              expected_id
+        | Some e -> e
+      in
+      if not (error_id =~ rex expected_id) then
+        Test.fail
+          "Injection should have failed with *%s* but failed with %s"
+          expected_id
+          error_id ;
       (* Dummy value for operation hash *)
       return ""
 
@@ -1270,6 +1310,7 @@ let test_batcher =
       let originator = Constant.bootstrap2.public_key_hash in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~operator
           ~batch_signer:Constant.bootstrap5.public_key_hash
@@ -1279,7 +1320,10 @@ let test_batcher =
           client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       (* Genarating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
@@ -1345,7 +1389,7 @@ let test_batcher =
       let* _txh =
         craft_tx_and_inject
           tx_client
-          ~failswith:"proto.alpha.tx_rollup_operation_counter_mismatch"
+          ~failswith:"tx_rollup_operation_counter_mismatch"
           ~qty:5L
           ~counter:5L
           ~signer:bls_key_2
@@ -1376,7 +1420,7 @@ let test_batcher =
         (* mix both *)
         tx_client_inject_transaction
           ~tx_client
-          ~failswith:"proto.alpha.tx_rollup_incorrect_aggregated_signature"
+          ~failswith:"tx_rollup_incorrect_aggregated_signature"
           transaction
           [signature]
       in
@@ -1390,7 +1434,7 @@ let test_batcher =
           ~dest:bls_key_2.aggregate_public_key_hash
           ~ticket:ticket_id
           ~counter:2L
-          ~failswith:"proto.alpha.tx_rollup_balance_too_low"
+          ~failswith:"tx_rollup_balance_too_low"
       in
 
       Log.info "Checking rollup node queue" ;
@@ -1503,10 +1547,13 @@ let test_reorganization =
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let* tx_rollup_hash, tx_node =
-        init_and_run_rollup_node ~originator:operator node1 client1
+        init_and_run_rollup_node ~protocol ~originator:operator node1 client1
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client1) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client1)
+          tx_node
       in
       (* Genarating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client1 in
@@ -1619,10 +1666,13 @@ let test_l2_proof_rpc_position =
       let operator = Constant.bootstrap1.public_key_hash in
       let originator = Constant.bootstrap2.public_key_hash in
       let* tx_rollup_hash, tx_node =
-        init_and_run_rollup_node ~originator node client
+        init_and_run_rollup_node ~protocol ~originator node client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       (* Generating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
@@ -1769,7 +1819,7 @@ let test_l2_proof_rpc_position =
       in
       let* () =
         Process.check_error
-          ~msg:(rex "proto.alpha.tx_rollup_proof_produced_rejected_state")
+          ~msg:(rex "tx_rollup_proof_produced_rejected_state")
           process
       in
       Log.info "Try to reject a good commitment at level 1, message 1" ;
@@ -1810,7 +1860,7 @@ let test_l2_proof_rpc_position =
       in
       let* () =
         Process.check_error
-          ~msg:(rex "proto.alpha.tx_rollup_proof_produced_rejected_state")
+          ~msg:(rex "tx_rollup_proof_produced_rejected_state")
           process
       in
       unit)
@@ -1828,7 +1878,7 @@ let test_reject_bad_commitment =
       let originator = Constant.bootstrap1.public_key_hash in
       let operator = Constant.bootstrap3.public_key_hash in
       let* tx_rollup_hash, tx_node =
-        init_and_run_rollup_node ~originator node client
+        init_and_run_rollup_node ~protocol ~originator node client
       in
       (* Generating some identities *)
       let* bls_key1 = Client.bls_gen_and_show_keys client in
@@ -1923,6 +1973,7 @@ let test_committer =
       let originator = Constant.bootstrap2.public_key_hash in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~operator
           ~batch_signer:Constant.bootstrap5.public_key_hash
@@ -1930,7 +1981,10 @@ let test_committer =
           client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       (* Generating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
@@ -2030,13 +2084,17 @@ let test_tickets_context =
       let originator = Constant.bootstrap1.public_key_hash in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
           node
           client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       (* Generating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
@@ -2066,9 +2124,7 @@ let test_tickets_context =
                ("ticketer", `String contract_id);
                ("ty", `O [("prim", `String "string")]);
                ("contents", `O [("string", `String "toru")]);
-               ( "hash",
-                 `String
-                   "exprv19N2bE6WdMUXKMP81oYAvrKQK6MbLGDfRDHtRNZXEc5HseEKW" );
+               ("hash", `String ticket_id);
              ]
       in
       Check.(ticket = expected_ticket)
@@ -2152,6 +2208,7 @@ let test_withdrawals =
       let operator = Constant.bootstrap1.public_key_hash in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~operator
           ~batch_signer:Constant.bootstrap5.public_key_hash
@@ -2161,7 +2218,10 @@ let test_withdrawals =
           client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       let check_l2_block_finalized block =
         let finalized =
@@ -2332,6 +2392,7 @@ let test_accuser =
   let* tx_rollup_hash, tx_node =
     (* Starting without committer/operator *)
     init_and_run_rollup_node
+      ~protocol
       ~originator
       ~batch_signer:Constant.bootstrap5.public_key_hash
       ~rejection_signer:operator
@@ -2397,13 +2458,17 @@ let test_batcher_large_message =
       let originator = Constant.bootstrap1.public_key_hash in
       let* _tx_rollup_hash, tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
           node
           client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       let* bls_key = Client.bls_gen_and_show_keys client in
       let pkh1_str = bls_key.aggregate_public_key_hash in
@@ -2448,13 +2513,17 @@ let test_transfer_command =
       let originator = Constant.bootstrap1.public_key_hash in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
           node
           client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       (* Generating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
@@ -2512,13 +2581,17 @@ let test_withdraw_command =
       let originator = Constant.bootstrap1.public_key_hash in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
+          ~protocol
           ~originator
           ~batch_signer:Constant.bootstrap5.public_key_hash
           node
           client
       in
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       (* Generating some identities *)
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
@@ -2581,13 +2654,17 @@ let test_catch_up =
   let* tx_rollup_hash, tx_node =
     (* Starting without committer/operator *)
     init_and_run_rollup_node
+      ~protocol
       ~originator
       ~batch_signer:Constant.bootstrap5.public_key_hash
       node
       client
   in
   let tx_client =
-    Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+    Tx_rollup_client.create
+      ~protocol
+      ~wallet_dir:(Client.base_dir client)
+      tx_node
   in
   (* Generating some identities *)
   let* bls_key_1 = Client.bls_gen_and_show_keys client in
@@ -2697,6 +2774,7 @@ let test_origination_deposit_same_block =
       (* Do not bake after origination, we will also inject deposit *)
       let tx_node =
         Rollup_node.create
+          ~protocol
           Observer
           ~rollup_id:tx_rollup_hash
           ~allow_deposit:false
@@ -2752,7 +2830,10 @@ let test_origination_deposit_same_block =
       (* Get the operation containing the ticket transfer. We assume
          that only one operation is issued in this block. *)
       let tx_client =
-        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+        Tx_rollup_client.create
+          ~protocol
+          ~wallet_dir:(Client.base_dir client)
+          tx_node
       in
       let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit_json inbox in

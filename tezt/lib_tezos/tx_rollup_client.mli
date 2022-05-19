@@ -31,8 +31,8 @@ type t
    program at [path], storing local information in [base_dir], and
    communicating with the specified [node]. *)
 val create :
+  protocol:Protocol.t ->
   ?name:string ->
-  ?path:string ->
   ?base_dir:string ->
   ?wallet_dir:string ->
   ?color:Log.Color.t ->

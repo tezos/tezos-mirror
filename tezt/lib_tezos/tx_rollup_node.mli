@@ -30,7 +30,7 @@ type t
 type mode = Accuser | Batcher | Custom | Maintenance | Observer | Operator
 
 val create :
-  ?path:string ->
+  protocol:Protocol.t ->
   ?runner:Runner.t ->
   ?data_dir:string ->
   ?addr:string ->

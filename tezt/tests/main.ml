@@ -112,8 +112,8 @@ let () =
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
-  Tx_rollup.register ~protocols:[Alpha] ;
-  Tx_rollup_node.register ~protocols:[Alpha] ;
+  Tx_rollup.register ~protocols:[Alpha; Jakarta] ;
+  Tx_rollup_node.register ~protocols:[Alpha; Jakarta] ;
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
