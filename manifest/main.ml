@@ -678,6 +678,32 @@ let tezos_rpc =
       ]
     ~js_compatible:true
 
+let _tezos_polynomial =
+  public_lib
+    "tezos-polynomial"
+    ~path:"src/lib_polynomial"
+    ~synopsis:"Tezos: polynomials' library"
+    ~deps:[data_encoding |> open_; bls12_381]
+    ~modules:
+      [
+        "Carray";
+        "Fr_generation";
+        "Domain";
+        "Univariate";
+        "Multivariate";
+        "Evaluations_c";
+        "Polynomial_c";
+        "Polynomial";
+      ]
+    ~linkall:true
+    ~c_library_flags:["-lpthread"]
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = [];
+        names = ["caml_polynomial_stubs"; "polynomial"];
+      }
+
 let tezos_crypto =
   public_lib
     "tezos-crypto"
