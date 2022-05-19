@@ -113,9 +113,9 @@ val set_deposits_limit :
   Tez.tez option ->
   Operation.packed tzresult Lwt.t
 
-(** [revelation ?fee ?gas_limit ctxt pkh] Creates a new [Reveal]
-   {!manager_operation} to reveal a public key [pkh] applying to
-   current context [ctxt].
+(** [revelation ?fee ?gas_limit ?forge_pkh ctxt pkh] Creates a new
+   [Reveal] {!manager_operation} to reveal a public key [pkh] applying
+   to current context [ctxt].
 
     Optional arguments allow to override defaults:
 
@@ -123,11 +123,15 @@ val set_deposits_limit :
    [Tez.zero].}
 
        {li [?gas_limit:Gas.Arith.integral]: force a gas limit,
-   otherwise set to 10000 gas units.}}
-*)
+   otherwise set to 10000 gas units.}
+
+       {li [?forge_pkh]: use a
+   provided [pkh] as source, instead of hashing [pkh]. Useful for
+   forging non-honest reveal operations} *)
 val revelation :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
+  ?forge_pkh:public_key_hash option ->
   Context.t ->
   public_key ->
   Operation.packed tzresult Lwt.t

@@ -115,19 +115,38 @@ let is_manager_key_revealed c manager =
   | Some (Manager_repr.Hash _) -> return_false
   | Some (Manager_repr.Public_key _) -> return_true
 
-let reveal_manager_key c manager public_key =
+let check_public_key public_key expected_hash =
+  let provided_hash = Signature.Public_key.hash public_key in
+  error_unless
+    (Signature.Public_key_hash.equal provided_hash expected_hash)
+    (Inconsistent_hash {public_key; expected_hash; provided_hash})
+
+let reveal_manager_key ?(check_consistency = true) c manager public_key =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Manager.get c contract >>=? function
   | Public_key _ -> fail (Previously_revealed_key contract)
-  | Hash v ->
-      let actual_hash = Signature.Public_key.hash public_key in
-      if Signature.Public_key_hash.equal actual_hash v then
-        let v = Manager_repr.Public_key public_key in
-        Storage.Contract.Manager.update c contract v
-      else
-        fail
-          (Inconsistent_hash
-             {public_key; expected_hash = v; provided_hash = actual_hash})
+  | Hash expected_hash ->
+      (* Ensure that the manager is equal to the retrieved hash. *)
+      error_unless
+        (Signature.Public_key_hash.equal manager expected_hash)
+        (Inconsistent_hash {public_key; expected_hash; provided_hash = manager})
+      >>?= fun () ->
+      (* TODO tezos/tezos#3078
+
+         We keep the consistency check and the optional argument to
+         preserve the semantics of reveal_manager_key prior to
+         tezos/tezos!5182, when called outside the scope of
+         [apply_operation].
+
+         Inside appply.ml, it is used with
+         ?check_consistency=false. Ultimately this parameter should go
+         away, and the split check_publick_key / reveal_manager_key
+         pattern has to be exported to usage outside apply.ml *)
+      when_ check_consistency (fun () ->
+          Lwt.return @@ check_public_key public_key expected_hash)
+      >>=? fun () ->
+      let pk = Manager_repr.Public_key public_key in
+      Storage.Contract.Manager.update c contract pk
 
 let get_manager_key ?error ctxt pkh =
   let contract = Contract_repr.Implicit pkh in

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2022 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,7 +32,7 @@
     Subject:    On the reveal operation.
 *)
 
-(** Test for the [Reveal] operation. *)
+(** Protocol integration tests for the [Reveal] operation. *)
 
 open Protocol
 open Alpha_context
@@ -112,6 +112,163 @@ let test_transfer_fees_emptying_after_reveal_batched () =
   Incremental.add_operation ~expect_apply_failure:(fun _ -> return_unit) inc op
   >>=? fun _inc -> return_unit
 
+(* We assert that the changes introduced in !5182, splitting the
+   application of Reveal operations into a pre-checking and
+   an application phase, do not allow to forge dishonest revelations. *)
+let test_reveal_with_fake_account () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, bootstrap) ->
+  (* Create two fresh, unrevealed, accounts a and b. *)
+  let account_a = Account.new_account () in
+  let a_pkh = account_a.pkh in
+  let a_contract = Contract.Implicit a_pkh in
+  let account_b = Account.new_account () in
+  let b_pkh = account_b.pkh in
+  let b_contract = Contract.Implicit b_pkh in
+  (* Assert a and b are fresh.*)
+  (* TODO tezos/tezos#2996
+
+     These preambles are too verbose and boilerplate. We should factor
+     out revealing fresh unrevealed accounts. *)
+  when_ (Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
+      failwith
+        "Expected different pkhs: got %a %a"
+        Signature.Public_key_hash.pp
+        a_pkh
+        Signature.Public_key_hash.pp
+        b_pkh)
+  >>=? fun () ->
+  Op.transaction (B blk) bootstrap a_contract Tez.one >>=? fun oa ->
+  Op.transaction (B blk) bootstrap b_contract Tez.one >>=? fun ob ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:bootstrap
+    (B blk)
+    [oa; ob]
+  >>=? fun batch ->
+  Block.bake blk ~operation:batch >>=? fun b ->
+  (Context.Contract.is_manager_key_revealed (B blk) a_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  (Context.Contract.is_manager_key_revealed (B blk) b_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  (* get initial balance of account_a *)
+  Context.Contract.balance (B b) a_contract >>=? fun a_balance_before ->
+  (* We will attempt to forge a reveal with a fake account that
+     impersonates account_a but uses account_b's public and secret
+     keys, e.g.
+
+     fake_a = Account.{pkh = account_a.pkh; pk = account_b.pk; sk =
+     account_b.sk}
+
+     and we will attempt to reveal the public key of b with a's
+     pkh. This operation should fail without updating account_a's
+     balance *)
+  Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
+  >>=? fun operation ->
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation
+    ~expect_failure:(function
+      | [
+          Environment.Ecoproto_error
+            (Contract_manager_storage.Inconsistent_hash _);
+        ] ->
+          return_unit
+      | errs ->
+          failwith
+            "Expected an Contract_manager_storage.Inconsistent_hash error but \
+             got %a"
+            Error_monad.pp_print_trace
+            errs)
+    i
+    operation
+  >>=? fun i ->
+  Context.Contract.balance (I i) a_contract >>=? fun a_balance_after ->
+  unless (Tez.equal a_balance_after a_balance_before) (fun () ->
+      failwith
+        "Balance of contract_a should have not changed: expected %atz, got %atz"
+        Tez.pp
+        a_balance_before
+        Tez.pp
+        a_balance_after)
+
+(* On the following test, we create an account a, fund it, reveal it,
+   and get its balance. Then we attempt to forge a reveal for another
+   account b, using a's pkh. *)
+let test_reveal_with_fake_account_already_revealed () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, bootstrap) ->
+  (* Create two fresh, unrevealed, accounts a and b. *)
+  let account_a = Account.new_account () in
+  let a_pkh = account_a.pkh in
+  let a_contract = Contract.Implicit a_pkh in
+  let account_b = Account.new_account () in
+  let b_pkh = account_b.pkh in
+  let b_contract = Contract.Implicit b_pkh in
+  (* Assert a and b are fresh.*)
+  (* TODO tezos/tezos#2996
+
+     These preambles are too verbose and boilerplate. We should factor
+     out revealing fresh unrevealed accounts. *)
+  when_ (Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
+      failwith
+        "Expected different pkhs: got %a %a"
+        Signature.Public_key_hash.pp
+        a_pkh
+        Signature.Public_key_hash.pp
+        b_pkh)
+  >>=? fun () ->
+  Op.transaction (B blk) bootstrap a_contract Tez.one >>=? fun oa ->
+  Op.transaction (B blk) bootstrap b_contract Tez.one >>=? fun ob ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:bootstrap
+    (B blk)
+    [oa; ob]
+  >>=? fun batch ->
+  Block.bake blk ~operation:batch >>=? fun b ->
+  (Context.Contract.is_manager_key_revealed (B blk) a_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  (Context.Contract.is_manager_key_revealed (B blk) b_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  (* We first reveal a in a block *)
+  Op.revelation ~fee:Tez.one_mutez (B b) account_a.pk >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  Context.Contract.balance (B b) a_contract >>=? fun a_balance_before ->
+  (* Reveal the public key of b while impersonating account_a. This
+     operation should fail without updating account_a's balance *)
+  Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
+  >>=? fun operation ->
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation
+    ~expect_failure:(function
+      | [
+          Environment.Ecoproto_error
+            (Contract_manager_storage.Inconsistent_hash _);
+        ] ->
+          return_unit
+      | errs ->
+          failwith
+            "Expected a Previously_revealed_key error but got %a"
+            Error_monad.pp_print_trace
+            errs)
+    i
+    operation
+  >>=? fun i ->
+  Context.Contract.balance (I i) a_contract >>=? fun a_balance_after ->
+  unless (Tez.equal a_balance_after a_balance_before) (fun () ->
+      failwith
+        "Balance of contract_a should have not changed: expected %atz, got %atz"
+        Tez.pp
+        a_balance_before
+        Tez.pp
+        a_balance_after)
+
 let tests =
   [
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
@@ -124,4 +281,12 @@ let tests =
       "transfer fees emptying balance after reveal in batch"
       `Quick
       test_transfer_fees_emptying_after_reveal_batched;
+    Tztest.tztest
+      "cannot forge reveal with fake keys and signature"
+      `Quick
+      test_reveal_with_fake_account;
+    Tztest.tztest
+      "cannot re-reveal an account with fake keys and signature"
+      `Quick
+      test_reveal_with_fake_account_already_revealed;
   ]

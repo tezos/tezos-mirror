@@ -306,8 +306,17 @@ let manager_operation ?(force_reveal = true) ?counter ?(fee = Tez.zero)
     Contents_list (Cons (op_reveal, Single op))
 
 let revelation ?(fee = Tez.zero)
-    ?(gas_limit = Gas.Arith.integral_of_int_exn 10000) ctxt public_key =
-  let pkh = Signature.Public_key.hash public_key in
+    ?(gas_limit = Gas.Arith.integral_of_int_exn 10000) ?(forge_pkh = None) ctxt
+    public_key =
+  (* If Some pkh is provided to ?forge_pkh we take that hash at face
+     value, otherwise we honestly compute the hash from
+     [public_key]. This is useful to test forging Reveal operations
+     (cf. tezos!5182). *)
+  let pkh =
+    match forge_pkh with
+    | Some pkh -> pkh
+    | None -> Signature.Public_key.hash public_key
+  in
   let source = Contract.Implicit pkh in
   Context.Contract.counter ctxt source >>=? fun counter ->
   Context.Contract.manager ctxt source >|=? fun account ->
@@ -317,7 +326,7 @@ let revelation ?(fee = Tez.zero)
       (Single
          (Manager_operation
             {
-              source = Signature.Public_key.hash public_key;
+              source = pkh;
               fee;
               counter;
               operation = Reveal public_key;

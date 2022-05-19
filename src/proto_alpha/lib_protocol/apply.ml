@@ -1239,7 +1239,17 @@ let apply_external_manager_operation_content :
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
   | Reveal pk ->
-      Contract.reveal_manager_key ctxt source pk >>=? fun ctxt ->
+      (* TODO tezos/tezos#3070
+
+         We have already asserted the consistency of the supplied public
+         key during precheck, so we avoid re-checking that precondition
+         with [?check_consistency=false]. This optional parameter is
+         temporary, to avoid breaking compatibility with external legacy
+         usage of [Contract.reveal_manager_key]. However, the pattern of
+         using [Contract.check_public_key] and this usage of
+         [Contract.reveal_manager_key] should become the standard. *)
+      Contract.reveal_manager_key ~check_consistency:false ctxt source pk
+      >>=? fun ctxt ->
       return
         ( ctxt,
           (Reveal_result
@@ -1906,12 +1916,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
      risk getting different results if the operation has already been
      deserialized before (e.g. when retrieve in JSON format). *)
   (match operation with
-  | Reveal _pk ->
-      (* TODO #2603
-         Should pre-check/validate have a specific precondition for
-         individual reveals?
-      *)
-      return ctxt
+  | Reveal pk -> Contract.check_public_key pk source >>?= fun () -> return ctxt
   | Transaction {parameters; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
