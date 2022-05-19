@@ -571,11 +571,9 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
       let timestamp = Store.Block.timestamp block in
       let () =
         let nv = Worker.state w in
-        let () =
-          Shell_metrics.Worker.update
-            nv.parameters.metrics.validation_worker_metrics
-            request_status
-        in
+        Shell_metrics.Worker.update
+          nv.parameters.metrics.validation_worker_metrics
+          request_status ;
         match update with
         | Event.Ignored_head ->
             Prometheus.Counter.inc_one nv.parameters.metrics.ignored_head_count
@@ -583,7 +581,11 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
             Prometheus.Counter.inc_one nv.parameters.metrics.branch_switch_count ;
             Prometheus.Gauge.set
               nv.parameters.metrics.head_level
-              (Int32.to_float level)
+              (Int32.to_float level) ;
+            Shell_metrics.Chain_validator.update_proto (fun () ->
+                collect_proto
+                  ~metrics:nv.parameters.metrics
+                  (nv.parameters.chain_store, block))
         | Event.Head_increment ->
             Prometheus.Counter.inc_one
               nv.parameters.metrics.head_increment_count ;
