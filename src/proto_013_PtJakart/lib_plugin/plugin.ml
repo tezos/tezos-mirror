@@ -3007,6 +3007,39 @@ module RPC = struct
       RPC_context.make_call1 S.initial_level ctxt block sc_rollup_address ()
   end
 
+  module Tx_rollup = struct
+    open Data_encoding
+
+    module S = struct
+      let path : RPC_context.t RPC_path.context =
+        RPC_path.(open_root / "context" / "tx_rollup")
+
+      let has_bond =
+        RPC_service.get_service
+          ~description:
+            "Returns true if the public key hash already deposited a bond  for \
+             the given rollup"
+          ~query:RPC_query.empty
+          ~output:bool
+          RPC_path.(
+            path /: Tx_rollup.rpc_arg / "has_bond"
+            /: Signature.Public_key_hash.rpc_arg)
+    end
+
+    let register_has_bond () =
+      Registration.register2
+        ~chunked:false
+        S.has_bond
+        (fun ctxt rollup operator () () ->
+          Tx_rollup_commitment.has_bond ctxt rollup operator
+          >>=? fun (_ctxt, has_bond) -> return has_bond)
+
+    let register () = register_has_bond ()
+
+    let has_bond ctxt block rollup operator =
+      RPC_context.make_call2 S.has_bond ctxt block rollup operator () ()
+  end
+
   module Forge = struct
     module S = struct
       open Data_encoding
@@ -3114,6 +3147,27 @@ module RPC = struct
               ~output:
                 (obj1 (req "path" Tx_rollup_commitment.Merkle.path_encoding))
               RPC_path.(path / "merkle_tree_path")
+
+          let message_result_hash =
+            RPC_service.post_service
+              ~description:"Compute the message result hash"
+              ~query:RPC_query.empty
+              ~input:Tx_rollup_message_result.encoding
+              ~output:(obj1 (req "hash" Tx_rollup_message_result_hash.encoding))
+              RPC_path.(path / "message_result_hash")
+        end
+
+        module Withdraw = struct
+          let path = RPC_path.(path / "withdraw")
+
+          let withdraw_list_hash =
+            RPC_service.post_service
+              ~description:"Compute the hash of a withdraw list"
+              ~query:RPC_query.empty
+              ~input:
+                (obj1 (req "withdraw_list" (list Tx_rollup_withdraw.encoding)))
+              ~output:(obj1 (req "hash" Tx_rollup_withdraw_list_hash.encoding))
+              RPC_path.(path / "withdraw_list_hash")
         end
       end
     end
@@ -3177,7 +3231,18 @@ module RPC = struct
         (fun () (message_result_hashes, position) ->
           let open Tx_rollup_commitment.Merkle in
           let tree = List.fold_left snoc nil message_result_hashes in
-          Lwt.return (compute_path tree position))
+          Lwt.return (compute_path tree position)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Commitment.message_result_hash
+        (fun () message_result ->
+          return
+            (Tx_rollup_message_result_hash.hash_uncarbonated message_result)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Withdraw.withdraw_list_hash
+        (fun () withdrawals ->
+          return (Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals))
 
     module Manager = struct
       let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
@@ -3892,6 +3957,7 @@ module RPC = struct
     Endorsing_rights.register () ;
     Validators.register () ;
     Sc_rollup.register () ;
+    Tx_rollup.register () ;
     Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
         if q.offset < 0l then fail Negative_level_offset
         else
