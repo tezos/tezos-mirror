@@ -1,6 +1,6 @@
 tx_rollup_rpc_state.out
 
-./tezos-client --wait none originate tx rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
+./tezos-client --wait none originate tx rollup tx_rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.
 Estimated gas: 1420.108 units (will add 100 for safety)
 Operation successfully injected in the node.
@@ -28,6 +28,7 @@ This sequence of operations was run:
       Consumed gas: 1420.108
       Originated tx rollup: [TX_ROLLUP_HASH]
 
+Transaction rollup memorized as tx_rollup
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/state'
 { "last_removed_commitment_hashes": null,

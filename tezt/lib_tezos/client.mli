@@ -1052,6 +1052,7 @@ module Tx_rollup : sig
     ?storage_limit:int ->
     ?fee:Tez.t ->
     ?hooks:Process.hooks ->
+    ?alias:string ->
     src:string ->
     t ->
     string Runnable.process

@@ -1316,7 +1316,7 @@ let sign_block client block_hex ~delegate =
 
 module Tx_rollup = struct
   let originate ?(wait = "none") ?(burn_cap = Tez.of_int 9_999_999)
-      ?(storage_limit = 60_000) ?fee ?hooks ~src client =
+      ?(storage_limit = 60_000) ?fee ?hooks ?(alias = "tx_rollup") ~src client =
     let process =
       spawn_command
         ?hooks
@@ -1327,6 +1327,7 @@ module Tx_rollup = struct
            "originate";
            "tx";
            "rollup";
+           alias;
            "from";
            src;
            "--burn-cap";

@@ -29,8 +29,14 @@ open Protocol
 open Alpha_context
 open Client_proto_context
 open Client_proto_contracts
+open Client_proto_rollups
 open Client_keys
 open Client_proto_args
+
+let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name tx_rollup =
+  TxRollupAlias.add ~force cctxt alias_name tx_rollup >>=? fun () ->
+  cctxt#message "Transaction rollup memorized as %s" alias_name >>= fun () ->
+  return_unit
 
 let encrypted_switch =
   Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
@@ -1892,7 +1898,8 @@ let commands_rw () =
     command
       ~group
       ~desc:"Launch a new transaction rollup."
-      (args7
+      (args8
+         force_switch
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1901,18 +1908,23 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["originate"; "tx"; "rollup"]
+      @@ TxRollupAlias.fresh_alias_param
+           ~name:"tx_rollup"
+           ~desc:"Fresh name for a transaction rollup"
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"Account originating the transaction rollup."
       @@ stop)
-      (fun ( fee,
+      (fun ( force,
+             fee,
              dry_run,
              verbose_signing,
              simulation,
              fee_parameter,
              storage_limit,
              counter )
+           alias
            source
            cctxt ->
         match source with
@@ -1936,7 +1948,22 @@ let commands_rw () =
               ~src_sk
               ~fee_parameter
               ()
-            >>=? fun _res -> return_unit);
+            >>=? fun res ->
+            TxRollupAlias.of_fresh cctxt force alias >>=? fun alias_name ->
+            (match res with
+            | ( _,
+                _,
+                Apply_results.Manager_operation_result
+                  {
+                    operation_result =
+                      Apply_results.Applied
+                        (Apply_results.Tx_rollup_origination_result
+                          {originated_tx_rollup; _});
+                    _;
+                  } ) ->
+                ok originated_tx_rollup
+            | _ -> error_with "transaction rollup was not correctly originated")
+            >>?= fun res -> save_tx_rollup ~force cctxt alias_name res);
     command
       ~group
       ~desc:"Submit a batch of transaction rollup operations."
