@@ -132,6 +132,18 @@ let rpc_addr_arg =
          |> Result.map_error (fun e -> [Exn (Failure e)])
          |> Lwt.return))
 
+let rpc_addr_opt_arg =
+  let default = P2p_point.Id.to_string Node_config.default_rpc_addr in
+  let doc = rpc_addr_doc default in
+  Clic.arg
+    ~long:"rpc-addr"
+    ~placeholder:"address:port"
+    ~doc
+    (Clic.parameter (fun _ s ->
+         P2p_point.Id.of_string s
+         |> Result.map_error (fun e -> [Exn (Failure e)])
+         |> Lwt.return))
+
 let reconnection_delay_arg =
   let default = Node_config.default_reconnection_delay in
   let doc = reconnection_delay_doc default in
@@ -140,6 +152,16 @@ let reconnection_delay_arg =
     ~placeholder:"delay"
     ~doc
     ~default:(string_of_float default)
+    (Clic.parameter (fun _ p ->
+         try return (float_of_string p) with _ -> failwith "Cannot read float"))
+
+let reconnection_delay_opt_arg =
+  let default = Node_config.default_reconnection_delay in
+  let doc = reconnection_delay_doc default in
+  Clic.arg
+    ~long:"reconnection-delay"
+    ~placeholder:"delay"
+    ~doc
     (Clic.parameter (fun _ p ->
          try return (float_of_string p) with _ -> failwith "Cannot read float"))
 
@@ -173,6 +195,99 @@ let group =
     }
 
 let to_tzresult msg = function Some x -> return x | None -> failwith msg
+
+let config_from_args data_dir rollup_id mode operator batch_signer
+    finalize_commitment_signer remove_commitment_signer rejection_signer
+    dispatch_withdrawals_signer origination_level rpc_addr allow_deposit
+    reconnection_delay =
+  let data_dir =
+    match data_dir with
+    | Some d -> d
+    | None -> Node_config.default_data_dir rollup_id
+  in
+  Node_config.
+    {
+      data_dir;
+      mode;
+      signers =
+        {
+          operator;
+          submit_batch = batch_signer;
+          finalize_commitment = finalize_commitment_signer;
+          remove_commitment = remove_commitment_signer;
+          rejection = rejection_signer;
+          dispatch_withdrawals = dispatch_withdrawals_signer;
+        };
+      rollup_id;
+      origination_level;
+      rpc_addr;
+      reconnection_delay;
+      allow_deposit;
+      l2_blocks_cache_size = default_l2_blocks_cache_size;
+      caps = default_caps;
+      batch_burn_limit = None;
+    }
+
+let patch_config_from_args config rollup_id mode operator batch_signer
+    finalize_commitment_signer remove_commitment_signer rejection_signer
+    dispatch_withdrawals_signer origination_level rpc_addr allow_deposit
+    reconnection_delay =
+  if
+    Protocol.Alpha_context.Tx_rollup.(rollup_id <> config.Node_config.rollup_id)
+  then
+    error_with
+      "Rollup node is configured for rollup %a but asked to run for rollup %a"
+      Protocol.Alpha_context.Tx_rollup.pp
+      config.Node_config.rollup_id
+      Protocol.Alpha_context.Tx_rollup.pp
+      rollup_id
+  else
+    let operator = Option.either operator config.signers.operator in
+    let submit_batch = Option.either batch_signer config.signers.submit_batch in
+    let finalize_commitment =
+      Option.either
+        finalize_commitment_signer
+        config.signers.finalize_commitment
+    in
+    let remove_commitment =
+      Option.either remove_commitment_signer config.signers.remove_commitment
+    in
+    let dispatch_withdrawals =
+      Option.either
+        dispatch_withdrawals_signer
+        config.signers.dispatch_withdrawals
+    in
+    let rejection = Option.either rejection_signer config.signers.rejection in
+    let signers =
+      {
+        Node_config.operator;
+        submit_batch;
+        finalize_commitment;
+        remove_commitment;
+        dispatch_withdrawals;
+        rejection;
+      }
+    in
+    let origination_level =
+      Option.either origination_level config.origination_level
+    in
+    let rpc_addr = Option.value rpc_addr ~default:config.rpc_addr in
+    let reconnection_delay =
+      Option.value reconnection_delay ~default:config.reconnection_delay
+    in
+    let allow_deposit = allow_deposit || config.allow_deposit in
+    let config =
+      {
+        config with
+        mode;
+        signers;
+        origination_level;
+        rpc_addr;
+        reconnection_delay;
+        allow_deposit;
+      }
+    in
+    ok config
 
 let configuration_init_command =
   let open Clic in
@@ -214,34 +329,21 @@ let configuration_init_command =
          cctxt ->
       let open Lwt_result_syntax in
       let*! () = Event.(emit preamble_warning) () in
-      let data_dir =
-        match data_dir with
-        | Some d -> d
-        | None -> Node_config.default_data_dir rollup_id
-      in
       let config =
-        Node_config.
-          {
-            data_dir;
-            mode;
-            signers =
-              {
-                operator;
-                submit_batch = batch_signer;
-                finalize_commitment = finalize_commitment_signer;
-                remove_commitment = remove_commitment_signer;
-                rejection = rejection_signer;
-                dispatch_withdrawals = dispatch_withdrawals_signer;
-              };
-            rollup_id;
-            origination_level;
-            rpc_addr;
-            reconnection_delay;
-            allow_deposit;
-            l2_blocks_cache_size = default_l2_blocks_cache_size;
-            caps = default_caps;
-            batch_burn_limit = None;
-          }
+        config_from_args
+          data_dir
+          rollup_id
+          mode
+          operator
+          batch_signer
+          finalize_commitment_signer
+          remove_commitment_signer
+          rejection_signer
+          dispatch_withdrawals_signer
+          origination_level
+          rpc_addr
+          allow_deposit
+          reconnection_delay
       in
       let* file = Node_config.save config in
       (* This is necessary because the node has not yet been launched, so event
@@ -256,20 +358,85 @@ let run_command =
   command
     ~group
     ~desc:"Run the transaction rollup daemon."
-    (args2 data_dir_arg rollup_id_arg)
-    (prefixes ["run"] @@ stop)
-    (fun (data_dir, rollup_id) cctxt ->
+    (args11
+       data_dir_arg
+       operator_arg
+       batch_signer_arg
+       finalize_commitment_signer_arg
+       remove_commitment_signer_arg
+       rejection_signer_arg
+       dispatch_withdrawals_signer_arg
+       origination_level_arg
+       rpc_addr_opt_arg
+       allow_deposit_arg
+       reconnection_delay_opt_arg)
+    (prefix "run" @@ mode_param @@ prefix "for"
+    @@ Clic.param
+         ~name:"rollup-id"
+         ~desc:"address of the rollup"
+         rollup_id_param
+    @@ stop)
+    (fun ( data_dir,
+           operator,
+           batch_signer,
+           finalize_commitment_signer,
+           remove_commitment_signer,
+           rejection_signer,
+           dispatch_withdrawals_signer,
+           origination_level,
+           rpc_addr,
+           allow_deposit,
+           reconnection_delay )
+         mode
+         rollup_id
+         cctxt ->
       let*! () = Event.(emit preamble_warning) () in
-      let* data_dir =
+      let* config =
         match data_dir with
-        | Some d -> return d
         | None ->
-            let* rollup_id =
-              to_tzresult "Provide at least --rollup-id or --data-dir" rollup_id
+            let rpc_addr =
+              Option.value rpc_addr ~default:Node_config.default_rpc_addr
             in
-            return (Node_config.default_data_dir rollup_id)
+            let reconnection_delay =
+              Option.value
+                reconnection_delay
+                ~default:Node_config.default_reconnection_delay
+            in
+            return
+              (config_from_args
+                 data_dir
+                 rollup_id
+                 mode
+                 operator
+                 batch_signer
+                 finalize_commitment_signer
+                 remove_commitment_signer
+                 rejection_signer
+                 dispatch_withdrawals_signer
+                 origination_level
+                 rpc_addr
+                 allow_deposit
+                 reconnection_delay)
+        | Some data_dir ->
+            let* config = Node_config.load ~data_dir in
+            let*? config =
+              patch_config_from_args
+                config
+                rollup_id
+                mode
+                operator
+                batch_signer
+                finalize_commitment_signer
+                remove_commitment_signer
+                rejection_signer
+                dispatch_withdrawals_signer
+                origination_level
+                rpc_addr
+                allow_deposit
+                reconnection_delay
+            in
+            return config
       in
-      let* config = Node_config.load ~data_dir in
       Daemon.run config cctxt)
 
 let tx_rollup_commands () =
