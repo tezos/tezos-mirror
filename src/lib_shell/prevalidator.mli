@@ -152,9 +152,9 @@ module Internal_for_tests : sig
   (** Documented in {!Prevalidator}, because this is only exported for tests. *)
   type worker_tools = {
     push_request :
-      (unit, error trace) Prevalidator_worker_state.Request.t -> bool Lwt.t;
+      (unit, Empty.t) Prevalidator_worker_state.Request.t -> bool Lwt.t;
     push_request_now :
-      (unit, error trace) Prevalidator_worker_state.Request.t -> unit;
+      (unit, Empty.t) Prevalidator_worker_state.Request.t -> unit;
   }
 
   (** The corresponding internal type of the mempool (see {!Prevalidator.S}),
@@ -202,7 +202,10 @@ module Internal_for_tests : sig
       val on_advertise : _ types_state_shell -> unit
 
       val on_arrived :
-        types_state -> Operation_hash.t -> Operation.t -> unit tzresult Lwt.t
+        types_state ->
+        Operation_hash.t ->
+        Operation.t ->
+        (unit, Empty.t) result Lwt.t
 
       val on_ban : types_state -> Operation_hash.t -> unit tzresult Lwt.t
 

@@ -32,11 +32,11 @@ module Request = struct
         * Block_hash.Set.t
         * Operation_hash.Set.t
         -> (unit, error trace) t
-    | Notify : P2p_peer.Id.t * Mempool.t -> (unit, error trace) t
-    | Leftover : (unit, error trace) t
+    | Notify : P2p_peer.Id.t * Mempool.t -> (unit, Empty.t) t
+    | Leftover : (unit, Empty.t) t
     | Inject : {op : Operation.t; force : bool} -> (unit, error trace) t
-    | Arrived : Operation_hash.t * Operation.t -> (unit, error trace) t
-    | Advertise : (unit, error trace) t
+    | Arrived : Operation_hash.t * Operation.t -> (unit, Empty.t) t
+    | Advertise : (unit, Empty.t) t
     | Ban : Operation_hash.t -> (unit, error trace) t
 
   type view = View : _ t -> view

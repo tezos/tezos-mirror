@@ -48,11 +48,11 @@ module Request = struct
         block : Store.Block.t;
       }
         -> (Event.update, error trace) t
-    | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, error trace) t
+    | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
     | Notify_head :
         P2p_peer.Id.t * Block_hash.t * Block_header.t * Mempool.t
-        -> (unit, error trace) t
-    | Disconnection : P2p_peer.Id.t -> (unit, error trace) t
+        -> (unit, Empty.t) t
+    | Disconnection : P2p_peer.Id.t -> (unit, Empty.t) t
 
   let view (type a b) (req : (a, b) t) : view =
     match req with
@@ -95,8 +95,7 @@ module Types = struct
     new_head_input : Store.Block.t Lwt_watcher.input;
     mutable child : (state * (unit -> unit Lwt.t (* shutdown *))) option;
     prevalidator : Prevalidator.t option ref;
-    active_peers :
-      (Peer_validator.t, Error_monad.tztrace) P2p_peer.Error_table.t;
+    active_peers : (Peer_validator.t, Empty.t) P2p_peer.Error_table.t;
   }
 
   let is_bootstrapped (state : state) =
@@ -178,12 +177,12 @@ let notify_new_block w peer block =
   Worker.Queue.push_request_now w (Validated {peer; block})
 
 let with_activated_peer_validator w peer_id f =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let nv = Worker.state w in
   let* pv =
     P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
-        let*! () = Worker.log_event w (Connection peer_id) in
-        let*! pv =
+        let* () = Worker.log_event w (Connection peer_id) in
+        let* pv =
           Peer_validator.create
             ~notify_new_block:(notify_new_block w (Some peer_id))
             ~notify_termination:(fun _pv ->
@@ -195,12 +194,14 @@ let with_activated_peer_validator w peer_id f =
         in
         Lwt.return_ok pv)
   in
-  match Peer_validator.status pv with
-  | Worker_types.Running _ -> f pv
-  | Worker_types.Closing (_, _)
-  | Worker_types.Closed (_, _, _)
-  | Worker_types.Launching _ ->
-      return_unit
+  match pv with
+  | Ok pv -> (
+      match Peer_validator.status pv with
+      | Worker_types.Running _ -> f pv
+      | Worker_types.Closing (_, _)
+      | Worker_types.Closed (_, _, _)
+      | Worker_types.Launching _ ->
+          return_ok_unit)
 
 let may_update_protocol_level chain_store ~block =
   let open Lwt_result_syntax in
@@ -496,29 +497,35 @@ let on_notify_branch w peer_id locator =
       return_ok_unit)
 
 let on_notify_head w peer_id (hash, header) mempool =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let nv = Worker.state w in
-  let*! () = check_and_update_synchronisation_state w (hash, header) peer_id in
-  let* () =
+  let* () = check_and_update_synchronisation_state w (hash, header) peer_id in
+  let* (r : (_, Empty.t) result) =
     with_activated_peer_validator w peer_id (fun pv ->
         Peer_validator.notify_head pv hash header ;
-        return_unit)
+        return_ok_unit)
   in
-  match !(nv.prevalidator) with
-  | Some prevalidator ->
-      let*! () = Prevalidator.notify_operations prevalidator peer_id mempool in
-      return_unit
-  | None -> return_unit
+  match r with
+  | Ok () -> (
+      match !(nv.prevalidator) with
+      | Some prevalidator ->
+          let* () =
+            Prevalidator.notify_operations prevalidator peer_id mempool
+          in
+          return_ok_unit
+      | None -> return_ok_unit)
 
 let on_disconnection w peer_id =
   let open Lwt_result_syntax in
   let nv = Worker.state w in
   match P2p_peer.Error_table.find nv.active_peers peer_id with
   | None -> return_unit
-  | Some pv ->
-      let* pv = pv in
-      let*! () = Peer_validator.shutdown pv in
-      return_unit
+  | Some pv -> (
+      let*! pv = pv in
+      match pv with
+      | Ok pv ->
+          let*! () = Peer_validator.shutdown pv in
+          return_unit)
 
 let on_request (type a b) w start_testchain active_chains spawn_child
     (req : (a, b) Request.t) : (a, b) result Lwt.t =
@@ -778,13 +785,6 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
     let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =
       let request_view = Request.view request in
-      let emit_and_return_unit errs =
-        let*! () =
-          Worker.log_event w (Request_failure (request_view, st, errs))
-        in
-        return_unit
-      in
-
       match request with
       | Validated _ ->
           (* If an error happens here, it means that the request
@@ -811,9 +811,9 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
          see it if we relax the interface of [tezos-worker] to use
          [('a, 'b) result] instead of [tzresult] and if each
          request uses its own error type. *)
-      | Notify_branch _ -> emit_and_return_unit errs
-      | Notify_head _ -> emit_and_return_unit errs
-      | Disconnection _ -> emit_and_return_unit errs
+      | Notify_branch _ -> ( match errs with _ -> .)
+      | Notify_head _ -> ( match errs with _ -> .)
+      | Disconnection _ -> ( match errs with _ -> .)
 
     let on_completion = on_completion
 

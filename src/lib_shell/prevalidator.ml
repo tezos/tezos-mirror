@@ -154,10 +154,10 @@ module Tools = struct
       Also see the enclosing module documentation as to why we have this record. *)
   type worker_tools = {
     push_request :
-      (unit, error trace) Prevalidator_worker_state.Request.t -> bool Lwt.t;
+      (unit, Empty.t) Prevalidator_worker_state.Request.t -> bool Lwt.t;
         (** Adds a message to the queue. *)
     push_request_now :
-      (unit, error trace) Prevalidator_worker_state.Request.t -> unit;
+      (unit, Empty.t) Prevalidator_worker_state.Request.t -> unit;
         (** Adds a message to the queue immediately. *)
   }
 end
@@ -270,7 +270,10 @@ module type S = sig
     val on_advertise : _ types_state_shell -> unit
 
     val on_arrived :
-      types_state -> Operation_hash.t -> Operation.t -> unit tzresult Lwt.t
+      types_state ->
+      Operation_hash.t ->
+      Operation.t ->
+      (unit, Empty.t) result Lwt.t
 
     val on_ban : types_state -> Operation_hash.t -> unit tzresult Lwt.t
 
@@ -764,7 +767,7 @@ module Make_s
       of the mempool. These functions are called by the {!Worker} when
       an event arrives. *)
   module Requests = struct
-    let on_arrived (pv : types_state) oph op =
+    let on_arrived (pv : types_state) oph op : (unit, Empty.t) result Lwt.t =
       let open Lwt_syntax in
       let* already_handled =
         already_handled ~origin:Event.Arrived pv.shell oph
@@ -1617,21 +1620,22 @@ module Make
     let on_error (type a b) _w st (request : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =
       let open Lwt_result_syntax in
-      let emit_and_return errs =
-        let request_view = Request.view request in
-        let*! () = Event.(emit request_failed) (request_view, st, errs) in
-        Lwt.return_error errs
-      in
       match request with
       | Request.(Inject _) as r ->
           let*! () = Event.(emit request_failed) (Request.view r, st, errs) in
           return_unit
-      | Request.Flush _ -> emit_and_return errs
-      | Request.Notify _ -> emit_and_return errs
-      | Request.Leftover -> emit_and_return errs
-      | Request.Arrived _ -> emit_and_return errs
-      | Request.Advertise -> emit_and_return errs
-      | Request.Ban _ -> emit_and_return errs
+      | Request.Notify _ -> ( match errs with _ -> .)
+      | Request.Leftover -> ( match errs with _ -> .)
+      | Request.Arrived _ -> ( match errs with _ -> .)
+      | Request.Advertise -> ( match errs with _ -> .)
+      | Request.Flush _ ->
+          let request_view = Request.view request in
+          let*! () = Event.(emit request_failed) (request_view, st, errs) in
+          Lwt.return_error errs
+      | Request.Ban _ ->
+          let request_view = Request.view request in
+          let*! () = Event.(emit request_failed) (request_view, st, errs) in
+          Lwt.return_error errs
 
     let on_completion _w r _ st =
       match Request.view r with
