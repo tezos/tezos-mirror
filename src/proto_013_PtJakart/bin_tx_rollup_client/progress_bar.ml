@@ -23,45 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Client configuration. *)
-type t = private {
-  base_dir : string;
-      (** [base_dir] is a directory where client user data is stored. *)
-  wallet_dir : string;
-      (** [base_dir] is a directory where client keys are stored. *)
-  endpoint : Uri.t;
-      (** [endpoint] is used to communicate with the transaction rollup
-          node. *)
-}
+let progress_bar_str ~progress ~width =
+  (* 0 <= progress <= 1 *)
+  let progress = min 1. (max 0. progress) in
+  let filled_width = progress *. float_of_int width in
+  let whole_width = int_of_float filled_width in
+  let remainder_width = filled_width -. float_of_int whole_width in
+  let part_width = int_of_float (remainder_width *. 8.) in
+  let empty_width = width - whole_width - 1 in
+  let part_char =
+    if empty_width < 0 then ""
+    else
+      match part_width with
+      | 0 -> " "
+      | 1 -> "▏"
+      | 2 -> "▎"
+      | 3 -> "▍"
+      | 4 -> "▌"
+      | 5 -> "▋"
+      | 6 -> "▊"
+      | _ -> "▉"
+  in
+  let empty_width = max empty_width 0 in
+  let filled =
+    String.concat ""
+    @@
+    match List.init ~when_negative_length:[] whole_width (fun _ -> "█") with
+    | Error _ -> []
+    | Ok l -> l
+  in
+  String.concat "" ["["; filled; part_char; String.make empty_width ' '; "]"]
 
-(** [parse argv] parses command-line arguments to return
-   [(configuration, argv')] where [configuration] is deduced from the
-   command-line arguments and [argv'] is the rest of the command-line
-   arguments that have no meaning relatively to [Configuration]. *)
-val parse : string list -> (t * string list) tzresult Lwt.t
-
-(** [global_options ()] returns the list of options that have an
-   influence on the configuration. *)
-val global_options :
-  unit -> (string option * string option * Uri.t option, 'a) Clic.options
-
-(** Instance of [Tezos_client_base.Client_context] that only handles IOs and
-    RPCs. Can be used for keys and RPCs related commands. *)
-class type tx_client_context =
-  object
-    inherit Tezos_client_base.Client_context.io_wallet
-
-    inherit RPC_context.generic
-  end
-
-(** Instance of [tx_client_context] for linux systems. Relies on
-    [Tezos_rpc_http_client_unix]. *)
-class unix_tx_client_context :
-  wallet_dir:string
-  -> password_filename:string option
-  -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
-  -> tx_client_context
-
-(** [make_unix_client_context config] generates a unix_tx_client_context from
-    the client configuration. *)
-val make_unix_client_context : t -> unix_tx_client_context
+let pp ppf ~width progress =
+  Format.fprintf
+    ppf
+    "%s %5.1f %%"
+    (progress_bar_str ~progress ~width)
+    (progress *. 100.)

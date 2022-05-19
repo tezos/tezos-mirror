@@ -23,45 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Client configuration. *)
-type t = private {
-  base_dir : string;
-      (** [base_dir] is a directory where client user data is stored. *)
-  wallet_dir : string;
-      (** [base_dir] is a directory where client keys are stored. *)
-  endpoint : Uri.t;
-      (** [endpoint] is used to communicate with the transaction rollup
-          node. *)
-}
-
-(** [parse argv] parses command-line arguments to return
-   [(configuration, argv')] where [configuration] is deduced from the
-   command-line arguments and [argv'] is the rest of the command-line
-   arguments that have no meaning relatively to [Configuration]. *)
-val parse : string list -> (t * string list) tzresult Lwt.t
-
-(** [global_options ()] returns the list of options that have an
-   influence on the configuration. *)
-val global_options :
-  unit -> (string option * string option * Uri.t option, 'a) Clic.options
-
-(** Instance of [Tezos_client_base.Client_context] that only handles IOs and
-    RPCs. Can be used for keys and RPCs related commands. *)
-class type tx_client_context =
-  object
-    inherit Tezos_client_base.Client_context.io_wallet
-
-    inherit RPC_context.generic
-  end
-
-(** Instance of [tx_client_context] for linux systems. Relies on
-    [Tezos_rpc_http_client_unix]. *)
-class unix_tx_client_context :
-  wallet_dir:string
-  -> password_filename:string option
-  -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
-  -> tx_client_context
-
-(** [make_unix_client_context config] generates a unix_tx_client_context from
-    the client configuration. *)
-val make_unix_client_context : t -> unix_tx_client_context
+(** [pp ppf ~width percentage] displays a progress bar of size [width] on
+    formatter [ppf] filled to the value specified by [percentage] (between [0.0]
+    and [1.0]). *)
+val pp : Format.formatter -> width:int -> float -> unit
