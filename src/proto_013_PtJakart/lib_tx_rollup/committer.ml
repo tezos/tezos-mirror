@@ -23,34 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 
-(** Hash with b58check encoding mop(53), for hashes of L1 manager operations *)
-module Hash : S.HASH
+let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
+  let message_results = Inbox.proto_message_results inbox in
+  let messages =
+    List.map Tx_rollup_message_result_hash.hash_uncarbonated message_results
+  in
+  let inbox_merkle_root = Inbox.merkle_root inbox in
+  let predecessor =
+    Option.map (fun b -> b.L2block.header.commitment) predecessor
+  in
+  Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
 
-(** Alias for L1 operations hashes *)
-type hash = Hash.t
-
-(** The type of L1 operations that are injected on Tezos by the rollup node *)
-type t = {
-  hash : hash;  (** The hash of the L1 manager operation (without the source) *)
-  source : public_key_hash;
-      (** The source of the operation, i.e., the key that will sign the
-          operation for injection. Note: the source is decided when the
-          operation is queued in the injector at the moment. *)
-  manager_operation : packed_manager_operation;  (** The manager operation *)
-}
-
-(** Hash a manager operation *)
-val hash_manager_operation : packed_manager_operation -> hash
-
-(** Hash an L1 operation. This is the same as hashing the corresponding manager
-    operation. *)
-val hash : t -> hash
-
-(** Encoding for L1 operations *)
-val encoding : t Data_encoding.t
-
-(** Pretty printer for L1 operations. Only the relevant part for the rollup node
-    is printed. *)
-val pp : Format.formatter -> t -> unit
+let commit_block ~operator tx_rollup block =
+  let commit_operation =
+    Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment}
+  in
+  Injector.add_pending_operation ~source:operator commit_operation

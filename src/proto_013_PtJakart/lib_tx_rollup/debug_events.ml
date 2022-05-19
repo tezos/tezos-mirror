@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,17 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Deamon provides the [run] function that tracks the head of Tezos nodes to compute
-    the state of a rollup asynchronously. *)
+include Internal_event.Simple
 
-(** [run daemon ~data_dir cctxt] starts the main daemon loop. The goal of
-    this loop is to track the head of the Tezos node behind [cctxt], in order to
-    keep the [daemon] state up-to-date with what happens on layer 1.
+let section = ["tx_rollup_node"]
 
-     If the connection with layer 1 is lost, the function will regularly try
-   to reconnect to it. The initial delay between two attempts can be specified
-   using the [reconnection_delay] field in the configuration file.
-
-     When the daemon needs to send Tezos operations, it does so by assuming the
-   identity in the state. *)
-val run : Node_config.t -> Protocol_client_context.full -> unit tzresult Lwt.t
+let should_not_happen =
+  declare_1
+    ~section
+    ~name:"tx_rollup_node_should_not_happen"
+    ~msg:"This should not happen at {loc}"
+    ~level:Warning
+    ("loc", Data_encoding.string)
+    ~pp1:Format.pp_print_string

@@ -24,7 +24,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Protocol
+open Alpha_context
 
 type block_id =
   [ `Head
@@ -44,7 +46,10 @@ let context_of_block_id state block_id =
   | `Tezos_block b -> (
       let* b = State.get_tezos_l2_block_hash state b in
       match b with None -> return_none | Some b -> context_of_l2_block state b)
-  | `Head -> return_some (State.get_head state).header.context
+  | `Head -> (
+      match State.get_head state with
+      | None -> return_none
+      | Some head -> return_some head.header.context)
   | `Level l -> (
       let* b = State.get_level state l in
       match b with None -> return_none | Some b -> context_of_l2_block state b)
@@ -63,13 +68,13 @@ let construct_block_id = function
 let destruct_block_id h =
   match h with
   | "head" -> Ok `Head
-  | "genesis" -> Ok (`Level L2block.Genesis)
+  | "genesis" -> Ok (`Level Tx_rollup_level.root)
   | _ -> (
       match Int32.of_string_opt h with
       | Some l -> (
-          match Alpha_context.Tx_rollup_level.of_int32 l with
+          match Tx_rollup_level.of_int32 l with
           | Error _ -> Error "Invalid rollup level"
-          | Ok l -> Ok (`Level (L2block.Rollup_level l)))
+          | Ok l -> Ok (`Level l))
       | None -> (
           match Block_hash.of_b58check_opt h with
           | Some b -> Ok (`Tezos_block b)
@@ -157,8 +162,92 @@ module Arg = struct
       ()
 end
 
+module Encodings = struct
+  open Data_encoding
+
+  let header =
+    merge_objs (obj1 (req "hash" L2block.Hash.encoding)) L2block.header_encoding
+
+  type any_block = Raw of L2block.t | Fancy of Fancy_l2block.t
+
+  let block block_encoding =
+    merge_objs block_encoding (obj1 (req "metadata" L2block.metadata_encoding))
+
+  let raw_block = block L2block.encoding
+
+  let any_block =
+    block
+    @@ union
+         [
+           case
+             ~title:"raw"
+             (Tag 0)
+             L2block.encoding
+             (function Raw b -> Some b | _ -> None)
+             (fun b -> Raw b);
+           case
+             ~title:"fancy"
+             (Tag 1)
+             Fancy_l2block.encoding
+             (function Fancy b -> Some b | _ -> None)
+             (fun b -> Fancy b);
+         ]
+
+  let block = block Fancy_l2block.encoding
+
+  let synchroniztion_level =
+    conv
+      (fun State.{processed_tezos_level; known_tezos_level} ->
+        (processed_tezos_level, known_tezos_level))
+      (fun (processed_tezos_level, known_tezos_level) ->
+        State.{processed_tezos_level; known_tezos_level})
+    @@ obj2 (req "processed_tezos_level" int32) (req "known_tezos_level" int32)
+
+  let synchronization_result =
+    union
+      [
+        case
+          ~title:"synchronized"
+          (Tag 0)
+          (constant "synchronized")
+          (function `Synchronized -> Some () | _ -> None)
+          (fun () -> `Synchronized);
+        case
+          ~title:"synchronizing"
+          (Tag 1)
+          (obj1 (req "synchronizing" synchroniztion_level))
+          (function `Synchronizing levels -> Some levels | _ -> None)
+          (fun levels -> `Synchronizing levels);
+      ]
+end
+
 module Block = struct
   open Lwt_result_syntax
+
+  let format_query =
+    let open RPC_query in
+    query (fun format -> format)
+    |+ field
+         ~descr:
+           "Whether to return the L2 block in raw format (raw) or as a more \
+            human readable version (fancy, default)."
+         "format"
+         (RPC_arg.make
+            ~name:"format"
+            ~destruct:(function
+              | "raw" -> Ok `Raw
+              | "fancy" -> Ok `Fancy
+              | s ->
+                  Error
+                    (Printf.sprintf
+                       "Invalid value (%s) for parameter format, possible \
+                        values are: raw, fancy."
+                       s))
+            ~construct:(function `Raw -> "raw" | `Fancy -> "fancy")
+            ())
+         `Fancy
+         (fun format -> format)
+    |> seal
 
   let path : (unit * block_id) RPC_path.context = RPC_path.(open_root)
 
@@ -181,20 +270,15 @@ module Block = struct
   let block =
     RPC_service.get_service
       ~description:"Get the L2 block in the tx-rollup-node"
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option L2block.encoding)
+      ~query:format_query
+      ~output:(Data_encoding.option Encodings.any_block)
       path
 
   let header =
     RPC_service.get_service
       ~description:"Get the L2 block header in the tx-rollup-node"
       ~query:RPC_query.empty
-      ~output:
-        Data_encoding.(
-          option
-          @@ merge_objs
-               (obj1 (req "hash" L2block.Hash.encoding))
-               L2block.header_encoding)
+      ~output:(Data_encoding.option Encodings.header)
       RPC_path.(path / "header")
 
   let inbox =
@@ -209,7 +293,7 @@ module Block = struct
     match block_id with
     | `L2_block b -> State.get_block state b
     | `Tezos_block b -> State.get_tezos_l2_block state b
-    | `Head -> return_some (State.get_head state)
+    | `Head -> return (State.get_head state)
     | `Level l -> State.get_level_l2_block state l
 
   let proof =
@@ -221,31 +305,39 @@ module Block = struct
       RPC_path.(path / "proof" / "message" /: RPC_arg.int)
 
   let () =
-    register0 block @@ fun (state, block_id) () () ->
+    register0 block @@ fun (state, block_id) style () ->
     let*! block = block_of_id state block_id in
-    return block
+    match block with
+    | None -> return_none
+    | Some block -> (
+        let*! metadata = State.get_block_metadata state block.header in
+        match style with
+        | `Raw -> return_some (Encodings.Raw block, metadata)
+        | `Fancy -> (
+            let hash = block.hash in
+            let*! ctxt_hash_opt = context_of_l2_block state hash in
+            match ctxt_hash_opt with
+            | Some ctxt_hash ->
+                let*! ctxt =
+                  Context.checkout_exn state.context_index ctxt_hash
+                in
+                let*! fancy_block = Fancy_l2block.of_l2block ctxt block in
+                return_some (Encodings.Fancy fancy_block, metadata)
+            | None ->
+                failwith
+                  "The block %a can not be retrieved"
+                  L2block.Hash.pp
+                  hash))
 
   let () =
     register0 header @@ fun (state, block_id) () () ->
     let*! block = block_of_id state block_id in
     match block with
-    | None -> return None
-    | Some block -> return (Some (block.hash, block.header))
+    | None -> return_none
+    | Some L2block.{hash; header; _} -> return_some (hash, header)
 
   let () =
     register0 inbox @@ fun (state, block_id) () () ->
-    let*! block = block_of_id state block_id in
-    match block with
-    | None -> return None
-    | Some block -> (
-        match block_id with
-        | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
-            (* Tezos block has no l2 inbox *)
-            return None
-        | _ -> return (Some block.inbox))
-
-  let () =
-    register1 proof @@ fun ((state, block_id), message_pos) () () ->
     let*! block = block_of_id state block_id in
     match block with
     | None -> return_none
@@ -253,67 +345,37 @@ module Block = struct
         match block_id with
         | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
             (* Tezos block has no l2 inbox *)
-            failwith "The tezos block (%a) has not L2 inbox" Block_hash.pp b
-        | _ ->
-            let open Inbox in
-            let inbox = block.inbox in
-            let index = state.context_index in
-            let* prev_ctxt, message =
-              if message_pos = 0 then
-                (* We must take the block predecessor context *)
-                let*? message =
-                  match List.nth_opt inbox.contents message_pos with
-                  | Some x -> ok x
-                  | None ->
-                      error
-                        (Error.Tx_rollup_invalid_message_position_in_inbox
-                           message_pos)
-                in
-                let pred_block_hash = block.header.predecessor in
-                let*! pred_block = State.get_block state pred_block_hash in
-                match pred_block with
-                | None ->
-                    failwith
-                      "The block (%a) does not have a predecessor"
-                      L2block.Hash.pp
-                      block.hash
-                | Some block -> (
-                    let hash = block.hash in
-                    let*! ctxt_hash = context_of_l2_block state hash in
-                    match ctxt_hash with
-                    | Some ctxt_hash ->
-                        let*! ctxt = Context.checkout_exn index ctxt_hash in
-                        return (ctxt, message)
-                    | None ->
-                        failwith
-                          "The block can not be retrieved from the hash %a"
-                          L2block.Hash.pp
-                          hash)
-              else
-                let*? pred_message, message =
-                  match List.drop_n (message_pos - 1) inbox.contents with
-                  | pred_message :: message :: _ -> ok (pred_message, message)
-                  | _ ->
-                      error
-                        (Error.Tx_rollup_invalid_message_position_in_inbox
-                           message_pos)
-                in
-                let ctxt_hash = pred_message.l2_context_hash.irmin_hash in
-                let*! ctxt = Context.checkout_exn index ctxt_hash in
-                return (ctxt, message)
-            in
-            let l2_parameters =
-              Protocol.Tx_rollup_l2_apply.
-                {
-                  tx_rollup_max_withdrawals_per_batch =
-                    state.constants.parametric
-                      .tx_rollup_max_withdrawals_per_batch;
-                }
-            in
-            let* proof, _ =
-              Prover_apply.apply_message prev_ctxt l2_parameters message.message
-            in
-            return_some proof)
+            return_none
+        | _ -> return_some block.inbox)
+
+  let () =
+    register1 proof @@ fun ((state, block_id), message_pos) () () ->
+    let*! block = block_of_id state block_id in
+    match block with
+    | None -> return_none
+    | Some block ->
+        let*? () =
+          match block_id with
+          | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
+              (* Tezos block has no l2 inbox *)
+              error_with "The tezos block (%a) has not L2 inbox" Block_hash.pp b
+          | _ -> ok ()
+        in
+        let*? () =
+          error_when
+            (List.compare_length_with block.inbox message_pos < 0)
+            (Error.Tx_rollup_invalid_message_position_in_inbox message_pos)
+        in
+        let* (Tx_rollup_rejection {proof; _}) =
+          (* We build a rejection for our commitment because we are only
+             interested in the proof *)
+          Accuser.build_rejection
+            state
+            ~reject_commitment:block.commitment
+            block
+            ~position:message_pos
+        in
+        return_some proof
 
   let build_directory state =
     !directory
@@ -442,15 +504,24 @@ module Context_RPC = struct
       ~output:(Data_encoding.option bls_pk_encoding)
       RPC_path.(path / "addresses" /: Arg.address_indexable / "public_key")
 
+  let ticket =
+    RPC_service.get_service
+      ~description:
+        "Get a ticket from its hash (or index), or null if the ticket is not \
+         known by the rollup"
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(option Ticket.encoding)
+      RPC_path.(path / "tickets" /: Arg.ticket_indexable)
+
   let get_index ?(check_index = false) (context : Context.t)
       (i : (_, _) Indexable.t) get count =
     match Indexable.destruct i with
     | Left i ->
         if check_index then
           let* number_indexes = count context in
-          if Indexable.to_int32 i >= number_indexes then return None
-          else return (Some i)
-        else return (Some i)
+          if Indexable.to_int32 i >= number_indexes then return_none
+          else return_some i
+        else return_some i
     | Right v -> get context v
 
   let get_address_index ?check_index context address =
@@ -496,13 +567,13 @@ module Context_RPC = struct
     register1 address_metadata @@ fun (c, address) () () ->
     let* address_index = get_address_index c address in
     match address_index with
-    | None -> return None
+    | None -> return_none
     | Some address_index -> (
         let* metadata = Context.Address_metadata.get c address_index in
         match metadata with
-        | None -> return None
+        | None -> return_none
         | Some {counter; public_key} ->
-            return (Some {index = address_index; counter; public_key}))
+            return_some {index = address_index; counter; public_key})
 
   let () =
     register1 address_counter @@ fun (c, address) () () ->
@@ -519,12 +590,22 @@ module Context_RPC = struct
     register1 address_public_key @@ fun (c, address) () () ->
     let* address_index = get_address_index c address in
     match address_index with
-    | None -> return None
+    | None -> return_none
     | Some address_index -> (
         let* metadata = Context.Address_metadata.get c address_index in
         match metadata with
-        | None -> return None
-        | Some {public_key; _} -> return (Some public_key))
+        | None -> return_none
+        | Some {public_key; _} -> return_some public_key)
+
+  let () =
+    register1 ticket @@ fun (c, ticket_id) () () ->
+    let open Lwt_result_syntax in
+    let* ticket_index = get_ticket_index c ticket_id in
+    match ticket_index with
+    | None -> return_none
+    | Some ticket_index ->
+        let*! ticket = Context.get_ticket c ticket_index in
+        return ticket
 
   let build_directory state =
     !directory
@@ -547,7 +628,7 @@ module Injection = struct
 
   let prefix = RPC_path.(open_root)
 
-  let directory : Batcher.t RPC_directory.t ref = ref RPC_directory.empty
+  let directory : unit RPC_directory.t ref = ref RPC_directory.empty
 
   let register service f =
     directory := RPC_directory.register !directory service f
@@ -558,11 +639,10 @@ module Injection = struct
 
   let export_service s = RPC_service.prefix prefix s
 
-  let build_directory state =
-    match state.State.batcher with
-    | None -> RPC_directory.empty
-    | Some batcher ->
-        !directory |> RPC_directory.map (fun () -> Lwt.return batcher)
+  let build_directory _state =
+    if Batcher.active () then !directory
+    else (* No queue/batching RPC if batcher is inactive *)
+      RPC_directory.empty
 
   let inject_query =
     let open RPC_query in
@@ -596,19 +676,80 @@ module Injection = struct
       path
 
   let () =
-    register0 inject_transaction (fun batcher q transaction ->
-        Batcher.register_transaction
-          ~eager_batch:q#eager_batch
-          batcher
-          transaction)
+    register0 inject_transaction (fun () q transaction ->
+        Batcher.register_transaction ~eager_batch:q#eager_batch transaction)
 
   let () =
-    register1 get_transaction (fun (batcher, tr_hash) () () ->
-        return @@ Batcher.find_transaction batcher tr_hash)
+    register1 get_transaction (fun ((), tr_hash) () () ->
+        let open Lwt_result_syntax in
+        let*? tr = Batcher.find_transaction tr_hash in
+        return tr)
 
   let () =
-    register0 get_queue (fun batcher () () ->
-        return @@ Batcher.get_queue batcher)
+    register0 get_queue (fun () () () ->
+        let open Lwt_result_syntax in
+        let*? q = Batcher.get_queue () in
+        return q)
+end
+
+module Monitor = struct
+  let path : unit RPC_path.context = RPC_path.open_root
+
+  let prefix = RPC_path.(open_root / "monitor")
+
+  let directory : State.t RPC_directory.t ref = ref RPC_directory.empty
+
+  let gen_register service f =
+    directory := RPC_directory.gen_register !directory service f
+
+  let gen_register0 service f = gen_register (RPC_service.subst0 service) f
+
+  let export_service s =
+    let p = RPC_path.prefix prefix path in
+    RPC_service.prefix p s
+
+  let build_directory state =
+    !directory
+    |> RPC_directory.map (fun () -> Lwt.return state)
+    |> RPC_directory.prefix prefix
+
+  let synchronized =
+    RPC_service.get_service
+      ~description:
+        "Wait for the node to have synchronized its L2 chain with the L1 \
+         chain, streaming its progress."
+      ~query:RPC_query.empty
+      ~output:Encodings.synchronization_result
+      RPC_path.(path / "synchronized")
+
+  let () =
+    gen_register0 synchronized (fun state () () ->
+        let open Lwt_syntax in
+        let levels_stream, stopper =
+          Lwt_watcher.create_stream state.sync.sync_level_input
+        in
+        let synced = ref false in
+        let next () =
+          if !synced then Lwt.return_none
+          else
+            let levels =
+              let+ levels = Lwt_stream.get levels_stream in
+              match levels with
+              | None ->
+                  synced := true ;
+                  `Synchronized
+              | Some levels -> `Synchronizing levels
+            in
+            let synchronized =
+              let+ () = State.synchronized state in
+              synced := true ;
+              `Synchronized
+            in
+            let+ result = Lwt.pick [levels; synchronized] in
+            Some result
+        in
+        let shutdown () = Lwt_watcher.shutdown stopper in
+        RPC_answer.return_stream {next; shutdown})
 end
 
 let register state =
@@ -619,6 +760,7 @@ let register state =
       Block.build_directory;
       Context_RPC.build_directory;
       Injection.build_directory;
+      Monitor.build_directory;
     ]
 
 let launch ~host ~acl ~node ~dir () =
@@ -626,7 +768,7 @@ let launch ~host ~acl ~node ~dir () =
 
 let start configuration state =
   let open Lwt_result_syntax in
-  let Configuration.{rpc_addr; _} = configuration in
+  let Node_config.{rpc_addr; _} = configuration in
   let host, rpc_port = rpc_addr in
   let host = P2p_addr.to_string host in
   let dir = register state in
@@ -674,8 +816,24 @@ let counter ctxt (block : block_id) tz4 =
 let inbox ctxt block =
   RPC_context.make_call1 Block.(export_service inbox) ctxt block () ()
 
+let raw_block ctxt block =
+  let open Lwt_result_syntax in
+  let+ raw_block =
+    RPC_context.make_call1 Block.(export_service block) ctxt block `Raw ()
+  in
+  Option.map
+    (function Encodings.Raw b, metadata -> (b, metadata) | _ -> assert false)
+    raw_block
+
 let block ctxt block =
-  RPC_context.make_call1 Block.(export_service block) ctxt block () ()
+  let open Lwt_result_syntax in
+  let+ raw_block =
+    RPC_context.make_call1 Block.(export_service block) ctxt block `Fancy ()
+  in
+  Option.map
+    (function
+      | Encodings.Fancy b, metadata -> (b, metadata) | _ -> assert false)
+    raw_block
 
 let get_queue ctxt =
   RPC_context.make_call Injection.(export_service get_queue) ctxt () () ()
@@ -697,3 +855,20 @@ let inject_transaction ctxt ?(eager_batch = false) transaction =
        method eager_batch = eager_batch
     end)
     transaction
+
+let get_message_proof ctxt block ~message_position =
+  RPC_context.make_call2
+    Block.(export_service proof)
+    ctxt
+    block
+    message_position
+    ()
+    ()
+
+let monitor_synchronized ctxt =
+  RPC_context.make_streamed_call
+    Monitor.(export_service synchronized)
+    ctxt
+    ()
+    ()
+    ()

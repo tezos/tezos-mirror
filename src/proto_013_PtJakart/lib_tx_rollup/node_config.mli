@@ -29,25 +29,48 @@
    Provide a default configuration
 *)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2817
-   Better documentation/semantic for signers + modes
-*)
-type signers = {
-  submit_batch : Signature.public_key_hash option;
-  finalize_commitment : Signature.public_key_hash option;
-  remove_commitment : Signature.public_key_hash option;
-  rejection : Signature.public_key_hash option;
+(** Mode for the rollup node *)
+type mode =
+  | Observer  (** Only follows the chain and reconstructs L2 blocks *)
+  | Accuser  (** Follows the chain and rejects bad commitments *)
+  | Batcher  (** Accept transactions in its queue and batches them on the L1 *)
+  | Maintenance
+      (** Follows the chain and injects commitments (and rejects bad ones) *)
+  | Operator  (** Equivalent to maintenance + batcher  *)
+  | Custom
+      (** This mode allows to tweak which operations are injected by selecting the
+          signers *)
+
+type 'a purposed = {
+  operator : 'a;
+  submit_batch : 'a;
+  finalize_commitment : 'a;
+  remove_commitment : 'a;
+  rejection : 'a;
+  dispatch_withdrawals : 'a;
 }
+
+type signers = Signature.public_key_hash option purposed
+
+type cost_caps = {
+  fee_cap : Protocol.Alpha_context.Tez.t;
+  burn_cap : Protocol.Alpha_context.Tez.t;
+}
+
+type caps = cost_caps purposed
 
 type t = {
   data_dir : string;
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t option;
+  origination_level : int32 option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
-  operator : Signature.public_key_hash option;
+  mode : mode;
   signers : signers;
+  allow_deposit : bool;
   l2_blocks_cache_size : int;
+  caps : caps;
+  batch_burn_limit : Protocol.Alpha_context.Tez.t option;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -62,6 +85,22 @@ val default_reconnection_delay : float
 (** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
     cached by the rollup node *)
 val default_l2_blocks_cache_size : int
+
+(** The default fees/burn caps *)
+val default_cost_caps : cost_caps
+
+(** The default fees/burn caps for operations of the injector *)
+val default_caps : caps
+
+val modes : mode list
+
+val string_of_mode : mode -> string
+
+val mode_of_string : string -> mode tzresult
+
+(** [check_mode config] ensures the signers correspond to the chosen mode and
+    removes the extra ones. *)
+val check_mode : t -> t tzresult
 
 (** [save configuration] overwrites [configuration] file and returns the filename. *)
 val save : t -> string tzresult Lwt.t

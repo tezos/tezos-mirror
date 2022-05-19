@@ -23,30 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of signers for operations injected by the Tx rollup node  *)
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
-}
+open Protocol.Alpha_context
 
-(** Type of chain reorganizations. *)
-type 'block reorg = {
-  ancestor : 'block option;
-      (** The common ancestor of the two chains. Can be [None] if the chains have no
-          common ancestor, in which case all the blocks are changed *)
-  old_chain : 'block list;
-      (** The blocks that were in the old chain and which are not in the new one. *)
-  new_chain : 'block list;
-      (** The blocks that are now in the new chain. The length of [old_chain] and
-      [new_chain] may be different. *)
-}
+(** Build the commitment for an inbox. *)
+val commitment_of_inbox :
+  predecessor:L2block.t option ->
+  Tx_rollup_level.t ->
+  Inbox.t ->
+  Tx_rollup_commitment.Full.t
 
-(** Retrieve a signer from the client wallet. *)
-val get_signer :
-  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
-
-val no_reorg : 'a reorg
-
-val reorg_encoding : 'a Data_encoding.t -> 'a reorg Data_encoding.t
+(** Commit a block on the L1 chain. This takes the commitment embedded in the
+    block an produces a commitment operation that is queued for injection in the
+    injector. *)
+val commit_block :
+  operator:public_key_hash -> Tx_rollup.t -> L2block.t -> unit tzresult Lwt.t

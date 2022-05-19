@@ -38,47 +38,49 @@ module Tezos_blocks_cache :
 (** Information about the rollup that is kept in the state. *)
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
+}
+
+type sync_levels = {processed_tezos_level : int32; known_tezos_level : int32}
+
+type sync_info = {
+  mutable synchronized : bool;
+  on_synchronized : unit Lwt_condition.t;
+  mutable current_levels : sync_levels;
+  sync_level_input : sync_levels Lwt_watcher.input;
 }
 
 type t = private {
   stores : Stores.t;
-  cctxt : Client_context.full;
+  cctxt : Protocol_client_context.full;
   context_index : Context.index;
-  mutable head : L2block.t;
+  mutable head : L2block.t option;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
-  operator : signer option;
-  signers : Configuration.signers;
-  batcher : Batcher.t option;
+  signers : Node_config.signers;
+  caps : Node_config.caps;
+  sync : sync_info;
 }
 
-(** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
-   for the rollup node with a new store and context.  If the [rollup_genesis]
-   block hash is provided, checks that the rollup [rollup_id] is created inside
-   the block identified by the hash. Otherwise, the genesis information is read
-   from the disk. Note that if a [rollup_genesis] is provided, it must also
-   match the one on disk. L2 block are cached (controlled by
-   l2_blocks_cache_size) for performance improvements
-   w.r.t. access to the store. *)
+(** [init cctxt config] creates a new state for the rollup node with a new store
+   and context.  If the [rollup_genesis] block hash is provided in [config],
+   checks that the rollup [rollup_id] is created inside the block identified by
+   the hash. Otherwise, the genesis information is read from the disk. Note that
+   if a [rollup_genesis] is provided, it must also match the one on disk. L2
+   block are cached (controlled by l2_blocks_cache_size) for performance
+   improvements w.r.t. access to the store. *)
 val init :
   #Protocol_client_context.full ->
-  data_dir:string ->
   ?readonly:bool ->
-  ?rollup_genesis:Block_hash.t ->
-  l2_blocks_cache_size:int ->
-  operator:Signature.public_key_hash option ->
-  signers:Configuration.signers ->
-  Tx_rollup.t ->
+  Node_config.t ->
   t tzresult Lwt.t
 
 (** {2 Reading the state from disk}  *)
 
 (** Retrieve the current head of the rollup. Note that the current head can go
     in the past or change in case of reorganisations at the L1 layer.  *)
-val get_head : t -> L2block.t
+val get_head : t -> L2block.t option
 
 (** Retrieve an L2 block by its hash *)
 val get_block : t -> L2block.hash -> L2block.t option Lwt.t
@@ -110,8 +112,28 @@ val get_level_l2_block_header :
 (** Same as {!get_level} but retrieves the associated L2 block at the same time. *)
 val get_level_l2_block : t -> L2block.level -> L2block.t option Lwt.t
 
-(** Returns [true] if the Tezos block was already processed by the rollup node. *)
-val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
+(** Returns [`Known block] if the Tezos block was already processed by the
+    rollup node where [block] is either [Some l2_block], when there is an L2
+    block for the Tezos block, or [None] otherwise. It returns [`Unknown] when
+    the Tezos block has never been processed. *)
+val tezos_block_already_processed :
+  t -> Block_hash.t -> [> `Known of L2block.t option | `Unknown] Lwt.t
+
+(** Returns the inclusion info for a commitment. *)
+val get_included_commitment :
+  t ->
+  Tx_rollup_commitment_hash.t ->
+  L2block.commitment_included_info option Lwt.t
+
+(** Returns the last finalized (on L1) rollup level. *)
+val get_finalized_level : t -> Tx_rollup_level.t option Lwt.t
+
+(** Retrieve an L2 block metadata from its header *)
+val get_block_metadata : t -> L2block.header -> L2block.metadata Lwt.t
+
+(** Retrieve an L2 block and associated metadata by its hash *)
+val get_block_and_metadata :
+  t -> L2block.hash -> (L2block.t * L2block.metadata) option Lwt.t
 
 (** {2 Saving the state to disk}  *)
 
@@ -119,7 +141,7 @@ val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
     reorganized. *)
 val set_head : t -> L2block.t -> L2block.t reorg tzresult Lwt.t
 
-(** Set the Tezos head. Returns the reorganization of L1 blocks (if any). *)
+(** Set the Tezos head and returns the reorganization of L1 blocks. *)
 val set_tezos_head :
   t -> Block_hash.t -> Alpha_block_services.block_info reorg tzresult Lwt.t
 
@@ -138,10 +160,31 @@ val save_level : t -> L2block.level -> L2block.hash -> unit Lwt.t
 val save_tezos_block_info :
   t ->
   Block_hash.t ->
-  L2block.hash ->
+  L2block.hash option ->
   level:int32 ->
   predecessor:Block_hash.t ->
   unit Lwt.t
+
+(** Register a commitment as included on L1. *)
+val set_commitment_included :
+  t ->
+  Tx_rollup_commitment_hash.t ->
+  Block_hash.t ->
+  Operation_hash.t ->
+  unit Lwt.t
+
+(** Register a commitment as not included on L1. *)
+val unset_commitment_included : t -> Tx_rollup_commitment_hash.t -> unit Lwt.t
+
+(** Register the last finalized (on L1) rollup level. *)
+val set_finalized_level : t -> Tx_rollup_level.t -> unit tzresult Lwt.t
+
+(** Delete the last finalized (on L1) rollup level. *)
+val delete_finalized_level : t -> unit Lwt.t
+
+(** Register the origination level of the rollup for this node. *)
+val set_rollup_info :
+  t -> Tx_rollup.t -> origination_level:int32 -> unit tzresult Lwt.t
 
 (** {2 Misc}  *)
 
@@ -153,3 +196,19 @@ val rollup_operation_index : int
 (** Fetch a Tezos block from the cache or the node *)
 val fetch_tezos_block :
   t -> Block_hash.t -> Alpha_block_services.block_info tzresult Lwt.t
+
+(** Compute the reorganization of L2 blocks from the chain whose head is
+    [old_head_hash] and the chain whose head [new_head_hash]. *)
+val rollup_reorg :
+  t -> old_head:L2block.t -> new_head:L2block.t -> L2block.t reorg Lwt.t
+
+(** [synchronized state] is a promise that resolves when the rollup node whose
+    state is [state] is synchronized with L1. If the node is already
+    synchronized, it resolves immediately. *)
+val synchronized : t -> unit Lwt.t
+
+(** Notify the processed Tezos level to watchers on the sync_levels input. *)
+val notify_processed_tezos_level : t -> int32 -> unit
+
+(** Set the latest known Tezos level but do not notify sync levels input. *)
+val set_known_tezos_level : t -> int32 -> unit

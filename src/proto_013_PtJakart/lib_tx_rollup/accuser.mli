@@ -23,32 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
-}
+open Protocol.Alpha_context
 
-let get_signer cctxt pkh =
-  let open Lwt_result_syntax in
-  let* alias, pk, sk = Client_keys.get_key cctxt pkh in
-  return {alias; pkh; pk; sk}
+(** [build_rejection state ~reject_commitment block ~position] constructs a
+    rejection operation for rejecting message at position [position] in the (bad)
+    commitment [reject_commitment], using the actual L2 block [block].  *)
+val build_rejection :
+  State.t ->
+  reject_commitment:Tx_rollup_commitment.Full.t ->
+  L2block.t ->
+  position:int ->
+  Kind.tx_rollup_rejection manager_operation tzresult Lwt.t
 
-type 'block reorg = {
-  ancestor : 'block option;
-  old_chain : 'block list;
-  new_chain : 'block list;
-}
-
-let no_reorg = {ancestor = None; old_chain = []; new_chain = []}
-
-let reorg_encoding block_encoding =
-  let open Data_encoding in
-  conv
-    (fun {ancestor; old_chain; new_chain} -> (ancestor, old_chain, new_chain))
-    (fun (ancestor, old_chain, new_chain) -> {ancestor; old_chain; new_chain})
-  @@ obj3
-       (opt "ancestor" block_encoding)
-       (req "old_chain" (list block_encoding))
-       (req "new_chain" (list block_encoding))
+(** [reject_bad_commitment ~source state commitment] injects a rejection
+    operation with [source] if the [commitment] is rejectable. *)
+val reject_bad_commitment :
+  source:Signature.Public_key_hash.t ->
+  State.t ->
+  Tx_rollup_commitment.Full.t ->
+  unit tzresult Lwt.t
