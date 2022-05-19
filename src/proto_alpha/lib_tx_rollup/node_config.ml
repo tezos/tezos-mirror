@@ -381,64 +381,94 @@ let get_configuration_filename data_dir =
   let filename = "config.json" in
   Filename.concat data_dir filename
 
+module SigKindSet = struct
+  include Set.Make (struct
+    type t =
+      [ `operator
+      | `submit_batch
+      | `finalize_commitment
+      | `remove_commitment
+      | `rejection
+      | `dispatch_withdrawals ]
+
+    let compare = Stdlib.compare
+  end)
+
+  let elt_to_string = function
+    | `operator -> "operator"
+    | `submit_batch -> "submit_batch"
+    | `finalize_commitment -> "finalize_commitment"
+    | `remove_commitment -> "remove_commitment"
+    | `rejection -> "rejection"
+    | `dispatch_withdrawals -> "dispatch_withdrawals"
+
+  let to_string_list s = elements s |> List.map elt_to_string
+end
+
 let check_mode config =
-  let config_signers =
-    let add signer name acc =
-      Option.fold ~none:acc ~some:(fun _ -> String.Set.add name acc) signer
+  let with_signers signers =
+    let config_signers =
+      let add signer name acc =
+        Option.fold ~none:acc ~some:(fun _ -> SigKindSet.add name acc) signer
+      in
+      SigKindSet.empty
+      |> add config.signers.operator `operator
+      |> add config.signers.submit_batch `submit_batch
+      |> add config.signers.finalize_commitment `finalize_commitment
+      |> add config.signers.remove_commitment `remove_commitment
+      |> add config.signers.rejection `rejection
+      |> add config.signers.dispatch_withdrawals `dispatch_withdrawals
     in
-    String.Set.empty
-    |> add config.signers.operator "operator"
-    |> add config.signers.submit_batch "submit_batch"
-    |> add config.signers.finalize_commitment "finalize_commitment"
-    |> add config.signers.remove_commitment "remove_commitment"
-    |> add config.signers.rejection "rejection"
-    |> add config.signers.dispatch_withdrawals "dispatch_withdrawals"
-  in
-  let should_have signers =
-    let signers = String.Set.of_list signers in
-    if String.Set.equal config_signers signers then Ok ()
+    let signers = SigKindSet.of_list signers in
+    if SigKindSet.equal config_signers signers then Ok config
     else
       let missing_signers =
-        String.Set.(diff signers config_signers |> elements)
+        SigKindSet.(diff signers config_signers |> to_string_list)
       in
-      let extra_signers =
-        String.Set.(diff config_signers signers |> elements)
-      in
-      let mode = string_of_mode config.mode in
-      Error
-        [
-          Error.Tx_rollup_mismatch_mode_signers
-            {mode; missing_signers; extra_signers};
-        ]
+      if missing_signers <> [] then
+        let mode = string_of_mode config.mode in
+        Error [Error.Tx_rollup_missing_mode_signers {mode; missing_signers}]
+      else
+        let extra_signers = SigKindSet.(diff config_signers signers) in
+        let remove kind signers =
+          match kind with
+          | `operator -> {signers with operator = None}
+          | `submit_batch -> {signers with submit_batch = None}
+          | `finalize_commitment -> {signers with finalize_commitment = None}
+          | `remove_commitment -> {signers with remove_commitment = None}
+          | `rejection -> {signers with rejection = None}
+          | `dispatch_withdrawals -> {signers with dispatch_withdrawals = None}
+        in
+        let signers = SigKindSet.fold remove extra_signers config.signers in
+        Ok {config with signers}
   in
   match config.mode with
-  | Observer -> should_have []
-  | Accuser -> should_have ["rejection"]
-  | Batcher -> should_have ["submit_batch"]
+  | Observer -> with_signers []
+  | Accuser -> with_signers [`rejection]
+  | Batcher -> with_signers [`submit_batch]
   | Maintenance ->
-      should_have
+      with_signers
         [
-          "operator";
-          "finalize_commitment";
-          "remove_commitment";
-          "rejection";
-          "dispatch_withdrawals";
+          `operator;
+          `finalize_commitment;
+          `remove_commitment;
+          `rejection;
+          `dispatch_withdrawals;
         ]
   | Operator ->
-      should_have
+      with_signers
         [
-          "operator";
-          "submit_batch";
-          "finalize_commitment";
-          "remove_commitment";
-          "rejection";
-          "dispatch_withdrawals";
+          `operator;
+          `submit_batch;
+          `finalize_commitment;
+          `remove_commitment;
+          `rejection;
+          `dispatch_withdrawals;
         ]
-  | Custom -> Ok ()
+  | Custom -> Ok config
 
 let save configuration =
   let open Lwt_result_syntax in
-  let*? () = check_mode configuration in
   let json = Data_encoding.Json.construct encoding configuration in
   let*! () = Lwt_utils_unix.create_dir configuration.data_dir in
   let file = get_configuration_filename configuration.data_dir in
@@ -464,5 +494,4 @@ let load ~data_dir =
   in
   let* json = Lwt_utils_unix.Json.read_file file in
   let config = Data_encoding.Json.destruct encoding json in
-  let*? () = check_mode config in
   return config
