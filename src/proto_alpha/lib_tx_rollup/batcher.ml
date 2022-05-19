@@ -39,9 +39,6 @@ type state = {
   lock : Lwt_mutex.t;
 }
 
-(* TODO/TORU: remove me *)
-let max_number_of_batches = 10
-
 let encode_batch batch =
   Data_encoding.Binary.to_string Tx_rollup_l2_batch.encoding batch
   |> Result.map_error (fun err -> [Data_encoding_wrapper.Encoding_error err])
@@ -103,59 +100,41 @@ let is_batch_valid ctxt (constants : Constants.t) batch =
 
 let get_batches ctxt constants queue =
   let open Lwt_result_syntax in
-  let exception
-    Batches_finished of {
-      rev_batches :
-        (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.t list;
-      to_remove : L2_transaction.hash list;
-    }
-  in
-  try
-    let* rev_batches, rev_current_trs, to_remove =
-      Tx_queue.fold_es
-        (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
-          let new_trs = tr :: rev_current_trs in
-          let*? batch = L2_transaction.batch (List.rev new_trs) in
-          let* b = is_batch_valid ctxt constants batch in
-          if b then return (batches, new_trs, tr_hash :: to_remove)
-          else
-            match rev_current_trs with
-            | [_] ->
-                (* If only one transaction makes the batch invalid, we remove it
-                   from the current transactions and it'll be removed later. *)
+  let* rev_batches, rev_current_trs, to_remove =
+    Tx_queue.fold_es
+      (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
+        let new_trs = tr :: rev_current_trs in
+        let*? batch = L2_transaction.batch (List.rev new_trs) in
+        let* b = is_batch_valid ctxt constants batch in
+        if b then return (batches, new_trs, tr_hash :: to_remove)
+        else
+          match rev_current_trs with
+          | [_] ->
+              (* If only one transaction makes the batch invalid, we remove it
+                 from the current transactions and it'll be removed later. *)
+              let*! () = Event.(emit Batcher.invalid_transaction) tr in
+              return (batches, [], tr_hash :: to_remove)
+          | _ ->
+              let*? batch = L2_transaction.batch (List.rev rev_current_trs) in
+              let new_batches = batch :: batches in
+              (* We add the batch to the accumulator and we go on. *)
+              let*? batch = L2_transaction.batch [tr] in
+              let* b = is_batch_valid ctxt constants batch in
+              if b then return (new_batches, [tr], tr_hash :: to_remove)
+              else
                 let*! () = Event.(emit Batcher.invalid_transaction) tr in
-                return (batches, [], tr_hash :: to_remove)
-            | _ ->
-                let*? batch = L2_transaction.batch (List.rev rev_current_trs) in
-                let new_batches = batch :: batches in
-                if
-                  List.compare_length_with new_batches max_number_of_batches
-                  >= 0
-                then
-                  (* We created enough batches, we exit the loop *)
-                  raise
-                    (Batches_finished {rev_batches = new_batches; to_remove})
-                else
-                  (* We add the batch to the accumulator and we go on. *)
-                  let*? batch = L2_transaction.batch [tr] in
-                  let* b = is_batch_valid ctxt constants batch in
-                  if b then return (new_batches, [tr], tr_hash :: to_remove)
-                  else
-                    let*! () = Event.(emit Batcher.invalid_transaction) tr in
-                    return (new_batches, [], tr_hash :: to_remove))
-        queue
-        ([], [], [])
-    in
-    let*? batches =
-      let open Result_syntax in
-      if rev_current_trs <> [] then
-        let+ last_batch = L2_transaction.batch (List.rev rev_current_trs) in
-        List.rev (last_batch :: rev_batches)
-      else return (List.rev rev_batches)
-    in
-    return (batches, to_remove)
-  with Batches_finished {rev_batches; to_remove} ->
-    return (List.rev rev_batches, to_remove)
+                return (new_batches, [], tr_hash :: to_remove))
+      queue
+      ([], [], [])
+  in
+  let*? batches =
+    let open Result_syntax in
+    if rev_current_trs <> [] then
+      let+ last_batch = L2_transaction.batch (List.rev rev_current_trs) in
+      List.rev (last_batch :: rev_batches)
+    else return (List.rev rev_batches)
+  in
+  return (batches, to_remove)
 
 let on_batch state =
   let open Lwt_result_syntax in
