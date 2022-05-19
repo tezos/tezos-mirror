@@ -50,19 +50,8 @@ let init (cctxt : Protocol_client_context.full) rollup_address operator
       (cctxt#chain, cctxt#block)
       rollup_address
   in
-  let* kind =
-    Plugin.RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
-  in
   let+ kind =
-    match kind with
-    | Some k -> return k
-    | None ->
-        (* Technically this error cannot happen, initial level will fail if the
-           rollup does not exist. *)
-        cctxt#error
-          "Rollup %a does not exists."
-          Sc_rollup.Address.pp
-          rollup_address
+    Plugin.RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
   in
   {
     cctxt;

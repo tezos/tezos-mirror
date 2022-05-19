@@ -1634,8 +1634,21 @@ module RPC = struct
             Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
             f ctxt arg q i)
 
+    let opt_register1_fullctxt ~chunked s f =
+      patched_services :=
+        RPC_directory.opt_register
+          ~chunked
+          !patched_services
+          s
+          (fun (ctxt, arg) q i ->
+            Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+            f ctxt arg q i)
+
     let register1 ~chunked s f =
       register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
+
+    let opt_register1 ~chunked s f =
+      opt_register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
 
     let register2_fullctxt ~chunked s f =
       patched_services :=
@@ -3319,7 +3332,7 @@ module RPC = struct
         RPC_service.get_service
           ~description:"Kind of smart-contract rollup"
           ~query:RPC_query.empty
-          ~output:(obj1 (opt "kind" Sc_rollup.Kind.encoding))
+          ~output:Sc_rollup.Kind.encoding
           RPC_path.(path /: Sc_rollup.Address.rpc_arg / "kind")
 
       let boot_sector =
@@ -3386,8 +3399,8 @@ module RPC = struct
           Sc_rollup.inbox ctxt rollup >>=? fun (inbox, _ctxt) -> return inbox)
 
     let register_kind () =
-      Registration.register1 ~chunked:true S.kind @@ fun ctxt address () () ->
-      Alpha_context.Sc_rollup.kind ctxt address
+      Registration.opt_register1 ~chunked:true S.kind
+      @@ fun ctxt address () () -> Alpha_context.Sc_rollup.kind ctxt address
 
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
     let register_initial_level () =
