@@ -98,8 +98,9 @@ val string_of_mode : mode -> string
 
 val mode_of_string : string -> mode tzresult
 
-(** [check_mode config] ensures the signers correspond to the chosen mode. *)
-val check_mode : t -> unit tzresult
+(** [check_mode config] ensures the signers correspond to the chosen mode and
+    removes the extra ones. *)
+val check_mode : t -> t tzresult
 
 (** [save configuration] overwrites [configuration] file and returns the filename. *)
 val save : t -> string tzresult Lwt.t

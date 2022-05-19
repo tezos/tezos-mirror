@@ -117,12 +117,11 @@ type error +=
     message regarding the layer1 limit. *)
 type error += Transaction_too_large of {actual : int; limit : int}
 
-(** Mismatch between the chosen mode and the provided signers. *)
+(** Missing signers for the chosen mode. *)
 type error +=
-  | Tx_rollup_mismatch_mode_signers of {
+  | Tx_rollup_missing_mode_signers of {
       mode : string;
       missing_signers : string list;
-      extra_signers : string list;
     }
 
 (** Error returned when the rollup node is not authorized to make deposits *)

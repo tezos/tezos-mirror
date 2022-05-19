@@ -345,6 +345,7 @@ let configuration_init_command =
           allow_deposit
           reconnection_delay
       in
+      let*? config = Node_config.check_mode config in
       let* file = Node_config.save config in
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
@@ -437,6 +438,7 @@ let run_command =
             in
             return config
       in
+      let*? config = Node_config.check_mode config in
       Daemon.run config cctxt)
 
 let tx_rollup_commands () =

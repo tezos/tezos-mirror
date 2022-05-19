@@ -477,51 +477,34 @@ let () =
     (fun (actual, limit) -> Transaction_too_large {actual; limit})
 
 type error +=
-  | Tx_rollup_mismatch_mode_signers of {
+  | Tx_rollup_missing_mode_signers of {
       mode : string;
       missing_signers : string list;
-      extra_signers : string list;
     }
 
 let () =
   register_error_kind
-    ~id:"tx_rollup.node.mismatch_mode_signers"
-    ~title:"Mismatch between mode and signers"
-    ~description:"Mismatch between the chosen mode and the provided signers."
-    ~pp:(fun ppf (mode, missing_signers, extra_signers) ->
-      Format.fprintf ppf "@[<hov>" ;
-      if missing_signers <> [] then
-        Format.fprintf
-          ppf
-          "Missing signers %a"
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-             Format.pp_print_string)
-          missing_signers ;
-      if missing_signers <> [] && extra_signers <> [] then
-        Format.fprintf ppf " and " ;
-      if extra_signers <> [] then
-        Format.fprintf
-          ppf
-          "superfluous signers %a"
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-             Format.pp_print_string)
-          extra_signers ;
-      Format.fprintf ppf " for mode %s.@]" mode)
+    ~id:"tx_rollup.node.missing_mode_signers"
+    ~title:"Missing signers for the chosen mode"
+    ~description:"Missing signers for the chosen mode."
+    ~pp:(fun ppf (mode, missing_signers) ->
+      Format.fprintf
+        ppf
+        "@[<hov>Missing signers %a for mode %s.@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_string)
+        missing_signers
+        mode)
     `Permanent
     Data_encoding.(
-      obj3
-        (req "mode" string)
-        (req "missing_signers" (list string))
-        (req "extra_signers" (list string)))
+      obj2 (req "mode" string) (req "missing_signers" (list string)))
     (function
-      | Tx_rollup_mismatch_mode_signers {mode; missing_signers; extra_signers}
-        ->
-          Some (mode, missing_signers, extra_signers)
+      | Tx_rollup_missing_mode_signers {mode; missing_signers} ->
+          Some (mode, missing_signers)
       | _ -> None)
-    (fun (mode, missing_signers, extra_signers) ->
-      Tx_rollup_mismatch_mode_signers {mode; missing_signers; extra_signers})
+    (fun (mode, missing_signers) ->
+      Tx_rollup_missing_mode_signers {mode; missing_signers})
 
 type error += Tx_rollup_deposit_not_allowed
 
