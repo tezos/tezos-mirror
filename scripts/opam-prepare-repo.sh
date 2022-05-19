@@ -55,16 +55,25 @@ trap clean_tarball EXIT
 
 if [ -f "$tarball" ] ; then
     cp "$tarball" "$tarball_copy"
+elif [ -d "$tarball" ] ; then
+    tarball=$(realpath "$tarball")
+    log "using directory '$tarball' as url"
+    rm -f "$tarball_copy"
 else
     log "Downloading tarball from $tarball..."
     curl "$tarball" --output "$tarball_copy"
 fi
 
-log "Hashing tarball..."
-sha256=$(sha256sum "$tarball_copy" | cut -d ' ' -f 1)
-log "SHA256: $sha256"
-sha512=$(sha512sum "$tarball_copy" | cut -d ' ' -f 1)
-log "SHA512: $sha512"
+if [ -f "$tarball_copy" ] ; then
+    log "Hashing tarball..."
+    sha256=$(sha256sum "$tarball_copy" | cut -d ' ' -f 1)
+    log "SHA256: $sha256"
+    sha512=$(sha512sum "$tarball_copy" | cut -d ' ' -f 1)
+    log "SHA512: $sha512"
+else
+    sha256=""
+    sha512=""
+fi
 
 log "Generating opam files for $version..."
 cd "$script_dir"/../manifest
