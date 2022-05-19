@@ -215,7 +215,6 @@ let get_liquidity_baking_subsidy ctxt =
 
 let get_liquidity_baking_cpmm_address ctxt =
   Alpha_services.Liquidity_baking.get_cpmm_address rpc_ctxt ctxt
-  >|=? fun hash -> Contract.Originated hash
 
 (* Voting *)
 
@@ -302,9 +301,11 @@ module Contract = struct
     Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
 
   let storage ctxt contract =
+    let contract = Contract.Originated contract in
     Alpha_services.Contract.storage rpc_ctxt ctxt contract
 
   let script ctxt contract =
+    let contract = Contract.Originated contract in
     Alpha_services.Contract.script rpc_ctxt ctxt contract
     >>=? fun {code; storage = _} ->
     match Data_encoding.force_decode code with

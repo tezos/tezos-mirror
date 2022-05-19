@@ -51,14 +51,23 @@ let load_script ~storage file =
   Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
 
 (** Returns a block in which the contract is originated. *)
-let originate_contract file storage src b baker =
+let originate_contract_hash file storage src b baker =
   let script = load_script ~storage file in
-  Op.contract_origination (B b) src ~fee:(Test_tez.of_int 10) ~script
+  Op.contract_origination_hash (B b) src ~fee:(Test_tez.of_int 10) ~script
   >>=? fun (operation, dst) ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
   >>=? fun incr ->
   Incremental.add_operation incr operation >>=? fun incr ->
   Incremental.finalize_block incr >|=? fun b -> (dst, b)
+
+let originate_contract file storage src b baker =
+  originate_contract_hash file storage src b baker >|=? fun (dst, b) ->
+  (Contract.Originated dst, b)
+
+let fake_KT1 =
+  Contract_hash.of_b58check_exn "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+
+let default_self = Contract.Originated fake_KT1
 
 let default_source = Contract.Implicit Signature.Public_key_hash.zero
 
@@ -67,7 +76,7 @@ let default_step_constants =
     {
       source = default_source;
       payer = default_source;
-      self = default_source;
+      self = default_self;
       amount = Tez.zero;
       balance = Tez.zero;
       chain_id = Chain_id.zero;

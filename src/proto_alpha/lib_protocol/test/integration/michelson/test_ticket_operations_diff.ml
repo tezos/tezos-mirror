@@ -188,11 +188,11 @@ let init ?tx_rollup_enable () =
 let originate block ~script ~storage ~src ~baker ~forges_tickets =
   let code = Expr.toplevel_from_string script in
   let storage = Expr.from_string storage in
-  let script =
-    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
-  in
   let* operation, destination =
-    Op.contract_origination (B block) src ~fee:(Test_tez.of_int 10) ~script
+    let script =
+      Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+    in
+    Op.contract_origination_hash (B block) src ~fee:(Test_tez.of_int 10) ~script
   in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
@@ -204,6 +204,7 @@ let originate block ~script ~storage ~src ~baker ~forges_tickets =
       incr
       operation
   in
+  let script = (code, storage) in
   Incremental.finalize_block incr >|=? fun block -> (destination, script, block)
 
 let two_ticketers block =
@@ -218,13 +219,16 @@ let one_ticketer block = two_ticketers block >|=? fst
 let nat n = Script_int.(abs @@ of_int n)
 
 let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
-  let* orig_contract, script, block =
+  let* orig_contract, (code, storage), block =
     originate block ~script ~storage ~src ~baker ~forges_tickets
   in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
   let ctxt = Incremental.alpha_ctxt incr in
+  let script =
+    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+  in
   let* ( Script_ir_translator.Ex_script
            (Script
              {
@@ -252,7 +256,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
           Origination
             {
               origination = {delegate = None; script; credit = Tez.one};
-              preorigination = orig_contract;
+              preorigination = Contract.Originated orig_contract;
               storage_type;
               storage;
             };
@@ -260,7 +264,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
       }
   in
   let incr = Incremental.set_alpha_ctxt incr ctxt in
-  return (orig_contract, operation, incr)
+  return (Contract.Originated orig_contract, operation, incr)
 
 let delegation_operation ~src =
   Script_typed_ir.Internal_operation
@@ -273,7 +277,7 @@ let originate block ~src ~baker ~script ~storage ~forges_tickets =
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
-  return (orig_contract, incr)
+  return (Contract.Originated orig_contract, incr)
 
 let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
   let open Lwt_result_syntax in

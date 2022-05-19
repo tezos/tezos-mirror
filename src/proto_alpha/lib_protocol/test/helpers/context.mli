@@ -86,7 +86,7 @@ val get_endorsing_reward :
 
 val get_liquidity_baking_subsidy : t -> Tez.t tzresult Lwt.t
 
-val get_liquidity_baking_cpmm_address : t -> Contract.t tzresult Lwt.t
+val get_liquidity_baking_cpmm_address : t -> Contract_hash.t tzresult Lwt.t
 
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
@@ -145,11 +145,11 @@ module Contract : sig
 
   val delegate_opt : t -> Contract.t -> public_key_hash option tzresult Lwt.t
 
-  val storage : t -> Contract.t -> Script.expr tzresult Lwt.t
+  val storage : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 
-  val script : t -> Contract.t -> Script.expr tzresult Lwt.t
+  val script : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 
-  val script_hash : t -> Contract.t -> Script_expr_hash.t tzresult Lwt.t
+  val script_hash : t -> Contract_hash.t -> Script_expr_hash.t tzresult Lwt.t
 end
 
 module Delegate : sig

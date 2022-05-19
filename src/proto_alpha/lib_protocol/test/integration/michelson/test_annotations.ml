@@ -65,7 +65,8 @@ let init_and_originate contract_code_string =
   Incremental.begin_construction b >>=? fun inc ->
   let code = Expr.toplevel_from_string contract_code_string in
   let script = Script.{code = lazy_expr code; storage = lazy_none} in
-  Op.contract_origination (I inc) source ~script >>=? fun (operation, addr) ->
+  Op.contract_origination_hash (I inc) source ~script
+  >>=? fun (operation, addr) ->
   Incremental.add_operation inc operation >|=? fun inc -> (inc, source, addr)
 
 let assert_stored_script_equal inc addr expected_code_string =
@@ -93,7 +94,10 @@ let get_address_from_storage inc factory_addr =
       failwith "Did not expect non-default entrypoint"
   | Some {destination = Tx_rollup _; _} ->
       failwith "Did not expect non-contract address"
-  | Some {destination = Contract addr; entrypoint = _it_is_default} ->
+  | Some {destination = Contract (Implicit _); _} ->
+      failwith "Did not expect implict account"
+  | Some {destination = Contract (Originated addr); entrypoint = _it_is_default}
+    ->
       return addr
   | _ ->
       failwith
@@ -110,7 +114,12 @@ let test_external_origination () =
 let test_internal_origination () =
   init_and_originate contract_factory_with_annotations
   >>=? fun (inc, source, factory) ->
-  Op.transaction (I inc) source factory ~parameters:lazy_none Tez.zero
+  Op.transaction
+    (I inc)
+    source
+    (Contract.Originated factory)
+    ~parameters:lazy_none
+    Tez.zero
   >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
   get_address_from_storage inc factory >>=? fun addr ->

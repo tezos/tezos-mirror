@@ -889,10 +889,10 @@ module ConcreteBaseMachine :
         Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
         let env =
           {
-            cpmm_contract;
-            tzbtc_contract;
+            cpmm_contract = Contract.Originated cpmm_contract;
+            tzbtc_contract = Contract.Originated tzbtc_contract;
             tzbtc_admin;
-            liquidity_contract;
+            liquidity_contract = Contract.Originated liquidity_contract;
             liquidity_admin;
             implicit_accounts = accounts;
             holder;

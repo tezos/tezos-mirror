@@ -80,7 +80,7 @@ let test_bad_contract_parameter () =
   | Error (Environment.Ecoproto_error (Bad_contract_parameter source') :: _) ->
       Alcotest.(check Testable.contract)
         "incorrect field in Bad_contract_parameter"
-        Contract_helpers.default_source
+        Contract_helpers.default_self
         source' ;
       return_unit
   | Error errs ->

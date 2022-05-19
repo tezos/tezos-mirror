@@ -89,3 +89,10 @@ let address_of_string_exn s =
   match Contract.of_b58check s with
   | Ok c -> c
   | Error _ -> raise @@ Invalid_address_expr s
+
+let originated_of_string_exn s =
+  match address_of_string_exn s with
+  | Contract.Originated addr -> addr
+  | Contract.Implicit _ ->
+      invalid_arg
+        "Expected originated contract address, got implicit contract address"
