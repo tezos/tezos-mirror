@@ -2153,12 +2153,114 @@ let burn_origination_storage_fees ctxt
         paid_storage_size_diff;
       } )
 
-(** [burn_storage_fees ctxt smopr storage_limit payer] burns the storage fees
-    associated to an operation result [smopr].
+(** [burn_manager_storage_fees ctxt smopr storage_limit payer] burns the
+    storage fees associated to an external operation result [smopr].
     Returns an updated context, an updated storage limit with the space consumed
     by the operation subtracted, and [smopr] with the relevant balance updates
     included. *)
-let burn_storage_fees :
+let burn_manager_storage_fees :
+    type kind.
+    context ->
+    kind successful_manager_operation_result ->
+    storage_limit:Z.t ->
+    payer:public_key_hash ->
+    (context * Z.t * kind successful_manager_operation_result) tzresult Lwt.t =
+ fun ctxt smopr ~storage_limit ~payer ->
+  let payer = `Contract (Contract.Implicit payer) in
+  match smopr with
+  | Transaction_result transaction_result ->
+      burn_transaction_storage_fees
+        ctxt
+        transaction_result
+        ~storage_limit
+        ~payer
+      >>=? fun (ctxt, storage_limit, transaction_result) ->
+      return (ctxt, storage_limit, Transaction_result transaction_result)
+  | Origination_result origination_result ->
+      burn_origination_storage_fees
+        ctxt
+        origination_result
+        ~storage_limit
+        ~payer
+      >>=? fun (ctxt, storage_limit, origination_result) ->
+      return (ctxt, storage_limit, Origination_result origination_result)
+  | Reveal_result _ | Delegation_result _ -> return (ctxt, storage_limit, smopr)
+  | Register_global_constant_result payload ->
+      let consumed = payload.size_of_constant in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Register_global_constant_result
+            {
+              balance_updates;
+              consumed_gas = payload.consumed_gas;
+              size_of_constant = payload.size_of_constant;
+              global_address = payload.global_address;
+            } )
+  | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
+  | Tx_rollup_origination_result payload ->
+      Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
+      >>=? fun (ctxt, storage_limit, origination_bus) ->
+      let balance_updates = origination_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_origination_result {payload with balance_updates} )
+  | Tx_rollup_return_bond_result _ | Tx_rollup_remove_commitment_result _
+  | Tx_rollup_rejection_result _ | Tx_rollup_finalize_commitment_result _
+  | Tx_rollup_commit_result _ ->
+      return (ctxt, storage_limit, smopr)
+  | Transfer_ticket_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = payload.balance_updates @ storage_bus in
+      return
+        ( ctxt,
+          storage_limit,
+          Transfer_ticket_result {payload with balance_updates} )
+  | Tx_rollup_submit_batch_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_submit_batch_result {payload with balance_updates} )
+  | Tx_rollup_dispatch_tickets_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_dispatch_tickets_result {payload with balance_updates} )
+  | Sc_rollup_originate_result payload ->
+      Fees.burn_sc_rollup_origination_fees
+        ctxt
+        ~storage_limit
+        ~payer
+        payload.size
+      >>=? fun (ctxt, storage_limit, balance_updates) ->
+      let result = Sc_rollup_originate_result {payload with balance_updates} in
+      return (ctxt, storage_limit, result)
+  | Sc_rollup_add_messages_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_cement_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_publish_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_refute_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_timeout_result _ -> return (ctxt, storage_limit, smopr)
+
+(** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
+    storage fees associated to an internal operation result [smopr].
+    Returns an updated context, an updated storage limit with the space consumed
+    by the operation subtracted, and [smopr] with the relevant balance updates
+    included. *)
+let burn_internal_storage_fees :
     type kind.
     context ->
     kind successful_manager_operation_result ->
@@ -2291,7 +2393,11 @@ let apply_manager_contents (type kind) ctxt mode chain_id
         internal_operations
       >>= function
       | Success ctxt, internal_operations_results -> (
-          burn_storage_fees ctxt operation_results ~storage_limit ~payer:source
+          burn_manager_storage_fees
+            ctxt
+            operation_results
+            ~storage_limit
+            ~payer:source
           >>= function
           | Ok (ctxt, storage_limit, operation_results) -> (
               List.fold_left_es
@@ -2299,7 +2405,11 @@ let apply_manager_contents (type kind) ctxt mode chain_id
                   let (Internal_manager_operation_result (op, mopr)) = imopr in
                   match mopr with
                   | Applied smopr ->
-                      burn_storage_fees ctxt smopr ~storage_limit ~payer:source
+                      burn_internal_storage_fees
+                        ctxt
+                        smopr
+                        ~storage_limit
+                        ~payer:source
                       >>=? fun (ctxt, storage_limit, smopr) ->
                       let imopr =
                         Internal_manager_operation_result (op, Applied smopr)
