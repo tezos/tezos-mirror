@@ -1,1 +1,124 @@
-../../lib_protocol_compiler/dune_protocol.v1
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_environment_demo_noops)
+ (public_name tezos-protocol-demo-noops.environment)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (modules Environment))
+
+(rule
+ (targets environment.ml)
+ (action
+  (write-file
+   %{targets}
+   "module Name = struct let name = \"demo-noops\" end\ninclude Tezos_protocol_environment.MakeV6(Name)()\nmodule CamlinternalFormatBasics = struct include CamlinternalFormatBasics end\n")))
+
+(library
+ (name tezos_raw_protocol_demo_noops)
+ (public_name tezos-protocol-demo-noops.raw)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-demo-noops.environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -w +a-4-40..42-44-45-48
+   -warn-error +a
+   -nostdlib
+   -nopervasives
+   -open Tezos_protocol_environment_demo_noops.Environment
+   -open Pervasives
+   -open Error_monad))
+ (modules Main))
+
+(library
+ (name tezos_protocol_demo_noops)
+ (public_name tezos-protocol-demo-noops)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-demo-noops.raw)
+ (flags (-w +a-4-40..42-44-45-48
+         -warn-error +a
+         -nopervasives))
+ (modules Protocol))
+
+(install
+ (package tezos-protocol-demo-noops)
+ (section lib)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+
+(rule
+ (targets protocol.ml)
+ (deps main.ml main.mli)
+ (action
+  (write-file
+   %{targets}
+   "module Environment = Tezos_protocol_environment_demo_noops.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_demo_noops\ninclude Tezos_raw_protocol_demo_noops.Main\n")))
+
+(rule
+ (alias runtest_compile_protocol)
+ (deps main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
+
+(rule
+ (alias runtest_sandbox)
+ (deps .tezos_protocol_demo_noops.objs/native/tezos_protocol_demo_noops.cmx)
+ (action (progn)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-demo-noops)
+ (deps (alias runtest_sandbox))
+ (action (progn)))
+
+(library
+ (name tezos_protocol_demo_noops_functor)
+ (public_name tezos-protocol-functor-demo-noops)
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-demo-noops.raw)
+ (flags (-w +a-4-40..42-44-45-48
+         -warn-error +a
+         -nopervasives))
+ (modules Functor))
+
+(rule
+ (targets functor.ml)
+ (deps main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+
+(library
+ (name tezos_embedded_protocol_demo_noops)
+ (public_name tezos-embedded-protocol-demo-noops)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-demo-noops
+  tezos-protocol-updater
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags (:standard
+         -w +a-4-40..42-44-45-48
+         -warn-error +a))
+ (modules Registerer))
+
+(rule
+ (targets registerer.ml)
+ (deps main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-embedded-protocol-packer} %{src_dir} demo_noops)))))

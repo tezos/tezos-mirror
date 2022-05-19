@@ -1,17 +1,27 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name main)
+ (libraries
+  alcotest-lwt
+  tezos-base
+  tezos-protocol-012-Psithaca
+  tezos-012-Psithaca-test-helpers
+  tezos-base-test-helpers
+  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-plugin-012-Psithaca)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_012_Psithaca
+   -open Tezos_012_Psithaca_test_helpers
+   -open Tezos_base_test_helpers
+   -open Tezos_protocol_012_Psithaca_parameters
+   -open Tezos_protocol_plugin_012_Psithaca)))
+
+(rule
+ (alias runtest)
  (package tezos-protocol-012-Psithaca-tests)
- (libraries alcotest-lwt
-            tezos-base
-            tezos-protocol-012-Psithaca
-            tezos-base-test-helpers
-            tezos-012-Psithaca-test-helpers
-            tezos-protocol-012-Psithaca-parameters
-            tezos-protocol-plugin-012-Psithaca)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_protocol_012_Psithaca
-                   -open Tezos_012_Psithaca_test_helpers
-                   -open Tezos_base_test_helpers
-                   -open Tezos_protocol_012_Psithaca_parameters
-                   -open Tezos_protocol_plugin_012_Psithaca)))
+ (action (run %{dep:./main.exe})))

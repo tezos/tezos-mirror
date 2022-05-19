@@ -1,10 +1,6 @@
 (* This module decodes TEZOS_PROTOCOL files. *)
 
-type t = {
-  hash : string;
-  modules : string list;
-  expected_env_version : int option;
-}
+type t = {hash : string; modules : string list; expected_env_version : int}
 
 let of_string_exn ?filename s =
   let die msg =
@@ -30,7 +26,7 @@ let of_string_exn ?filename s =
       let lookup key f = f (List.assoc_opt key assoc) in
       let expected_env_version =
         lookup "expected_env_version" (optional float)
-        |> Option.map Int.of_float
+        |> Option.map Int.of_float |> Option.value ~default:0
       in
       let hash = lookup "hash" (required string) in
       let modules = lookup "modules" (required (listed string)) in

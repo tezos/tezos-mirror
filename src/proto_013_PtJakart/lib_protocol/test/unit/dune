@@ -1,23 +1,35 @@
-(test
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
  (name main)
+ (libraries
+  tezos-base
+  tezos-base-test-helpers
+  tezos-micheline
+  tezos-client-013-PtJakart
+  tezos-client-base
+  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-environment
+  tezos-stdlib-unix
+  tezos-protocol-013-PtJakart
+  tezos-protocol-013-PtJakart.environment
+  tezos-013-PtJakart-test-helpers
+  alcotest-lwt
+  tezos-stdlib)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_base_test_helpers
+   -open Tezos_micheline
+   -open Tezos_client_013_PtJakart
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_protocol_environment_013_PtJakart
+   -open Tezos_013_PtJakart_test_helpers
+   -open Tezos_stdlib)))
+
+(rule
+ (alias runtest)
  (package tezos-protocol-013-PtJakart-tests)
- (libraries tezos-base
-            tezos-micheline
-            tezos-protocol-environment
-            alcotest-lwt
-            tezos-013-PtJakart-test-helpers
-            tezos-stdlib-unix
-            tezos-client-base
-            tezos-protocol-013-PtJakart-parameters
-            tezos-base-test-helpers)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_base_test_helpers
-                   -open Tezos_micheline
-                   -open Tezos_client_013_PtJakart
-                   -open Tezos_protocol_013_PtJakart
-                   -open Tezos_protocol_environment_013_PtJakart
-                   -open Tezos_013_PtJakart_test_helpers
-		   -open Tezos_base_test_helpers
-                   -open Tezos_stdlib))
- (action (run %{test} "test" "Unit")))
+ (action (run %{exe:main.exe} test Unit)))

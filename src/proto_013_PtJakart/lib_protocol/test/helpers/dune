@@ -1,25 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_013_PtJakart_test_helpers)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-013-PtJakart-test-helpers)
- (libraries alcotest-lwt
-            qcheck-alcotest
-            tezos-test-helpers
-            tezos-base
-            tezos-micheline
-            tezos-stdlib-unix
-            tezos-shell-services
-            tezos-protocol-environment
-            tezos-protocol-013-PtJakart
-            tezos-protocol-013-PtJakart-parameters
-            tezos-client-013-PtJakart
-            tezos-protocol-plugin-013-PtJakart)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_micheline
-                   -open Tezos_stdlib_unix
-                   -open Tezos_protocol_013_PtJakart
-                   -open Tezos_client_013_PtJakart
-                   -open Tezos_protocol_plugin_013_PtJakart
-                   -open Tezos_protocol_environment_013_PtJakart
-                   -open Tezos_shell_services)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  alcotest-lwt
+  qcheck-alcotest
+  tezos-test-helpers
+  tezos-base
+  tezos-micheline
+  tezos-stdlib-unix
+  tezos-protocol-013-PtJakart
+  tezos-client-013-PtJakart
+  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-environment
+  tezos-protocol-plugin-013-PtJakart
+  tezos-protocol-013-PtJakart.environment
+  tezos-shell-services)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_micheline
+   -open Tezos_stdlib_unix
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_client_013_PtJakart
+   -open Tezos_protocol_plugin_013_PtJakart
+   -open Tezos_protocol_environment_013_PtJakart
+   -open Tezos_shell_services)))

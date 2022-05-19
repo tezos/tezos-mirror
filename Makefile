@@ -77,16 +77,17 @@ build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
 .PHONY: $(TEZOS_BIN)
-$(TEZOS_BIN): generate_dune
+$(TEZOS_BIN):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
 .PHONY: $(UNRELEASED_TEZOS_BIN)
-$(UNRELEASED_TEZOS_BIN): generate_dune
+$(UNRELEASED_TEZOS_BIN):
 	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	@cp -f _build/install/default/bin/$@ ./
 
-build: generate_dune
+.PHONY: build
+build:
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
@@ -99,18 +100,8 @@ endif
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
 PROTOCOLS=$(patsubst %/lib_protocol/TEZOS_PROTOCOL,%,${TEZOS_PROTOCOL_FILES})
 
-DUNE_INCS=$(patsubst %,%/lib_protocol/dune.inc, ${PROTOCOLS})
-
-.PHONY: generate_dune
-generate_dune: ${DUNE_INCS}
-
-${DUNE_INCS}:: src/proto_%/lib_protocol/dune.inc: \
-  src/proto_%/lib_protocol/TEZOS_PROTOCOL
-	dune build --profile=$(PROFILE) @$(dir $@)/runtest_dune_template --auto-promote
-	touch $@
-
 .PHONY: all.pkg
-all.pkg: generate_dune
+all.pkg:
 	@dune build --profile=$(PROFILE) \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
 
@@ -242,11 +233,6 @@ test-coverage-tenderbake:
 	-@$(MAKE) test-unit-alpha
 	-@$(MAKE) test-python-tenderbake
 
-.PHONY: lint-opam-dune
-lint-opam-dune:
-	@dune build --profile=$(PROFILE) @runtest_dune_template
-
-
 # Ensure that all unit tests are restricted to their opam package
 # (change 'tezos-test-helpers' to one the most elementary packages of
 # the repo if you add "internal" dependencies to tezos-test-helpers)
@@ -273,7 +259,7 @@ lint-ometrics:
         --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
         --exclude-entry-re "compare\|compare_.+\|.+_compare"
 
-.PHONY: lint-ometric-gitlab
+.PHONY: lint-ometrics-gitlab
 lint-ometrics-gitlab:
 	@echo "Running ometrics analysis in your changes."
 	@mkdir -p _reports
@@ -289,7 +275,7 @@ lint-ometrics-gitlab:
 	@echo "Report should be available in file://$(shell pwd)/${CODE_QUALITY_REPORT}"
 
 .PHONY: test
-test: lint-opam-dune test-code
+test: test-code
 
 .PHONY: check-linting check-python-linting
 

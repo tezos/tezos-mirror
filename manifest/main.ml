@@ -28,6 +28,22 @@ module V = Version
 
 let sf = Printf.sprintf
 
+module String_set = Set.Make (String)
+
+let final_protocol_versions =
+  let path = "../src/lib_protocol_compiler/final_protocol_versions" in
+  let ic = open_in path in
+  let rec loop acc =
+    try
+      let s = input_line ic in
+      let acc' = if String.equal s "" then acc else String_set.add s acc in
+      loop acc'
+    with End_of_file ->
+      close_in ic ;
+      acc
+  in
+  loop String_set.empty
+
 (* EXTERNAL LIBS *)
 
 let alcotest = external_lib ~js_compatible:true "alcotest" V.(at_least "1.5.0")
@@ -233,8 +249,6 @@ let qcheck_alcotest =
 let qcheck_core = external_lib "qcheck-core" V.True
 
 let re = external_lib ~js_compatible:true "re" V.(at_least "1.7.2")
-
-let re_str = external_sublib ~js_compatible:true re "re.str"
 
 let resto_version = V.(at_least "0.6" && less_than "0.7")
 
@@ -1777,16 +1791,7 @@ let tezos_protocol_compiler_native =
       Dune.
         [
           install
-            [
-              V
-                [
-                  S "dune_protocol.v0";
-                  S "dune_protocol.v1";
-                  S "dune_protocol.template.v0";
-                  S "dune_protocol.template.v1";
-                  S "final_protocol_versions";
-                ];
-            ]
+            [V [S "final_protocol_versions"]]
             ~package:"tezos-protocol-compiler"
             ~section:"libexec";
         ]
@@ -2566,7 +2571,7 @@ let _tezos_protocol_compiler_bin =
     ~linkall:true
     ~modules:["Main_native"]
 
-let _tezos_protocol_compiler_tezos_protocol_packer =
+let tezos_protocol_compiler_tezos_protocol_packer =
   public_exe
     "tezos-protocol-compiler.tezos-protocol-packer"
     ~path:"src/lib_protocol_compiler/bin"
@@ -2765,12 +2770,6 @@ end = struct
 
   let baking_exn p = mandatory "baking" p p.baking
 
-  (* For now we declare some packages as external packages just so
-     that we can depend on them, but their dune and .opam files are
-     not yet generated. *)
-  let todo ?opam ?main_module x =
-    Printf.ksprintf (fun name -> external_lib ?opam ?main_module name V.True) x
-
   (* N as in "protocol number in the Alpha family". *)
   module N = struct
     (* This function is asymmetrical on purpose: we don't want to compare
@@ -2800,14 +2799,509 @@ end = struct
     let ( == ) a b = compare_asymmetric a b == 0
   end
 
+  module Lib_protocol = struct
+    type t = {
+      main : target;
+      embedded : target;
+      environment : target;
+      raw_protocol : target;
+    }
+
+    (** AV0 is the Architecture Version corresponding to the first protocols.
+        After protocol 010, some changes were made in the architecture
+        of [lib_protocol], resulting in Architecture Version 1 (AV1). This
+        new version has been in effect since protocol 011. *)
+    type lib_protocol_architecture_version = AV0 | AV1
+
+    let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
+        ?benchmark_type_inference ~main ~environment ~name_underscore ~name_dash
+        ~number () =
+      let some_if condition make = if condition then Some make else None in
+      let _integration_consensus =
+        test
+          "main"
+          ~path:
+            (sf
+               "src/proto_%s/lib_protocol/test/integration/consensus"
+               name_underscore)
+          ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+          ~deps:
+            [
+              alcotest_lwt;
+              tezos_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              main |> open_;
+              test_helpers |> if_some |> open_;
+              tezos_base_test_helpers |> open_;
+              parameters |> if_some |> open_;
+              plugin |> if_some |> open_;
+            ]
+      in
+      let _integration_gas =
+        test
+          "main"
+          ~path:
+            (sf
+               "src/proto_%s/lib_protocol/test/integration/gas"
+               name_underscore)
+          ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+          ~deps:
+            [
+              alcotest_lwt;
+              tezos_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              main |> open_;
+              test_helpers |> if_some |> open_;
+              tezos_base_test_helpers |> open_;
+            ]
+      in
+      let _integration_michelson =
+        test
+          "main"
+          ~path:
+            (sf
+               "src/proto_%s/lib_protocol/test/integration/michelson"
+               name_underscore)
+          ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+          ~dep_globs:
+            (List.filter_map
+               Fun.id
+               [
+                 Some "contracts/*";
+                 "patched_contracts/*" |> some_if N.(number >= 013);
+               ])
+          ~deps:
+            [
+              alcotest_lwt;
+              tezos_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              main |> open_;
+              test_helpers |> if_some |> open_;
+              tezos_base_test_helpers |> open_;
+              tezos_client_base |> if_ N.(number <= 012);
+              client |> if_some |> open_;
+              tezos_benchmark;
+              tezos_micheline |> open_;
+              benchmark |> if_some |> open_;
+              benchmark_type_inference |> if_some |> open_;
+              parameters |> if_some |> if_ N.(number >= 013);
+            ]
+      in
+      let _integration_operations =
+        test
+          "main"
+          ~path:
+            (sf
+               "src/proto_%s/lib_protocol/test/integration/operations"
+               name_underscore)
+          ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+          ?dep_globs:(["contracts/*"] |> some_if N.(number >= 013))
+          ~deps:
+            [
+              alcotest_lwt;
+              tezos_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              main |> open_;
+              client |> if_some |> if_ N.(number >= 012) |> open_;
+              test_helpers |> if_some |> open_;
+              tezos_base_test_helpers |> open_;
+            ]
+      in
+      let _integration =
+        test
+          "main"
+          ~path:
+            (sf "src/proto_%s/lib_protocol/test/integration" name_underscore)
+          ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+          ~deps:
+            [
+              alcotest_lwt;
+              tezos_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              client |> if_some |> open_;
+              tezos_client_base |> if_ N.(number <= 012);
+              main |> open_;
+              parameters |> if_some |> open_;
+              test_helpers |> if_some |> open_;
+              tezos_base_test_helpers |> open_;
+            ]
+      in
+      let _pbt =
+        tests
+          (List.filter_map
+             Fun.id
+             [
+               Some "liquidity_baking_pbt";
+               Some "saturation_fuzzing";
+               "test_merkle_list" |> some_if N.(number >= 013);
+               Some "test_gas_properties";
+               "test_sampler" |> some_if N.(number >= 012);
+               Some "test_script_comparison";
+               Some "test_tez_repr";
+               "test_tx_rollup_l2_encoding" |> some_if N.(number >= 013);
+               "test_tx_rollup_l2_withdraw_storage" |> some_if N.(number <= 010);
+               "test_bitset" |> some_if N.(number >= 013);
+               "test_sc_rollup_tick_repr" |> some_if N.(number >= 013);
+               "refutation_game_pbt" |> some_if N.(number == 013);
+               "test_carbonated_map" |> some_if N.(number >= 013);
+             ])
+          ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
+          ~path:(sf "src/proto_%s/lib_protocol/test/pbt" name_underscore)
+          ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+          ~deps:
+            [
+              tezos_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              tezos_micheline |> open_;
+              client |> if_some |> open_;
+              main |> open_;
+              tezos_test_helpers;
+              test_helpers |> if_some |> open_;
+              alcotest;
+              qcheck_alcotest;
+              tezos_client_base |> if_ N.(number <= 012);
+              tezos_benchmark;
+              benchmark |> if_some |> open_;
+              benchmark_type_inference |> if_some |> open_;
+            ]
+      in
+      let _unit =
+        test
+          "main"
+          ~path:(sf "src/proto_%s/lib_protocol/test/unit" name_underscore)
+          ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+          ~runtest:false
+          ~deps:
+            [
+              tezos_base |> open_ ~m:"TzPervasives"
+              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              tezos_base_test_helpers |> open_;
+              tezos_micheline |> open_;
+              client |> if_some |> open_;
+              tezos_client_base;
+              parameters |> if_some;
+              tezos_protocol_environment;
+              tezos_stdlib_unix;
+              main |> open_;
+              environment |> open_;
+              test_helpers |> if_some |> open_;
+              alcotest_lwt;
+              tezos_stdlib |> if_ N.(number >= 013) |> open_;
+            ]
+          ~dune:
+            Dune.
+              [
+                alias_rule
+                  "runtest"
+                  ~package:(sf "tezos-protocol-%s-tests" name_dash)
+                  ~action:(run_exe "main" ["test"; "Unit"]);
+              ]
+      in
+      ()
+
+    let make ~template_version ~name_dash ~name_underscore ~number () =
+      let dirname = sf "../src/proto_%s/lib_protocol" name_underscore in
+      let ( // ) = Filename.concat in
+      let tezos_protocol_filename = dirname // "TEZOS_PROTOCOL" in
+      let tezos_protocol = Tezos_protocol.of_file_exn tezos_protocol_filename in
+      let modules_as_deps =
+        let basenames_of_module module_ =
+          [".ml"; ".mli"]
+          |> List.filter_map (fun ext ->
+                 let basename = String.uncapitalize_ascii module_ ^ ext in
+                 if Sys.file_exists (dirname // basename) then Some basename
+                 else None)
+        in
+        let s_expr =
+          tezos_protocol.Tezos_protocol.modules
+          |> List.map (fun module_ ->
+                 match basenames_of_module module_ with
+                 | _ :: _ as basenames -> Dune.(G (of_atom_list basenames))
+                 | [] ->
+                     failwith
+                       (sf
+                          "In %s a module %s was declared, but no \
+                           corresponding .ml or .mli files were found in \
+                           directory %s"
+                          tezos_protocol_filename
+                          module_
+                          dirname))
+          |> Dune.of_list
+        in
+        Dune.V s_expr
+      in
+      let warnings =
+        match template_version with
+        | AV0 -> "+a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68"
+        | AV1 -> "+a-4-40..42-44-45-48"
+      in
+      let warn_error =
+        match template_version with AV0 -> "-A" | AV1 -> "+a"
+      in
+      let environment =
+        public_lib
+          (sf "tezos-protocol-%s.environment" name_dash)
+          ~internal_name:(sf "tezos_protocol_environment_%s" name_underscore)
+          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~opam:(sf "tezos-protocol-%s" name_dash)
+          ~modules:["Environment"]
+          ~linkall:true
+          ~deps:[tezos_protocol_environment]
+          ~dune:
+            Dune.
+              [
+                targets_rule
+                  ["environment.ml"]
+                  ~action:
+                    [
+                      S "write-file";
+                      S "%{targets}";
+                      S
+                        (sf
+                           {|module Name = struct let name = "%s" end
+include Tezos_protocol_environment.MakeV%d(Name)()
+module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
+|}
+                           name_dash
+                           tezos_protocol.expected_env_version);
+                    ];
+              ]
+      in
+      let raw_protocol =
+        public_lib
+          (sf "tezos-protocol-%s.raw" name_dash)
+          ~internal_name:(sf "tezos_raw_protocol_%s" name_underscore)
+          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~opam:(sf "tezos-protocol-%s" name_dash)
+          ~linkall:true
+          ~modules:tezos_protocol.modules
+          ~warnings
+          ~warn_error:"+a"
+          ~nopervasives:true
+          ~nostdlib:true
+          ~deps:[environment |> open_ ~m:"Environment"]
+          ~opens:["Pervasives"; "Error_monad"]
+      in
+      let main =
+        public_lib
+          (sf "tezos-protocol-%s" name_dash)
+          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~synopsis:
+            (match number with
+            | (Alpha | V _) as number when N.(number <= 003) ->
+                sf
+                  "Tezos/Protocol: %s (economic-protocol definition, functor \
+                   version)"
+                  name_underscore
+            | Alpha | V _ | Other -> (
+                match name_dash with
+                | "genesis" | "demo-noops" | "demo-counter" ->
+                    sf
+                      "Tezos/Protocol: %s economic-protocol definition"
+                      name_underscore
+                | _ -> "Tezos/Protocol: economic-protocol definition"))
+          ~modules:["Protocol"]
+          ~warnings:
+            (match template_version with
+            | AV0 -> "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
+            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warn_error
+          ~nopervasives:true
+          ~flags_nostandard:true
+          ~deps:
+            [
+              tezos_protocol_environment;
+              tezos_protocol_environment_sigs;
+              raw_protocol;
+            ]
+          ~dune:
+            Dune.
+              [
+                install
+                  [as_ "TEZOS_PROTOCOL" "raw/TEZOS_PROTOCOL"]
+                  ~package:(sf "tezos-protocol-%s" name_dash)
+                  ~section:"lib";
+                targets_rule
+                  ["protocol.ml"]
+                  ~deps:[modules_as_deps]
+                  ~action:
+                    [
+                      S "write-file";
+                      S "%{targets}";
+                      S
+                        (sf
+                           {|module Environment = Tezos_protocol_environment_%s.Environment
+let hash = Tezos_crypto.Protocol_hash.of_b58check_exn "%s"
+let name = Environment.Name.name
+include Tezos_raw_protocol_%s
+include Tezos_raw_protocol_%s.Main
+|}
+                           name_underscore
+                           tezos_protocol.hash
+                           name_underscore
+                           name_underscore);
+                    ];
+                alias_rule
+                  "runtest_compile_protocol"
+                  ~deps_dune:
+                    [modules_as_deps; [S ":src_dir"; S "TEZOS_PROTOCOL"]]
+                  ~action:
+                    [
+                      S "run";
+                      S "%{bin:tezos-protocol-compiler}";
+                      (if
+                       String_set.mem
+                         tezos_protocol.Tezos_protocol.hash
+                         final_protocol_versions
+                      then E
+                      else S "-no-hash-check");
+                      S ".";
+                    ];
+                alias_rule
+                  "runtest_sandbox"
+                  ~deps:
+                    [
+                      sf
+                        ".tezos_protocol_%s.objs/native/tezos_protocol_%s.cmx"
+                        name_underscore
+                        name_underscore;
+                    ]
+                  ~action:[S "progn"];
+                alias_rule
+                  "runtest"
+                  ~package:(sf "tezos-protocol-%s" name_dash)
+                  ~alias_deps:["runtest_sandbox"];
+              ]
+      in
+      let _functor =
+        public_lib
+          (sf "tezos-protocol-functor-%s" name_dash)
+          ~internal_name:(sf "tezos_protocol_%s_functor" name_underscore)
+          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~synopsis:
+            (match number with
+            | V _ as number when N.(number <= 003) ->
+                sf
+                  "Tezos/Protocol: %s (economic-protocol definition \
+                   parameterized by its environment implementation)"
+                  (if N.(number == 000) then name_dash else name_underscore)
+            | Alpha | V _ | Other -> (
+                match name_dash with
+                | "genesis" | "demo-noops" | "demo-counter" ->
+                    sf
+                      "Tezos/Protocol: %s (economic-protocol definition \
+                       parameterized by its environment implementation)"
+                      name_underscore
+                | _ ->
+                    "Tezos/Protocol: economic-protocol definition \
+                     parameterized by its environment implementation"))
+          ~modules:["Functor"]
+            (* The instrumentation is removed as it can lead to a stack overflow *)
+            (* https://gitlab.com/tezos/tezos/-/issues/1927 *)
+          ~bisect_ppx:false
+          ~warnings:
+            (match template_version with
+            | AV0 -> "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
+            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warn_error
+          ~nopervasives:true
+          ~flags_nostandard:true
+          ~opam_only_deps:[tezos_protocol_compiler_tezos_protocol_packer]
+          ~deps:
+            [
+              tezos_protocol_environment;
+              tezos_protocol_environment_sigs;
+              raw_protocol;
+            ]
+          ~dune:
+            Dune.
+              [
+                targets_rule
+                  ["functor.ml"]
+                  ~deps:[modules_as_deps; [S ":src_dir"; S "TEZOS_PROTOCOL"]]
+                  ~action:
+                    [
+                      S "with-stdout-to";
+                      S "%{targets}";
+                      [
+                        S "chdir";
+                        S "%{workspace_root}";
+                        [
+                          S "run";
+                          S
+                            "%{bin:tezos-protocol-compiler.tezos-protocol-packer}";
+                          S "%{src_dir}";
+                        ];
+                      ];
+                    ];
+              ]
+      in
+      let embedded =
+        public_lib
+          (sf "tezos-embedded-protocol-%s" name_dash)
+          ~internal_name:(sf "tezos_embedded_protocol_%s" name_underscore)
+          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~synopsis:
+            (match number with
+            | (Alpha | V _) as number when N.(number <= 003) ->
+                sf
+                  "Tezos/Protocol: %s (economic-protocol definition, embedded \
+                   in `tezos-node`)"
+                  (if N.(number == 000) then name_dash else name_underscore)
+            | Alpha | V _ | Other -> (
+                match name_dash with
+                | "genesis" | "demo-noops" | "demo-counter" ->
+                    sf
+                      "Tezos/Protocol: %s (economic-protocol definition, \
+                       embedded in `tezos-node`)"
+                      name_underscore
+                | _ ->
+                    "Tezos/Protocol: economic-protocol definition, embedded in \
+                     `tezos-node`"))
+          ~modules:["Registerer"]
+          ~linkall:true
+          ~warnings:
+            (match template_version with
+            | AV0 -> "+a-4-6-7-9-16-29-32-40..42-44-45-48-60-67"
+            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warn_error:"+a"
+          ~deps:[main; tezos_protocol_updater; tezos_protocol_environment]
+          ~dune:
+            Dune.
+              [
+                targets_rule
+                  ["registerer.ml"]
+                  ~deps:[modules_as_deps; [S ":src_dir"; S "TEZOS_PROTOCOL"]]
+                  ~action:
+                    [
+                      S "with-stdout-to";
+                      S "%{targets}";
+                      [
+                        S "chdir";
+                        S "%{workspace_root}";
+                        [
+                          S "run";
+                          S "%{bin:tezos-embedded-protocol-packer}";
+                          S "%{src_dir}";
+                          S name_underscore;
+                        ];
+                      ];
+                    ];
+              ]
+      in
+      {main; embedded; environment; raw_protocol}
+  end
+
   let genesis =
     let name_dash = "genesis" in
     let name_underscore = "genesis" in
-    let main =
-      todo
-        ~main_module:(sf "Tezos_protocol_%s" name_underscore)
-        "tezos-protocol-%s"
-        name_dash
+    let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
+      Lib_protocol.make
+        ~template_version:AV0
+        ~name_dash
+        ~name_underscore
+        ~number:Other
+        ()
     in
     let client =
       public_lib
@@ -2829,31 +3323,31 @@ end = struct
         ~linkall:true
     in
     register
-    @@ make
-         ~name:"genesis"
-         ~status:Not_mainnet
-         ~main:(todo "tezos-protocol-genesis")
-         ~embedded:(todo "tezos-embedded-protocol-genesis")
-         ~client
-         ()
+    @@ make ~name:"genesis" ~status:Not_mainnet ~main ~embedded ~client ()
 
   let demo_noops =
-    register
-    @@ make
-         ~name:"demo-noops"
-         ~status:Not_mainnet
-         ~main:(todo "tezos-protocol-demo-noops")
-         ~embedded:(todo "tezos-embedded-protocol-demo-noops")
-         ()
+    let name_dash = "demo-noops" in
+    let name_underscore = "demo_noops" in
+    let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
+      Lib_protocol.make
+        ~template_version:AV1
+        ~name_dash
+        ~name_underscore
+        ~number:Other
+        ()
+    in
+    register @@ make ~name:"demo-noops" ~status:Not_mainnet ~main ~embedded ()
 
   let _demo_counter =
     let name_dash = "demo-counter" in
     let name_underscore = "demo_counter" in
-    let main =
-      todo
-        ~main_module:(sf "Tezos_protocol_%s" name_underscore)
-        "tezos-protocol-%s"
-        name_dash
+    let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
+      Lib_protocol.make
+        ~template_version:AV1
+        ~name_dash
+        ~name_underscore
+        ~number:Other
+        ()
     in
     let client =
       public_lib
@@ -2873,13 +3367,7 @@ end = struct
         ~warnings:"-9+27-30-32-40@8"
     in
     register
-    @@ make
-         ~name:"demo-counter"
-         ~status:Not_mainnet
-         ~main:(todo "tezos-protocol-demo-counter")
-         ~embedded:(todo "tezos-embedded-protocol-demo-counter")
-         ~client
-         ()
+    @@ make ~name:"demo-counter" ~status:Not_mainnet ~main ~embedded ~client ()
 
   let register_alpha_family status number name =
     let make_full_name sep =
@@ -2904,35 +3392,18 @@ end = struct
       | Overridden -> false
     in
     let opt_map l f = Option.map f l in
+    let both o1 o2 =
+      match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
+    in
     let warnings =
       if N.(number == 002 || number == 001) then Some "-9+27-30-32-40@8"
       else None
     in
-    let main =
-      todo
-        ~main_module:(sf "Tezos_protocol_%s" name_underscore)
-        "tezos-protocol-%s"
-        name_dash
-    in
-    let embedded =
-      todo
-        ~main_module:(sf "Tezos_embedded_protocol_%s" name_underscore)
-        "tezos-embedded-protocol-%s"
-        name_dash
-    in
-    let environment =
-      todo
-        ~opam:(sf "tezos-protocol-%s" name_dash)
-        ~main_module:(sf "Tezos_protocol_environment_%s" name_underscore)
-        "tezos-protocol-%s.environment"
-        name_dash
-    in
-    let raw_protocol =
-      todo
-        ~opam:(sf "tezos-protocol-%s" name_dash)
-        ~main_module:(sf "Tezos_raw_protocol_%s" name_underscore)
-        "tezos-protocol-%s.raw"
-        name_dash
+    let {Lib_protocol.main; embedded; environment; raw_protocol} =
+      let template_version =
+        if N.(number >= 011) then Lib_protocol.AV1 else AV0
+      in
+      Lib_protocol.make ~template_version ~name_dash ~name_underscore ~number ()
     in
     let parameters =
       some_if (N.(number >= 008) && not_overridden) @@ fun () ->
@@ -2987,12 +3458,6 @@ end = struct
             ])
         ~bisect_ppx:false
     in
-    let test_helpers =
-      todo
-        "tezos-%s-test-helpers"
-        name_dash
-        ~main_module:(sf "Tezos_%s_test_helpers" name_underscore)
-    in
     let plugin =
       some_if (N.(number >= 007) && not_overridden) @@ fun () ->
       public_lib
@@ -3025,32 +3490,6 @@ end = struct
         ~modules:["Plugin_registerer"]
         ~bisect_ppx:N.(number >= 008)
     in
-    let _plugin_tests =
-      opt_map plugin @@ fun plugin ->
-      some_if (active && N.(number <> 011)) @@ fun () ->
-      tests
-        ["test_consensus_filter"; "test_filter_state"; "test_plugin"]
-        ~path:(sf "src/proto_%s/lib_plugin/test" name_underscore)
-        ~synopsis:"Tezos/Protocol: protocol plugin tests"
-        ~opam:(sf "tezos-protocol-plugin-%s-tests" name_dash)
-        ~deps:
-          [
-            tezos_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            tezos_base_test_helpers |> open_;
-            tezos_base_unix |> if_ N.(number >= 013);
-            alcotest_lwt;
-            tezos_test_helpers;
-            qcheck_alcotest;
-            tezos_stdlib_unix;
-            tezos_micheline |> open_;
-            plugin |> open_;
-            environment |> open_;
-            main |> open_ |> open_ ~m:"Protocol";
-            parameters |> if_some |> open_;
-            test_helpers |> open_;
-          ]
-    in
     let client =
       some_if not_overridden @@ fun () ->
       public_lib
@@ -3077,6 +3516,64 @@ end = struct
         ?inline_tests:(if N.(number >= 009) then Some ppx_inline_test else None)
         ~linkall:true
         ?warnings
+    in
+    let test_helpers =
+      some_if active @@ fun () ->
+      public_lib
+        (sf "tezos-%s-test-helpers" name_dash)
+        ~path:
+          (if active then
+           sf "src/proto_%s/lib_protocol/test/helpers" name_underscore
+          else sf "src/proto_%s/lib_protocol" name_underscore)
+        ~opam:
+          (if active then sf "tezos-%s-test-helpers" name_dash
+          else sf "tezos-%s-test-helpers" name_dash)
+        ~internal_name:(sf "tezos_%s_test_helpers" name_underscore)
+        ~synopsis:"Tezos/Protocol: protocol testing framework"
+        ~opam_only_deps:[tezos_protocol_environment; parameters |> if_some]
+        ~deps:
+          [
+            alcotest_lwt;
+            qcheck_alcotest;
+            tezos_test_helpers;
+            tezos_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            tezos_micheline |> open_;
+            tezos_stdlib_unix |> open_;
+            main |> open_;
+            client |> if_some |> open_;
+            parameters |> if_some;
+            tezos_protocol_environment;
+            plugin |> if_some |> open_;
+            environment |> open_;
+            tezos_shell_services |> open_;
+          ]
+    in
+    let _plugin_tests =
+      opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
+      some_if (active && N.(number <> 011)) @@ fun () ->
+      tests
+        ["test_consensus_filter"; "test_filter_state"; "test_plugin"]
+        ~path:(sf "src/proto_%s/lib_plugin/test" name_underscore)
+        ~synopsis:"Tezos/Protocol: protocol plugin tests"
+        ~opam:(sf "tezos-protocol-plugin-%s-tests" name_dash)
+        ~deps:
+          [
+            tezos_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            tezos_base_test_helpers |> open_;
+            tezos_base_unix |> if_ N.(number >= 013);
+            alcotest_lwt;
+            tezos_test_helpers;
+            qcheck_alcotest;
+            tezos_stdlib_unix;
+            tezos_micheline |> open_;
+            plugin |> open_;
+            environment |> open_;
+            main |> open_ |> open_ ~m:"Protocol";
+            parameters |> if_some |> open_;
+            test_helpers |> open_;
+          ]
     in
     let _client_tests =
       some_if N.(number >= 011) @@ fun () ->
@@ -3268,7 +3765,7 @@ end = struct
         ~linkall:true
     in
     let _baking_tests =
-      opt_map baking @@ fun baking ->
+      opt_map (both baking test_helpers) @@ fun (baking, test_helpers) ->
       some_if N.(number >= 011) @@ fun () ->
       let mockup_simulator =
         some_if N.(number >= 012) @@ fun () ->
@@ -3609,6 +4106,7 @@ end = struct
           ]
     in
     let benchmark =
+      opt_map test_helpers @@ fun test_helpers ->
       some_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmark-%s" name_dash)
@@ -3638,6 +4136,7 @@ end = struct
         ~bisect_ppx:N.(number <= 012)
     in
     let _benchmark_tests =
+      opt_map (both benchmark test_helpers) @@ fun (benchmark, test_helpers) ->
       some_if active @@ fun () ->
       (* Note: to enable gprof profiling,
          manually add the following stanza to lib_benchmark/test/dune:
@@ -3686,7 +4185,9 @@ end = struct
                   ];
             ]
     in
-    let benchmarks_proto =
+    let benchmarks_proto : Manifest.target option =
+      Option.bind (both benchmark test_helpers)
+      @@ fun (benchmark, test_helpers) ->
       some_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmarks-proto-%s" name_dash)
@@ -3715,6 +4216,22 @@ end = struct
           ]
         ~linkall:true
     in
+    let _ =
+      if active then
+        Lib_protocol.make_tests
+          ?test_helpers
+          ?parameters
+          ?plugin
+          ?client
+          ?benchmark:(Option.bind benchmark Fun.id)
+          ?benchmark_type_inference
+          ~main
+          ~environment
+          ~name_underscore
+          ~name_dash
+          ~number
+          ()
+    in
     register
     @@ make
          ~number
@@ -3728,7 +4245,7 @@ end = struct
          ?baking_commands_registration
          ?plugin
          ?plugin_registerer
-         ~test_helpers
+         ?test_helpers
          ?parameters
          ?benchmarks_proto
          ?baking
@@ -3923,29 +4440,6 @@ let _s_packer =
             [as_ "s_packer.exe" "s_packer"]
             ~package:"tezos-protocol-environment"
             ~section:"libexec";
-        ]
-
-let _replace =
-  private_exe
-    "replace"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_base_unix;
-        tezos_stdlib_unix |> open_;
-        re_str;
-      ]
-    ~modules:["Replace"]
-    ~static:true
-    ~dune:
-      Dune.
-        [
-          install
-            [as_ "replace.exe" "replace"]
-            ~section:"libexec"
-            ~package:"tezos-protocol-compiler";
         ]
 
 let _tezos_validator_bin =
@@ -4271,9 +4765,6 @@ let _tezos_tps_evaluation =
 let exclude filename =
   let is_proto_ name = has_prefix ~prefix:"proto_" name in
   match String.split_on_char '/' filename with
-  (* lib_protocol files (that's a TODO). *)
-  | "src" :: maybe_proto :: "lib_protocol" :: _ when is_proto_ maybe_proto ->
-      true
   (* proto_/parameters/dune (it only has a (copy_files) stanza). *)
   | "src" :: maybe_proto :: "parameters" :: _ when is_proto_ maybe_proto -> true
   (* lib_time_measurement (its dune structure is *very* specific). *)

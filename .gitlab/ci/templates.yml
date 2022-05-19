@@ -289,7 +289,6 @@ variables:
         - "**/dune.inc"
         - "**/*.dune.inc"
         - "**/dune-project"
-        - "**/dune_protocol.*"
         - "**/*.opam"
         - scripts/version.sh
         - .gitlab-ci.yml

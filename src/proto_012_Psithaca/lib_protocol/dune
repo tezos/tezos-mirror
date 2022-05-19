@@ -1,1 +1,696 @@
-../../lib_protocol_compiler/dune_protocol.v1
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_environment_012_Psithaca)
+ (public_name tezos-protocol-012-Psithaca.environment)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (modules Environment))
+
+(rule
+ (targets environment.ml)
+ (action
+  (write-file
+   %{targets}
+   "module Name = struct let name = \"012-Psithaca\" end\ninclude Tezos_protocol_environment.MakeV4(Name)()\nmodule CamlinternalFormatBasics = struct include CamlinternalFormatBasics end\n")))
+
+(library
+ (name tezos_raw_protocol_012_Psithaca)
+ (public_name tezos-protocol-012-Psithaca.raw)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-012-Psithaca.environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -w +a-4-40..42-44-45-48
+   -warn-error +a
+   -nostdlib
+   -nopervasives
+   -open Tezos_protocol_environment_012_Psithaca.Environment
+   -open Pervasives
+   -open Error_monad))
+ (modules
+  Misc
+  Non_empty_string
+  Path_encoding
+  Storage_description
+  State_hash
+  Nonce_hash
+  Script_expr_hash
+  Contract_hash
+  Blinded_public_key_hash
+  Block_payload_hash
+  Slot_repr
+  Tez_repr
+  Period_repr
+  Time_repr
+  Round_repr
+  Block_payload_repr
+  Fixed_point_repr
+  Saturation_repr
+  Gas_limit_repr
+  Constants_repr
+  Raw_level_repr
+  Fitness_repr
+  Cycle_repr
+  Level_repr
+  Seed_repr
+  Sampler
+  Voting_period_repr
+  Script_string_repr
+  Script_int_repr
+  Script_timestamp_repr
+  Michelson_v1_primitives
+  Script_repr
+  Cache_memory_helpers
+  Contract_repr
+  Roll_repr_legacy
+  Vote_repr
+  Block_header_repr
+  Operation_repr
+  Manager_repr
+  Commitment_repr
+  Parameters_repr
+  Sapling_repr
+  Lazy_storage_kind
+  Receipt_repr
+  Migration_repr
+  Raw_context_intf
+  Raw_context
+  Storage_costs
+  Storage_sigs
+  Storage_functors
+  Storage
+  Cache_repr
+  Constants_storage
+  Level_storage
+  Nonce_storage
+  Seed_storage
+  Roll_storage_legacy
+  Contract_manager_storage
+  Delegate_activation_storage
+  Frozen_deposits_storage
+  Stake_storage
+  Contract_delegate_storage
+  Sapling_storage
+  Lazy_storage_diff
+  Contract_storage
+  Commitment_storage
+  Token
+  Delegate_storage
+  Bootstrap_storage
+  Voting_period_storage
+  Vote_storage
+  Fees_storage
+  Ticket_storage
+  Liquidity_baking_repr
+  Liquidity_baking_cpmm
+  Liquidity_baking_lqt
+  Liquidity_baking_migration
+  Init_storage
+  Sapling_validator
+  Global_constants_costs
+  Global_constants_storage
+  Alpha_context
+  Local_gas_counter
+  Gas_monad
+  Script_tc_errors
+  Script_ir_annot
+  Script_typed_ir
+  Script_typed_ir_size
+  Script_typed_ir_size_costs
+  Michelson_v1_gas
+  Script_list
+  Script_comparable
+  Script_set
+  Script_map
+  Script_ir_translator
+  Script_cache
+  Script_tc_errors_registration
+  Ticket_costs
+  Ticket_scanner
+  Ticket_balance_key
+  Script_interpreter_defs
+  Script_interpreter
+  Baking
+  Amendment
+  Apply_results
+  Apply
+  Services_registration
+  Constants_services
+  Sapling_services
+  Contract_services
+  Delegate_services
+  Voting_services
+  Alpha_services
+  Main))
+
+(library
+ (name tezos_protocol_012_Psithaca)
+ (public_name tezos-protocol-012-Psithaca)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-012-Psithaca.raw)
+ (flags (-w +a-4-40..42-44-45-48
+         -warn-error +a
+         -nopervasives))
+ (modules Protocol))
+
+(install
+ (package tezos-protocol-012-Psithaca)
+ (section lib)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+
+(rule
+ (targets protocol.ml)
+ (deps
+  misc.ml misc.mli
+  non_empty_string.ml non_empty_string.mli
+  path_encoding.ml path_encoding.mli
+  storage_description.ml storage_description.mli
+  state_hash.ml state_hash.mli
+  nonce_hash.ml nonce_hash.mli
+  script_expr_hash.ml script_expr_hash.mli
+  contract_hash.ml contract_hash.mli
+  blinded_public_key_hash.ml blinded_public_key_hash.mli
+  block_payload_hash.ml block_payload_hash.mli
+  slot_repr.ml slot_repr.mli
+  tez_repr.ml tez_repr.mli
+  period_repr.ml period_repr.mli
+  time_repr.ml time_repr.mli
+  round_repr.ml round_repr.mli
+  block_payload_repr.ml block_payload_repr.mli
+  fixed_point_repr.ml fixed_point_repr.mli
+  saturation_repr.ml saturation_repr.mli
+  gas_limit_repr.ml gas_limit_repr.mli
+  constants_repr.ml constants_repr.mli
+  raw_level_repr.ml raw_level_repr.mli
+  fitness_repr.ml fitness_repr.mli
+  cycle_repr.ml cycle_repr.mli
+  level_repr.ml level_repr.mli
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  script_string_repr.ml script_string_repr.mli
+  script_int_repr.ml script_int_repr.mli
+  script_timestamp_repr.ml script_timestamp_repr.mli
+  michelson_v1_primitives.ml michelson_v1_primitives.mli
+  script_repr.ml script_repr.mli
+  cache_memory_helpers.ml
+  contract_repr.ml contract_repr.mli
+  roll_repr_legacy.ml roll_repr_legacy.mli
+  vote_repr.ml vote_repr.mli
+  block_header_repr.ml block_header_repr.mli
+  operation_repr.ml operation_repr.mli
+  manager_repr.ml manager_repr.mli
+  commitment_repr.ml commitment_repr.mli
+  parameters_repr.ml parameters_repr.mli
+  sapling_repr.ml
+  lazy_storage_kind.ml lazy_storage_kind.mli
+  receipt_repr.ml receipt_repr.mli
+  migration_repr.ml migration_repr.mli
+  raw_context_intf.ml
+  raw_context.ml raw_context.mli
+  storage_costs.ml storage_costs.mli
+  storage_sigs.ml
+  storage_functors.ml storage_functors.mli
+  storage.ml storage.mli
+  cache_repr.ml cache_repr.mli
+  constants_storage.ml constants_storage.mli
+  level_storage.ml level_storage.mli
+  nonce_storage.ml nonce_storage.mli
+  seed_storage.ml seed_storage.mli
+  roll_storage_legacy.ml roll_storage_legacy.mli
+  contract_manager_storage.ml contract_manager_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
+  stake_storage.ml stake_storage.mli
+  contract_delegate_storage.ml contract_delegate_storage.mli
+  sapling_storage.ml
+  lazy_storage_diff.ml lazy_storage_diff.mli
+  contract_storage.ml contract_storage.mli
+  commitment_storage.ml commitment_storage.mli
+  token.ml token.mli
+  delegate_storage.ml delegate_storage.mli
+  bootstrap_storage.ml bootstrap_storage.mli
+  voting_period_storage.ml voting_period_storage.mli
+  vote_storage.ml vote_storage.mli
+  fees_storage.ml fees_storage.mli
+  ticket_storage.ml ticket_storage.mli
+  liquidity_baking_repr.ml liquidity_baking_repr.mli
+  liquidity_baking_cpmm.ml
+  liquidity_baking_lqt.ml
+  liquidity_baking_migration.ml liquidity_baking_migration.mli
+  init_storage.ml init_storage.mli
+  sapling_validator.ml
+  global_constants_costs.ml global_constants_costs.mli
+  global_constants_storage.ml global_constants_storage.mli
+  alpha_context.ml alpha_context.mli
+  local_gas_counter.ml
+  gas_monad.ml gas_monad.mli
+  script_tc_errors.ml
+  script_ir_annot.ml script_ir_annot.mli
+  script_typed_ir.ml script_typed_ir.mli
+  script_typed_ir_size.ml script_typed_ir_size.mli
+  script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas.ml michelson_v1_gas.mli
+  script_list.ml script_list.mli
+  script_comparable.ml script_comparable.mli
+  script_set.ml script_set.mli
+  script_map.ml script_map.mli
+  script_ir_translator.ml script_ir_translator.mli
+  script_cache.ml script_cache.mli
+  script_tc_errors_registration.ml script_tc_errors_registration.mli
+  ticket_costs.ml ticket_costs.mli
+  ticket_scanner.ml ticket_scanner.mli
+  ticket_balance_key.ml ticket_balance_key.mli
+  script_interpreter_defs.ml
+  script_interpreter.ml script_interpreter.mli
+  baking.ml baking.mli
+  amendment.ml amendment.mli
+  apply_results.ml apply_results.mli
+  apply.ml apply.mli
+  services_registration.ml services_registration.mli
+  constants_services.ml constants_services.mli
+  sapling_services.ml
+  contract_services.ml contract_services.mli
+  delegate_services.ml delegate_services.mli
+  voting_services.ml voting_services.mli
+  alpha_services.ml alpha_services.mli
+  main.ml main.mli)
+ (action
+  (write-file
+   %{targets}
+   "module Environment = Tezos_protocol_environment_012_Psithaca.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_012_Psithaca\ninclude Tezos_raw_protocol_012_Psithaca.Main\n")))
+
+(rule
+ (alias runtest_compile_protocol)
+ (deps
+  misc.ml misc.mli
+  non_empty_string.ml non_empty_string.mli
+  path_encoding.ml path_encoding.mli
+  storage_description.ml storage_description.mli
+  state_hash.ml state_hash.mli
+  nonce_hash.ml nonce_hash.mli
+  script_expr_hash.ml script_expr_hash.mli
+  contract_hash.ml contract_hash.mli
+  blinded_public_key_hash.ml blinded_public_key_hash.mli
+  block_payload_hash.ml block_payload_hash.mli
+  slot_repr.ml slot_repr.mli
+  tez_repr.ml tez_repr.mli
+  period_repr.ml period_repr.mli
+  time_repr.ml time_repr.mli
+  round_repr.ml round_repr.mli
+  block_payload_repr.ml block_payload_repr.mli
+  fixed_point_repr.ml fixed_point_repr.mli
+  saturation_repr.ml saturation_repr.mli
+  gas_limit_repr.ml gas_limit_repr.mli
+  constants_repr.ml constants_repr.mli
+  raw_level_repr.ml raw_level_repr.mli
+  fitness_repr.ml fitness_repr.mli
+  cycle_repr.ml cycle_repr.mli
+  level_repr.ml level_repr.mli
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  script_string_repr.ml script_string_repr.mli
+  script_int_repr.ml script_int_repr.mli
+  script_timestamp_repr.ml script_timestamp_repr.mli
+  michelson_v1_primitives.ml michelson_v1_primitives.mli
+  script_repr.ml script_repr.mli
+  cache_memory_helpers.ml
+  contract_repr.ml contract_repr.mli
+  roll_repr_legacy.ml roll_repr_legacy.mli
+  vote_repr.ml vote_repr.mli
+  block_header_repr.ml block_header_repr.mli
+  operation_repr.ml operation_repr.mli
+  manager_repr.ml manager_repr.mli
+  commitment_repr.ml commitment_repr.mli
+  parameters_repr.ml parameters_repr.mli
+  sapling_repr.ml
+  lazy_storage_kind.ml lazy_storage_kind.mli
+  receipt_repr.ml receipt_repr.mli
+  migration_repr.ml migration_repr.mli
+  raw_context_intf.ml
+  raw_context.ml raw_context.mli
+  storage_costs.ml storage_costs.mli
+  storage_sigs.ml
+  storage_functors.ml storage_functors.mli
+  storage.ml storage.mli
+  cache_repr.ml cache_repr.mli
+  constants_storage.ml constants_storage.mli
+  level_storage.ml level_storage.mli
+  nonce_storage.ml nonce_storage.mli
+  seed_storage.ml seed_storage.mli
+  roll_storage_legacy.ml roll_storage_legacy.mli
+  contract_manager_storage.ml contract_manager_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
+  stake_storage.ml stake_storage.mli
+  contract_delegate_storage.ml contract_delegate_storage.mli
+  sapling_storage.ml
+  lazy_storage_diff.ml lazy_storage_diff.mli
+  contract_storage.ml contract_storage.mli
+  commitment_storage.ml commitment_storage.mli
+  token.ml token.mli
+  delegate_storage.ml delegate_storage.mli
+  bootstrap_storage.ml bootstrap_storage.mli
+  voting_period_storage.ml voting_period_storage.mli
+  vote_storage.ml vote_storage.mli
+  fees_storage.ml fees_storage.mli
+  ticket_storage.ml ticket_storage.mli
+  liquidity_baking_repr.ml liquidity_baking_repr.mli
+  liquidity_baking_cpmm.ml
+  liquidity_baking_lqt.ml
+  liquidity_baking_migration.ml liquidity_baking_migration.mli
+  init_storage.ml init_storage.mli
+  sapling_validator.ml
+  global_constants_costs.ml global_constants_costs.mli
+  global_constants_storage.ml global_constants_storage.mli
+  alpha_context.ml alpha_context.mli
+  local_gas_counter.ml
+  gas_monad.ml gas_monad.mli
+  script_tc_errors.ml
+  script_ir_annot.ml script_ir_annot.mli
+  script_typed_ir.ml script_typed_ir.mli
+  script_typed_ir_size.ml script_typed_ir_size.mli
+  script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas.ml michelson_v1_gas.mli
+  script_list.ml script_list.mli
+  script_comparable.ml script_comparable.mli
+  script_set.ml script_set.mli
+  script_map.ml script_map.mli
+  script_ir_translator.ml script_ir_translator.mli
+  script_cache.ml script_cache.mli
+  script_tc_errors_registration.ml script_tc_errors_registration.mli
+  ticket_costs.ml ticket_costs.mli
+  ticket_scanner.ml ticket_scanner.mli
+  ticket_balance_key.ml ticket_balance_key.mli
+  script_interpreter_defs.ml
+  script_interpreter.ml script_interpreter.mli
+  baking.ml baking.mli
+  amendment.ml amendment.mli
+  apply_results.ml apply_results.mli
+  apply.ml apply.mli
+  services_registration.ml services_registration.mli
+  constants_services.ml constants_services.mli
+  sapling_services.ml
+  contract_services.ml contract_services.mli
+  delegate_services.ml delegate_services.mli
+  voting_services.ml voting_services.mli
+  alpha_services.ml alpha_services.mli
+  main.ml main.mli
+  (:src_dir TEZOS_PROTOCOL))
+ (action (run %{bin:tezos-protocol-compiler} .)))
+
+(rule
+ (alias runtest_sandbox)
+ (deps
+  .tezos_protocol_012_Psithaca.objs/native/tezos_protocol_012_Psithaca.cmx)
+ (action (progn)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-012-Psithaca)
+ (deps (alias runtest_sandbox))
+ (action (progn)))
+
+(library
+ (name tezos_protocol_012_Psithaca_functor)
+ (public_name tezos-protocol-functor-012-Psithaca)
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-012-Psithaca.raw)
+ (flags (-w +a-4-40..42-44-45-48
+         -warn-error +a
+         -nopervasives))
+ (modules Functor))
+
+(rule
+ (targets functor.ml)
+ (deps
+  misc.ml misc.mli
+  non_empty_string.ml non_empty_string.mli
+  path_encoding.ml path_encoding.mli
+  storage_description.ml storage_description.mli
+  state_hash.ml state_hash.mli
+  nonce_hash.ml nonce_hash.mli
+  script_expr_hash.ml script_expr_hash.mli
+  contract_hash.ml contract_hash.mli
+  blinded_public_key_hash.ml blinded_public_key_hash.mli
+  block_payload_hash.ml block_payload_hash.mli
+  slot_repr.ml slot_repr.mli
+  tez_repr.ml tez_repr.mli
+  period_repr.ml period_repr.mli
+  time_repr.ml time_repr.mli
+  round_repr.ml round_repr.mli
+  block_payload_repr.ml block_payload_repr.mli
+  fixed_point_repr.ml fixed_point_repr.mli
+  saturation_repr.ml saturation_repr.mli
+  gas_limit_repr.ml gas_limit_repr.mli
+  constants_repr.ml constants_repr.mli
+  raw_level_repr.ml raw_level_repr.mli
+  fitness_repr.ml fitness_repr.mli
+  cycle_repr.ml cycle_repr.mli
+  level_repr.ml level_repr.mli
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  script_string_repr.ml script_string_repr.mli
+  script_int_repr.ml script_int_repr.mli
+  script_timestamp_repr.ml script_timestamp_repr.mli
+  michelson_v1_primitives.ml michelson_v1_primitives.mli
+  script_repr.ml script_repr.mli
+  cache_memory_helpers.ml
+  contract_repr.ml contract_repr.mli
+  roll_repr_legacy.ml roll_repr_legacy.mli
+  vote_repr.ml vote_repr.mli
+  block_header_repr.ml block_header_repr.mli
+  operation_repr.ml operation_repr.mli
+  manager_repr.ml manager_repr.mli
+  commitment_repr.ml commitment_repr.mli
+  parameters_repr.ml parameters_repr.mli
+  sapling_repr.ml
+  lazy_storage_kind.ml lazy_storage_kind.mli
+  receipt_repr.ml receipt_repr.mli
+  migration_repr.ml migration_repr.mli
+  raw_context_intf.ml
+  raw_context.ml raw_context.mli
+  storage_costs.ml storage_costs.mli
+  storage_sigs.ml
+  storage_functors.ml storage_functors.mli
+  storage.ml storage.mli
+  cache_repr.ml cache_repr.mli
+  constants_storage.ml constants_storage.mli
+  level_storage.ml level_storage.mli
+  nonce_storage.ml nonce_storage.mli
+  seed_storage.ml seed_storage.mli
+  roll_storage_legacy.ml roll_storage_legacy.mli
+  contract_manager_storage.ml contract_manager_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
+  stake_storage.ml stake_storage.mli
+  contract_delegate_storage.ml contract_delegate_storage.mli
+  sapling_storage.ml
+  lazy_storage_diff.ml lazy_storage_diff.mli
+  contract_storage.ml contract_storage.mli
+  commitment_storage.ml commitment_storage.mli
+  token.ml token.mli
+  delegate_storage.ml delegate_storage.mli
+  bootstrap_storage.ml bootstrap_storage.mli
+  voting_period_storage.ml voting_period_storage.mli
+  vote_storage.ml vote_storage.mli
+  fees_storage.ml fees_storage.mli
+  ticket_storage.ml ticket_storage.mli
+  liquidity_baking_repr.ml liquidity_baking_repr.mli
+  liquidity_baking_cpmm.ml
+  liquidity_baking_lqt.ml
+  liquidity_baking_migration.ml liquidity_baking_migration.mli
+  init_storage.ml init_storage.mli
+  sapling_validator.ml
+  global_constants_costs.ml global_constants_costs.mli
+  global_constants_storage.ml global_constants_storage.mli
+  alpha_context.ml alpha_context.mli
+  local_gas_counter.ml
+  gas_monad.ml gas_monad.mli
+  script_tc_errors.ml
+  script_ir_annot.ml script_ir_annot.mli
+  script_typed_ir.ml script_typed_ir.mli
+  script_typed_ir_size.ml script_typed_ir_size.mli
+  script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas.ml michelson_v1_gas.mli
+  script_list.ml script_list.mli
+  script_comparable.ml script_comparable.mli
+  script_set.ml script_set.mli
+  script_map.ml script_map.mli
+  script_ir_translator.ml script_ir_translator.mli
+  script_cache.ml script_cache.mli
+  script_tc_errors_registration.ml script_tc_errors_registration.mli
+  ticket_costs.ml ticket_costs.mli
+  ticket_scanner.ml ticket_scanner.mli
+  ticket_balance_key.ml ticket_balance_key.mli
+  script_interpreter_defs.ml
+  script_interpreter.ml script_interpreter.mli
+  baking.ml baking.mli
+  amendment.ml amendment.mli
+  apply_results.ml apply_results.mli
+  apply.ml apply.mli
+  services_registration.ml services_registration.mli
+  constants_services.ml constants_services.mli
+  sapling_services.ml
+  contract_services.ml contract_services.mli
+  delegate_services.ml delegate_services.mli
+  voting_services.ml voting_services.mli
+  alpha_services.ml alpha_services.mli
+  main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+
+(library
+ (name tezos_embedded_protocol_012_Psithaca)
+ (public_name tezos-embedded-protocol-012-Psithaca)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-012-Psithaca
+  tezos-protocol-updater
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags (:standard
+         -w +a-4-40..42-44-45-48
+         -warn-error +a))
+ (modules Registerer))
+
+(rule
+ (targets registerer.ml)
+ (deps
+  misc.ml misc.mli
+  non_empty_string.ml non_empty_string.mli
+  path_encoding.ml path_encoding.mli
+  storage_description.ml storage_description.mli
+  state_hash.ml state_hash.mli
+  nonce_hash.ml nonce_hash.mli
+  script_expr_hash.ml script_expr_hash.mli
+  contract_hash.ml contract_hash.mli
+  blinded_public_key_hash.ml blinded_public_key_hash.mli
+  block_payload_hash.ml block_payload_hash.mli
+  slot_repr.ml slot_repr.mli
+  tez_repr.ml tez_repr.mli
+  period_repr.ml period_repr.mli
+  time_repr.ml time_repr.mli
+  round_repr.ml round_repr.mli
+  block_payload_repr.ml block_payload_repr.mli
+  fixed_point_repr.ml fixed_point_repr.mli
+  saturation_repr.ml saturation_repr.mli
+  gas_limit_repr.ml gas_limit_repr.mli
+  constants_repr.ml constants_repr.mli
+  raw_level_repr.ml raw_level_repr.mli
+  fitness_repr.ml fitness_repr.mli
+  cycle_repr.ml cycle_repr.mli
+  level_repr.ml level_repr.mli
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  script_string_repr.ml script_string_repr.mli
+  script_int_repr.ml script_int_repr.mli
+  script_timestamp_repr.ml script_timestamp_repr.mli
+  michelson_v1_primitives.ml michelson_v1_primitives.mli
+  script_repr.ml script_repr.mli
+  cache_memory_helpers.ml
+  contract_repr.ml contract_repr.mli
+  roll_repr_legacy.ml roll_repr_legacy.mli
+  vote_repr.ml vote_repr.mli
+  block_header_repr.ml block_header_repr.mli
+  operation_repr.ml operation_repr.mli
+  manager_repr.ml manager_repr.mli
+  commitment_repr.ml commitment_repr.mli
+  parameters_repr.ml parameters_repr.mli
+  sapling_repr.ml
+  lazy_storage_kind.ml lazy_storage_kind.mli
+  receipt_repr.ml receipt_repr.mli
+  migration_repr.ml migration_repr.mli
+  raw_context_intf.ml
+  raw_context.ml raw_context.mli
+  storage_costs.ml storage_costs.mli
+  storage_sigs.ml
+  storage_functors.ml storage_functors.mli
+  storage.ml storage.mli
+  cache_repr.ml cache_repr.mli
+  constants_storage.ml constants_storage.mli
+  level_storage.ml level_storage.mli
+  nonce_storage.ml nonce_storage.mli
+  seed_storage.ml seed_storage.mli
+  roll_storage_legacy.ml roll_storage_legacy.mli
+  contract_manager_storage.ml contract_manager_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
+  frozen_deposits_storage.ml frozen_deposits_storage.mli
+  stake_storage.ml stake_storage.mli
+  contract_delegate_storage.ml contract_delegate_storage.mli
+  sapling_storage.ml
+  lazy_storage_diff.ml lazy_storage_diff.mli
+  contract_storage.ml contract_storage.mli
+  commitment_storage.ml commitment_storage.mli
+  token.ml token.mli
+  delegate_storage.ml delegate_storage.mli
+  bootstrap_storage.ml bootstrap_storage.mli
+  voting_period_storage.ml voting_period_storage.mli
+  vote_storage.ml vote_storage.mli
+  fees_storage.ml fees_storage.mli
+  ticket_storage.ml ticket_storage.mli
+  liquidity_baking_repr.ml liquidity_baking_repr.mli
+  liquidity_baking_cpmm.ml
+  liquidity_baking_lqt.ml
+  liquidity_baking_migration.ml liquidity_baking_migration.mli
+  init_storage.ml init_storage.mli
+  sapling_validator.ml
+  global_constants_costs.ml global_constants_costs.mli
+  global_constants_storage.ml global_constants_storage.mli
+  alpha_context.ml alpha_context.mli
+  local_gas_counter.ml
+  gas_monad.ml gas_monad.mli
+  script_tc_errors.ml
+  script_ir_annot.ml script_ir_annot.mli
+  script_typed_ir.ml script_typed_ir.mli
+  script_typed_ir_size.ml script_typed_ir_size.mli
+  script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas.ml michelson_v1_gas.mli
+  script_list.ml script_list.mli
+  script_comparable.ml script_comparable.mli
+  script_set.ml script_set.mli
+  script_map.ml script_map.mli
+  script_ir_translator.ml script_ir_translator.mli
+  script_cache.ml script_cache.mli
+  script_tc_errors_registration.ml script_tc_errors_registration.mli
+  ticket_costs.ml ticket_costs.mli
+  ticket_scanner.ml ticket_scanner.mli
+  ticket_balance_key.ml ticket_balance_key.mli
+  script_interpreter_defs.ml
+  script_interpreter.ml script_interpreter.mli
+  baking.ml baking.mli
+  amendment.ml amendment.mli
+  apply_results.ml apply_results.mli
+  apply.ml apply.mli
+  services_registration.ml services_registration.mli
+  constants_services.ml constants_services.mli
+  sapling_services.ml
+  contract_services.ml contract_services.mli
+  delegate_services.ml delegate_services.mli
+  voting_services.ml voting_services.mli
+  alpha_services.ml alpha_services.mli
+  main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-embedded-protocol-packer} %{src_dir} 012_Psithaca)))))

@@ -1,1 +1,171 @@
-../../lib_protocol_compiler/dune_protocol.v1
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_environment_demo_counter)
+ (public_name tezos-protocol-demo-counter.environment)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (modules Environment))
+
+(rule
+ (targets environment.ml)
+ (action
+  (write-file
+   %{targets}
+   "module Name = struct let name = \"demo-counter\" end\ninclude Tezos_protocol_environment.MakeV6(Name)()\nmodule CamlinternalFormatBasics = struct include CamlinternalFormatBasics end\n")))
+
+(library
+ (name tezos_raw_protocol_demo_counter)
+ (public_name tezos-protocol-demo-counter.raw)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-demo-counter.environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -w +a-4-40..42-44-45-48
+   -warn-error +a
+   -nostdlib
+   -nopervasives
+   -open Tezos_protocol_environment_demo_counter.Environment
+   -open Pervasives
+   -open Error_monad))
+ (modules
+  Error
+  Proto_params
+  Header
+  State
+  Proto_operation
+  Receipt
+  Apply
+  Services
+  Main))
+
+(library
+ (name tezos_protocol_demo_counter)
+ (public_name tezos-protocol-demo-counter)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-demo-counter.raw)
+ (flags (-w +a-4-40..42-44-45-48
+         -warn-error +a
+         -nopervasives))
+ (modules Protocol))
+
+(install
+ (package tezos-protocol-demo-counter)
+ (section lib)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+
+(rule
+ (targets protocol.ml)
+ (deps
+  error.ml error.mli
+  proto_params.ml proto_params.mli
+  header.ml header.mli
+  state.ml state.mli
+  proto_operation.ml proto_operation.mli
+  receipt.ml receipt.mli
+  apply.ml apply.mli
+  services.ml services.mli
+  main.ml main.mli)
+ (action
+  (write-file
+   %{targets}
+   "module Environment = Tezos_protocol_environment_demo_counter.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_demo_counter\ninclude Tezos_raw_protocol_demo_counter.Main\n")))
+
+(rule
+ (alias runtest_compile_protocol)
+ (deps
+  error.ml error.mli
+  proto_params.ml proto_params.mli
+  header.ml header.mli
+  state.ml state.mli
+  proto_operation.ml proto_operation.mli
+  receipt.ml receipt.mli
+  apply.ml apply.mli
+  services.ml services.mli
+  main.ml main.mli
+  (:src_dir TEZOS_PROTOCOL))
+ (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
+
+(rule
+ (alias runtest_sandbox)
+ (deps
+  .tezos_protocol_demo_counter.objs/native/tezos_protocol_demo_counter.cmx)
+ (action (progn)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-demo-counter)
+ (deps (alias runtest_sandbox))
+ (action (progn)))
+
+(library
+ (name tezos_protocol_demo_counter_functor)
+ (public_name tezos-protocol-functor-demo-counter)
+ (libraries
+  tezos-protocol-environment
+  tezos-protocol-environment.sigs
+  tezos-protocol-demo-counter.raw)
+ (flags (-w +a-4-40..42-44-45-48
+         -warn-error +a
+         -nopervasives))
+ (modules Functor))
+
+(rule
+ (targets functor.ml)
+ (deps
+  error.ml error.mli
+  proto_params.ml proto_params.mli
+  header.ml header.mli
+  state.ml state.mli
+  proto_operation.ml proto_operation.mli
+  receipt.ml receipt.mli
+  apply.ml apply.mli
+  services.ml services.mli
+  main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+
+(library
+ (name tezos_embedded_protocol_demo_counter)
+ (public_name tezos-embedded-protocol-demo-counter)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-demo-counter
+  tezos-protocol-updater
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags (:standard
+         -w +a-4-40..42-44-45-48
+         -warn-error +a))
+ (modules Registerer))
+
+(rule
+ (targets registerer.ml)
+ (deps
+  error.ml error.mli
+  proto_params.ml proto_params.mli
+  header.ml header.mli
+  state.ml state.mli
+  proto_operation.ml proto_operation.mli
+  receipt.ml receipt.mli
+  apply.ml apply.mli
+  services.ml services.mli
+  main.ml main.mli (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to
+   %{targets}
+   (chdir
+    %{workspace_root}
+    (run %{bin:tezos-embedded-protocol-packer} %{src_dir} demo_counter)))))
