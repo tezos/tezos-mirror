@@ -107,4 +107,102 @@ module Simulation = struct
     injection_force protocol
 end
 
-let register ~protocols = Simulation.register protocols
+module Transfer = struct
+  let get_balance pkh client =
+    let*! json = RPC.Contracts.get_balance ~contract_id:pkh client in
+    return (Tez.of_mutez_int (JSON.as_int json))
+
+  let alias_pkh_destination =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Transfer to public key hash alias"
+      ~tags:["client"; "alias"; "transfer"]
+    @@ fun protocol ->
+    let* node, client = Client.init_with_protocol `Client ~protocol () in
+    let* client2 = Client.init ~endpoint:(Node node) () in
+    let* victim = Client.gen_and_show_keys ~alias:"victim" client in
+    let* malicious = Client.gen_and_show_keys ~alias:"malicious" client2 in
+    let malicious = {malicious with Account.alias = victim.public_key_hash} in
+    Log.info "Importing malicious account whose alias is victim's public key" ;
+    let* () = Client.import_secret_key client malicious in
+    let amount = Tez.of_int 2 in
+    Log.info
+      "Transferring to victim's public key hash should not transfer to \
+       malicious" ;
+    let* () =
+      Client.transfer
+        ~amount
+        ~giver:Constant.bootstrap1.public_key_hash
+        ~receiver:victim.public_key_hash
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* balance_victim = get_balance victim.public_key_hash client
+    and* balance_malicious = get_balance malicious.public_key_hash client in
+    Check.((balance_victim = amount) (convert Tez.to_string string))
+      ~error_msg:"Balance of victim should be %R but is %L." ;
+    Check.((balance_malicious = Tez.zero) (convert Tez.to_string string))
+      ~error_msg:"Balance of malicious should be %R but is %L." ;
+    unit
+
+  let alias_pkh_source =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Transfer from public key hash alias"
+      ~tags:["client"; "alias"; "transfer"]
+    @@ fun protocol ->
+    let* node, client = Client.init_with_protocol `Client ~protocol () in
+    let* client2 = Client.init ~endpoint:(Node node) () in
+    let* malicious = Client.gen_and_show_keys ~alias:"malicious" client in
+    let* victim = Client.gen_and_show_keys ~alias:"victim" client2 in
+    let victim = {victim with Account.alias = malicious.public_key_hash} in
+    Log.info "Importing victim account whose alias is malicious's public key" ;
+    let* () = Client.import_secret_key client victim in
+    Log.info "Giving some tokens to victim" ;
+    let* () =
+      Client.transfer
+        ~amount:(Tez.of_int 100)
+        ~giver:Constant.bootstrap1.public_key_hash
+        ~receiver:("text:" ^ victim.public_key_hash)
+        ~burn_cap:Tez.one
+        client
+    in
+    Log.info "Giving some tokens to malicious" ;
+    let* () =
+      Client.transfer
+        ~amount:(Tez.of_int 100)
+        ~giver:Constant.bootstrap2.public_key_hash
+        ~receiver:("text:" ^ malicious.public_key_hash)
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* prev_balance_victim = get_balance victim.public_key_hash client in
+    let amount = Tez.of_int 2 in
+    Log.info
+      "Transferring from malicious's public key hash should not transfer from \
+       victim" ;
+    let* () =
+      Client.transfer
+        ~amount
+        ~giver:malicious.public_key_hash
+        ~receiver:Constant.bootstrap1.public_key_hash
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* balance_victim = get_balance victim.public_key_hash client in
+    Check.(
+      (balance_victim = prev_balance_victim) (convert Tez.to_string string))
+      ~error_msg:"Balance of victim should be %R but is %L." ;
+    unit
+
+  let register protocol =
+    alias_pkh_destination protocol ;
+    alias_pkh_source protocol
+end
+
+let register ~protocols =
+  Simulation.register [Jakarta; Alpha] ;
+  Transfer.register protocols
