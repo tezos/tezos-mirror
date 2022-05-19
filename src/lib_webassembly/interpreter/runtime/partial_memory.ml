@@ -87,7 +87,7 @@ let valid_limits {min; max} =
   | Some m -> I32.le_u min m
 
 (* Copied from [Memory] module *)
-let create n =
+let _create n =
   if I32.gt_u n max_pages then raise SizeOverflow else
   try
     let size = Int64.(mul (of_int32 n) page_size) in
