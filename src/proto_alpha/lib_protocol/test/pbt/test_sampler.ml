@@ -31,7 +31,7 @@
     Subject:      Operations in Saturation_repr
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 open Protocol.Sampler
 
 (* ------------------------------------------------------------------------- *)
@@ -180,7 +180,7 @@ struct
     let error = linf empirical truth in
     let max_error = 0.001 *. Mass.to_float total_mass in
     if not Q.(error < Q.of_float max_error) then
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "didn't converge (%f)@.%a"
         (Q.to_float error)
         (pp_dist Format.pp_print_int)
@@ -250,20 +250,18 @@ module Test_z =
 let qcheck_wrap = qcheck_wrap ~rand:state
 
 let alias_float_test =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~count:100
     ~name:"alias_float"
-    QCheck.(list_of_size (Gen.int_range 1 20) pos_float)
+    QCheck2.Gen.(list_size (int_range 1 20) pfloat)
     Test_float.make
 
 let alias_z_test =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~count:100
     ~name:"alias_z"
-    QCheck.(
-      list_of_size
-        (Gen.int_range 1 20)
-        (make Gen.(nat >>= fun n -> return (Z.of_int n))))
+    QCheck2.Gen.(
+      list_size (int_range 1 20) (nat >>= fun n -> return (Z.of_int n)))
     Test_z.make
 
 let () =

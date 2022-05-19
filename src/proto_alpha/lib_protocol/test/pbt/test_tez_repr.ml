@@ -46,16 +46,16 @@ let z_in_mutez_bounds (z : Z.t) : bool =
 let compare (c' : Z.t) (c : Tez.t tzresult) : bool =
   match (z_in_mutez_bounds @@ c', c) with
   | true, Ok c ->
-      Lib_test.Qcheck_helpers.qcheck_eq'
+      Lib_test.Qcheck2_helpers.qcheck_eq'
         ~pp:Z.pp_print
         ~expected:c'
         ~actual:(tez_to_z c)
         ()
   | true, Error _ ->
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "@[<h 0>Results are in Z bounds, but tez operation fails.@]"
   | false, Ok _ ->
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "@[<h 0>Results are not in Z bounds, but tez operation did not fail.@]"
   | false, Error _ -> true
 
@@ -75,61 +75,56 @@ let prop_binop64 (f : Tez.t -> int64 -> Tez.t tzresult) (f' : Z.t -> Z.t -> Z.t)
     ((a, b) : Tez.t * int64) : bool =
   compare (f' (tez_to_z a) (Z.of_int64 b)) (f a b)
 
-(** Arbitrary int64 by conversion from int32 *)
-let arb_int64_of32 : int64 QCheck.arbitrary =
-  QCheck.(map ~rev:Int64.to_int32 Int64.of_int32 int32)
+(** Generator for int64 by conversion from int32 *)
+let gen_int64_of32 : int64 QCheck2.Gen.t =
+  QCheck2.Gen.(map Int64.of_int32 int32)
 
-(** Arbitrary int64 mixing small positive integers,
+(** Generator for int64 mixing small positive integers,
     int64s from int32 and arbitrary int64 with equal frequency *)
-let arb_int64_sizes : int64 QCheck.arbitrary =
-  let open QCheck in
-  oneof
-    [
-      QCheck.map ~rev:Int64.to_int Int64.of_int (int_range (-10) 10);
-      arb_int64_of32;
-      int64;
-    ]
+let gen_int64_sizes : int64 QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  oneof [map Int64.of_int (int_range (-10) 10); gen_int64_of32; int64]
 
-(** Arbitrary positive int64, mixing small positive integers,
+(** Generator for positive int64, mixing small positive integers,
     int64s from int32 and arbitrary int64 with equal frequency *)
-let arb_ui64_sizes : int64 QCheck.arbitrary =
-  let open QCheck in
-  map_same_type
+let gen_ui64_sizes : int64 QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  map
     (fun i ->
       let v = if i = Int64.min_int then Int64.max_int else Int64.abs i in
       assert (v >= 0L) ;
       v)
-    arb_int64_sizes
+    gen_int64_sizes
 
-(** Arbitrary tez based on [arb_tez_sizes] *)
-let arb_tez_sizes =
-  let open QCheck in
-  map ~rev:Tez.to_mutez Tez.of_mutez_exn arb_ui64_sizes
+(** Generator for tez based on [gen_tez_sizes] *)
+let gen_tez_sizes =
+  let open QCheck2.Gen in
+  map Tez.of_mutez_exn gen_ui64_sizes
 
 let test_coherent_mul =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"Tez.(*?) is coherent w.r.t. Z.(*)"
-    QCheck.(pair arb_tez_sizes arb_ui64_sizes)
+    QCheck2.Gen.(pair gen_tez_sizes gen_ui64_sizes)
     (prop_binop64 ( *? ) Z.( * ))
 
 let test_coherent_sub =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"Tez.(-?) is coherent w.r.t. Z.(-)"
-    QCheck.(pair arb_tez_sizes arb_tez_sizes)
+    QCheck2.Gen.(pair gen_tez_sizes gen_tez_sizes)
     (prop_binop ( -? ) Z.( - ))
 
 let test_coherent_add =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"Tez.(+?) is coherent w.r.t. Z.(+)"
-    QCheck.(pair arb_tez_sizes arb_tez_sizes)
+    QCheck2.Gen.(pair gen_tez_sizes gen_tez_sizes)
     (prop_binop ( +? ) Z.( + ))
 
 let test_coherent_div =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"Tez.(/?) is coherent w.r.t. Z.(/)"
-    QCheck.(pair arb_tez_sizes arb_ui64_sizes)
+    QCheck2.Gen.(pair gen_tez_sizes gen_ui64_sizes)
     (fun (a, b) ->
-      QCheck.assume (b > 0L) ;
+      QCheck2.assume (b > 0L) ;
       prop_binop64 ( /? ) Z.( / ) (a, b))
 
 let tests =
@@ -138,4 +133,4 @@ let tests =
 let () =
   Alcotest.run
     "protocol > pbt > tez_repr"
-    [("Tez_repr", Lib_test.Qcheck_helpers.qcheck_wrap tests)]
+    [("Tez_repr", Lib_test.Qcheck2_helpers.qcheck_wrap tests)]

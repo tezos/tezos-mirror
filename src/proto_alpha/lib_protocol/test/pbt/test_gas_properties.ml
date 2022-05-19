@@ -32,9 +32,9 @@
 *)
 
 open Protocol
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
-(** Extract a Tezos result for compatibility with QCheck. *)
+(** Extract a Tezos result for compatibility with QCheck2. *)
 let extract_qcheck_result = function
   | Ok pure_result -> pure_result
   | Error err ->
@@ -88,8 +88,8 @@ let test_consume_commutes (start, cost1, cost2) =
           (Gas.consumed ~since:start ~until:branch2)) )
 
 (** Arbitrary context with a gas limit of 100_000_000. *)
-let context_arb : Alpha_context.t QCheck.arbitrary =
-  QCheck.always
+let context_gen : Alpha_context.t QCheck2.Gen.t =
+  QCheck2.Gen.return
     (Lwt_main.run
        ( Context.init1 () >>=? fun (b, _contract) ->
          Incremental.begin_construction b >|=? fun inc ->
@@ -102,12 +102,12 @@ let context_arb : Alpha_context.t QCheck.arbitrary =
      | Error _ -> assert false)
 
 (** This arbitrary could be improved (pretty printer and shrinker) if there was a way to convert a [cost] back to an [int]. Otherwise one needs to write a custom [arbitrary] instance, but I wanted to stick to the former design of this test for the time being. *)
-let gas_cost_arb : Alpha_context.Gas.cost QCheck.arbitrary =
+let gas_cost_gen : Alpha_context.Gas.cost QCheck2.Gen.t =
   let open Alpha_context.Gas in
-  let open QCheck in
+  let open QCheck2.Gen in
   let rand = 0 -- 1000 in
   let safe_rand = map Saturation_repr.safe_int rand in
-  choose
+  oneof
     [
       map atomic_step_cost safe_rand;
       map step_cost safe_rand;
@@ -120,20 +120,20 @@ let gas_cost_arb : Alpha_context.Gas.cost QCheck.arbitrary =
 
 let tests =
   [
-    QCheck.Test.make
+    QCheck2.Test.make
       ~count:1000
       ~name:"Consuming commutes"
-      QCheck.(triple context_arb gas_cost_arb gas_cost_arb)
+      QCheck2.Gen.(triple context_gen gas_cost_gen gas_cost_gen)
       test_consume_commutes;
-    QCheck.Test.make
+    QCheck2.Test.make
       ~count:1000
       ~name:"Consuming [free] consumes nothing"
-      context_arb
+      context_gen
       test_free_consumption;
-    QCheck.Test.make
+    QCheck2.Test.make
       ~count:1000
       ~name:"[free] is the neutral element of Gas addition"
-      QCheck.(pair context_arb gas_cost_arb)
+      QCheck2.Gen.(pair context_gen gas_cost_gen)
       test_free_neutral;
   ]
 

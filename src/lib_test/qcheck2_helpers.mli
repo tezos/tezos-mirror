@@ -151,6 +151,13 @@ val sublist : 'a list -> 'a list QCheck2.Gen.t
     this generator can produce [], [0], [0, 2], [1, 2], [1], etc. *)
 val holey : 'a list -> 'a list QCheck2.Gen.t
 
+(** [of_option_gen gen] converts a generator [gen] of optional values into a
+    generator of values by rerunning the generator if the generated value
+    was a [None] until a [Some] is generated.
+
+    Be careful: if [None] is always returned, this hangs forever! *)
+val of_option_gen : 'a option QCheck2.Gen.t -> 'a QCheck2.Gen.t
+
 (** Map-related generators. *)
 module MakeMapGen (Map : sig
   type 'a t

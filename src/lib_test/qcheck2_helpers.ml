@@ -181,6 +181,10 @@ let holey (l : 'a list) : 'a list QCheck2.Gen.t =
   in
   List.rev rev_result
 
+let rec of_option_gen gen =
+  let open QCheck2.Gen in
+  gen >>= function None -> of_option_gen gen | Some a -> return a
+
 let endpoint_gen =
   let open QCheck2 in
   let open Gen in

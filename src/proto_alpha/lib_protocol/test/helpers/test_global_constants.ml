@@ -62,7 +62,7 @@ let assert_ok = function
 (** Filters out values that would cause [register] *)
 let assume_expr_not_too_large expr =
   let node = root expr in
-  QCheck.assume @@ not
+  QCheck2.assume @@ not
   @@ Global_constants_storage.Internal_for_tests.node_too_large node
 
 module Generators = struct
