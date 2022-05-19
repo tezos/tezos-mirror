@@ -153,7 +153,7 @@ module Regressions = struct
     let rpc_state =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_state")
+        ~output_file:(fun p -> sf "tx_rollup_rpc_state.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollup, regression) - state"
         ~tags:["tx_rollup"; "rpc"]
       @@ fun protocol ->
@@ -164,7 +164,7 @@ module Regressions = struct
     let rpc_inbox =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox")
+        ~output_file:(fun p -> sf "tx_rollup_rpc_inbox.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - inbox"
         ~tags:["tx_rollup"; "rpc"; "inbox"]
       @@ fun protocol ->
@@ -183,7 +183,8 @@ module Regressions = struct
     let rpc_inbox_message_hash =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox_message_hash")
+        ~output_file:(fun p ->
+          sf "tx_rollup_rpc_inbox_message_hash.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - inbox message hash"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "message"]
       @@ fun protocol ->
@@ -195,7 +196,8 @@ module Regressions = struct
     let rpc_inbox_merkle_tree_hash =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox_merkle_tree_hash")
+        ~output_file:(fun p ->
+          sf "tx_rollup_rpc_inbox_merkle_tree_hash.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - inbox merkle tree hash"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "merkle_tree_hash"]
       @@ fun protocol ->
@@ -216,7 +218,8 @@ module Regressions = struct
     let rpc_inbox_merkle_tree_path =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox_merkle_tree_path")
+        ~output_file:(fun p ->
+          sf "tx_rollup_rpc_inbox_merkle_tree_path.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - inbox merkle tree path"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "merkle_tree_path"]
       @@ fun protocol ->
@@ -283,7 +286,8 @@ module Regressions = struct
     let rpc_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_commitment")
+        ~output_file:(fun p ->
+          sf "tx_rollup_rpc_commitment.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - commitment"
         ~tags:["tx_rollup"; "rpc"; "commitment"]
       @@ fun protocol ->
@@ -303,7 +307,8 @@ module Regressions = struct
     let rpc_commitment_remove =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_commitment_remove")
+        ~output_file:(fun p ->
+          sf "tx_rollup_rpc_commitment_remove.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - commitment remove"
         ~tags:["tx_rollup"; "rpc"; "commitment"]
       @@ fun protocol ->
@@ -348,7 +353,12 @@ module Regressions = struct
         submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
       in
       let* () =
-        Process.check_error ~msg:(rex "tx_rollup_remove_commitment_too_early") p
+        let error =
+          match protocol with
+          | Jakarta -> "tx_rollup_no_commitment_to_remove"
+          | _ -> "tx_rollup_remove_commitment_too_early"
+        in
+        Process.check_error ~msg:(rex error) p
       in
 
       Log.info "Step 8. Last_removed_commitments_hashes is None before removing" ;
@@ -385,7 +395,8 @@ module Regressions = struct
     let rpc_pending_bonded_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_pending_bonded_commitments")
+        ~output_file:(fun p ->
+          sf "tx_rollup_rpc_pending_bonded_commitments.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - pending bonded commitments"
         ~tags:["tx_rollup"; "rpc"; "commitment"; "bond"]
       @@ fun protocol ->
@@ -426,7 +437,8 @@ module Regressions = struct
     let batch_encoding =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_batch_encoding")
+        ~output_file:(fun p ->
+          sf "tx_rollup_batch_encoding.%s" (Protocol.tag p))
         ~title:"RPC (tx_rollups, regression) - batch encoding"
         ~tags:["tx_rollup"; "batch"; "encoding"]
       @@ fun protocol ->
@@ -488,7 +500,8 @@ module Regressions = struct
     let submit_empty_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_limit_empty_batch")
+        ~output_file:(fun p ->
+          sf "tx_rollup_limit_empty_batch.%s" (Protocol.tag p))
         ~title:"Submit empty batch"
         ~tags:["tx_rollup"; "batch"; "client"]
       @@ fun protocol ->
@@ -500,7 +513,8 @@ module Regressions = struct
     let submit_maximum_size_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_limit_maximum_size_batch")
+        ~output_file:(fun p ->
+          sf "tx_rollup_limit_maximum_size_batch.%s" (Protocol.tag p))
         ~title:"Submit maximum size batch"
         ~tags:["tx_rollup"; "batch"; "client"]
       @@ fun protocol ->
@@ -528,7 +542,8 @@ module Regressions = struct
     let inbox_maximum_size =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_limit_maximum_size_inbox")
+        ~output_file:(fun p ->
+          sf "tx_rollup_limit_maximum_size_inbox.%s" (Protocol.tag p))
         ~title:"Submit maximum size inbox"
         ~tags:["tx_rollup"; "inbox"; "client"]
       @@ fun protocol ->
@@ -580,8 +595,10 @@ module Regressions = struct
       let open Tezt_tezos in
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ ->
-          "tx_rollup_client_submit_batch_invalid_rollup_address")
+        ~output_file:(fun p ->
+          sf
+            "tx_rollup_client_submit_batch_invalid_rollup_address.%s"
+            (Protocol.tag p))
         ~title:"Submit a batch to an invalid rollup address should fail"
         ~tags:["tx_rollup"; "client"; "fail"; "batch"]
       @@ fun protocol ->
@@ -615,7 +632,8 @@ module Regressions = struct
     let client_submit_finalize_commitment_no_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_no_batch")
+        ~output_file:(fun p ->
+          sf "tx_rollup_finalize_commitment_no_batch.%s" (Protocol.tag p))
         ~title:"Submit a finalize commitment operation without batch"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
@@ -626,13 +644,14 @@ module Regressions = struct
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
 
     let client_submit_finalize_commitment_no_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_no_commitment")
+        ~output_file:(fun p ->
+          sf "tx_rollup_finalize_commitment_no_commitment.%s" (Protocol.tag p))
         ~title:"Submit a finalize commitment operation without commitment"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
@@ -646,13 +665,14 @@ module Regressions = struct
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
 
     let client_submit_finalize_commitment_future =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_future")
+        ~output_file:(fun p ->
+          sf "tx_rollup_finalize_commitment_future.%s" (Protocol.tag p))
         ~title:
           "Submit a finalize commitment operation for a commitment in the \
            future"
@@ -668,13 +688,14 @@ module Regressions = struct
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
 
     let client_submit_finalize_too_recent_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_too_recent_commitment")
+        ~output_file:(fun p ->
+          sf "tx_rollup_finalize_too_recent_commitment.%s" (Protocol.tag p))
         ~title:"Try to finalize a too recent commitment"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
@@ -697,7 +718,7 @@ module Regressions = struct
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
   end
 
@@ -968,7 +989,7 @@ let test_rollup_with_two_commitments =
   let* () =
     Process.check_error
       ~exit_code:1
-      ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+      ~msg:(rex "tx_rollup_no_commitment_to_finalize")
       process
   in
   let batch = Rollup.make_batch "blob" in
@@ -1037,7 +1058,7 @@ let test_rollup_with_two_commitments =
 let test_rollup_last_commitment_is_rejected =
   Protocol.register_regression_test
     ~__FILE__
-    ~output_file:(fun _ -> "tx_rollup_rejection")
+    ~output_file:(fun p -> sf "tx_rollup_rejection.%s" (Protocol.tag p))
     ~title:"RPC (tx_rollup, regression) - rejection"
     ~tags:["tx_rollup"; "rejection"]
   @@ fun protocol ->
@@ -1247,9 +1268,7 @@ let test_rollup_wrong_rejection =
       state
   in
   let* () =
-    Process.check_error
-      ~msg:(rex "proto.alpha.tx_rollup_proof_failed_to_reject")
-      process
+    Process.check_error ~msg:(rex "tx_rollup_proof_failed_to_reject") process
   in
   let* () = Client.bake_for_and_wait client in
   let*! state = Rollup.get_state ~rollup client in
@@ -1305,9 +1324,7 @@ let test_rollup_wrong_path_for_rejection =
       state
   in
   let* () =
-    Process.check_error
-      ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path")
-      process
+    Process.check_error ~msg:(rex "tx_rollup_wrong_message_path") process
   in
   unit
 
@@ -1372,9 +1389,7 @@ let test_rollup_wrong_rejection_long_path =
       state
   in
   let* () =
-    Process.check_error
-      ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path_depth")
-      process
+    Process.check_error ~msg:(rex "tx_rollup_wrong_message_path_depth") process
   in
   (* We check here the path is valid but the operation is rejected for
      a different reason. *)
@@ -1392,9 +1407,7 @@ let test_rollup_wrong_rejection_long_path =
       ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
       state
   in
-  Process.check_error
-    ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path")
-    process
+  Process.check_error ~msg:(rex "tx_rollup_wrong_message_path") process
 
 let check_bond_is ~src client ~expected =
   let*! bond = RPC.Contracts.get_frozen_bonds ~contract_id:src client in
