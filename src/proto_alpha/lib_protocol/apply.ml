@@ -2126,6 +2126,33 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
 
+let burn_origination_storage_fees ctxt
+    {
+      lazy_storage_diff;
+      balance_updates;
+      originated_contracts;
+      consumed_gas;
+      storage_size;
+      paid_storage_size_diff;
+    } ~storage_limit ~payer =
+  let consumed = paid_storage_size_diff in
+  Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+  >>=? fun (ctxt, storage_limit, storage_bus) ->
+  Fees.burn_origination_fees ctxt ~storage_limit ~payer
+  >>=? fun (ctxt, storage_limit, origination_bus) ->
+  let balance_updates = storage_bus @ origination_bus @ balance_updates in
+  return
+    ( ctxt,
+      storage_limit,
+      {
+        lazy_storage_diff;
+        balance_updates;
+        originated_contracts;
+        consumed_gas;
+        storage_size;
+        paid_storage_size_diff;
+      } )
+
 (** [burn_storage_fees ctxt smopr storage_limit payer] burns the storage fees
     associated to an operation result [smopr].
     Returns an updated context, an updated storage limit with the space consumed
@@ -2149,27 +2176,14 @@ let burn_storage_fees :
         ~payer
       >|=? fun (ctxt, storage_limit, transaction_result) ->
       (ctxt, storage_limit, Transaction_result transaction_result)
-  | Origination_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      Fees.burn_origination_fees ctxt ~storage_limit ~payer
-      >>=? fun (ctxt, storage_limit, origination_bus) ->
-      let balance_updates =
-        storage_bus @ origination_bus @ payload.balance_updates
-      in
-      return
-        ( ctxt,
-          storage_limit,
-          Origination_result
-            {
-              lazy_storage_diff = payload.lazy_storage_diff;
-              balance_updates;
-              originated_contracts = payload.originated_contracts;
-              consumed_gas = payload.consumed_gas;
-              storage_size = payload.storage_size;
-              paid_storage_size_diff = payload.paid_storage_size_diff;
-            } )
+  | Origination_result origination_result ->
+      burn_origination_storage_fees
+        ctxt
+        origination_result
+        ~storage_limit
+        ~payer
+      >|=? fun (ctxt, storage_limit, origination_result) ->
+      (ctxt, storage_limit, Origination_result origination_result)
   | Reveal_result _ | Delegation_result _ -> return (ctxt, storage_limit, smopr)
   | Register_global_constant_result payload ->
       let consumed = payload.size_of_constant in
