@@ -242,7 +242,7 @@ let machine_validation_tests =
            ConcreteMachine.run ~invariant scenario env state >>=? fun _ ->
            return_unit));
     QCheck2.Test.make
-      ~count:100_000
+      ~count:50_000
       ~name:"Positive pools"
       ~print:Liquidity_baking_generator.print_scenario
       (Liquidity_baking_generator.gen_scenario 1_000_000 1_000_000 50)
@@ -260,7 +260,7 @@ let machine_validation_tests =
 let economic_tests =
   [
     QCheck2.Test.make
-      ~count:100_000
+      ~count:50_000
       ~name:"No global gain"
       ~print:Liquidity_baking_generator.print_adversary_scenario
       (Liquidity_baking_generator.gen_adversary_scenario 1_000_000 1_000_000 50)
@@ -271,7 +271,7 @@ let economic_tests =
         in
         true);
     QCheck2.Test.make
-      ~count:100_000
+      ~count:50_000
       ~name:"Remove liquidities is consistent"
       ~print:Liquidity_baking_generator.print_scenario
       (Liquidity_baking_generator.gen_scenario 1_000_000 1_000_000 50)
@@ -282,7 +282,7 @@ let economic_tests =
         in
         true);
     QCheck2.Test.make
-      ~count:100_000
+      ~count:50_000
       ~name:"Share price only increases"
       ~print:Liquidity_baking_generator.print_scenario
       (Liquidity_baking_generator.gen_scenario 1_000_000 1_000_000 50)
