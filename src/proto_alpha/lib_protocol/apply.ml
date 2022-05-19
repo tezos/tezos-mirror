@@ -1733,8 +1733,8 @@ let apply_external_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Sc_rollup_originate {kind; boot_sector} ->
-      Sc_rollup_operations.originate ctxt ~kind ~boot_sector
+  | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
+      Sc_rollup_operations.originate ctxt ~kind ~boot_sector ~parameters_ty
       >>=? fun ({address; size}, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result =

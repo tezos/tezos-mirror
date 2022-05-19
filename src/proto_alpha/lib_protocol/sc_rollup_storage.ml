@@ -29,7 +29,7 @@ module Store = Storage.Sc_rollup
 module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
-let originate ctxt ~kind ~boot_sector =
+let originate ctxt ~kind ~boot_sector ~parameters_ty =
   Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
   let level = Raw_context.current_level ctxt in
   Sc_rollup_repr.Address.from_nonce nonce >>?= fun address ->
@@ -37,6 +37,8 @@ let originate ctxt ~kind ~boot_sector =
   Store.Initial_level.add ctxt address (Level_storage.current ctxt).level
   >>= fun ctxt ->
   Store.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
+  Store.Parameters_type.add ctxt address parameters_ty
+  >>=? fun (ctxt, param_ty_size_diff, _added) ->
   let inbox = Sc_rollup_inbox_repr.empty address level.level in
   Store.Inbox.init ctxt address inbox >>=? fun (ctxt, size_diff) ->
   Store.Last_cemented_commitment.init ctxt address Commitment_hash.zero
@@ -51,7 +53,7 @@ let originate ctxt ~kind ~boot_sector =
   let size =
     Z.of_int
       (origination_size + stored_kind_size + boot_sector_size + addresses_size
-     + size_diff + lcc_size_diff + stakers_size_diff)
+     + size_diff + lcc_size_diff + stakers_size_diff + param_ty_size_diff)
   in
   return (address, size, ctxt)
 

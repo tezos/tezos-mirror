@@ -35,6 +35,7 @@ val originate :
   Raw_context.t ->
   kind:Sc_rollup_repr.Kind.t ->
   boot_sector:string ->
+  parameters_ty:Script_repr.lazy_expr ->
   (Sc_rollup_repr.Address.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** [kind context address] returns [Some kind] iff [address] is an

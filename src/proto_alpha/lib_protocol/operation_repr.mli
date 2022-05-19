@@ -428,6 +428,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollup_repr.Kind.t;
       boot_sector : string;
+      parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
   (* [Sc_rollup_add_messages] adds messages to a given rollup's

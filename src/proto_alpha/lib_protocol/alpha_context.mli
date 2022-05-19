@@ -2519,7 +2519,11 @@ module Sc_rollup : sig
     context ->
     kind:Kind.t ->
     boot_sector:string ->
+    parameters_ty:Script.lazy_expr ->
     (t * Z.t * context) tzresult Lwt.t
+
+  val parameters_type :
+    context -> t -> (Script.lazy_expr * context) tzresult Lwt.t
 
   val kind : context -> t -> Kind.t option tzresult Lwt.t
 
@@ -3113,6 +3117,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
+      parameters_ty : Script.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {

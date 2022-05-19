@@ -660,7 +660,7 @@ let originated_sc_rollup op =
   Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
 
 let sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
-    (src : Contract.t) kind boot_sector =
+    (src : Contract.t) kind boot_sector parameters_ty =
   manager_operation
     ?counter
     ?fee
@@ -668,7 +668,7 @@ let sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
     ?storage_limit
     ~source:src
     ctxt
-    (Sc_rollup_originate {kind; boot_sector})
+    (Sc_rollup_originate {kind; boot_sector; parameters_ty})
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   let op = sign account.sk ctxt to_sign_op in
