@@ -280,15 +280,10 @@ let chain_events cctxt store chain =
 let check_sc_rollup_address_exists sc_rollup_address
     (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
-  let* kind_opt =
+  let* kind =
     RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) sc_rollup_address ()
   in
-  let*! () =
-    match kind_opt with
-    | None ->
-        cctxt#error "%a does not exist" Sc_rollup.Address.pp sc_rollup_address
-    | Some kind -> Event.rollup_exists ~addr:sc_rollup_address ~kind
-  in
+  let*! () = Event.rollup_exists ~addr:sc_rollup_address ~kind in
   return_unit
 
 type info = {origination_level : int32}
