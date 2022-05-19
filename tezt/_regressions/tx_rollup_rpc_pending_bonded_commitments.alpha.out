@@ -1,4 +1,4 @@
-tx_rollup_rpc_commitment.out
+tx_rollup_rpc_pending_bonded_commitments.alpha.out
 
 ./tezos-client --wait none originate tx rollup tx_rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.
@@ -86,26 +86,8 @@ This sequence of operations was run:
       Consumed gas: 3694.292
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitment/0'
-{ "commitment":
-    { "level": 0,
-      "messages":
-        { "count": 1,
-          "root": "[TX_ROLLUP_MESSAGE_RESULT_LIST_HASH]",
-          "last_message_result_hash":
-            "[TX_ROLLUP_MESSAGE_RESULT_HASH]" },
-      "predecessor": null,
-      "inbox_merkle_root":
-        "[TX_ROLLUP_INBOX_HASH]" },
-  "commitment_hash": "[TX_ROLLUP_COMMITMENT_HASH]",
-  "committer": "[PUBLIC_KEY_HASH]", "submitted_at": 5 }
+./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/pending_bonded_commitments/[PUBLIC_KEY_HASH]'
+1
 
-./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/state'
-{ "last_removed_commitment_hashes": null,
-  "finalized_commitments": { "next": 0 },
-  "unfinalized_commitments": { "newest": 0, "oldest": 0 },
-  "uncommitted_inboxes": { "next": 1 },
-  "commitment_newest_hash":
-    "[TX_ROLLUP_COMMITMENT_HASH]",
-  "tezos_head_level": 3, "burn_per_byte": "0", "allocated_storage": "4000",
-  "occupied_storage": "0", "inbox_ema": 0, "commitments_watermark": 0 }
+./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/pending_bonded_commitments/[PUBLIC_KEY_HASH]'
+0

@@ -1,4 +1,4 @@
-tx_rollup_limit_maximum_size_batch.out
+tx_rollup_limit_maximum_size_batch.alpha.out
 
 ./tezos-client --wait none originate tx rollup tx_rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.

@@ -1,4 +1,4 @@
-tx_rollup_client_submit_batch_invalid_rollup_address.out
+tx_rollup_client_submit_batch_invalid_rollup_address.jakarta.out
 
 ./tezos-client --wait none submit tx rollup batch 0x to 'this is an invalid tx rollup address' from '[PUBLIC_KEY_HASH]'
 Error:

@@ -1,4 +1,4 @@
-tx_rollup_rpc_inbox_merkle_tree_path.out
+tx_rollup_rpc_inbox_merkle_tree_path.alpha.out
 
 ./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
