@@ -532,6 +532,9 @@ let on_disconnection w peer_id =
 
 let on_request (type a b) w start_testchain active_chains spawn_child
     (req : (a, b) Request.t) : (a, b) result Lwt.t =
+  let nv = Worker.state w in
+  Prometheus.Counter.inc_one
+    nv.parameters.metrics.worker_counters.worker_request_count ;
   match req with
   | Request.Validated {peer; block} ->
       on_validation_request
@@ -578,6 +581,9 @@ let collect_proto ~metrics (chain_store, block) =
 let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
     unit tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let nv = Worker.state w in
+  Prometheus.Counter.inc_one
+    nv.parameters.metrics.worker_counters.worker_error_count ;
   let request_view = Request.view request in
   match request with
   | Validated _ ->
@@ -608,8 +614,12 @@ let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
   | Notify_branch _ -> ( match errs with _ -> .)
   | Notify_head _ -> ( match errs with _ -> .)
   | Disconnection _ -> ( match errs with _ -> .)
+
 let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
     request_status =
+  let nv = Worker.state w in
+  Prometheus.Counter.inc_one
+    nv.parameters.metrics.worker_counters.worker_completion_count ;
   match req with
   | Request.Validated {block; _} ->
       let fitness = Store.Block.fitness block in
@@ -617,9 +627,8 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
       let level = Store.Block.level block in
       let timestamp = Store.Block.timestamp block in
       let () =
-        let nv = Worker.state w in
-        Shell_metrics.Worker.update
-          nv.parameters.metrics.validation_worker_metrics
+        Shell_metrics.Worker.update_timestamps
+          nv.parameters.metrics.worker_timestamps
           request_status ;
         match update with
         | Event.Ignored_head ->

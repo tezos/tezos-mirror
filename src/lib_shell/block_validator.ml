@@ -332,14 +332,16 @@ let on_preapplication_request w
   | Ok res -> return_ok (Preapplied res)
   | Error errs -> return_ok (Preapplication_error errs)
 
+let metrics = Shell_metrics.Block_validator.init Name.base
+
 let on_request :
     type r request_error.
     t -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
- fun w -> function
+ fun w r ->
+  Prometheus.Counter.inc_one metrics.worker_counters.worker_request_count ;
+  match r with
   | Request.Request_validation r -> on_validation_request w r
   | Request.Request_preapplication r -> on_preapplication_request w r
-
-let metrics = Shell_metrics.Block_validator.init Name.base
 
 type launch_error = |
 
@@ -358,6 +360,7 @@ let on_launch _ _ (limits, start_testchain, db, validation_process) :
 
 let on_error (type a b) (w : t) st (r : (a, b) Request.t) (errs : b) =
   let open Lwt_syntax in
+  Prometheus.Counter.inc_one metrics.worker_counters.worker_error_count ;
   match r with
   | Request_validation v ->
       let view = Request.validation_view v in
@@ -375,6 +378,7 @@ let on_completion :
     t -> (a, b) Request.t -> a -> Worker_types.request_status -> unit Lwt.t =
  fun w request v st ->
   let open Lwt_syntax in
+  Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
   match (request, v) with
   | Request.Request_validation {hash; _}, Already_commited ->
       Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
@@ -385,17 +389,13 @@ let on_completion :
       let* () = Worker.log_event w (Previously_validated hash) in
       Lwt.return_unit
   | Request.Request_validation _, Validated -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validated_blocks_count ;
       match Request.view request with
       | Validation v -> Worker.log_event w (Validation_success (v, st))
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Validation_error errs -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_errors_count ;
       match Request.view request with
       | Validation v ->
@@ -414,9 +414,7 @@ let on_completion :
           Worker.log_event w (Event.Preapplication_failure (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Validation_error_after_precheck errs -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_errors_after_precheck_count ;
       match Request.view request with
       | Validation v ->
@@ -425,9 +423,7 @@ let on_completion :
             (Event.Validation_failure_after_precheck (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Precheck_failed errs -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.precheck_failed_count ;
       match Request.view request with
       | Validation v ->

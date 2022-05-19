@@ -24,13 +24,23 @@
 (*****************************************************************************)
 
 module Worker : sig
-  type t
+  type timestamps
 
-  val update : t -> Worker_types.request_status -> unit
+  type counters = {
+    worker_request_count : Prometheus.Counter.t;
+    worker_completion_count : Prometheus.Counter.t;
+    worker_error_count : Prometheus.Counter.t;
+  }
+
+  val update_timestamps : timestamps -> Worker_types.request_status -> unit
 end
 
 (** Metrics associated to the mempool *)
 module Mempool : sig
+  type t = {worker_counters : Worker.counters}
+
+  val init : string list -> t
+
   val set_applied_collector : (unit -> float) -> unit
 
   val set_prechecked_collector : (unit -> float) -> unit
@@ -64,7 +74,8 @@ module Block_validator : sig
     preapplication_errors_count : Prometheus.Counter.t;
     validation_errors_after_precheck_count : Prometheus.Counter.t;
     precheck_failed_count : Prometheus.Counter.t;
-    validation_worker_metrics : Worker.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
 
   val init : string list -> t
@@ -110,11 +121,12 @@ module Chain_validator : sig
     branch_switch_count : Prometheus.Counter.t;
     head_increment_count : Prometheus.Counter.t;
     head_round : Prometheus.Gauge.t;
-    validation_worker_metrics : Worker.t;
     head_cycle : Prometheus.Gauge.t;
     consumed_gas : Prometheus.Gauge.t;
     is_bootstrapped : Prometheus.Gauge.t;
     sync_status : Prometheus.Gauge.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
 
   val update_bootstrapped : metrics:t -> bool -> unit

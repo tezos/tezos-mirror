@@ -181,6 +181,8 @@ type ('protocol_data, 'a) types_state_shell = {
   worker : Tools.worker_tools;
 }
 
+let metrics = Shell_metrics.Mempool.init Name.base
+
 (** The concrete production instance of {!block_tools} *)
 let block_tools : Store.Block.t Classification.block_tools =
   {
@@ -1418,6 +1420,7 @@ module Make
         (r, request_error) result Lwt.t =
      fun w request ->
       let open Lwt_result_syntax in
+      Prometheus.Counter.inc_one metrics.worker_counters.worker_request_count ;
       let pv = Worker.state w in
       let post_processing :
           (r, request_error) result Lwt.t -> (r, request_error) result Lwt.t =
@@ -1621,6 +1624,7 @@ module Make
 
     let on_error (type a b) _w st (request : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =
+      Prometheus.Counter.inc_one metrics.worker_counters.worker_error_count ;
       let open Lwt_result_syntax in
       match request with
       | Request.(Inject _) as r ->
@@ -1640,6 +1644,7 @@ module Make
           Lwt.return_error errs
 
     let on_completion _w r _ st =
+      Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
       match Request.view r with
       | Request.View (Flush _) | View (Inject _) | View (Ban _) ->
           Event.(emit request_completed_notice) (Request.view r, st)
