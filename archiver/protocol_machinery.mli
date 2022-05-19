@@ -30,9 +30,8 @@ module type PROTOCOL_SERVICES = sig
 
   val wrap_full : Tezos_client_base.Client_context.full -> wrap_full
 
-  type endorsing_rights
-
-  val endorsing_rights : wrap_full -> Int32.t -> endorsing_rights tzresult Lwt.t
+  val endorsing_rights :
+    wrap_full -> Int32.t -> Consensus_ops.rights tzresult Lwt.t
 
   (* [couple_ops_to_rights ops rights] returns [(participating,
      missing)], where [participating] is a list associating delegates
@@ -43,7 +42,7 @@ module type PROTOCOL_SERVICES = sig
      list for [participating]. *)
   val couple_ops_to_rights :
     (int * 'a) list ->
-    endorsing_rights ->
+    Consensus_ops.rights ->
     (Signature.public_key_hash * 'a) list * Signature.public_key_hash list
 
   type block_id
@@ -73,8 +72,26 @@ module type PROTOCOL_SERVICES = sig
     wrap_full -> Block_hash.t -> Consensus_ops.block_info tzresult Lwt.t
 end
 
-module type S = sig
-  val register_commands : unit -> unit
+module type MAIN_LOOPS = sig
+  val protocol_hash : Protocol_hash.t
+
+  val blocks_loop : Tezos_client_base.Client_context.full -> unit Lwt.t
+
+  val endorsements_loop : Tezos_client_base.Client_context.full -> unit Lwt.t
 end
 
-module Make (Protocol_services : PROTOCOL_SERVICES) : S
+module type JSON_COMMANDS = sig
+  val register_json_commands : unit -> unit
+end
+
+module type DB_COMMANDS = sig
+  val register_db_commands : unit -> unit
+end
+
+module Make_main_loops
+    (Protocol_services : PROTOCOL_SERVICES)
+    (Archiver : Archiver.S) : MAIN_LOOPS
+
+module Make_json_commands (Loop : MAIN_LOOPS) : JSON_COMMANDS
+
+module Make_db_commands (Loop : MAIN_LOOPS) : DB_COMMANDS

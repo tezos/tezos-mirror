@@ -37,14 +37,24 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let wrap_full cctxt =
     new Tezos_client_010_PtGRANAD.Protocol_client_context.wrap_full cctxt
 
-  type endorsing_right = Protocol.Delegate_services.Endorsing_rights.t
-
-  type endorsing_rights = endorsing_right list
-
   let endorsing_rights cctxt block =
-    Protocol.Delegate_services.Endorsing_rights.get
-      cctxt
-      (cctxt#chain, `Level block)
+    let* rights =
+      Protocol.Delegate_services.Endorsing_rights.get
+        cctxt
+        (cctxt#chain, `Level block)
+    in
+    return
+    @@ List.map
+         (fun Protocol.Delegate_services.Endorsing_rights.
+                {level; delegate; slots; _} ->
+           Consensus_ops.
+             {
+               level = Protocol.Alpha_context.Raw_level.to_int32 level;
+               address = delegate;
+               first_slot = Stdlib.List.hd (List.sort compare slots);
+               power = List.length slots;
+             })
+         rights
 
   type block_id = Block_hash.t
 
@@ -56,26 +66,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         (fun (acc, rights) (slot, ops) ->
           match
             List.partition
-              (fun right ->
-                List.mem
-                  ~equal:Int.equal
-                  slot
-                  right.Protocol.Delegate_services.Endorsing_rights.slots)
+              (fun right -> Int.equal slot right.Consensus_ops.first_slot)
               rights
           with
           | (([] | _ :: _ :: _), _) -> assert false
           | ([right], rights') ->
-              ( (right.Protocol.Delegate_services.Endorsing_rights.delegate, ops)
-                :: acc,
-                rights' ))
+              ((right.Consensus_ops.address, ops) :: acc, rights'))
         ([], rights)
         ops
     in
-    ( items,
-      List.map
-        (fun right ->
-          right.Protocol.Delegate_services.Endorsing_rights.delegate)
-        missing )
+    (items, List.map (fun right -> right.Consensus_ops.address) missing)
 
   let extract_endorsement
       (operation_content : Protocol.Alpha_context.packed_operation) =
@@ -188,4 +188,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         }
 end
 
-include Protocol_machinery.Make (Services)
+module Json_loops =
+  Protocol_machinery.Make_main_loops (Services) (Json_archiver)
+module Db_loops = Protocol_machinery.Make_main_loops (Services) (Db_archiver)
+include Protocol_machinery.Make_json_commands (Json_loops)
+include Protocol_machinery.Make_db_commands (Db_loops)

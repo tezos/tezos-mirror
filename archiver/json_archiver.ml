@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,7 +22,10 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Lwt_result_syntax
+
+class type t = Tezos_client_base.Client_context.full
 
 let levels_per_folder = 4096l
 
@@ -569,3 +572,6 @@ let add_block ~level block_hash ~round timestamp reception_time baker block_info
             reception_time,
             baker,
             block_info )))
+
+(* only used by the db archiver *)
+let add_rights _rights _aliases = ()

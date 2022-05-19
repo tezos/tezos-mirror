@@ -38,28 +38,39 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let wrap_full cctxt =
     new Tezos_client_012_Psithaca.Protocol_client_context.wrap_full cctxt
 
-  type endorsing_rights = Plugin.RPC.Endorsing_rights.delegate_rights list
-
-  let endorsing_rights cctxt level =
-    let* answers =
-      Plugin.RPC.Endorsing_rights.get cctxt (cctxt#chain, `Level level)
-    in
-    match answers with
-    | answer :: _ -> return answer.Plugin.RPC.Endorsing_rights.delegates_rights
-    | [] -> return_nil
-
-  type block_id = Protocol.Block_payload_hash.t
-
-  module BlockIdMap = Map.Make (Protocol.Block_payload_hash)
-
   let slot_to_int x =
     (* YES this is Fun.x ! *)
     Data_encoding.Binary.of_bytes_exn
       Data_encoding.uint16
       (Data_encoding.Binary.to_bytes_exn Protocol.Alpha_context.Slot.encoding x)
 
-  let same_slot slot right =
-    Int.equal slot (slot_to_int right.Plugin.RPC.Endorsing_rights.first_slot)
+  let endorsing_rights cctxt level =
+    let* answers =
+      Plugin.RPC.Endorsing_rights.get cctxt (cctxt#chain, `Level level)
+    in
+    match answers with
+    | answer :: _ ->
+        return
+          (List.map
+             (fun Plugin.RPC.Endorsing_rights.
+                    {delegate; first_slot; endorsing_power} ->
+               Consensus_ops.
+                 {
+                   level =
+                     Protocol.Alpha_context.Raw_level.to_int32
+                       answer.Plugin.RPC.Endorsing_rights.level;
+                   address = delegate;
+                   first_slot = slot_to_int first_slot;
+                   power = endorsing_power;
+                 })
+             answer.Plugin.RPC.Endorsing_rights.delegates_rights)
+    | [] -> return_nil
+
+  type block_id = Protocol.Block_payload_hash.t
+
+  module BlockIdMap = Map.Make (Protocol.Block_payload_hash)
+
+  let same_slot slot right = Int.equal slot right.Consensus_ops.first_slot
 
   (* NB: A delegate is in [missing] if we have seen neither
      endorsements from him, nor preendorsements. It might be
@@ -73,13 +84,11 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           with
           | (([] | _ :: _ :: _), _) -> assert false
           | ([right], rights') ->
-              ((right.Plugin.RPC.Endorsing_rights.delegate, ops) :: acc, rights'))
+              ((right.Consensus_ops.address, ops) :: acc, rights'))
         ([], rights)
         ops
     in
-    ( items,
-      List.map (fun right -> right.Plugin.RPC.Endorsing_rights.delegate) missing
-    )
+    (items, List.map (fun right -> right.Consensus_ops.address) missing)
 
   let extract_endorsement
       (operation_content : Protocol.Alpha_context.packed_operation) =
@@ -230,4 +239,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         }
 end
 
-include Protocol_machinery.Make (Services)
+module Json_loops =
+  Protocol_machinery.Make_main_loops (Services) (Json_archiver)
+module Db_loops = Protocol_machinery.Make_main_loops (Services) (Db_archiver)
+include Protocol_machinery.Make_json_commands (Json_loops)
+include Protocol_machinery.Make_db_commands (Db_loops)

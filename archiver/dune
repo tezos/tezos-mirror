@@ -2,6 +2,7 @@
  (name teztale_archiver)
  (public_name teztale.archiver)
  (libraries
+  sqlite3
   tezos-client-base-unix
   teztale.lib
   (select
@@ -20,6 +21,7 @@
    PtJakart_machine.ml
    from
    (tezos-client-013-PtJakart -> PtJakart_machine.real.ml)))
+ (modules_without_implementation archiver)
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
     Tezos_shell_services -open Tezos_client_base_unix -open

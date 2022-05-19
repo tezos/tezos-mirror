@@ -23,6 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Protocol_machinery.JSON_COMMANDS
-
-include Protocol_machinery.DB_COMMANDS
+include Archiver.S with type t = Sqlite3.db

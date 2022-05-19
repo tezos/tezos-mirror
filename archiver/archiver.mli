@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Protocol_machinery.JSON_COMMANDS
+module type S = sig
+  type t
 
-include Protocol_machinery.DB_COMMANDS
+  val launch : t -> string -> unit Lwt.t
+
+  val stop : unit -> unit
+
+  (* [add_received ?unaccurate level ops] adds information about the list of
+     received consensus operations [ops], all at level [level]. [unaccurate] is
+     true iff the [level] is the same as the current head's level. [ops] is an
+     association list of tuples [(delegate, ops)], where [ops] is a list of
+     operations all produced by [delegate]. *)
+  val add_received :
+    ?unaccurate:bool -> Int32.t -> Consensus_ops.delegate_ops -> unit
+
+  (* [add_block level hash round ts reception_time baker pkhs] adds
+     information about a newly received block: its level, hash, round,
+     its timestamp, its reception time, its baker, and its endorsers
+     (the ones whose endorsements are actually included). *)
+  val add_block :
+    level:Int32.t ->
+    Block_hash.t ->
+    round:Int32.t ->
+    Time.Protocol.t ->
+    Time.System.t ->
+    Signature.Public_key_hash.t ->
+    Consensus_ops.block_info ->
+    unit
+
+  val add_rights : Consensus_ops.rights -> Wallet.t -> unit
+end

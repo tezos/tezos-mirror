@@ -32,13 +32,12 @@ module type PROTOCOL_SERVICES = sig
 
   val wrap_full : Tezos_client_base.Client_context.full -> wrap_full
 
-  type endorsing_rights
-
-  val endorsing_rights : wrap_full -> Int32.t -> endorsing_rights tzresult Lwt.t
+  val endorsing_rights :
+    wrap_full -> Int32.t -> Consensus_ops.rights tzresult Lwt.t
 
   val couple_ops_to_rights :
     (int * 'a) list ->
-    endorsing_rights ->
+    Consensus_ops.rights ->
     (Signature.public_key_hash * 'a) list * Signature.public_key_hash list
 
   type block_id
@@ -68,11 +67,17 @@ module type PROTOCOL_SERVICES = sig
     wrap_full -> Block_hash.t -> Consensus_ops.block_info tzresult Lwt.t
 end
 
-module type S = sig
-  val register_commands : unit -> unit
+module type MAIN_LOOPS = sig
+  val protocol_hash : Protocol_hash.t
+
+  val blocks_loop : Tezos_client_base.Client_context.full -> unit Lwt.t
+
+  val endorsements_loop : Tezos_client_base.Client_context.full -> unit Lwt.t
 end
 
-module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
+module Make_main_loops
+    (Protocol_services : PROTOCOL_SERVICES)
+    (Archiver : Archiver.S) : MAIN_LOOPS = struct
   let print_failures f =
     let*! o = f in
     match o with
@@ -81,8 +86,24 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
         let () = Error_monad.pp_print_trace Format.err_formatter e in
         Lwt.return_unit
 
+  let aliases cctxt =
+    let*! aliases_opt = Wallet.of_context cctxt in
+    match aliases_opt with
+    | Ok aliases -> return aliases
+    | Error err ->
+        let () = Error_monad.pp_print_trace Format.err_formatter err in
+        return Wallet.empty
+
   let dump_my_current_endorsements cctxt ~full level ops =
-    let* rights = Protocol_services.endorsing_rights cctxt level in
+    let cctxt' = Protocol_services.wrap_full cctxt in
+    let* rights = Protocol_services.endorsing_rights cctxt' level in
+    let* aliases = aliases cctxt in
+    Archiver.add_rights rights aliases ;
+    (* We could slightly optimize the db-archiver by not coupling ops
+       to rights. In this case we'd need two versions of
+       [Archiver.add_received] (one for the json-archiver, and one for
+       the db-archiver); and we'd need to change the query used by the
+       db-archiver. *)
     let (items, missing) = Protocol_services.couple_ops_to_rights ops rights in
     let endorsements =
       if full then
@@ -90,7 +111,7 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
       else items
     in
     let unaccurate = if full then Some false else None in
-    let () = Json_archiver.add_received ?unaccurate level endorsements in
+    let () = Archiver.add_received ?unaccurate level endorsements in
     return_unit
 
   let rec pack_by_slot i e = function
@@ -99,34 +120,20 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
     | [] -> [(i, [e])]
 
   let endorsements_recorder cctxt current_level =
+    let cctxt' = Protocol_services.wrap_full cctxt in
     let* (op_stream, _stopper) =
-      Protocol_services.consensus_operation_stream cctxt
+      Protocol_services.consensus_operation_stream cctxt'
     in
     let*! out =
       Lwt_stream.fold
         (fun ((hash, ((block, level, kind, round), slot)), errors) acc ->
           let reception_time = Time.System.now () in
+          let op = Consensus_ops.{hash; kind; round; errors; reception_time} in
           Protocol_services.BlockIdMap.update
             block
             (function
-              | Some (_, l) ->
-                  Some
-                    ( level,
-                      pack_by_slot
-                        slot
-                        Consensus_ops.
-                          {hash; kind; round; errors; reception_time}
-                        l )
-              | None ->
-                  Some
-                    ( level,
-                      [
-                        ( slot,
-                          [
-                            Consensus_ops.
-                              {hash; kind; round; errors; reception_time};
-                          ] );
-                      ] ))
+              | Some (_, l) -> Some (level, pack_by_slot slot op l)
+              | None -> Some (level, [(slot, [op])]))
             acc)
         op_stream
         Protocol_services.BlockIdMap.empty
@@ -175,9 +182,9 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
                         let timestamp =
                           header.Block_header.shell.Block_header.timestamp
                         in
-                        Json_archiver.add_block
-                          ~level:block_level
+                        Archiver.add_block
                           hash
+                          ~level:block_level
                           ~round:(Int32.of_int round)
                           timestamp
                           reception_time
@@ -193,25 +200,37 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
         let () = Error_monad.pp_print_trace Format.err_formatter e in
         Lwt.return_unit
     | Ok (head_stream, _stopper) ->
-        let cctxt = Protocol_services.wrap_full cctxt in
         Lwt_stream.iter_s
           (fun (_hash, header) ->
             let block_level = header.Block_header.shell.Block_header.level in
             print_failures (endorsements_recorder cctxt block_level))
           head_stream
 
+  let protocol_hash = Protocol_services.hash
+end
+
+module type JSON_COMMANDS = sig
+  val register_json_commands : unit -> unit
+end
+
+module type DB_COMMANDS = sig
+  val register_db_commands : unit -> unit
+end
+
+let group = {Clic.name = "teztale"; Clic.title = "A delegate operation monitor"}
+
+module Make_json_commands (Loops : MAIN_LOOPS) : JSON_COMMANDS = struct
   let main cctxt prefix =
     let dumper = Json_archiver.launch cctxt prefix in
     let main =
-      let*! () = Lwt.Infix.(blocks_loop cctxt <&> endorsements_loop cctxt) in
+      let*! () =
+        Lwt.Infix.(Loops.blocks_loop cctxt <&> Loops.endorsements_loop cctxt)
+      in
       let () = Json_archiver.stop () in
       Lwt.return_unit
     in
     let*! out = Lwt.join [dumper; main] in
     return out
-
-  let group =
-    {Clic.name = "teztale"; Clic.title = "A delegate operation monitor"}
 
   let directory_parameter =
     Clic.parameter (fun _ p ->
@@ -219,21 +238,79 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
           failwith "Directory doesn't exist: '%s'" p
         else return p)
 
-  let register_commands () =
-    Tezos_client_commands.Client_commands.register
-      Protocol_services.hash
-      (fun _ ->
+  let register_json_commands () =
+    Tezos_client_commands.Client_commands.register Loops.protocol_hash (fun _ ->
         [
           Clic.command
             ~group
-            ~desc:"Go"
+            ~desc:"run the json archiver"
             Clic.no_options
-            (Clic.prefixes ["run"; "in"]
+            (Clic.prefixes ["run"; "json-archiver"; "in"]
             @@ Clic.param
                  ~name:"archive_path"
                  ~desc:"folder in which to dump files"
                  directory_parameter
             @@ Clic.stop)
             (fun () prefix cctxt -> main cctxt prefix);
+        ])
+end
+
+module Make_db_commands (Loops : MAIN_LOOPS) : DB_COMMANDS = struct
+  let main cctxt prefix source =
+    let db = Sqlite3.db_open prefix in
+    let () = Db.set_pragma_use_foreign_keys db in
+    let dumper = Db_archiver.launch db source in
+    let main =
+      let*! () =
+        Lwt.Infix.(Loops.blocks_loop cctxt <&> Loops.endorsements_loop cctxt)
+      in
+      let () = Db_archiver.stop () in
+      Lwt.return_unit
+    in
+    let*! out = Lwt.join [dumper; main] in
+    return out
+
+  let new_file_parameter =
+    Clic.parameter (fun _ p ->
+        if Sys.file_exists p then failwith "File already exist: '%s'" p
+        else return p)
+
+  let path_parameter =
+    Clic.parameter (fun _ p ->
+        if not (Sys.file_exists p) then failwith "File does not exist: '%s'" p
+        else return p)
+
+  let register_db_commands () =
+    Tezos_client_commands.Client_commands.register Loops.protocol_hash (fun _ ->
+        [
+          Clic.command
+            ~group
+            ~desc:"create empty Sqlite3 database"
+            Clic.no_options
+            (Clic.prefixes ["create"; "database"; "in"]
+            @@ Clic.param
+                 ~name:"db_path"
+                 ~desc:"path to file in which to store the Sqlite3 database"
+                 new_file_parameter
+            @@ Clic.stop)
+            (fun () path _cctxt ->
+              Db.create_db path ;
+              return_unit);
+          Clic.command
+            ~group
+            ~desc:"run the db archiver"
+            Clic.no_options
+            (Clic.prefixes ["run"; "db-archiver"; "on"]
+            @@ Clic.param
+                 ~name:"db_path"
+                 ~desc:"path to Sqlite3 database file where to store the data"
+                 path_parameter
+            @@ Clic.prefix "for"
+            @@ Clic.param
+                 ~name:"source"
+                 ~desc:"name of the data source (i.e. of the node)"
+                 (Clic.parameter (fun _ p -> return p))
+            @@ Clic.stop)
+            (fun () prefix source cctxt -> main cctxt prefix source);
         ])
 end
