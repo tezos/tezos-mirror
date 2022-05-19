@@ -291,13 +291,33 @@ let do_runlike_command node arguments =
 let run node =
   do_runlike_command
     node
-    [
-      "--base-dir";
-      Client.base_dir node.persistent_state.client;
-      "run";
-      "--data-dir";
-      node.persistent_state.data_dir;
-    ]
+    (([
+        "--base-dir";
+        Client.base_dir node.persistent_state.client;
+        "run";
+        string_of_mode node.persistent_state.mode;
+        "for";
+        node.persistent_state.rollup_id;
+        "--data-dir";
+        data_dir node;
+        "--rpc-addr";
+        rpc_addr node;
+      ]
+     @ if node.persistent_state.allow_deposit then ["--allow-deposit"] else [])
+    |> add_option "--origination-level"
+       @@ Option.map string_of_int node.persistent_state.origination_level
+    |> add_option "--operator" @@ operator node
+    |> add_option "--batch-signer" node.persistent_state.batch_signer
+    |> add_option
+         "--finalize-commitment-signer"
+         node.persistent_state.finalize_commitment_signer
+    |> add_option
+         "--remove-commitment-signer"
+         node.persistent_state.remove_commitment_signer
+    |> add_option
+         "--dispatch-withdrawals-signer"
+         node.persistent_state.dispatch_withdrawals_signer
+    |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
 
 let change_signers ?operator ?batch_signer ?finalize_commitment_signer
     ?remove_commitment_signer ?dispatch_withdrawals_signer ?rejection_signer
