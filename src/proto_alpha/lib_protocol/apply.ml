@@ -2088,6 +2088,44 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   let consumed_gas = Gas.consumed ~since:ctxt_before ~until:ctxt in
   (ctxt, {balance_updates; consumed_gas})
 
+let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
+  match trr with
+  | Transaction_to_contract_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      (if payload.allocated_destination_contract then
+       Fees.burn_origination_fees ctxt ~storage_limit ~payer
+      else return (ctxt, storage_limit, []))
+      >>=? fun (ctxt, storage_limit, origination_bus) ->
+      let balance_updates =
+        storage_bus @ payload.balance_updates @ origination_bus
+      in
+      return
+        ( ctxt,
+          storage_limit,
+          Transaction_to_contract_result
+            {
+              storage = payload.storage;
+              lazy_storage_diff = payload.lazy_storage_diff;
+              balance_updates;
+              originated_contracts = payload.originated_contracts;
+              consumed_gas = payload.consumed_gas;
+              storage_size = payload.storage_size;
+              paid_storage_size_diff = payload.paid_storage_size_diff;
+              allocated_destination_contract =
+                payload.allocated_destination_contract;
+            } )
+  | Transaction_to_tx_rollup_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Transaction_to_tx_rollup_result {payload with balance_updates} )
+
 (** [burn_storage_fees ctxt smopr storage_limit payer] burns the storage fees
     associated to an operation result [smopr].
     Returns an updated context, an updated storage limit with the space consumed
@@ -2103,43 +2141,14 @@ let burn_storage_fees :
  fun ctxt smopr ~storage_limit ~payer ->
   let payer = `Contract (Contract.Implicit payer) in
   match smopr with
-  | Transaction_result (Transaction_to_contract_result payload) ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      (if payload.allocated_destination_contract then
-       Fees.burn_origination_fees ctxt ~storage_limit ~payer
-      else return (ctxt, storage_limit, []))
-      >>=? fun (ctxt, storage_limit, origination_bus) ->
-      let balance_updates =
-        storage_bus @ payload.balance_updates @ origination_bus
-      in
-      return
-        ( ctxt,
-          storage_limit,
-          Transaction_result
-            (Transaction_to_contract_result
-               {
-                 storage = payload.storage;
-                 lazy_storage_diff = payload.lazy_storage_diff;
-                 balance_updates;
-                 originated_contracts = payload.originated_contracts;
-                 consumed_gas = payload.consumed_gas;
-                 storage_size = payload.storage_size;
-                 paid_storage_size_diff = payload.paid_storage_size_diff;
-                 allocated_destination_contract =
-                   payload.allocated_destination_contract;
-               }) )
-  | Transaction_result (Transaction_to_tx_rollup_result payload) ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Transaction_result
-            (Transaction_to_tx_rollup_result {payload with balance_updates}) )
+  | Transaction_result transaction_result ->
+      burn_transaction_storage_fees
+        ctxt
+        transaction_result
+        ~storage_limit
+        ~payer
+      >|=? fun (ctxt, storage_limit, transaction_result) ->
+      (ctxt, storage_limit, Transaction_result transaction_result)
   | Origination_result payload ->
       let consumed = payload.paid_storage_size_diff in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
