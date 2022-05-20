@@ -1629,9 +1629,14 @@ module Contract : sig
 
   val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
 
+  (** See {Contract_storage.get_balance}. *)
   val get_balance : context -> t -> Tez.t tzresult Lwt.t
 
   val get_balance_carbonated : context -> t -> (context * Tez.t) tzresult Lwt.t
+
+  (** See {Contract_storage.check_allocated_and_get_balance}. *)
+  val check_allocated_and_get_balance :
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val fresh_contract_from_current_nonce :
     context -> (context * Contract_hash.t) tzresult

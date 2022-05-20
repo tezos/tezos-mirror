@@ -87,6 +87,17 @@ val get_balance_carbonated :
   Contract_repr.t ->
   (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
+(** Return the balance of spendable tez owned by the Implicit contract
+    of the given [public_key_hash].
+
+    @return [Error Empty_implicit_contract] if the contract is not
+    allocated in {!Storage.Contract.Spendable_balance}.
+
+    This function is a fusion of {!must_be_allocated} and
+    {!get_balance} for Implicit contracts exclusively. *)
+val check_allocated_and_get_balance :
+  Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+
 val get_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
 

@@ -542,6 +542,15 @@ let get_balance_carbonated c contract =
   >>?= fun c ->
   get_balance c contract >>=? fun balance -> return (c, balance)
 
+let check_allocated_and_get_balance c pkh =
+  let open Lwt_result_syntax in
+  let* balance_opt =
+    Storage.Contract.Spendable_balance.find c (Contract_repr.Implicit pkh)
+  in
+  match balance_opt with
+  | None -> Error_monad.fail (Empty_implicit_contract pkh)
+  | Some balance -> return balance
+
 let update_script_storage c contract storage lazy_storage_diff =
   let storage = Script_repr.lazy_expr storage in
   update_script_lazy_storage c lazy_storage_diff
