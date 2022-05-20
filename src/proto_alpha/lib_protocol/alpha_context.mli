@@ -2612,6 +2612,7 @@ module Sc_rollup : sig
     type t = {
       turn : player;
       inbox_snapshot : Inbox.t;
+      level : Raw_level.t;
       dissection : (State_hash.t option * Tick.t) list;
     }
 

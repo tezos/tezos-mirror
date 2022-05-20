@@ -182,6 +182,11 @@ type player = Alice | Bob
       otherwise they would have a 'moving target' because the actual
       inbox may be updated continuously.
 
+    - [level], the inbox level of the commitment the game is refuting.
+      This is only used when checking [Blocked_step] proofs---the proof
+      will show that the next message available in [inbox_snapshot] is
+      at [level], so shouldn't be included in this commitment.
+
     - [dissection], a list of states with tick counts. The current
       player will specify, in the next move, a tick count that
       indicates the last of these states that she agrees with.
@@ -195,6 +200,7 @@ type player = Alice | Bob
 type t = {
   turn : player;
   inbox_snapshot : Sc_rollup_inbox_repr.t;
+  level : Raw_level_repr.t;
   dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
 }
 
