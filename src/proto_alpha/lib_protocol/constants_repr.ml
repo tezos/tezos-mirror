@@ -219,6 +219,11 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The smart contract rollup max available messages must be strictly \
         greater than 0.")
+  >>? fun () ->
+  error_unless
+    Tez_repr.(constants.sc_rollup.stake_amount >= zero)
+    (Invalid_protocol_constants
+       "The smart contract rollup max stake amount must be non-negative.")
   >>? fun () -> Result.return_unit
 
 module Generated = struct
