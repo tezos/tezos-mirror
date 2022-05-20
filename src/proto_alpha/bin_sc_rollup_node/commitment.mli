@@ -44,17 +44,20 @@ open Protocol.Alpha_context
 module type Mutable_level_store =
   Store.Mutable_value with type value = Raw_level.t
 
-(** [last_commitment (module Last_level_module: Mutable_level_store) store]
-      returns the last commitment stored according to the value of
-      level indicated by [module Last_level_module]. If no commitment has been 
-      stored for the level indicated by [module Last_level_module], then None 
-      is returned. Two possible implementations for [module Last_level_module] 
-      are [Store.Last_published_commitment_level] and 
+(** [last_commitment_with_hash (module Last_level_module: Mutable_level_store) store]
+      returns the last commitment and relative hash
+      stored according to the value of level indicated by 
+      [module Last_level_module]. If no commitment has been stored for the
+      level indicated by [module Last_level_module], then None is returned.
+      Two possible implementations for [module Last_level_module] are
+      [Store.Last_published_commitment_level] and
       [Store.Last_stored_commitment_level].
   *)
 
-val last_commitment :
-  (module Mutable_level_store) -> Store.t -> Sc_rollup.Commitment.t option Lwt.t
+val last_commitment_with_hash :
+  (module Mutable_level_store) ->
+  Store.t ->
+  (Sc_rollup.Commitment.t * Sc_rollup.Commitment_hash.t) option Lwt.t
 
 module type S = sig
   module PVM : Pvm.S
@@ -94,6 +97,18 @@ module type S = sig
     }
   *)
   val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
+
+  (** [cement_commitment_if_possible node_ctxt store head] checks whether the
+      next commitment to be cemented (i.e. whose inbox level is
+      [sc_rollup_commitment_frequency] levels after
+      [Store.Last_cemented_commitment_level store]) can be cemented. In
+      particular, the request to cement the commitment happens only if the
+      commitment is stored in [Store.Commitments store], and if
+      [sc_rollup_challenge_period] levels have passed since when the the
+      commitment was originally published.
+  *)
+  val cement_commitment_if_possible :
+    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
 
   (** [start ()] only emits the event that the commitment manager
       for the rollup node has started. *)

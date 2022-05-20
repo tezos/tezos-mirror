@@ -297,9 +297,13 @@ module Commitments = Make_append_only_map (struct
 
   let string_of_key l = Int32.to_string @@ Raw_level.to_int32 l
 
-  type value = Sc_rollup.Commitment.t
+  type value = Sc_rollup.Commitment.t * Sc_rollup.Commitment_hash.t
 
-  let value_encoding = Sc_rollup.Commitment.encoding
+  let value_encoding =
+    Data_encoding.(
+      obj2
+        (req "commitment" Sc_rollup.Commitment.encoding)
+        (req "hash" Sc_rollup.Commitment_hash.encoding))
 end)
 
 module Last_stored_commitment_level = Make_mutable_value (struct
@@ -332,4 +336,18 @@ module Last_cemented_commitment_hash = Make_mutable_value (struct
   type value = Sc_rollup.Commitment_hash.t
 
   let value_encoding = Sc_rollup.Commitment_hash.encoding
+end)
+
+module Commitments_published_at_level = Make_append_only_map (struct
+  let path = ["commitments"; "published_at_level"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Sc_rollup.Commitment_hash.t
+
+  let string_of_key = Sc_rollup.Commitment_hash.to_b58check
+
+  type value = Raw_level.t
+
+  let value_encoding = Raw_level.encoding
 end)

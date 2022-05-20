@@ -164,12 +164,14 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.last_stored_commitment ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let*! commitment =
-          Commitment.last_commitment
+        let*! commitment_with_hash =
+          Commitment.last_commitment_with_hash
             (module Store.Last_stored_commitment_level)
             store
         in
-        return @@ Option.map commitment_with_hash commitment)
+        return
+          (commitment_with_hash
+          |> Option.map (fun (commitment, hash) -> (commitment, hash, None))))
 
   let register_last_published_commitment store dir =
     RPC_directory.register0
@@ -177,12 +179,21 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.last_published_commitment ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let*! commitment =
-          Commitment.last_commitment
-            (module Store.Last_published_commitment_level)
-            store
+        let*! result =
+          let open Lwt_option_syntax in
+          let* commitment, hash =
+            Commitment.last_commitment_with_hash
+              (module Store.Last_published_commitment_level)
+              store
+          in
+          (* If the commitment has been published then the corresponding
+             level in Store.Commitments.published_at_level is available. *)
+          let*! published_at_level =
+            Store.Commitments_published_at_level.get store hash
+          in
+          return (commitment, hash, Some published_at_level)
         in
-        return @@ Option.map commitment_with_hash commitment)
+        return result)
 
   let register_current_status store dir =
     RPC_directory.register0
