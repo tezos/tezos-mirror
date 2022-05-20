@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard
-   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
+   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
    -warn-error +a
    -nostdlib
    -nopervasives
@@ -123,7 +123,7 @@
   tezos-protocol-environment.sigs
   tezos-protocol-009-PsFLoren.raw)
  (flags
-  (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
+  (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
    -warn-error -A
    -nopervasives))
  (modules Protocol))
@@ -324,7 +324,7 @@
   tezos-protocol-environment.sigs
   tezos-protocol-009-PsFLoren.raw)
  (flags
-  (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
+  (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
    -warn-error -A
    -nopervasives))
  (modules Functor))
@@ -429,7 +429,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard
-   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
+   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
    -warn-error +a))
  (modules Registerer))
 
