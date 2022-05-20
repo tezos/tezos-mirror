@@ -56,15 +56,15 @@ This sequence of operations was run:
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 3
-         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
          nb_available_messages = 1
          nb_messages_in_commitment_period = 1
          starting_level_of_current_commitment_period = 2
          message_counter = 1
          old_levels_messages = 
-       content = CoUkdBQ53N7FWav8LuTvrcp3jyoxnpqk3xnEo3gSCgNwia4fq44j
+       content = [SC_ROLLUP_COMMITMENT_HASH]
        index = 1
-       back_pointers = CoVawGHT9AxoKnd7hDBCii5PEcM2U3WbtL4L5HGD6PC9BWcLnzqD
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
     
     
 
@@ -95,16 +95,16 @@ This sequence of operations was run:
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 4
-         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
          nb_available_messages = 2
          nb_messages_in_commitment_period = 2
          starting_level_of_current_commitment_period = 2
          message_counter = 1
          old_levels_messages = 
-       content = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
+       content = [SC_ROLLUP_COMMITMENT_HASH]
        index = 2
-       back_pointers = CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
-      CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
     
     
 
@@ -135,16 +135,16 @@ This sequence of operations was run:
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 4
-         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
          nb_available_messages = 2
          nb_messages_in_commitment_period = 2
          starting_level_of_current_commitment_period = 2
          message_counter = 1
          old_levels_messages = 
-       content = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
+       content = [SC_ROLLUP_COMMITMENT_HASH]
        index = 2
-       back_pointers = CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
-      CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
     
     
 
@@ -175,16 +175,16 @@ This sequence of operations was run:
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 5
-         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
          nb_available_messages = 3
          nb_messages_in_commitment_period = 3
          starting_level_of_current_commitment_period = 2
          message_counter = 1
          old_levels_messages = 
-       content = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
+       content = [SC_ROLLUP_COMMITMENT_HASH]
        index = 3
-       back_pointers = CoUybFZtfeEftCQTTS5AM8bvPtyikzL1HUdACbgxd9BrKNJboubL
-      CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
     
     
 
