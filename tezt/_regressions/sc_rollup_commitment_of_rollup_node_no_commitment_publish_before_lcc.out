@@ -34,22 +34,23 @@ This sequence of operations was run:
 2
 
 ./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
-{ "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "commitment":
+{ "commitment":
     { "compressed_state":
         "[SC_ROLLUP_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_messages": 0, "number_of_ticks": 0 } }
+      "number_of_messages": 0, "number_of_ticks": 0 },
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
-{ "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "commitment":
+{ "commitment":
     { "compressed_state":
         "[SC_ROLLUP_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_messages": 0, "number_of_ticks": 0 } }
+      "number_of_messages": 0, "number_of_ticks": 0 },
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
+  "published_at_level": 35 }
 
 ./tezos-client --wait none cement commitment '[SC_ROLLUP_COMMITMENT_HASH]' from bootstrap1 for sc rollup '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -80,19 +81,20 @@ This sequence of operations was run:
 null
 
 ./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
-{ "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "commitment":
+{ "commitment":
     { "compressed_state":
         "[SC_ROLLUP_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_messages": 0, "number_of_ticks": 0 } }
+      "number_of_messages": 0, "number_of_ticks": 0 },
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
-{ "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "commitment":
+{ "commitment":
     { "compressed_state":
         "[SC_ROLLUP_STATE_HASH]",
       "inbox_level": 62,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_messages": 0, "number_of_ticks": 0 } }
+      "number_of_messages": 0, "number_of_ticks": 0 },
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
+  "published_at_level": 65 }

@@ -58,12 +58,17 @@ let commitment_from_json json =
         number_of_ticks;
       }
 
-let commitment_with_hash_from_json json =
-  let hash, commitment_json =
-    (JSON.get "hash" json, JSON.get "commitment" json)
+let commitment_with_hash_and_level_from_json json =
+  let hash, commitment_json, published_at_level =
+    ( JSON.get "hash" json,
+      JSON.get "commitment" json,
+      JSON.get "published_at_level" json )
   in
   Option.map
-    (fun commitment -> (JSON.as_string hash, commitment))
+    (fun commitment ->
+      ( JSON.as_string hash,
+        commitment,
+        published_at_level |> JSON.as_opt |> Option.map JSON.as_int ))
     (commitment_from_json commitment_json)
 
 let next_name = ref 1
@@ -135,12 +140,12 @@ let status ?hooks sc_client =
 let last_stored_commitment ?hooks sc_client =
   let open Lwt.Syntax in
   let+ json = rpc_get ?hooks sc_client ["last_stored_commitment"] in
-  commitment_with_hash_from_json json
+  commitment_with_hash_and_level_from_json json
 
 let last_published_commitment ?hooks sc_client =
   let open Lwt.Syntax in
   let+ json = rpc_get ?hooks sc_client ["last_published_commitment"] in
-  commitment_with_hash_from_json json
+  commitment_with_hash_and_level_from_json json
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command

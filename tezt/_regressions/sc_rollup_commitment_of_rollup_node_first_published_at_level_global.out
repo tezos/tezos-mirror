@@ -1,4 +1,4 @@
-sc_rollup_commitment_of_rollup_node_handles_chain_reorgs.out
+sc_rollup_commitment_of_rollup_node_first_published_at_level_global.out
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith booting with  --burn-cap 9999999
 Node is bootstrapped.
@@ -83,55 +83,15 @@ This sequence of operations was run:
   "sc_rollup_commitment_storage_size_in_bytes": 84,
   "sc_rollup_max_lookahead_in_blocks": 30000 }
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
-Node is bootstrapped.
-Estimated gas: 1652.229 units (will add 100 for safety)
-Estimated storage: no bytes added
-Operation successfully injected in the node.
-Operation hash is '[OPERATION_HASH]'
-NOT waiting for the operation to be included.
-Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
-and/or an external block explorer to make sure that it has been included.
-This sequence of operations was run:
-  Manager signed operations:
-    From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000457
-    Expected counter: 2
-    Gas limit: 1753
-    Storage limit: 0 bytes
-    Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000457
-      payload fees(the block proposer) ....... +ꜩ0.000457
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
-      This operation sending a message to a smart contract rollup was successfully applied
-      Consumed gas: 1652.229
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 32
-         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
-         nb_available_messages = 1
-         message_counter = 1
-         old_levels_messages = 
-       content = CoUkdBQ53N7FWav8LuTvrcp3jyoxnpqk3xnEo3gSCgNwia4fq44j
-       index = 30
-       back_pointers = CoVombgbRqaZQavbAhd8Fe9uPd2VkwetxbaeuN3ky612Y1BW3NvM
-      CoVombgbRqaZQavbAhd8Fe9uPd2VkwetxbaeuN3ky612Y1BW3NvM
-      CoW1mKR4SV9TNevf2emDd2y5vBSJoHpPZAaXcK4rg3qYRqQpqc7G
-      CoUoi6qvq4GfPg1uwb68W7M74XnGgLYcsZWw6tM21DhnF66Th1jz
-      CoVs7qYHAiJBuPs36A7NMDo47y1nhL6mbdb2gEtMQi1zrBbRQzaX
-    
-    
-
-
-./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
+./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_messages": 0, "number_of_ticks": 0 },
-  "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
+  "published_at_level": 35 }
 
 ./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
 { "commitment":

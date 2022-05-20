@@ -142,13 +142,15 @@ let test_scenario ?commitment_frequency ?challenge_window
         node
         client)
 
-let inbox_level (_, (commitment : Sc_rollup_client.commitment)) =
+let inbox_level (_hash, (commitment : Sc_rollup_client.commitment), _level) =
   commitment.inbox_level
 
-let number_of_messages (_, (commitment : Sc_rollup_client.commitment)) =
+let number_of_messages
+    (_hash, (commitment : Sc_rollup_client.commitment), _level) =
   commitment.number_of_messages
 
-let number_of_ticks (_, (commitment : Sc_rollup_client.commitment)) =
+let number_of_ticks (_hash, (commitment : Sc_rollup_client.commitment), _level)
+    =
   commitment.number_of_ticks
 
 let last_cemented_commitment_hash_with_level json =
@@ -156,9 +158,12 @@ let last_cemented_commitment_hash_with_level json =
   let level = JSON.(json |-> "level" |> as_int) in
   (hash, level)
 
-let hash (hash, (_ : Sc_rollup_client.commitment)) = hash
+let hash (hash, (_ : Sc_rollup_client.commitment), _level) = hash
 
-let predecessor (_hash, {Sc_rollup_client.predecessor; _}) = predecessor
+let first_published_at_level (_hash, (_ : Sc_rollup_client.commitment), level) =
+  level
+
+let predecessor (_hash, {Sc_rollup_client.predecessor; _}, _level) = predecessor
 
 let cement_commitment client ~sc_rollup_address ~hash =
   let* () =
@@ -990,11 +995,11 @@ let check_published_commitment_in_l1 ?(force_new_level = true) sc_rollup_address
   let* commitment_in_l1 =
     match published_commitment with
     | None -> Lwt.return_none
-    | Some (hash, _) ->
+    | Some (hash, _commitment, _level) ->
         tezos_client_get_commitment client sc_rollup_address hash
   in
   Option.iter (fun (c1, c2) -> check_eq_commitment c1 c2)
-  @@ Option.bind published_commitment (fun (_, c1) ->
+  @@ Option.bind published_commitment (fun (_, c1, _level) ->
          Option.map (fun c2 -> (c1, c2)) commitment_in_l1) ;
   Lwt.return_unit
 
@@ -1079,8 +1084,8 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   Option.iter (fun (c1, c2) -> check_eq_commitment c1 c2)
-  @@ Option.bind published_commitment (fun (_, c1) ->
-         Option.map (fun (_, c2) -> (c1, c2)) stored_commitment) ;
+  @@ Option.bind published_commitment (fun (_hash, c1, _level) ->
+         Option.map (fun (_, c2, _level) -> (c1, c2)) stored_commitment) ;
   check_published_commitment_in_l1 sc_rollup_address client published_commitment
 
 let commitment_not_stored_if_non_final _protocol sc_rollup_node
@@ -1213,8 +1218,8 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup_address _node
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   Option.iter (fun (c1, c2) -> check_eq_commitment c1 c2)
-  @@ Option.bind published_commitment (fun (_, c1) ->
-         Option.map (fun (_, c2) -> (c1, c2)) stored_commitment) ;
+  @@ Option.bind published_commitment (fun (_hash, c1, _level) ->
+         Option.map (fun (_hash, c2, _level) -> (c1, c2)) stored_commitment) ;
   check_published_commitment_in_l1 sc_rollup_address client published_commitment
 
 let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
@@ -1336,8 +1341,8 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   Option.iter (fun (c1, c2) -> check_eq_commitment c1 c2)
-  @@ Option.bind published_commitment (fun (_, c1) ->
-         Option.map (fun (_, c2) -> (c1, c2)) stored_commitment) ;
+  @@ Option.bind published_commitment (fun (_hash, c1, _level) ->
+         Option.map (fun (_hash, c2, _level) -> (c1, c2)) stored_commitment) ;
   check_published_commitment_in_l1 sc_rollup_address client published_commitment
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2942
@@ -1491,6 +1496,98 @@ let commitment_before_lcc_not_stored ?(commitment_frequency = 30)
       ~error_msg:
         "Predecessor fo commitment published by rollup_node2 should be the \
          cemented commitment (%L = %R)"
+  in
+  return ()
+
+(* Test that the level when a commitment was first published is fetched correctly
+   by rollup nodes. *)
+let first_published_level_is_global _protocol sc_rollup_node sc_rollup_address
+    node client =
+  (* Rollup node 1 processes messages, produces and publishes two commitments. *)
+  let* init_level =
+    RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
+  in
+  let* commitment_frequency =
+    get_sc_rollup_commitment_frequency_in_blocks client
+  in
+  let init_level = init_level |> JSON.as_int in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  Check.(level = init_level)
+    Check.int
+    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+  let* () = bake_levels commitment_frequency client in
+  let* commitment_inbox_level =
+    Sc_rollup_node.wait_for_level
+      sc_rollup_node
+      (init_level + commitment_frequency)
+  in
+  (* Bake `block_finality_time` additional level to ensure that block number
+     `init_level + sc_rollup_commitment_frequency_in_blocks` is processed by
+     the rollup node as finalized. *)
+  let* () = bake_levels block_finality_time client in
+  let* commitment_finalized_level =
+    Sc_rollup_node.wait_for_level
+      sc_rollup_node
+      (commitment_inbox_level + block_finality_time)
+  in
+  let* rollup_node1_published_commitment =
+    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
+  in
+  let () =
+    Check.(
+      Option.map inbox_level rollup_node1_published_commitment
+      = Some commitment_inbox_level)
+      (Check.option Check.int)
+      ~error_msg:
+        "Commitment has been published at a level different than expected (%L \
+         = %R)" ;
+    Check.(
+      Option.bind rollup_node1_published_commitment first_published_at_level
+      <> None)
+      (Check.option Check.int)
+      ~error_msg:
+        "Level at which commitment has first been published is undefined"
+  in
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  (* Rollup node 2 starts and processes enough levels to publish a commitment.*)
+  let bootstrap2_key = Constant.bootstrap2.public_key_hash in
+  let* client' = Client.init ?endpoint:(Some (Node node)) () in
+  let sc_rollup_node' =
+    Sc_rollup_node.create node client' ~operator_pkh:bootstrap2_key
+  in
+  let sc_rollup_client' = Sc_rollup_client.create sc_rollup_node' in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node' sc_rollup_address
+  in
+  let* () = Sc_rollup_node.run sc_rollup_node' in
+
+  let* rollup_node2_catchup_level =
+    Sc_rollup_node.wait_for_level sc_rollup_node' commitment_finalized_level
+  in
+  Check.(rollup_node2_catchup_level = commitment_finalized_level)
+    Check.int
+    ~error_msg:"Current level has moved past cementation inbox level (%L = %R)" ;
+  (* Check that no commitment was published. *)
+  let* rollup_node2_published_commitment =
+    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
+  in
+  let* () =
+    Option.iter (fun (c1, c2) -> check_eq_commitment c1 c2)
+    @@ Option.bind rollup_node1_published_commitment (fun (_, c1, _level) ->
+           rollup_node2_published_commitment
+           |> Option.map (fun (_, c2, _level) -> (c1, c2))) ;
+    Lwt.return_unit
+  in
+  let () =
+    Check.(
+      Option.bind rollup_node1_published_commitment first_published_at_level
+      = Option.bind rollup_node2_published_commitment first_published_at_level)
+      (Check.option Check.int)
+      ~error_msg:
+        "Rollup nodes do not agree on level when commitment was first \
+         published (%L = %R)"
   in
   return ()
 
@@ -1704,6 +1801,10 @@ let register ~protocols =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2976
        change tests so that we do not need to repeat custom parameters. *)
     (commitment_before_lcc_not_stored ~challenge_window:1)
+    protocols ;
+  test_commitment_scenario
+    "first_published_at_level_global"
+    first_published_level_is_global
     protocols ;
   test_rollup_origination_boot_sector protocols ;
   test_rollup_node_uses_boot_sector protocols ;
