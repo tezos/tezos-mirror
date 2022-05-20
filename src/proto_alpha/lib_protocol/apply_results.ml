@@ -1470,6 +1470,10 @@ type 'kind contents_result =
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
+  | Dal_slot_availability_result : {
+      delegate : Signature.Public_key_hash.t;
+    }
+      -> Kind.dal_slot_availability contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -1663,6 +1667,24 @@ module Encoding = struct
             Endorsement_result {balance_updates; delegate; endorsement_power});
       }
 
+  let[@coq_axiom_with_reason "gadt"] dal_slot_availability_case =
+    Case
+      {
+        op_case = Operation.Encoding.dal_slot_availability_case;
+        encoding = obj1 (req "delegate" Signature.Public_key_hash.encoding);
+        select =
+          (function
+          | Contents_result (Dal_slot_availability_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Dal_slot_availability _ as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj = (function Dal_slot_availability_result {delegate} -> delegate);
+        inj = (fun delegate -> Dal_slot_availability_result {delegate});
+      }
+
   let[@coq_axiom_with_reason "gadt"] seed_nonce_revelation_case =
     Case
       {
@@ -1848,6 +1870,7 @@ module Encoding = struct
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preendorsement_result _) -> None
           | Contents_result (Endorsement_result _) -> None
+          | Contents_result (Dal_slot_availability_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Double_endorsement_evidence_result _) -> None
@@ -2151,6 +2174,7 @@ let contents_result_encoding =
          make seed_nonce_revelation_case;
          make endorsement_case;
          make preendorsement_case;
+         make dal_slot_availability_case;
          make double_preendorsement_evidence_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
@@ -2346,6 +2370,8 @@ let kind_equal :
   | Endorsement _, _ -> None
   | Preendorsement _, Preendorsement_result _ -> Some Eq
   | Preendorsement _, _ -> None
+  | Dal_slot_availability _, Dal_slot_availability_result _ -> Some Eq
+  | Dal_slot_availability _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Double_preendorsement_evidence _, Double_preendorsement_evidence_result _ ->

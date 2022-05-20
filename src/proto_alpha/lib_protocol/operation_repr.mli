@@ -68,6 +68,8 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type 'a double_consensus_operation_evidence =
@@ -189,6 +191,7 @@ val pp_consensus_content : Format.formatter -> consensus_content -> unit
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
+  | Dal_slot_availability of Chain_id.t
 
 val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -238,6 +241,12 @@ and _ contents =
   (* Endorsement: About consensus, endorsement of a block held by a
      validator. *)
   | Endorsement : consensus_content -> Kind.endorsement contents
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
+
+     Temporary operation to avoid modifying endorsement encoding. *)
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      -> Kind.dal_slot_availability contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their
      nonces after a given number of cycles to keep their block rewards
@@ -567,6 +576,8 @@ module Encoding : sig
   val preendorsement_case : Kind.preendorsement case
 
   val endorsement_case : Kind.endorsement case
+
+  val dal_slot_availability_case : Kind.dal_slot_availability case
 
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 

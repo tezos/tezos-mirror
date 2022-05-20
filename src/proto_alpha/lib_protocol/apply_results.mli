@@ -99,6 +99,10 @@ and 'kind contents_result =
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
+  | Dal_slot_availability_result : {
+      delegate : Signature.Public_key_hash.t;
+    }
+      -> Kind.dal_slot_availability contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result

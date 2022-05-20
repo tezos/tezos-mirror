@@ -2909,6 +2909,8 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type 'a double_consensus_operation_evidence =
@@ -3051,6 +3053,9 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal.Endorsement.t
+      -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
       nonce : Nonce.t;
@@ -3255,6 +3260,7 @@ module Operation : sig
   type consensus_watermark =
     | Endorsement of Chain_id.t
     | Preendorsement of Chain_id.t
+    | Dal_slot_availability of Chain_id.t
 
   val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -3317,6 +3323,8 @@ module Operation : sig
     val preendorsement_case : Kind.preendorsement case
 
     val endorsement_case : Kind.endorsement case
+
+    val dal_slot_availability_case : Kind.dal_slot_availability case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 

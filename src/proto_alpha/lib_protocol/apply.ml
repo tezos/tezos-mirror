@@ -1740,7 +1740,7 @@ let apply_external_manager_operation_content :
       Dal_apply.apply_publish_slot_header ctxt slot fee >>?= fun ctxt ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Dal_publish_slot_header_result {consumed_gas} in
-      return (ctxt, result, [])        
+      return (ctxt, result, [])
   | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       Sc_rollup_operations.originate ctxt ~kind ~boot_sector ~parameters_ty
       >>=? fun ({address; size}, ctxt) ->
@@ -2018,7 +2018,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
   | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
   | Sc_rollup_atomic_batch _ ->
-      assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
+      assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Dal_publish_slot_header {slot} ->
       Dal_apply.validate_publish_slot_header ctxt slot >>?= fun () ->
       return ctxt)
@@ -2282,7 +2282,7 @@ let burn_internal_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_dispatch_tickets_result {payload with balance_updates} )
-  | Dal_publish_slot_header_result _ -> return (ctxt, storage_limit, smopr)        
+  | Dal_publish_slot_header_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_originate_result ({size; _} as payload) ->
       Fees.burn_sc_rollup_origination_fees ctxt ~storage_limit ~payer size
       >>=? fun (ctxt, storage_limit, balance_updates) ->
@@ -2668,6 +2668,7 @@ let record_operation (type kind) ctxt (operation : kind operation) : context =
   match operation.protocol_data.contents with
   | Single (Preendorsement _) -> ctxt
   | Single (Endorsement _) -> ctxt
+  | Single (Dal_slot_availability _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Double_endorsement_evidence _ | Double_preendorsement_evidence _
@@ -3141,6 +3142,23 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
                      delegate;
                      endorsement_power = voting_power;
                    }) ))
+  | Single (Dal_slot_availability (endorser, slot_availability)) ->
+      (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
+
+         This is a temporary operation. We do no check for the
+         moment. In particular, this means we do not check the
+         signature. Consequently, it is really important to ensure this
+         operation cannot be included into a block when the feature flag
+         is not set. This is done in order to avoid modifying the
+         endorsement encoding. However, once the DAL will be ready, this
+         operation should be merged with an endorsement or at least
+         refined. *)
+      Dal_apply.validate_data_availability ctxt slot_availability >>?= fun () ->
+      Dal_apply.apply_data_availability ctxt slot_availability ~endorser
+      >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Single_result (Dal_slot_availability_result {delegate = endorser}) )
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->

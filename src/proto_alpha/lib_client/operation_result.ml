@@ -1117,6 +1117,13 @@ let rec pp_contents_and_result_list :
         delegate
         endorsement_power
   | Single_and_result
+      (Dal_slot_availability _, Dal_slot_availability_result {delegate}) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Slot availability:@,Delegate: %a@]"
+        Signature.Public_key_hash.pp
+        delegate
+  | Single_and_result
       ( Double_endorsement_evidence {op1; op2},
         Double_endorsement_evidence_result bus ) ->
       Format.fprintf

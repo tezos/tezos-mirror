@@ -39,6 +39,8 @@ module Kind = struct
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type 'a double_consensus_operation_evidence =
@@ -187,12 +189,15 @@ let pp_consensus_content ppf content =
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
+  | Dal_slot_availability of Chain_id.t
 
 let bytes_of_consensus_watermark = function
   | Preendorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
   | Endorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id)
+  | Dal_slot_availability chain_id ->
+      Bytes.cat (Bytes.of_string "\x14") (Chain_id.to_bytes chain_id)
 
 let to_watermark w = Signature.Custom (bytes_of_consensus_watermark w)
 
@@ -207,6 +212,10 @@ let of_watermark = function
         | '\x13' ->
             Option.map
               (fun chain_id -> Preendorsement chain_id)
+              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
+        | '\x14' ->
+            Option.map
+              (fun chain_id -> Dal_slot_availability chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -241,6 +250,9 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
@@ -1218,6 +1230,29 @@ module Encoding = struct
                   @@ union [make endorsement_case]))
                (varopt "signature" Signature.encoding)))
 
+  let dal_slot_availability_encoding =
+    obj2
+      (req "endorser" Signature.Public_key_hash.encoding)
+      (req "endorsement" Dal_endorsement_repr.encoding)
+
+  let dal_slot_availability_case =
+    Case
+      {
+        tag = 22;
+        name = "dal_slot_availability";
+        encoding = dal_slot_availability_encoding;
+        select =
+          (function
+          | Contents (Dal_slot_availability _ as op) -> Some op | _ -> None);
+        proj =
+          (fun [@coq_match_with_default] (Dal_slot_availability
+                                           (endorser, endorsement)) ->
+            (endorser, endorsement));
+        inj =
+          (fun (endorser, endorsement) ->
+            Dal_slot_availability (endorser, endorsement));
+      }
+
   let[@coq_axiom_with_reason "gadt"] seed_nonce_revelation_case =
     Case
       {
@@ -1513,6 +1548,7 @@ module Encoding = struct
          [
            make endorsement_case;
            make preendorsement_case;
+           make dal_slot_availability_case;
            make seed_nonce_revelation_case;
            make double_endorsement_evidence_case;
            make double_preendorsement_evidence_case;
@@ -1603,6 +1639,7 @@ let acceptable_passes (op : packed_operation) =
   | Single (Failing_noop _) -> []
   | Single (Preendorsement _) -> [0]
   | Single (Endorsement _) -> [0]
+  | Single (Dal_slot_availability _) -> [0]
   | Single (Proposals _) -> [1]
   | Single (Ballot _) -> [1]
   | Single (Seed_nonce_revelation _) -> [2]
@@ -1679,6 +1716,11 @@ let check_signature (type kind) key chain_id
       | Single (Endorsement _) as contents ->
           check
             ~watermark:(to_watermark (Endorsement chain_id))
+            (Contents_list contents)
+            signature
+      | Single (Dal_slot_availability _) as contents ->
+          check
+            ~watermark:(to_watermark (Dal_slot_availability chain_id))
             (Contents_list contents)
             signature
       | Single
@@ -1773,6 +1815,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preendorsement _, _ -> None
   | Endorsement _, Endorsement _ -> Some Eq
   | Endorsement _, _ -> None
+  | Dal_slot_availability _, Dal_slot_availability _ -> Some Eq
+  | Dal_slot_availability _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq
