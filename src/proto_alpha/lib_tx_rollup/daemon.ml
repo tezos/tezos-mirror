@@ -117,7 +117,49 @@ let extract_messages_from_block block_info rollup_id =
       block_info.Alpha_block_services.operations
       State.rollup_operation_index
   in
-  let rec get_messages :
+  let add_message_ticket (msg, _size) new_ticket (messages, tickets) =
+    let tickets =
+      match new_ticket with None -> tickets | Some ticket -> ticket :: tickets
+    in
+    (msg :: messages, tickets)
+  in
+  let get_messages_of_internal_operation ~source messages_tickets
+      (Internal_manager_operation_result
+        ( {
+            operation;
+            source = _use_the_source_of_the_external_operation;
+            nonce = _;
+          },
+          result )) =
+    match (operation, result) with
+    | ( Transaction
+          {amount = _; parameters; destination = Tx_rollup dst; entrypoint},
+        Applied
+          (Transaction_result
+            (Transaction_to_tx_rollup_result {ticket_hash; _})) )
+      when Tx_rollup.equal dst rollup_id
+           && Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) ->
+        (* Deposit message *)
+        ( Option.bind (Data_encoding.force_decode parameters)
+        @@ fun parameters ->
+          parse_tx_rollup_deposit_parameters parameters |> Result.to_option )
+        |> Option.fold
+             ~none:messages_tickets
+             ~some:(fun (ticketer, ty, contents, amount, destination) ->
+               let deposit =
+                 Tx_rollup_message.make_deposit
+                   source
+                   destination
+                   ticket_hash
+                   amount
+               in
+               add_message_ticket
+                 deposit
+                 (Some Ticket.{ticketer; ty; contents; hash = ticket_hash})
+                 messages_tickets)
+    | _ -> messages_tickets
+  in
+  let get_messages :
       type kind.
       source:public_key_hash ->
       kind manager_operation ->
@@ -125,53 +167,22 @@ let extract_messages_from_block block_info rollup_id =
       packed_internal_manager_operation_result list ->
       Tx_rollup_message.t list * Ticket.t list ->
       Tx_rollup_message.t list * Ticket.t list =
-   fun ~source op result internal_operation_results (messages, tickets) ->
-    let message_size_ticket =
+   fun ~source op result internal_operation_results messages_tickets ->
+    let acc =
       match (op, result) with
       | ( Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _},
           Applied (Tx_rollup_submit_batch_result _) )
         when Tx_rollup.equal rollup_id tx_rollup ->
           (* Batch message *)
-          Some (Tx_rollup_message.make_batch content, None)
-      | ( Transaction
-            {amount = _; parameters; destination = Tx_rollup dst; entrypoint},
-          Applied
-            (Transaction_result
-              (Transaction_to_tx_rollup_result {ticket_hash; _})) )
-        when Tx_rollup.equal dst rollup_id
-             && Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) ->
-          (* Deposit message *)
-          Option.bind (Data_encoding.force_decode parameters)
-          @@ fun parameters ->
-          parse_tx_rollup_deposit_parameters parameters
-          |> Result.to_option
-          |> Option.map @@ fun (ticketer, ty, contents, amount, destination) ->
-             let deposit =
-               Tx_rollup_message.make_deposit
-                 source
-                 destination
-                 ticket_hash
-                 amount
-             in
-             (deposit, Some Ticket.{ticketer; ty; contents; hash = ticket_hash})
-      | _, _ -> None
-    in
-    let acc =
-      match message_size_ticket with
-      | None -> (messages, tickets)
-      | Some ((msg, _size), new_ticket) ->
-          let tickets =
-            match new_ticket with
-            | None -> tickets
-            | Some ticket -> ticket :: tickets
-          in
-          (msg :: messages, tickets)
+          add_message_ticket
+            (Tx_rollup_message.make_batch content)
+            None
+            messages_tickets
+      | _, _ -> messages_tickets
     in
     (* Add messages from internal operations *)
     List.fold_left
-      (fun acc (Internal_manager_operation_result ({operation; _}, result)) ->
-        let operation = manager_operation_of_internal_operation operation in
-        get_messages ~source operation result [] acc)
+      (get_messages_of_internal_operation ~source)
       acc
       internal_operation_results
   in
@@ -598,6 +609,8 @@ let fail_when_slashed (type kind) state l1_operation
   match state.State.signers.operator with
   | None -> return_unit
   | Some operator -> (
+      (* This function handles external operations only. Internal operations have
+         to be handled in [handle] in [handle_l1_operation] below. *)
       match result with
       | Applied result ->
           let balance_updates =
@@ -635,6 +648,8 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
   in
   let* () = fail_when_slashed state l1_operation result in
+  (* This function handles external operations only. Internal operations have
+     to be handled in [handle] in [handle_l1_operation] below. *)
   match (op, result) with
   | ( Tx_rollup_commit {commitment; tx_rollup},
       Applied (Tx_rollup_commit_result _) )
@@ -665,6 +680,8 @@ let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
   let is_my_rollup tx_rollup =
     Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
   in
+  (* This function handles external operations only. Internal operations have
+     to be handled in [handle] in [handle_l1_operation] below. *)
   match (op, result) with
   | ( Tx_rollup_commit {commitment; tx_rollup},
       Applied (Tx_rollup_commit_result _) )
@@ -690,7 +707,7 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
   let handle_op =
     match direction with `Rollback -> rollback_op | `Process -> process_op
   in
-  let rec handle :
+  let handle :
       type kind.
       source:public_key_hash ->
       kind manager_operation ->
@@ -698,17 +715,9 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
       packed_internal_manager_operation_result list ->
       'acc ->
       'acc tzresult Lwt.t =
-   fun ~source op result internal_operation_results acc ->
-    let* acc =
-      handle_op state ~source block.hash operation.hash op result acc
-    in
-    (* Add messages from internal operations *)
-    List.fold_left_es
-      (fun acc (Internal_manager_operation_result ({operation; _}, result)) ->
-        let operation = manager_operation_of_internal_operation operation in
-        handle ~source operation result [] acc)
-      acc
-      internal_operation_results
+   fun ~source op result _internal_operation_results acc ->
+    handle_op state ~source block.hash operation.hash op result acc
+   (* There are no messages to handle for internal operations for now. *)
   in
   let rec handle_list :
       type kind. 'acc -> kind contents_and_result_list -> 'acc tzresult Lwt.t =
