@@ -413,15 +413,6 @@ module Contracts : sig
     Client.t ->
     JSON.t Runnable.process
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
-  val get_all_delegates :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    string list Lwt.t
-
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id] *)
   val get :
     ?endpoint:Client.endpoint ->

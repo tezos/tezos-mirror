@@ -129,7 +129,7 @@ let test_contracts _protocol ?endpoint client =
     unit
   in
   let*! _contracts = RPC.Contracts.get_all ?endpoint ~hooks client in
-  let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
+  let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
@@ -540,7 +540,7 @@ let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
 
 let get_contracts ?endpoint client =
   let*! _ = RPC.Contracts.get_all ?endpoint ~hooks client in
-  let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
+  let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
 
   Lwt.return contracts
 
