@@ -9,7 +9,6 @@ opam:prepare:
     - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
     - git -C _opam-repo-for-release add packages
     - git -C _opam-repo-for-release commit -m "tezos packages"
-  needs: []
   artifacts:
     paths:
       - _opam-repo-for-release/
