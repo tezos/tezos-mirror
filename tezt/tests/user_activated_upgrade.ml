@@ -36,16 +36,14 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
     ~title:"metadata consistency"
     ~tags:["rpc"; "metadata"; "migration"]
   @@ fun () ->
-  let node = Node.create [] in
-  let* () = Node.config_init node [] in
   let migration_level = 3 in
-  Node.Config_file.(
-    update
-      node
-      (set_sandbox_network_with_user_activated_upgrades
-         [(migration_level, migrate_to)])) ;
-  let* () = Node.run node [] in
-  let* () = Node.wait_for_ready node in
+  let* node =
+    Node.init
+      ~patch_config:
+        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])
+      []
+  in
   let* client = Client.(init ~endpoint:(Node node) ()) in
   let* () = Client.activate_protocol ~protocol:migrate_from client in
   let* () =

@@ -664,15 +664,13 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
     ~executors
   @@ fun () ->
   let setup_migration_time ~migration_level cont =
-    let node = Node.create [] in
-    let* () = Node.config_init node [Synchronisation_threshold 0] in
-    Node.Config_file.(
-      update
-        node
-        (set_sandbox_network_with_user_activated_upgrades
-           [(migration_level, migrate_to)])) ;
-    let* () = Node.run node [] in
-    let* () = Node.wait_for_ready node in
+    let* node =
+      Node.init
+        ~patch_config:
+          (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+             [(migration_level, migrate_to)])
+        [Synchronisation_threshold 0]
+    in
     let* client = Client.(init ~endpoint:(Node node) ()) in
     let* () = Client.activate_protocol ~protocol:migrate_from client in
     cont node client

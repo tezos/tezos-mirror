@@ -599,7 +599,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
-    ?snapshot arguments =
+    ?patch_config ?snapshot arguments =
   let node =
     create
       ?runner
@@ -616,6 +616,11 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
+  let () =
+    match patch_config with
+    | None -> ()
+    | Some patch -> Config_file.update node patch
+  in
   let* () =
     match snapshot with
     | Some (file, reconstruct) -> snapshot_import ~reconstruct node file
