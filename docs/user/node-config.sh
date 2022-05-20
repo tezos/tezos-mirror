@@ -5,17 +5,14 @@
 # [remove config file if exists]
 rm -f tmp/config.json
 # [initialize config file]
-../tezos-node config --config-file=tmp/config.json --network=sandbox init
+./tezos-node config init --config-file=tmp/config.json --network=sandbox
 # [update config file]
-../tezos-node config --config-file=tmp/config.json --data-dir=tmp \
-  --expected-pow=24.5 --peer="[::]:10732" --peer="192.168.1.3:9733" \
-  --private-mode --disable-mempool \
+./tezos-node config update --config-file=tmp/config.json --data-dir=tmp \
+  --peer="[::]:10732" --peer="192.168.1.3:9733" \
+  --private-mode \
   --rpc-addr="localhost:8733" --net-addr="1.2.3.4" \
-  --connections=100 --max-download-speed=1024 --max-upload-speed=1024 \
-  --cors-origin="*" --cors-header="Content-Type" \
-  --rpc-tls="tezos-node.crt,tezos-node.key" \
+  --connections=25 \
   --log-output="tezos-node.log" \
-  --synchronisation-threshold=5 --sync-latency=120 --history-mode=full \
-  update
+  --history-mode=full
 # [show config file]
-../tezos-node config --data-dir=tmp show
+./tezos-node config show --data-dir=tmp

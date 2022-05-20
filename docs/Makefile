@@ -147,9 +147,13 @@ p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
 install-dependencies:
 	@poetry install
 
+user/node-config.json: user/node-config.sh
+	cd ..; ./docs/user/node-config.sh >docs/$@
+
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: api/errors.rst developer/metrics.csv rpc p2p manuals install-dependencies
+html: api/errors.rst developer/metrics.csv user/node-config.json \
+		rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/ithaca" || true
@@ -195,5 +199,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst developer/metrics.csv active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html ithaca/tezos-*.html jakarta/tezos-*.html alpha/tezos-*.html
