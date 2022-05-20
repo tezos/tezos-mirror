@@ -3192,9 +3192,7 @@ end = struct
         | AV1 -> "+a-4-40..42-44-45-48-51-70"
         | AV2 -> "+a-4-40..42-44-45-48-70"
       in
-      let warn_error =
-        match template_version with AV0 -> "-A" | AV1 | AV2 -> "+a"
-      in
+      let warn_error = "+a" in
       let environment =
         public_lib
           (sf "tezos-protocol-%s.environment" name_dash)
