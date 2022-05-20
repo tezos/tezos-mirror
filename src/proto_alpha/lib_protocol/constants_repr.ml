@@ -202,6 +202,12 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The ratio blocks_per_cycle per blocks_per_stake_snapshot should be \
         between 1 and 65535")
+  >>? fun () ->
+  error_unless
+    Compare.Int.(constants.sc_rollup.origination_size >= 0)
+    (Invalid_protocol_constants
+       "The smart contract rollup origination size must be non-negative.")
+  >>? fun () ->
   >>? fun () -> Result.return_unit
 
 module Generated = struct
