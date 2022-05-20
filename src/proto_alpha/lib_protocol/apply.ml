@@ -818,8 +818,16 @@ type execution_arg =
       -> execution_arg
   | Untyped_arg : Script.expr -> execution_arg
 
-let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
-    ~before_operation ~balance_updates ~allocated_destination_contract =
+let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
+    ~entrypoint ~before_operation =
+  let contract = Contract.Implicit pkh in
+  (* Transfers of zero to implicit accounts are forbidden. *)
+  error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
+  (* If the implicit contract is not yet allocated at this point then
+     the next transfer of tokens will allocate it. *)
+  Contract.allocated ctxt contract >>= fun already_allocated ->
+  Token.transfer ctxt (`Contract source) (`Contract contract) amount
+  >>=? fun (ctxt, balance_updates) ->
   let is_unit =
     match parameter with
     | Typed_arg (_, Unit_t, ()) -> true
@@ -829,162 +837,137 @@ let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
         | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> true
         | _ -> false)
   in
-  ( (if Entrypoint.is_default entrypoint then Result.return_unit
-    else error (Script_tc_errors.No_such_entrypoint entrypoint))
-  >>? fun () ->
-    if is_unit then
-      (* Only allow [Unit] parameter to implicit accounts. *)
-      ok ctxt
-    else error (Script_interpreter.Bad_contract_parameter contract) )
-  >|? fun ctxt ->
-  let result =
-    Transaction_result
-      (Transaction_to_contract_result
-         {
-           storage = None;
-           lazy_storage_diff = None;
-           balance_updates;
-           originated_contracts = [];
-           consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-           storage_size = Z.zero;
-           paid_storage_size_diff = Z.zero;
-           allocated_destination_contract;
-         })
-  in
-  (ctxt, result)
-
-let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~script_ir
-    ~script ~parameter ~cache_key ~balance_updates =
-  (* Token.transfer which is being called before already loads this value into
-     the Irmin cache, so no need to burn gas for it. *)
-  Contract.get_balance ctxt contract >>=? fun balance ->
-  let now = Script_timestamp.now ctxt in
-  let level =
-    (Level.current ctxt).level |> Raw_level.to_int32 |> Script_int.of_int32
-    |> Script_int.abs
-  in
-  let step_constants =
-    let open Script_interpreter in
-    {
-      source;
-      payer = Contract.Implicit payer;
-      self = contract;
-      amount;
-      chain_id;
-      balance;
-      now;
-      level;
-    }
-  in
-  let execute =
-    match parameter with
-    | Untyped_arg parameter -> Script_interpreter.execute ~parameter
-    | Typed_arg (location, parameter_ty, parameter) ->
-        Script_interpreter.execute_with_typed_parameter
-          ~location
-          ~parameter_ty
-          ~parameter
-  in
-  let cached_script = Some script_ir in
-  execute ctxt ~cached_script mode step_constants ~script ~entrypoint ~internal
-  >>=? fun ( {
-               script = updated_cached_script;
-               code_size = updated_size;
-               storage;
-               lazy_storage_diff;
-               operations;
-               ticket_diffs;
-             },
-             ctxt ) ->
-  update_script_storage_and_ticket_balances
-    ctxt
-    ~self:contract
-    storage
-    lazy_storage_diff
-    ticket_diffs
-    operations
-  >>=? fun (ticket_table_size_diff, ctxt) ->
-  Ticket_balance.adjust_storage_space ctxt ~storage_diff:ticket_table_size_diff
-  >>=? fun (ticket_paid_storage_diff, ctxt) ->
-  Fees.record_paid_storage_space ctxt contract
-  >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
-  Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
-  >>=? fun originated_contracts ->
   Lwt.return
-    ( Script_cache.update
-        ctxt
-        cache_key
-        ({script with storage = Script.lazy_expr storage}, updated_cached_script)
-        updated_size
+    ( ( (if Entrypoint.is_default entrypoint then Result.return_unit
+        else error (Script_tc_errors.No_such_entrypoint entrypoint))
+      >>? fun () ->
+        if is_unit then
+          (* Only allow [Unit] parameter to implicit accounts. *)
+          ok ctxt
+        else error (Script_interpreter.Bad_contract_parameter contract) )
     >|? fun ctxt ->
       let result =
         Transaction_result
           (Transaction_to_contract_result
              {
-               storage = Some storage;
-               lazy_storage_diff;
+               storage = None;
+               lazy_storage_diff = None;
                balance_updates;
-               originated_contracts;
+               originated_contracts = [];
                consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-               storage_size = new_size;
-               paid_storage_size_diff =
-                 Z.add contract_paid_storage_size_diff ticket_paid_storage_diff;
-               allocated_destination_contract = false;
+               storage_size = Z.zero;
+               paid_storage_size_diff = Z.zero;
+               allocated_destination_contract = not already_allocated;
              })
       in
-      (ctxt, result, operations) )
+      (ctxt, result, []) )
 
-let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
-  match contract with
-  | Originated contract_hash -> (
-      (* Since the contract is originated, nothing will be allocated
-         or this transfer of tokens will fail.
-         Calls to non-existing contracts are detected by [Script_cache.find]
-         returning [None] because [Token.transfer] will succeed on non-existing
-         contracts if the amount is zero.
-      *)
-      Token.transfer ctxt (`Contract source) (`Contract contract) amount
-      >>=? fun (ctxt, balance_updates) ->
-      Script_cache.find ctxt contract_hash >>=? fun (ctxt, cache_key, script) ->
-      match script with
-      | None -> fail (Contract.Non_existing_contract contract)
-      | Some (script, script_ir) ->
-          apply_transaction_to_smart_contract
-            ~ctxt
-            ~source
-            ~contract
-            ~amount
-            ~entrypoint
-            ~before_operation
-            ~payer
-            ~chain_id
-            ~mode
-            ~internal
-            ~script_ir
-            ~script
-            ~parameter
-            ~cache_key
-            ~balance_updates)
-  | Implicit _ ->
-      (* Transfers of zero to implicit accounts are forbidden. *)
-      error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
-      (* If the implicit contract is not yet allocated at this point then
-         the next transfer of tokens will allocate it. *)
-      Contract.allocated ctxt contract >>= fun already_allocated ->
-      Token.transfer ctxt (`Contract source) (`Contract contract) amount
-      >>=? fun (ctxt, balance_updates) ->
-      let allocated_destination_contract = not already_allocated in
-      apply_transaction_to_implicit
-        ~ctxt
-        ~contract
-        ~parameter
+let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
+    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~parameter =
+  let contract = Contract.Originated contract_hash in
+  (* Since the contract is originated, nothing will be allocated or this
+     transfer of tokens will fail.  [Token.transfer] will succeed even on
+     non-existing contracts, if the amount is zero.  Then if the destination
+     does not exist, [Script_cache.find] will signal that by returning [None]
+     and we'll fail.
+  *)
+  Token.transfer ctxt (`Contract source) (`Contract contract) amount
+  >>=? fun (ctxt, balance_updates) ->
+  Script_cache.find ctxt contract_hash >>=? fun (ctxt, cache_key, script) ->
+  match script with
+  | None -> fail (Contract.Non_existing_contract contract)
+  | Some (script, script_ir) ->
+      (* Token.transfer which is being called before already loads this value into
+         the Irmin cache, so no need to burn gas for it. *)
+      Contract.get_balance ctxt contract >>=? fun balance ->
+      let now = Script_timestamp.now ctxt in
+      let level =
+        (Level.current ctxt).level |> Raw_level.to_int32 |> Script_int.of_int32
+        |> Script_int.abs
+      in
+      let step_constants =
+        let open Script_interpreter in
+        {
+          source;
+          payer = Contract.Implicit payer;
+          self = contract;
+          amount;
+          chain_id;
+          balance;
+          now;
+          level;
+        }
+      in
+      let execute =
+        match parameter with
+        | Untyped_arg parameter -> Script_interpreter.execute ~parameter
+        | Typed_arg (location, parameter_ty, parameter) ->
+            Script_interpreter.execute_with_typed_parameter
+              ~location
+              ~parameter_ty
+              ~parameter
+      in
+      let cached_script = Some script_ir in
+      execute
+        ctxt
+        ~cached_script
+        mode
+        step_constants
+        ~script
         ~entrypoint
-        ~before_operation
-        ~balance_updates
-        ~allocated_destination_contract
-      >>?= fun (ctxt, result) -> return (ctxt, result, [])
+        ~internal
+      >>=? fun ( {
+                   script = updated_cached_script;
+                   code_size = updated_size;
+                   storage;
+                   lazy_storage_diff;
+                   operations;
+                   ticket_diffs;
+                 },
+                 ctxt ) ->
+      update_script_storage_and_ticket_balances
+        ctxt
+        ~self:contract
+        storage
+        lazy_storage_diff
+        ticket_diffs
+        operations
+      >>=? fun (ticket_table_size_diff, ctxt) ->
+      Ticket_balance.adjust_storage_space
+        ctxt
+        ~storage_diff:ticket_table_size_diff
+      >>=? fun (ticket_paid_storage_diff, ctxt) ->
+      Fees.record_paid_storage_space ctxt contract
+      >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
+      Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
+      >>=? fun originated_contracts ->
+      Lwt.return
+        ( Script_cache.update
+            ctxt
+            cache_key
+            ( {script with storage = Script.lazy_expr storage},
+              updated_cached_script )
+            updated_size
+        >|? fun ctxt ->
+          let result =
+            Transaction_result
+              (Transaction_to_contract_result
+                 {
+                   storage = Some storage;
+                   lazy_storage_diff;
+                   balance_updates;
+                   originated_contracts;
+                   consumed_gas =
+                     Gas.consumed ~since:before_operation ~until:ctxt;
+                   storage_size = new_size;
+                   paid_storage_size_diff =
+                     Z.add
+                       contract_paid_storage_size_diff
+                       ticket_paid_storage_diff;
+                   allocated_destination_contract = false;
+                 })
+          in
+          (ctxt, result, operations) )
 
 let ex_ticket_size :
     context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
@@ -1170,7 +1153,7 @@ let apply_internal_manager_operation_content :
   match operation with
   | Transaction_to_contract
       {
-        destination;
+        destination = Implicit pkh;
         amount;
         unparsed_parameters = _;
         entrypoint;
@@ -1178,19 +1161,37 @@ let apply_internal_manager_operation_content :
         parameters_ty;
         parameters = typed_parameters;
       } ->
-      (apply_transaction
+      (apply_transaction_to_implicit
          ~ctxt
          ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
          ~source
-         ~contract:destination
+         ~pkh
          ~amount
          ~entrypoint
          ~before_operation
-         ~payer
-         ~chain_id
-         ~mode
-         ~internal:true
         : (_ * kind successful_manager_operation_result * _) tzresult Lwt.t)
+  | Transaction_to_contract
+      {
+        amount;
+        destination = Originated contract_hash;
+        entrypoint;
+        location;
+        parameters_ty;
+        parameters = typed_parameters;
+        unparsed_parameters = _;
+      } ->
+      apply_transaction_to_smart_contract
+        ~ctxt
+        ~source
+        ~contract_hash
+        ~amount
+        ~entrypoint
+        ~before_operation
+        ~payer
+        ~chain_id
+        ~mode
+        ~internal:true
+        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       apply_transaction_to_tx_rollup
@@ -1255,17 +1256,36 @@ let apply_external_manager_operation_content :
             : kind successful_manager_operation_result),
           [] )
   | Transaction
-      {amount; parameters; destination = Contract contract; entrypoint} ->
+      {amount; parameters; destination = Contract (Implicit pkh); entrypoint} ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      apply_transaction
+      apply_transaction_to_implicit
         ~ctxt
-        ~parameter:(Untyped_arg parameters)
         ~source:source_contract
-        ~contract
+        ~amount
+        ~pkh
+        ~parameter:(Untyped_arg parameters)
+        ~entrypoint
+        ~before_operation
+  | Transaction
+      {
+        amount;
+        parameters;
+        destination = Contract (Originated contract_hash);
+        entrypoint;
+      } ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        parameters
+      >>?= fun (parameters, ctxt) ->
+      apply_transaction_to_smart_contract
+        ~ctxt
+        ~source:source_contract
+        ~contract_hash
         ~amount
         ~entrypoint
         ~before_operation
@@ -1273,6 +1293,7 @@ let apply_external_manager_operation_content :
         ~chain_id
         ~mode
         ~internal:false
+        ~parameter:(Untyped_arg parameters)
   | Transaction {destination = Tx_rollup _; _} ->
       fail Tx_rollup_non_internal_transaction
   | Tx_rollup_dispatch_tickets
