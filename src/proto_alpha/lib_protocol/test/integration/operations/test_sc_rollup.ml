@@ -125,12 +125,15 @@ let number_of_ticks_exn n =
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
-let rec bake_until i top =
-  let level = Incremental.level i in
-  if level >= top then return i
-  else
-    Incremental.finalize_block i >>=? fun b ->
-    Incremental.begin_construction b >>=? fun i -> bake_until i top
+let bake_until i top =
+  let rec aux i top =
+    let level = Incremental.level i in
+    if level >= top then return i
+    else
+      Incremental.finalize_block i >>=? fun b ->
+      Incremental.begin_construction b >>=? fun i -> aux i top
+  in
+  aux i (Int32.of_int top)
 
 let dummy_commitment ctxt rollup =
   let ctxt = Incremental.alpha_ctxt ctxt in
@@ -168,7 +171,12 @@ let test_publish_and_cement () =
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
   let* i = Incremental.begin_construction b in
-  let* i = bake_until i 20l in
+  let* constants = Context.get_constants (I i) in
+  let* i =
+    bake_until
+      i
+      (succ constants.parametric.sc_rollup_challenge_window_in_blocks)
+  in
   let hash = Sc_rollup.Commitment.hash c in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* _ = Incremental.add_operation i cement_op in
@@ -223,7 +231,12 @@ let test_cement_fails_on_conflict () =
   let* i = Incremental.add_operation i operation2 in
   let* b = Incremental.finalize_block i in
   let* i = Incremental.begin_construction b in
-  let* i = bake_until i 20l in
+  let* constants = Context.get_constants (I i) in
+  let* i =
+    bake_until
+      i
+      (succ constants.parametric.sc_rollup_challenge_window_in_blocks)
+  in
   let hash = Sc_rollup.Commitment.hash commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
   let expect_failure = function
@@ -276,7 +289,7 @@ let test_challenge_window_period_boundaries () =
       ctxt
       contract
       rollup
-      (Int32.of_int sc_rollup_challenge_window_in_blocks)
+      sc_rollup_challenge_window_in_blocks
   in
   (* Succeeds because the challenge period is over. *)
   let* () =
@@ -284,7 +297,7 @@ let test_challenge_window_period_boundaries () =
       ctxt
       contract
       rollup
-      Int32.(of_int sc_rollup_challenge_window_in_blocks |> succ)
+      (succ sc_rollup_challenge_window_in_blocks)
   in
   return_unit
 
