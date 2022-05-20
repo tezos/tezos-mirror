@@ -88,7 +88,8 @@ module Make (PVM : Pvm.S) = struct
     (* Publishing a commitment when one is available does not depend on the state of
        the current head, but we still need to ensure that the node only published
        one commitment per block. *)
-    Components.Commitment.publish_commitment node_ctxt store
+    let* () = Components.Commitment.publish_commitment node_ctxt store in
+    Components.Commitment.cement_commitment_if_possible node_ctxt store head
 
   (* [on_layer_1_chain_event node_ctxt store chain_event old_heads] processes a
      list of heads, coming from either a list of [old_heads] or from the current

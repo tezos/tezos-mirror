@@ -74,20 +74,33 @@ let sc_rollup_commitment_frequency =
     Default_parameters.constants_mainnet
       .sc_rollup_commitment_frequency_in_blocks
 
+let sc_rollup_challenge_window =
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2977
+     Use effective on-chain protocol parameter. *)
+  Int32.of_int
+    Default_parameters.constants_mainnet.sc_rollup_challenge_window_in_blocks
+
 let last_commitment_level (module Last_commitment_level : Mutable_level_store)
     store =
   Last_commitment_level.find store
 
-let last_commitment (module Last_commitment_level : Mutable_level_store) store =
-  let open Lwt_syntax in
+let last_commitment_with_hash
+    (module Last_commitment_level : Mutable_level_store) store =
+  let open Lwt_option_syntax in
   let* last_commitment_level =
     last_commitment_level (module Last_commitment_level) store
   in
-  match last_commitment_level with
-  | Some level ->
-      let+ commitment = Store.Commitments.get store level in
-      Some commitment
-  | None -> return None
+  let*! commitment_with_hash =
+    Store.Commitments.get store last_commitment_level
+  in
+  return commitment_with_hash
+
+let last_commitment (module Last_commitment_level : Mutable_level_store) store =
+  let open Lwt_option_syntax in
+  let+ commitment, _hash =
+    last_commitment_with_hash (module Last_commitment_level) store
+  in
+  commitment
 
 let next_commitment_level (module Last_commitment_level : Mutable_level_store)
     ~origination_level store =
@@ -123,13 +136,16 @@ let must_store_commitment ~origination_level current_level store =
 
 let update_last_stored_commitment store (commitment : Sc_rollup.Commitment.t) =
   let open Lwt_syntax in
+  let commitment_hash = Sc_rollup.Commitment.hash commitment in
   let inbox_level = commitment.inbox_level in
   let* lcc_level = Store.Last_cemented_commitment_level.get store in
   (* Do not change the order of these two operations. This guarantees that
      whenever `Store.Last_stored_commitment_level.get` returns `Some hash`,
      then the call to `Store.Commitments.get hash` will succeed.
   *)
-  let* () = Store.Commitments.add store inbox_level commitment in
+  let* () =
+    Store.Commitments.add store inbox_level (commitment, commitment_hash)
+  in
   let* () = Store.Last_stored_commitment_level.set store inbox_level in
   let* () = Commitment_event.commitment_stored commitment in
   if commitment.inbox_level <= lcc_level then
@@ -139,44 +155,17 @@ let update_last_stored_commitment store (commitment : Sc_rollup.Commitment.t) =
 module type S = sig
   module PVM : Pvm.S
 
-  (** [process_head node_ctxt store head] checks whether a new
-      commitment needs to be computed and stored, by looking at the level of
-      [head] and checking whether it is a multiple of 20 levels away from
-      [node_ctxt.initial_level]. It uses the functionalities of [PVM] to
-      compute the hash of to be included in the commitment.
-  *)
-
   val process_head :
     Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
 
-  (** [get_last_cemented_commitment_hash_with_level node_ctxt store] 
-      fetches and stores information about the last cemented commitment 
-      in the layer1 chain.
-    *)
   val get_last_cemented_commitment_hash_with_level :
     Node_context.t -> Store.t -> unit tzresult Lwt.t
 
-  (** [publish_commitment node_ctxt store] publishes the earliest commitment
-      stored in [store] that has not been published yet, unless its inbox level
-      is below or equal to the inbox level of the last cemented commitment in
-      the layer1 chain. In this case, the rollup node checks whether it has
-      computed a commitment whose inbox level is
-      [sc_rollup_commitment_frequency] levels after the inbox level of the last
-      cemented commitment: 
-      {ul
-      {li if the commitment is found and its predecessor hash coincides with
-       the hash of the LCC, the rollup node will try to publish that commitment
-      instead; }
-      {li if the commitment is found but its predecessor hash differs from the
-        hash of the LCC, the rollup node will stop its execution;}
-      {li if no commitment is found, no action is taken by the rollup node;
-        in particular, no commitment is published.}
-    }
-  *)
   val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
 
-  (** [start ()] only emits the event that the commitment manager
-      for the rollup node has started. *)
+  val cement_commitment_if_possible :
+    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
+
   val start : unit -> unit Lwt.t
 end
 
@@ -290,7 +279,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       Store.Commitments.mem store next_level_to_publish
     in
     if is_commitment_available then
-      let*! commitment = Store.Commitments.get store next_level_to_publish in
+      let*! commitment, commitment_hash =
+        Store.Commitments.get store next_level_to_publish
+      in
       let*! () =
         if check_lcc_hash then
           let open Lwt_syntax in
@@ -324,20 +315,26 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       let open Apply_results in
       let*! () =
         match operation_result with
-        | Applied (Sc_rollup_publish_result _) ->
+        | Applied (Sc_rollup_publish_result {published_at_level; _}) ->
             let open Lwt_syntax in
             let* () =
               Store.Last_published_commitment_level.set
                 store
                 commitment.inbox_level
             in
-            Commitment_event.commitment_published commitment
+            let* () =
+              Store.Commitments_published_at_level.add
+                store
+                commitment_hash
+                published_at_level
+            in
+            Commitment_event.publish_commitment_injected commitment
         | Failed (Sc_rollup_publish_manager_kind, _errors) ->
-            Commitment_event.commitment_failed commitment
+            Commitment_event.publish_commitment_failed commitment
         | Backtracked (Sc_rollup_publish_result _, _errors) ->
-            Commitment_event.commitment_backtracked commitment
+            Commitment_event.publish_commitment_backtracked commitment
         | Skipped Sc_rollup_publish_manager_kind ->
-            Commitment_event.commitment_skipped commitment
+            Commitment_event.publish_commitment_skipped commitment
       in
       return_unit
     else return_unit
@@ -371,6 +368,89 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       else (false, next_publishable_level)
     in
     get_commitment_and_publish node_ctxt level_to_publish store ~check_lcc_hash
+
+  let earliest_cementing_level store commitment_hash =
+    let open Lwt_option_syntax in
+    let+ published_at_level =
+      Store.Commitments_published_at_level.find store commitment_hash
+    in
+    Int32.add (Raw_level.to_int32 published_at_level) sc_rollup_challenge_window
+
+  let can_be_cemented earliest_cementing_level head_level =
+    earliest_cementing_level <= head_level
+
+  let cement_commitment ({Node_context.cctxt; rollup_address; _} as node_ctxt)
+      ({Sc_rollup.Commitment.inbox_level; _} as commitment) commitment_hash
+      store =
+    let open Lwt_result_syntax in
+    let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
+    let* _, _, Manager_operation_result {operation_result; _} =
+      Client_proto_context.sc_rollup_cement
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ~commitment:commitment_hash
+        ~source
+        ~rollup:rollup_address
+        ~src_pk
+        ~src_sk
+        ~fee_parameter:Configuration.default_fee_parameter
+        ()
+    in
+    let open Apply_results in
+    let*! () =
+      match operation_result with
+      | Applied (Sc_rollup_cement_result _) ->
+          let open Lwt_syntax in
+          let* () =
+            Store.Last_cemented_commitment_level.set store inbox_level
+          in
+          let* () =
+            Store.Last_cemented_commitment_hash.set store commitment_hash
+          in
+          Commitment_event.cement_commitment_injected commitment
+      | Failed (Sc_rollup_cement_manager_kind, _errors) ->
+          Commitment_event.cement_commitment_failed commitment
+      | Backtracked (Sc_rollup_cement_result _, _errors) ->
+          Commitment_event.cement_commitment_backtracked commitment
+      | Skipped Sc_rollup_cement_manager_kind ->
+          Commitment_event.cement_commitment_skipped commitment
+    in
+    return_unit
+
+  (* TODO:  https://gitlab.com/tezos/tezos/-/issues/3008
+     Use the injector to cement commitments. *)
+  let cement_commitment_if_possible
+      ({Node_context.initial_level = origination_level; _} as node_ctxt) store
+      (Layer1.Head {level = head_level; _}) =
+    let open Lwt_result_syntax in
+    let* next_level_to_cement =
+      Lwt.map Environment.wrap_tzresult
+      @@ next_commitment_level
+           ~origination_level
+           (module Store.Last_cemented_commitment_level)
+           store
+    in
+    let*! commitment_with_hash =
+      Store.Commitments.find store next_level_to_cement
+    in
+    match commitment_with_hash with
+    (* If `commitment_with_hash` is defined, the commitment to be cemented has
+       been stored but not necessarily published by the rollup node. *)
+    | Some (commitment, commitment_hash) -> (
+        let*! earliest_cementing_level =
+          earliest_cementing_level store commitment_hash
+        in
+        match earliest_cementing_level with
+        (* If `earliest_cementing_level` is well defined, then the rollup node
+           has previously published `commitment`, which means that the rollup
+           is indirectly staked on it. *)
+        | Some earliest_cementing_level ->
+            if can_be_cemented earliest_cementing_level head_level then
+              cement_commitment node_ctxt commitment commitment_hash store
+            else return ()
+        | None -> return ())
+    | None -> return ()
 
   let start () = Commitment_event.starting ()
 end

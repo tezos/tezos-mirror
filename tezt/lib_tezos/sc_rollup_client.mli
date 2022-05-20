@@ -68,19 +68,21 @@ val status : ?hooks:Process.hooks -> t -> string Lwt.t
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option
 
-(** [commitment_with_hash_from_json] parses a commitment and its hash from the
+(** [commitment_with_hash_and_level_from_json] parses a commitment, its hash
+    and the level when the commitment was first published (if any), from the
     JSON representation. *)
-val commitment_with_hash_from_json : JSON.t -> (string * commitment) option
+val commitment_with_hash_and_level_from_json :
+  JSON.t -> (string * commitment * int option) option
 
 (** [last_stored_commitment client] gets the last commitment with its hash
     stored by the rollup node. *)
 val last_stored_commitment :
-  ?hooks:Process.hooks -> t -> (string * commitment) option Lwt.t
+  ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
 
-(** [last_published_commitment client] gets the last commitment published with
-    its hash by the rollup node. *)
+(** [last_published_commitment client] gets the last commitment published by the rollup node, 
+with its hash and level when the commitment was first published. *)
 val last_published_commitment :
-  ?hooks:Process.hooks -> t -> (string * commitment) option Lwt.t
+  ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :
