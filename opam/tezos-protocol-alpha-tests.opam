@@ -28,6 +28,7 @@ depends: [
   "tezos-protocol-environment" {with-test}
   "tezos-stdlib-unix" {with-test}
   "tezos-stdlib" {with-test}
+  "tezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

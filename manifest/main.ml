@@ -2997,6 +2997,29 @@ end = struct
                   ~action:(run_exe "main" ["test"; "Unit"]);
               ]
       in
+      let _regresssion =
+        if N.(number >= 014) then
+          Some
+            (test
+               "main"
+               ~path:
+                 (sf
+                    "src/proto_%s/lib_protocol/test/regression"
+                    name_underscore)
+               ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+               ~deps:
+                 [
+                   tezt;
+                   tezos_base |> open_ ~m:"TzPervasives";
+                   main |> open_;
+                   client |> if_some |> open_;
+                   plugin |> if_some |> open_;
+                   test_helpers |> if_some |> open_;
+                   tezos_micheline |> open_;
+                 ]
+               ~dep_globs:["contracts/*"; "tezt/_regressions/*"])
+        else None
+      in
       ()
 
     let make ~template_version ~name_dash ~name_underscore ~number () =
@@ -4775,6 +4798,10 @@ let exclude filename =
   (* Dune files in src/proto_*/parameters only have a (copy_files) stanza
      (no library / executable / test). *)
   | "src" :: maybe_proto :: "parameters" :: _ when is_proto_ maybe_proto -> true
+  (* This dune file does not contain any targets, only a dirs stanza. *)
+  | ["src"; maybe_proto; "lib_protocol"; "test"; "regression"; "tezt"; "dune"]
+    when is_proto_ maybe_proto ->
+      true
   (* The following directory has a very specific structure that would be hard
      to port to the manifest. Also, it is not released, and is not a dependency
      for releases as it is an opt-in instrumentation. *)
