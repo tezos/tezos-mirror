@@ -99,6 +99,7 @@ type player = Alice | Bob
 type t = {
   turn : player;
   inbox_snapshot : Sc_rollup_inbox_repr.t;
+  level : Raw_level_repr.t;
   dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
 }
 
@@ -130,13 +131,14 @@ let opponent = function Alice -> Bob | Bob -> Alice
 let encoding =
   let open Data_encoding in
   conv
-    (fun {turn; inbox_snapshot; dissection} ->
-      (turn, inbox_snapshot, dissection))
-    (fun (turn, inbox_snapshot, dissection) ->
-      {turn; inbox_snapshot; dissection})
-    (obj3
+    (fun {turn; inbox_snapshot; level; dissection} ->
+      (turn, inbox_snapshot, level, dissection))
+    (fun (turn, inbox_snapshot, level, dissection) ->
+      {turn; inbox_snapshot; level; dissection})
+    (obj4
        (req "turn" player_encoding)
        (req "inbox_snapshot" Sc_rollup_inbox_repr.encoding)
+       (req "level" Raw_level_repr.encoding)
        (req
           "dissection"
           (list
@@ -159,13 +161,15 @@ let pp_dissection ppf d =
 let pp ppf game =
   Format.fprintf
     ppf
-    "[%a] %a playing; inbox snapshot is %a"
+    "[%a] %a playing; inbox snapshot = %a; level = %a"
     pp_dissection
     game.dissection
     pp_player
     game.turn
     Sc_rollup_inbox_repr.pp
     game.inbox_snapshot
+    Raw_level_repr.pp
+    game.level
 
 module Index = struct
   type t = Staker.t * Staker.t
@@ -220,6 +224,7 @@ let initial inbox ~(parent : Commitment.t) ~(child : Commitment.t) ~refuter
   {
     turn = (if alice_to_play then Alice else Bob);
     inbox_snapshot = inbox;
+    level = child.inbox_level;
     dissection =
       [
         (Some parent.compressed_state, Sc_rollup_tick_repr.initial);
@@ -466,6 +471,7 @@ let play game refutation =
              {
                turn = opponent game.turn;
                inbox_snapshot = game.inbox_snapshot;
+               level = game.level;
                dissection = states;
              })
     | Proof proof ->
