@@ -3254,10 +3254,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                   name_underscore
             | Alpha | V _ -> "Tezos/Protocol: economic-protocol definition")
           ~modules:["Protocol"]
-          ~warnings:
-            (match template_version with
-            | AV0 -> "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
-            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warnings
           ~warn_error
           ~nopervasives:true
           ~flags_nostandard:true
@@ -3350,10 +3347,7 @@ include Tezos_raw_protocol_%s.Main
             (* The instrumentation is removed as it can lead to a stack overflow *)
             (* https://gitlab.com/tezos/tezos/-/issues/1927 *)
           ~bisect_ppx:false
-          ~warnings:
-            (match template_version with
-            | AV0 -> "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
-            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warnings
           ~warn_error
           ~nopervasives:true
           ~flags_nostandard:true
@@ -3409,10 +3403,7 @@ include Tezos_raw_protocol_%s.Main
                  `tezos-node`")
           ~modules:["Registerer"]
           ~linkall:true
-          ~warnings:
-            (match template_version with
-            | AV0 -> "+a-4-6-7-9-16-29-32-40..42-44-45-48-60-67"
-            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warnings
           ~warn_error:"+a"
           ~deps:[main; tezos_protocol_updater; tezos_protocol_environment]
           ~dune:
