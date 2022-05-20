@@ -1386,7 +1386,7 @@ and 'kind manager_operation =
       -> Kind.transaction manager_operation
   | Origination : {
       origination : Alpha_context.origination;
-      preorigination : Contract.t;
+      preorigination : Contract_hash.t;
       storage_type : ('storage, _) ty;
       storage : 'storage;
     }

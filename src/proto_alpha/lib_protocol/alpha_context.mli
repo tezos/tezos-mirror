@@ -1528,7 +1528,7 @@ module Contract : sig
     context -> (context * Contract_hash.t) tzresult
 
   val originated_from_current_nonce :
-    since:context -> until:context -> t list tzresult Lwt.t
+    since:context -> until:context -> Contract_hash.t list tzresult Lwt.t
 
   val get_frozen_bonds : context -> t -> Tez.t tzresult Lwt.t
 

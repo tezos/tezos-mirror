@@ -49,6 +49,7 @@ let contracts =
   in
   let until = incr_n_times since 5 in
   Contract_repr.originated_contracts ~since ~until
+  |> List.map (fun c -> Contract_repr.Originated c)
 
 let dest x = Destination_repr.Contract x
 
