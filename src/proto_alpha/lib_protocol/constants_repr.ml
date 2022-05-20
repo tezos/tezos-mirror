@@ -230,6 +230,24 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The smart contract rollup commitment period in blocks must be strictly \
         greater than 0.")
+  >>? fun () ->
+  error_unless
+    (let sc_rollup_max_lookahead_in_blocks =
+       constants.sc_rollup.max_lookahead_in_blocks
+     in
+     Compare.Int32.(
+       sc_rollup_max_lookahead_in_blocks
+       > Int32.of_int constants.sc_rollup.commitment_period_in_blocks
+       && (* Check that [sc_rollup_challenge_window_in_blocks <
+             sc_rollup_max_lookahead_in_blocks]. Otherwise committers would be
+             forced to commit at an artificially slow rate, affecting the
+             throughput of the rollup. *)
+       sc_rollup_max_lookahead_in_blocks
+       > Int32.of_int constants.sc_rollup.challenge_window_in_blocks))
+    (Invalid_protocol_constants
+       "The smart contract rollup max lookahead in blocks must be greater than \
+        [sc_rollup_commitment_period_in_blocks] and \
+        [sc_rollup_challenge_window_in_blocks].")
   >>? fun () -> Result.return_unit
 
 module Generated = struct
