@@ -54,7 +54,7 @@ type cached_contract = Script.t * Script_ir_translator.ex_script
    and [Script_ir_translator.parse_script]. *)
 val find :
   context ->
-  Contract.t ->
+  Contract_hash.t ->
   (context * identifier * cached_contract option) tzresult Lwt.t
 
 (** [update ctxt identifier unparsed_script ir_script size] refreshes the
@@ -65,13 +65,13 @@ val update : context -> identifier -> cached_contract -> int -> context tzresult
 (** [entries ctxt] returns the contracts in the cache as well as their
    respective size. The list is sorted by date of last modification:
    the least recently updated entry comes first. *)
-val entries : context -> (Contract.t * int) list tzresult
+val entries : context -> (Contract_hash.t * int) list tzresult
 
 (** [contract_rank ctxt contract] returns the number of contracts
     older than [contract] in the cache of [ctxt]. This function
     returns [None] if [contract] does not exist in the cache of
     [ctxt]. *)
-val contract_rank : context -> Contract.t -> int option
+val contract_rank : context -> Contract_hash.t -> int option
 
 (** [size ctxt] is an overapproximation of the cache size in
    memory (in bytes). *)
@@ -81,5 +81,6 @@ val size : context -> int
 val size_limit : context -> int
 
 (** [insert] is a variant of [update] which identifies the contract to update
-    by its address (of type [Contract.t]) instead of its cache identifier. *)
-val insert : context -> Contract.t -> cached_contract -> int -> context tzresult
+    by its address (of type [Contract_hash.t]) instead of its cache identifier. *)
+val insert :
+  context -> Contract_hash.t -> cached_contract -> int -> context tzresult

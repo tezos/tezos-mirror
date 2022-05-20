@@ -197,8 +197,7 @@ module Cache = struct
       RPC_service.get_service
         ~description:"Return the list of cached contracts"
         ~query:RPC_query.empty
-        ~output:
-          Data_encoding.(list @@ tup2 Alpha_context.Contract.encoding int31)
+        ~output:Data_encoding.(list @@ tup2 Contract_hash.encoding int31)
         RPC_path.(custom_root / "context" / "cache" / "contracts" / "all")
 
     let contract_cache_size =
@@ -222,7 +221,7 @@ module Cache = struct
           "Return the number of cached contracts older than the provided \
            contract"
         ~query:RPC_query.empty
-        ~input:Alpha_context.Contract.encoding
+        ~input:Alpha_context.Contract.originated_encoding
         ~output:Data_encoding.(option int31)
         RPC_path.(custom_root / "context" / "cache" / "contracts" / "rank")
   end

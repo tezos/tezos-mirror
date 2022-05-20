@@ -938,7 +938,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
 let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
   match contract with
-  | Originated _ -> (
+  | Originated contract_hash -> (
       (* Since the contract is originated, nothing will be allocated
          or this transfer of tokens will fail.
          Calls to non-existing contracts are detected by [Script_cache.find]
@@ -947,7 +947,7 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
       *)
       Token.transfer ctxt (`Contract source) (`Contract contract) amount
       >>=? fun (ctxt, balance_updates) ->
-      Script_cache.find ctxt contract >>=? fun (ctxt, cache_key, script) ->
+      Script_cache.find ctxt contract_hash >>=? fun (ctxt, cache_key, script) ->
       match script with
       | None -> fail (Contract.Non_existing_contract contract)
       | Some (script, script_ir) ->
@@ -3131,7 +3131,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
          (`Contract liquidity_baking_cpmm_contract)
          liquidity_baking_subsidy
        >>=? fun (ctxt, balance_updates) ->
-       Script_cache.find ctxt liquidity_baking_cpmm_contract
+       Script_cache.find ctxt liquidity_baking_cpmm_contract_hash
        >>=? fun (ctxt, cache_key, script) ->
        match script with
        | None -> fail (Script_tc_errors.No_such_entrypoint Entrypoint.default)

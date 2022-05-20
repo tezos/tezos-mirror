@@ -95,14 +95,12 @@ module Cache_shared_config = struct
 end
 
 (* We can't produce a Script_cache.identifier without calling [Script_cache.find]. *)
-let identifier_of_contract (c : Alpha_context.Contract.t) : Cache.identifier =
+let identifier_of_contract (c : Contract_hash.t) : Cache.identifier =
   let _, id, _ = Cache.find throwaway_context c |> assert_ok_lwt in
   id
 
-let contract_of_int i : Alpha_context.Contract.t =
-  Alpha_context.Contract.of_b58check
-    Contract_hash.(to_b58check (hash_string [string_of_int i]))
-  |> assert_ok
+let contract_of_int i : Contract_hash.t =
+  Contract_hash.(of_b58check_exn (to_b58check (hash_string [string_of_int i])))
 
 let identifier_of_int i = identifier_of_contract @@ contract_of_int i
 

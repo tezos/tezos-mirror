@@ -27,13 +27,17 @@ open Alpha_context
 
 type identifier = string
 
-let identifier_of_contract addr = Contract.to_b58check addr
+let identifier_of_contract addr = Contract_hash.to_b58check addr
 
-let contract_of_identifier identifier = Contract.of_b58check identifier
+let contract_of_identifier identifier =
+  match Contract_hash.of_b58check_opt identifier with
+  | Some addr -> Ok addr
+  | None -> error (Contract_repr.Invalid_contract_notation identifier)
 
 type cached_contract = Script.t * Script_ir_translator.ex_script
 
 let load_and_elaborate ctxt addr =
+  let addr = Contract.Originated addr in
   Contract.get_script ctxt addr >>=? fun (ctxt, script) ->
   match script with
   | None -> return (ctxt, None)

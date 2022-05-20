@@ -178,7 +178,7 @@ let tickets_of_transaction ctxt ~(destination : Contract.t) ~entrypoint
     ~location ~parameters_ty ~parameters =
   match destination with
   | Implicit _ -> return (None, ctxt)
-  | Originated _ ->
+  | Originated contract_hash ->
       (* TODO: #2653
          Avoid having to load the script from the cache.
          This is currently in place to avoid regressions for type-checking
@@ -186,7 +186,7 @@ let tickets_of_transaction ctxt ~(destination : Contract.t) ~entrypoint
       *)
       parse_and_cache_script
         ctxt
-        ~destination
+        ~destination:contract_hash
         ~get_non_cached_script:(fun ctxt ->
           (* Look up the script from the context. *)
           Contract.get_script ctxt destination >>=? fun (ctxt, script_opt) ->
