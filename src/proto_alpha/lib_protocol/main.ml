@@ -135,6 +135,8 @@ type validation_state = {
   liquidity_baking_toggle_ema : Alpha_context.Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
+  validate_operation_info : Validate_operation.validate_operation_info;
+  validate_operation_state : Validate_operation.validate_operation_state;
 }
 
 let begin_partial_application ~chain_id ~ancestor_context:ctxt
@@ -177,6 +179,9 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
         block_producer;
       }
   in
+  let validate_operation_info, validate_operation_state =
+    Validate_operation.init_info_and_state ctxt Block chain_id
+  in
   return
     {
       mode;
@@ -189,6 +194,8 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
         Apply_results.pack_migration_operation_results
           migration_operation_results
         @ liquidity_baking_operations_results;
+      validate_operation_info;
+      validate_operation_state;
     }
 
 (* During applications the valid consensus operations are:
@@ -233,6 +240,9 @@ let begin_application ~chain_id ~predecessor_context:ctxt ~predecessor_timestamp
         block_producer;
       }
   in
+  let validate_operation_info, validate_operation_state =
+    Validate_operation.init_info_and_state ctxt Block chain_id
+  in
   return
     {
       mode;
@@ -245,6 +255,8 @@ let begin_application ~chain_id ~predecessor_context:ctxt ~predecessor_timestamp
         Apply_results.pack_migration_operation_results
           migration_operation_results
         @ liquidity_baking_operations_results;
+      validate_operation_info;
+      validate_operation_state;
     }
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
@@ -276,11 +288,16 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
             predecessor_round;
           }
       in
+      let validate_operation_info, validate_operation_state =
+        Validate_operation.init_info_and_state ctxt Mempool chain_id
+      in
       return
         ( mode,
           ctxt,
           liquidity_baking_operations_results,
-          liquidity_baking_toggle_ema )
+          liquidity_baking_toggle_ema,
+          validate_operation_info,
+          validate_operation_state )
   | Some proto_header ->
       Alpha_context.Fitness.round_from_raw predecessor_fitness
       >>?= fun predecessor_round ->
@@ -323,15 +340,22 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
             predecessor_level;
           }
       in
+      let validate_operation_info, validate_operation_state =
+        Validate_operation.init_info_and_state ctxt Block chain_id
+      in
       return
         ( mode,
           ctxt,
           liquidity_baking_operations_results,
-          liquidity_baking_toggle_ema ))
+          liquidity_baking_toggle_ema,
+          validate_operation_info,
+          validate_operation_state ))
   >|=? fun ( mode,
              ctxt,
              liquidity_baking_operations_results,
-             liquidity_baking_toggle_ema ) ->
+             liquidity_baking_toggle_ema,
+             validate_operation_info,
+             validate_operation_state ) ->
   {
     mode;
     chain_id;
@@ -342,6 +366,8 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
     implicit_operations_results =
       Apply_results.pack_migration_operation_results migration_operation_results
       @ liquidity_baking_operations_results;
+    validate_operation_info;
+    validate_operation_state;
   }
 
 let apply_operation_with_mode mode ctxt chain_id data op_count operation

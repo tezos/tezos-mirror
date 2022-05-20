@@ -107,6 +107,8 @@ type validation_state = {
   liquidity_baking_toggle_ema : Alpha_context.Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
+  validate_operation_info : Validate_operation.validate_operation_info;
+  validate_operation_state : Validate_operation.validate_operation_state;
 }
 
 type operation_data = Alpha_context.packed_protocol_data
