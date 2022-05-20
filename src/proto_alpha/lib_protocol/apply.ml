@@ -2888,6 +2888,22 @@ let apply_manager_contents_list ctxt mode ~payload_producer chain_id
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
+let handle_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
+    contents_list operation =
+  (* Use the initial context, the contract may be deleted by the
+     fee transfer in [precheck_manager_contents] *)
+  find_manager_public_key ctxt contents_list >>=? fun public_key ->
+  precheck_manager_contents_list ctxt contents_list ~mempool_mode
+  >>=? fun (ctxt, prechecked_contents_list) ->
+  Operation.check_signature public_key chain_id operation >>?= fun () ->
+  apply_manager_contents_list
+    ctxt
+    mode
+    ~payload_producer
+    chain_id
+    prechecked_contents_list
+  >|= ok
+
 let check_denunciation_age ctxt kind given_level =
   let max_slashing_period = Constants.max_slashing_period ctxt in
   let current_cycle = (Level.current ctxt).cycle in
@@ -3207,34 +3223,24 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
   | Single (Failing_noop _) ->
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
-  | Single (Manager_operation _) as op ->
-      (* Use the initial context, the contract may be deleted by the
-         fee transfer in [precheck_manager_contents] *)
-      find_manager_public_key ctxt op >>=? fun public_key ->
-      precheck_manager_contents_list ctxt op ~mempool_mode
-      >>=? fun (ctxt, prechecked_contents_list) ->
-      Operation.check_signature public_key chain_id operation >>?= fun () ->
-      apply_manager_contents_list
+  | Single (Manager_operation _) ->
+      handle_manager_operation
         ctxt
         mode
         ~payload_producer
         chain_id
-        prechecked_contents_list
-      >|= ok
-  | Cons (Manager_operation _, _) as op ->
-      (* Use the initial context, the contract may be deleted by the
-         fee transfer in [precheck_manager_contents] *)
-      find_manager_public_key ctxt op >>=? fun public_key ->
-      precheck_manager_contents_list ctxt op ~mempool_mode
-      >>=? fun (ctxt, prechecked_contents_list) ->
-      Operation.check_signature public_key chain_id operation >>?= fun () ->
-      apply_manager_contents_list
+        ~mempool_mode
+        contents_list
+        operation
+  | Cons (Manager_operation _, _) ->
+      handle_manager_operation
         ctxt
         mode
         ~payload_producer
         chain_id
-        prechecked_contents_list
-      >|= ok
+        ~mempool_mode
+        contents_list
+        operation
 
 let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
     ~payload_producer hash operation =
