@@ -7,7 +7,8 @@ opam:prepare:
   script:
     - git init _opam-repo-for-release
     - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
-    - (cd _opam-repo-for-release && git add packages && git commit -m "tezos packages")
+    - git -C _opam-repo-for-release add packages
+    - git -C _opam-repo-for-release commit -m "tezos packages"
   needs: []
   artifacts:
     paths:
