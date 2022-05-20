@@ -29,15 +29,16 @@ open Apply_results
 
 let tez_sym = "\xEA\x9C\xA9"
 
-let pp_manager_operation_content (type kind) source internal pp_result ppf
-    ((operation, result) : kind manager_operation * _) =
-  Format.fprintf ppf "@[<v 0>" ;
+let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
+    pp_result res =
+  let {operation; source; _} = op in
+  (* For now, try to use the same format as in [pp_manager_operation_content]. *)
+  Format.fprintf ppf "@[<v 0>@[<v 2>Internal " ;
   (match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,Amount: %s%a@,From: %a@,To: %a"
-        (if internal then "Internal transaction" else "Transaction")
+        "Transaction:@,Amount: %s%a@,From: %a@,To: %a"
         tez_sym
         Tez.pp
         amount
@@ -47,24 +48,21 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         destination ;
       if not (Entrypoint.is_default entrypoint) then
         Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;
-      (if not (Script_repr.is_unit_parameter parameters) then
-       let expr =
-         WithExceptions.Option.to_exn
-           ~none:(Failure "ill-serialized argument")
-           (Data_encoding.force_decode parameters)
-       in
-       Format.fprintf
-         ppf
-         "@,Parameter: @[<v 0>%a@]"
-         Michelson_v1_printer.print_expr
-         expr) ;
-      pp_result ppf result ;
-      Format.fprintf ppf "@]"
-  | Origination {delegate; credit; script = {code; storage}} ->
+      if not (Script_repr.is_unit_parameter parameters) then
+        let expr =
+          WithExceptions.Option.to_exn
+            ~none:(Failure "ill-serialized argument")
+            (Data_encoding.force_decode parameters)
+        in
+        Format.fprintf
+          ppf
+          "@,Parameter: @[<v 0>%a@]"
+          Michelson_v1_printer.print_expr
+          expr
+  | Origination {delegate; credit; script = {code; storage}} -> (
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,From: %a@,Credit: %s%a"
-        (if internal then "Internal origination" else "Origination")
+        "Origination:@,From: %a@,Credit: %s%a"
         Contract.pp
         source
         tez_sym
@@ -89,47 +87,103 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         Michelson_v1_printer.print_expr
         storage ;
-      (match delegate with
+      match delegate with
       | None -> Format.fprintf ppf "@,No delegate for this contract"
       | Some delegate ->
           Format.fprintf
             ppf
             "@,Delegate: %a"
             Signature.Public_key_hash.pp
-            delegate) ;
-      pp_result ppf result ;
-      Format.fprintf ppf "@]"
+            delegate)
+  | Delegation delegate_opt -> (
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
+      match delegate_opt with
+      | None -> Format.pp_print_string ppf "nobody"
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)) ;
+
+  Format.fprintf ppf "%a@]@]" pp_result res
+
+let pp_internal_operation ppf op =
+  pp_internal_operation_result ppf op (fun (_ : Format.formatter) () -> ()) ()
+
+let pp_manager_operation_content (type kind) source pp_result ppf
+    ((operation, result) : kind manager_operation * _) =
+  (* For now, try to keep formatting in sync with [pp_internal_operation_result]. *)
+  Format.fprintf ppf "@[<v 0>@[<v 2>" ;
+  (match operation with
+  | Transaction {destination; amount; parameters; entrypoint} ->
+      Format.fprintf
+        ppf
+        "Transaction:@,Amount: %s%a@,From: %a@,To: %a"
+        tez_sym
+        Tez.pp
+        amount
+        Contract.pp
+        source
+        Destination.pp
+        destination ;
+      if not (Entrypoint.is_default entrypoint) then
+        Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;
+      if not (Script_repr.is_unit_parameter parameters) then
+        let expr =
+          WithExceptions.Option.to_exn
+            ~none:(Failure "ill-serialized argument")
+            (Data_encoding.force_decode parameters)
+        in
+        Format.fprintf
+          ppf
+          "@,Parameter: @[<v 0>%a@]"
+          Michelson_v1_printer.print_expr
+          expr
+  | Origination {delegate; credit; script = {code; storage}} -> (
+      Format.fprintf
+        ppf
+        "Origination:@,From: %a@,Credit: %s%a"
+        Contract.pp
+        source
+        tez_sym
+        Tez.pp
+        credit ;
+      let code =
+        WithExceptions.Option.to_exn
+          ~none:(Failure "ill-serialized code")
+          (Data_encoding.force_decode code)
+      and storage =
+        WithExceptions.Option.to_exn
+          ~none:(Failure "ill-serialized storage")
+          (Data_encoding.force_decode storage)
+      in
+      let {Michelson_v1_parser.source; _} =
+        Michelson_v1_printer.unparse_toplevel code
+      in
+      Format.fprintf
+        ppf
+        "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]"
+        Format.pp_print_text
+        source
+        Michelson_v1_printer.print_expr
+        storage ;
+      match delegate with
+      | None -> Format.fprintf ppf "@,No delegate for this contract"
+      | Some delegate ->
+          Format.fprintf
+            ppf
+            "@,Delegate: %a"
+            Signature.Public_key_hash.pp
+            delegate)
   | Reveal key ->
       Format.fprintf
         ppf
-        "@[<v 2>%s of manager public key:@,Contract: %a@,Key: %a%a@]"
-        (if internal then "Internal revelation" else "Revelation")
+        "Revelation of manager public key:@,Contract: %a@,Key: %a"
         Contract.pp
         source
         Signature.Public_key.pp
         key
-        pp_result
-        result
-  | Delegation None ->
-      Format.fprintf
-        ppf
-        "@[<v 2>%s:@,Contract: %a@,To: nobody%a@]"
-        (if internal then "Internal Delegation" else "Delegation")
-        Contract.pp
-        source
-        pp_result
-        result
-  | Delegation (Some delegate) ->
-      Format.fprintf
-        ppf
-        "@[<v 2>%s:@,Contract: %a@,To: %a%a@]"
-        (if internal then "Internal Delegation" else "Delegation")
-        Contract.pp
-        source
-        Signature.Public_key_hash.pp
-        delegate
-        pp_result
-        result
+  | Delegation delegate_opt -> (
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
+      match delegate_opt with
+      | None -> Format.pp_print_string ppf "nobody"
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
   | Register_global_constant {value = lazy_value} ->
       let value =
         WithExceptions.Option.to_exn
@@ -138,210 +192,136 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
       in
       Format.fprintf
         ppf
-        "Register Global:@,@[<v 2>  Value: %a%a@]"
+        "Register Global:@,Value: %a"
         Michelson_v1_printer.print_expr
         value
-        pp_result
-        result
-  | Set_deposits_limit None ->
+  | Set_deposits_limit limit_opt -> (
       Format.fprintf
         ppf
-        "@[<v 2>%s:@,Delegate: %a@,Unlimited deposits%a@]"
-        (if internal then "Internal set deposits limit"
-        else "Set deposits limit")
+        "Set deposits limit:@,Delegate: %a@,"
         Contract.pp
-        source
-        pp_result
-        result
-  | Set_deposits_limit (Some limit) ->
-      Format.fprintf
-        ppf
-        "@[<v 2>%s:@,Delegate: %a@,Limit: %a%a@]"
-        (if internal then "Internal set deposits limit"
-        else "Set deposits limit")
-        Contract.pp
-        source
-        Tez.pp
-        limit
-        pp_result
-        result
+        source ;
+      match limit_opt with
+      | None -> Format.pp_print_string ppf "Unlimited deposits"
+      | Some limit -> Format.fprintf ppf "Limit: %a" Tez.pp limit)
   | Tx_rollup_origination ->
-      Format.fprintf
-        ppf
-        "@[<v 2>%s:@,From: %a%a@]"
-        (if internal then "Internal tx rollup origination"
-        else "Tx rollup origination")
-        Contract.pp
-        source
-        pp_result
-        result
+      Format.fprintf ppf "Tx rollup origination:@,From: %a" Contract.pp source
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a, %d bytes, From: %a%a@]"
-        (if internal then "Internal tx rollup transaction"
-        else "Tx rollup transaction")
+        "Tx rollup transaction:%a, %d bytes, From: %a"
         Tx_rollup.pp
         tx_rollup
         (String.length content)
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_commit {tx_rollup; commitment} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a, %a@,From: %a%a@]"
-        (if internal then "Internal tx rollup commitment"
-        else "Tx rollup commitment")
+        "Tx rollup commitment:%a, %a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Tx_rollup_commitment.Full.pp
         commitment
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_return_bond {tx_rollup} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup return commitment bond"
-        else "Tx rollup return commitment bond")
+        "Tx rollup return commitment bond:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Format.fprintf
         ppf
-        "@[<v >%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup finalize commitment"
-        else "Tx rollup finalize commitment")
+        "Tx rollup finalize commitment:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_remove_commitment {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup remove commitment"
-        else "Tx rollup remove commitment")
+        "Tx rollup remove commitment:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_rejection {tx_rollup; _} ->
       (* FIXME/TORU *)
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a @,From: %a%a@]"
-        (if internal then "Internal tx rollup rejection"
-        else "Tx rollup rejection")
+        "Tx rollup rejection:%a @,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a@,From: %a%a@]"
-        (if internal then "Internal tx rollup dispatch tickets"
-        else "Tx rollup dispatch tickets")
+        "Tx rollup dispatch tickets:%a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        pp_result
-        result
   | Transfer_ticket _ ->
-      Format.fprintf
-        ppf
-        "@[<v 2>%s:@,From: %a%a@]"
-        (if internal then "Internal transfer ticket" else "Transfer ticket")
-        Contract.pp
-        source
-        pp_result
-        result
+      Format.fprintf ppf "Transfer tickets:@,From: %a" Contract.pp source
   | Sc_rollup_originate {kind; boot_sector} ->
       let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
       Format.fprintf
         ppf
-        "@[<v 2>Originate smart contract rollup of kind %s with boot sector \
-         '%a'%a@]"
+        "Originate smart contract rollup of kind %s with boot sector '%a'"
         R.name
         R.pp_boot_sector
         boot_sector
-        pp_result
-        result
   | Sc_rollup_add_messages {rollup; messages = _} ->
       Format.fprintf
         ppf
-        "@[<v 2>Add a message to the inbox of the smart contract rollup at \
-         address %a%a@]"
+        "Add a message to the inbox of the smart contract rollup at address %a"
         Sc_rollup.Address.pp
         rollup
-        pp_result
-        result
   | Sc_rollup_cement {rollup; commitment} ->
       Format.fprintf
         ppf
-        "@[<v 2>Cement the commitment %a in the smart contract rollup at \
-         address %a%a@]"
+        "Cement the commitment %a in the smart contract rollup at address %a"
         Sc_rollup.Commitment_hash.pp
         commitment
         Sc_rollup.Address.pp
         rollup
-        pp_result
-        result
   | Sc_rollup_publish {rollup; commitment} ->
       Format.fprintf
         ppf
-        "@[<v 2>Publish commitment %a in the smart contract rollup at address \
-         %a%a@]"
+        "Publish commitment %a in the smart contract rollup at address %a"
         Sc_rollup.Commitment.pp
         commitment
         Sc_rollup.Address.pp
         rollup
-        pp_result
-        result
   | Sc_rollup_refute {rollup; opponent; refutation} ->
       Format.fprintf
         ppf
-        "@[<v 2>Refute staker %a in the smart contract rollup at address %a \
-         using refutation %a%a@]"
+        "Refute staker %a in the smart contract rollup at address %a using \
+         refutation %a"
         Sc_rollup.Staker.pp
         opponent
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Game.pp_refutation
         refutation
-        pp_result
-        result
   | Sc_rollup_timeout {rollup; stakers} ->
       Format.fprintf
         ppf
-        "@[<v 2>Punish one of the two stakers %a and %a by timeout in the \
-         smart contract rollup at address %a%a@]"
+        "Punish one of the two stakers %a and %a by timeout in the smart \
+         contract rollup at address %a"
         Sc_rollup.Staker.pp
         (fst stakers)
         Sc_rollup.Staker.pp
         (snd stakers)
         Sc_rollup.Address.pp
-        rollup
-        pp_result
-        result) ;
+        rollup) ;
 
-  Format.fprintf ppf "@]"
+  Format.fprintf ppf "%a@]@]" pp_result result
 
 let pp_balance_updates ppf = function
   | [] -> ()
@@ -975,7 +955,7 @@ let pp_manager_operation_contents_and_result ppf
   Format.fprintf
     ppf
     "@,%a"
-    (pp_manager_operation_content (Contract.Implicit source) false pp_result)
+    (pp_manager_operation_content (Contract.Implicit source) pp_result)
     (operation, operation_result) ;
   (match internal_operation_results with
   | [] -> ()
@@ -985,15 +965,11 @@ let pp_manager_operation_contents_and_result ppf
         "@,@[<v 2>Internal operations:@ %a@]"
         (Format.pp_print_list
            (fun ppf (Internal_manager_operation_result (op, res)) ->
-             let operation =
-               manager_operation_of_internal_operation op.operation
-             in
-             pp_manager_operation_content
-               op.source
-               false
-               pp_result
+             pp_internal_operation_result
                ppf
-               (operation, res)))
+               (Internal_contents op)
+               pp_result
+               res))
         internal_operation_results) ;
   Format.fprintf ppf "@]"
 
@@ -1154,16 +1130,3 @@ let pp_operation_result ppf
   let contents_and_result_list = Apply_results.pack_contents_list op res in
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
-
-let pp_internal_operation_result ppf (Apply_results.Internal_contents op) =
-  let operation = manager_operation_of_internal_operation op.operation in
-  pp_manager_operation_content
-    op.source
-    true
-    (fun _ppf () -> ())
-    ppf
-    (operation, ())
-
-let pp_internal_operation ppf (Script_typed_ir.Internal_operation op) =
-  let op = contents_of_internal_operation op in
-  pp_internal_operation_result ppf (Internal_contents op)

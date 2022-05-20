@@ -76,7 +76,7 @@ This sequence of operations was run:
       Storage size: 51 bytes
       Consumed gas: 2115.714
     Internal operations:
-      Delegation:
+      Internal Delegation:
         Contract: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
         This delegation was successfully applied
@@ -113,7 +113,7 @@ This sequence of operations was run:
       Storage size: 51 bytes
       Consumed gas: 1202.968
     Internal operations:
-      Delegation:
+      Internal Delegation:
         Contract: [CONTRACT_HASH]
         To: nobody
         This delegation was successfully applied

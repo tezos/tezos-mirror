@@ -35,7 +35,7 @@ This sequence of operations was run:
       Storage size: 4633 bytes
       Consumed gas: 1747.789
     Internal operations:
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ0
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
@@ -52,7 +52,7 @@ This sequence of operations was run:
           Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 461
         Storage size: 2331 bytes
         Consumed gas: 3265.725
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ3891.966034
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
@@ -61,7 +61,7 @@ This sequence of operations was run:
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ3891.966034
           [CONTRACT_HASH] ... +ꜩ3891.966034
-      Transaction:
+      Internal Transaction:
         Amount: ꜩ3.895862
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]

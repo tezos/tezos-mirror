@@ -28,7 +28,7 @@ This sequence of operations was run:
       Storage size: 93 bytes
       Consumed gas: 2121.040
     Internal operations:
-      Origination:
+      Internal Origination:
         From: [CONTRACT_HASH]
         Credit: ꜩ0
         Script:
