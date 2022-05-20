@@ -208,6 +208,12 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The smart contract rollup origination size must be non-negative.")
   >>? fun () ->
+  error_unless
+    Compare.Int.(constants.sc_rollup.challenge_window_in_blocks >= 0)
+    (Invalid_protocol_constants
+       "The smart contract rollup challenge window in blocks must be \
+        non-negative.")
+  >>? fun () ->
   >>? fun () -> Result.return_unit
 
 module Generated = struct
