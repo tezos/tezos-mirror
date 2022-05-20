@@ -10,21 +10,8 @@ unified_coverage:
   # This job requires all bisect_ppx artifacts from the stage test, so we override
   # the `dependencies: []` in `.default_settings` with a list of jobs.
   # Each new job in the stage test needs to be manually added to this list.
+  # Total: 51
   dependencies:
-    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__1]"
-    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__2]"
-    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__3]"
-    - "unit:012_Psithaca: [proto_012_Psithaca]"
-    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__1]"
-    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__2]"
-    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__3]"
-    - "unit:013_PtJakart: [proto_013_PtJakart]"
-    - "unit:alpha: [proto_alpha__lib_protocol__1]"
-    - "unit:alpha: [proto_alpha__lib_protocol__2]"
-    - "unit:alpha: [proto_alpha__lib_protocol__3]"
-    - "unit:alpha: [proto_alpha]"
-    - "unit:non-proto-x86_64"
-    - "integration:sandboxes:acc-endorsement"
     - "integration:pytest 1/25"
     - "integration:pytest 2/25"
     - "integration:pytest 3/25"
@@ -50,6 +37,8 @@ unified_coverage:
     - "integration:pytest 23/25"
     - "integration:pytest 24/25"
     - "integration:pytest 25/25"
+    - "integration:sandboxes:acc-endorsement"
+    - "test-liquidity-baking-scripts"
     - "tezt 1/9"
     - "tezt 2/9"
     - "tezt 3/9"
@@ -59,6 +48,22 @@ unified_coverage:
     - "tezt 7/9"
     - "tezt 8/9"
     - "tezt 9/9"
+    - "tezt:static-binaries 1/2"
+    - "tezt:static-binaries 2/2"
+    - "unit:012_Psithaca: [proto_012_Psithaca]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__1]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__2]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__3]"
+    - "unit:013_PtJakart: [proto_013_PtJakart]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__1]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__2]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__3]"
+    - "unit:alpha: [proto_alpha]"
+    - "unit:alpha: [proto_alpha__lib_protocol__1]"
+    - "unit:alpha: [proto_alpha__lib_protocol__2]"
+    - "unit:alpha: [proto_alpha__lib_protocol__3]"
+    - "unit:non-proto-x86_64"
+
   script:
     # On the development branches, we compute coverage
     - ./scripts/ci/report_coverage.sh
