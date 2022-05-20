@@ -42,6 +42,8 @@ Node
 - Added metrics to observe the bootstrapped and synchronisation
   status.
 
+- Added metrics to track the peer validator requests.
+
 Client
 ------
 

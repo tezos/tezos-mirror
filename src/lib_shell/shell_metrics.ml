@@ -583,3 +583,137 @@ module Version = struct
     in
     ()
 end
+
+module Peer_validator = struct
+  type t = {
+    on_no_request : Prometheus.Counter.t;
+    new_head_completed : Prometheus.Counter.t;
+    new_branch_completed : Prometheus.Counter.t;
+    invalid_locator : Prometheus.Counter.t;
+    invalid_block : Prometheus.Counter.t;
+    system_error : Prometheus.Counter.t;
+    unavailable_protocol : Prometheus.Counter.t;
+    unknown_ancestor : Prometheus.Counter.t;
+    too_short_locator : Prometheus.Counter.t;
+    operations_fetching_canceled_new_branch : Prometheus.Counter.t;
+    operations_fetching_canceled_new_known_valid_head : Prometheus.Counter.t;
+    operations_fetching_canceled_new_unknown_head : Prometheus.Counter.t;
+    unknown_error : Prometheus.Counter.t;
+    connections : Prometheus.Counter.t;
+  }
+
+  let init name =
+    let namespace = String.concat "_" name in
+    let subsystem = None in
+    let on_no_request =
+      let help =
+        "Number of time we did no hear new messages from a peer since the last \
+         timeout."
+      in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "on_no_request_count"
+    in
+    let new_head_completed =
+      let help =
+        "Number of time we successfuly completed a new head request from a \
+         peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "new_head_completed"
+    in
+    let new_branch_completed =
+      let help =
+        "Number of time we successfuly completed a new branch request from a \
+         peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "new_branch_completed"
+    in
+    let invalid_locator =
+      let help = "Number of time we received an invalid locator from a peer." in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "invalid_locator"
+    in
+    let invalid_block =
+      let help = "Number of time we received an invalid block from a peer." in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "invalid_block"
+    in
+    let system_error =
+      let help =
+        "Number of time a request trigerred a system error from a peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "system_error"
+    in
+    let unavailable_protocol =
+      let help =
+        "Number of time we received an unknown protocol from a peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "unavailable_protocol"
+    in
+    let unknown_ancestor =
+      let help =
+        "Number of time we received a locator with an unknown ancestor from a \
+         peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "unknown_ancestor"
+    in
+    let too_short_locator =
+      let help =
+        "Number of time we received a too short locator from a peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "too_short_locator"
+    in
+    let operations_fetching_canceled_new_branch =
+      let help =
+        "Number of time we canceled the fetching of operations on a new branch \
+         request for a peer."
+      in
+      Prometheus.Counter.v
+        ~help
+        ~namespace
+        ?subsystem
+        "operations_fetching_canceled_new_branch"
+    in
+    let operations_fetching_canceled_new_known_valid_head =
+      let help =
+        "Number of time we canceled the fetching of operations on a new head \
+         request for a peer."
+      in
+      Prometheus.Counter.v
+        ~help
+        ~namespace
+        ?subsystem
+        "operations_fetching_canceled_new_known_valid_head"
+    in
+    let operations_fetching_canceled_new_unknown_head =
+      let help =
+        "Number of time we canceled the fetching of operations on a new head \
+         request or an unknown head for a peer."
+      in
+      Prometheus.Counter.v
+        ~help
+        ~namespace
+        ?subsystem
+        "operations_fetching_canceled_new_unknown_head"
+    in
+    let unknown_error =
+      let help = "Number of time an unknown error happened for a peer." in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "unknown_error"
+    in
+    let connections =
+      let help = "Number of time we connected to a peer." in
+      Prometheus.Counter.v ~help ~namespace ?subsystem "connections"
+    in
+    {
+      on_no_request;
+      new_head_completed;
+      new_branch_completed;
+      invalid_locator;
+      invalid_block;
+      system_error;
+      unavailable_protocol;
+      unknown_ancestor;
+      too_short_locator;
+      operations_fetching_canceled_new_branch;
+      operations_fetching_canceled_new_known_valid_head;
+      operations_fetching_canceled_new_unknown_head;
+      unknown_error;
+      connections;
+    }
+end
