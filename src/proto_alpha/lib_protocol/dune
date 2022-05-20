@@ -165,6 +165,7 @@
   Sc_rollup_stake_storage
   Sc_rollup_refutation_storage
   Sc_rollup_storage
+  Dal_slot_storage
   Alpha_context
   Script_string
   Script_int
@@ -380,6 +381,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli
@@ -581,6 +583,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli
@@ -802,6 +805,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli
@@ -1019,6 +1023,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli

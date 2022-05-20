@@ -144,6 +144,8 @@
         "Sc_rollup_refutation_storage",
         "Sc_rollup_storage",
 
+	"Dal_slot_storage",
+
         "Alpha_context",
         "Script_string",
         "Script_int",
