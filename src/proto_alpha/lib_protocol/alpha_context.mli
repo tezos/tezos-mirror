@@ -1664,6 +1664,14 @@ module Contract : sig
   val check_counter_increment :
     context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
 
+  (** See {Contract_storage.simulate_spending}. *)
+  val simulate_spending :
+    context ->
+    balance:Tez.t ->
+    amount:Tez.t ->
+    public_key_hash ->
+    (Tez.t * bool) tzresult Lwt.t
+
   val raw_originate :
     context ->
     prepaid_bootstrap_storage:bool ->
