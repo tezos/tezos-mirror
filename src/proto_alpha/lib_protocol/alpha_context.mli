@@ -2747,6 +2747,45 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
+module Dal : sig
+  module Endorsement : sig
+    type t
+
+    val encoding : t Data_encoding.t
+
+    val empty : t
+
+    val occupied_size_in_bits : t -> int
+
+    val expected_size_in_bits : max_index:int -> int
+
+    val shards : context -> endorser:Signature.Public_key_hash.t -> int list
+
+    val record_available_shards : context -> t -> int list -> context
+  end
+
+  module Slot : sig
+    type header
+
+    type t = private {level : Raw_level.t; index : int; header : header}
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+
+    val current_slot_fees : context -> t -> Tez.t option
+
+    val update_slot_fees : context -> t -> Tez.t -> context * bool
+
+    val find : context -> Raw_level.t -> t list option tzresult Lwt.t
+
+    val finalize_current_slots : context -> context Lwt.t
+
+    val finalize_pending_slots :
+      context -> (context * Endorsement.t) tzresult Lwt.t
+  end
+end
+
 module Block_payload : sig
   val hash :
     predecessor:Block_hash.t ->
