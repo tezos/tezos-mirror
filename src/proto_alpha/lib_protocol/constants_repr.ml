@@ -224,6 +224,12 @@ let check_constants constants =
     Tez_repr.(constants.sc_rollup.stake_amount >= zero)
     (Invalid_protocol_constants
        "The smart contract rollup max stake amount must be non-negative.")
+  >>? fun () ->
+  error_unless
+    Compare.Int.(constants.sc_rollup.commitment_period_in_blocks > 0)
+    (Invalid_protocol_constants
+       "The smart contract rollup commitment period in blocks must be strictly \
+        greater than 0.")
   >>? fun () -> Result.return_unit
 
 module Generated = struct
