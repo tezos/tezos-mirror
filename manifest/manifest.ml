@@ -801,6 +801,7 @@ module Target = struct
     main_module : string option;
     js_compatible : bool;
     npm_deps : Npm.t list;
+    released_on_opam : bool;
   }
 
   type opam_only = {
@@ -1343,8 +1344,10 @@ module Target = struct
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail -> Test_executable {names = (head, tail); run = runtest}
 
-  let vendored_lib ?main_module ?(js_compatible = false) ?(npm_deps = []) name =
-    Some (Vendored {name; main_module; js_compatible; npm_deps})
+  let vendored_lib ?(released_on_opam = true) ?main_module
+      ?(js_compatible = false) ?(npm_deps = []) name =
+    Some
+      (Vendored {name; main_module; js_compatible; npm_deps; released_on_opam})
 
   let external_lib ?main_module ?opam ?(js_compatible = false) ?(npm_deps = [])
       name version =
@@ -2343,46 +2346,62 @@ let packages_dir, release, remove_extra_files =
   (!packages_dir, release, !remove_extra_files)
 
 let generate_opam_ci () =
-  let opam_packages =
-    (* Find all .opam files.
-       Do not just generate for packages registered in the manifest:
-       there are a few other .opam files that we want to test in the CI.
-       FIXME: https://gitlab.com/tezos/tezos/-/merge_requests/5157
-       Once all targets worth testing are declared in manifest/main.ml,
-       we can take the list of registered packages instead of
-       listing files. *)
-    List.map find_opam_and_dune_files ["src"; "tezt"; "opam"]
-    |> List.fold_left String_set.union String_set.empty
-    |> String_set.filter (fun f -> Filename.extension f = ".opam")
-    |> String_set.map (fun f -> Filename.remove_extension (Filename.basename f))
+  let depends_on_unreleased_packages l =
+    let rec fold ~seen acc t =
+      let name = Target.name_for_errors t in
+      if String_set.mem name seen then (seen, acc)
+      else
+        let seen = String_set.add name seen in
+        match t with
+        | Vendored {released_on_opam = false; name; _} ->
+            (seen, String_set.add name acc)
+        | t -> (
+            match Target.get_internal t with
+            | None -> (seen, acc)
+            | Some i ->
+                List.fold_left
+                  (fun (seen, acc) (t : Target.t) -> fold ~seen acc t)
+                  (seen, acc)
+                  i.deps)
+    in
+
+    List.fold_left
+      (fun (seen, acc) (internal : Target.internal) ->
+        fold ~seen acc (Internal internal))
+      (String_set.empty, String_set.empty)
+      l
+    |> snd
   in
-  (* We filter out a few packages because they have dependencies on
-     libraries in vendors that are not releases officially.  In
-     particular, pyml-plot is used by tezos-benchmark and dependant.
-  *)
-  let opam_packages =
-    String_set.filter
-      (fun x ->
-        match String.split_on_char '-' x with
-        | ["tezos"; "snoop"] -> false
-        | ["tezos"; "shell"; "benchmarks"] -> false
-        | "tezos" :: "benchmark" :: _ -> false
-        | "tezos" :: "benchmarks" :: _ -> false
-        | ["tezos"; "protocol"; "plugin"; "alpha"; "tests"]
-        | ["tezos"; "protocol"; "alpha"; "tests"] ->
-            false
-        | ["tezos"; "protocol"; "plugin"; _num; _name; "tests"]
-        | ["tezos"; "protocol"; _num; _name; "tests"] ->
-            false
-        | _ -> true)
-      opam_packages
+  let only_test_or_private_targets l =
+    List.for_all
+      (fun (internal : Target.internal) ->
+        match internal.kind with
+        | Public_executable _ -> not internal.release
+        | Public_library _ -> false
+        | Private_executable _ | Private_library _ -> true
+        | Test_executable _ -> true)
+      l
   in
   write ".gitlab/ci/opam-ci.yml" @@ fun fmt ->
   Format.fprintf fmt "# This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "# Edit file manifest/manifest.ml instead.@." ;
-  String_set.iter
-    (fun package_name ->
-      Format.fprintf fmt "@." ;
+  Target.iter_internal_by_opam @@ fun package_name internal_pkgs ->
+  Format.fprintf fmt "@." ;
+  if only_test_or_private_targets internal_pkgs then
+    Format.fprintf
+      fmt
+      "# Ignoring package %s, it only contains tests or private targets\n"
+      package_name
+  else
+    let unreleased = depends_on_unreleased_packages internal_pkgs in
+    if not (String_set.is_empty unreleased) then (
+      Format.fprintf
+        fmt
+        "# Ignoring package %s, it depends on vendored packages\n\
+         # that do not exists inside the official opam-repository:\n"
+        package_name ;
+      String_set.iter (Format.fprintf fmt "# - %s\n") unreleased)
+    else
       Format.fprintf
         fmt
         {|opam:%s:
@@ -2391,8 +2410,7 @@ let generate_opam_ci () =
     package: %s
 |}
         package_name
-        package_name)
-    opam_packages
+        package_name
 
 let generate () =
   Printexc.record_backtrace true ;

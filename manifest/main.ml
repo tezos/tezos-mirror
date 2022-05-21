@@ -314,7 +314,7 @@ let flextesa = vendored_lib "flextesa"
 
 let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos"
 
-let pyml_plot = vendored_lib "pyml-plot"
+let pyml_plot = vendored_lib ~released_on_opam:false "pyml-plot"
 
 (* INTERNAL LIBS *)
 

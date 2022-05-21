@@ -1,10 +1,7 @@
 # This file was automatically generated, do not edit.
 # Edit file manifest/manifest.ml instead.
 
-opam:internal-devtools:
-  extends: .opam_template
-  variables:
-    package: internal-devtools
+# Ignoring package internal-devtools, it only contains tests or private targets
 
 opam:tezos-012-Psithaca-test-helpers:
   extends: .opam_template
@@ -90,6 +87,55 @@ opam:tezos-base-test-helpers:
   extends: .opam_template
   variables:
     package: tezos-base-test-helpers
+
+# Ignoring package tezos-benchmark, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
+# Ignoring package tezos-benchmark-012-Psithaca, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
+# Ignoring package tezos-benchmark-013-PtJakart, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
+# Ignoring package tezos-benchmark-alpha, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
+# Ignoring package tezos-benchmark-examples, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
+# Ignoring package tezos-benchmark-tests, it only contains tests or private targets
+
+opam:tezos-benchmark-type-inference-012-Psithaca:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-type-inference-012-Psithaca
+
+opam:tezos-benchmark-type-inference-013-PtJakart:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-type-inference-013-PtJakart
+
+opam:tezos-benchmark-type-inference-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-type-inference-alpha
+
+# Ignoring package tezos-benchmarks-proto-012-Psithaca, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
+# Ignoring package tezos-benchmarks-proto-013-PtJakart, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
+# Ignoring package tezos-benchmarks-proto-alpha, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
 
 opam:tezos-clic:
   extends: .opam_template
@@ -646,6 +692,8 @@ opam:tezos-protocol-012-Psithaca-parameters:
   variables:
     package: tezos-protocol-012-Psithaca-parameters
 
+# Ignoring package tezos-protocol-012-Psithaca-tests, it only contains tests or private targets
+
 opam:tezos-protocol-013-PtJakart:
   extends: .opam_template
   variables:
@@ -656,6 +704,8 @@ opam:tezos-protocol-013-PtJakart-parameters:
   variables:
     package: tezos-protocol-013-PtJakart-parameters
 
+# Ignoring package tezos-protocol-013-PtJakart-tests, it only contains tests or private targets
+
 opam:tezos-protocol-alpha:
   extends: .opam_template
   variables:
@@ -665,6 +715,8 @@ opam:tezos-protocol-alpha-parameters:
   extends: .opam_template
   variables:
     package: tezos-protocol-alpha-parameters
+
+# Ignoring package tezos-protocol-alpha-tests, it only contains tests or private targets
 
 opam:tezos-protocol-compiler:
   extends: .opam_template
@@ -851,6 +903,8 @@ opam:tezos-protocol-plugin-012-Psithaca-registerer:
   variables:
     package: tezos-protocol-plugin-012-Psithaca-registerer
 
+# Ignoring package tezos-protocol-plugin-012-Psithaca-tests, it only contains tests or private targets
+
 opam:tezos-protocol-plugin-013-PtJakart:
   extends: .opam_template
   variables:
@@ -861,6 +915,8 @@ opam:tezos-protocol-plugin-013-PtJakart-registerer:
   variables:
     package: tezos-protocol-plugin-013-PtJakart-registerer
 
+# Ignoring package tezos-protocol-plugin-013-PtJakart-tests, it only contains tests or private targets
+
 opam:tezos-protocol-plugin-alpha:
   extends: .opam_template
   variables:
@@ -870,6 +926,8 @@ opam:tezos-protocol-plugin-alpha-registerer:
   extends: .opam_template
   variables:
     package: tezos-protocol-plugin-alpha-registerer
+
+# Ignoring package tezos-protocol-plugin-alpha-tests, it only contains tests or private targets
 
 opam:tezos-protocol-updater:
   extends: .opam_template
@@ -966,15 +1024,16 @@ opam:tezos-shell:
   variables:
     package: tezos-shell
 
+# Ignoring package tezos-shell-benchmarks, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
 opam:tezos-shell-context:
   extends: .opam_template
   variables:
     package: tezos-shell-context
 
-opam:tezos-shell-context-test:
-  extends: .opam_template
-  variables:
-    package: tezos-shell-context-test
+# Ignoring package tezos-shell-context-test, it only contains tests or private targets
 
 opam:tezos-shell-services:
   extends: .opam_template
@@ -1001,6 +1060,10 @@ opam:tezos-signer-services:
   variables:
     package: tezos-signer-services
 
+# Ignoring package tezos-snoop, it depends on vendored packages
+# that do not exists inside the official opam-repository:
+# - pyml-plot
+
 opam:tezos-stdlib:
   extends: .opam_template
   variables:
@@ -1026,20 +1089,12 @@ opam:tezos-test-helpers-extra:
   variables:
     package: tezos-test-helpers-extra
 
-opam:tezos-time-measurement:
-  extends: .opam_template
-  variables:
-    package: tezos-time-measurement
-
 opam:tezos-tooling:
   extends: .opam_template
   variables:
     package: tezos-tooling
 
-opam:tezos-tps-evaluation:
-  extends: .opam_template
-  variables:
-    package: tezos-tps-evaluation
+# Ignoring package tezos-tps-evaluation, it only contains tests or private targets
 
 opam:tezos-tx-rollup-013-PtJakart:
   extends: .opam_template
