@@ -25,6 +25,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Tx_rollup_internal of string
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.internal"
+    ~title:"Internal error in rollup node"
+    ~description:"Internal error encountered"
+    ~pp:(fun ppf loc ->
+      Format.fprintf ppf "Internal error in rollup node at %s" loc)
+    `Permanent
+    Data_encoding.(obj1 (req "loc" string))
+    (function Tx_rollup_internal loc -> Some loc | _ -> None)
+    (fun loc -> Tx_rollup_internal loc)
+
 type error +=
   | Tx_rollup_not_originated_in_the_given_block of
       Protocol.Alpha_context.Tx_rollup.t
@@ -73,11 +87,7 @@ let () =
     ~title:"Unable to find configuration file"
     ~description:"The configuration file does not seem to exist"
     ~pp:(fun ppf filepath ->
-      Format.fprintf
-        ppf
-        "The configuration file '%s' does not seem to exist. Try giving \
-         another '--data-dir' or running the 'config init on' subcommand"
-        filepath)
+      Format.fprintf ppf "The configuration file '%s' does not exist." filepath)
     `Permanent
     Data_encoding.(obj1 (req "filepath" string))
     (function
@@ -327,21 +337,208 @@ let () =
       | Tx_rollup_invalid_message_position_in_inbox i -> Some i | _ -> None)
     (fun i -> Tx_rollup_invalid_message_position_in_inbox i)
 
-type error += No_worker_for_source of Signature.Public_key_hash.t
+type error += No_batcher
 
 let () =
   register_error_kind
-    ~id:"tx_rollup.node.no_worker_for_source"
-    ~title:"No injecting queue for source"
-    ~description:
-      "An L1 operation could not be queued because its source has no worker."
+    ~id:"tx_rollup.node.no_batcher"
+    ~title:"No batcher for this node"
+    ~description:"This node does not have a batcher"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This rollup node does not have batcher.")
+    `Permanent
+    Data_encoding.unit
+    (function No_batcher -> Some () | _ -> None)
+    (fun () -> No_batcher)
+
+type error +=
+  | Tx_rollup_unknown_ticket of
+      Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.either
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.unknown_ticket"
+    ~title:"No ticket registered for indexable ticket hash"
+    ~description:"A ticket indexable has not ticket associated in the context."
     ~pp:(fun ppf s ->
       Format.fprintf
         ppf
-        "No worker for source %a"
-        Signature.Public_key_hash.pp
+        "Unknown ticket for ticket indexable %a"
+        Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.pp
         s)
     `Permanent
-    Data_encoding.(obj1 (req "source" Signature.Public_key_hash.encoding))
-    (function No_worker_for_source s -> Some s | _ -> None)
-    (fun s -> No_worker_for_source s)
+    Data_encoding.(
+      obj1
+        (req
+           "ticket_index"
+           Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.encoding))
+    (function Tx_rollup_unknown_ticket t -> Some t | _ -> None)
+    (fun t -> Tx_rollup_unknown_ticket t)
+
+type error +=
+  | Tx_rollup_no_proto_inbox of
+      Protocol.Alpha_context.Tx_rollup_level.t * Block_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.no_proto_inbox"
+    ~title:"No inbox on L1 node"
+    ~description:"Inbox on L1 node cannot be retrieved."
+    ~pp:(fun ppf (l, b) ->
+      Format.fprintf
+        ppf
+        "No inbox on L1 for rollup level %a at block %a"
+        Protocol.Alpha_context.Tx_rollup_level.pp
+        l
+        Block_hash.pp
+        b)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "level" Protocol.Alpha_context.Tx_rollup_level.encoding)
+        (req "block" Block_hash.encoding))
+    (function Tx_rollup_no_proto_inbox (l, b) -> Some (l, b) | _ -> None)
+    (fun (l, b) -> Tx_rollup_no_proto_inbox (l, b))
+
+type error +=
+  | Tx_rollup_inbox_mismatch of {
+      level : Protocol.Alpha_context.Tx_rollup_level.t;
+      reconstructed_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+      protocol_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+    }
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.inbox_mismatch"
+    ~title:"Inbox mismatch between L1 and L2"
+    ~description:
+      "Inbox reconstructed on L2 does not match the one stored on the L1 node."
+    ~pp:(fun ppf (level, reconstructed_inbox, protocol_inbox) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Inbox reconstructed for rollup level %a does not match the one \
+         stored on the Tezos node.@,\
+         @[<hov 2>Reconstructed:@ %a@]@,\
+         @[<hov 2>Stored on Tezos:@ %a@]@,\
+         @]"
+        Protocol.Alpha_context.Tx_rollup_level.pp
+        level
+        Protocol.Alpha_context.Tx_rollup_inbox.pp
+        reconstructed_inbox
+        Protocol.Alpha_context.Tx_rollup_inbox.pp
+        protocol_inbox)
+    `Permanent
+    Data_encoding.(
+      obj3
+        (req "level" Protocol.Alpha_context.Tx_rollup_level.encoding)
+        (req
+           "reconstructed_inbox"
+           Protocol.Alpha_context.Tx_rollup_inbox.encoding)
+        (req "protocol_inbox" Protocol.Alpha_context.Tx_rollup_inbox.encoding))
+    (function
+      | Tx_rollup_inbox_mismatch {level; reconstructed_inbox; protocol_inbox} ->
+          Some (level, reconstructed_inbox, protocol_inbox)
+      | _ -> None)
+    (fun (level, reconstructed_inbox, protocol_inbox) ->
+      Tx_rollup_inbox_mismatch {level; reconstructed_inbox; protocol_inbox})
+
+type error +=
+  | Tx_rollup_cannot_check_inbox of Protocol.Alpha_context.Tx_rollup_level.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_check_inbox"
+    ~title:"Cannot check the inbox with the L1 node"
+    ~description:"Reconstructed inbox cannot be checked."
+    ~pp:(fun ppf l ->
+      Format.fprintf
+        ppf
+        "Cannot check the reconstructed inbox at level %a with the L1 node"
+        Protocol.Alpha_context.Tx_rollup_level.pp
+        l)
+    `Permanent
+    Data_encoding.(
+      obj1 (req "level" Protocol.Alpha_context.Tx_rollup_level.encoding))
+    (function Tx_rollup_cannot_check_inbox l -> Some l | _ -> None)
+    (fun l -> Tx_rollup_cannot_check_inbox l)
+
+type error += Transaction_too_large of {actual : int; limit : int}
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.transaction_too_large"
+    ~title:"transaction too large to be batched"
+    ~description:"The transaction is too large to be batched."
+    `Permanent
+    Data_encoding.(obj2 (req "actual" int31) (req "limit" int31))
+    (function
+      | Transaction_too_large {actual; limit} -> Some (actual, limit)
+      | _ -> None)
+    (fun (actual, limit) -> Transaction_too_large {actual; limit})
+
+type error +=
+  | Tx_rollup_missing_mode_signers of {
+      mode : string;
+      missing_signers : string list;
+    }
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.missing_mode_signers"
+    ~title:"Missing signers for the chosen mode"
+    ~description:"Missing signers for the chosen mode."
+    ~pp:(fun ppf (mode, missing_signers) ->
+      Format.fprintf
+        ppf
+        "@[<hov>Missing signers %a for mode %s.@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_string)
+        missing_signers
+        mode)
+    `Permanent
+    Data_encoding.(
+      obj2 (req "mode" string) (req "missing_signers" (list string)))
+    (function
+      | Tx_rollup_missing_mode_signers {mode; missing_signers} ->
+          Some (mode, missing_signers)
+      | _ -> None)
+    (fun (mode, missing_signers) ->
+      Tx_rollup_missing_mode_signers {mode; missing_signers})
+
+type error += Tx_rollup_deposit_not_allowed
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.deposit_not_allowed"
+    ~title:"Deposit not allowed for operator"
+    ~description:"This node is not authorized to make a deposit"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "This rollup node is not authorized to make a deposit for the operator \
+         and the operator has never made a deposit for the rollup. Please \
+         restart/configure the node with --allow-deposit.")
+    `Permanent
+    Data_encoding.unit
+    (function Tx_rollup_deposit_not_allowed -> Some () | _ -> None)
+    (fun () -> Tx_rollup_deposit_not_allowed)
+
+type error += Tx_rollup_deposit_slashed of Operation_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.deposit_slashed"
+    ~title:"Deposit slashed"
+    ~description:"Deposit slashed."
+    ~pp:(fun ppf op ->
+      Format.fprintf
+        ppf
+        "The deposit for our operator was slashed in operation %a. Aborting to \
+         investigate."
+        Operation_hash.pp
+        op)
+    `Permanent
+    Data_encoding.(obj1 (req "operation" Operation_hash.encoding))
+    (function Tx_rollup_deposit_slashed o -> Some o | _ -> None)
+    (fun o -> Tx_rollup_deposit_slashed o)

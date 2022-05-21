@@ -25,6 +25,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Internal error in rollup node *)
+type error += Tx_rollup_internal of string
+
 (** Error issued when the rollup referenced by its hash has not been created
     on the block referenced by its hash. The node computes a state from the
     block that created the rollup. *)
@@ -85,6 +88,44 @@ type error += Tx_rollup_tree_kinded_key_not_found
 (** Error when a message position does not exist in the inbox for the proof RPC *)
 type error += Tx_rollup_invalid_message_position_in_inbox of int
 
-(** Error when the injector has no worker for the source which must inject an
-    operation. *)
-type error += No_worker_for_source of Signature.Public_key_hash.t
+(** Error when we want to interact with the batcher but it was not started. *)
+type error += No_batcher
+
+(** Error when a ticket is not registered for a ticket index *)
+type error +=
+  | Tx_rollup_unknown_ticket of
+      Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.either
+
+(** Error when the tezos node does not know the inbox *)
+type error +=
+  | Tx_rollup_no_proto_inbox of
+      Protocol.Alpha_context.Tx_rollup_level.t * Block_hash.t
+
+(** Error when the node reconstructed a different inbox than the one stored on L1 *)
+type error +=
+  | Tx_rollup_inbox_mismatch of {
+      level : Protocol.Alpha_context.Tx_rollup_level.t;
+      reconstructed_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+      protocol_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+    }
+
+(** Error when the cannot check the inbox with L1 *)
+type error +=
+  | Tx_rollup_cannot_check_inbox of Protocol.Alpha_context.Tx_rollup_level.t
+
+(** Error when the transaction submitted to the batcher produces a too large
+    message regarding the layer1 limit. *)
+type error += Transaction_too_large of {actual : int; limit : int}
+
+(** Missing signers for the chosen mode. *)
+type error +=
+  | Tx_rollup_missing_mode_signers of {
+      mode : string;
+      missing_signers : string list;
+    }
+
+(** Error returned when the rollup node is not authorized to make deposits *)
+type error += Tx_rollup_deposit_not_allowed
+
+(** Error (fatal) when we are slashed *)
+type error += Tx_rollup_deposit_slashed of Operation_hash.t

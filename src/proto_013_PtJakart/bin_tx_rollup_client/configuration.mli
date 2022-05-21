@@ -27,6 +27,8 @@
 type t = private {
   base_dir : string;
       (** [base_dir] is a directory where client user data is stored. *)
+  wallet_dir : string;
+      (** [base_dir] is a directory where client keys are stored. *)
   endpoint : Uri.t;
       (** [endpoint] is used to communicate with the transaction rollup
           node. *)
@@ -40,7 +42,8 @@ val parse : string list -> (t * string list) tzresult Lwt.t
 
 (** [global_options ()] returns the list of options that have an
    influence on the configuration. *)
-val global_options : unit -> (string option * Uri.t option, 'a) Clic.options
+val global_options :
+  unit -> (string option * string option * Uri.t option, 'a) Clic.options
 
 (** Instance of [Tezos_client_base.Client_context] that only handles IOs and
     RPCs. Can be used for keys and RPCs related commands. *)
@@ -54,7 +57,7 @@ class type tx_client_context =
 (** Instance of [tx_client_context] for linux systems. Relies on
     [Tezos_rpc_http_client_unix]. *)
 class unix_tx_client_context :
-  base_dir:string
+  wallet_dir:string
   -> password_filename:string option
   -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
   -> tx_client_context

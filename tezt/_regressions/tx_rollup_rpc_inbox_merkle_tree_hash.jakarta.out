@@ -1,0 +1,23 @@
+tx_rollup_rpc_inbox_merkle_tree_hash.jakarta.out
+
+./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+  "message": {
+    "batch": "626c6f62"
+  }
+}'
+
+./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+  "message": {
+    "batch": "676c6f756269626f756c6761"
+  }
+}'
+{ "hash": "[TX_ROLLUP_MESSAGE_HASH]" }
+{ "hash": "[TX_ROLLUP_MESSAGE_HASH]" }
+
+./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/merkle_tree_hash with '{
+  "message_hashes": [
+    "[TX_ROLLUP_MESSAGE_HASH]",
+    "[TX_ROLLUP_MESSAGE_HASH]"
+  ]
+}'
+{ "hash": "[TX_ROLLUP_INBOX_HASH]" }

@@ -29,6 +29,7 @@ type mode = Accuser | Batcher | Custom | Maintenance | Observer | Operator
 
 module Parameters = struct
   type persistent_state = {
+    protocol : Protocol.t;
     tezos_node : Node.t;
     client : Client.t;
     data_dir : string;
@@ -223,12 +224,11 @@ let event_from_full_event_filter filter json =
 let wait_for ?where node name filter =
   wait_for_full ?where node name (event_from_full_event_filter filter)
 
-let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
-    ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name mode
-    ~rollup_id ?origination_level ?operator ?batch_signer
-    ?finalize_commitment_signer ?remove_commitment_signer
-    ?dispatch_withdrawals_signer ?rejection_signer ?(allow_deposit = false)
-    client tezos_node =
+let create ~protocol ?runner ?data_dir ?(addr = "127.0.0.1")
+    ?(dormant_mode = false) ?color ?event_pipe ?name mode ~rollup_id
+    ?origination_level ?operator ?batch_signer ?finalize_commitment_signer
+    ?remove_commitment_signer ?dispatch_withdrawals_signer ?rejection_signer
+    ?(allow_deposit = false) client tezos_node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let rpc_addr =
     match String.rindex_opt addr ':' with
@@ -238,6 +238,9 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
   in
+  let path =
+    String.concat "-" [Constant.tx_rollup_node; Protocol.daemon_name protocol]
+  in
   let tx_node =
     create
       ?runner
@@ -246,6 +249,7 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
       ?color
       ?event_pipe
       {
+        protocol;
         tezos_node;
         data_dir;
         rollup_id;

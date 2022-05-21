@@ -37,8 +37,20 @@ val destruct_block_id : string -> (block_id, string) result
 
 type context_id = [block_id | `Context of Tx_rollup_l2_context_hash.t]
 
+module Encodings : sig
+  val header : (L2block.hash * L2block.header) Data_encoding.t
+
+  type any_block = Raw of L2block.t | Fancy of Fancy_l2block.t
+
+  val block : (Fancy_l2block.t * L2block.metadata) Data_encoding.t
+
+  val raw_block : (L2block.t * L2block.metadata) Data_encoding.t
+
+  val any_block : (any_block * L2block.metadata) Data_encoding.t
+end
+
 (** Starts the RPC server of the tx_rollup_node. *)
-val start : Configuration.t -> State.t -> RPC_server.server tzresult Lwt.t
+val start : Node_config.t -> State.t -> RPC_server.server tzresult Lwt.t
 
 (** Returns the balance for an l2-address and a ticket. *)
 val balance :
@@ -59,9 +71,17 @@ val counter :
 val inbox :
   #RPC_context.simple -> block_id -> Inbox.t option Error_monad.tzresult Lwt.t
 
+(** Returns the L2 block in the tx-rollup-node in the raw format. *)
+val raw_block :
+  #RPC_context.simple ->
+  block_id ->
+  (L2block.t * L2block.metadata) option Error_monad.tzresult Lwt.t
+
 (** Returns the L2 block in the tx-rollup-node. *)
 val block :
-  #RPC_context.simple -> block_id -> L2block.t option Error_monad.tzresult Lwt.t
+  #RPC_context.simple ->
+  block_id ->
+  (Fancy_l2block.t * L2block.metadata) option Error_monad.tzresult Lwt.t
 
 (** Returns the whole queue of L2 transactions. *)
 val get_queue :
@@ -80,3 +100,18 @@ val inject_transaction :
   ?eager_batch:bool ->
   L2_transaction.t ->
   L2_transaction.hash Error_monad.tzresult Lwt.t
+
+(** Get the merkle proof associated to a message position in the block's inbox. *)
+val get_message_proof :
+  #RPC_context.simple ->
+  block_id ->
+  message_position:int ->
+  Tx_rollup_l2_proof.t option Error_monad.tzresult Lwt.t
+
+(** Monitors the synchronized progress of the rollup node with respect to L1. *)
+val monitor_synchronized :
+  #RPC_context.streamed ->
+  ([`Synchronizing of State.sync_levels | `Synchronized] Lwt_stream.t
+  * RPC_context.stopper)
+  tzresult
+  Lwt.t

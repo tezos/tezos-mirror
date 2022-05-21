@@ -23,47 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
-open Protocol
-open Alpha_context
-open Common
+type tag =
+  | Commitment
+  | Submit_batch
+  | Finalize_commitment
+  | Remove_commitment
+  | Rejection
+  | Dispatch_withdrawals
 
-type injection_strategy =
-  | Each_block  (** Inject pending operations after each new L1 block *)
-  | Delay_block
-      (** Wait for some time after the L1 block is produced to inject pending
-          operations. This strategy allows for maximizing the number of the same
-          kind of operations to include in a block. *)
-
-(** Initializes the injector with a client context, for a list of signers. Each
-    signer has its own worker with a queue of operations to inject. *)
-val init :
-  #Client_context.full ->
-  signers:
-    (public_key_hash * injection_strategy * Injector_worker_types.tag list) list ->
-  unit tzresult Lwt.t
-
-(** Add an operation as pending injection in the injector. *)
-val add_pending_operation : L1_operation.t -> unit tzresult Lwt.t
-
-(** Add multiple operations as pending injection in the injector. *)
-val add_pending_operations : L1_operation.t trace -> unit tzresult Lwt.t
-
-(** Notify the injector of a new Tezos head. The injector marks the operations
-    appropriately (for instance reverted operations that are part of a
-    reorganization are put back in the pending queue). When an operation is
-    considered as {e confirmed}, it disappears from the injector. *)
-val new_tezos_head :
-  Alpha_block_services.block_info ->
-  Alpha_block_services.block_info reorg ->
-  unit Lwt.t
-
-(** Trigger an injection of the pending operations for all workers. If [tags]
-    is given, only the workers which have a tag in [tags] inject their pending
-    operations. If [strategy] is given, only workers which have this strategy
-    inject their pending operations. *)
-val inject :
-  ?tags:Injector_worker_types.tag list ->
-  ?strategy:injection_strategy ->
-  unit ->
-  unit Lwt.t
+include
+  Injector_sigs.S with type rollup_node_state := State.t and type tag := tag

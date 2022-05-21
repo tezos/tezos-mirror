@@ -52,8 +52,13 @@ let interpret_message ~rejection_max_proof_size ctxt l2_parameters message =
   let open Lwt_result_syntax in
   let* proof, res = Prover_apply.apply_message ctxt l2_parameters message in
   let proof_size = Prover_apply.proof_size proof in
+  let message_size =
+    Data_encoding.Binary.length
+      Protocol.Alpha_context.Tx_rollup_message.encoding
+      message
+  in
   let result =
-    if proof_size > rejection_max_proof_size then
+    if proof_size > rejection_max_proof_size - message_size then
       (* The proof is too large, we can not commit this state. The
          result is discarded. *)
       Inbox.Discarded

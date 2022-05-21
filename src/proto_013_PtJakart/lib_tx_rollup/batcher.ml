@@ -31,6 +31,7 @@ module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 type state = {
   rollup : Tx_rollup.t;
   constants : Constants.t;
+  batch_burn_limit : Tez.t option;
   index : Context.index;
   signer : Signature.public_key_hash;
   transactions : Tx_queue.t;
@@ -38,38 +39,25 @@ type state = {
   lock : Lwt_mutex.t;
 }
 
-(* TODO/TORU: remove me *)
-let max_number_of_batches = 10
-
 let encode_batch batch =
   Data_encoding.Binary.to_string Tx_rollup_l2_batch.encoding batch
   |> Result.map_error (fun err -> [Data_encoding_wrapper.Encoding_error err])
 
 let inject_batches state batches =
   let open Lwt_result_syntax in
-  let*? operations =
-    List.map_e
-      (fun batch ->
-        let open Result_syntax in
-        let+ batch_content = encode_batch batch in
-        let manager_operation =
-          Manager
-            (Tx_rollup_submit_batch
-               {
-                 tx_rollup = state.rollup;
-                 content = batch_content;
-                 burn_limit = None;
-               })
-        in
-        {
-          L1_operation.hash =
-            L1_operation.hash_manager_operation manager_operation;
-          source = state.signer;
-          manager_operation;
-        })
-      batches
-  in
-  Injector.add_pending_operations operations
+  List.iter_es
+    (fun batch ->
+      let*? batch_content = encode_batch batch in
+      let batch_operation =
+        Tx_rollup_submit_batch
+          {
+            tx_rollup = state.rollup;
+            content = batch_content;
+            burn_limit = state.batch_burn_limit;
+          }
+      in
+      Injector.add_pending_operation ~source:state.signer batch_operation)
+    batches
 
 (** [is_batch_valid] returns whether the batch is valid or not based on two
     criteria:
@@ -112,59 +100,41 @@ let is_batch_valid ctxt (constants : Constants.t) batch =
 
 let get_batches ctxt constants queue =
   let open Lwt_result_syntax in
-  let exception
-    Batches_finished of {
-      rev_batches :
-        (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.t list;
-      to_remove : L2_transaction.hash list;
-    }
-  in
-  try
-    let* rev_batches, rev_current_trs, to_remove =
-      Tx_queue.fold_es
-        (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
-          let new_trs = tr :: rev_current_trs in
-          let*? batch = L2_transaction.batch (List.rev new_trs) in
-          let* b = is_batch_valid ctxt constants batch in
-          if b then return (batches, new_trs, tr_hash :: to_remove)
-          else
-            match rev_current_trs with
-            | [_] ->
-                (* If only one transaction makes the batch invalid, we remove it
-                   from the current transactions and it'll be removed later. *)
+  let* rev_batches, rev_current_trs, to_remove =
+    Tx_queue.fold_es
+      (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
+        let new_trs = tr :: rev_current_trs in
+        let*? batch = L2_transaction.batch (List.rev new_trs) in
+        let* b = is_batch_valid ctxt constants batch in
+        if b then return (batches, new_trs, tr_hash :: to_remove)
+        else
+          match rev_current_trs with
+          | [_] ->
+              (* If only one transaction makes the batch invalid, we remove it
+                 from the current transactions and it'll be removed later. *)
+              let*! () = Event.(emit Batcher.invalid_transaction) tr in
+              return (batches, [], tr_hash :: to_remove)
+          | _ ->
+              let*? batch = L2_transaction.batch (List.rev rev_current_trs) in
+              let new_batches = batch :: batches in
+              (* We add the batch to the accumulator and we go on. *)
+              let*? batch = L2_transaction.batch [tr] in
+              let* b = is_batch_valid ctxt constants batch in
+              if b then return (new_batches, [tr], tr_hash :: to_remove)
+              else
                 let*! () = Event.(emit Batcher.invalid_transaction) tr in
-                return (batches, [], tr_hash :: to_remove)
-            | _ ->
-                let*? batch = L2_transaction.batch (List.rev rev_current_trs) in
-                let new_batches = batch :: batches in
-                if
-                  List.compare_length_with new_batches max_number_of_batches
-                  >= 0
-                then
-                  (* We created enough batches, we exit the loop *)
-                  raise
-                    (Batches_finished {rev_batches = new_batches; to_remove})
-                else
-                  (* We add the batch to the accumulator and we go on. *)
-                  let*? batch = L2_transaction.batch [tr] in
-                  let* b = is_batch_valid ctxt constants batch in
-                  if b then return (new_batches, [tr], tr_hash :: to_remove)
-                  else
-                    let*! () = Event.(emit Batcher.invalid_transaction) tr in
-                    return (new_batches, [], tr_hash :: to_remove))
-        queue
-        ([], [], [])
-    in
-    let*? batches =
-      let open Result_syntax in
-      if rev_current_trs <> [] then
-        let+ last_batch = L2_transaction.batch (List.rev rev_current_trs) in
-        List.rev (last_batch :: rev_batches)
-      else return (List.rev rev_batches)
-    in
-    return (batches, to_remove)
-  with Batches_finished {rev_batches; to_remove} ->
-    return (List.rev rev_batches, to_remove)
+                return (new_batches, [], tr_hash :: to_remove))
+      queue
+      ([], [], [])
+  in
+  let*? batches =
+    let open Result_syntax in
+    if rev_current_trs <> [] then
+      let+ last_batch = L2_transaction.batch (List.rev rev_current_trs) in
+      List.rev (last_batch :: rev_batches)
+    else return (List.rev rev_batches)
+  in
+  return (batches, to_remove)
 
 let on_batch state =
   let open Lwt_result_syntax in
@@ -187,9 +157,28 @@ let on_batch state =
 let on_register state ~apply (tr : L2_transaction.t) =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
+  let*? aggregated_signature =
+    match Bls.aggregate_signature_opt tr.signatures with
+    | Some s -> ok s
+    | None -> error_with "could not aggregate signatures of transaction"
+  in
   let batch =
-    Tx_rollup_l2_batch.V1.
-      {contents = [tr.transaction]; aggregated_signature = tr.signature}
+    Tx_rollup_l2_batch.V1.{contents = [tr.transaction]; aggregated_signature}
+  in
+  let batch_string =
+    Data_encoding.Binary.to_string_exn Tx_rollup_l2_batch.encoding (V1 batch)
+  in
+  let _msg, msg_size = Tx_rollup_message.make_batch batch_string in
+  let* () =
+    fail_when
+      (msg_size
+     >= state.constants.parametric.tx_rollup_hard_size_limit_per_message)
+      (Error.Transaction_too_large
+         {
+           actual = msg_size;
+           limit =
+             state.constants.parametric.tx_rollup_hard_size_limit_per_message;
+         })
   in
   let context = state.incr_context in
   let prev_context = context in
@@ -234,7 +223,7 @@ let on_new_head state head =
      Flush and reapply queue *)
   state.incr_context <- context
 
-let init_batcher_state ~rollup ~signer index constants =
+let init_batcher_state ~rollup ~signer ~batch_burn_limit index constants =
   let open Lwt_syntax in
   let+ incr_context = Context.init_context index in
   {
@@ -242,6 +231,7 @@ let init_batcher_state ~rollup ~signer index constants =
     index;
     signer;
     constants;
+    batch_burn_limit;
     transactions = Tx_queue.create 500_000;
     incr_context;
     lock = Lwt_mutex.create ();
@@ -254,6 +244,7 @@ module Types = struct
     signer : Signature.public_key_hash;
     index : Context.index;
     constants : Constants.t;
+    batch_burn_limit : Tez.t option;
   }
 end
 
@@ -277,9 +268,11 @@ module Handlers = struct
 
   let on_request w r = protect @@ fun () -> on_request w r
 
-  let on_launch _w rollup Types.{signer; index; constants} =
+  let on_launch _w rollup Types.{signer; index; constants; batch_burn_limit} =
     let open Lwt_result_syntax in
-    let*! state = init_batcher_state ~rollup ~signer index constants in
+    let*! state =
+      init_batcher_state ~rollup ~signer ~batch_burn_limit index constants
+    in
     return state
 
   let on_error _w r st errs =
@@ -301,24 +294,57 @@ end
 
 let table = Worker.create_table Queue
 
-type t = worker
+let worker_promise, worker_waker = Lwt.task ()
 
-let init ~rollup ~signer index constants =
-  Worker.launch table rollup {signer; index; constants} (module Handlers)
+let init ~rollup ~signer ~batch_burn_limit index constants =
+  let open Lwt_result_syntax in
+  let+ worker =
+    Worker.launch
+      table
+      rollup
+      {signer; index; constants; batch_burn_limit}
+      (module Handlers)
+  in
+  Lwt.wakeup worker_waker worker
 
-let find_transaction w tr_hash =
+(* This is a batcher worker for a single tx rollup *)
+let worker =
+  lazy
+    (match Lwt.state worker_promise with
+    | Lwt.Return worker -> ok worker
+    | Lwt.Fail _ | Lwt.Sleep -> error Error.No_batcher)
+
+let active () =
+  match Lwt.state worker_promise with
+  | Lwt.Return _ -> true
+  | Lwt.Fail _ | Lwt.Sleep -> false
+
+let find_transaction tr_hash =
+  let open Result_syntax in
+  let+ w = Lazy.force worker in
   let state = Worker.state w in
   Tx_queue.find_opt state.transactions tr_hash
 
-let get_queue w =
+let get_queue () =
+  let open Result_syntax in
+  let+ w = Lazy.force worker in
   let state = Worker.state w in
   Tx_queue.elements state.transactions
 
-let register_transaction ?(eager_batch = false) ?(apply = true) w tr =
+let register_transaction ?(eager_batch = false) ?(apply = true) tr =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     w
     (Request.Register {tr; apply; eager_batch})
 
-let batch w = Worker.Queue.push_request_and_wait w Request.Batch
+let batch () =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w Request.Batch
 
-let new_head w b = Worker.Queue.push_request w (Request.New_head b)
+let new_head b =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  let*! () = Worker.Queue.push_request w (Request.New_head b) in
+  return_unit
