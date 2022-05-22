@@ -937,6 +937,25 @@ let test_network test_mode_tag _protocol ?endpoint client =
       in
       test peer_id
 
+let test_workers _test_mode_tag _protocol ?endpoint client =
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_worker_block_validator in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_workers_chain_validators
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_worker_chain_validator ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_worker_chain_validator_ddb ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_worker_chain_validator_peers_validators ()
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_workers_prevalidators in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_worker_prevalidator () in
+  unit
+
 (* Test access to RPC regulated with an ACL. *)
 let test_whitelist address () =
   let whitelist =
@@ -1109,7 +1128,15 @@ let register protocols =
       "network"
       ~test_function:test_network
       ~parameter_overrides:consensus_threshold
-      ~nodes_args:[Connections 1]
+      ~nodes_args:[Connections 1] ;
+    match test_mode_tag with
+    (* No worker RPCs in these modes *)
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
+    | _ ->
+        check_rpc
+          "workers"
+          ~test_function:test_workers
+          ~parameter_overrides:consensus_threshold
   in
   List.iter
     (register protocols)
