@@ -89,6 +89,7 @@ val get_operations_of_validation_pass :
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
+  ?force_metadata:bool ->
   ?operation_offset:int ->
   validation_pass:int ->
   Client.t ->

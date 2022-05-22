@@ -1101,7 +1101,7 @@ let test_whitelist address () =
          ]
   in
   let* client = start_with_acl address whitelist in
-  let* success_resp = Client.rpc GET ["chains"; "main"; "blocks"] client in
+  let* success_resp = RPC.Client.call client @@ RPC.get_chain_blocks () in
   let block_hash = JSON.geti 0 success_resp |> JSON.geti 0 |> JSON.as_string in
   let* () =
     if block_hash = "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" then
@@ -1132,7 +1132,7 @@ let test_blacklist address () =
     Client.spawn_rpc GET ["chains"; "main"; "blocks"] client
     |> Process.check_error ~exit_code:1
   in
-  let* _success_resp = Client.rpc GET ["network"; "connections"] client in
+  let* _success_resp = RPC.Client.call client @@ RPC.get_network_connections in
   unit
 
 let binary_regression_test () =

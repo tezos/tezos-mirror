@@ -91,15 +91,12 @@ let metadata_is_too_large client =
 (* Uses the deprecated version of the query paramater to force the
    recomputation of the operations metadata.*)
 let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
-  let rpc_args = ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"] in
   let* first_manager_operation =
-    if force_metadata then
-      Client.rpc
-        ~query_string:[("force_metadata", "")]
-        Client.GET
-        rpc_args
-        client
-    else Client.rpc Client.GET rpc_args client
+    RPC.get_operations_of_validation_pass
+      ~force_metadata
+      ~validation_pass:3
+      ~operation_offset:0
+      client
   in
   let first_operation_result =
     JSON.(
@@ -116,8 +113,12 @@ let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
   unit
 
 let get_endorsement client =
-  let rpc_args = ["chains"; "main"; "blocks"; "head"; "operations"; "0"; "0"] in
-  let* _ = Client.rpc Client.GET rpc_args client in
+  let* _ =
+    RPC.get_operations_of_validation_pass
+      ~validation_pass:0
+      ~operation_offset:0
+      client
+  in
   unit
 
 let setup_node ~limit protocol =
