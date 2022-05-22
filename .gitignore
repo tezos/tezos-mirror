@@ -11,6 +11,7 @@ __pycache__
 /_docker_build
 /_snoop
 /node_modules
+/_opam-repo-for-releases/
 
 /test_results
 

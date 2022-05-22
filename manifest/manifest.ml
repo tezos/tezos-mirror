@@ -479,7 +479,7 @@ module Opam = struct
 
   type build_instruction = {command : command_item list; with_test : bool}
 
-  type url = {url : string; sha256 : string; sha512 : string}
+  type url = {url : string; sha256 : string option; sha512 : string option}
 
   type t = {
     maintainer : string;
@@ -670,10 +670,11 @@ module Opam = struct
     let pp_url {url; sha256; sha512} =
       pp_line "url {" ;
       pp_line "  src: \"%s\"" url ;
-      pp_line "  checksum: [" ;
-      pp_line "    \"sha256=%s\"" sha256 ;
-      pp_line "    \"sha512=%s\"" sha512 ;
-      pp_line "  ]" ;
+      if sha256 <> None || sha512 <> None then (
+        pp_line "  checksum: [" ;
+        Option.iter (fun sha256 -> pp_line "    \"sha256=%s\"" sha256) sha256 ;
+        Option.iter (fun sha512 -> pp_line "    \"sha512=%s\"" sha512) sha512 ;
+        pp_line "  ]") ;
       pp_line "}"
     in
     pp_line "opam-version: \"2.0\"" ;
@@ -2333,14 +2334,26 @@ let packages_dir, release, remove_extra_files =
   in
   Arg.parse spec anon_fun usage_msg ;
   let release =
-    match (!url, !sha256, !sha512, !version) with
-    | "", "", "", "" -> None
-    | "", _, _, _ | _, "", _, _ | _, _, "", _ | _, _, _, "" ->
+    match (!url, !version) with
+    | "", "" -> None
+    | "", _ | _, "" ->
         prerr_endline
-          "Error: either all of --url, --sha256, --sha512 and --release must \
-           be specified, or none of them." ;
+          "Error: either --url and --release must be specified, or none of \
+           them." ;
         exit 1
-    | url, sha256, sha512, version ->
+    | url, version ->
+        let sha256, sha512 =
+          match (!sha256, !sha512, version) with
+          | sha256, sha512, "dev" ->
+              ( (if sha256 = "" then None else Some sha256),
+                if sha512 = "" then None else Some sha512 )
+          | "", _, _ | _, "", _ ->
+              prerr_endline
+                "Error: when making a release other than 'dev', --sha256 and \
+                 --sha512 are mandatory." ;
+              exit 1
+          | sha256, sha512, _ -> (Some sha256, Some sha512)
+        in
         Some {version; url = {url; sha256; sha512}}
   in
   (!packages_dir, release, !remove_extra_files)
