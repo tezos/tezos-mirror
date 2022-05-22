@@ -9,7 +9,6 @@ from . import contract_paths
 CHAIN_ID = "main"
 BLOCK_ID = "head"
 PKH = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-PROTOCOL_HASH = protocol.HASH
 BLOCK_LEVEL = "3"
 LIST_OFFSET = "0"
 OPERATION_OFFSET = "0"
@@ -89,18 +88,6 @@ class TestRPCsExistence:
 
     def test_chain_invalid_blocks(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/invalid_blocks')
-
-    def test_errors(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/errors')
-
-    def test_fetch_protocol_protocol_hash(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/fetch_protocol/{PROTOCOL_HASH}')
-
-    def test_protocols(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/protocols')
-
-    def test_protocols_protocol_hash(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/protocols/{PROTOCOL_HASH}')
 
     def test_chain_block(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}')
@@ -231,12 +218,6 @@ class TestRPCsExistence:
             f'operations/{LIST_OFFSET}/'
             f'{OPERATION_OFFSET}',
         )
-
-    def test_stat_gc(self, sandbox: Sandbox):
-        assert sandbox.client(1).rpc('get', "/stats/gc")
-
-    def test_stat_memory(self, sandbox: Sandbox):
-        assert sandbox.client(1).rpc('get', "/stats/memory")
 
 
 class TestDeprecatedRPCs:

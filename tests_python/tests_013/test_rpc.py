@@ -232,12 +232,6 @@ class TestRPCsExistence:
             f'{OPERATION_OFFSET}',
         )
 
-    def test_stat_gc(self, sandbox: Sandbox):
-        assert sandbox.client(1).rpc('get', "/stats/gc")
-
-    def test_stat_memory(self, sandbox: Sandbox):
-        assert sandbox.client(1).rpc('get', "/stats/memory")
-
 
 class TestDeprecatedRPCs:
     def test_chain_block_context_contract_delegatable(
