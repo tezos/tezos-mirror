@@ -196,7 +196,8 @@ let get_chain_level_caboose ?(chain = "main") () =
 
 let get_worker_block_validator = make GET ["workers"; "block_validator"] Fun.id
 
-let get_workers_chain_validators = make GET ["workers"; "chain_validators"] Fun.id
+let get_workers_chain_validators =
+  make GET ["workers"; "chain_validators"] Fun.id
 
 let get_worker_chain_validator ?(chain = "main") () =
   make GET ["workers"; "chain_validators"; chain] Fun.id
@@ -211,3 +212,20 @@ let get_workers_prevalidators = make GET ["workers"; "prevalidators"] Fun.id
 
 let get_worker_prevalidator ?(chain = "main") () =
   make GET ["workers"; "prevalidators"; chain] Fun.id
+
+let get_errors = make GET ["errors"] Fun.id
+
+let get_protocol protocol_hash = make GET ["protocols"; protocol_hash] Fun.id
+
+let get_protocols =
+  make
+    GET
+    ["protocols"]
+    JSON.(fun json -> json |> as_list |> List.map as_string)
+
+let get_fetch_protocol protocol_hash =
+  make GET ["fetch_protocol"; protocol_hash] Fun.id
+
+let get_stats_gc = make GET ["stats"; "gc"] Fun.id
+
+let get_stats_memory = make GET ["stats"; "memory"] Fun.id

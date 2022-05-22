@@ -247,3 +247,21 @@ val get_workers_prevalidators : JSON.t t
 
       [chain] defaults to ["main"]. *)
 val get_worker_prevalidator : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /errors] *)
+val get_errors : JSON.t t
+
+(** RPC: [GET /protocols *)
+val get_protocols : string list t
+
+(** RPC: [GET /protocols/<protocol_hash>] *)
+val get_protocol : string -> JSON.t t
+
+(** RPC: [GET /fetch_protocol/<protocol_hash>] *)
+val get_fetch_protocol : string -> JSON.t t
+
+(** RPC: [GET /stats/gc] *)
+val get_stats_gc : JSON.t t
+
+(** RPC: [GET /stats/memory] *)
+val get_stats_memory : JSON.t t
