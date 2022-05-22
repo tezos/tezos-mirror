@@ -217,3 +217,33 @@ val get_chain_level_savepoint : ?chain:string -> unit -> block_descriptor t
 
     [chain] defaults to ["main"]. *)
 val get_chain_level_caboose : ?chain:string -> unit -> block_descriptor t
+
+(** RPC: [GET /workers/block_validator] *)
+val get_worker_block_validator : JSON.t t
+
+(** RPC: [GET /workers/chain_validators] *)
+val get_workers_chain_validators : JSON.t t
+
+(** RPC: [GET /workers/chain_validators/<chain>]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_chain_validator : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /workers/chain_validators/<chain>/ddb]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_chain_validator_ddb : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /workers/chain_validators/<chain>/peers_validators]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_chain_validator_peers_validators :
+  ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /workers/prevalidators] *)
+val get_workers_prevalidators : JSON.t t
+
+(** RPC: [GET /workers/prevalidators/[chain]]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_prevalidator : ?chain:string -> unit -> JSON.t t

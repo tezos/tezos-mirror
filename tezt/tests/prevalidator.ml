@@ -2650,7 +2650,9 @@ let forge_pre_filtered_operation =
   let* () = Client.bake_for_and_wait client_2 in
   (* Step 5 *)
   (* Get client_2 ddb and check that it contains no operation *)
-  let* ddb2 = RPC.get_ddb client_2 in
+  let* ddb2 =
+    RPC.Client.call client_2 @@ RPC.get_worker_chain_validator_ddb ()
+  in
   check_empty_operation__ddb ddb2 ;
   Log.info "Operation Ddb of client_2 does not contain any operation" ;
   unit
