@@ -966,6 +966,7 @@ let test_misc_shell _test_mode_tag protocol ?endpoint client =
   in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_gc in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_memory in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_config in
   unit
 
 (* Test access to RPC regulated with an ACL. *)
