@@ -74,6 +74,74 @@ let get_network_peer_banned peer_id =
 let get_network_peer_unban peer_id =
   make GET ["network"; "peers"; peer_id; "unban"] Fun.id
 
+let get_chain_blocks ?(chain = "main") () =
+  make GET ["chains"; chain; "blocks"] Fun.id
+
+let get_chain_invalid_blocks ?(chain = "main") () =
+  make GET ["chains"; chain; "invalid_blocks"] Fun.id
+
+let get_chain_block_header_raw ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "header"; "raw"] Fun.id
+
+let get_chain_block_live_blocks ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "live_blocks"] Fun.id
+
+let decode_operation_hashes json = JSON.(json |> as_list |> List.map as_string)
+
+let get_chain_block_operation_hashes ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "operation_hashes"] (fun json ->
+      JSON.(json |> as_list |> List.map @@ decode_operation_hashes))
+
+let get_chain_block_operation_hashes_of_validation_pass ?(chain = "main")
+    ?(block = "head") validation_pass =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operation_hashes";
+      string_of_int validation_pass;
+    ]
+    decode_operation_hashes
+
+let get_chain_block_operation_hash ?(chain = "main") ?(block = "head")
+    ~validation_pass ~operation_offset () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operation_hashes";
+      string_of_int validation_pass;
+      string_of_int operation_offset;
+    ]
+    JSON.as_string
+
+let get_chain_block_helper_complete ?(chain = "main") ?(block = "head") prefix =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "complete"; prefix]
+    Fun.id
+
+let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
+    block_level =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "nonces";
+      string_of_int block_level;
+    ]
+    Fun.id
+
 let get_network_peer_untrust peer_id =
   make GET ["network"; "peers"; peer_id; "untrust"] Fun.id
 

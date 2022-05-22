@@ -87,6 +87,74 @@ val get_network_greylist_ips : JSON.t t
 (** RPC: [GET /network/greylist/clear] *)
 val get_network_greylist_clear : JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks]
+
+    [chain] defaults to ["main"]. *)
+val get_chain_blocks : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/invalid_blocks]
+
+    [chain] defaults to ["main"]. *)
+val get_chain_invalid_blocks : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/nonces/<block_level>]
+
+    [chain] defaults to ["main"]. *)
+val get_chain_block_context_nonce :
+  ?chain:string -> ?block:string -> int -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/header/raw]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_header_raw :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/live_blocks]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_live_blocks :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/operation_hashes]
+
+    - [chain] defaults to ["main"].
+    - [block] defaults to ["head"].
+*)
+val get_chain_block_operation_hashes :
+  ?chain:string -> ?block:string -> unit -> string list list t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/operation_hashes/<validation_pass>]
+
+    - [chain] defaults to ["main"].
+    - [block] defaults to ["head"].
+*)
+val get_chain_block_operation_hashes_of_validation_pass :
+  ?chain:string -> ?block:string -> int -> string list t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/operation_hashes/<validation_pass>/<operation_offset>]
+
+    - [chain] defaults to ["main"].
+    - [block] defaults to ["head"].
+*)
+val get_chain_block_operation_hash :
+  ?chain:string ->
+  ?block:string ->
+  validation_pass:int ->
+  operation_offset:int ->
+  unit ->
+  string t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/complete/<prefix>]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_helper_complete :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /network/peers] *)
 val get_network_peers : (string * JSON.t) list t
 
