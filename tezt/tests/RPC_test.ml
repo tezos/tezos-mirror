@@ -969,6 +969,123 @@ let test_misc_shell _test_mode_tag protocol ?endpoint client =
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_config in
   unit
 
+let test_chain _test_mode_tag protocol ?endpoint client =
+  let block_level = 3 in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_blocks () in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_chain_id () in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_invalid_blocks ()
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block () in
+  let* _ = RPC.get_constants_errors ?endpoint client in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_nonce block_level
+  in
+  let* () =
+    if Protocol.number protocol >= 013 then
+      let* _ =
+        (* Calls [/chains/main/blocks/head/context/sc_rollup] *)
+        RPC.Sc_rollup.list ?endpoint client
+      in
+      unit
+    else unit
+  in
+  let* _ =
+    (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
+    RPC.get_context_value ?endpoint client ~ctxt_type:Bytes ~value_path:[]
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash () in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
+  let* _ =
+    (* Calls [/chains/main/blocks/head/header/protocol_data] *)
+    RPC.get_protocol_data ?endpoint client
+  in
+  let* _ =
+    (* Calls [/chains/main/blocks/head/header/protocol_data/raw] *)
+    RPC.raw_protocol_data ?endpoint client
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
+  in
+  let* _ =
+    let pkh = Constant.bootstrap1.public_key in
+    let prefix = String.sub pkh 0 10 in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3234
+
+       The result of this RPC endpoint is empty, but I guess it
+       should be a list containing [pkh]. The original python
+       test has the same result. *)
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_helper_complete prefix
+  in
+  let* _ =
+    let* () = Client.bake_for_and_wait client in
+    let* head_hash =
+      RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash ()
+    in
+    let prefix = String.sub head_hash 0 10 in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3234
+
+       The result of this RPC endpoint is empty, but I guess it
+       should be a list containing [head_hash]. The original python
+       test has the same result. *)
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_helper_complete prefix
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_live_blocks ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_metadata ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_operation_hashes ()
+  in
+  let* () =
+    let validation_pass = 3 in
+    let operation_offset = 0 in
+    let* () =
+      Client.transfer
+        ~amount:Tez.one
+        ~giver:"bootstrap1"
+        ~receiver:"bootstrap2"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* _ =
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operation_hashes ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operation_hashes_of_validation_pass validation_pass
+    in
+    let* _ =
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operation_hash
+           ~validation_pass
+           ~operation_offset
+           ()
+    in
+    let* _ = RPC.get_operations ?endpoint client in
+    let* _ =
+      RPC.get_operations_of_validation_pass ?endpoint ~validation_pass client
+    in
+    let* _ =
+      RPC.get_operations_of_validation_pass
+        ?endpoint
+        ~validation_pass
+        ~operation_offset
+        client
+    in
+    unit
+  in
+  unit
+
 (* Test access to RPC regulated with an ACL. *)
 let test_whitelist address () =
   let whitelist =
@@ -1150,13 +1267,21 @@ let register protocols =
           "workers"
           ~test_function:test_workers
           ~parameter_overrides:consensus_threshold) ;
-    match test_mode_tag with
+    (match test_mode_tag with
     (* No misc shell RPCs in these modes *)
     | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
     | _ ->
         check_rpc
           "misc_shell"
           ~test_function:test_misc_shell
+          ~parameter_overrides:consensus_threshold) ;
+    match test_mode_tag with
+    (* No chain RPCs in these modes *)
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
+    | _ ->
+        check_rpc
+          "chain"
+          ~test_function:test_chain
           ~parameter_overrides:consensus_threshold
   in
   List.iter
