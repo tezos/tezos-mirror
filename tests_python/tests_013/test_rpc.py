@@ -76,9 +76,6 @@ class TestRPCsExistence:
 
     block_hash = ""
 
-    def test_config_file(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/config')
-
     def test_chain_blocks(self, sandbox: Sandbox):
         utils.bake(sandbox.client(1))
         time.sleep(3)
