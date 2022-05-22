@@ -27,6 +27,7 @@
 open Protocol
 open Alpha_context
 open Apply_results
+open Apply_operation_result
 
 let tez_sym = "\xEA\x9C\xA9"
 

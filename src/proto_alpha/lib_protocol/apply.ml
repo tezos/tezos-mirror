@@ -811,6 +811,7 @@ let () =
     (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account)
 
 open Apply_results
+open Apply_operation_result
 
 let assert_tx_rollup_feature_enabled ctxt =
   let level = (Level.current ctxt).level in

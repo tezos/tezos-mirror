@@ -1892,7 +1892,7 @@ let commands_rw () =
                 Apply_results.Manager_operation_result
                   {
                     operation_result =
-                      Apply_results.Applied
+                      Apply_operation_result.Applied
                         (Apply_results.Tx_rollup_origination_result
                           {originated_tx_rollup; _});
                     _;
