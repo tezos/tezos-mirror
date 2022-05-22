@@ -102,31 +102,6 @@ class TestRPCsExistence:
     def test_protocols_protocol_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/protocols/{PROTOCOL_HASH}')
 
-    def test_workers_block_validator(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/workers/block_validator')
-
-    def test_workers_chain_validators(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/workers/chain_validators')
-
-    def test_workers_chain_validator(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/workers/chain_validators/{CHAIN_ID}')
-
-    def test_workers_chain_validator_ddb(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/workers/chain_validators/{CHAIN_ID}/ddb'
-        )
-
-    def test_workers_chain_validator_peers_validators(self, sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/workers/chain_validators/{CHAIN_ID}/' 'peers_validators'
-        )
-
-    def test_workers_prevalidators(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/workers/prevalidators')
-
-    def test_workers_prevalidators_chain_id(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/workers/prevalidators/{CHAIN_ID}')
-
     def test_chain_block(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}')
 
