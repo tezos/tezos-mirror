@@ -58,11 +58,9 @@ let test ~__FILE__ ?output_file ?(tags = []) title f =
       Protocol.register_regression_test ~output_file ~__FILE__ ~title ~tags f
   | None -> Protocol.register_test ~__FILE__ ~title ~tags f
 
-let setup ?commitment_frequency ?challenge_window f ~protocol =
+let setup ?commitment_period ?challenge_window f ~protocol =
   let parameters =
-    make_parameter
-      "sc_rollup_commitment_frequency_in_blocks"
-      commitment_frequency
+    make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
     @ [(["sc_rollup_enable"], Some "true")]
   in
@@ -80,10 +78,10 @@ let setup ?commitment_frequency ?challenge_window f ~protocol =
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f node client bootstrap1_key
 
-let get_sc_rollup_commitment_frequency_in_blocks client =
+let get_sc_rollup_commitment_period_in_blocks client =
   let* constants = RPC.get_constants ~hooks client in
   constants
-  |> JSON.get "sc_rollup_commitment_frequency_in_blocks"
+  |> JSON.get "sc_rollup_commitment_period_in_blocks"
   |> JSON.as_int |> return
 
 let sc_rollup_node_rpc sc_node service =
@@ -123,9 +121,9 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   let* () = Client.bake_for tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
-(* TODO: create and insert issue number. Many tests
-   can be refactored using test_scenario.*)
-let test_scenario ?commitment_frequency ?challenge_window
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
+   Many tests can be refactored using test_scenario. *)
+let test_scenario ?commitment_period ?challenge_window
     {output_file_prefix; variant; tags; description} scenario =
   let output_file _ = output_file_prefix ^ "_" ^ variant in
   let tags = tags @ [variant] in
@@ -135,8 +133,7 @@ let test_scenario ?commitment_frequency ?challenge_window
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
-      setup ?commitment_frequency ?challenge_window ~protocol
-      @@ fun node client ->
+      setup ?commitment_period ?challenge_window ~protocol @@ fun node client ->
       ( with_fresh_rollup @@ fun sc_rollup_address sc_rollup_node _filename ->
         scenario protocol sc_rollup_node sc_rollup_address node client )
         node
@@ -437,11 +434,14 @@ let send_message client sc_rollup_address msg =
   in
   Client.bake_for_and_wait client
 
-let send_messages n sc_rollup_address client =
+let send_messages ?batch_size n sc_rollup_address client =
   let messages =
     List.map
       (fun i ->
-        let json = `A (List.map (fun _ -> `String "CAFEBABE") (range 1 i)) in
+        let batch_size = match batch_size with None -> i | Some v -> v in
+        let json =
+          `A (List.map (fun _ -> `String "CAFEBABE") (range 1 batch_size))
+        in
         "text:" ^ Ezjsonm.to_string json)
       (range 1 n)
   in
@@ -725,6 +725,34 @@ let basic_scenario _protocol sc_rollup_node sc_rollup_address _node client =
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node expected_level in
   return ()
 
+let too_many_messages _protocol sc_rollup_node sc_rollup_address _node client =
+  (* The following should be equal to `Sc_rollup_repr.Number_of_messages.max_int`. *)
+  let num_messages = 4_096 in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2932
+     The following should be equal to the period of commitment publications. *)
+  let num_levels = 20 in
+  let batch_size = (num_messages / num_levels) + 1 in
+  let* current_level = RPC.get_current_level client in
+  let expected_level = JSON.(as_int (current_level |-> "level")) + num_levels in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* success =
+    Lwt.catch
+      (fun () ->
+        let* () =
+          send_messages ~batch_size num_levels sc_rollup_address client
+        in
+        let* _ =
+          Sc_rollup_node.wait_for_level
+            ~timeout:3.
+            sc_rollup_node
+            expected_level
+        in
+        return false)
+      (fun _exn -> return true)
+  in
+  if success then return ()
+  else failwith "Adding too many messages in the inbox should fail."
+
 let sc_rollup_node_stops_scenario _protocol sc_rollup_node sc_rollup_address
     _node client =
   let num_messages = 2 in
@@ -788,6 +816,9 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node sc_rollup_address
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node 5 in
   return ()
 
+(* One can retrieve the list of originated SCORUs.
+   -----------------------------------------------
+*)
 let test_rollup_list =
   let open Lwt.Syntax in
   let go node client bootstrap1 =
@@ -1003,9 +1034,9 @@ let check_published_commitment_in_l1 ?(force_new_level = true) sc_rollup_address
          Option.map (fun c2 -> (c1, c2)) commitment_in_l1) ;
   Lwt.return_unit
 
-let test_commitment_scenario ?commitment_frequency ?challenge_window variant =
+let test_commitment_scenario ?commitment_period ?challenge_window variant =
   test_scenario
-    ?commitment_frequency
+    ?commitment_period
     ?challenge_window
     {
       output_file_prefix = "sc_rollup_commitment_of_rollup_node";
@@ -1017,12 +1048,12 @@ let test_commitment_scenario ?commitment_frequency ?challenge_window variant =
 
 let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
   (* The rollup is originated at level `init_level`, and it requires
-     `sc_rollup_commitment_frequency_in_blocks` levels to store a commitment.
+     `sc_rollup_commitment_period_in_blocks` levels to store a commitment.
      There is also a delay of `block_finality_time` before storing a
      commitment, to avoid including wrong commitments due to chain
      reorganisations. Therefore the commitment will be stored and published
      when the [Commitment] module processes the block at level
-     `init_level + sc_rollup_commitment_frequency_in_blocks +
+     `init_level + sc_rollup_commitment_period_in_blocks +
      levels_to_finalise`.
   *)
   let* init_level =
@@ -1031,7 +1062,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
 
   let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
-    get_sc_rollup_commitment_frequency_in_blocks client
+    get_sc_rollup_commitment_period_in_blocks client
   in
   let store_commitment_level =
     init_level + levels_to_commitment + block_finality_time
@@ -1055,7 +1086,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
       (init_level + levels_to_commitment)
   in
   (* Bake [block_finality_time] additional levels to ensure that block number
-     [init_level + sc_rollup_commitment_frequency_in_blocks] is
+     [init_level + sc_rollup_commitment_period_in_blocks] is
      processed by the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
   let* _ =
@@ -1091,12 +1122,12 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
 let commitment_not_stored_if_non_final _protocol sc_rollup_node
     sc_rollup_address _node client =
   (* The rollup is originated at level `init_level`, and it requires
-     `sc_rollup_commitment_frequency_in_blocks` levels to store a commitment.
+     `sc_rollup_commitment_period_in_blocks` levels to store a commitment.
      There is also a delay of `block_finality_time` before storing a
      commitment, to avoid including wrong commitments due to chain
      reorganisations. Therefore the commitment will be stored and published
      when the [Commitment] module processes the block at level
-     `init_level + sc_rollup_commitment_frequency_in_blocks +
+     `init_level + sc_rollup_commitment_period_in_blocks +
      levels_to_finalise`. At the level before, the commitment will not be
      neither stored nor published.
   *)
@@ -1106,7 +1137,7 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node
 
   let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
-    get_sc_rollup_commitment_frequency_in_blocks client
+    get_sc_rollup_commitment_period_in_blocks client
   in
   let levels_to_finalize = block_finality_time - 1 in
   let store_commitment_level = init_level + levels_to_commitment in
@@ -1147,12 +1178,12 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node
 
 let commitments_messages_reset _protocol sc_rollup_node sc_rollup_address _node
     client =
-  (* For `sc_rollup_commitment_frequency_in_blocks` levels after the sc rollup
+  (* For `sc_rollup_commitment_period_in_blocks` levels after the sc rollup
      origination, i messages are sent to the rollup, for a total of
-     `sc_rollup_commitment_frequency_in_blocks *
-     (sc_rollup_commitment_frequency_in_blocks + 1)/2` messages. These will be
+     `sc_rollup_commitment_period_in_blocks *
+     (sc_rollup_commitment_period_in_blocks + 1)/2` messages. These will be
      the number of messages in the first commitment published by the rollup
-     node. Then, for other `sc_rollup_commitment_frequency_in_blocks` levels,
+     node. Then, for other `sc_rollup_commitment_period_in_blocks` levels,
      no messages are sent to the sc-rollup address. The second commitment
      published by the sc-rollup node will contain 0 messages. Finally,
      `block_finality_time` empty levels are baked which ensures that two
@@ -1164,7 +1195,7 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup_address _node
 
   let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
-    get_sc_rollup_commitment_frequency_in_blocks client
+    get_sc_rollup_commitment_period_in_blocks client
   in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
@@ -1179,9 +1210,9 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup_address _node
     *)
     send_messages levels_to_commitment sc_rollup_address client
   in
-  (* Bake other `sc_rollup_commitment_frequency_in_blocks +
+  (* Bake other `sc_rollup_commitment_period_in_blocks +
      block_finality_time` levels with no messages. The first
-     `sc_rollup_commitment_frequency_in_blocks` levels contribute to the second
+     `sc_rollup_commitment_period_in_blocks` levels contribute to the second
      commitment stored by the rollup node. The last `block_finality_time`
      levels ensure that the second commitment is stored and published by the
      rollup node.
@@ -1224,7 +1255,7 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup_address _node
 
 let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
   (* No messages are published after origination, for
-     `sc_rollup_commitment_frequency_in_blocks - 1` levels. Then a divergence
+     `sc_rollup_commitment_period_in_blocks - 1` levels. Then a divergence
      occurs:  in the first branch one message is published for
      `block_finality_time - 1` blocks. In the second branch no messages are
      published for `block_finality_time` blocks. The second branch is
@@ -1239,7 +1270,7 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
 
   let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
-    get_sc_rollup_commitment_frequency_in_blocks client
+    get_sc_rollup_commitment_period_in_blocks client
   in
   let num_empty_blocks = block_finality_time in
   let num_messages = 1 in
@@ -1251,9 +1282,9 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
   let* () = Client.Admin.connect_address client ~peer:node' in
 
   let* () = Sc_rollup_node.run sc_rollup_node in
-  (* We bake `sc_rollup_commitment_frequency_in_blocks - 1` levels, which
+  (* We bake `sc_rollup_commitment_period_in_blocks - 1` levels, which
      should cause both nodes to observe level
-     `sc_rollup_commitment_frequency_in_blocks + init_level - 1 . *)
+     `sc_rollup_commitment_period_in_blocks + init_level - 1 . *)
   let* () = bake_levels (levels_to_commitment - 1) client in
   let* _ = Node.wait_for_level node (init_level + levels_to_commitment - 1) in
   let* _ = Node.wait_for_level node' (init_level + levels_to_commitment - 1) in
@@ -1301,7 +1332,7 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
   let* () = trigger_reorg () in
   (* After triggering a reorganisation the node should see that there is a more
      attractive head at level `init_level +
-     sc_rollup_commitment_frequency_in_blocks + block_finality_time - 1`.
+     sc_rollup_commitment_period_in_blocks + block_finality_time - 1`.
   *)
   let* _ =
     Sc_rollup_node.wait_for_level
@@ -1346,10 +1377,10 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
   check_published_commitment_in_l1 sc_rollup_address client published_commitment
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2942
-   Do not pass an explicit value for `?commitment_frequency until
+   Do not pass an explicit value for `?commitment_period until
    https://gitlab.com/tezos/tezos/-/merge_requests/5212 has been merged. *)
 (* Test that nodes do not publish commitments before the last cemented commitment. *)
-let commitment_before_lcc_not_stored ?(commitment_frequency = 30)
+let commitment_before_lcc_not_stored ?(commitment_period = 30)
     ?(challenge_window = 20_160) _protocol sc_rollup_node sc_rollup_address node
     client =
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
@@ -1364,14 +1395,12 @@ let commitment_before_lcc_not_stored ?(commitment_frequency = 30)
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* () = bake_levels commitment_frequency client in
+  let* () = bake_levels commitment_period client in
   let* commitment_inbox_level =
-    Sc_rollup_node.wait_for_level
-      sc_rollup_node
-      (init_level + commitment_frequency)
+    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + commitment_period)
   in
   (* Bake `block_finality_time` additional level to ensure that block number
-     `init_level + sc_rollup_commitment_frequency_in_blocks` is processed by
+     `init_level + sc_rollup_commitment_period_in_blocks` is processed by
      the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
   let* commitment_finalized_level =
@@ -1464,14 +1493,14 @@ let commitment_before_lcc_not_stored ?(commitment_frequency = 30)
         "Commitment stored by first and second rollup nodes differ (%L = %R)"
   in
 
-  (* Bake other commitment_frequency levels and check that rollup_node2 is
+  (* Bake other commitment_period levels and check that rollup_node2 is
      able to publish a commitment. *)
-  let* () = bake_levels commitment_frequency client' in
-  let commitment_inbox_level = commitment_inbox_level + commitment_frequency in
+  let* () = bake_levels commitment_period client' in
+  let commitment_inbox_level = commitment_inbox_level + commitment_period in
   let* _ =
     Sc_rollup_node.wait_for_level
       sc_rollup_node'
-      (level_after_cementation + commitment_frequency)
+      (level_after_cementation + commitment_period)
   in
   let* rollup_node2_last_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
@@ -1507,9 +1536,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_address
   let* init_level =
     RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
   in
-  let* commitment_frequency =
-    get_sc_rollup_commitment_frequency_in_blocks client
-  in
+  let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
   let init_level = init_level |> JSON.as_int in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
@@ -1517,14 +1544,12 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_address
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* () = bake_levels commitment_frequency client in
+  let* () = bake_levels commitment_period client in
   let* commitment_inbox_level =
-    Sc_rollup_node.wait_for_level
-      sc_rollup_node
-      (init_level + commitment_frequency)
+    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + commitment_period)
   in
   (* Bake `block_finality_time` additional level to ensure that block number
-     `init_level + sc_rollup_commitment_frequency_in_blocks` is processed by
+     `init_level + sc_rollup_commitment_period_in_blocks` is processed by
      the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
   let* commitment_finalized_level =
@@ -1686,6 +1711,9 @@ let client_with_initial_keys ~protocol =
   let* () = Sc_rollup_client.import_secret_key account sc_client in
   return (sc_client, account)
 
+(* Check that the client can show the address of a registered account.
+   -------------------------------------------------------------------
+*)
 let test_rollup_client_show_address =
   test
     ~__FILE__
@@ -1725,6 +1753,9 @@ let test_rollup_client_show_address =
              sk)
       else return ())
 
+(* Check that the client can generate keys.
+   ----------------------------------------
+*)
 let test_rollup_client_generate_keys =
   test
     ~__FILE__
@@ -1739,6 +1770,9 @@ let test_rollup_client_generate_keys =
       let* _account = Sc_rollup_client.show_address ~alias sc_client in
       return ())
 
+(* Check that the client can list keys.
+   ------------------------------------
+*)
 let test_rollup_client_list_keys =
   test
     ~__FILE__
@@ -1778,6 +1812,10 @@ let register ~protocols =
   test_rollup_inbox_size protocols ;
   test_rollup_inbox_current_messages_hash protocols ;
   test_rollup_inbox_of_rollup_node "basic" basic_scenario protocols ;
+  test_rollup_inbox_of_rollup_node
+    "too_many_messages"
+    too_many_messages
+    protocols ;
   test_rollup_inbox_of_rollup_node
     "stops"
     sc_rollup_node_stops_scenario

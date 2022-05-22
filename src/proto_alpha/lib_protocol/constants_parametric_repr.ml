@@ -92,7 +92,7 @@ type t = {
   sc_rollup_challenge_window_in_blocks : int;
   sc_rollup_max_available_messages : int;
   sc_rollup_stake_amount_in_mutez : int;
-  sc_rollup_commitment_frequency_in_blocks : int;
+  sc_rollup_commitment_period_in_blocks : int;
   sc_rollup_commitment_storage_size_in_bytes : int;
   sc_rollup_max_lookahead_in_blocks : int32;
 }
@@ -157,7 +157,7 @@ let encoding =
                     c.sc_rollup_challenge_window_in_blocks,
                     c.sc_rollup_max_available_messages,
                     c.sc_rollup_stake_amount_in_mutez,
-                    c.sc_rollup_commitment_frequency_in_blocks,
+                    c.sc_rollup_commitment_period_in_blocks,
                     c.sc_rollup_commitment_storage_size_in_bytes,
                     c.sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ))
     (fun ( ( preserved_cycles,
@@ -216,7 +216,7 @@ let encoding =
                        sc_rollup_challenge_window_in_blocks,
                        sc_rollup_max_available_messages,
                        sc_rollup_stake_amount_in_mutez,
-                       sc_rollup_commitment_frequency_in_blocks,
+                       sc_rollup_commitment_period_in_blocks,
                        sc_rollup_commitment_storage_size_in_bytes,
                        sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ) ->
       {
@@ -276,7 +276,7 @@ let encoding =
         sc_rollup_challenge_window_in_blocks;
         sc_rollup_max_available_messages;
         sc_rollup_stake_amount_in_mutez;
-        sc_rollup_commitment_frequency_in_blocks;
+        sc_rollup_commitment_period_in_blocks;
         sc_rollup_commitment_storage_size_in_bytes;
         sc_rollup_max_lookahead_in_blocks;
       })
@@ -357,7 +357,7 @@ let encoding =
                          (req "sc_rollup_challenge_window_in_blocks" int31)
                          (req "sc_rollup_max_available_messages" int31)
                          (req "sc_rollup_stake_amount_in_mutez" int31)
-                         (req "sc_rollup_commitment_frequency_in_blocks" int31)
+                         (req "sc_rollup_commitment_period_in_blocks" int31)
                          (req
                             "sc_rollup_commitment_storage_size_in_bytes"
                             int31)

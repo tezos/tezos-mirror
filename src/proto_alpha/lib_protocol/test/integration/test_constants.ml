@@ -74,7 +74,7 @@ let test_sc_rollup_challenge_window_lt_max_lookahead () =
   Assert.lt_int32 ~loc:__LOC__ challenge_window max_lookahead
 
 (* Check that
-    [commitment_storage_cost * max_lookahead / commitment_frequency < stake_amount]
+    [commitment_storage_cost * max_lookahead / commitment_period < stake_amount]
 
    Otherwise storage could be overallocated - since backtracking is not allowed, a staker
    can allocated at most [d] nodes (where [d] is the tree depth) - the maximum storage cost
@@ -94,15 +94,15 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
   let max_lookahead =
     Int64.of_int32 constants.sc_rollup_max_lookahead_in_blocks
   in
-  let commitment_frequency =
-    Int64.of_int constants.sc_rollup_commitment_frequency_in_blocks
+  let commitment_period =
+    Int64.of_int constants.sc_rollup_commitment_period_in_blocks
   in
   let stake_amount = Int64.of_int constants.sc_rollup_stake_amount_in_mutez in
   Assert.leq_int64
     ~loc:__LOC__
     (Int64.mul
        commitment_storage_cost
-       (Int64.div max_lookahead commitment_frequency))
+       (Int64.div max_lookahead commitment_period))
     stake_amount
 
 (* Check that

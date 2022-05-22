@@ -230,9 +230,9 @@ let sc_rollup_stake_amount_in_mutez c =
   let constants = Raw_context.constants c in
   constants.sc_rollup_stake_amount_in_mutez
 
-let sc_rollup_commitment_frequency_in_blocks c =
+let sc_rollup_commitment_period_in_blocks c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_commitment_frequency_in_blocks
+  constants.sc_rollup_commitment_period_in_blocks
 
 let sc_rollup_commitment_storage_size_in_bytes c =
   let constants = Raw_context.constants c in

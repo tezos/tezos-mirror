@@ -46,6 +46,8 @@ type error +=
   | (* `Temporary *) Sc_rollup_no_game
   | (* `Temporary *) Sc_rollup_staker_in_game
   | (* `Temporary *) Sc_rollup_timeout_level_not_reached
+  | (* `Temporary *)
+      Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
 let () =
   register_error_kind
@@ -90,6 +92,18 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_wrong_turn -> Some () | _ -> None)
     (fun () -> Sc_rollup_wrong_turn) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_max_number_of_messages_reached_for_commitment_period"
+    ~title:"Maximum number of messages reached for commitment period"
+    ~description:"Maximum number of messages reached for commitment period"
+    Data_encoding.unit
+    (function
+      | Sc_rollup_max_number_of_messages_reached_for_commitment_period ->
+          Some ()
+      | _ -> None)
+    (fun () -> Sc_rollup_max_number_of_messages_reached_for_commitment_period) ;
+
   let description = "Already staked." in
   register_error_kind
     `Temporary
@@ -308,15 +322,35 @@ let inbox ctxt rollup =
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some inbox -> return (inbox, ctxt)
 
-let assert_inbox_size_ok ctxt next_size =
+let assert_inbox_size_ok ctxt inbox extra_num_messages =
+  let next_size =
+    Z.add
+      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
+      (Z.of_int extra_num_messages)
+  in
   let max_size = Constants_storage.sc_rollup_max_available_messages ctxt in
   fail_unless
     Compare.Z.(next_size <= Z.of_int max_size)
     Sc_rollup_max_number_of_available_messages_reached
 
+let assert_inbox_nb_messages_in_commitment_period inbox extra_messages =
+  let nb_messages_in_commitment_period =
+    Int64.add
+      (Sc_rollup_inbox_repr.number_of_messages_during_commitment_period inbox)
+      (Int64.of_int extra_messages)
+  in
+  let limit = Int64.of_int32 Sc_rollup_repr.Number_of_messages.max_int in
+  fail_when
+    Compare.Int64.(nb_messages_in_commitment_period > limit)
+    Sc_rollup_max_number_of_messages_reached_for_commitment_period
+
 let add_messages ctxt rollup messages =
+  let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_tzresult_syntax in
   let open Raw_context in
+  let commitment_period =
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
+  in
   let* inbox, ctxt = inbox ctxt rollup in
   let* num_messages, total_messages_size, ctxt =
     List.fold_left_es
@@ -336,12 +370,27 @@ let add_messages ctxt rollup messages =
       (0, 0, ctxt)
       messages
   in
-  let next_size =
-    Z.add
-      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
-      (Z.of_int num_messages)
+  let* () = assert_inbox_size_ok ctxt inbox num_messages in
+  let start =
+    Sc_rollup_inbox_repr.starting_level_of_current_commitment_period inbox
   in
-  let* () = assert_inbox_size_ok ctxt next_size in
+  let freshness = Raw_level_repr.diff level start in
+  let inbox =
+    let open Int32 in
+    let open Compare.Int32 in
+    if freshness >= commitment_period then (
+      let nb_periods =
+        to_int ((mul (div freshness commitment_period)) commitment_period)
+      in
+      let new_starting_level = Raw_level_repr.(add start nb_periods) in
+      assert (Raw_level_repr.(new_starting_level <= level)) ;
+      assert (
+        rem (Raw_level_repr.diff new_starting_level start) commitment_period
+        = 0l) ;
+      Sc_rollup_inbox_repr.start_new_commitment_period inbox new_starting_level)
+    else inbox
+  in
+  let* () = assert_inbox_nb_messages_in_commitment_period inbox num_messages in
   let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
   let* origination_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
   let levels =
@@ -356,12 +405,11 @@ let add_messages ctxt rollup messages =
     Sc_rollup_costs.cost_add_messages ~num_messages ~total_messages_size levels
   in
   let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_messages in
-  let {Level_repr.level; _} = Raw_context.current_level ctxt in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
-    *)
+  *)
   let* current_messages, inbox =
     Sc_rollup_inbox_repr.(
       add_messages_no_history inbox level messages current_messages)
@@ -528,7 +576,7 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
 (** Enfore that a commitment's inbox level increases by an exact fixed amount over its predecessor.
     This property is used in several places - not obeying it causes severe breakage.
 *)
-let assert_commitment_frequency ctxt rollup commitment =
+let assert_commitment_period ctxt rollup commitment =
   let open Lwt_tzresult_syntax in
   let pred = Commitment.(commitment.predecessor) in
   let* ctxt, pred_level =
@@ -542,7 +590,7 @@ let assert_commitment_frequency ctxt rollup commitment =
       return (ctxt, Commitment.(pred.inbox_level))
   in
   (* We want to check the following inequalities on [commitment.inbox_level],
-     [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_frequency].
+     [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_period].
 
      - Greater-than-or-equal (>=), to ensure inbox_levels are monotonically
      increasing.  along each branch of commitments. Together with
@@ -558,12 +606,12 @@ let assert_commitment_frequency ctxt rollup commitment =
      Because [a >= b && a = b] is equivalent to [a = b], we can the latter as
      an optimization.
   *)
-  let sc_rollup_commitment_frequency =
-    Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+  let sc_rollup_commitment_period =
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
   if
     Raw_level_repr.(
-      commitment.inbox_level = add pred_level sc_rollup_commitment_frequency)
+      commitment.inbox_level = add pred_level sc_rollup_commitment_period)
   then return ctxt
   else fail Sc_rollup_bad_inbox_level
 
@@ -577,7 +625,7 @@ let assert_commitment_frequency ctxt rollup commitment =
 let assert_refine_conditions_met ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
-  assert_commitment_frequency ctxt rollup commitment
+  assert_commitment_period ctxt rollup commitment
 
 let refine_stake ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
@@ -609,7 +657,7 @@ let refine_stake ctxt rollup staker commitment =
       in
       (* WARNING: [commitment_storage_size] is a defined constant, and used
          to set a bound on the relationship between [max_lookahead],
-         [commitment_frequency] and [stake_amount].  Be careful changing this
+         [commitment_period] and [stake_amount].  Be careful changing this
          calculation. *)
       let size_diff =
         commitment_size_diff + commitment_added_size_diff

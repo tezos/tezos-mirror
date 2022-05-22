@@ -23,19 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The rollup node stores and publishes commitments for the PVM 
+(** The rollup node stores and publishes commitments for the PVM
     every 20 levels.
 
-    Every time a finalized block is processed  by the rollup node, 
-    the latter determines whether the last commitment that the node 
-    has produced referred to 20 blocks earlier. In this case, it 
-    computes and stores a new commitment in a level-indexed map. 
+    Every time a finalized block is processed  by the rollup node,
+    the latter determines whether the last commitment that the node
+    has produced referred to 20 blocks earlier. In this case, it
+    computes and stores a new commitment in a level-indexed map.
 
-    Stored commitments are signed by the rollup node operator 
-    and published on the layer1 chain. To ensure that commitments 
-    produced by the rollup node are eventually published, 
-    storing and publishing commitments are decoupled. Every time 
-    a new head is processed, the node tries to publish the oldest 
+    Stored commitments are signed by the rollup node operator
+    and published on the layer1 chain. To ensure that commitments
+    produced by the rollup node are eventually published,
+    storing and publishing commitments are decoupled. Every time
+    a new head is processed, the node tries to publish the oldest
     commitment that was not published already.
 *)
 
@@ -46,7 +46,7 @@ module type Mutable_level_store =
 
 (** [last_commitment_with_hash (module Last_level_module: Mutable_level_store) store]
       returns the last commitment and relative hash
-      stored according to the value of level indicated by 
+      stored according to the value of level indicated by
       [module Last_level_module]. If no commitment has been stored for the
       level indicated by [module Last_level_module], then None is returned.
       Two possible implementations for [module Last_level_module] are
@@ -72,8 +72,8 @@ module type S = sig
   val process_head :
     Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
 
-  (** [get_last_cemented_commitment_hash_with_level node_ctxt store] 
-      fetches and stores information about the last cemeneted commitment 
+  (** [get_last_cemented_commitment_hash_with_level node_ctxt store]
+      fetches and stores information about the last cemeneted commitment
       in the layer1 chain.
     *)
   val get_last_cemented_commitment_hash_with_level :
@@ -84,8 +84,8 @@ module type S = sig
       is below or equal to the inbox level of the last cemented commitment in
       the layer1 chain. In this case, the rollup node checks whether it has
       computed a commitment whose inbox level is
-      [sc_rollup_commitment_frequency] levels after the inbox level of the last
-      cemented commitment: 
+      [sc_rollup_commitment_period] levels after the inbox level of the last
+      cemented commitment:
       {ul
       {li if the commitment is found and its predecessor hash coincides with
        the hash of the LCC, the rollup node will try to publish that commitment
@@ -100,7 +100,7 @@ module type S = sig
 
   (** [cement_commitment_if_possible node_ctxt store head] checks whether the
       next commitment to be cemented (i.e. whose inbox level is
-      [sc_rollup_commitment_frequency] levels after
+      [sc_rollup_commitment_period] levels after
       [Store.Last_cemented_commitment_level store]) can be cemented. In
       particular, the request to cement the commitment happens only if the
       commitment is stored in [Store.Commitments store], and if

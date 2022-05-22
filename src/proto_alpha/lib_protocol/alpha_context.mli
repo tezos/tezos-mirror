@@ -778,7 +778,7 @@ module Constants : sig
       sc_rollup_challenge_window_in_blocks : int;
       sc_rollup_max_available_messages : int;
       sc_rollup_stake_amount_in_mutez : int;
-      sc_rollup_commitment_frequency_in_blocks : int;
+      sc_rollup_commitment_period_in_blocks : int;
       sc_rollup_commitment_storage_size_in_bytes : int;
       sc_rollup_max_lookahead_in_blocks : int32;
     }
@@ -896,6 +896,14 @@ module Constants : sig
   val sc_rollup_origination_size : context -> int
 
   val sc_rollup_max_available_messages : context -> int
+
+  val sc_rollup_stake_amount_in_mutez : Raw_context.t -> int
+
+  val sc_rollup_commitment_period_in_blocks : Raw_context.t -> int
+
+  val sc_rollup_commitment_storage_size_in_bytes : Raw_context.t -> int
+
+  val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}

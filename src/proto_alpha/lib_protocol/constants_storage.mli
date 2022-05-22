@@ -135,7 +135,7 @@ val sc_rollup_max_available_messages : Raw_context.t -> int
 
 val sc_rollup_stake_amount_in_mutez : Raw_context.t -> int
 
-val sc_rollup_commitment_frequency_in_blocks : Raw_context.t -> int
+val sc_rollup_commitment_period_in_blocks : Raw_context.t -> int
 
 val sc_rollup_commitment_storage_size_in_bytes : Raw_context.t -> int
 

@@ -23,19 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The rollup node stores and publishes commitments for the PVM 
+(** The rollup node stores and publishes commitments for the PVM
     every 20 levels.
 
-    Every time a finalized block is processed  by the rollup node, 
-    the latter determines whether the last commitment that the node 
-    has produced referred to 20 blocks earlier. In this case, it 
-    computes and stores a new commitment in a level-indexed map. 
+    Every time a finalized block is processed  by the rollup node,
+    the latter determines whether the last commitment that the node
+    has produced referred to 20 blocks earlier. In this case, it
+    computes and stores a new commitment in a level-indexed map.
 
-    Stored commitments are signed by the rollup node operator 
-    and published on the layer1 chain. To ensure that commitments 
-    produced by the rollup node are eventually published, 
-    storing and publishing commitments are decoupled. Every time 
-    a new head is processed, the node tries to publish the oldest 
+    Stored commitments are signed by the rollup node operator
+    and published on the layer1 chain. To ensure that commitments
+    produced by the rollup node are eventually published,
+    storing and publishing commitments are decoupled. Every time
+    a new head is processed, the node tries to publish the oldest
     commitment that was not published already.
 *)
 
@@ -67,12 +67,11 @@ module Number_of_messages = Mutable_counter.Make ()
 
 module Number_of_ticks = Mutable_counter.Make ()
 
-let sc_rollup_commitment_frequency =
+let sc_rollup_commitment_period =
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2977
      Use effective on-chain protocol parameter. *)
   Int32.of_int
-    Default_parameters.constants_mainnet
-      .sc_rollup_commitment_frequency_in_blocks
+    Default_parameters.constants_mainnet.sc_rollup_commitment_period_in_blocks
 
 let sc_rollup_challenge_window =
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2977
@@ -114,7 +113,7 @@ let next_commitment_level (module Last_commitment_level : Mutable_level_store)
   Raw_level.of_int32
   @@ Int32.add
        (Raw_level.to_int32 last_commitment_level)
-       sc_rollup_commitment_frequency
+       sc_rollup_commitment_period
 
 let last_commitment_hash (module Last_commitment_level : Mutable_level_store)
     store =
@@ -158,9 +157,30 @@ module type S = sig
   val process_head :
     Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
 
+  (** [get_last_cemented_commitment_hash_with_level node_ctxt store]
+      fetches and stores information about the last cemented commitment
+      in the layer1 chain.
+    *)
   val get_last_cemented_commitment_hash_with_level :
     Node_context.t -> Store.t -> unit tzresult Lwt.t
 
+  (** [publish_commitment node_ctxt store] publishes the earliest commitment
+      stored in [store] that has not been published yet, unless its inbox level
+      is below or equal to the inbox level of the last cemented commitment in
+      the layer1 chain. In this case, the rollup node checks whether it has
+      computed a commitment whose inbox level is
+      [sc_rollup_commitment_period] levels after the inbox level of the last
+      cemented commitment:
+      {ul
+      {li if the commitment is found and its predecessor hash coincides with
+       the hash of the LCC, the rollup node will try to publish that commitment
+      instead; }
+      {li if the commitment is found but its predecessor hash differs from the
+        hash of the LCC, the rollup node will stop its execution;}
+      {li if no commitment is found, no action is taken by the rollup node;
+        in particular, no commitment is published.}
+    }
+  *)
   val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
 
   val cement_commitment_if_possible :
