@@ -64,6 +64,9 @@ include module type of RPC_legacy
 
 (** {2 RPC Definitions} *)
 
+(** RPC: [GET /config] *)
+val get_config : JSON.t t
+
 (** RPC: [GET /network/connections]
 
     Returns the list of [(address, port)] pairs. *)

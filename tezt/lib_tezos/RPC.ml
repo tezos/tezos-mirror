@@ -26,6 +26,8 @@
 include RPC_core
 include RPC_legacy
 
+let get_config = make GET ["config"] Fun.id
+
 let get_network_connections =
   make GET ["network"; "connections"] @@ fun json ->
   let decode_connection json =
