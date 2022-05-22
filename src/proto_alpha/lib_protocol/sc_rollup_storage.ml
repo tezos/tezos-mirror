@@ -73,6 +73,13 @@ let get_boot_sector ctxt rollup =
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some boot_sector -> return boot_sector
 
+let parameters_type ctxt rollup =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, res = Store.Parameters_type.find ctxt rollup in
+  match res with
+  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | Some x -> return (x, ctxt)
+
 module Outbox = struct
   let level_index ctxt level =
     let max_active_levels =

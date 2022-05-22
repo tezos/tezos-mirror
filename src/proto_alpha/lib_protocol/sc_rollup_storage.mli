@@ -55,6 +55,14 @@ val initial_level :
 (** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
 val get_boot_sector : Raw_context.t -> Sc_rollup_repr.t -> string tzresult Lwt.t
 
+(** [parameters_type ctxt rollup] returns the registered type of a rollup.
+    Fails with an [Sc_rollup_does_not_exist] error in case there is no
+    registered type for the rollup. *)
+val parameters_type :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Script_repr.lazy_expr * Raw_context.t) tzresult Lwt.t
+
 (** A module for managing state concerning a rollup's outbox. *)
 module Outbox : sig
   (** [record_applied_message ctxt rollup level ~message_index] marks the
