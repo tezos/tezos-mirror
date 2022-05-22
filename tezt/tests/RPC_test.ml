@@ -610,7 +610,7 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
   unit
 
 (* Test the various other RPCs. *)
-let test_others _test_mode_tag _protocol ?endpoint client =
+let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
   let* _ = RPC.get_constants ?endpoint ~hooks client in
   let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
   let* _ = RPC.get_current_level ?endpoint ~hooks client in
@@ -956,6 +956,18 @@ let test_workers _test_mode_tag _protocol ?endpoint client =
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_worker_prevalidator () in
   unit
 
+let test_misc_shell _test_mode_tag protocol ?endpoint client =
+  let protocol_hash = Protocol.hash protocol in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_errors in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocols in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocol protocol_hash in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_fetch_protocol protocol_hash
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_gc in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_memory in
+  unit
+
 (* Test access to RPC regulated with an ACL. *)
 let test_whitelist address () =
   let whitelist =
@@ -1114,8 +1126,8 @@ let register protocols =
         [(["blocks_per_cycle"], Some "4"); cycles_per_voting_period]
         @ consensus_threshold protocol) ;
     check_rpc_regression
-      "others"
-      ~test_function:test_others
+      "misc_protocol"
+      ~test_function:test_misc_protocol
       ~parameter_overrides:consensus_threshold ;
     (match test_mode_tag with
     | `Client_data_dir_proxy_server | `Client_rpc_proxy_server | `Light -> ()
@@ -1129,13 +1141,21 @@ let register protocols =
       ~test_function:test_network
       ~parameter_overrides:consensus_threshold
       ~nodes_args:[Connections 1] ;
-    match test_mode_tag with
+    (match test_mode_tag with
     (* No worker RPCs in these modes *)
     | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
     | _ ->
         check_rpc
           "workers"
           ~test_function:test_workers
+          ~parameter_overrides:consensus_threshold) ;
+    match test_mode_tag with
+    (* No misc shell RPCs in these modes *)
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
+    | _ ->
+        check_rpc
+          "misc_shell"
+          ~test_function:test_misc_shell
           ~parameter_overrides:consensus_threshold
   in
   List.iter
