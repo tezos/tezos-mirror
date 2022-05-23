@@ -199,6 +199,7 @@
   Script_list
   Script_tc_context
   Apply_operation_result
+  Apply_internal_results
   Apply_results
   Script_ir_translator
   Script_big_map
@@ -423,6 +424,7 @@
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
   apply_operation_result.ml apply_operation_result.mli
+  apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
@@ -633,6 +635,7 @@
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
   apply_operation_result.ml apply_operation_result.mli
+  apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
@@ -852,6 +855,7 @@
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
   apply_operation_result.ml apply_operation_result.mli
+  apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
@@ -1075,6 +1079,7 @@
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
   apply_operation_result.ml apply_operation_result.mli
+  apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
