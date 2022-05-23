@@ -14,7 +14,7 @@
   tezos-protocol-plugin-012-Psithaca
   tezos-protocol-012-Psithaca.environment
   tezos-protocol-012-Psithaca
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   tezos-012-Psithaca-test-helpers)
  (flags
   (:standard

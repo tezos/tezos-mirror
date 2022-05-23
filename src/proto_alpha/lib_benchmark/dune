@@ -14,7 +14,7 @@
   tezos-benchmark-type-inference-alpha
   tezos-protocol-alpha
   tezos-crypto
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   hashcons
   tezos-alpha-test-helpers
   prbnmcn-stats)

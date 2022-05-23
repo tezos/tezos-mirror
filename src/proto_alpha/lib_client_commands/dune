@@ -8,7 +8,7 @@
  (libraries
   tezos-base
   tezos-protocol-alpha
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-stdlib-unix
   tezos-protocol-environment
   tezos-shell-services
@@ -45,7 +45,7 @@
  (libraries
   tezos-base
   tezos-protocol-alpha
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-protocol-environment
   tezos-shell-services
   tezos-client-base

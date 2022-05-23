@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_012_Psithaca_parameters)
- (public_name tezos-protocol-012-Psithaca-parameters)
+ (public_name tezos-protocol-012-Psithaca.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -20,7 +20,7 @@
  (name gen)
  (libraries
   tezos-base
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   tezos-protocol-012-Psithaca)
  (link_flags (:standard -linkall))
  (flags
@@ -46,6 +46,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
- (package tezos-protocol-012-Psithaca-parameters)
+ (package tezos-protocol-012-Psithaca)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

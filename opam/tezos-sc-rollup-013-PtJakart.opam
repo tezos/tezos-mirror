@@ -13,7 +13,6 @@ depends: [
   "tezos-base"
   "tezos-protocol-013-PtJakart"
   "tezos-protocol-plugin-013-PtJakart"
-  "tezos-protocol-013-PtJakart-parameters"
   "tezos-rpc"
 ]
 build: [

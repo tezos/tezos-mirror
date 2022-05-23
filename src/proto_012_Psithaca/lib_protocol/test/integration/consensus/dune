@@ -9,7 +9,7 @@
   tezos-protocol-012-Psithaca
   tezos-012-Psithaca-test-helpers
   tezos-base-test-helpers
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   tezos-protocol-plugin-012-Psithaca)
  (flags
   (:standard

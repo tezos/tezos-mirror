@@ -17,7 +17,6 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-protocol-alpha"
   "tezos-client-alpha"
-  "tezos-protocol-alpha-parameters"
   "tezos-protocol-environment"
   "tezos-protocol-plugin-alpha"
   "tezos-shell-services"

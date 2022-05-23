@@ -14,7 +14,7 @@
   tezos-micheline
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha-parameters)
+  tezos-protocol-alpha.parameters)
  (flags
   (:standard
    -open Tezos_base.TzPervasives

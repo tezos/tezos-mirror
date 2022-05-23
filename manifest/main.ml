@@ -3515,9 +3515,8 @@ include Tezos_raw_protocol_%s.Main
     let parameters =
       some_if (N.(number >= 008) && not_overridden) @@ fun () ->
       public_lib
-        (sf "tezos-protocol-%s-parameters" name_dash)
+        (sf "tezos-protocol-%s.parameters" name_dash)
         ~path:(sf "src/proto_%s/lib_parameters" name_underscore)
-        ~synopsis:"Tezos/Protocol: parameters"
         ~all_modules_except:["gen"]
         ~deps:
           [
@@ -3532,7 +3531,7 @@ include Tezos_raw_protocol_%s.Main
       private_exe
         "gen"
         ~path:(sf "src/proto_%s/lib_parameters" name_underscore)
-        ~opam:(sf "tezos-protocol-%s-parameters" name_dash)
+        ~opam:(sf "tezos-protocol-%s" name_dash)
         ~deps:
           [
             tezos_base |> open_ ~m:"TzPervasives";
@@ -3560,7 +3559,7 @@ include Tezos_raw_protocol_%s.Main
                   S "test-parameters.json";
                   S "mainnet-parameters.json";
                 ]
-                ~package:(sf "tezos-protocol-%s-parameters" name_dash)
+                ~package:(sf "tezos-protocol-%s" name_dash)
                 ~section:"lib";
             ])
         ~bisect_ppx:false

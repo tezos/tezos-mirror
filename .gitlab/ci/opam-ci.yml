@@ -647,11 +647,6 @@ opam:tezos-protocol-008-PtEdo2Zk:
   variables:
     package: tezos-protocol-008-PtEdo2Zk
 
-opam:tezos-protocol-008-PtEdo2Zk-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-008-PtEdo2Zk-parameters
-
 opam:tezos-protocol-008-PtEdoTez:
   extends: .opam_template
   variables:
@@ -662,40 +657,20 @@ opam:tezos-protocol-009-PsFLoren:
   variables:
     package: tezos-protocol-009-PsFLoren
 
-opam:tezos-protocol-009-PsFLoren-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-009-PsFLoren-parameters
-
 opam:tezos-protocol-010-PtGRANAD:
   extends: .opam_template
   variables:
     package: tezos-protocol-010-PtGRANAD
-
-opam:tezos-protocol-010-PtGRANAD-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-010-PtGRANAD-parameters
 
 opam:tezos-protocol-011-PtHangz2:
   extends: .opam_template
   variables:
     package: tezos-protocol-011-PtHangz2
 
-opam:tezos-protocol-011-PtHangz2-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-011-PtHangz2-parameters
-
 opam:tezos-protocol-012-Psithaca:
   extends: .opam_template
   variables:
     package: tezos-protocol-012-Psithaca
-
-opam:tezos-protocol-012-Psithaca-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-012-Psithaca-parameters
 
 # Ignoring package tezos-protocol-012-Psithaca-tests, it only contains tests or private targets
 
@@ -704,22 +679,12 @@ opam:tezos-protocol-013-PtJakart:
   variables:
     package: tezos-protocol-013-PtJakart
 
-opam:tezos-protocol-013-PtJakart-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-013-PtJakart-parameters
-
 # Ignoring package tezos-protocol-013-PtJakart-tests, it only contains tests or private targets
 
 opam:tezos-protocol-alpha:
   extends: .opam_template
   variables:
     package: tezos-protocol-alpha
-
-opam:tezos-protocol-alpha-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-alpha-parameters
 
 # Ignoring package tezos-protocol-alpha-tests, it only contains tests or private targets
 

@@ -19,7 +19,7 @@
   tezos-context.helpers
   tezos-protocol-alpha
   tezos-protocol-plugin-alpha
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-server

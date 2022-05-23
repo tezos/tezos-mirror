@@ -9,7 +9,7 @@
   tezos-micheline
   tezos-client-alpha
   tezos-client-base
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-protocol-environment
   tezos-stdlib-unix
   tezos-protocol-alpha

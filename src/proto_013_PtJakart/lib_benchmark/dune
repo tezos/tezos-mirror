@@ -14,7 +14,7 @@
   tezos-benchmark-type-inference-013-PtJakart
   tezos-protocol-013-PtJakart
   tezos-crypto
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   hashcons
   tezos-013-PtJakart-test-helpers
   prbnmcn-stats)

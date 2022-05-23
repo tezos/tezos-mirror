@@ -8,7 +8,7 @@
   tezos-base
   tezos-client-alpha
   tezos-protocol-alpha
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-alpha-test-helpers
   tezos-base-test-helpers)
  (flags

@@ -12,7 +12,7 @@
   tezos-base-test-helpers
   tezos-baking-013-PtJakart.mockup-simulator
   tezos-baking-013-PtJakart
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-crypto
   alcotest-lwt)
  (flags

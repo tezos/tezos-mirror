@@ -15,7 +15,7 @@
   tezos-protocol-plugin-013-PtJakart
   tezos-protocol-013-PtJakart.environment
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-013-PtJakart-test-helpers)
  (flags
   (:standard

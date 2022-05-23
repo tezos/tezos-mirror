@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_008_PtEdo2Zk_parameters)
- (public_name tezos-protocol-008-PtEdo2Zk-parameters)
+ (public_name tezos-protocol-008-PtEdo2Zk.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -20,7 +20,7 @@
  (name gen)
  (libraries
   tezos-base
-  tezos-protocol-008-PtEdo2Zk-parameters)
+  tezos-protocol-008-PtEdo2Zk.parameters)
  (link_flags (:standard -linkall))
  (flags
   (:standard
@@ -44,6 +44,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
- (package tezos-protocol-008-PtEdo2Zk-parameters)
+ (package tezos-protocol-008-PtEdo2Zk)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

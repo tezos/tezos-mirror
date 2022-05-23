@@ -15,7 +15,7 @@
   tezos-benchmark-type-inference-012-Psithaca
   tezos-protocol-012-Psithaca
   tezos-crypto
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   hashcons
   tezos-012-Psithaca-test-helpers
   prbnmcn-stats)

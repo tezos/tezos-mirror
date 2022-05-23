@@ -15,7 +15,7 @@
   tezos-protocol-plugin-alpha
   tezos-protocol-alpha.environment
   tezos-protocol-alpha
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-alpha-test-helpers)
  (flags
   (:standard

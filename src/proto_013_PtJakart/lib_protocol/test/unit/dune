@@ -9,7 +9,7 @@
   tezos-micheline
   tezos-client-013-PtJakart
   tezos-client-base
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-protocol-environment
   tezos-stdlib-unix
   tezos-protocol-013-PtJakart

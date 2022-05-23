@@ -14,7 +14,6 @@ depends: [
   "tezos-protocol-013-PtJakart" {with-test}
   "tezos-013-PtJakart-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
-  "tezos-protocol-013-PtJakart-parameters" {with-test}
   "tezos-protocol-plugin-013-PtJakart" {with-test}
   "tezos-client-013-PtJakart" {with-test}
   "tezos-benchmark" {with-test}

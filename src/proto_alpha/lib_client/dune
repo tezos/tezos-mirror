@@ -14,7 +14,7 @@
   tezos-proxy
   tezos-signer-backends
   tezos-protocol-plugin-alpha
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-rpc)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
