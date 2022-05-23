@@ -57,6 +57,7 @@ module Sc_rollup = struct
   include Sc_rollup_repr
   module Inbox = Sc_rollup_inbox_repr
   module Game = Sc_rollup_game_repr
+  module Commitment_storage = Sc_rollup_commitment_storage
   include Sc_rollup_storage
 end
 

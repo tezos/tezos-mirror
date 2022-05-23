@@ -2655,6 +2655,17 @@ module Sc_rollup : sig
     val outcome_encoding : outcome Data_encoding.t
   end
 
+  module Commitment_storage : sig
+    val get_commitment :
+      context ->
+      t ->
+      Commitment_hash.t ->
+      (Commitment.t * context) tzresult Lwt.t
+
+    val last_cemented_commitment_hash_with_level :
+      context -> t -> (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
+  end
+
   val rpc_arg : t RPC_arg.t
 
   val add_messages :
@@ -2692,9 +2703,6 @@ module Sc_rollup : sig
     Staker.t ->
     (conflict_point * context) tzresult Lwt.t
 
-  val get_commitment :
-    context -> t -> Commitment_hash.t -> (Commitment.t * context) tzresult Lwt.t
-
   val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
 
   val list : context -> t list tzresult Lwt.t
@@ -2702,9 +2710,6 @@ module Sc_rollup : sig
   val initial_level : context -> t -> Raw_level.t tzresult Lwt.t
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
-
-  val last_cemented_commitment_hash_with_level :
-    context -> t -> (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
 
   val get_or_init_game :
     context ->

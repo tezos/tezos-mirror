@@ -23,93 +23,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(** Defines storage for Smart Contract Optimistic Rollups.
-
-    {2 Commitments}
-
-    [Commitment]s are stored directly in the L1 context. Commitments are
-    immutable and content-addressed, and can be indexed by a [Commitment_hash].
-
-    A commitment represents a claim about the state of a PVM.
-
-    We also keep auxiliary state about each commitment, namely:
-
-    {ul
-      {li When it was first added.}
-      {li Its current number of stakers.}
-      }
-
-    This auxiliary data is not part of the commitment itself. They represent
-    information that the L1 knows about the claim, not the claim itself.
-
-    {3 Predecessors and Boot state}
-    Each commitment contains the hash of its {i predecessor}. Multiple
-    commitments can have the same predecessor. Therefore, commitments form
-    a Merkle tree.
-
-    Conceptually the root of this tree is the [Commitment_hash.zero].  This
-    commitment claims that the PVM (Proof-generating Virtual Machine) is in a
-    pre-boot state and waiting to start booting by interpreting the boot sector with
-    respect to the Machine semantics.
-
-    {3 Cemented and Disputable commitments}
-    Commitments accepted as true by the protocol are referred to as Cemented.
-
-    {3 Stakers}
-    The Stakers table maps Stakers (implicit accounts) to commitments hashes.
-
-    Let [Stakers(S)] mean "looking up the key S in [Stakers]".
-
-    A staker [S] is directly staked on [C] if [Stakers(S) = C]. A staker [S]
-    is indirectly staked on [C] if [C] is an ancestor of [Stakers(S)] in the commitment tree.
-
-    {3 Dispute}
-    Commitments that have at least one sibling are referred to as Disputed.
-    More formally, a commitment C is disputed if at least one staker is not
-    (directly or indirectly) staked on C.
-
-    {3 Dispute resolution}
-    The rollup protocol ensures that all disputes are resolved before cementing
-    a commitment. Therefore, cemented commitments form a list rather than a tree.
-
-    In the context we only store the Last Cemented Commitment (LCC), which is
-    by definition a descendant of [zero]. We also store all Disputable
-    commitments that have at least one Staker.
-
-    For example, assuming the full set of commitments for a rollup
-    looks like this:
-
-    {[
-                 LCC  staker1  staker2
-                  |      |        |
-                  |      V        |
-                  V   --c3        |
-      zero--c1 --c2--/            |
-                     \            V
-                      --c4------ c5
-    ]}
-    then commitments [c2..c5] will be stored in the context.
-
-    {3 Conflicts}
-
-    Let Commitments(S) be the set of commitments directly staked on by staker S.
-
-    Two stakers A and B are:
-
-    {ul
-      {li In total agreement iff Commitments(A) = Commitments(B).}
-      {li In partial agreement iff either Commitments(A) ⊂ Commitments(B), or
-        Commitments(B) ⊂ Commitments(A).}
-      {li In conflict iff they are neither in total or partial agreement.}}
-
-    We can further refine a conflict to note what they are in conflict about,
-    e.g. they may be in conflict about the inbox, about execution, or both. We
-    can resolve conflicts by first resolving the conflict about inbox, then
-    about execution (since execution is irrelevant if the inbox is not
-    correct).
-    *)
-
 (** Module [Internal] implements functions that are used only internally by
     the [Sc_rollup_storage] module, but need to be exposed in tests or
     benchmarks.
@@ -283,20 +196,6 @@ val publish_commitment :
   (Sc_rollup_repr.Commitment_hash.t * Raw_level_repr.t * Raw_context.t) tzresult
   Lwt.t
 
-(** [last_cemented_commitment context rollup] returns the last cemented
-    commitment of the rollup.
-
-    If no commitments have been cemented, the rollup is said to be in a
-    pre-boot state, and [last_cemented_commitment = Commitment_hash.zero].
-
-    May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}} *)
-val last_cemented_commitment :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  (Sc_rollup_repr.Commitment_hash.t * Raw_context.t) tzresult Lwt.t
-
 (** [cement_commitment context rollup commitment] cements the given
     commitment.
 
@@ -351,19 +250,6 @@ val get_conflict_point :
   Sc_rollup_repr.Staker.t ->
   (conflict_point * Raw_context.t) tzresult Lwt.t
 
-(** [get_commitment context rollup commitment_hash] returns the commitment with the given hash.
-
-    May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-      {li [Sc_rollup_unknown_commitment] if [commitment] does not exist}
-    } *)
-val get_commitment :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  Sc_rollup_repr.Commitment_hash.t ->
-  (Sc_rollup_repr.Commitment.t * Raw_context.t) tzresult Lwt.t
-
 (** [remove_staker context rollup staker] forcibly removes the given [staker]
     and confiscates their frozen deposits.
 
@@ -393,21 +279,6 @@ val initial_level :
 
 (** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
 val get_boot_sector : Raw_context.t -> Sc_rollup_repr.t -> string tzresult Lwt.t
-
-(* [last_cemented_commitment_hash_with_level ctxt sc_rollup] returns the hash
-    and level of the last cemented commitment (lcc) for [sc_rollup]. If the
-    rollup exists but no lcc exists, the initial commitment
-    `Sc_rollup.Commitment.zero` together with the rollup origination level is
-    returned.
-
-   May fail with:
-     {ul
-       {li [Sc_rollup_does_not_exist] if [rollup] does not exist}} *)
-val last_cemented_commitment_hash_with_level :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  (Sc_rollup_repr.Commitment_hash.t * Raw_level_repr.t * Raw_context.t) tzresult
-  Lwt.t
 
 (** [get_or_init_game ctxt rollup refuter defender] returns the current
     game between the two stakers [refuter] and [defender] if it exists.

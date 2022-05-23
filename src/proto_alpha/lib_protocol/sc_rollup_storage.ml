@@ -27,6 +27,7 @@
 open Sc_rollup_errors
 module Store = Storage.Sc_rollup
 module Commitment = Sc_rollup_repr.Commitment
+module Commitment_storage = Sc_rollup_commitment_storage
 module Commitment_hash = Sc_rollup_repr.Commitment_hash
 
 module Internal = struct
@@ -62,13 +63,6 @@ let originate ctxt ~kind ~boot_sector =
   return (address, size, ctxt)
 
 let kind ctxt address = Store.PVM_kind.find ctxt address
-
-let last_cemented_commitment ctxt rollup =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Last_cemented_commitment.find ctxt rollup in
-  match res with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some lcc -> return (lcc, ctxt)
 
 (** Try to consume n messages. *)
 let consume_n_messages ctxt rollup n =
@@ -186,30 +180,6 @@ let add_messages ctxt rollup messages =
   let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
   return (inbox, Z.of_int size, ctxt)
 
-(* This function is called in other functions in the module only after they have
-   checked for the existence of the rollup, and therefore it is not necessary
-   for it to check for the existence of the rollup again. It is not directly
-   exposed by the module. Instead, a different public function [get_commitment]
-   is provided, which checks for the existence of [rollup] before calling
-   [get_commitment_internal]. *)
-let get_commitment_internal ctxt rollup commitment =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Commitments.find (ctxt, rollup) commitment in
-  match res with
-  | None -> fail (Sc_rollup_unknown_commitment commitment)
-  | Some commitment -> return (commitment, ctxt)
-
-let get_commitment ctxt rollup commitment =
-  let open Lwt_tzresult_syntax in
-  (* Assert that a last cemented commitment exists. *)
-  let* _lcc, ctxt = last_cemented_commitment ctxt rollup in
-  get_commitment_internal ctxt rollup commitment
-
-let get_predecessor ctxt rollup node =
-  let open Lwt_tzresult_syntax in
-  let* commitment, ctxt = get_commitment_internal ctxt rollup node in
-  return (commitment.predecessor, ctxt)
-
 let find_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
@@ -233,23 +203,6 @@ let get_commitment_stake_count ctxt rollup node =
     Store.Commitment_stake_count.find (ctxt, rollup) node
   in
   return (Option.value ~default:0l maybe_staked_on_commitment, ctxt)
-
-(** [set_commitment_added ctxt rollup node current] sets the commitment
-    addition time of [node] to [current] iff the commitment time was
-    not previously set, and leaves it unchanged otherwise.
- *)
-let set_commitment_added ctxt rollup node new_value =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Commitment_added.find (ctxt, rollup) node in
-  match res with
-  | Some old_value ->
-      (* No need to re-add the read value *)
-      return (0, old_value, ctxt)
-  | None ->
-      let* ctxt, size_diff, _was_bound =
-        Store.Commitment_added.add (ctxt, rollup) node new_value
-      in
-      return (size_diff, new_value, ctxt)
 
 let deallocate ctxt rollup node =
   let open Lwt_tzresult_syntax in
@@ -292,7 +245,7 @@ let decrease_commitment_stake_count ctxt rollup node =
 
 let deposit_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
-  let* lcc, ctxt = last_cemented_commitment ctxt rollup in
+  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
   match res with
   | None ->
@@ -306,7 +259,7 @@ let deposit_stake ctxt rollup staker =
 
 let withdraw_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
-  let* lcc, ctxt = last_cemented_commitment ctxt rollup in
+  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
   match res with
   | None -> fail Sc_rollup_not_staked
@@ -328,7 +281,9 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
       let* level = Store.Initial_level.get ctxt rollup in
       return (ctxt, level)
     else
-      let* lcc, ctxt = get_commitment_internal ctxt rollup lcc in
+      let* lcc, ctxt =
+        Commitment_storage.get_commitment_unsafe ctxt rollup lcc
+      in
       return (ctxt, Commitment.(lcc.inbox_level))
   in
   let max_level = Commitment.(commitment.inbox_level) in
@@ -352,7 +307,9 @@ let assert_commitment_period ctxt rollup commitment =
       let* level = Store.Initial_level.get ctxt rollup in
       return (ctxt, level)
     else
-      let* pred, ctxt = get_commitment_internal ctxt rollup pred_hash in
+      let* pred, ctxt =
+        Commitment_storage.get_commitment_unsafe ctxt rollup pred_hash
+      in
       return (ctxt, Commitment.(pred.inbox_level))
   in
   (* We want to check the following inequalities on [commitment.inbox_level],
@@ -395,7 +352,7 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
 
 let refine_stake ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
-  let* lcc, ctxt = last_cemented_commitment ctxt rollup in
+  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* staked_on, ctxt = find_staker ctxt rollup staker in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
   let new_hash = Commitment.hash commitment in
@@ -413,7 +370,7 @@ let refine_stake ctxt rollup staker commitment =
       in
       let level = (Raw_context.current_level ctxt).level in
       let* commitment_added_size_diff, commitment_added_level, ctxt =
-        set_commitment_added ctxt rollup new_hash level
+        Commitment_storage.set_commitment_added ctxt rollup new_hash level
       in
       let* ctxt, staker_count_diff =
         Store.Stakers.update (ctxt, rollup) staker new_hash
@@ -443,7 +400,9 @@ let refine_stake ctxt rollup staker commitment =
          the LCC. *)
       fail Sc_rollup_staker_backtracked
     else
-      let* pred, ctxt = get_predecessor ctxt rollup node in
+      let* pred, ctxt =
+        Commitment_storage.get_predecessor_unsafe ctxt rollup node
+      in
       let* _size, ctxt = increase_commitment_stake_count ctxt rollup node in
       (go [@ocaml.tailcall]) pred ctxt
   in
@@ -466,13 +425,15 @@ let cement_commitment ctxt rollup new_lcc =
   in
   (* Calling [last_final_commitment] first to trigger failure in case of
      non-existing rollup. *)
-  let* old_lcc, ctxt = last_cemented_commitment ctxt rollup in
+  let* old_lcc, ctxt =
+    Commitment_storage.last_cemented_commitment ctxt rollup
+  in
   (* Get is safe, as [Stakers_size] is initialized on origination. *)
   let* ctxt, total_staker_count = Store.Staker_count.get ctxt rollup in
   if Compare.Int32.(total_staker_count <= 0l) then fail Sc_rollup_no_stakers
   else
     let* new_lcc_commitment, ctxt =
-      get_commitment_internal ctxt rollup new_lcc
+      Commitment_storage.get_commitment_unsafe ctxt rollup new_lcc
     in
     let* ctxt, new_lcc_added =
       Store.Commitment_added.get (ctxt, rollup) new_lcc
@@ -514,7 +475,9 @@ type conflict_point = Commitment_hash.t * Commitment_hash.t
 let goto_inbox_level ctxt rollup inbox_level commit =
   let open Lwt_tzresult_syntax in
   let rec go ctxt commit =
-    let* info, ctxt = get_commitment_internal ctxt rollup commit in
+    let* info, ctxt =
+      Commitment_storage.get_commitment_unsafe ctxt rollup commit
+    in
     if Raw_level_repr.(info.Commitment.inbox_level <= inbox_level) then (
       (* Assert that we're exactly at that level. If this isn't the case, we're most likely in a
          situation where inbox levels are inconsistent. *)
@@ -527,7 +490,7 @@ let goto_inbox_level ctxt rollup inbox_level commit =
 let get_conflict_point ctxt rollup staker1 staker2 =
   let open Lwt_tzresult_syntax in
   (* Ensure the LCC is set. *)
-  let* lcc, ctxt = last_cemented_commitment ctxt rollup in
+  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   (* Find out on which commitments the competitors are staked. *)
   let* commit1, ctxt = find_staker ctxt rollup staker1 in
   let* commit2, ctxt = find_staker ctxt rollup staker2 in
@@ -541,8 +504,12 @@ let get_conflict_point ctxt rollup staker1 staker2 =
         || commit2 = lcc)
       Sc_rollup_no_conflict
   in
-  let* commit1_info, ctxt = get_commitment_internal ctxt rollup commit1 in
-  let* commit2_info, ctxt = get_commitment_internal ctxt rollup commit2 in
+  let* commit1_info, ctxt =
+    Commitment_storage.get_commitment_unsafe ctxt rollup commit1
+  in
+  let* commit2_info, ctxt =
+    Commitment_storage.get_commitment_unsafe ctxt rollup commit2
+  in
   (* Make sure that both commits are at the same inbox level. In case they are not move the commit
      that is farther ahead to the exact inbox level of the other.
 
@@ -565,8 +532,12 @@ let get_conflict_point ctxt rollup staker1 staker2 =
   let rec traverse_in_parallel ctxt commit1 commit2 =
     (* We know that commit1 <> commit2 at the first call and during recursive calls
        as well. *)
-    let* commit1_info, ctxt = get_commitment_internal ctxt rollup commit1 in
-    let* commit2_info, ctxt = get_commitment_internal ctxt rollup commit2 in
+    let* commit1_info, ctxt =
+      Commitment_storage.get_commitment_unsafe ctxt rollup commit1
+    in
+    let* commit2_info, ctxt =
+      Commitment_storage.get_commitment_unsafe ctxt rollup commit2
+    in
     (* This assert should hold because:
        - We call function [traverse_in_parallel] with two initial commitments
        whose levels are equal to [target_inbox_level],
@@ -594,7 +565,7 @@ let get_conflict_point ctxt rollup staker1 staker2 =
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in
-  let* lcc, ctxt = last_cemented_commitment ctxt rollup in
+  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
   match res with
   | None -> fail Sc_rollup_not_staked
@@ -608,7 +579,9 @@ let remove_staker ctxt rollup staker =
         let rec go node ctxt =
           if Commitment_hash.(node = lcc) then return ctxt
           else
-            let* pred, ctxt = get_predecessor ctxt rollup node in
+            let* pred, ctxt =
+              Commitment_storage.get_predecessor_unsafe ctxt rollup node
+            in
             let* ctxt = decrease_commitment_stake_count ctxt rollup node in
             (go [@ocaml.tailcall]) pred ctxt
         in
@@ -629,18 +602,6 @@ let get_boot_sector ctxt rollup =
   match boot_sector with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some boot_sector -> return boot_sector
-
-let last_cemented_commitment_hash_with_level ctxt rollup =
-  let open Lwt_tzresult_syntax in
-  let* commitment_hash, ctxt = last_cemented_commitment ctxt rollup in
-  if Commitment_hash.(commitment_hash = zero) then
-    let+ initial_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
-    (commitment_hash, initial_level, ctxt)
-  else
-    let+ {inbox_level; _}, ctxt =
-      get_commitment_internal ctxt rollup commitment_hash
-    in
-    (commitment_hash, inbox_level, ctxt)
 
 (** TODO: #2902 replace with protocol constant and consider good value. *)
 let timeout_period_in_blocks = 500
@@ -664,9 +625,11 @@ let get_or_init_game ctxt rollup ~refuter ~defender =
         | _ -> fail Sc_rollup_staker_in_game
       in
       let* (_, child), ctxt = get_conflict_point ctxt rollup refuter defender in
-      let* child, ctxt = get_commitment_internal ctxt rollup child in
+      let* child, ctxt =
+        Commitment_storage.get_commitment_unsafe ctxt rollup child
+      in
       let* parent, ctxt =
-        get_commitment_internal ctxt rollup child.predecessor
+        Commitment_storage.get_commitment_unsafe ctxt rollup child.predecessor
       in
       let* ctxt, inbox = Store.Inbox.get ctxt rollup in
       let game =

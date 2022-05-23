@@ -3430,7 +3430,8 @@ module RPC = struct
       @@ fun ctxt address () () ->
       let open Lwt_tzresult_syntax in
       let+ last_cemented_commitment, level, _ctxt =
-        Alpha_context.Sc_rollup.last_cemented_commitment_hash_with_level
+        Alpha_context.Sc_rollup.Commitment_storage
+        .last_cemented_commitment_hash_with_level
           ctxt
           address
       in
@@ -3441,7 +3442,10 @@ module RPC = struct
       @@ fun ctxt address commitment_hash () () ->
       let open Lwt_result_syntax in
       let+ commitment, _ =
-        Alpha_context.Sc_rollup.get_commitment ctxt address commitment_hash
+        Alpha_context.Sc_rollup.Commitment_storage.get_commitment
+          ctxt
+          address
+          commitment_hash
       in
       commitment
 

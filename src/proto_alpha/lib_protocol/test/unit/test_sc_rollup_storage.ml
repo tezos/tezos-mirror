@@ -136,7 +136,8 @@ let test_initial_state_is_pre_boot () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
   let* lcc, ctxt =
-    lift @@ Sc_rollup_storage.last_cemented_commitment ctxt rollup
+    lift
+    @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   assert_commitment_hash_equal
     ~loc:__LOC__
@@ -728,7 +729,10 @@ let test_last_cemented_commitment_hash_with_level () =
   let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
   let* c1', inbox_level', ctxt =
     lift
-    @@ Sc_rollup_storage.last_cemented_commitment_hash_with_level ctxt rollup
+    @@ Sc_rollup_commitment_storage
+       .last_cemented_commitment_hash_with_level
+         ctxt
+         rollup
   in
   let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c1' in
   Assert.equal_int32
@@ -1526,12 +1530,12 @@ let test_refine_stake_of_missing_rollup () =
 let test_last_cemented_commitment_of_missing_rollup () =
   assert_fails_with_missing_rollup
     ~loc:__LOC__
-    Sc_rollup_storage.last_cemented_commitment
+    Sc_rollup_commitment_storage.last_cemented_commitment
 
 let test_last_cemented_commitment_hash_with_level_of_missing_rollup () =
   assert_fails_with_missing_rollup
     ~loc:__LOC__
-    Sc_rollup_storage.last_cemented_commitment_hash_with_level
+    Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
 
 let test_cement_commitment_of_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
@@ -1550,7 +1554,7 @@ let test_get_conflict_point_on_missing_rollup () =
 
 let test_get_commitment_of_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
-      Sc_rollup_storage.get_commitment
+      Sc_rollup_commitment_storage.get_commitment
         ctxt
         rollup
         Sc_rollup_repr.Commitment_hash.zero)
@@ -1561,7 +1565,10 @@ let test_get_missing_commitment () =
   let commitment_hash = Sc_rollup_repr.Commitment_hash.zero in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_storage.get_commitment ctxt rollup commitment_hash)
+    (Sc_rollup_commitment_storage.get_commitment
+       ctxt
+       rollup
+       commitment_hash)
     "Commitment scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG does \
      not exist"
 
@@ -1649,7 +1656,7 @@ let test_concurrent_refinement_cement () =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
        let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c1 in
-       Sc_rollup_storage.last_cemented_commitment ctxt rollup
+       Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   let* c2, ctxt =
     lift
@@ -1666,7 +1673,7 @@ let test_concurrent_refinement_cement () =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
        let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c2 in
-       Sc_rollup_storage.last_cemented_commitment ctxt rollup
+       Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
 
