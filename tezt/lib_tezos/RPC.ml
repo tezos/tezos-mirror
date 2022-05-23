@@ -55,6 +55,9 @@ let get_block ?(chain = "main") ?(block = "head") () =
 let get_block_metadata ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
 
+let get_block_header ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
+
 type block_descriptor = {block_hash : string; level : int}
 
 let parse_block_descriptor json =

@@ -59,6 +59,13 @@ val get_block : ?chain:string -> ?block:string -> unit -> JSON.t t
 *)
 val get_block_metadata : ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chain/[chain]/blocks/[block]/header]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** A level and its hash *)
 type block_descriptor = {block_hash : string; level : int}
 
