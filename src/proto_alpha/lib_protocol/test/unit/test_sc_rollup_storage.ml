@@ -268,6 +268,27 @@ let test_removing_staker_from_lcc_fails () =
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
     Sc_rollup_errors.Sc_rollup_remove_lcc
 
+let withdraw_stake_and_check_balances ctxt rollup staker =
+  perform_staking_action_and_check
+    ctxt
+    rollup
+    staker
+    (fun ctxt rollup staker_contract stake ->
+      let* ctxt' =
+        lift
+        @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
+             ctxt
+             rollup
+             staker
+      in
+      let* () =
+        assert_balance_increased ctxt ctxt' (`Contract staker_contract) stake
+      in
+      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+      let bonds_account = `Frozen_bonds (staker_contract, bond_id) in
+      let+ () = assert_balance_decreased ctxt ctxt' bonds_account stake in
+      ctxt')
+
 let test_deposit_then_withdraw () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
@@ -276,13 +297,7 @@ let test_deposit_then_withdraw () =
       "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = withdraw_stake_and_check_balances ctxt rollup staker in
   assert_true ctxt
 
 let test_withdrawal_from_missing_rollup () =
@@ -315,13 +330,7 @@ let test_withdrawing_twice () =
       "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = withdraw_stake_and_check_balances ctxt rollup staker in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
@@ -487,13 +496,7 @@ let test_withdraw_and_cement () =
          staker1
          commitment
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-         ctxt
-         rollup
-         staker2
-  in
+  let* ctxt = withdraw_stake_and_check_balances ctxt rollup staker2 in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
   let* ctxt =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
