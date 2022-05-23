@@ -140,3 +140,7 @@ val sc_rollup_commitment_period_in_blocks : Raw_context.t -> int
 val sc_rollup_commitment_storage_size_in_bytes : Raw_context.t -> int
 
 val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32
+
+val sc_rollup_max_active_outbox_levels : Raw_context.t -> int32
+
+val sc_rollup_max_outbox_messages_per_level : Raw_context.t -> int

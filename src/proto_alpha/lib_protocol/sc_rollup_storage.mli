@@ -144,6 +144,9 @@ type error +=
       Sc_rollup_bad_inbox_level
   | (* `Temporary *)
       Sc_rollup_max_number_of_messages_reached_for_commitment_period
+  | (* `Temporary *) Sc_rollup_invalid_outbox_message_index
+  | (* `Temporary *) Sc_rollup_outbox_level_expired
+  | (* `Temporary *) Sc_rollup_outbox_message_already_applied
 
 (** Module [Internal] implements functions that are used only internally by
     the [Sc_rollup_storage] module, but need to be exposed in tests or
@@ -566,3 +569,25 @@ val apply_outcome :
   Sc_rollup_repr.Staker.t * Sc_rollup_repr.Staker.t ->
   Sc_rollup_game_repr.outcome ->
   (Sc_rollup_game_repr.status * Raw_context.t) tzresult Lwt.t
+
+(** A module for managing state concerning a rollup's outbox. *)
+module Outbox : sig
+  (** [record_applied_message ctxt rollup level ~message_index] marks the
+      message in the outbox of rollup [rollup] at level [level] and position
+      [message_index] as processed. Returns the size diff resulting from
+      adding an entry. The size diff may be 0 if an entry already exists, or
+      negative if an index is replaced with a new level.
+
+      An attempt to apply an old level that has already been replaced
+      fails with an [Sc_rollup_outbox_level_expired] error.
+
+      In case a message has already been applied for the given level and message
+      index, the function fails with an
+      [Sc_rollup_outbox_message_already_applied]  error.  *)
+  val record_applied_message :
+    Raw_context.t ->
+    Sc_rollup_repr.t ->
+    Raw_level_repr.t ->
+    message_index:int ->
+    (Z.t * Raw_context.t) tzresult Lwt.t
+end

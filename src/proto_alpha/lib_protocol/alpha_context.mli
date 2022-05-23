@@ -781,6 +781,8 @@ module Constants : sig
       sc_rollup_commitment_period_in_blocks : int;
       sc_rollup_commitment_storage_size_in_bytes : int;
       sc_rollup_max_lookahead_in_blocks : int32;
+      sc_rollup_max_active_outbox_levels : int32;
+      sc_rollup_max_outbox_messages_per_level : int;
     }
 
     val encoding : t Data_encoding.t
@@ -2731,6 +2733,15 @@ module Sc_rollup : sig
     Staker.t * Staker.t ->
     Game.outcome ->
     (Game.status * context) tzresult Lwt.t
+
+  module Outbox : sig
+    val record_applied_message :
+      context ->
+      t ->
+      Raw_level.t ->
+      message_index:int ->
+      (Z.t * context) tzresult Lwt.t
+  end
 
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t

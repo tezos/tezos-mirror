@@ -81,7 +81,9 @@ This sequence of operations was run:
   "sc_rollup_stake_amount_in_mutez": 32000000,
   "sc_rollup_commitment_period_in_blocks": 30,
   "sc_rollup_commitment_storage_size_in_bytes": 84,
-  "sc_rollup_max_lookahead_in_blocks": 30000 }
+  "sc_rollup_max_lookahead_in_blocks": 30000,
+  "sc_rollup_max_active_outbox_levels": 20160,
+  "sc_rollup_max_outbox_messages_per_level": 100 }
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.

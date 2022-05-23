@@ -1646,4 +1646,65 @@ module Sc_rollup = struct
 
         let encoding = Sc_rollup_repr.Staker.encoding
       end)
+
+  (** An index used for a SCORU's outbox levels. An outbox level is mapped to
+     the index through: [outbox_level % sc_rollup_max_active_outbox_levels].
+     That way we keep a limited number of entries. The current value of an
+     entry contains the most recently added level that maps to the index. *)
+  module Level_index = struct
+    type t = int32
+
+    let rpc_arg =
+      let construct = Int32.to_string in
+      let destruct hash =
+        Int32.of_string_opt hash
+        |> Result.of_option ~error:"Cannot parse level index"
+      in
+      RPC_arg.make
+        ~descr:"The level index for applied outbox message records"
+        ~name:"level_index"
+        ~construct
+        ~destruct
+        ()
+
+    let encoding =
+      Data_encoding.def
+        "level_index"
+        ~title:"Level index"
+        ~description:"The level index for applied outbox message records"
+        Data_encoding.int32
+
+    let compare = Compare.Int32.compare
+
+    let path_length = 1
+
+    let to_path c l = Int32.to_string c :: l
+
+    let of_path = function [c] -> Int32.of_string_opt c | _ -> None
+  end
+
+  module Level_index_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["level_index"]
+         end))
+         (Make_index (Level_index))
+
+  module Bitset_and_level = struct
+    type t = Raw_level_repr.t * Bitset.t
+
+    let encoding =
+      Data_encoding.(
+        obj2
+          (req "level" Raw_level_repr.encoding)
+          (req "bitset" Bitset.encoding))
+  end
+
+  module Applied_outbox_messages =
+    Level_index_context.Make_carbonated_map
+      (struct
+        let name = ["applied_outbox_messages"]
+      end)
+      (Bitset_and_level)
 end
