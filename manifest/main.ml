@@ -678,7 +678,7 @@ let tezos_rpc =
       ]
     ~js_compatible:true
 
-let _tezos_polynomial =
+let tezos_polynomial =
   public_lib
     "tezos-polynomial"
     ~path:"src/lib_polynomial"
@@ -767,6 +767,35 @@ let _tezos_crypto_tests_unix =
         lwt_unix;
         qcheck_alcotest;
         tezos_test_helpers;
+      ]
+
+let tezos_crypto_dal =
+  public_lib
+    "tezos-crypto.dal"
+    ~path:"src/lib_crypto/dal"
+    ~opam:"tezos-crypto"
+    ~deps:
+      [
+        tezos_stdlib |> open_;
+        tezos_error_monad |> open_;
+        data_encoding |> open_;
+        tezos_polynomial |> open_;
+      ]
+
+let _tezos_crypto_dal_tests =
+  tests
+    ["test_dal_cryptobox"]
+    ~path:"src/lib_crypto/dal/test"
+    ~opam:"tezos-crypto"
+    ~deps:
+      [
+        tezos_stdlib |> open_;
+        tezos_crypto_dal |> open_;
+        tezos_error_monad |> open_;
+        data_encoding |> open_;
+        alcotest;
+        qcheck_alcotest;
+        tezos_polynomial;
       ]
 
 let tezos_event_logging =
