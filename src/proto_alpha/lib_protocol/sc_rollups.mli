@@ -80,3 +80,26 @@ module Kind : sig
   (** [string_of_kind kind] returns a human-readable representation of [kind]. *)
   val string_of_kind : t -> string
 end
+
+(** A module signature we can use to form first-class modules that carry
+    a specific proof a long with the PVM module interface. *)
+module type PVM_with_proof = sig
+  include PVM.S
+
+  val proof : proof
+end
+
+(** A wrapper for first-class modules [(module PVM_with_proof)]. We need
+    this in order to implement an encoding function. The [Unencodable]
+    case is provided so that tests can provide their own PVM interfaces
+    without having to include proof encodings here. *)
+type wrapped_proof =
+  | Unencodable of (module PVM_with_proof)
+  | Arith_pvm_with_proof of
+      (module PVM_with_proof
+         with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+
+(** Unwrap a [wrapped_proof] into a first-class module. *)
+val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
+
+val wrapped_proof_encoding : wrapped_proof Data_encoding.t

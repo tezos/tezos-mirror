@@ -96,3 +96,51 @@ module Kind = struct
 
   let pp fmt k = Format.fprintf fmt "%s" (string_of_kind k)
 end
+
+module type PVM_with_proof = sig
+  include PVM.S
+
+  val proof : proof
+end
+
+type wrapped_proof =
+  | Unencodable of (module PVM_with_proof)
+  | Arith_pvm_with_proof of
+      (module PVM_with_proof
+         with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+
+let wrapped_proof_module p =
+  match p with
+  | Unencodable p -> p
+  | Arith_pvm_with_proof p ->
+      let (module P) = p in
+      (module struct
+        include P
+      end : PVM_with_proof)
+
+let wrapped_proof_encoding =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        ~title:"Arithmetic PVM with proof"
+        (Tag 0)
+        Sc_rollup_arith.ProtocolImplementation.proof_encoding
+        (function
+          | Arith_pvm_with_proof pvm ->
+              let (module P : PVM_with_proof
+                    with type proof =
+                      Sc_rollup_arith.ProtocolImplementation.proof) =
+                pvm
+              in
+              Some P.proof
+          | _ -> None)
+        (fun proof ->
+          let module P = struct
+            include Sc_rollup_arith.ProtocolImplementation
+
+            let proof = proof
+          end in
+          Arith_pvm_with_proof (module P));
+    ]
