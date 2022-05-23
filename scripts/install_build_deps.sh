@@ -14,8 +14,7 @@ opam_repository=${opam_repository:?}
 
 create_opam_switch() {
     [ -n "$1" ] || { echo "create_opam_switch expects a non-empty argument"; return 1; }
-    opam switch create "$1" --empty --repositories=tezos
-    opam install "ocaml-base-compiler.$ocaml_version"
+    opam switch create "$1" --repositories=tezos "ocaml-base-compiler.$ocaml_version" --no-install
 }
 
 if [ "$1" = "--dev" ]; then
