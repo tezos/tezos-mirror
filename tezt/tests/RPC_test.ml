@@ -112,11 +112,13 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
         let* proxy_server = Proxy_server.init ?args node in
         return Client.(Proxy_server proxy_server)
   in
-  let* _ = test_function protocol ?endpoint:(Some endpoint) client in
+  let* _ =
+    test_function test_mode_tag protocol ?endpoint:(Some endpoint) client
+  in
   unit
 
 (* Test the contracts RPC. *)
-let test_contracts _protocol ?endpoint client =
+let test_contracts _test_mode_tag _protocol ?endpoint client =
   let test_implicit_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
@@ -543,13 +545,13 @@ let get_contracts ?endpoint client =
   Lwt.return contracts
 
 (* Test the delegates RPC for the specified protocol. *)
-let test_delegates _protocol ?endpoint client =
+let test_delegates _test_mode_tag _protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
 
 (* Test the votes RPC. *)
-let test_votes _protocol ?endpoint client =
+let test_votes _test_mode_tag _protocol ?endpoint client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
@@ -583,7 +585,7 @@ let test_votes _protocol ?endpoint client =
   unit
 
 (* Test the various other RPCs. *)
-let test_others _protocol ?endpoint client =
+let test_others _test_mode_tag _protocol ?endpoint client =
   let* _ = RPC.get_constants ?endpoint ~hooks client in
   let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
   let* _ = RPC.get_current_level ?endpoint ~hooks client in
@@ -681,7 +683,7 @@ let bake_empty_block ?endpoint client =
 *)
 (* [mode] is only useful insofar as it helps adapting the test to specific
  * `Proxy mode constraint*)
-let test_mempool protocol ?endpoint client =
+let test_mempool _test_mode_tag protocol ?endpoint client =
   let* node = Node.init mempool_node_flags in
   let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
   let* () = Client.Admin.connect_address ?endpoint client ~peer:node in
