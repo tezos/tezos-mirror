@@ -730,8 +730,11 @@ let test_forked_migration_bakers ?(migration_level = 4)
       else (
         Log.info "Checking level %d" level ;
         let block_id = string_of_int level in
-        let* block_content_1 = RPC.get_block ~block:block_id client_1
-        and* block_content_2 = RPC.get_block ~block:block_id client_2 in
+        let* block_content_1 =
+          RPC.Client.call client_1 @@ RPC.get_block ~block:block_id ()
+        and* block_content_2 =
+          RPC.Client.call client_2 @@ RPC.get_block ~block:block_id ()
+        in
         Check.(
           (JSON.encode block_content_1 = JSON.encode block_content_2)
             string

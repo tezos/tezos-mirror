@@ -45,6 +45,13 @@ val private_injection_operations :
   unit ->
   [`OpHash of string] list t
 
+(** RPC: [GET /chain/[chain]/blocks/[block]]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_block : ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [GET /chain/[chain]/blocks/[block]/metadata]
 
     [chain] defaults to ["main"].

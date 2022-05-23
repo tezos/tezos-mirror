@@ -74,7 +74,7 @@ let check_n_applied_operations_in_mempool n client =
     return these manager operations (which will usually be transactions
     injected by the transfer command). *)
 let check_n_manager_operations_in_head n client =
-  let* head = RPC.get_block client in
+  let* head = RPC.Client.call client @@ RPC.get_block () in
   let manager_ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
   Check.(
     (List.length manager_ops = n)

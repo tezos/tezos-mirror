@@ -2326,7 +2326,7 @@ let test_withdrawals =
       in
       Log.info "Baking 1 L1 block for inclusion of commitment" ;
       let* () = Client.bake_for_and_wait client in
-      let* block = RPC.get_block client in
+      let* block = RPC.Client.call client @@ RPC.get_block () in
       check_l1_block_contains_commitment ~level:2 block ;
       Log.info "Baking 2 L1 blocks for finalization of commitment" ;
       let* () =
@@ -2337,13 +2337,13 @@ let test_withdrawals =
         check_injection tx_node "dispatch_withdrawals"
         @@ Client.bake_for_and_wait client
       in
-      let* block = RPC.get_block client in
+      let* block = RPC.Client.call client @@ RPC.get_block () in
       check_l1_block_contains_finalize ~level:2 block ;
       let* l2_head = Rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_block_finalized l2_head ;
       Log.info "Baking 1 L1 block for dispatch to be included" ;
       let* () = Client.bake_for_and_wait client in
-      let* block = RPC.get_block client in
+      let* block = RPC.Client.call client @@ RPC.get_block () in
       check_l1_block_contains_dispatch block ;
       Log.info "Originate contract to withdraw tickets" ;
       let* withdraw_contract =
@@ -2432,11 +2432,11 @@ let test_accuser =
   let* () =
     check_injection tx_node "rejection" @@ Client.bake_for_and_wait client
   in
-  let* block = RPC.get_block client in
+  let* block = RPC.Client.call client @@ RPC.get_block () in
   check_l1_block_contains_commitment ~level:0 block ;
   Log.info "Baking 1 L1 block for rejection to be included" ;
   let* () = Client.bake_for_and_wait client in
-  let* block = RPC.get_block client in
+  let* block = RPC.Client.call client @@ RPC.get_block () in
   let* _ = RPC.get_mempool_pending_operations client in
   check_l1_block_contains_rejection ~level:0 block ;
   unit
@@ -2810,7 +2810,7 @@ let test_origination_deposit_same_block =
           ~force:true
       in
       let* () = Client.bake_for_and_wait client in
-      let* block = RPC.get_block client in
+      let* block = RPC.Client.call client @@ RPC.get_block () in
       Log.info
         "Checking that block contains both the rollup origination and the \
          deposit" ;
