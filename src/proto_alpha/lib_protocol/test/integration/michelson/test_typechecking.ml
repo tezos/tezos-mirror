@@ -498,7 +498,8 @@ let test_parse_comb_data () =
 
 let test_parse_address () =
   let open Script_typed_ir in
-  test_context_with_nat_nat_big_map () >>=? fun (ctxt, _big_map_id) ->
+  test_context_with_nat_nat_big_map ~sc_rollup_enable:true ()
+  >>=? fun (ctxt, _big_map_id) ->
   (* KT1% (empty entrypoint) *)
   wrap_error_lwt
     (Lwt.return (Contract.of_b58check "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"))
@@ -520,6 +521,26 @@ let test_parse_address () =
     address_t
     (String (-1, "tz1fakefakefakefakefakefakefakcphLA5%"))
     {destination = Contract tz1fake; entrypoint = Entrypoint.default}
+  >>=? fun ctxt ->
+  (* scr1% (empty entrypoint) *)
+  wrap_error_lwt
+    (Lwt.return
+       (Destination.of_b58check "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"))
+  >>=? fun scr1 ->
+  test_parse_data
+    __LOC__
+    ctxt
+    address_t
+    (String (-1, "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"))
+    {destination = scr1; entrypoint = Entrypoint.default}
+  >>=? fun ctxt ->
+  (* scr1% (default entrypoint) *)
+  test_parse_data
+    __LOC__
+    ctxt
+    address_t
+    (String (-1, "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF%"))
+    {destination = scr1; entrypoint = Entrypoint.default}
   >|=? fun _ctxt -> ()
 
 let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
