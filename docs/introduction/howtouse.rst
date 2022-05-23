@@ -262,14 +262,14 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-.. _faucet:
+.. _using_faucet:
 
 Get Free Tez
 ~~~~~~~~~~~~
 
 To test the networks and help users get familiar with the system, on
-:doc:`test networks<test_networks>` you can obtain free tez from a
-`faucet <https://faucet.tzalpha.net>`__.
+:doc:`test networks<test_networks>` you can obtain free tez from
+:ref:`a faucet <faucet>`.
 
 This will provide a faucet account in the form of a JSON file
 ``tz1__xxxxxxxxx__.json``, that can be activated with the following
