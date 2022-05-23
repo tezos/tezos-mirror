@@ -2615,7 +2615,7 @@ module Sc_rollup : sig
 
       val add_messages_no_history :
         t ->
-        Raw_level_repr.t ->
+        Raw_level.t ->
         string list ->
         messages ->
         (messages * t, error trace) result Lwt.t
@@ -2666,30 +2666,24 @@ module Sc_rollup : sig
       context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
 
     val inbox : context -> rollup -> (t * context) tzresult Lwt.t
+
+    module Proof : sig
+      type t
+    end
+  end
+
+  module Proof : sig
+    type t
   end
 
   module Game : sig
-    module Proof : sig
-      type t =
-        | Computation_step of {
-            valid : bool;
-            start : State_hash.t;
-            stop : State_hash.t;
-          }
-        | Input_step of {
-            valid : bool;
-            start : State_hash.t;
-            stop : State_hash.t;
-          }
-        | Blocked_step of {valid : bool; start : State_hash.t}
-    end
-
     type player = Alice | Bob
 
     type t = {
       turn : player;
       inbox_snapshot : Inbox.t;
       level : Raw_level.t;
+      pvm_name : string;
       dissection : (State_hash.t option * Tick.t) list;
     }
 

@@ -76,6 +76,7 @@
   Skip_list_repr
   Sc_rollup_inbox_repr
   Sc_rollup_commitment_repr
+  Sc_rollup_proof_repr
   Sc_rollup_game_repr
   Seed_repr
   Sampler
@@ -295,6 +296,7 @@
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -501,6 +503,7 @@
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -727,6 +730,7 @@
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -949,6 +953,7 @@
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli

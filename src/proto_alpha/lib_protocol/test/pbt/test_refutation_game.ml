@@ -36,6 +36,7 @@ open Protocol
 open Alpha_context
 open Sc_rollup
 open Lwt_syntax
+open Tezos_context_memory
 
 exception TickNotFound of Sc_rollup_tick_repr.t
 
@@ -49,28 +50,28 @@ module Sc_rollup_repr = Protocol.Sc_rollup_repr
 *)
 let assume_some opt f = match opt with Some x -> f x | None -> assert false
 
-let to_PVM_state_hash hash =
-  State_hash.of_bytes_exn @@ Sc_rollup_repr.State_hash.to_bytes hash
-
-let of_PVM_state_hash x =
-  Sc_rollup_repr.State_hash.of_bytes_exn @@ State_hash.to_bytes x
-
 let hash_state state number =
   Digest.bytes @@ Bytes.of_string @@ state ^ string_of_int number
 
-let proof_start_state proof =
-  let open Sc_rollup_game_repr.Proof in
-  match proof with
-  | Computation_step {start; _}
-  | Input_step {start; _}
-  | Blocked_step {start; _} ->
-      to_PVM_state_hash start
+type dummy_proof = {
+  start : Sc_rollup_repr.State_hash.t;
+  stop : Sc_rollup_repr.State_hash.t option;
+  valid : bool;
+}
 
-let proof_stop_state proof =
-  let open Sc_rollup_game_repr.Proof in
-  match proof with
-  | Computation_step {stop; _} | Input_step {stop; _} -> to_PVM_state_hash stop
-  | Blocked_step _ -> assert false
+let dummy_proof_encoding : dummy_proof Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {start; stop; valid} -> (start, stop, valid))
+    (fun (start, stop, valid) -> {start; stop; valid})
+    (obj3
+       (req "start" Sc_rollup_repr.State_hash.encoding)
+       (req "stop" (option Sc_rollup_repr.State_hash.encoding))
+       (req "valid" bool))
+
+let proof_start_state proof = proof.start
+
+let proof_stop_state proof = proof.stop
 
 let check pred =
   let open Result_syntax in
@@ -190,10 +191,7 @@ let rec correct_string () =
   if List.length x < 3 then correct_string () else x
 
 module type TestPVM = sig
-  include
-    Sc_rollup_PVM_sem.S
-      with type hash = State_hash.t
-       and type proof = Sc_rollup_game_repr.Proof.t
+  include Sc_rollup_PVM_sem.S with type hash = Sc_rollup_repr.State_hash.t
 
   module Utils : sig
     (** This a post-boot state. It is used as default in many functions. *)
@@ -225,20 +223,24 @@ module MakeCountingPVM (P : sig
 end) : TestPVM with type state = int = struct
   type state = int
 
-  type hash = State_hash.t
+  type hash = Sc_rollup_repr.State_hash.t
 
   type context = unit
 
-  type proof = Sc_rollup_game_repr.Proof.t
+  type proof = dummy_proof
 
   let proof_start_state = proof_start_state
 
   let proof_stop_state = proof_stop_state
 
-  let state_hash (x : state) =
-    Lwt.return (State_hash.hash_string [Int.to_string x])
+  let proof_input_given _ = None
 
-  let is_input_state _ = Lwt.return None
+  let proof_input_requested _ = Sc_rollup_PVM_sem.No_input_required
+
+  let state_hash (x : state) =
+    Lwt.return (Sc_rollup_repr.State_hash.hash_string [Int.to_string x])
+
+  let is_input_state _ = Lwt.return Sc_rollup_PVM_sem.No_input_required
 
   let initial_state _ _ = Lwt.return P.target
 
@@ -253,32 +255,17 @@ end) : TestPVM with type state = int = struct
       match (s1, s2) with
       | None, _ -> assert false
       | Some start_hash, Some stop_hash ->
-          Lwt.return
-          @@ Sc_rollup_game_repr.Proof.(
-               Computation_step
-                 {
-                   start = of_PVM_state_hash start_hash;
-                   stop = of_PVM_state_hash @@ stop_hash;
-                   valid = v;
-                 })
+          Lwt.return @@ {start = start_hash; stop = Some stop_hash; valid = v}
       | Some start_hash, None ->
-          Lwt.return
-          @@ Sc_rollup_game_repr.Proof.(
-               Blocked_step {start = of_PVM_state_hash start_hash; valid = v})
+          Lwt.return @@ {start = start_hash; stop = None; valid = v}
   end
 
-  let proof_encoding = Sc_rollup_game_repr.Proof.encoding
+  let proof_encoding = dummy_proof_encoding
 
   let eval state =
     if state >= P.target then Lwt.return state else Lwt.return (state + 1)
 
-  let verify_proof ~input:_ proof =
-    let open Sc_rollup_game_repr.Proof in
-    match proof with
-    | Computation_step {valid; _}
-    | Input_step {valid; _}
-    | Blocked_step {valid; _} ->
-        Lwt.return valid
+  let verify_proof proof = Lwt.return proof.valid
 end
 
 (** This is a random PVM. Its state is a pair of a string and a
@@ -291,9 +278,9 @@ end) : TestPVM with type state = string * int list = struct
 
   type context = unit
 
-  type proof = Sc_rollup_game_repr.Proof.t
+  type proof = dummy_proof
 
-  type hash = State_hash.t
+  type hash = Sc_rollup_repr.State_hash.t
 
   let to_string (a, b) =
     Format.sprintf "(%s, [%s])" a (String.concat ";" @@ List.map Int.to_string b)
@@ -302,12 +289,16 @@ end) : TestPVM with type state = string * int list = struct
 
   let proof_stop_state = proof_stop_state
 
+  let proof_input_given _ = None
+
+  let proof_input_requested _ = Sc_rollup_PVM_sem.No_input_required
+
   let state_hash (x : state) =
-    Lwt.return @@ State_hash.hash_string [to_string x]
+    Lwt.return @@ Sc_rollup_repr.State_hash.hash_string [to_string x]
 
   let initial_state _ _ = Lwt.return ("hello", P.initial_prog)
 
-  let is_input_state _ = Lwt.return None
+  let is_input_state _ = Lwt.return Sc_rollup_PVM_sem.No_input_required
 
   let set_input _ state = Lwt.return state
 
@@ -325,72 +316,56 @@ end) : TestPVM with type state = string * int list = struct
       match (s1, s2) with
       | None, _ -> assert false
       | Some start_hash, Some stop_hash ->
-          Lwt.return
-          @@ Sc_rollup_game_repr.Proof.(
-               Computation_step
-                 {
-                   start = of_PVM_state_hash start_hash;
-                   stop = of_PVM_state_hash @@ stop_hash;
-                   valid = v;
-                 })
+          Lwt.return @@ {start = start_hash; stop = Some stop_hash; valid = v}
       | Some start_hash, None ->
-          Lwt.return
-          @@ Sc_rollup_game_repr.Proof.(
-               Blocked_step {start = of_PVM_state_hash start_hash; valid = v})
+          Lwt.return @@ {start = start_hash; stop = None; valid = v}
   end
 
-  let proof_encoding = Sc_rollup_game_repr.Proof.encoding
+  let proof_encoding = dummy_proof_encoding
 
   let eval (hash, continuation) =
     match continuation with
     | [] -> Lwt.return (hash, continuation)
     | h :: tl -> Lwt.return (hash_state hash h, tl)
 
-  let verify_proof ~input:_ proof =
-    let open Sc_rollup_game_repr.Proof in
-    match proof with
-    | Computation_step {valid; _}
-    | Input_step {valid; _}
-    | Blocked_step {valid; _} ->
-        Lwt.return valid
+  let verify_proof proof = Lwt.return proof.valid
 end
 
 module ContextPVM = Sc_rollup_arith.Make (struct
   module Tree = struct
-    include Tezos_context_memory.Context.Tree
+    include Context.Tree
 
-    type tree = Tezos_context_memory.Context.tree
+    type tree = Context.tree
 
-    type t = Tezos_context_memory.Context.t
+    type t = Context.t
 
     type key = string list
 
     type value = bytes
   end
 
-  type tree = Tezos_context_memory.Context.tree
+  type tree = Context.tree
 
-  let empty_tree = Tree.empty Tezos_context_memory.Context.empty
+  let empty_tree = Tree.empty Context.empty
 
-  type proof = Sc_rollup_game_repr.Proof.t
+  type proof = Context.Proof.tree Context.Proof.t
 
   let verify_proof proof f =
-    let* a, r = f empty_tree in
-    if Sc_rollup_game_repr.Proof.valid proof then return (Ok (a, r))
-    else return (Error (`Proof_mismatch "Wrong proof"))
+    Lwt.map Result.to_option (Context.verify_tree_proof proof f)
 
-  let to_state_hash hash =
-    State_hash.of_bytes_exn @@ Sc_rollup_repr.State_hash.to_bytes hash
+  let kinded_hash_to_state_hash = function
+    | `Value hash | `Node hash ->
+        Sc_rollup_repr.State_hash.hash_bytes [Context_hash.to_bytes hash]
 
   let proof_start_state proof =
-    to_state_hash @@ Sc_rollup_game_repr.Proof.start proof
+    kinded_hash_to_state_hash proof.Context.Proof.before
 
   let proof_stop_state proof =
-    match Sc_rollup_game_repr.Proof.stop proof with
-    | Some a -> to_state_hash a
-    | None -> assert false
+    kinded_hash_to_state_hash proof.Context.Proof.after
 
-  let proof_encoding = Sc_rollup_game_repr.Proof.encoding
+  let proof_encoding =
+    let open Data_encoding in
+    conv (fun _ -> ()) (fun _ -> assert false) unit
 end)
 
 module TestArith (P : sig
@@ -409,7 +384,7 @@ end) : TestPVM = struct
         let input =
           Sc_rollup_PVM_sem.
             {
-              inbox_level = Raw_level.root;
+              inbox_level = Raw_level_repr.root;
               message_counter = Z.zero;
               payload = P.inputs;
             }
@@ -425,7 +400,7 @@ end) : TestPVM = struct
       let input =
         Sc_rollup_PVM_sem.
           {
-            inbox_level = Raw_level.root;
+            inbox_level = Raw_level_repr.root;
             message_counter = Z.zero;
             payload = String.concat " " program;
           }
@@ -439,18 +414,9 @@ end) : TestPVM = struct
       match (s1, s2) with
       | None, _ -> assert false
       | Some start_hash, Some stop_hash ->
-          Lwt.return
-          @@ Sc_rollup_game_repr.Proof.(
-               Computation_step
-                 {
-                   start = of_PVM_state_hash start_hash;
-                   stop = of_PVM_state_hash @@ stop_hash;
-                   valid = v;
-                 })
+          Lwt.return @@ {start = start_hash; stop = Some stop_hash; valid = v}
       | Some start_hash, None ->
-          Lwt.return
-          @@ Sc_rollup_game_repr.Proof.(
-               Blocked_step {start = of_PVM_state_hash start_hash; valid = v})
+          Lwt.return @@ {start = start_hash; stop = None; valid = v}
   end
 end
 
@@ -459,8 +425,8 @@ end
 *)
 module Strategies
     (PVM : TestPVM
-             with type hash = Sc_rollup.State_hash.t
-              and type proof = Sc_rollup_game_repr.Proof.t) =
+             with type hash = Sc_rollup_repr.State_hash.t
+              and type proof = dummy_proof) =
 struct
   module Game = Sc_rollup_game_repr
 
@@ -540,7 +506,7 @@ struct
                              let* h = PVM.state_hash s in
                              Lwt.return (Some h)
                     in
-                    (Option.map of_PVM_state_hash hash, tick))
+                    (hash, tick))
                   a)
               tick_list
           in
@@ -581,12 +547,7 @@ struct
     in
     let number_of_ticks = Int32.of_int int_tick in
     let parent =
-      get_comm
-        Sc_rollup_commitment_repr.Hash.zero
-        0l
-        3l
-        1l
-        (of_PVM_state_hash start_hash)
+      get_comm Sc_rollup_commitment_repr.Hash.zero 0l 3l 1l start_hash
     in
     let child =
       get_comm
@@ -594,7 +555,7 @@ struct
         0l
         3l
         number_of_ticks
-        (of_PVM_state_hash initial_hash)
+        initial_hash
     in
 
     let initial_game = initial inbox ~parent ~child ~refuter ~defender in
@@ -640,8 +601,7 @@ struct
           Lwt.return (Some state)
     in
 
-    Lwt.return
-    @@ not (Option.equal ( = ) state (Option.map of_PVM_state_hash new_hash))
+    Lwt.return @@ not (Option.equal ( = ) state new_hash)
 
   (** This function assembles a random decision from a given dissection.
     It first picks a random section from the dissection and modifies randomly
@@ -654,16 +614,14 @@ struct
     let cardinal = List.length d in
     let x = max 0 (Random.int (cardinal - 1)) in
     let start_state, start =
-      match List.nth d x with
-      | Some (s, t) -> (Option.map to_PVM_state_hash s, t)
-      | None -> assert false
+      match List.nth d x with Some (s, t) -> (s, t) | None -> assert false
     in
     let _, stop =
       match List.nth d (x + 1) with
-      | Some (s, t) -> (Option.map to_PVM_state_hash s, t)
+      | Some (s, t) -> (s, t)
       | None -> assert false
     in
-    let start_hash = Option.map of_PVM_state_hash start_state in
+    let start_hash = start_state in
     let stop_hash = Some (random_hash ()) in
     let* random_dissection =
       random_dissection start start_hash stop stop_hash
@@ -680,13 +638,10 @@ struct
           | None -> Lwt.return_false
           | Some x ->
               let* correct_hash = PVM.state_hash x in
-              Lwt.return (correct_hash = to_PVM_state_hash new_hash)
+              Lwt.return (correct_hash = new_hash)
         in
         let* proof =
-          PVM.Utils.make_proof
-            start_state
-            (Some (to_PVM_state_hash @@ random_hash ()))
-            valid
+          PVM.Utils.make_proof start_state (Some (random_hash ())) valid
         in
         Lwt.return
           (Some Sc_rollup_game_repr.{choice = start; step = Proof proof})
@@ -936,11 +891,11 @@ let test_random_dissection (module P : TestPVM) start_at length =
     | Some x -> x
   in
   let* start = state_hash section_start_state in
-  let stop_hash = Some (aux @@ of_PVM_state_hash start) in
+  let stop_hash = Some (aux start) in
   Lwt.return
     (Result.to_option
      @@ Sc_rollup_game_repr.check_dissection
-          (Some (of_PVM_state_hash start))
+          (Some start)
           section_start_at
           stop_hash
           section_stop_at

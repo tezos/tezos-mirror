@@ -143,6 +143,4 @@ module type P = sig
 end
 
 module Make (Context : P) :
-  S
-    with type context = Context.Tree.t
-     and type state = Context.tree
+  S with type context = Context.Tree.t and type state = Context.tree

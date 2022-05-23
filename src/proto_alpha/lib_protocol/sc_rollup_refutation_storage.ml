@@ -190,8 +190,15 @@ let get_or_init_game ctxt rollup ~refuter ~defender =
         Commitment_storage.get_commitment_unsafe ctxt rollup child.predecessor
       in
       let* ctxt, inbox = Store.Inbox.get ctxt rollup in
+      let* kind = Store.PVM_kind.get ctxt rollup in
       let game =
-        Sc_rollup_game_repr.initial inbox ~parent ~child ~refuter ~defender
+        Sc_rollup_game_repr.initial
+          inbox
+          ~pvm_name:(Sc_rollups.Kind.string_of_kind kind)
+          ~parent
+          ~child
+          ~refuter
+          ~defender
       in
       let* ctxt, _ = Store.Game.init (ctxt, rollup) stakers game in
       let* ctxt, _ =
@@ -214,7 +221,10 @@ let update_game ctxt rollup ~player ~opponent refutation =
        Sc_rollup_repr.Staker.equal turn player)
       Sc_rollup_wrong_turn
   in
-  match Sc_rollup_game_repr.play game refutation with
+  let* move_result =
+    Lwt.map Result.ok @@ Sc_rollup_game_repr.play game refutation
+  in
+  match move_result with
   | Either.Left outcome -> return (Some outcome, ctxt)
   | Either.Right new_game ->
       let* ctxt, _ = Store.Game.update (ctxt, rollup) (alice, bob) new_game in

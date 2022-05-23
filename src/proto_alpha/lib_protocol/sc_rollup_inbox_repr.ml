@@ -790,7 +790,7 @@ module Proof = struct
   let drop_error result = Lwt.map (Result.map_error (fun _ -> ())) result
 
   let rec valid (l, n) inbox proof =
-    assert Z.(geq n zero);
+    assert (Z.(geq n zero)) ;
     let open Lwt_result_syntax in
     match split_proof proof with
     | None ->
