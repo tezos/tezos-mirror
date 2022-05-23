@@ -603,61 +603,60 @@ module Peer_validator = struct
   }
 
   let init name =
-    let namespace = String.concat "_" name in
-    let subsystem = None in
+    let subsystem = String.concat "_" name in
     let on_no_request =
       let help =
         "Number of time we did no hear new messages from a peer since the last \
          timeout."
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "on_no_request_count"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "on_no_request_count"
     in
     let new_head_completed =
       let help =
         "Number of time we successfuly completed a new head request from a \
          peer."
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "new_head_completed"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "new_head_completed"
     in
     let new_branch_completed =
       let help =
         "Number of time we successfuly completed a new branch request from a \
          peer."
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "new_branch_completed"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "new_branch_completed"
     in
     let invalid_locator =
       let help = "Number of time we received an invalid locator from a peer." in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "invalid_locator"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "invalid_locator"
     in
     let invalid_block =
       let help = "Number of time we received an invalid block from a peer." in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "invalid_block"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "invalid_block"
     in
     let system_error =
       let help =
         "Number of time a request trigerred a system error from a peer."
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "system_error"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "system_error"
     in
     let unavailable_protocol =
       let help =
         "Number of time we received an unknown protocol from a peer."
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "unavailable_protocol"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "unavailable_protocol"
     in
     let unknown_ancestor =
       let help =
         "Number of time we received a locator with an unknown ancestor from a \
          peer."
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "unknown_ancestor"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "unknown_ancestor"
     in
     let too_short_locator =
       let help =
         "Number of time we received a too short locator from a peer."
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "too_short_locator"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "too_short_locator"
     in
     let operations_fetching_canceled_new_branch =
       let help =
@@ -667,7 +666,7 @@ module Peer_validator = struct
       Prometheus.Counter.v
         ~help
         ~namespace
-        ?subsystem
+        ~subsystem
         "operations_fetching_canceled_new_branch"
     in
     let operations_fetching_canceled_new_known_valid_head =
@@ -678,7 +677,7 @@ module Peer_validator = struct
       Prometheus.Counter.v
         ~help
         ~namespace
-        ?subsystem
+        ~subsystem
         "operations_fetching_canceled_new_known_valid_head"
     in
     let operations_fetching_canceled_new_unknown_head =
@@ -689,16 +688,16 @@ module Peer_validator = struct
       Prometheus.Counter.v
         ~help
         ~namespace
-        ?subsystem
+        ~subsystem
         "operations_fetching_canceled_new_unknown_head"
     in
     let unknown_error =
       let help = "Number of time an unknown error happened for a peer." in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "unknown_error"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "unknown_error"
     in
     let connections =
       let help = "Number of time we connected to a peer." in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "connections"
+      Prometheus.Counter.v ~help ~namespace ~subsystem "connections"
     in
     {
       on_no_request;
