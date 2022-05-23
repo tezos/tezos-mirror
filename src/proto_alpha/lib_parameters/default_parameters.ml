@@ -195,7 +195,6 @@ let constants_mainnet =
            The following constants need to be refined. *)
         stake_amount = Tez.of_mutez_exn 32_000_000L;
         commitment_period_in_blocks = 30;
-        commitment_storage_size_in_bytes = 84;
         max_lookahead_in_blocks = 30_000l;
         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;

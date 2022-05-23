@@ -92,8 +92,6 @@ type sc_rollup = {
   stake_amount : Tez_repr.t;
   (* The period with which commitments are made. *)
   commitment_period_in_blocks : int;
-  (* The storage size requirement (in bytes) of a commitment *)
-  commitment_storage_size_in_bytes : int;
   (* The maximum depth of a staker's position - chosen alongside
      [commitment_period_in_blocks] to prevent the cost
      of a staker's commitments' storage being greater than their deposit. *)

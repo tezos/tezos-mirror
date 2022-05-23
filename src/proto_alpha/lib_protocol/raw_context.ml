@@ -998,10 +998,6 @@ let prepare_first_block ~level ~timestamp ctxt =
                    The following constants need to be refined. *)
                 stake_amount = Tez_repr.of_mutez_exn 32_000_000L;
                 commitment_period_in_blocks = 30;
-                (* 76 for Commitments entry + 4 for Commitment_stake_count entry
-                   + 4 for Commitment_added entry
-                   + 0 for Staker_count_update entry *)
-                commitment_storage_size_in_bytes = 84;
                 max_lookahead_in_blocks = 30_000l;
                 (* Number of active levels kept for executing outbox messages.
                    WARNING: Changing this value impacts the storage charge for

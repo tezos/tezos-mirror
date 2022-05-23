@@ -683,7 +683,6 @@ def _test_create_mockup_init_show_roundtrip(
                 "sc_rollup_max_available_messages": 1_000_000,
                 "sc_rollup_stake_amount": "42000000",
                 "sc_rollup_commitment_period_in_blocks": 40,
-                "sc_rollup_commitment_storage_size_in_bytes": 84,
                 "sc_rollup_max_lookahead_in_blocks": 30_000,
                 "sc_rollup_max_active_outbox_levels": 20_160,
                 "sc_rollup_max_outbox_messages_per_level": 100,

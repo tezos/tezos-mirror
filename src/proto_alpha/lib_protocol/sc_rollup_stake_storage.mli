@@ -123,6 +123,9 @@ val find_staker :
   Signature.public_key_hash ->
   (Sc_rollup_commitment_repr.Hash.t * Raw_context.t) tzresult Lwt.t
 
+(** The storage size requirement (in bytes) of a commitment *)
+val commitment_storage_size_in_bytes : int
+
 (**/**)
 
 module Internal_for_tests : sig

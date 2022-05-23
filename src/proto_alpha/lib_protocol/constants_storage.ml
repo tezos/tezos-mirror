@@ -238,10 +238,6 @@ let sc_rollup_commitment_period_in_blocks c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.commitment_period_in_blocks
 
-let sc_rollup_commitment_storage_size_in_bytes c =
-  let sc_rollup = Raw_context.sc_rollup c in
-  sc_rollup.commitment_storage_size_in_bytes
-
 let sc_rollup_max_lookahead_in_blocks c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.max_lookahead_in_blocks

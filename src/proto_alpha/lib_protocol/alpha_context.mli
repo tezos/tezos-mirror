@@ -756,7 +756,6 @@ module Constants : sig
       max_available_messages : int;
       stake_amount : Tez.t;
       commitment_period_in_blocks : int;
-      commitment_storage_size_in_bytes : int;
       max_lookahead_in_blocks : int32;
       max_active_outbox_levels : int32;
       max_outbox_messages_per_level : int;
@@ -925,8 +924,6 @@ module Constants : sig
   val sc_rollup_stake_amount : Raw_context.t -> Tez.t
 
   val sc_rollup_commitment_period_in_blocks : Raw_context.t -> int
-
-  val sc_rollup_commitment_storage_size_in_bytes : Raw_context.t -> int
 
   val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32
 

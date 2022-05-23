@@ -86,7 +86,7 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
     Alpha_context.Tez.to_mutez constants.cost_per_byte
   in
   let commitment_storage_size =
-    Int64.of_int constants.sc_rollup.commitment_storage_size_in_bytes
+    Int64.of_int Sc_rollup_stake_storage.commitment_storage_size_in_bytes
   in
   let commitment_storage_cost =
     Int64.mul cost_per_byte_mutez commitment_storage_size
@@ -108,15 +108,15 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
     stake_amount
 
 (* Check that
-   [sc_rollup_commitment_storage_size_in_bytes = commitments_entry_size +
-   commitment_stake_count_entry_size + commitment_added_entry_size]
+   [{!Sc_rollup_stake_storage.commitment_storage_size_in_bytes} =
+   commitments_entry_size + commitment_stake_count_entry_size +
+   commitment_added_entry_size]
 
    Required to ensure [sc_rollup_stake_amount] and [sc_rollup_max_lookahead] are
    correctly scaled with respect to each other - see
    {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}
 *)
 let test_sc_rollup_commitment_storage_size () =
-  let constants = Default_parameters.constants_mainnet in
   let open Protocol in
   Assert.get_some
     ~loc:__LOC__
@@ -152,7 +152,7 @@ let test_sc_rollup_commitment_storage_size () =
   in
   Assert.equal_int
     ~loc:__LOC__
-    constants.sc_rollup.commitment_storage_size_in_bytes
+    Sc_rollup_stake_storage.commitment_storage_size_in_bytes
     (Bytes.length commitment_bytes
     + Bytes.length level_bytes
     + Bytes.length commitment_stake_count_bytes)

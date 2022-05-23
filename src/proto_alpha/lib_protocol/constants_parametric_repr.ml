@@ -101,7 +101,6 @@ type sc_rollup = {
   max_available_messages : int;
   stake_amount : Tez_repr.t;
   commitment_period_in_blocks : int;
-  commitment_storage_size_in_bytes : int;
   max_lookahead_in_blocks : int32;
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
@@ -231,7 +230,6 @@ let sc_rollup_encoding =
         c.max_available_messages,
         c.stake_amount,
         c.commitment_period_in_blocks,
-        c.commitment_storage_size_in_bytes,
         c.max_lookahead_in_blocks,
         c.max_active_outbox_levels,
         c.max_outbox_messages_per_level ))
@@ -241,7 +239,6 @@ let sc_rollup_encoding =
            sc_rollup_max_available_messages,
            sc_rollup_stake_amount,
            sc_rollup_commitment_period_in_blocks,
-           sc_rollup_commitment_storage_size_in_bytes,
            sc_rollup_max_lookahead_in_blocks,
            sc_rollup_max_active_outbox_levels,
            sc_rollup_max_outbox_messages_per_level ) ->
@@ -252,20 +249,17 @@ let sc_rollup_encoding =
         max_available_messages = sc_rollup_max_available_messages;
         stake_amount = sc_rollup_stake_amount;
         commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
-        commitment_storage_size_in_bytes =
-          sc_rollup_commitment_storage_size_in_bytes;
         max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
       })
-    (obj10
+    (obj9
        (req "sc_rollup_enable" bool)
        (req "sc_rollup_origination_size" int31)
        (req "sc_rollup_challenge_window_in_blocks" int31)
        (req "sc_rollup_max_available_messages" int31)
        (req "sc_rollup_stake_amount" Tez_repr.encoding)
        (req "sc_rollup_commitment_period_in_blocks" int31)
-       (req "sc_rollup_commitment_storage_size_in_bytes" int31)
        (req "sc_rollup_max_lookahead_in_blocks" int32)
        (req "sc_rollup_max_active_outbox_levels" int32)
        (req "sc_rollup_max_outbox_messages_per_level" int31))
