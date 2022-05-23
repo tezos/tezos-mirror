@@ -50,6 +50,13 @@ type error +=
   | (* `Temporary *) Sc_rollup_invalid_outbox_message_index
   | (* `Temporary *) Sc_rollup_outbox_level_expired
   | (* `Temporary *) Sc_rollup_outbox_message_already_applied
+  | (* `Temporary *)
+      Sc_rollup_staker_funds_too_low of {
+      staker : Signature.public_key_hash;
+      sc_rollup : Sc_rollup_repr.t;
+      staker_balance : Tez_repr.t;
+      min_expected_balance : Tez_repr.t;
+    }
 
 let () =
   register_error_kind
@@ -278,4 +285,39 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_outbox_message_already_applied -> Some () | _ -> None)
     (fun () -> Sc_rollup_outbox_message_already_applied) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_staker_funds_too_low"
+    ~title:"Staker does not have enough funds to make a deposit"
+    ~description:
+      "Staker doesn't have enough funds to make a smart contract rollup \
+       deposit."
+    ~pp:(fun ppf (staker, sc_rollup, staker_balance, min_expected_balance) ->
+      Format.fprintf
+        ppf
+        "Staker (%a) doesn't have enough funds to make the deposit for smart \
+         contract rollup (%a). Staker's balance is %a while a balance of at \
+         least %a is required."
+        Signature.Public_key_hash.pp
+        staker
+        Sc_rollup_repr.pp
+        sc_rollup
+        Tez_repr.pp
+        staker_balance
+        Tez_repr.pp
+        min_expected_balance)
+    Data_encoding.(
+      obj4
+        (req "staker" Signature.Public_key_hash.encoding)
+        (req "sc_rollup" Sc_rollup_repr.encoding)
+        (req "staker_balance" Tez_repr.encoding)
+        (req "min_expected_balance" Tez_repr.encoding))
+    (function
+      | Sc_rollup_staker_funds_too_low
+          {staker; sc_rollup; staker_balance; min_expected_balance} ->
+          Some (staker, sc_rollup, staker_balance, min_expected_balance)
+      | _ -> None)
+    (fun (staker, sc_rollup, staker_balance, min_expected_balance) ->
+      Sc_rollup_staker_funds_too_low
+        {staker; sc_rollup; staker_balance; min_expected_balance}) ;
   ()

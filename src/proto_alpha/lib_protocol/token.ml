@@ -51,6 +51,7 @@ type infinite_sink =
   | `Double_signing_punishments
   | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
   | `Tx_rollup_rejection_punishments
+  | `Sc_rollup_refutation_punishments
   | `Burned ]
 
 type sink = [infinite_sink | container]
@@ -112,6 +113,7 @@ let credit ctxt dest amount origin =
         | `Double_signing_punishments -> Double_signing_punishments
         | `Lost_endorsing_rewards (d, p, r) -> Lost_endorsing_rewards (d, p, r)
         | `Tx_rollup_rejection_punishments -> Tx_rollup_rejection_punishments
+        | `Sc_rollup_refutation_punishments -> Sc_rollup_refutation_punishments
         | `Burned -> Burned
       in
       return (ctxt, sink)

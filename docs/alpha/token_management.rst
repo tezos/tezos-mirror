@@ -97,7 +97,7 @@ The field ``kind`` allows to identify the type of container account, it can have
     Accounts in this category are further identified by the following additional fields:
 
     - the field ``contract`` contains the public key hash of the implicit account, or the contract hash of the originated account
-    - the field ``bond_id`` contains the identifier of the bond (e.g. a rollup hash if the bond is associated to a transaction rollup).
+    - the field ``bond_id`` contains the identifier of the bond (e.g. a rollup hash if the bond is associated to a transaction or a smart contract rollup).
 * ``"accumulator"`` represents accounts used to store tokens for some short period of time.
   This type of account is further identified by the additional field ``category`` whose (only possible) value ``"block fees"`` designates the container account used to collect manager operation fees while block's operations are being applied.
   Other categories may be added in the future.
@@ -121,6 +121,7 @@ The field ``category`` of a sink account may have one of the following values:
   - the field ``participation`` has the value ``"true"`` if participation was not sufficient and has the value ``"false"`` otherwise
   - the field ``revelation`` has the value ``"true"`` if the delegate has not revealed his nonce and has the value ``"false"`` otherwise.
 * ``"Tx_rollup_rejection_punishments"`` is the destination of tokens burned as punishment for submitting erroneous commitments
+* ``"Sc_rollup_refutation_punishments"`` is the destination of tokens burned as punishment for submitting bad commitments that have been refuted
 * ``"burned"`` is only for internal use and testing.
   It will not appear on mainnet, but may appear on test networks or in sandboxed mode.
 

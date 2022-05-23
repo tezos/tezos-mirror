@@ -39,14 +39,28 @@ module Commitment_repr = Sc_rollup_commitment_repr
 (** Lift a computation using using environment errors to use shell errors. *)
 let lift k = Lwt.map Environment.wrap_tzresult k
 
+let initial_staker_balance = Tez_repr.of_mutez_exn 100_000_000_000L
+
 let new_context () =
   let* b, _contract = Context.init1 () in
-  Incremental.begin_construction b >|=? fun inc ->
+  Incremental.begin_construction b >>=? fun inc ->
   let state = Incremental.validation_state inc in
   let ctxt = state.ctxt in
   (* Necessary to originate rollups. *)
   let ctxt = Alpha_context.Origination_nonce.init ctxt Operation_hash.zero in
-  Alpha_context.Internal_for_tests.to_raw ctxt
+  let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+  (* Mint some tez for staker accounts. *)
+  let mint_tez_for ctxt pkh_str =
+    let pkh = Signature.Public_key_hash.of_b58check_exn pkh_str in
+    let contract = Contract_repr.Implicit pkh in
+    let+ ctxt, _ =
+      lift
+      @@ Token.transfer ctxt `Minted (`Contract contract) initial_staker_balance
+    in
+    ctxt
+  in
+  let* ctxt = mint_tez_for ctxt "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG" in
+  mint_tez_for ctxt "tz1RikjCkrEde1QQmuesp796jCxeiyE6t3Vo"
 
 let new_sc_rollup ctxt =
   let+ rollup, _size, ctxt =

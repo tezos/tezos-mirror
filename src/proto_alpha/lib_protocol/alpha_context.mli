@@ -2137,8 +2137,20 @@ module Tx_rollup_errors : sig
     [`Inbox | `Commitment] -> int -> count_limit:int -> unit tzresult
 end
 
+(** This is a forward declaration to avoid circular dependencies.
+    Use module [Sc_rollup] instead whenever possible.
+    TODO : find a better way to resolve the circular dependency
+           https://gitlab.com/tezos/tezos/-/issues/3147 *)
+module Sc_rollup_repr : sig
+  module Address : S.HASH
+
+  type t = Address.t
+end
+
 module Bond_id : sig
-  type t = Tx_rollup_bond_id of Tx_rollup.t
+  type t =
+    | Tx_rollup_bond_id of Tx_rollup.t
+    | Sc_rollup_bond_id of Sc_rollup_repr.t
 
   val pp : Format.formatter -> t -> unit
 
@@ -2178,6 +2190,7 @@ module Receipt : sig
     | Frozen_bonds of Contract.t * Bond_id.t
     | Tx_rollup_rejection_punishments
     | Tx_rollup_rejection_rewards
+    | Sc_rollup_refutation_punishments
 
   val compare_balance : balance -> balance -> int
 
@@ -2460,9 +2473,9 @@ module Sc_rollup : sig
     module Map : Map.S with type key = t
   end
 
-  module Address : S.HASH
+  module Address = Sc_rollup_repr.Address
 
-  type t = Address.t
+  type t = Sc_rollup_repr.t
 
   type rollup := t
 
@@ -3687,6 +3700,7 @@ module Token : sig
     | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
     | `Burned
     | `Tx_rollup_rejection_punishments
+    | `Sc_rollup_refutation_punishments
     | container ]
 
   val allocated : context -> container -> (context * bool) tzresult Lwt.t

@@ -123,8 +123,8 @@ val find_staker :
 
 module Internal_for_tests : sig
   (** [deposit_stake context rollup staker] stakes [staker] at the last
-      cemented commitment, freezing [sc_rollup_deposit] from [staker]'s account
-      balance.
+      cemented commitment, freezing [sc_rollup_stake_amount_in_mutez] from
+      [staker]'s account balance.
 
       Warning: must be called only if [rollup] exists and [staker] is not to be
       found in {!Store.Stakers.}

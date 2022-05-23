@@ -266,6 +266,17 @@ let test_transferring_to_burned ctxt =
         (Lost_endorsing_rewards (pkh, p, r), Credited amount, Block_application);
       ])
     true
+  >>=? fun () ->
+  wrap (Token.transfer ctxt `Minted `Sc_rollup_refutation_punishments amount)
+  >>=? fun (_, bupds) ->
+  Assert.equal_bool
+    ~loc:__LOC__
+    (bupds
+    = [
+        minted_bupd;
+        (Sc_rollup_refutation_punishments, Credited amount, Block_application);
+      ])
+    true
 
 let test_transferring_to_frozen_bonds ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in

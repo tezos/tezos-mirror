@@ -47,14 +47,38 @@ let modify_staker_count ctxt rollup f =
   assert (Compare.Int.(size_diff = 0)) ;
   return ctxt
 
+let get_contract_and_stake ctxt staker =
+  let staker_contract = Contract_repr.Implicit staker in
+  let mutez_amount = Constants_storage.sc_rollup_stake_amount_in_mutez ctxt in
+  let stake = Tez_repr.of_mutez_exn (Int64.of_int mutez_amount) in
+  (staker_contract, stake)
+
 (** Warning: must be called only if [rollup] exists and [staker] is not to be
     found in {!Store.Stakers.} *)
 let deposit_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
-     We should lock stake here, and fail if there aren't enough funds.
-  *)
+  let staker_contract, stake = get_contract_and_stake ctxt staker in
+  let* ctxt, staker_balance = Token.balance ctxt (`Contract staker_contract) in
+  let* () =
+    fail_when
+      Tez_repr.(staker_balance < stake)
+      (Sc_rollup_staker_funds_too_low
+         {
+           staker;
+           sc_rollup = rollup;
+           staker_balance;
+           min_expected_balance = stake;
+         })
+  in
+  let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+  let* ctxt, _balance_updates =
+    Token.transfer
+      ctxt
+      (`Contract staker_contract)
+      (`Frozen_bonds (staker_contract, bond_id))
+      stake
+  in
   let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
   let* ctxt = modify_staker_count ctxt rollup Int32.succ in
   return ctxt
@@ -71,9 +95,15 @@ let withdraw_stake ctxt rollup staker =
           Commitment_hash.(staked_on_commitment = lcc)
           Sc_rollup_not_staked_on_lcc
       in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
-         We should refund stake here.
-      *)
+      let staker_contract, stake = get_contract_and_stake ctxt staker in
+      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+      let* ctxt, _balance_updates =
+        Token.transfer
+          ctxt
+          (`Frozen_bonds (staker_contract, bond_id))
+          (`Contract staker_contract)
+          stake
+      in
       let* ctxt, _size_freed =
         Store.Stakers.remove_existing (ctxt, rollup) staker
       in
@@ -347,6 +377,15 @@ let remove_staker ctxt rollup staker =
   | Some staked_on ->
       let* () =
         fail_when Commitment_hash.(staked_on = lcc) Sc_rollup_remove_lcc
+      in
+      let staker_contract, stake = get_contract_and_stake ctxt staker in
+      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+      let* ctxt, _balance_updates =
+        Token.transfer
+          ctxt
+          (`Frozen_bonds (staker_contract, bond_id))
+          `Sc_rollup_refutation_punishments
+          stake
       in
       let* ctxt, _size_diff =
         Store.Stakers.remove_existing (ctxt, rollup) staker
