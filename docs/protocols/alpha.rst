@@ -65,3 +65,7 @@ Internal
 - Rename `run_view` into `run_tzip4_view` for consistency with
   `run_script_view`. Does not affect the existing `run_view` RPC.
   (MR :gl:`!4810`)
+
+- Precheck no longer returns the gas it has consumed. Instead of
+  "replaying" the gas from precheck, `apply_manager_contents` consumes
+  the same gas again step by step. (MR :gl:`!5506`)

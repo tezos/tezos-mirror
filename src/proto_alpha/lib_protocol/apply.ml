@@ -1108,8 +1108,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
-let prepare_apply_manager_operation_content ~ctxt ~source
-    ~gas_consumed_in_precheck =
+let prepare_apply_manager_operation_content ~ctxt ~source =
   let before_operation =
     (* This context is not used for backtracking. Only to compute
          gas consumption and originations for the operation result. *)
@@ -1117,14 +1116,7 @@ let prepare_apply_manager_operation_content ~ctxt ~source
   in
   Contract.must_exist ctxt source >>=? fun () ->
   Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
-  (match gas_consumed_in_precheck with
-  | None -> Ok ctxt
-  | Some gas -> Gas.consume ctxt gas)
-  >>?= fun ctxt ->
-  let consume_deserialization_gas = Script.When_needed in
-  (* [note]: deserialization gas has already been accounted for in the gas
-     consumed by the precheck and the lazy_exprs have been forced. *)
-  return (ctxt, before_operation, consume_deserialization_gas)
+  return (ctxt, before_operation)
 
 let apply_internal_manager_operation_content :
     type kind.
@@ -1140,11 +1132,9 @@ let apply_internal_manager_operation_content :
     tzresult
     Lwt.t =
  fun ctxt mode ~payer ~source ~chain_id operation ->
-  prepare_apply_manager_operation_content
-    ~ctxt
-    ~source
-    ~gas_consumed_in_precheck:None
-  >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
+  prepare_apply_manager_operation_content ~ctxt ~source
+  >>=? fun (ctxt, before_operation) ->
+  let consume_deserialization_gas = Script.When_needed in
   match operation with
   | Transaction_to_contract
       {
@@ -1236,7 +1226,6 @@ let apply_external_manager_operation_content :
     Script_ir_translator.unparsing_mode ->
     source:public_key_hash ->
     chain_id:Chain_id.t ->
-    gas_consumed_in_precheck:Gas.cost option ->
     fee:Tez.t ->
     kind manager_operation ->
     (context
@@ -1244,13 +1233,19 @@ let apply_external_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~source ~chain_id ~gas_consumed_in_precheck ~fee operation ->
+ fun ctxt mode ~source ~chain_id ~fee operation ->
   let source_contract = Contract.Implicit source in
-  prepare_apply_manager_operation_content
-    ~ctxt
-    ~source:source_contract
-    ~gas_consumed_in_precheck
-  >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
+  prepare_apply_manager_operation_content ~ctxt ~source:source_contract
+  >>=? fun (ctxt, before_operation) ->
+  let consume_deserialization_gas =
+    (* Note that we used to set this to [Script.When_needed] because
+       the deserialization gas was accounted for in the gas consumed
+       by precheck. However, we no longer have access to this precheck
+       gas, so we want to always consume the deserialization gas
+       again, independently of the internal state of the lazy_exprs in
+       the arguments. *)
+    Script.Always
+  in
   match operation with
   | Reveal pk ->
       (* TODO #2603
@@ -1560,6 +1555,8 @@ let apply_external_manager_operation_content :
       return (ctxt, result, [])
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
       let message, message_size = Tx_rollup_message.make_batch content in
+      Tx_rollup_gas.hash_cost message_size >>?= fun cost ->
+      Gas.consume ctxt cost >>?= fun ctxt ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_inbox.append_message ctxt tx_rollup state message
       >>=? fun (ctxt, state, paid_storage_size_diff) ->
@@ -1912,7 +1909,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   apply ctxt [] ops
 
 let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
-    ~(only_batch : bool) : (context * precheck_result) tzresult Lwt.t =
+    ~(only_batch : bool) : (context * Receipt.balance_updates) tzresult Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
                                    source;
@@ -1936,7 +1933,6 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   @@ Gas.consume_limit_in_block ctxt gas_limit
   >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
-  let ctxt_before = ctxt in
   Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
   let source_contract = Contract.Implicit source in
   Contract.must_be_allocated ctxt source_contract >>=? fun () ->
@@ -1952,8 +1948,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
       @@ (* Fail early if not enough gas for complete deserialization
-             cost or if deserialization fails. The gas consumed here is
-            "replayed" in [apply_manager_contents]. *)
+            cost or if deserialization fails. *)
       ( Script.force_decode_in_context
           ~consume_deserialization_gas
           ctxt
@@ -2075,9 +2070,6 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source_contract) `Block_fees fee
-  >|=? fun (ctxt, balance_updates) ->
-  let consumed_gas = Gas.consumed ~since:ctxt_before ~until:ctxt in
-  (ctxt, {balance_updates; consumed_gas})
 
 let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
   match trr with
@@ -2288,7 +2280,7 @@ let burn_internal_storage_fees :
   | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
-    ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
+    (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
     * packed_internal_manager_operation_result list)
@@ -2311,7 +2303,6 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     ctxt
     mode
     ~source
-    ~gas_consumed_in_precheck
     ~chain_id
     ~fee
     operation
@@ -2379,10 +2370,7 @@ let rec mark_skipped :
  fun ~payload_producer level prechecked_contents_list ->
   match[@coq_match_with_default] prechecked_contents_list with
   | PrecheckedSingle
-      {
-        contents = Manager_operation {operation; _};
-        result = {balance_updates; _};
-      } ->
+      {contents = Manager_operation {operation; _}; balance_updates} ->
       Single_result
         (Manager_operation_result
            {
@@ -2391,11 +2379,7 @@ let rec mark_skipped :
              internal_operation_results = [];
            })
   | PrecheckedCons
-      ( {
-          contents = Manager_operation {operation; _};
-          result = {balance_updates; _};
-        },
-        rest ) ->
+      ({contents = Manager_operation {operation; _}; balance_updates}, rest) ->
       Cons_result
         ( Manager_operation_result
             {
@@ -2445,14 +2429,14 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
     match contents_list with
     | Single contents ->
         precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        >>=? fun (ctxt, result) ->
-        return (ctxt, PrecheckedSingle {contents; result})
+        >>=? fun (ctxt, balance_updates) ->
+        return (ctxt, PrecheckedSingle {contents; balance_updates})
     | Cons (contents, rest) ->
         precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        >>=? fun (ctxt, result) ->
+        >>=? fun (ctxt, balance_updates) ->
         rec_precheck_manager_contents_list ctxt rest
         >>=? fun (ctxt, results_rest) ->
-        return (ctxt, PrecheckedCons ({contents; result}, results_rest))
+        return (ctxt, PrecheckedCons ({contents; balance_updates}, results_rest))
   in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
   check_counters_consistency contents_list >>=? fun () ->
@@ -2525,17 +2509,8 @@ let rec apply_manager_contents_list_rec :
  fun ctxt mode ~payload_producer chain_id prechecked_contents_list ->
   let level = Level.current ctxt in
   match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle
-      {
-        contents = Manager_operation _ as op;
-        result = {consumed_gas; balance_updates};
-      } ->
-      apply_manager_contents
-        ctxt
-        mode
-        chain_id
-        ~gas_consumed_in_precheck:(Some (Gas.cost_of_gas consumed_gas))
-        op
+  | PrecheckedSingle {contents = Manager_operation _ as op; balance_updates} ->
+      apply_manager_contents ctxt mode chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
@@ -2543,18 +2518,8 @@ let rec apply_manager_contents_list_rec :
       in
       (ctxt_result, Single_result result)
   | PrecheckedCons
-      ( {
-          contents = Manager_operation _ as op;
-          result = {consumed_gas; balance_updates};
-        },
-        rest ) -> (
-      apply_manager_contents
-        ctxt
-        mode
-        chain_id
-        ~gas_consumed_in_precheck:(Some (Gas.cost_of_gas consumed_gas))
-        op
-      >>= function
+      ({contents = Manager_operation _ as op; balance_updates}, rest) -> (
+      apply_manager_contents ctxt mode chain_id op >>= function
       | Failure, operation_result, internal_operation_results ->
           let result =
             Manager_operation_result
