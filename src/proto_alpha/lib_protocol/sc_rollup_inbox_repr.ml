@@ -68,7 +68,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"sc_rollup_inbox.invalid_level_add_messages"
-    ~title:"Internal error: Trying to add an message to an inbox from the past"
+    ~title:"Internal error: Trying to add a message to an inbox from the past"
     ~description:
       "An inbox can only accept messages for its current level or for the next \
        levels."
@@ -215,7 +215,7 @@ let pp fmt
          rollup = %a
          level = %a
          current messages hash  = %a
-         nb_available_messages = %s
+         nb_available_messages = %Ld
          nb_messages_in_commitment_period = %s
          starting_level_of_current_commitment_period = %a
          message_counter = %a
@@ -227,7 +227,7 @@ let pp fmt
     level
     Context_hash.pp
     (current_messages_hash ())
-    (Int64.to_string nb_available_messages)
+    nb_available_messages
     (Int64.to_string nb_messages_in_commitment_period)
     Raw_level_repr.pp
     starting_level_of_current_commitment_period
@@ -410,7 +410,7 @@ module MakeHashingScheme (Tree : TREE) :
   let add_message inbox payload messages =
     let open Lwt_syntax in
     let message_index = inbox.message_counter in
-    let message_counter = Z.succ inbox.message_counter in
+    let message_counter = Z.succ message_index in
     let key = key_of_message message_index in
     let nb_available_messages = Int64.succ inbox.nb_available_messages in
     let* messages =

@@ -57,7 +57,7 @@
     Commitments accepted as true by the protocol are referred to as Cemented.
 
     {3 Stakers}
-    The Stakers table maps Stakers (implicit accounts) to commitments.
+    The Stakers table maps Stakers (implicit accounts) to commitments hashes.
 
     Let [Stakers(S)] mean "looking up the key S in [Stakers]".
 
@@ -178,7 +178,7 @@ val kind :
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Kind.t option tzresult Lwt.t
 
-(** [add_message context rollup msg] adds [msg] to [rollup]'s inbox.
+(** [add_messages context rollup msg] adds [msg] to [rollup]'s inbox.
 
     This function returns the updated context as well as the size diff.
 
@@ -347,7 +347,8 @@ val last_cemented_commitment :
     }
 
     If successful, [last_cemented_commitment] is set to the given [commitment] and
-    the appropriate amount of inbox messages is consumed.
+    the appropriate amount of inbox messages is consumed. The old LCC is also
+    deallocated.
 
     May fail with:
     {ul
@@ -417,10 +418,10 @@ val remove_staker :
   Sc_rollup_repr.Staker.t ->
   Raw_context.t tzresult Lwt.t
 
-(* [list context] returns a list of all rollups that have been originated. *)
+(** [list context] returns a list of all rollups that have been originated. *)
 val list : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 
-(* [initial_level ctxt sc_rollup] returns the level at which a [sc_rollup] was
+(** [initial_level ctxt sc_rollup] returns the level at which a [sc_rollup] was
    originated. *)
 val initial_level :
   Raw_context.t -> Sc_rollup_repr.t -> Raw_level_repr.t tzresult Lwt.t

@@ -670,14 +670,14 @@ module Sc_rollup : sig
       - a merkelized inbox, of which only the root hash is stored
       - a tree of commitments, rooted at the last cemented commitment
       - a map from stakers to commitments
-      - a map from commitments to the time (level) of its first insertion
+      - a map from commitments to the time (level) of their first insertion
 
       For performance reasons we also store (per rollup):
 
       - the total number of active stakers;
       - the number of stakers per commitment.
 
-      See module comments for details.
+      See module {!Sc_rollup_repr.Commitment} for details.
   *)
   module PVM_kind :
     Indexed_data_storage

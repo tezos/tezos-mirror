@@ -235,7 +235,7 @@ let () =
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_unknown_commitment"
-    ~title:"Rollup does not exist"
+    ~title:"Unknown commitment"
     ~description
     ~pp:(fun ppf x ->
       Format.fprintf
@@ -251,7 +251,7 @@ let () =
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_bad_inbox_level"
-    ~title:"Committed too soon"
+    ~title:"Committing to a bad inbox level"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
@@ -475,13 +475,15 @@ let get_commitment_stake_count ctxt rollup node =
 let set_commitment_added ctxt rollup node new_value =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Commitment_added.find (ctxt, rollup) node in
-  let new_value =
-    match res with None -> new_value | Some old_value -> old_value
-  in
-  let* ctxt, size_diff, _was_bound =
-    Store.Commitment_added.add (ctxt, rollup) node new_value
-  in
-  return (size_diff, new_value, ctxt)
+  match res with
+  | Some old_value ->
+      (* No need to re-add the read value *)
+      return (0, old_value, ctxt)
+  | None ->
+      let* ctxt, size_diff, _was_bound =
+        Store.Commitment_added.add (ctxt, rollup) node new_value
+      in
+      return (size_diff, new_value, ctxt)
 
 let deallocate ctxt rollup node =
   let open Lwt_tzresult_syntax in
@@ -578,32 +580,30 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
 *)
 let assert_commitment_period ctxt rollup commitment =
   let open Lwt_tzresult_syntax in
-  let pred = Commitment.(commitment.predecessor) in
+  let pred_hash = Commitment.(commitment.predecessor) in
   let* ctxt, pred_level =
-    if Commitment_hash.(pred = zero) then
+    if Commitment_hash.(pred_hash = zero) then
       let* level = Store.Initial_level.get ctxt rollup in
       return (ctxt, level)
     else
-      let* pred, ctxt =
-        get_commitment_internal ctxt rollup commitment.predecessor
-      in
+      let* pred, ctxt = get_commitment_internal ctxt rollup pred_hash in
       return (ctxt, Commitment.(pred.inbox_level))
   in
   (* We want to check the following inequalities on [commitment.inbox_level],
      [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_period].
 
      - Greater-than-or-equal (>=), to ensure inbox_levels are monotonically
-     increasing.  along each branch of commitments. Together with
+     increasing along each branch of commitments. Together with
      [assert_commitment_not_too_far_ahead] this is sufficient to limit the
-     depth of the commitment tree, which is also the number commitments stored
+     depth of the commitment tree, which is also the number of commitments stored
      per staker. This constraint must be enforced at submission time.
 
-     - Equality (=), so that that L2 blocks are produced at a regular rate.  This
+     - Equality (=), so that L2 blocks are produced at a regular rate.  This
      ensures that there is only ever one branch of correct commitments,
      simplifying refutation logic. This could also be enforced at refutation time
      rather than submission time, but doing it here works too.
 
-     Because [a >= b && a = b] is equivalent to [a = b], we can the latter as
+     Because [a >= b && a = b] is equivalent to [a = b], we can just keep the latter as
      an optimization.
   *)
   let sc_rollup_commitment_period =
@@ -616,10 +616,10 @@ let assert_commitment_period ctxt rollup commitment =
   else fail Sc_rollup_bad_inbox_level
 
 (** Check invariants on [inbox_level], enforcing overallocation of storage and
-    regularity of block prorudction.
+    regularity of block production.
 
      The constants used by [assert_refine_conditions_met] must be chosen such
-     that the maximum cost of storage allocated by each staker at most the size
+     that the maximum cost of storage allocated by each staker is at most the size
      of their deposit.
  *)
 let assert_refine_conditions_met ctxt rollup lcc commitment =
@@ -686,11 +686,12 @@ let refine_stake ctxt rollup staker commitment =
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
-  match res with
-  | None ->
-      let* ctxt = deposit_stake ctxt rollup staker in
-      refine_stake ctxt rollup staker commitment
-  | Some _ -> refine_stake ctxt rollup staker commitment
+  let* ctxt =
+    match res with
+    | None -> deposit_stake ctxt rollup staker
+    | Some _ -> return ctxt
+  in
+  refine_stake ctxt rollup staker commitment
 
 let cement_commitment ctxt rollup new_lcc =
   let open Lwt_tzresult_syntax in
@@ -796,28 +797,34 @@ let get_conflict_point ctxt rollup staker1 staker2 =
      We use this fact in the following to efficiently traverse both commitment histories towards
      the conflict points. *)
   let rec traverse_in_parallel ctxt commit1 commit2 =
-    if Commitment_hash.(commit1 = commit2) then
-      (* This case will most dominantly happen when either commit is part of the other's history.
-         It occurs when the commit that is farther ahead gets dereferenced to its predecessor often
-         enough to land at the other commit. *)
-      fail Sc_rollup_no_conflict
+    (* We know that commit1 <> commit2 at the first call and during recursive calls
+       as well. *)
+    let* commit1_info, ctxt = get_commitment_internal ctxt rollup commit1 in
+    let* commit2_info, ctxt = get_commitment_internal ctxt rollup commit2 in
+    (* This assert should hold because:
+       - We call function [traverse_in_parallel] with two initial commitments
+       whose levels are equal to [target_inbox_level],
+       - In recursive calls, the commitments are replaced by their respective
+       predecessors, and we know that successive commitments in a branch are
+       spaced by [sc_rollup_commitment_period_in_blocks] *)
+    assert (Raw_level_repr.(commit1_info.inbox_level = commit2_info.inbox_level)) ;
+    if Commitment_hash.(commit1_info.predecessor = commit2_info.predecessor)
+    then
+      (* Same predecessor means we've found the conflict points. *)
+      return ((commit1, commit2), ctxt)
     else
-      let* commit1_info, ctxt = get_commitment_internal ctxt rollup commit1 in
-      let* commit2_info, ctxt = get_commitment_internal ctxt rollup commit2 in
-      assert (
-        Raw_level_repr.(commit1_info.inbox_level = commit2_info.inbox_level)) ;
-      if Commitment_hash.(commit1_info.predecessor = commit2_info.predecessor)
-      then
-        (* Same predecessor means we've found the conflict points. *)
-        return ((commit1, commit2), ctxt)
-      else
-        (* Different predecessors means they run in parallel. *)
-        (traverse_in_parallel [@ocaml.tailcall])
-          ctxt
-          commit1_info.predecessor
-          commit2_info.predecessor
+      (* Different predecessors means they run in parallel. *)
+      (traverse_in_parallel [@ocaml.tailcall])
+        ctxt
+        commit1_info.predecessor
+        commit2_info.predecessor
   in
-  traverse_in_parallel ctxt commit1 commit2
+  if Commitment_hash.(commit1 = commit2) then
+    (* This case will most dominantly happen when either commit is part of the other's history.
+       It occurs when the commit that is farther ahead gets dereferenced to its predecessor often
+       enough to land at the other commit. *)
+    fail Sc_rollup_no_conflict
+  else traverse_in_parallel ctxt commit1 commit2
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in

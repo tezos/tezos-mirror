@@ -122,8 +122,8 @@ end) : S = struct
     in
     let {content; back_pointers; index} = cell1 in
     equal_content content cell2.content
-    && equal_back_pointers back_pointers cell2.back_pointers
     && Compare.Int.equal index cell2.index
+    && equal_back_pointers back_pointers cell2.back_pointers
 
   let index cell = cell.index
 
