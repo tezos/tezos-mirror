@@ -545,7 +545,11 @@ let test_cement_consumes_available_messages () =
   in
   let* ctxt = lift @@ Sc_rollup_storage.deposit_stake ctxt rollup staker in
   let* inbox, _n, ctxt =
-    lift @@ Sc_rollup_storage.add_messages ctxt rollup ["one"; "two"; "three"]
+    lift
+    @@ Sc_rollup_inbox_storage.add_messages
+         ctxt
+         rollup
+         ["one"; "two"; "three"]
   in
   let available_messages =
     Sc_rollup_inbox_repr.number_of_available_messages inbox
@@ -565,7 +569,9 @@ let test_cement_consumes_available_messages () =
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
   let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
-  let* new_inbox, _ctxt = lift @@ Sc_rollup_storage.inbox ctxt rollup in
+  let* new_inbox, _ctxt =
+    lift @@ Sc_rollup_inbox_storage.inbox ctxt rollup
+  in
   let new_available_messages =
     Sc_rollup_inbox_repr.number_of_available_messages new_inbox
   in
@@ -1507,10 +1513,12 @@ let test_kind_of_missing_rollup () =
 
 let test_add_messages_from_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
-      Sc_rollup_storage.add_messages ctxt rollup ["Dummy message"])
+      Sc_rollup_inbox_storage.add_messages ctxt rollup ["Dummy message"])
 
 let test_inbox_of_missing_rollup () =
-  assert_fails_with_missing_rollup ~loc:__LOC__ Sc_rollup_storage.inbox
+  assert_fails_with_missing_rollup
+    ~loc:__LOC__
+    Sc_rollup_inbox_storage.inbox
 
 let test_refine_stake_of_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
@@ -1716,7 +1724,7 @@ let test_carbonated_memory_inbox_set_messages () =
     set_gas_limit ctxt (Gas_limit_repr.Arith.integral_of_int_exn 20_000)
   in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
-  let* inbox, ctxt = lift @@ Sc_rollup_storage.inbox ctxt rollup in
+  let* inbox, ctxt = lift @@ Sc_rollup_inbox_storage.inbox ctxt rollup in
   let*? current_messages, ctxt =
     Environment.wrap_tzresult
     @@ Sc_rollup_in_memory_inbox.current_messages ctxt rollup
@@ -1763,7 +1771,7 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
           else ctxt
         in
         let* _inbox, _size_diff, ctxt =
-          lift @@ Sc_rollup_storage.add_messages ctxt rollup payload
+          lift @@ Sc_rollup_inbox_storage.add_messages ctxt rollup payload
         in
         return ctxt)
       ctxt

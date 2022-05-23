@@ -3406,7 +3406,8 @@ module RPC = struct
             "@[Context level at RPC time at %a@]@."
             Level.pp
             (Level.current ctxt) ;
-          Sc_rollup.inbox ctxt rollup >>=? fun (inbox, _ctxt) -> return inbox)
+          Sc_rollup.Inbox.inbox ctxt rollup >>=? fun (inbox, _ctxt) ->
+          return inbox)
 
     let register_kind () =
       Registration.opt_register1 ~chunked:true S.kind

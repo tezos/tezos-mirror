@@ -30,12 +30,6 @@ module Commitment = Sc_rollup_repr.Commitment
 module Commitment_storage = Sc_rollup_commitment_storage
 module Commitment_hash = Sc_rollup_repr.Commitment_hash
 
-module Internal = struct
-  let update_num_and_size_of_messages ~num_messages ~total_messages_size message
-      =
-    (num_messages + 1, total_messages_size + String.length message)
-end
-
 let originate ctxt ~kind ~boot_sector =
   Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
   let level = Raw_context.current_level ctxt in
@@ -74,111 +68,6 @@ let consume_n_messages ctxt rollup n =
       let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
       assert (Compare.Int.(size <= 0)) ;
       return ctxt
-
-let inbox ctxt rollup =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Inbox.find ctxt rollup in
-  match res with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some inbox -> return (inbox, ctxt)
-
-let assert_inbox_size_ok ctxt inbox extra_num_messages =
-  let next_size =
-    Z.add
-      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
-      (Z.of_int extra_num_messages)
-  in
-  let max_size = Constants_storage.sc_rollup_max_available_messages ctxt in
-  fail_unless
-    Compare.Z.(next_size <= Z.of_int max_size)
-    Sc_rollup_max_number_of_available_messages_reached
-
-let assert_inbox_nb_messages_in_commitment_period inbox extra_messages =
-  let nb_messages_in_commitment_period =
-    Int64.add
-      (Sc_rollup_inbox_repr.number_of_messages_during_commitment_period inbox)
-      (Int64.of_int extra_messages)
-  in
-  let limit = Int64.of_int32 Sc_rollup_repr.Number_of_messages.max_int in
-  fail_when
-    Compare.Int64.(nb_messages_in_commitment_period > limit)
-    Sc_rollup_max_number_of_messages_reached_for_commitment_period
-
-let add_messages ctxt rollup messages =
-  let {Level_repr.level; _} = Raw_context.current_level ctxt in
-  let open Lwt_tzresult_syntax in
-  let open Raw_context in
-  let commitment_period =
-    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
-  in
-  let* inbox, ctxt = inbox ctxt rollup in
-  let* num_messages, total_messages_size, ctxt =
-    List.fold_left_es
-      (fun (num_messages, total_messages_size, ctxt) message ->
-        let*? ctxt =
-          Raw_context.consume_gas
-            ctxt
-            Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages
-        in
-        let num_messages, total_messages_size =
-          Internal.update_num_and_size_of_messages
-            ~num_messages
-            ~total_messages_size
-            message
-        in
-        return (num_messages, total_messages_size, ctxt))
-      (0, 0, ctxt)
-      messages
-  in
-  let* () = assert_inbox_size_ok ctxt inbox num_messages in
-  let start =
-    Sc_rollup_inbox_repr.starting_level_of_current_commitment_period inbox
-  in
-  let freshness = Raw_level_repr.diff level start in
-  let inbox =
-    let open Int32 in
-    let open Compare.Int32 in
-    if freshness >= commitment_period then (
-      let nb_periods =
-        to_int ((mul (div freshness commitment_period)) commitment_period)
-      in
-      let new_starting_level = Raw_level_repr.(add start nb_periods) in
-      assert (Raw_level_repr.(new_starting_level <= level)) ;
-      assert (
-        rem (Raw_level_repr.diff new_starting_level start) commitment_period
-        = 0l) ;
-      Sc_rollup_inbox_repr.start_new_commitment_period inbox new_starting_level)
-    else inbox
-  in
-  let* () = assert_inbox_nb_messages_in_commitment_period inbox num_messages in
-  let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
-  let* origination_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
-  let levels =
-    Int32.sub
-      (Raw_level_repr.to_int32 inbox_level)
-      (Raw_level_repr.to_int32 origination_level)
-  in
-  let*? current_messages, ctxt =
-    Sc_rollup_in_memory_inbox.current_messages ctxt rollup
-  in
-  let gas_cost_add_messages =
-    Sc_rollup_costs.cost_add_messages ~num_messages ~total_messages_size levels
-  in
-  let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_messages in
-  (*
-      Notice that the protocol is forgetful: it throws away the inbox
-      history. On the contrary, the history is stored by the rollup
-      node to produce inclusion proofs when needed.
-  *)
-  let* current_messages, inbox =
-    Sc_rollup_inbox_repr.(
-      add_messages_no_history inbox level messages current_messages)
-  in
-  let*? ctxt =
-    Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
-  in
-  let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
-  return (inbox, Z.of_int size, ctxt)
 
 let find_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in

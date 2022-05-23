@@ -2474,6 +2474,8 @@ module Sc_rollup : sig
 
   type t = Address.t
 
+  type rollup := t
+
   module Kind : sig
     type t = Example_arith
 
@@ -2599,6 +2601,11 @@ module Sc_rollup : sig
 
     module MakeHashingScheme (Tree : TREE) :
       MerkelizedOperations with type tree = Tree.tree
+
+    val add_messages :
+      context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
+
+    val inbox : context -> rollup -> (t * context) tzresult Lwt.t
   end
 
   module Game : sig
@@ -2667,11 +2674,6 @@ module Sc_rollup : sig
   end
 
   val rpc_arg : t RPC_arg.t
-
-  val add_messages :
-    context -> t -> string list -> (Inbox.t * Z.t * context) tzresult Lwt.t
-
-  val inbox : context -> t -> (Inbox.t * context) tzresult Lwt.t
 
   val deposit_stake : context -> t -> Staker.t -> context tzresult Lwt.t
 

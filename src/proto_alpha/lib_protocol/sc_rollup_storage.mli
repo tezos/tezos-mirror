@@ -23,17 +23,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-(** Module [Internal] implements functions that are used only internally by
-    the [Sc_rollup_storage] module, but need to be exposed in tests or
-    benchmarks.
-  *)
-module Internal : sig
-  (** [update_num_and_size_of_messages ~num_messages ~total_messages_size
-       message] returns the length and total messages size
-      [messages]. *)
-  val update_num_and_size_of_messages :
-    num_messages:int -> total_messages_size:int -> string -> int * int
-end
 
 (** [originate context ~kind ~boot_sector] produces an address [a] for
    a smart contract rollup using the origination nonce found in
@@ -55,29 +44,6 @@ val kind :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Kind.t option tzresult Lwt.t
-
-(** [add_messages context rollup msg] adds [msg] to [rollup]'s inbox.
-
-    This function returns the updated context as well as the size diff.
-
-    May fail with:
-    {ul
-      {li [Sc_rollup_max_number_of_available_messages] if [inbox] is full}
-      {li [Sc_rollup_max_number_of_messages_reached_for_commitment_period] if
-      the number of messages pushed during commitment period is too high}
-    }
-*)
-val add_messages :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  string list ->
-  (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
-
-(** [inbox context rollup] returns the current state of the inbox. *)
-val inbox :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
 
 (** [deposit_stake context rollup staker] stakes [staker] at the last
     cemented commitment, freezing [sc_rollup_deposit] from [staker]'s account

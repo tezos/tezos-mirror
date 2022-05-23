@@ -55,7 +55,12 @@ module Slot = Slot_repr
 module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
-  module Inbox = Sc_rollup_inbox_repr
+
+  module Inbox = struct
+    include Sc_rollup_inbox_repr
+    include Sc_rollup_inbox_storage
+  end
+
   module Game = Sc_rollup_game_repr
   module Commitment_storage = Sc_rollup_commitment_storage
   include Sc_rollup_storage
