@@ -63,6 +63,7 @@ module Sc_rollup = struct
 
   module Game = Sc_rollup_game_repr
   module Commitment_storage = Sc_rollup_commitment_storage
+  module Stake_storage = Sc_rollup_stake_storage
   include Sc_rollup_storage
 end
 

@@ -2673,28 +2673,19 @@ module Sc_rollup : sig
       context -> t -> (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
   end
 
+  module Stake_storage : sig
+    val publish_commitment :
+      context ->
+      t ->
+      Staker.t ->
+      Commitment.t ->
+      (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
+
+    val cement_commitment :
+      context -> t -> Commitment_hash.t -> context tzresult Lwt.t
+  end
+
   val rpc_arg : t RPC_arg.t
-
-  val deposit_stake : context -> t -> Staker.t -> context tzresult Lwt.t
-
-  val withdraw_stake : context -> t -> Staker.t -> context tzresult Lwt.t
-
-  val refine_stake :
-    context ->
-    t ->
-    Staker.t ->
-    Commitment.t ->
-    (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
-
-  val publish_commitment :
-    context ->
-    t ->
-    Staker.t ->
-    Commitment.t ->
-    (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
-
-  val cement_commitment :
-    context -> t -> Commitment_hash.t -> context tzresult Lwt.t
 
   type conflict_point = Commitment_hash.t * Commitment_hash.t
 
@@ -2704,8 +2695,6 @@ module Sc_rollup : sig
     Staker.t ->
     Staker.t ->
     (conflict_point * context) tzresult Lwt.t
-
-  val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
 
   val list : context -> t list tzresult Lwt.t
 

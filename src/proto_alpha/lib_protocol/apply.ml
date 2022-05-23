@@ -1749,12 +1749,13 @@ let apply_external_manager_operation_content :
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
-      Sc_rollup.cement_commitment ctxt rollup commitment >>=? fun ctxt ->
+      Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
+      >>=? fun ctxt ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_cement_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
-      Sc_rollup.publish_commitment ctxt rollup source commitment
+      Sc_rollup.Stake_storage.publish_commitment ctxt rollup source commitment
       >>=? fun (staked_hash, published_at_level, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result =
