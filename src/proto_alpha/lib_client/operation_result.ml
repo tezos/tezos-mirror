@@ -30,6 +30,14 @@ open Apply_results
 
 let tez_sym = "\xEA\x9C\xA9"
 
+let pp_micheline_from_lazy_expr ppf expr =
+  let expr =
+    WithExceptions.Option.to_exn
+      ~none:(Failure "ill-serialized micheline expression")
+      (Data_encoding.force_decode expr)
+  in
+  Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr expr
+
 let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
     pp_result res =
   let {operation; source; _} = op in
@@ -50,16 +58,11 @@ let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
       if not (Entrypoint.is_default entrypoint) then
         Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;
       if not (Script_repr.is_unit_parameter parameters) then
-        let expr =
-          WithExceptions.Option.to_exn
-            ~none:(Failure "ill-serialized argument")
-            (Data_encoding.force_decode parameters)
-        in
         Format.fprintf
           ppf
-          "@,Parameter: @[<v 0>%a@]"
-          Michelson_v1_printer.print_expr
-          expr
+          "@,Parameter: %a"
+          pp_micheline_from_lazy_expr
+          parameters
   | Origination {delegate; credit; script = {code; storage}} -> (
       Format.fprintf
         ppf
@@ -73,10 +76,6 @@ let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
         WithExceptions.Option.to_exn
           ~none:(Failure "ill-serialized code")
           (Data_encoding.force_decode code)
-      and storage =
-        WithExceptions.Option.to_exn
-          ~none:(Failure "ill-serialized storage")
-          (Data_encoding.force_decode storage)
       in
       let {Michelson_v1_parser.source; _} =
         Michelson_v1_printer.unparse_toplevel code
@@ -86,7 +85,7 @@ let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
         "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]"
         Format.pp_print_text
         source
-        Michelson_v1_printer.print_expr
+        pp_micheline_from_lazy_expr
         storage ;
       match delegate with
       | None -> Format.fprintf ppf "@,No delegate for this contract"
@@ -126,16 +125,11 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       if not (Entrypoint.is_default entrypoint) then
         Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;
       if not (Script_repr.is_unit_parameter parameters) then
-        let expr =
-          WithExceptions.Option.to_exn
-            ~none:(Failure "ill-serialized argument")
-            (Data_encoding.force_decode parameters)
-        in
         Format.fprintf
           ppf
-          "@,Parameter: @[<v 0>%a@]"
-          Michelson_v1_printer.print_expr
-          expr
+          "@,Parameter: %a"
+          pp_micheline_from_lazy_expr
+          parameters
   | Origination {delegate; credit; script = {code; storage}} -> (
       Format.fprintf
         ppf
@@ -149,10 +143,6 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         WithExceptions.Option.to_exn
           ~none:(Failure "ill-serialized code")
           (Data_encoding.force_decode code)
-      and storage =
-        WithExceptions.Option.to_exn
-          ~none:(Failure "ill-serialized storage")
-          (Data_encoding.force_decode storage)
       in
       let {Michelson_v1_parser.source; _} =
         Michelson_v1_printer.unparse_toplevel code
@@ -162,7 +152,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]"
         Format.pp_print_text
         source
-        Michelson_v1_printer.print_expr
+        pp_micheline_from_lazy_expr
         storage ;
       match delegate with
       | None -> Format.fprintf ppf "@,No delegate for this contract"
@@ -185,16 +175,11 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
-  | Register_global_constant {value = lazy_value} ->
-      let value =
-        WithExceptions.Option.to_exn
-          ~none:(Failure "ill-serialized value")
-          (Data_encoding.force_decode lazy_value)
-      in
+  | Register_global_constant {value} ->
       Format.fprintf
         ppf
         "Register Global:@,Value: %a"
-        Michelson_v1_printer.print_expr
+        pp_micheline_from_lazy_expr
         value
   | Set_deposits_limit limit_opt -> (
       Format.fprintf
@@ -273,17 +258,12 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       Format.fprintf ppf "@[<v 2>Publish slot %a@]" Dal.Slot.pp slot
   | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       let (module R : Sc_rollup.PVM.S) = Sc_rollup.Kind.pvm_of kind in
-      let parameters_ty =
-        WithExceptions.Option.to_exn
-          ~none:(Failure "ill-serialized parameters type")
-          (Data_encoding.force_decode parameters_ty)
-      in
       Format.fprintf
         ppf
         "Originate smart contract rollup of kind %s and type %a with boot \
          sector '%a'"
         R.name
-        Michelson_v1_printer.print_expr
+        pp_micheline_from_lazy_expr
         parameters_ty
         R.pp_boot_sector
         boot_sector
