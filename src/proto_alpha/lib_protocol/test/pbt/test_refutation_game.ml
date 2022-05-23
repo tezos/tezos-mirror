@@ -781,22 +781,11 @@ struct
     in
     {initial; next_move}
 
-  (** this is an automatic refuter client. It generates a "perfect" client
-  for the refuter.*)
-  let machine_directed_refuter =
-    let initial = Lwt.return None in
-    let next_move game =
-      let dissection = game.dissection in
-      next_move dissection
-    in
-
-    {initial; next_move}
-
   (** This builds a defender client from a strategy.
     If the strategy is MachineDirected it uses the above constructions.
     If the strategy is random then it uses a random section for the initial
     commitments and  the random decision for the next move.*)
-  let defender_from_strategy = function
+  let player_from_strategy = function
     | Random ->
         let initial =
           let random_state = PVM.Utils.default_state in
@@ -806,27 +795,14 @@ struct
         in
 
         {initial; next_move = (fun game -> random_decision game.dissection)}
-    | MachineDirected -> machine_directed_defender
-
-  (** This builds a refuter client from a strategy.
-    If the strategy is MachineDirected it uses the above constructions.
-    If the strategy is random then it uses a random dissection
-    of the committed section for the initial refutation
-     and  the random decision for the next move.*)
-  let refuter_from_strategy = function
-    | Random ->
-        {
-          initial = Lwt.return None;
-          next_move = (fun game -> random_decision game.dissection);
-        }
-    | MachineDirected -> machine_directed_refuter
+    | MachineDirected -> machine_directed
 
   (** [test_strategies defender_strategy refuter_strategy expectation inbox]
     runs a game based oin the two given strategies and checks that the
      resulting outcome fits the expectations. *)
   let test_strategies defender_strategy refuter_strategy expectation inbox =
-    let defender_client = defender_from_strategy defender_strategy in
-    let refuter_client = refuter_from_strategy refuter_strategy in
+    let defender_client = player_from_strategy defender_strategy in
+    let refuter_client = player_from_strategy refuter_strategy in
     let outcome = run ~inbox ~defender_client ~refuter_client in
     expectation outcome
 
