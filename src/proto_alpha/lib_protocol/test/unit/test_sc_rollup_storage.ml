@@ -76,6 +76,50 @@ let new_sc_rollup ctxt =
   in
   (rollup, ctxt)
 
+let equal_tez ~loc =
+  Assert.equal ~loc Tez_repr.( = ) "Tez aren't equal" Tez_repr.pp
+
+let assert_balance_changed op ctxt ctxt' account amount =
+  let* _, balance = lift @@ Token.balance ctxt account in
+  let* _, balance' = lift @@ Token.balance ctxt' account in
+  let* balance_op_amount = lift @@ op balance amount in
+  equal_tez balance' ~loc:__LOC__ balance_op_amount
+
+let assert_balance_increased ctxt ctxt' account amount =
+  let ( +? ) t1 t2 = Lwt.return Tez_repr.(t1 +? t2) in
+  assert_balance_changed ( +? ) ctxt ctxt' account amount
+
+let assert_balance_decreased ctxt ctxt' account amount =
+  let ( -? ) t1 t2 = Lwt.return Tez_repr.(t1 -? t2) in
+  assert_balance_changed ( -? ) ctxt ctxt' account amount
+
+let perform_staking_action_and_check ctxt rollup staker do_and_check =
+  let staker_contract = Contract_repr.Implicit staker in
+  let mutez_amount = Constants_storage.sc_rollup_stake_amount_in_mutez ctxt in
+  let stake = Tez_repr.of_mutez_exn (Int64.of_int mutez_amount) in
+  do_and_check ctxt rollup staker_contract stake
+
+let deposit_stake_and_check_balances ctxt rollup staker =
+  perform_staking_action_and_check
+    ctxt
+    rollup
+    staker
+    (fun ctxt rollup staker_contract stake ->
+      let* ctxt' =
+        lift
+        @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
+             ctxt
+             rollup
+             staker
+      in
+      let* () =
+        assert_balance_decreased ctxt ctxt' (`Contract staker_contract) stake
+      in
+      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+      let bonds_account = `Frozen_bonds (staker_contract, bond_id) in
+      let+ () = assert_balance_increased ctxt ctxt' bonds_account stake in
+      ctxt')
+
 (** Originate a rollup with one staker and make a deposit to the initial LCC *)
 let originate_rollup_and_deposit_with_one_staker () =
   let* ctxt = new_context () in
@@ -83,13 +127,7 @@ let originate_rollup_and_deposit_with_one_staker () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let+ ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let+ ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   (ctxt, rollup, staker)
 
 (** Originate a rollup with two stakers and make a deposit to the initial LCC *)
@@ -102,20 +140,8 @@ let originate_rollup_and_deposit_with_two_stakers () =
   let staker2 =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1RikjCkrEde1QQmuesp796jCxeiyE6t3Vo"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker1
-  in
-  let+ ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker2
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker1 in
+  let+ ctxt = deposit_stake_and_check_balances ctxt rollup staker2 in
   (ctxt, rollup, staker1, staker2)
 
 (** Trivial assertion.
@@ -171,6 +197,46 @@ let test_deposit_to_missing_rollup () =
         rollup
         Sc_rollup_repr.Staker.zero)
 
+let test_deposit_by_underfunded_staker () =
+  let* ctxt = new_context () in
+  let* sc_rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1hhNZvjed6McQQLWtR7MRzPHpgSFZTXxdW"
+  in
+  let stake =
+    Tez_repr.of_mutez_exn @@ Int64.of_int
+    @@ Constants_storage.sc_rollup_stake_amount_in_mutez ctxt
+  in
+  let* () =
+    assert_fails_with
+      ~loc:__LOC__
+      (Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
+         ctxt
+         sc_rollup
+         staker)
+      (Sc_rollup_errors.Sc_rollup_staker_funds_too_low
+         {
+           staker;
+           sc_rollup;
+           staker_balance = Tez_repr.zero;
+           min_expected_balance = stake;
+         })
+  in
+  let staker_balance = Tez_repr.div_exn stake 2 in
+  let staker_contract = Contract_repr.Implicit staker in
+  let* ctxt, _ =
+    lift
+    @@ Token.transfer ctxt `Minted (`Contract staker_contract) staker_balance
+  in
+  assert_fails_with
+    ~loc:__LOC__
+    (Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
+       ctxt
+       sc_rollup
+       staker)
+    (Sc_rollup_errors.Sc_rollup_staker_funds_too_low
+       {staker; sc_rollup; staker_balance; min_expected_balance = stake})
+
 let test_initial_state_is_pre_boot () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
@@ -181,19 +247,13 @@ let test_initial_state_is_pre_boot () =
 
 let test_deposit_to_existing_rollup () =
   let* ctxt = new_context () in
-  lift
-  @@ let* rollup, ctxt = new_sc_rollup ctxt in
-     let staker =
-       Signature.Public_key_hash.of_b58check_exn
-         "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-     in
-     let* ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-     in
-     assert_true ctxt
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Signature.Public_key_hash.of_b58check_exn
+      "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
+  assert_true ctxt
 
 let test_removing_staker_from_lcc_fails () =
   let* ctxt = new_context () in
@@ -202,13 +262,7 @@ let test_removing_staker_from_lcc_fails () =
     Signature.Public_key_hash.of_b58check_exn
       "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
@@ -216,25 +270,20 @@ let test_removing_staker_from_lcc_fails () =
 
 let test_deposit_then_withdraw () =
   let* ctxt = new_context () in
-  lift
-  @@ let* rollup, ctxt = new_sc_rollup ctxt in
-     let staker =
-       Signature.Public_key_hash.of_b58check_exn
-         "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-     in
-     let* ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Signature.Public_key_hash.of_b58check_exn
+      "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
+  let* ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
          ctxt
          rollup
          staker
-     in
-     let* ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-         ctxt
-         rollup
-         staker
-     in
-     assert_true ctxt
+  in
+  assert_true ctxt
 
 let test_withdrawal_from_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
@@ -265,13 +314,7 @@ let test_withdrawing_twice () =
     Signature.Public_key_hash.of_b58check_exn
       "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let* ctxt =
     lift
     @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
@@ -308,36 +351,30 @@ let valid_inbox_level ctxt =
 
 let test_deposit_then_refine () =
   let* ctxt = new_context () in
-  lift
-  @@ let* rollup, ctxt = new_sc_rollup ctxt in
-     let staker =
-       Sc_rollup_repr.Staker.of_b58check_exn
-         "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-     in
-     let* ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-     in
-     let commitment =
-       Commitment_repr.
-         {
-           predecessor = Commitment_repr.Hash.zero;
-           inbox_level = valid_inbox_level ctxt 1l;
-           number_of_messages = number_of_messages_exn 3l;
-           number_of_ticks = number_of_ticks_exn 1232909l;
-           compressed_state = Sc_rollup_repr.State_hash.zero;
-         }
-     in
-     let* _node, _level, ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
+  let commitment =
+    Commitment_repr.
+      {
+        predecessor = Commitment_repr.Hash.zero;
+        inbox_level = valid_inbox_level ctxt 1l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _node, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
          rollup
          staker
          commitment
-     in
-     assert_true ctxt
+  in
+  assert_true ctxt
 
 let test_deposit_then_refine_bad_inbox () =
   let* ctxt = new_context () in
@@ -345,13 +382,7 @@ let test_deposit_then_refine_bad_inbox () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let commitment =
     Commitment_repr.
       {
@@ -471,32 +502,26 @@ let test_withdraw_and_cement () =
 
 let test_deposit_then_publish () =
   let* ctxt = new_context () in
-  lift
-  @@ let* rollup, ctxt = new_sc_rollup ctxt in
-     let staker =
-       Sc_rollup_repr.Staker.of_b58check_exn
-         "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-     in
-     let* ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-     in
-     let commitment =
-       Commitment_repr.
-         {
-           predecessor = Commitment_repr.Hash.zero;
-           inbox_level = valid_inbox_level ctxt 1l;
-           number_of_messages = number_of_messages_exn 5l;
-           number_of_ticks = number_of_ticks_exn 152231l;
-           compressed_state = Sc_rollup_repr.State_hash.zero;
-         }
-     in
-     let* _node, _level, ctxt =
-       Sc_rollup_stake_storage.publish_commitment ctxt rollup staker commitment
-     in
-     assert_true ctxt
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
+  let commitment =
+    Commitment_repr.
+      {
+        predecessor = Commitment_repr.Hash.zero;
+        inbox_level = valid_inbox_level ctxt 1l;
+        number_of_messages = number_of_messages_exn 5l;
+        number_of_ticks = number_of_ticks_exn 152231l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _node, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup staker commitment
+  in
+  assert_true ctxt
 
 let test_publish_missing_rollup () =
   let staker =
@@ -524,40 +549,34 @@ let test_cement () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  lift
-  @@ let* rollup, ctxt = new_sc_rollup ctxt in
-     let staker =
-       Sc_rollup_repr.Staker.of_b58check_exn
-         "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-     in
-     let* ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-     in
-     let commitment =
-       Commitment_repr.
-         {
-           predecessor = Commitment_repr.Hash.zero;
-           inbox_level = valid_inbox_level ctxt 1l;
-           number_of_messages = number_of_messages_exn 3l;
-           number_of_ticks = number_of_ticks_exn 1232909l;
-           compressed_state = Sc_rollup_repr.State_hash.zero;
-         }
-     in
-     let* c1, _level, ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
+  let commitment =
+    Commitment_repr.
+      {
+        predecessor = Commitment_repr.Hash.zero;
+        inbox_level = valid_inbox_level ctxt 1l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* c1, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
          rollup
          staker
          commitment
-     in
-     let ctxt =
-       Raw_context.Internal_for_tests.add_level ctxt challenge_window
-     in
-     let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
-     assert_true ctxt
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+  in
+  assert_true ctxt
 
 (* Create and cement three commitments:
 
@@ -640,13 +659,7 @@ let test_cement_then_remove () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let commitment =
     Commitment_repr.
       {
@@ -683,13 +696,7 @@ let test_cement_consumes_available_messages () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let* inbox, _n, ctxt =
     lift
     @@ Sc_rollup_inbox_storage.add_messages ctxt rollup ["one"; "two"; "three"]
@@ -745,13 +752,7 @@ let test_cement_unknown_commitment_fails () =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.cement_commitment
@@ -769,13 +770,7 @@ let test_cement_with_zero_stakers_fails () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let commitment =
     Commitment_repr.
       {
@@ -814,13 +809,7 @@ let test_cement_fail_too_recent () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let commitment =
     Commitment_repr.
       {
@@ -906,13 +895,7 @@ let test_last_cemented_commitment_hash_with_level () =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let inbox_level = valid_inbox_level ctxt 1l in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let commitment =
     Commitment_repr.
       {
@@ -953,13 +936,7 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let commitment =
     Commitment_repr.
       {
@@ -1821,13 +1798,7 @@ let test_staker_cannot_backtrack () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
-  let* ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-         ctxt
-         rollup
-         staker
-  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let level = valid_inbox_level ctxt in
   let commitment1 =
     Commitment_repr.
@@ -2437,6 +2408,10 @@ let tests =
       "deposit to missing rollup fails"
       `Quick
       test_deposit_to_missing_rollup;
+    Tztest.tztest
+      "deposit by underfunded staker"
+      `Quick
+      test_deposit_by_underfunded_staker;
     Tztest.tztest
       "deposit to existing rollup"
       `Quick
