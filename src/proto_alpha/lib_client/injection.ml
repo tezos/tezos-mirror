@@ -28,6 +28,7 @@ open Protocol
 open Alpha_context
 open Apply_results
 open Apply_operation_result
+open Apply_internal_results
 open Protocol_client_context
 
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain

@@ -29,7 +29,7 @@ open Alpha_context
 val tez_sym : string
 
 val pp_internal_operation :
-  Format.formatter -> Apply_results.packed_internal_contents -> unit
+  Format.formatter -> Apply_internal_results.packed_internal_contents -> unit
 
 val pp_operation_result :
   Format.formatter ->

@@ -206,7 +206,7 @@ let () =
   @@ def
        "operation"
        ["internal"]
-       Protocol.Apply_results.internal_contents_encoding ;
+       Protocol.Apply_internal_results.internal_contents_encoding ;
   register
   @@ def
        "operation"

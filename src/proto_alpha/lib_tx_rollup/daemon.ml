@@ -26,6 +26,7 @@
 (*****************************************************************************)
 
 open Protocol.Apply_results
+open Protocol.Apply_internal_results
 open Tezos_shell_services
 open Protocol_client_context
 open Protocol
