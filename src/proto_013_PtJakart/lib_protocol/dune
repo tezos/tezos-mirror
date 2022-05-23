@@ -620,7 +620,6 @@
 
 (library
  (name tezos_protocol_013_PtJakart_functor)
- (public_name tezos-protocol-functor-013-PtJakart)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

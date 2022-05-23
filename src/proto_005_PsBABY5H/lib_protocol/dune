@@ -289,7 +289,6 @@
 
 (library
  (name tezos_protocol_005_PsBABY5H_functor)
- (public_name tezos-protocol-functor-005-PsBABY5H)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

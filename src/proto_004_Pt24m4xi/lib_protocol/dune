@@ -286,7 +286,6 @@
 
 (library
  (name tezos_protocol_004_Pt24m4xi_functor)
- (public_name tezos-protocol-functor-004-Pt24m4xi)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

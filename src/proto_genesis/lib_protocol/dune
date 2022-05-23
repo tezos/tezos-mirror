@@ -84,7 +84,6 @@
 
 (library
  (name tezos_protocol_genesis_functor)
- (public_name tezos-protocol-functor-genesis)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

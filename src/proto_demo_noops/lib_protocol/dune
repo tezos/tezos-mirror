@@ -79,7 +79,6 @@
 
 (library
  (name tezos_protocol_demo_noops_functor)
- (public_name tezos-protocol-functor-demo-noops)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

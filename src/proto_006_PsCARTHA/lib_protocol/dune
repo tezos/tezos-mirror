@@ -289,7 +289,6 @@
 
 (library
  (name tezos_protocol_006_PsCARTHA_functor)
- (public_name tezos-protocol-functor-006-PsCARTHA)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs
