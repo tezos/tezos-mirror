@@ -694,7 +694,7 @@ struct
           (Some
              Sc_rollup_game_repr.{choice = start; step = Dissection dissection})
 
-  (** there are two kinds of strategies, random and machine directed*)
+  (** There are two kinds of strategies, random and machine-directed. *)
   type strategy = Random | MachineDirected
 
   (**
