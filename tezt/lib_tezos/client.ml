@@ -1637,6 +1637,30 @@ module Sc_rollup = struct
       spawn_cement_commitment ?hooks ?wait ?burn_cap ~hash ~src ~dst client
     in
     Process.check process
+
+  let submit_return_bond ?(wait = "none") ?burn_cap ?storage_limit ?fee ?hooks
+      ~rollup ~src client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ ["recover"; "bond"; "of"; src; "for"; "sc"; "rollup"; rollup]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun fee -> ["--fee"; Tez.to_string fee])
+            fee
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
 end
 
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
