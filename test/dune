@@ -1,3 +1,13 @@
+(library
+ (name fixtures)
+ (modules directory services)
+ (libraries resto-directory resto-json lwt))
+
+(library
+ (name util)
+ (modules util)
+ (libraries alcotest alcotest-lwt lwt))
+
 (executable
  (name acl_unit_test)
  (modules acl_unit_test)
@@ -36,8 +46,8 @@
 
 (executable
  (name resto_test)
- (modules directory resto_test services)
- (libraries resto-directory resto-json json-data-encoding
+ (modules resto_test)
+ (libraries fixtures util resto-directory resto-json json-data-encoding
    json-data-encoding-bson lwt lwt.unix))
 
 (alias
@@ -57,6 +67,17 @@
  (action
   (run %{exe:self_serving_client_test.exe})))
 
+(executable
+ (name directory_test)
+ (modules directory_test)
+ (libraries fixtures util resto-directory resto-json resto-cohttp lwt
+   alcotest alcotest-lwt fmt))
+
+(alias
+ (name runtest_directory)
+ (action
+  (run %{exe:directory_test.exe})))
+
 (alias
  (name runtest)
  (deps
@@ -64,4 +85,5 @@
   (alias runtest_acl_unit_test)
   (alias runtest_acl_integration_test)
   (alias runtest_self_serving_client)
-  (alias runtest_chunked_output_integration_test)))
+  (alias runtest_chunked_output_integration_test)
+  (alias runtest_directory)))

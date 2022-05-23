@@ -98,6 +98,13 @@ let dummy_service =
       / "trigger" /: Arg.float /: Arg.float /: Arg.float /: Arg.float
       /: Arg.float /: Arg.float /: Arg.float)
 
+let sum_service =
+  get_service
+    ~query:Query.empty
+    ~output:Json_encoding.int
+    ~error:Json_encoding.empty
+    Path.(root / "foobar" /:* Arg.int)
+
 let prefix_dir1 = Path.(root / "tartine" /: Arg.float / "chaussure")
 
 (** Client only *)

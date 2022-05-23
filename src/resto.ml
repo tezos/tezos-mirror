@@ -342,6 +342,20 @@ module Path = struct
   let subst2 = Internal.subst2
 
   let subst3 = Internal.subst3
+
+  let to_segments : type pr p. (pr, p) path -> string list =
+   fun path ->
+    let rec flatten_rev : type pr p. (pr, p) path -> string list = function
+      | Root -> []
+      | Static (p, s) -> s :: flatten_rev p
+      | Dynamic (p, arg) ->
+          Printf.sprintf "<%s>" arg.descr.name :: flatten_rev p
+      | DynamicTail (p, arg) ->
+          Printf.sprintf "<%s>*" arg.descr.name :: flatten_rev p
+    in
+    List.rev @@ flatten_rev path
+
+  let to_string path = "/" ^ String.concat "/" (to_segments path)
 end
 
 module Query = struct

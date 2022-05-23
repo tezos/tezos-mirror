@@ -249,6 +249,13 @@ module Path : sig
 
   val subst3 :
     ('p, (('p * 'a) * 'b) * 'c) path -> ('p2, (('p2 * 'a) * 'b) * 'c) path
+
+  (** [to_segments path] evaluates in the list of the different elements
+      that constitute the given [path]. *)
+  val to_segments : (_, _) path -> string list
+
+  (** [to_string path] evaluates in a string representation of the given [path].*)
+  val to_string : (_, _) path -> string
 end
 
 (** Service directory description *)

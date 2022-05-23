@@ -127,6 +127,20 @@ module Make (Encoding : ENCODING) : sig
     string list ->
     (registered_service, [> lookup_error]) result Lwt.t
 
+  (** [lookup_uri_desc d p] is [Ok u] where [u] is a formated URI description,
+      if there is a service [s] registered in [d] and the path of [s] matches [p].
+      It is [Error _] otherwise.
+
+      For instance, given the following path [p]: ["/entries-by-date/2022/01/10"]
+      where ["2022"], ["01"], and ["10"] are expected to be paramaters in the path
+      of [s], the function will evaluate in ["/entries-by-date/<year>/<month>/<day>"].*)
+  val lookup_uri_desc :
+    'prefix directory ->
+    'prefix ->
+    meth ->
+    string list ->
+    (string, [> lookup_error]) result Lwt.t
+
   (** [allowed_methods d p] is the set of methods [m] such that [lookup d m p] is
       [Ok _]. In other words, it is the set of methods [m] such that a service has
       been registered in [d] for a path that matches [p]. *)

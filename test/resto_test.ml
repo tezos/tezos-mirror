@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Services
-open Directory
+open Fixtures.Services
+open Fixtures.Directory
 open Resto_directory
 open Lwt.Infix
 
@@ -158,3 +158,41 @@ module Transparent = Test (struct
 end)
 
 let () = Printf.printf "\n### OK Resto ###\n\n%!"
+
+module Path = struct
+  open Resto
+
+  let test_to_segments ?(msg = "") exptd given =
+    Alcotest.(check (list string) msg exptd (Path.to_segments given))
+
+  let test_to_string ?(msg = "") exptd given =
+    Alcotest.(check string msg exptd (Path.to_string given))
+
+  let tests =
+    [
+      ( "to_segments should give the good segment list",
+        fun () ->
+          test_to_segments ~msg:"root" [] Path.root ;
+          test_to_segments
+            ~msg:"static_and_dynamic"
+            ["foo"; "<int>"; "bar"; "<float>"]
+            Path.(root / "foo" /: Arg.int / "bar" /: Arg.float) ;
+          test_to_segments
+            ~msg:"dynamic_tail"
+            ["foo"; "<int>*"]
+            Path.(root / "foo" /:* Arg.int) );
+      ( "to_string should give a well formated string",
+        fun () ->
+          test_to_string ~msg:"root" "/" Path.root ;
+          test_to_string
+            ~msg:"static_and_dynamic"
+            "/foo/<int>/bar/<float>"
+            Path.(root / "foo" /: Arg.int / "bar" /: Arg.float) ;
+          test_to_string
+            ~msg:"dynamic_tail"
+            "/foo/<int>*"
+            Path.(root / "foo" /:* Arg.int) );
+    ]
+end
+
+let () = Alcotest.run "resto" [("Path", Util.do_test Path.tests)]

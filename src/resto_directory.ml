@@ -32,6 +32,10 @@ let ( >>= ) = Lwt.bind
 
 let ( >|= ) = Lwt.( >|= )
 
+let ( >>? ) = Result.bind
+
+let ( >>=? ) = Lwt_result.bind
+
 module Answer = struct
   (** Return type for service handler *)
   type ('o, 'e) t =
@@ -418,6 +422,73 @@ module Make (Encoding : ENCODING) = struct
 
   let lookup =
     (lookup
+      : _ -> _ -> _ -> _ -> (_, lookup_error) result Lwt.t
+      :> _ -> _ -> _ -> _ -> (_, [> lookup_error]) result Lwt.t)
+
+  let rec resolve_uri_desc :
+      type a.
+      string list ->
+      a directory ->
+      a ->
+      string list ->
+      (string list * resolved_directory, _) result Lwt.t =
+   fun prefix dir args path ->
+    let fmt_desc desc = "<" ^ desc ^ ">" in
+    match (path, dir) with
+    | _, Empty -> Lwt.return_error `Not_found
+    | _, Dynamic (_, builder) ->
+        builder args >>= fun dir -> resolve_uri_desc prefix dir args path
+    | _, DynamicTail (arg, adir) ->
+        Lwt.return
+        @@ List.fold_right
+             (fun name acc ->
+               acc >>? fun (prefix, xs) ->
+               match arg.destruct name with
+               | Ok x -> Ok (fmt_desc arg.descr.name :: prefix, x :: xs)
+               | Error msg ->
+                   Error
+                     (`Cannot_parse_path
+                       (List.rev (name :: prefix), arg.descr, msg)))
+             path
+             (Ok (prefix, []))
+        >>=? fun (prefix, xs) -> resolve_uri_desc prefix adir (args, xs) []
+    | [], Static sdir -> Lwt.return_ok (prefix, Dir (sdir, args))
+    | _, Static {subdirs = None; _} -> Lwt.return_error `Not_found
+    | name :: remaining, Static {subdirs = Some (Suffixes static); _} -> (
+        match StringMap.find name static with
+        | exception Not_found -> Lwt.return_error `Not_found
+        | dir -> resolve_uri_desc (name :: prefix) dir args remaining)
+    | name :: remaining, Static {subdirs = Some (Arg (arg, adir)); _} -> (
+        match arg.destruct name with
+        | Ok x ->
+            resolve_uri_desc
+              (fmt_desc arg.descr.name :: prefix)
+              adir
+              (args, x)
+              remaining
+        | Error msg ->
+            Lwt.return_error
+            @@ `Cannot_parse_path (List.rev (name :: prefix), arg.descr, msg))
+
+  let lookup_uri_desc :
+      type a.
+      a directory ->
+      a ->
+      meth ->
+      string list ->
+      (string, lookup_error) result Lwt.t =
+   fun dir args meth path ->
+    resolve_uri_desc [] dir args path >>=? fun (path, Dir (dir, _)) ->
+    match MethMap.bindings dir.services with
+    | [] -> Lwt.return_error `Not_found
+    | l -> (
+        match MethMap.find meth dir.services with
+        | exception Not_found ->
+            Lwt.return_error (`Method_not_allowed (List.map fst l))
+        | _ -> Lwt.return_ok @@ "/" ^ String.concat "/" (List.rev path))
+
+  let lookup_uri_desc =
+    (lookup_uri_desc
       : _ -> _ -> _ -> _ -> (_, lookup_error) result Lwt.t
       :> _ -> _ -> _ -> _ -> (_, [> lookup_error]) result Lwt.t)
 
