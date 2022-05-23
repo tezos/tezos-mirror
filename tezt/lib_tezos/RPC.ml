@@ -48,3 +48,6 @@ let private_injection_operations ?(force = false) ?(async = false) ~ops () =
   make ~data ~query_string POST ["private"; "injection"; "operations"]
   @@ fun json ->
   JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
+
+let get_block_metadata ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id

@@ -41,11 +41,6 @@ let get_block_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let* json = Client.rpc ?endpoint ?hooks GET path client in
   return (JSON.as_string json)
 
-let get_block_metadata ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path = ["chains"; chain; "blocks"; block; "metadata"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
 let force_bootstrapped ?endpoint ?hooks ?(chain = "main") ?(bootstrapped = true)
     client =
   let path = ["chains"; chain] in

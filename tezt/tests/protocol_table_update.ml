@@ -31,7 +31,9 @@
 *)
 
 let check_protocol_activation ~migrate_from ~migrate_to ~block client =
-  let* migration_block = RPC.get_block_metadata ~block client in
+  let* migration_block =
+    RPC.Client.call client @@ RPC.get_block_metadata ~block ()
+  in
   let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Check.(
     (protocol = Protocol.hash migrate_from)

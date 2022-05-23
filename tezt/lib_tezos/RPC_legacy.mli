@@ -63,15 +63,6 @@ val get_block_hash :
   Client.t ->
   string Lwt.t
 
-(** Call RPC /chain/[chain]/blocks/[block]/metadata *)
-val get_block_metadata :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain] *)
 val force_bootstrapped :
   ?endpoint:Client.endpoint ->
