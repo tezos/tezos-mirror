@@ -1416,7 +1416,12 @@ let test_finds_conflict_point_at_lcc () =
          commitment2
   in
   let* (left, _right), ctxt =
-    lift @@ Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+    lift
+    @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+         ctxt
+         rollup
+         staker1
+         staker2
   in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt left c1
 
@@ -1480,7 +1485,12 @@ let test_finds_conflict_point_beneath_lcc () =
          commitment3
   in
   let* (left, right), ctxt =
-    lift @@ Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+    lift
+    @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+         ctxt
+         rollup
+         staker1
+         staker2
   in
   let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left c2 in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt right c3
@@ -1563,7 +1573,12 @@ let test_conflict_point_is_first_point_of_disagreement () =
          commitment4
   in
   let* (left, right), ctxt =
-    lift @@ Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+    lift
+    @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+         ctxt
+         rollup
+         staker1
+         staker2
   in
   let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left c2 in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt right c3
@@ -1652,7 +1667,12 @@ let test_conflict_point_computation_fits_in_gas_limit () =
       (Constants_storage.hard_gas_limit_per_operation ctxt)
   in
   let* (left, right), ctxt =
-    lift @@ Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+    lift
+    @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+         ctxt
+         rollup
+         staker1
+         staker2
   in
   let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left branch_1.(0) in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt right branch_2.(0)
@@ -1681,7 +1701,11 @@ let test_no_conflict_point_one_staker_at_lcc_preboot () =
   in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2)
+    (Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+       ctxt
+       rollup
+       staker1
+       staker2)
     "No conflict."
 
 let test_no_conflict_point_both_stakers_at_lcc_preboot () =
@@ -1690,7 +1714,11 @@ let test_no_conflict_point_both_stakers_at_lcc_preboot () =
   in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2)
+    (Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+       ctxt
+       rollup
+       staker1
+       staker2)
     "No conflict."
 
 let test_no_conflict_point_one_staker_at_lcc () =
@@ -1743,7 +1771,11 @@ let test_no_conflict_point_one_staker_at_lcc () =
   in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2)
+    (Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+       ctxt
+       rollup
+       staker1
+       staker2)
     "No conflict."
 
 let test_no_conflict_point_both_stakers_at_lcc () =
@@ -1785,7 +1817,11 @@ let test_no_conflict_point_both_stakers_at_lcc () =
   in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2)
+    (Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+       ctxt
+       rollup
+       staker1
+       staker2)
     "No conflict."
 
 let test_staker_cannot_backtrack () =
@@ -1981,7 +2017,7 @@ let test_cement_commitment_of_missing_rollup () =
 
 let test_get_conflict_point_on_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
-      Sc_rollup_storage.get_conflict_point
+      Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
         ctxt
         rollup
         Sc_rollup_repr.Staker.zero
@@ -2055,7 +2091,11 @@ let test_concurrent_refinement_point_of_conflict () =
            staker2
            commitment2
        in
-       Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+       Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+         ctxt
+         rollup
+         staker1
+         staker2
   in
   let* (c1', c2'), ctxt =
     lift
@@ -2073,7 +2113,11 @@ let test_concurrent_refinement_point_of_conflict () =
            staker1
            commitment1
        in
-       Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+       Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
+         ctxt
+         rollup
+         staker1
+         staker2
   in
   let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c1' in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c2 c2'

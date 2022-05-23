@@ -2685,50 +2685,38 @@ module Sc_rollup : sig
       context -> t -> Commitment_hash.t -> context tzresult Lwt.t
   end
 
+  module Refutation_storage : sig
+    type conflict_point = Commitment_hash.t * Commitment_hash.t
+
+    val update_game :
+      context ->
+      t ->
+      player:Staker.t ->
+      opponent:Staker.t ->
+      Game.refutation ->
+      (Game.outcome option * context) tzresult Lwt.t
+
+    val timeout :
+      context ->
+      t ->
+      Staker.t * Staker.t ->
+      (Game.outcome * context) tzresult Lwt.t
+
+    val apply_outcome :
+      context ->
+      t ->
+      Staker.t * Staker.t ->
+      Game.outcome ->
+      (Game.status * context) tzresult Lwt.t
+  end
+
   val rpc_arg : t RPC_arg.t
-
-  type conflict_point = Commitment_hash.t * Commitment_hash.t
-
-  val get_conflict_point :
-    context ->
-    t ->
-    Staker.t ->
-    Staker.t ->
-    (conflict_point * context) tzresult Lwt.t
 
   val list : context -> t list tzresult Lwt.t
 
   val initial_level : context -> t -> Raw_level.t tzresult Lwt.t
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
-
-  val get_or_init_game :
-    context ->
-    t ->
-    refuter:Staker.t ->
-    defender:Staker.t ->
-    (Game.t * context) tzresult Lwt.t
-
-  val update_game :
-    context ->
-    t ->
-    player:Staker.t ->
-    opponent:Staker.t ->
-    Game.refutation ->
-    (Game.outcome option * context) tzresult Lwt.t
-
-  val timeout :
-    context ->
-    t ->
-    Staker.t * Staker.t ->
-    (Game.outcome * context) tzresult Lwt.t
-
-  val apply_outcome :
-    context ->
-    t ->
-    Staker.t * Staker.t ->
-    Game.outcome ->
-    (Game.status * context) tzresult Lwt.t
 
   module Outbox : sig
     val record_applied_message :

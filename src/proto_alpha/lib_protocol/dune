@@ -160,6 +160,7 @@
   Sc_rollup_commitment_storage
   Sc_rollup_inbox_storage
   Sc_rollup_stake_storage
+  Sc_rollup_refutation_storage
   Sc_rollup_storage
   Alpha_context
   Script_string
@@ -371,6 +372,7 @@
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -568,6 +570,7 @@
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -786,6 +789,7 @@
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -999,6 +1003,7 @@
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
