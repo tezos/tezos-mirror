@@ -289,9 +289,13 @@ variables:
         - "**/dune.inc"
         - "**/*.dune.inc"
         - "**/dune-project"
+        - "**/dune-workspace"
         - "**/*.opam"
+        - .gitlab/ci/opam-ci.yml
+        - .gitlab/ci/packaging.yml
+        - manifest/manifest.ml
+        - scripts/opam-prepare-repo.sh
         - scripts/version.sh
-        - .gitlab-ci.yml
       when: on_success
     - when: never # default
 
