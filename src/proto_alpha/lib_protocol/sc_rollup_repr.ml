@@ -256,15 +256,15 @@ module Commitment = struct
     Format.fprintf
       fmt
       "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
-       predecessor: %a@ number_of_messages: %d@ number_of_ticks: %d@]"
+       predecessor: %a@ number_of_messages: %ld@ number_of_ticks: %ld@]"
       State_hash.pp
       compressed_state
       Raw_level_repr.pp
       inbox_level
       Commitment_hash.pp
       predecessor
-      (Int32.to_int (Number_of_messages.to_int32 number_of_messages))
-      (Int32.to_int (Number_of_ticks.to_int32 number_of_ticks))
+      (Number_of_messages.to_int32 number_of_messages)
+      (Number_of_ticks.to_int32 number_of_ticks)
 
   let encoding =
     let open Data_encoding in

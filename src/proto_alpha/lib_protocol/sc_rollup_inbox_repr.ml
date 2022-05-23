@@ -215,7 +215,7 @@ let pp fmt
          rollup = %a
          level = %a
          current messages hash  = %a
-         nb_available_messages = %s
+         nb_available_messages = %Ld
          nb_messages_in_commitment_period = %s
          starting_level_of_current_commitment_period = %a
          message_counter = %a
@@ -227,7 +227,7 @@ let pp fmt
     level
     Context_hash.pp
     (current_messages_hash ())
-    (Int64.to_string nb_available_messages)
+    nb_available_messages
     (Int64.to_string nb_messages_in_commitment_period)
     Raw_level_repr.pp
     starting_level_of_current_commitment_period
