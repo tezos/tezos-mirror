@@ -26,6 +26,7 @@
 
 open Alpha_context
 open Data_encoding
+open Apply_operation_result
 
 let error_encoding =
   def
@@ -336,24 +337,6 @@ let pack_migration_operation_results results =
       Successful_manager_result
         (migration_origination_result_to_successful_manager_operation_result el))
     results
-
-(** The result of an operation in the queue. [Skipped] ones should
-    always be at the tail, and after a single [Failed].
-    * The ['kind] parameter is the operation kind (a transaction, an
-      origination, etc.).
-    * The ['manager] parameter is the type of manager kinds.
-    * The ['successful] parameter is the type of successful operations.
-    The ['kind] parameter is used to make the type a GADT, but ['manager] and
-    ['successful] are used to share [operation_result] between internal and
-    external operation results, and are instantiated for each case. *)
-type ('kind, 'manager, 'successful) operation_result =
-  | Applied of 'successful
-  | Backtracked of 'successful * error trace option
-  | Failed :
-      'manager * error trace
-      -> ('kind, 'manager, 'successful) operation_result
-  | Skipped : 'manager -> ('kind, 'manager, 'successful) operation_result
-[@@coq_force_gadt]
 
 type 'kind manager_operation_result =
   ( 'kind,

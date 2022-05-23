@@ -22,3 +22,12 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type ('kind, 'manager, 'successful) operation_result =
+  | Applied of 'successful
+  | Backtracked of 'successful * error trace option
+  | Failed :
+      'manager * error trace
+      -> ('kind, 'manager, 'successful) operation_result
+  | Skipped : 'manager -> ('kind, 'manager, 'successful) operation_result
+[@@coq_force_gadt]
