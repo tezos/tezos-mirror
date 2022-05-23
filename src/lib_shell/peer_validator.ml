@@ -432,7 +432,8 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
               () ;
             return_ok_unit
         | Error _ ->
-            (* TODO: punish *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3061
+               should we punish here ? *)
             let* () =
               Worker.log_event
                 w
