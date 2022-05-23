@@ -141,12 +141,12 @@ unit:non-proto-x86_64:
   extends:
   - .unit_test_template_x86_64_coverage
   variables:
-    MAKE_TARGETS: test-nonproto-unit
+    MAKE_TARGETS: test-nonproto-unit test-webassembly
 
 unit:non-proto-arm64:
   extends: .unit_test_template_arm64
   variables:
-    MAKE_TARGETS: test-nonproto-unit
+    MAKE_TARGETS: test-nonproto-unit test-webassembly
 
 unit:js_components:
   extends: .unit_test_template_x86_64

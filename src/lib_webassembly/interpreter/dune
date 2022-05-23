@@ -8,3 +8,12 @@
  (modules (:standard \ main)))
 
 (include dune.inc)
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-webassembly-interpreter)
+ (flags (:standard
+         -open Tezos_webassembly_interpreter))
+ (modules main))

@@ -2552,6 +2552,14 @@ let tezos_webassembly_interpreter =
     ~all_modules_except:["main"]
     ~dune:Dune.[[S "include"; S "dune.inc"]]
 
+let _tezos_webassembly_repl =
+  private_exe
+    "main"
+    ~path:"src/lib_webassembly/interpreter"
+    ~modules:["main"]
+    ~opam:""
+    ~deps:[tezos_webassembly_interpreter |> open_]
+
 let _tezos_scoru_wasm =
   public_lib
     "tezos-scoru-wasm"
