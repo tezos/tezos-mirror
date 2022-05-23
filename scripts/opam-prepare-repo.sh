@@ -16,9 +16,9 @@ TARBALL_URL_OR_PATH is the URL (OR PATH) to put in opam files.  The
 script downloads the tarball (if necessary) and computes sha256 and
 sha512 checksums for you."
 
-version="$1"
-tarball="$2"
-opam_dir="$3"
+version="${1:-}"
+tarball="${2:-}"
+opam_dir="${3:-opam-repository}"
 
 if [ -z "$version" ] ; then
     echo "$usage"
@@ -28,10 +28,6 @@ fi
 if [ -z "$tarball" ] ; then
     echo "$usage"
     exit 1
-fi
-
-if [ -z "$opam_dir" ] ; then
-    opam_dir="opam-repository"
 fi
 
 log () {

@@ -1504,18 +1504,11 @@ let rec create_parent path =
     create_parent parent ;
     if not (Sys.file_exists parent) then Sys.mkdir parent 0o755)
 
-(* Write a file relatively to the root directory of the repository. *)
-let write filename f =
-  if !checks_done then
-    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
+let write_raw filename f =
   let real_filename =
     if Filename.is_relative filename then Filename.parent_dir_name // filename
     else filename
   in
-  if String_set.mem filename !generated_files then
-    failwith
-      (filename ^ " is generated twice; did you declare the same library twice?") ;
-  generated_files := String_set.add filename !generated_files ;
   create_parent real_filename ;
   let outch = open_out real_filename in
   let fmt = Format.formatter_of_out_channel outch in
@@ -1528,6 +1521,16 @@ let write filename f =
       Format.pp_print_flush fmt () ;
       close_out outch ;
       x
+
+(* Write a file relatively to the root directory of the repository. *)
+let write filename f =
+  if !checks_done then
+    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
+  if String_set.mem filename !generated_files then
+    failwith
+      (filename ^ " is generated twice; did you declare the same library twice?") ;
+  generated_files := String_set.add filename !generated_files ;
+  write_raw filename f
 
 let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   let libraries, empty_files_to_create =
@@ -2061,7 +2064,9 @@ let generate_opam_files_for_release packages_dir release =
     packages_dir // package // (package ^ "." ^ release.version) // "opam"
   in
   let opam = generate_opam ~release package internal_pkgs in
-  write opam_filename @@ fun fmt -> Opam.pp fmt opam
+  (* We don't use [write] here because we don't want these opam files
+     to be considered by the [check_for_non_generated_files] check *)
+  write_raw opam_filename @@ fun fmt -> Opam.pp fmt opam
 
 (* Bumping the dune lang version can result in different dune stanza
    semantic and could require changes to the generation logic. *)
