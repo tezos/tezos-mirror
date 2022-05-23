@@ -188,7 +188,7 @@ let test_cement_fails_if_premature () =
   let hash = Sc_rollup.Commitment.hash c in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let expect_failure = function
-    | Environment.Ecoproto_error (Sc_rollup_storage.Sc_rollup_too_recent as e)
+    | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_too_recent as e)
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
@@ -216,7 +216,7 @@ let test_publish_fails_on_backtrack () =
   let* i = Incremental.begin_construction b in
   let expect_failure = function
     | Environment.Ecoproto_error
-        (Sc_rollup_storage.Sc_rollup_staker_backtracked as e)
+        (Sc_rollup_errors.Sc_rollup_staker_backtracked as e)
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
@@ -251,8 +251,8 @@ let test_cement_fails_on_conflict () =
   let hash = Sc_rollup.Commitment.hash commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
   let expect_failure = function
-    | Environment.Ecoproto_error (Sc_rollup_storage.Sc_rollup_disputed as e)
-      :: _ ->
+    | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
+      ->
         Assert.test_error_encodings e ;
         return_unit
     | _ ->

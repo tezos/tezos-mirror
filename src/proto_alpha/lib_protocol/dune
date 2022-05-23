@@ -156,6 +156,7 @@
   Tx_rollup_commitment_storage
   Tx_rollup_storage
   Sc_rollup_costs
+  Sc_rollup_errors
   Sc_rollup_storage
   Alpha_context
   Script_string
@@ -363,6 +364,7 @@
   tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
   tx_rollup_storage.ml tx_rollup_storage.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
+  sc_rollup_errors.ml
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -556,6 +558,7 @@
   tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
   tx_rollup_storage.ml tx_rollup_storage.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
+  sc_rollup_errors.ml
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -770,6 +773,7 @@
   tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
   tx_rollup_storage.ml tx_rollup_storage.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
+  sc_rollup_errors.ml
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -979,6 +983,7 @@
   tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
   tx_rollup_storage.ml tx_rollup_storage.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
+  sc_rollup_errors.ml
   sc_rollup_storage.ml sc_rollup_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli

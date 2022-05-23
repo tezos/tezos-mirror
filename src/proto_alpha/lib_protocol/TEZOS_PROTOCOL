@@ -132,6 +132,7 @@
         "Tx_rollup_commitment_storage",
         "Tx_rollup_storage",
         "Sc_rollup_costs",
+        "Sc_rollup_errors",
         "Sc_rollup_storage",
 
         "Alpha_context",

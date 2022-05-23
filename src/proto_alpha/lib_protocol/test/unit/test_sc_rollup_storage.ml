@@ -1769,7 +1769,7 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
   else
     (* ... but if we stay in the same commitment period, it fails. *)
     Assert.proto_error ~loc:__LOC__ add_too_many_messages @@ function
-    | Sc_rollup_storage
+    | Sc_rollup_errors
       .Sc_rollup_max_number_of_messages_reached_for_commitment_period ->
         true
     | _ -> false
