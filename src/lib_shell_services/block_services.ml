@@ -858,7 +858,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
         let operations =
           RPC_service.post_service
-            ~description:"Simulate the validation of an operation."
+            ~description:
+              "Simulate the application of the operations with the context of \
+               the given block and return the result of each operation \
+               application."
             ~query:RPC_query.empty
             ~input:(list next_operation_encoding)
             ~output:

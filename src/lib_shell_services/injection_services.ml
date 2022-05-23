@@ -90,14 +90,14 @@ module S = struct
       ~description:
         "Inject an operation in node and broadcast it. Returns the ID of the \
          operation. The `signedOperationContents` should be constructed using \
-         a contextual RPCs from the latest block and signed by the client. By \
-         default, the RPC will wait for the operation to be (pre-)validated \
-         before answering. See RPCs under /blocks/prevalidation for more \
-         details on the prevalidation context. If ?async is true, the function \
-         returns immediately. Otherwise, the operation will be validated \
-         before the result is returned. An optional ?chain parameter can be \
-         used to specify whether to inject on the test chain or the main \
-         chain."
+         contextual RPCs from the latest block and signed by the client. The \
+         injection of the operation will apply it on the current mempool \
+         context. This context may change at each operation injection or \
+         operation reception from peers. By default, the RPC will wait for the \
+         operation to be (pre-)validated before returning. However, if ?async \
+         is true, the function returns immediately. The optional ?chain \
+         parameter can be used to specify whether to inject on the test chain \
+         or the main chain."
       ~query:operation_query
       ~input:bytes
       ~output:Operation_hash.encoding
