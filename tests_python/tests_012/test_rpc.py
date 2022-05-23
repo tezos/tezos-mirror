@@ -103,9 +103,6 @@ class TestRPCsExistence:
     def test_fetch_protocol_protocol_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/fetch_protocol/{PROTOCOL_HASH}')
 
-    def test_network_connections(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/connections')
-
     def test_network_connections_peer_id(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/connections/{peer_id}')
@@ -216,207 +213,11 @@ class TestRPCsExistence:
     def test_chain_block(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}')
 
-    def test_chain_block_context_constants(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'context/constants'
-        )
-
     def test_chain_block_context_constants_errors(self, sandbox: Sandbox):
         sandbox.client(1).rpc(
             'get',
             f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'context/constants/errors',
         )
-
-    def test_chain_block_context_contracts(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'context/contracts'
-        )
-
-    def test_chain_block_context_contract_id(
-        self, sandbox: Sandbox, session: dict
-    ):
-        accounts = session["originated_accounts"] + session["implicit_accounts"]
-        for contract_id in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/contracts/{contract_id}',
-            )
-
-    def test_chain_block_context_contract_balance(
-        self, sandbox: Sandbox, session: dict
-    ):
-        accounts = session["originated_accounts"] + session["implicit_accounts"]
-        for contract_id in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/contracts/{contract_id}/balance',
-            )
-
-    def test_chain_block_context_contract_counter(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit contracts, see
-        # proto_012_Psithaca/lib_protocol/contract_repr.ml
-        for contract_id in session["implicit_accounts"]:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/contracts/{contract_id}/counter',
-            )
-
-    def test_chain_block_context_contract_delegate(
-        self, sandbox: Sandbox, session: dict
-    ):
-        for contract_id in session["implicit_accounts"]:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/contracts/{contract_id}/delegate',
-            )
-
-    def test_chain_block_context_contract_script_originated(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only originated contracts
-        accounts = session["originated_accounts"]
-        for contract_id in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/contracts/{contract_id}/script',
-            )
-
-    def test_chain_block_context_contract_script_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        accounts = session["implicit_accounts"]
-        for contract_id in accounts:
-            with utils.assert_run_failure('No service found at this URL'):
-                sandbox.client(1).rpc(
-                    'get',
-                    f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                    f'context/contracts/{contract_id}/'
-                    'script',
-                )
-
-    def test_chain_block_context_contract_storage_originated(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only originated contracts
-        accounts = session["originated_accounts"]
-        for contract_id in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/contracts/{contract_id}/storage',
-            )
-
-    def test_chain_block_context_contract_storage_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit contracts
-        accounts = session["implicit_accounts"]
-        for contract_id in accounts:
-            with utils.assert_run_failure('No service found at this URL'):
-                sandbox.client(1).rpc(
-                    'get',
-                    f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                    f'context/contracts/{contract_id}/'
-                    'storage',
-                )
-
-    def test_chain_block_context_delegates(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'context/delegates'
-        )
-
-    def test_chain_block_context_delegate_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}',
-            )
-
-    def test_chain_block_context_delegate_deactivated_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}/deactivated',
-            )
-
-    def test_chain_block_context_delegate_delegated_balance_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}/delegated_balance',
-            )
-
-    def test_chain_block_context_delegate_delegated_contracts_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}/'
-                'delegated_contracts',
-            )
-
-    def test_chain_block_context_delegate_frozen_deposits_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}/'
-                'frozen_deposits',
-            )
-
-    def test_chain_block_context_delegate_grace_period_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}/grace_period',
-            )
-
-    def test_chain_block_context_delegate_staking_balance_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}/staking_balance',
-            )
 
     def test_chain_block_context_nonces_block_level(self, sandbox: Sandbox):
         sandbox.client(1).rpc(
@@ -457,17 +258,6 @@ class TestRPCsExistence:
             'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'header/raw'
         )
 
-    def test_chain_block_header_shell(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'header/shell'
-        )
-
-    def test_chain_block_helpers_baking_rights(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get',
-            f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'helpers/baking_rights',
-        )
-
     def test_chain_block_helpers_complete_prefix1(self, sandbox: Sandbox):
         prefix = PKH[:10]
         sandbox.client(1).rpc(
@@ -483,27 +273,6 @@ class TestRPCsExistence:
             'get',
             f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
             f'helpers/complete/{prefix}',
-        )
-
-    def test_chain_block_helpers_current_level(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get',
-            f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'helpers/current_level',
-        )
-
-    def test_chain_block_helpers_endorsing_rights(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get',
-            f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'helpers/endorsing_rights',
-        )
-
-    def test_chain_block_helpers_levels_in_current_cycle(
-        self, sandbox: Sandbox
-    ):
-        sandbox.client(1).rpc(
-            'get',
-            f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-            'helpers/levels_in_current_cycle',
         )
 
     def test_chain_block_live_blocks(self, sandbox: Sandbox):
@@ -565,44 +334,6 @@ class TestRPCsExistence:
             f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
             f'operations/{LIST_OFFSET}/'
             f'{OPERATION_OFFSET}',
-        )
-
-    def test_chain_block_votes_ballot_list(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' f'votes/ballot_list'
-        )
-
-    def test_chain_block_votes_ballots(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'votes/ballots'
-        )
-
-    def test_chain_block_votes_current_period(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get',
-            f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'votes/current_period',
-        )
-
-    def test_chain_block_votes_current_proposal(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get',
-            f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'votes/current_proposal',
-        )
-
-    def test_chain_block_votes_current_quorum(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get',
-            f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'votes/current_quorum',
-        )
-
-    def test_chain_block_votes_listings(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'votes/listings'
-        )
-
-    def test_chain_block_votes_proposals(self, sandbox: Sandbox):
-        sandbox.client(1).rpc(
-            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'votes/proposals'
         )
 
     def test_stat_gc(self, sandbox: Sandbox):

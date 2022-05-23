@@ -310,12 +310,6 @@ module Contracts = struct
     let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
 
-  let get_all_delegates ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
-    let* contracts = Client.rpc ?endpoint ?hooks GET path client in
-    return (JSON.as_list contracts |> List.map JSON.as_string)
-
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~contract_id
       client =
     let path =
