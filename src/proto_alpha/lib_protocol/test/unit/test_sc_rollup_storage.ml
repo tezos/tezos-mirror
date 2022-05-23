@@ -255,6 +255,28 @@ let test_deposit_to_existing_rollup () =
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   assert_true ctxt
 
+let assert_balance_unchanged ctxt ctxt' account =
+  let* _, balance = lift @@ Token.balance ctxt account in
+  let* _, balance' = lift @@ Token.balance ctxt' account in
+  equal_tez ~loc:__LOC__ balance' balance
+
+let remove_staker_and_check_balances ctxt rollup staker =
+  perform_staking_action_and_check
+    ctxt
+    rollup
+    staker
+    (fun ctxt rollup staker_contract stake ->
+      let* ctxt' =
+        lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
+      in
+      let* () =
+        assert_balance_unchanged ctxt ctxt' (`Contract staker_contract)
+      in
+      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+      let bonds_account = `Frozen_bonds (staker_contract, bond_id) in
+      let+ () = assert_balance_decreased ctxt ctxt' bonds_account stake in
+      ctxt')
+
 let test_removing_staker_from_lcc_fails () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
@@ -793,10 +815,7 @@ let test_cement_with_zero_stakers_fails () =
          commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-
-  let* ctxt =
-    lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
-  in
+  let* ctxt = remove_staker_and_check_balances ctxt rollup staker in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
@@ -1073,40 +1092,41 @@ let test_can_remove_staker () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  lift
-  @@ let* c1, _level, ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+  let* c1, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
          rollup
          staker1
          commitment1
-     in
-     let commitment2 =
-       Commitment_repr.
-         {
-           predecessor = c1;
-           inbox_level = level 2l;
-           number_of_messages = number_of_messages_exn 3l;
-           number_of_ticks = number_of_ticks_exn 1232909l;
-           compressed_state = Sc_rollup_repr.State_hash.zero;
-         }
-     in
-     let* _node, _level, ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+  in
+  let commitment2 =
+    Commitment_repr.
+      {
+        predecessor = c1;
+        inbox_level = level 2l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _node, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
          rollup
          staker2
          commitment2
-     in
-     let* ctxt = Sc_rollup_stake_storage.remove_staker ctxt rollup staker1 in
-     let challenge_window =
-       Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
-     in
-     let ctxt =
-       Raw_context.Internal_for_tests.add_level ctxt challenge_window
-     in
-     let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
-     assert_true ctxt
+  in
+  let* ctxt = remove_staker_and_check_balances ctxt rollup staker1 in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+  in
+  assert_true ctxt
 
 let test_can_remove_staker2 () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1123,41 +1143,41 @@ let test_can_remove_staker2 () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  lift
-  @@ let* c1, _level, ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+  let* c1, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
          rollup
          staker1
          commitment1
-     in
-     let commitment2 =
-       Commitment_repr.
-         {
-           predecessor = c1;
-           inbox_level = level 2l;
-           number_of_messages = number_of_messages_exn 3l;
-           number_of_ticks = number_of_ticks_exn 1232909l;
-           compressed_state = Sc_rollup_repr.State_hash.zero;
-         }
-     in
-     let* _node, _level, ctxt =
-       Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+  in
+  let commitment2 =
+    Commitment_repr.
+      {
+        predecessor = c1;
+        inbox_level = level 2l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _node, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
          rollup
          staker2
          commitment2
-     in
-     let* ctxt = Sc_rollup_stake_storage.remove_staker ctxt rollup staker2 in
-     let challenge_window =
-       Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
-     in
-     let ctxt =
-       Raw_context.Internal_for_tests.add_level ctxt challenge_window
-     in
-
-     let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
-     assert_true ctxt
+  in
+  let* ctxt = remove_staker_and_check_balances ctxt rollup staker2 in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+  in
+  assert_true ctxt
 
 let test_removed_staker_can_not_withdraw () =
   let* ctxt, rollup, staker1, staker2 =
