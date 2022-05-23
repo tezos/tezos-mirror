@@ -551,18 +551,23 @@ struct
     next_move : t -> refutation option Lwt.t;
   }
 
-  type oucome_for_tests = Defender_wins | Refuter_wins
+  type outcome_for_tests = Defender_wins | Refuter_wins
+
+  let equal_outcome a b =
+    match (a, b) with
+    | Defender_wins, Defender_wins -> true
+    | Refuter_wins, Refuter_wins -> true
+    | _ -> false
 
   let loser_to_outcome_for_tests loser alice_is_refuter =
     match loser with
     | Bob -> if alice_is_refuter then Refuter_wins else Defender_wins
     | Alice -> if alice_is_refuter then Defender_wins else Refuter_wins
 
-  let run ~inbox ~alice_is_refuter ~refuter_client ~defender_client =
-    let s1, _, _ = Signature.generate_key () in
-    let s2, _, _ = Signature.generate_key () in
-    let s1, s2 = Index.normalize (s1, s2) in
-    let defender, refuter = if alice_is_refuter then (s1, s2) else (s2, s1) in
+  let run ~inbox ~refuter_client ~defender_client =
+    let refuter, _, _ = Signature.generate_key () in
+    let defender, _, _ = Signature.generate_key () in
+    let alice_is_refuter = Staker.(refuter < defender) in
     let* start_hash = PVM.state_hash PVM.Utils.default_state in
     let* initial_data = defender_client.initial in
     let tick, initial_hash =
@@ -593,27 +598,23 @@ struct
 
     let initial_game = initial inbox ~parent ~child ~refuter ~defender in
     let outcome =
-      let rec loop game =
+      let rec loop game refuter_move =
         let* move =
-          match game.turn with
-          | Alice ->
-              if alice_is_refuter then refuter_client.next_move game
-              else defender_client.next_move game
-          | Bob ->
-              if alice_is_refuter then defender_client.next_move game
-              else refuter_client.next_move game
+          if refuter_move then refuter_client.next_move game
+          else defender_client.next_move game
         in
 
         match move with
-        | None -> Lwt.return Defender_wins
+        | None ->
+            Lwt.return (if refuter_move then Defender_wins else Refuter_wins)
         | Some move -> (
             play game move |> function
             | Either.Left outcome ->
                 Lwt.return
                   (loser_to_outcome_for_tests outcome.loser alice_is_refuter)
-            | Either.Right game -> loop game)
+            | Either.Right game -> loop game (not refuter_move))
       in
-      loop initial_game
+      loop initial_game true
     in
     outcome
 
@@ -810,72 +811,46 @@ struct
   (** [test_strategies defender_strategy refuter_strategy expectation inbox]
     runs a game based oin the two given strategies and checks that the
      resulting outcome fits the expectations. *)
-  let test_strategies alice_is_refuter defender_strategy refuter_strategy
-      expectation inbox =
+  let test_strategies defender_strategy refuter_strategy expectation inbox =
     let defender_client = player_from_strategy defender_strategy in
     let refuter_client = player_from_strategy refuter_strategy in
-    let outcome =
-      run ~inbox ~alice_is_refuter ~defender_client ~refuter_client
-    in
-    expectation outcome
+    let* outcome = run ~inbox ~defender_client ~refuter_client in
+    return (expectation outcome)
 
   (** the possible expectation functions *)
-  let defender_wins x =
-    let result = Lwt.map (fun a -> a = Defender_wins) x in
-    Lwt_main.run result
+  let defender_wins = equal_outcome Defender_wins
 
-  let refuter_wins x =
-    let result = Lwt.map (fun a -> a = Refuter_wins) x in
-    Lwt_main.run result
+  let refuter_wins = equal_outcome Refuter_wins
 
   let all_win _ = true
 end
 
 (** the following are the possible combinations of strategies*)
-let perfect_perfect (module P : TestPVM) inbox alice_is_refuter =
+let perfect_perfect (module P : TestPVM) inbox =
   let module R = Strategies (P) in
-  Lwt.return
-  @@ R.test_strategies
-       alice_is_refuter
-       MachineDirected
-       MachineDirected
-       R.defender_wins
-       inbox
+  R.test_strategies MachineDirected MachineDirected R.defender_wins inbox
 
-let random_random (module P : TestPVM) inbox alice_is_refuter =
+let random_random (module P : TestPVM) inbox =
   let module S = Strategies (P) in
-  Lwt.return @@ S.test_strategies alice_is_refuter Random Random S.all_win inbox
+  S.test_strategies Random Random S.all_win inbox
 
-let random_perfect (module P : TestPVM) inbox alice_is_refuter =
+let random_perfect (module P : TestPVM) inbox =
   let module S = Strategies (P) in
-  Lwt.return
-  @@ S.test_strategies
-       alice_is_refuter
-       Random
-       MachineDirected
-       S.refuter_wins
-       inbox
+  S.test_strategies Random MachineDirected S.refuter_wins inbox
 
-let perfect_random (module P : TestPVM) inbox alice_is_refuter =
+let perfect_random (module P : TestPVM) inbox =
   let module S = Strategies (P) in
-  Lwt.return
-  @@ S.test_strategies
-       alice_is_refuter
-       MachineDirected
-       Random
-       S.defender_wins
-       inbox
+  S.test_strategies MachineDirected Random S.defender_wins inbox
 
 (** This assembles a test from a RandomPVM and a function that choses the
   type of strategies *)
 let testing_randomPVM
-    (f : (module TestPVM) -> Sc_rollup_inbox_repr.t -> bool -> bool Lwt.t) name
-    =
+    (f : (module TestPVM) -> Sc_rollup_inbox_repr.t -> bool Lwt.t) name =
   let open QCheck2 in
   Test.make
     ~name
-    Gen.(pair (list_size small_int (int_range 0 100)) bool)
-    (fun (initial_prog, alice_is_refuter) ->
+    Gen.(list_size small_int (int_range 0 100))
+    (fun initial_prog ->
       assume (initial_prog <> []) ;
       let rollup = Sc_rollup_repr.Address.hash_string [""] in
       let level =
@@ -887,19 +862,14 @@ let testing_randomPVM
            (module MakeRandomPVM (struct
              let initial_prog = initial_prog
            end))
-           inbox
-           alice_is_refuter)
+           inbox)
 
 (** This assembles a test from a CountingPVM and a function that choses
 the type of strategies *)
 let testing_countPVM
-    (f : (module TestPVM) -> Sc_rollup_inbox_repr.t -> bool -> bool Lwt.t) name
-    =
+    (f : (module TestPVM) -> Sc_rollup_inbox_repr.t -> bool Lwt.t) name =
   let open QCheck2 in
-  Test.make
-    ~name
-    Gen.(pair small_int bool)
-    (fun (target, alice_is_refuter) ->
+  Test.make ~name Gen.small_int (fun target ->
       assume (target > 200) ;
       let rollup = Sc_rollup_repr.Address.hash_string [""] in
       let level =
@@ -911,17 +881,15 @@ let testing_countPVM
            (module MakeCountingPVM (struct
              let target = target
            end))
-           inbox
-           alice_is_refuter)
+           inbox)
 
-let testing_arith
-    (f : (module TestPVM) -> Sc_rollup_inbox_repr.t -> bool -> bool Lwt.t) name
-    =
+let testing_arith (f : (module TestPVM) -> Sc_rollup_inbox_repr.t -> bool Lwt.t)
+    name =
   let open QCheck2 in
   Test.make
     ~name
-    Gen.(triple gen_list small_int bool)
-    (fun (inputs, evals, alice_is_refuter) ->
+    Gen.(pair gen_list small_int)
+    (fun (inputs, evals) ->
       assume (evals > 1 && evals < List.length inputs - 1) ;
       let rollup = Sc_rollup_repr.Address.hash_string [""] in
       let level =
@@ -935,8 +903,7 @@ let testing_arith
 
              let evals = evals
            end))
-           inbox
-           alice_is_refuter)
+           inbox)
 
 let test_random_dissection (module P : TestPVM) start_at length =
   let open P in
