@@ -53,7 +53,6 @@
    The machine exposes extra operations to be used in the rollup node.
 
 *)
-open Alpha_context
 
 module type S = sig
   include Sc_rollup_PVM_sem.S
@@ -73,7 +72,7 @@ module type S = sig
   val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
   (** [get_tick state] returns the current tick of [state]. *)
-  val get_tick : state -> Sc_rollup.Tick.t Lwt.t
+  val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
   (** The machine has three possible statuses: *)
   type status = Halted | WaitingForInputMessage | Parsing | Evaluating
@@ -133,23 +132,17 @@ module type P = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val proof_start_state : proof -> Sc_rollup.State_hash.t
+  val proof_start_state : proof -> Sc_rollup_repr.State_hash.t
 
-  val proof_stop_state : proof -> Sc_rollup.State_hash.t
+  val proof_stop_state : proof -> Sc_rollup_repr.State_hash.t
 
+  (** A verson of [Context.verify_proof] without the annoying error
+      types, just to make life easier. *)
   val verify_proof :
-    proof ->
-    (tree -> (tree * 'a) Lwt.t) ->
-    ( tree * 'a,
-      [ `Proof_mismatch of string
-      | `Stream_too_long of string
-      | `Stream_too_short of string ] )
-    result
-    Lwt.t
+    proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
 end
 
 module Make (Context : P) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree
-     and type proof = Context.proof

@@ -83,17 +83,17 @@ let block_hash_param =
 
 let rollup_kind_param =
   Clic.parameter (fun _ name ->
-      match Sc_rollups.from ~name with
+      match Sc_rollup.Kind.pvm_of_name ~name with
       | None ->
           failwith
             "Parameter '%s' is not a valid rollup name (must be one of %s)"
             name
-            (String.concat ", " Sc_rollups.all_names)
+            (String.concat ", " Sc_rollup.Kind.all_names)
       | Some k -> return k)
 
 let boot_sector_param =
   let from_text s =
-    return (fun (module R : Sc_rollups.PVM.S) ->
+    return (fun (module R : Sc_rollup.PVM.S) ->
         R.parse_boot_sector s |> function
         | None -> failwith "Invalid boot sector"
         | Some boot_sector -> return boot_sector)
@@ -2599,7 +2599,7 @@ let commands_rw () =
               "Only implicit accounts can originate smart-contract rollups"
         | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let (module R : Sc_rollups.PVM.S) = pvm in
+            let (module R : Sc_rollup.PVM.S) = pvm in
             let Michelson_v1_parser.{expanded; _} = parameters_ty in
             let parameters_ty = Script.lazy_expr expanded in
             boot_sector pvm >>=? fun boot_sector ->
@@ -2618,7 +2618,7 @@ let commands_rw () =
               ~src_pk
               ~src_sk
               ~fee_parameter
-              ~kind:(Sc_rollups.kind_of pvm)
+              ~kind:(Sc_rollup.Kind.of_pvm pvm)
               ~boot_sector
               ~parameters_ty
               ()

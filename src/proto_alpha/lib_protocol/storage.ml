@@ -1496,9 +1496,9 @@ module Sc_rollup = struct
         let name = ["kind"]
       end)
       (struct
-        type t = Sc_rollup_repr.Kind.t
+        type t = Sc_rollups.Kind.t
 
-        let encoding = Sc_rollup_repr.Kind.encoding
+        let encoding = Sc_rollups.Kind.encoding
       end)
 
   module Boot_sector =

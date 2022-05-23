@@ -183,9 +183,9 @@ let assert_commitment_hash_equal ~loc _ctxt x y =
 let assert_kinds_are_equal ~loc x y =
   Assert.equal
     ~loc
-    (Option.equal Sc_rollup_repr.Kind.equal)
+    (Option.equal Sc_rollups.Kind.equal)
     "Compare optional kind"
-    (Format.pp_print_option Sc_rollup_repr.Kind.pp)
+    (Format.pp_print_option Sc_rollups.Kind.pp)
     x
     y
 

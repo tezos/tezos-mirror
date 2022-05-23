@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context.Sc_rollup
-
 module PVM = struct
   type boot_sector = string
 
@@ -41,32 +39,60 @@ module PVM = struct
   type t = (module S)
 end
 
-let all = [Kind.Example_arith]
+module Kind = struct
+  (*
 
-let kind_of_string = function "arith" -> Some Kind.Example_arith | _ -> None
+      Each time we add a data constructor to [t], we also need:
+      - to extend [Sc_rollups.all] with this new constructor ;
+      - to update [Sc_rollups.of_name] and [encoding] ;
+      - to update [Sc_rollups.pvm_proof] and [pvm_proof_encoding].
 
-let example_arith_pvm = (module Sc_rollup_arith.ProtocolImplementation : PVM.S)
+  *)
+  type t = Example_arith
 
-let of_kind = function Kind.Example_arith -> example_arith_pvm
+  let example_arith_case =
+    Data_encoding.(
+      case
+        ~title:"Example_arith smart contract rollup kind"
+        (Tag 0)
+        unit
+        (function Example_arith -> Some ())
+        (fun () -> Example_arith))
 
-let kind_of (module M : PVM.S) =
-  match kind_of_string M.name with
-  | Some k -> k
-  | None ->
-      failwith
-        (Format.sprintf "The module named %s is not in Sc_rollups.all." M.name)
+  let encoding = Data_encoding.union ~tag_size:`Uint16 [example_arith_case]
 
-let from ~name = Option.map of_kind (kind_of_string name)
+  let equal x y = match (x, y) with Example_arith, Example_arith -> true
 
-let all_names =
-  List.map
-    (fun k ->
-      let (module M : PVM.S) = of_kind k in
-      M.name)
-    all
+  let all = [Example_arith]
 
-let string_of_kind k =
-  let (module M) = of_kind k in
-  M.name
+  let of_name = function "arith" -> Some Example_arith | _ -> None
 
-let pp fmt k = Format.fprintf fmt "%s" (string_of_kind k)
+  let example_arith_pvm =
+    (module Sc_rollup_arith.ProtocolImplementation : PVM.S)
+
+  let pvm_of = function Example_arith -> example_arith_pvm
+
+  let of_pvm (module M : PVM.S) =
+    match of_name M.name with
+    | Some k -> k
+    | None ->
+        failwith
+          (Format.sprintf
+             "The module named %s is not in Sc_rollups.all."
+             M.name)
+
+  let pvm_of_name ~name = Option.map pvm_of (of_name name)
+
+  let all_names =
+    List.map
+      (fun k ->
+        let (module M : PVM.S) = pvm_of k in
+        M.name)
+      all
+
+  let string_of_kind k =
+    let (module M) = pvm_of k in
+    M.name
+
+  let pp fmt k = Format.fprintf fmt "%s" (string_of_kind k)
+end

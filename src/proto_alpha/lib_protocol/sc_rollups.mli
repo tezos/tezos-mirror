@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 (** Here is the list of PVMs available in this protocol. *)
-open Alpha_context.Sc_rollup
 
 module PVM : sig
   type boot_sector = string
@@ -42,27 +41,42 @@ module PVM : sig
   type t = (module S)
 end
 
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
+(** A smart contract rollup has a kind, which assigns meaning to
+   rollup operations. *)
+module Kind : sig
+  (**
 
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
+     The list of available rollup kinds.
 
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
+     This list must only be appended for backward compatibility.
+  *)
+  type t = Example_arith
 
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
+  val encoding : t Data_encoding.t
 
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
+  val equal : t -> t -> bool
 
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
+  val pp : Format.formatter -> t -> unit
 
-(** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-val string_of_kind : Kind.t -> string
+  (** [pvm_of kind] returns the [PVM] of the given [kind]. *)
+  val pvm_of : t -> PVM.t
 
-(** [pp fmt kind] is a pretty-printer for [kind]. *)
-val pp : Format.formatter -> Kind.t -> unit
+  (** [of_pvm pvm] returns the [kind] of the given [PVM]. *)
+  val of_pvm : PVM.t -> t
+
+  (** [pvm_of_name ~name] is [Some (module I)] if an implemented PVM
+      called [name]. This function returns [None] otherwise. *)
+  val pvm_of_name : name:string -> PVM.t option
+
+  (** [all] returns all implemented PVM. *)
+  val all : t list
+
+  (** [all_names] returns all implemented PVM names. *)
+  val all_names : string list
+
+  (** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
+  val of_name : string -> t option
+
+  (** [string_of_kind kind] returns a human-readable representation of [kind]. *)
+  val string_of_kind : t -> string
+end

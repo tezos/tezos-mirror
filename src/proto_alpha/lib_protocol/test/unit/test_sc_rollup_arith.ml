@@ -33,7 +33,6 @@
 
 open Protocol
 open Sc_rollup_arith.ProtocolImplementation
-open Alpha_context
 
 let create_context () =
   Context.init1 () >>=? fun (block, _contract) -> return block.context
@@ -55,17 +54,22 @@ let test_preboot () =
 let boot boot_sector f = pre_boot boot_sector @@ fun state -> eval state >>= f
 
 let test_boot () =
+  let open Sc_rollup_PVM_sem in
   boot "" @@ fun state ->
   is_input_state state >>= function
-  | Some _ -> return ()
-  | _ -> failwith "After booting, the machine must be waiting for input."
+  | Initial -> return ()
+  | First_after _ ->
+      failwith
+        "After booting, the machine should be waiting for the initial input."
+  | No_input_required ->
+      failwith "After booting, the machine must be waiting for input."
 
 let test_input_message () =
   let open Sc_rollup_PVM_sem in
   boot "" @@ fun state ->
   let input =
     {
-      inbox_level = Raw_level.root;
+      inbox_level = Raw_level_repr.root;
       message_counter = Z.zero;
       payload = "MESSAGE";
     }
@@ -73,10 +77,10 @@ let test_input_message () =
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   is_input_state state >>= function
-  | Some _ ->
+  | Initial | First_after _ ->
       failwith
         "After receiving a message, the rollup must not be waiting for input."
-  | None -> return ()
+  | No_input_required -> return ()
 
 let go ~max_steps target_status state =
   let rec aux i state =
@@ -95,7 +99,11 @@ let test_parsing_message ~valid (source, expected_code) =
   let open Sc_rollup_PVM_sem in
   boot "" @@ fun state ->
   let input =
-    {inbox_level = Raw_level.root; message_counter = Z.zero; payload = source}
+    {
+      inbox_level = Raw_level_repr.root;
+      message_counter = Z.zero;
+      payload = source;
+    }
   in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
@@ -159,7 +167,11 @@ let test_evaluation_message ~valid
   let open Sc_rollup_PVM_sem in
   boot boot_sector @@ fun state ->
   let input =
-    {inbox_level = Raw_level.root; message_counter = Z.zero; payload = source}
+    {
+      inbox_level = Raw_level_repr.root;
+      message_counter = Z.zero;
+      payload = source;
+    }
   in
   set_input input state >>= fun state ->
   eval state >>= fun state ->

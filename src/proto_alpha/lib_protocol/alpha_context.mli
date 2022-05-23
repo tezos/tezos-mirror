@@ -2494,10 +2494,38 @@ module Sc_rollup : sig
 
   type rollup := t
 
+  module PVM : sig
+    type boot_sector = string
+
+    module type S = sig
+      val name : string
+
+      val parse_boot_sector : string -> boot_sector option
+
+      val pp_boot_sector : Format.formatter -> boot_sector -> unit
+
+      include Sc_rollup_PVM_sem.S
+    end
+
+    type t = (module S)
+  end
+
   module Kind : sig
     type t = Example_arith
 
     val encoding : t Data_encoding.t
+
+    val pvm_of : t -> PVM.t
+
+    val of_pvm : PVM.t -> t
+
+    val pvm_of_name : name:string -> PVM.t option
+
+    val of_name : string -> t option
+
+    val all : t list
+
+    val all_names : string list
   end
 
   module Staker :

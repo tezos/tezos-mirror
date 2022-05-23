@@ -69,9 +69,12 @@
   Script_repr
   Cache_memory_helpers
   Sc_rollup_repr
+  Sc_rollup_tick_repr
+  Sc_rollup_PVM_sem
+  Sc_rollup_arith
+  Sc_rollups
   Skip_list_repr
   Sc_rollup_inbox_repr
-  Sc_rollup_tick_repr
   Sc_rollup_commitment_repr
   Sc_rollup_game_repr
   Seed_repr
@@ -285,9 +288,12 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
@@ -488,9 +494,12 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
@@ -711,9 +720,12 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
@@ -930,9 +942,12 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
