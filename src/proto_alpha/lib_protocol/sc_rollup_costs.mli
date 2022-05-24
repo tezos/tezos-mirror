@@ -36,6 +36,11 @@ module Constants : sig
   val cost_update_num_and_size_of_messages : Gas_limit_repr.cost
 end
 
+(** [is_valid_parameters_ty_cost ty] returns the cost of checking whether a type
+    is a valid sc rollup parameter. *)
+val is_valid_parameters_ty_cost :
+  ty_size:'a Saturation_repr.t -> Saturation_repr.may_saturate Saturation_repr.t
+
 (** [cost_add_messages ~num_messages ~total_messages_length level] 
     returns the cost of adding [num_messages] with total messages size
     [total_messages_size] to a sc-rollup inbox at level [level]. This 

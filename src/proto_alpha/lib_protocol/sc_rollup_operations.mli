@@ -26,6 +26,8 @@
 (** High-level operations over smart contract rollups. *)
 open Alpha_context
 
+type error += (* Temporary *) Sc_rollup_invalid_parameters_type
+
 type origination_result = {address : Sc_rollup.Address.t; size : Z.t}
 
 (** [originate context ~kind ~boot_sector] adds a new rollup running in a
