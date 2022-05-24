@@ -861,7 +861,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) imap_iter_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e * 'f, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'g, 'h) kinstr ->
+  ('e * 'f, 'a * 'b, 'a, 'b) kinstr ->
+  ('a, 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
   ('e, 'f) map ->
   'a * 'b ->
@@ -871,7 +872,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Tez.t, 'a) kinfo * (Tez.t, 'b, 'c, 'd) kinstr ->
+  (Tez.t, 'a) kinfo ->
+  (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Tez.t ->
   Script_int.n Script_int.num * 'b ->
