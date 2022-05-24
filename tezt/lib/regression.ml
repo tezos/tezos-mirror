@@ -80,10 +80,8 @@ let log_regression_diff diff =
 
 let all_output_files = ref String_set.empty
 
-let output_file_extension = "out"
-
 let full_output_file output_file =
-  (Cli.options.regression_dir // output_file) ^ "." ^ output_file_extension
+  (Cli.options.regression_dir // output_file) ^ ".out"
 
 let register ~__FILE__ ~title ~tags ~output_file f =
   let tags = "regression" :: tags in
@@ -104,9 +102,7 @@ let register ~__FILE__ ~title ~tags ~output_file f =
           (Log.quote_shell stored_full_output_file)
           (Log.quote_shell title) ;
       let capture_f ~full_output_file =
-        run_and_capture_output ~output_file:full_output_file @@ fun () ->
-        capture (output_file ^ "." ^ output_file_extension) ;
-        f ()
+        run_and_capture_output ~output_file:full_output_file f
       in
       if Cli.options.reset_regressions then
         capture_f ~full_output_file:stored_full_output_file
