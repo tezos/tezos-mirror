@@ -40,6 +40,28 @@ exception Sc_rollup_test_error of string
 
 let err x = Exn (Sc_rollup_test_error x)
 
+let wrap k = Lwt.map Environment.wrap_tzresult k
+
+let assert_fails ~loc ?error m =
+  let open Lwt_result_syntax in
+  let*! res = m in
+  match res with
+  | Ok _ -> Stdlib.failwith "Expected failure"
+  | Error err_res -> (
+      match (err_res, error) with
+      | Environment.Ecoproto_error err' :: _, Some err when err = err' ->
+          (* Matched exact error. *)
+          return_unit
+      | _, Some _ ->
+          (* Expected a different error. *)
+          let msg =
+            Printf.sprintf "Expected a different error at location %s" loc
+          in
+          Stdlib.failwith msg
+      | _, None ->
+          (* Any error is ok. *)
+          return ())
+
 (** [context_init tup] initializes a context for testing in which the
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
@@ -106,22 +128,30 @@ let test_sc_rollups_all_well_defined () =
   all_names_are_valid ()
 
 (** Initializes the context and originates a SCORU. *)
-let init_and_originate ?sc_rollup_challenge_window_in_blocks tup parameters_ty =
-  let* ctxt, contracts =
-    context_init ?sc_rollup_challenge_window_in_blocks tup
-  in
-  let contract = Context.tup_hd tup contracts in
+let sc_originate block contract parameters_ty =
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
     Op.sc_rollup_origination
-      (B ctxt)
+      ~counter:(Z.of_int 0)
+      (B block)
       contract
       kind
       ""
       (Script.lazy_expr @@ Expr.from_string parameters_ty)
   in
-  let* b = Block.bake ~operation ctxt in
-  return (b, contracts, rollup)
+  let* incr = Incremental.begin_construction block in
+  let* incr = Incremental.add_operation incr operation in
+  let* block = Incremental.finalize_block incr in
+  return (block, rollup)
+
+(** Initializes the context and originates a SCORU. *)
+let init_and_originate ?sc_rollup_challenge_window_in_blocks tup parameters_ty =
+  let* block, contracts =
+    context_init ?sc_rollup_challenge_window_in_blocks tup
+  in
+  let contract = Context.tup_hd tup contracts in
+  let* block, rollup = sc_originate block contract parameters_ty in
+  return (block, contracts, rollup)
 
 let number_of_messages_exn n =
   match Sc_rollup.Number_of_messages.of_int32 n with
@@ -293,6 +323,81 @@ let test_challenge_window_period_boundaries () =
   in
   return_unit
 
+(** Test originating with bad type. *)
+let test_originating_with_invalid_types () =
+  let* block, (contract, _, _) = context_init Context.T3 in
+  let assert_fails_for_type parameters_type =
+    assert_fails
+      ~loc:__LOC__
+      ~error:Sc_rollup_operations.Sc_rollup_invalid_parameters_type
+      (sc_originate block contract parameters_type)
+  in
+  (* Following types fail at validation time. *)
+  let* () =
+    [
+      "mutez";
+      "big_map string nat";
+      "contract string";
+      "sapling_state 2";
+      "sapling_transaction 2";
+      "lambda string nat";
+    ]
+    |> List.iter_es assert_fails_for_type
+  in
+  (* Operation fails with a different error as it's not "passable". *)
+  assert_fails ~loc:__LOC__ (sc_originate block contract "operation")
+
+let assert_equal_expr ~loc e1 e2 =
+  let s1 = Format.asprintf "%a" Michelson_v1_printer.print_expr e1 in
+  let s2 = Format.asprintf "%a" Michelson_v1_printer.print_expr e2 in
+  Assert.equal_string ~loc s1 s2
+
+let test_originating_with_valid_type () =
+  let* block, contract = context_init Context.T1 in
+  let assert_parameters_ty parameters_ty =
+    let* block, rollup = sc_originate block contract parameters_ty in
+    let* incr = Incremental.begin_construction block in
+    let ctxt = Incremental.alpha_ctxt incr in
+    let* expr, _ctxt = wrap @@ Sc_rollup.parameters_type ctxt rollup in
+    let*? expr, _ctxt =
+      Environment.wrap_tzresult
+      @@ Script.force_decode_in_context
+           ~consume_deserialization_gas:When_needed
+           ctxt
+           expr
+    in
+    assert_equal_expr ~loc:__LOC__ (Expr.from_string parameters_ty) expr
+  in
+  [
+    "unit";
+    "int";
+    "nat";
+    "signature";
+    "string";
+    "bytes";
+    "key_hash";
+    "key";
+    "timestamp";
+    "address";
+    "bls12_381_fr";
+    "bls12_381_g1";
+    "bls12_381_g2";
+    "bool";
+    "never";
+    "tx_rollup_l2_address";
+    "chain_id";
+    "ticket string";
+    "set nat";
+    "option (ticket string)";
+    "list nat";
+    "pair nat unit";
+    "or nat string";
+    "map string int";
+    "map (option (pair nat string)) (list (ticket nat))";
+    "or (nat %deposit) (string %name)";
+  ]
+  |> List.iter_es assert_parameters_ty
+
 let tests =
   [
     Tztest.tztest
@@ -319,4 +424,12 @@ let tests =
       "check the challenge window period boundaries"
       `Quick
       test_challenge_window_period_boundaries;
+    Tztest.tztest
+      "originating with invalid types"
+      `Quick
+      test_originating_with_invalid_types;
+    Tztest.tztest
+      "originating with valid type"
+      `Quick
+      test_originating_with_valid_type;
   ]
