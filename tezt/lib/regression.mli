@@ -40,8 +40,7 @@
     [Cli.options.regression_dir // output_file ^ ".out"].
 
     Note that [output_file] can contain subdirectories.
-    For instance, using the default [--regression-dir],
-    [~output_file:"math/sqrt"] will result in the creation of directory
+    For instance, [~output_file:"math/sqrt"] will result in the creation of directory
     ["tezt/_regressions/math"] if needed and regression output will be written
     in ["tezt/_regressions/math/sqrt.out"]. *)
 val register :

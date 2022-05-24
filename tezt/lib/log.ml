@@ -52,7 +52,6 @@ let channel =
     global_timeout = _;
     retry = _;
     test_timeout = _;
-    regression_dir = _;
     reset_regressions = _;
     on_unknown_regression_files_mode = _;
     loop_mode = _;

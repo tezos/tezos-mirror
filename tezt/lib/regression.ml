@@ -80,15 +80,12 @@ let log_regression_diff diff =
 
 let all_output_files = ref String_set.empty
 
-let full_output_file output_file =
-  (Cli.options.regression_dir // output_file) ^ ".out"
+let full_output_file output_file = "tezt/_regressions" // (output_file ^ ".out")
 
 let register ~__FILE__ ~title ~tags ~output_file f =
   let tags = "regression" :: tags in
   all_output_files := String_set.add output_file !all_output_files ;
   Test.register ~__FILE__ ~title ~tags (fun () ->
-      (* We cannot compute [stored_full_output_file] before [Test.register]
-         because [Cli.init] must have been called. *)
       let stored_full_output_file = full_output_file output_file in
       (* when the stored output doesn't already exists, must reset regressions *)
       if
@@ -188,7 +185,7 @@ let check_unknown_output_files () =
           found_unknown := true)
     | _ -> ()
   in
-  browse Cli.options.regression_dir ;
+  browse "tezt/_regressions" ;
   if !found_unknown then (
     Log.warn
       "Use --on-unknown-regression-files delete to delete those files and/or \
