@@ -127,7 +127,7 @@ let test_sc_rollup_commitment_storage_size () =
   let commitment =
     Alpha_context.Sc_rollup.Commitment.
       {
-        predecessor = Alpha_context.Sc_rollup.Commitment_hash.zero;
+        predecessor = Alpha_context.Sc_rollup.Commitment.Hash.zero;
         inbox_level = Alpha_context.Raw_level.of_int32_exn 21l;
         number_of_messages;
         number_of_ticks;

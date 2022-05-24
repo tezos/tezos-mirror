@@ -34,6 +34,7 @@
 
 open Protocol
 open Lwt_result_syntax
+module Commitment_repr = Sc_rollup_commitment_repr
 
 (** Lift a computation using using environment errors to use shell errors. *)
 let lift k = Lwt.map Environment.wrap_tzresult k
@@ -131,9 +132,9 @@ let assert_fails_with_missing_rollup ~loc op =
 let assert_commitment_hash_equal ~loc _ctxt x y =
   Assert.equal
     ~loc
-    Sc_rollup_repr.Commitment_hash.equal
+    Commitment_repr.Hash.equal
     "Compare commitment hash"
-    Sc_rollup_repr.Commitment_hash.pp
+    Commitment_repr.Hash.pp
     x
     y
 
@@ -159,11 +160,7 @@ let test_initial_state_is_pre_boot () =
   let* lcc, ctxt =
     lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
-  assert_commitment_hash_equal
-    ~loc:__LOC__
-    ctxt
-    lcc
-    Sc_rollup_repr.Commitment_hash.zero
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt lcc Commitment_repr.Hash.zero
 
 let test_deposit_to_existing_rollup () =
   let* ctxt = new_context () in
@@ -329,9 +326,9 @@ let test_deposit_then_refine () =
          staker
      in
      let commitment =
-       Sc_rollup_repr.Commitment.
+       Commitment_repr.
          {
-           predecessor = Sc_rollup_repr.Commitment_hash.zero;
+           predecessor = Commitment_repr.Hash.zero;
            inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
@@ -361,9 +358,9 @@ let test_deposit_then_refine_bad_inbox () =
          staker
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = Raw_level_repr.of_int32_exn 22l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -388,9 +385,9 @@ let test_publish () =
          "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
      in
      let commitment =
-       Sc_rollup_repr.Commitment.
+       Commitment_repr.
          {
-           predecessor = Sc_rollup_repr.Commitment_hash.zero;
+           predecessor = Commitment_repr.Hash.zero;
            inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 5l;
            number_of_ticks = number_of_ticks_exn 152231l;
@@ -407,9 +404,9 @@ let test_publish_returns_oldest_publish_level () =
     originate_rollup_and_deposit_with_two_stakers ()
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 5l;
         number_of_ticks = number_of_ticks_exn 152231l;
@@ -447,9 +444,9 @@ let test_withdraw_and_cement () =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -492,9 +489,9 @@ let test_deposit_then_publish () =
          staker
      in
      let commitment =
-       Sc_rollup_repr.Commitment.
+       Commitment_repr.
          {
-           predecessor = Sc_rollup_repr.Commitment_hash.zero;
+           predecessor = Commitment_repr.Hash.zero;
            inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 5l;
            number_of_ticks = number_of_ticks_exn 152231l;
@@ -511,9 +508,9 @@ let test_publish_missing_rollup () =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
   let commitment ctxt =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -545,9 +542,9 @@ let test_cement () =
          staker
      in
      let commitment =
-       Sc_rollup_repr.Commitment.
+       Commitment_repr.
          {
-           predecessor = Sc_rollup_repr.Commitment_hash.zero;
+           predecessor = Commitment_repr.Hash.zero;
            inbox_level = valid_inbox_level ctxt 1l;
            number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
@@ -583,9 +580,9 @@ let test_cement_three_commitments () =
   lift
   @@
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -600,7 +597,7 @@ let test_cement_three_commitments () =
       commitment
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -617,7 +614,7 @@ let test_cement_three_commitments () =
       commitment
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c2;
         inbox_level = level 3l;
@@ -656,9 +653,9 @@ let test_cement_then_remove () =
          staker
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -706,9 +703,9 @@ let test_cement_consumes_available_messages () =
     Sc_rollup_inbox_repr.number_of_available_messages inbox
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 1l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -765,7 +762,7 @@ let test_cement_unknown_commitment_fails () =
     (Sc_rollup_stake_storage.cement_commitment
        ctxt
        rollup
-       Sc_rollup_repr.Commitment_hash.zero)
+       Commitment_repr.Hash.zero)
     "Commitment scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG does \
      not exist"
 
@@ -786,9 +783,9 @@ let test_cement_with_zero_stakers_fails () =
          staker
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -831,9 +828,9 @@ let test_cement_fail_too_recent () =
          staker
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -870,9 +867,9 @@ let test_cement_deadline_uses_oldest_add_time () =
     originate_rollup_and_deposit_with_two_stakers ()
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -923,9 +920,9 @@ let test_last_cemented_commitment_hash_with_level () =
          staker
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -970,9 +967,9 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
          staker
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1011,9 +1008,9 @@ let test_stake_on_existing_node () =
     originate_rollup_and_deposit_with_two_stakers ()
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1043,9 +1040,9 @@ let test_cement_with_two_stakers () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1061,7 +1058,7 @@ let test_cement_with_two_stakers () =
          commitment1
      in
      let commitment2 =
-       Sc_rollup_repr.Commitment.
+       Commitment_repr.
          {
            predecessor = c1;
            inbox_level = level 2l;
@@ -1093,9 +1090,9 @@ let test_can_remove_staker () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1111,7 +1108,7 @@ let test_can_remove_staker () =
          commitment1
      in
      let commitment2 =
-       Sc_rollup_repr.Commitment.
+       Commitment_repr.
          {
            predecessor = c1;
            inbox_level = level 2l;
@@ -1143,9 +1140,9 @@ let test_can_remove_staker2 () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1161,7 +1158,7 @@ let test_can_remove_staker2 () =
          commitment1
      in
      let commitment2 =
-       Sc_rollup_repr.Commitment.
+       Commitment_repr.
          {
            predecessor = c1;
            inbox_level = level 2l;
@@ -1194,9 +1191,9 @@ let test_removed_staker_can_not_withdraw () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1212,7 +1209,7 @@ let test_removed_staker_can_not_withdraw () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1246,9 +1243,9 @@ let test_no_cement_on_conflict () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1264,9 +1261,9 @@ let test_no_cement_on_conflict () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 44l;
@@ -1298,9 +1295,9 @@ let test_no_cement_with_one_staker_at_zero_commitment () =
     originate_rollup_and_deposit_with_two_stakers ()
   in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1330,9 +1327,9 @@ let test_non_cemented_parent () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1348,7 +1345,7 @@ let test_non_cemented_parent () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1380,9 +1377,9 @@ let test_finds_conflict_point_at_lcc () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1398,9 +1395,9 @@ let test_finds_conflict_point_at_lcc () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 55l;
@@ -1431,9 +1428,9 @@ let test_finds_conflict_point_beneath_lcc () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1449,7 +1446,7 @@ let test_finds_conflict_point_beneath_lcc () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1467,7 +1464,7 @@ let test_finds_conflict_point_beneath_lcc () =
          commitment2
   in
   let commitment3 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1501,9 +1498,9 @@ let test_conflict_point_is_first_point_of_disagreement () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1519,7 +1516,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1537,7 +1534,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
          commitment2
   in
   let commitment3 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1555,7 +1552,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
          commitment3
   in
   let commitment4 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c2;
         inbox_level = level 3l;
@@ -1599,9 +1596,9 @@ let test_conflict_point_computation_fits_in_gas_limit () =
       (Int32.of_int commitment_freq)
   in
   let root_commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 1l;
         number_of_ticks = number_of_ticks_exn 1l;
@@ -1626,7 +1623,7 @@ let test_conflict_point_computation_fits_in_gas_limit () =
   in
   let rec branch ctxt staker_id staker predecessor i max acc =
     let commitment =
-      Sc_rollup_repr.Commitment.
+      Commitment_repr.
         {
           predecessor;
           inbox_level = level i;
@@ -1682,9 +1679,9 @@ let test_no_conflict_point_one_staker_at_lcc_preboot () =
     originate_rollup_and_deposit_with_two_stakers ()
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1727,9 +1724,9 @@ let test_no_conflict_point_one_staker_at_lcc () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1745,7 +1742,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1783,9 +1780,9 @@ let test_no_conflict_point_both_stakers_at_lcc () =
     originate_rollup_and_deposit_with_two_stakers ()
   in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1839,9 +1836,9 @@ let test_staker_cannot_backtrack () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1857,7 +1854,7 @@ let test_staker_cannot_backtrack () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1889,9 +1886,9 @@ let test_staker_cannot_change_branch () =
   in
   let level = valid_inbox_level ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -1907,7 +1904,7 @@ let test_staker_cannot_change_branch () =
          commitment1
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1925,7 +1922,7 @@ let test_staker_cannot_change_branch () =
          commitment2
   in
   let commitment3 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
@@ -1944,7 +1941,7 @@ let test_staker_cannot_change_branch () =
          commitment3
   in
   let commitment4 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
         predecessor = c2;
         inbox_level = level 3l;
@@ -1989,9 +1986,9 @@ let test_refine_stake_of_missing_rollup () =
         ctxt
         rollup
         Sc_rollup_repr.Staker.zero
-        Sc_rollup_repr.Commitment.
+        Commitment_repr.
           {
-            predecessor = Sc_rollup_repr.Commitment_hash.zero;
+            predecessor = Commitment_repr.Hash.zero;
             inbox_level = valid_inbox_level ctxt 1l;
             number_of_messages = number_of_messages_exn 3l;
             number_of_ticks = number_of_ticks_exn 1232909l;
@@ -2013,7 +2010,7 @@ let test_cement_commitment_of_missing_rollup () =
       Sc_rollup_stake_storage.cement_commitment
         ctxt
         rollup
-        Sc_rollup_repr.Commitment_hash.zero)
+        Commitment_repr.Hash.zero)
 
 let test_get_conflict_point_on_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
@@ -2028,12 +2025,12 @@ let test_get_commitment_of_missing_rollup () =
       Sc_rollup_commitment_storage.get_commitment
         ctxt
         rollup
-        Sc_rollup_repr.Commitment_hash.zero)
+        Commitment_repr.Hash.zero)
 
 let test_get_missing_commitment () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
-  let commitment_hash = Sc_rollup_repr.Commitment_hash.zero in
+  let commitment_hash = Commitment_repr.Hash.zero in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_commitment_storage.get_commitment ctxt rollup commitment_hash)
@@ -2056,9 +2053,9 @@ let test_concurrent_refinement_point_of_conflict () =
   in
   let level = valid_inbox_level before_ctxt in
   let commitment1 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -2066,9 +2063,9 @@ let test_concurrent_refinement_point_of_conflict () =
       }
   in
   let commitment2 =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = level 1l;
         number_of_messages = number_of_messages_exn 10l;
         number_of_ticks = number_of_ticks_exn 1232909l;
@@ -2127,9 +2124,9 @@ let test_concurrent_refinement_cement () =
     originate_rollup_and_deposit_with_two_stakers ()
   in
   let commitment =
-    Sc_rollup_repr.Commitment.
+    Commitment_repr.
       {
-        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level before_ctxt 1l;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;

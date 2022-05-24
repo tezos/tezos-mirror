@@ -87,7 +87,7 @@ module Simple = struct
       ~name
       ~msg
       ~level:Notice
-      ("predecessor", Sc_rollup.Commitment_hash.encoding)
+      ("predecessor", Sc_rollup.Commitment.Hash.encoding)
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
       ("number_of_messages", Sc_rollup.Number_of_messages.encoding)
@@ -121,7 +121,7 @@ module Simple = struct
          number_of_ticks: {number_of_ticks}"
       ~level:Notice
       ("lcc_level", Raw_level.encoding)
-      ("predecessor", Sc_rollup.Commitment_hash.encoding)
+      ("predecessor", Sc_rollup.Commitment.Hash.encoding)
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
       ("number_of_messages", Sc_rollup.Number_of_messages.encoding)
@@ -135,7 +135,7 @@ module Simple = struct
         "Last cemented commitment was updated to hash {hash} at inbox level \
          {level}"
       ~level:Notice
-      ("hash", Sc_rollup.Commitment_hash.encoding)
+      ("hash", Sc_rollup.Commitment.Hash.encoding)
       ("level", Raw_level.encoding)
 
   let compute_commitment =
@@ -160,8 +160,8 @@ module Simple = struct
          terminated."
       ~level:Fatal
       ("level", Raw_level.encoding)
-      ("predecessor_hash", Sc_rollup.Commitment_hash.encoding)
-      ("lcc_hash", Sc_rollup.Commitment_hash.encoding)
+      ("predecessor_hash", Sc_rollup.Commitment.Hash.encoding)
+      ("lcc_hash", Sc_rollup.Commitment.Hash.encoding)
 
   let commitment_stored = commitment_event `Store
 

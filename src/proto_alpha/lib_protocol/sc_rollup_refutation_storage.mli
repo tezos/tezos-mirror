@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Commitment_hash = Sc_rollup_repr.Commitment_hash
+module Commitment_hash = Sc_rollup_commitment_repr.Hash
 
 type conflict_point = Commitment_hash.t * Commitment_hash.t
 

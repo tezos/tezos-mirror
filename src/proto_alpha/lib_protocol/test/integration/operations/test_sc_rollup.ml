@@ -148,7 +148,7 @@ let dummy_commitment ctxt rollup =
   return
     Sc_rollup.Commitment.
       {
-        predecessor = Sc_rollup.Commitment_hash.zero;
+        predecessor = Sc_rollup.Commitment.Hash.zero;
         inbox_level;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 3000l;

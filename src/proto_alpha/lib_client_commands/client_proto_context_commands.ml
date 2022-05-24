@@ -119,7 +119,7 @@ let messages_param =
 
 let commitment_hash_param =
   Clic.parameter (fun _ commitment_hash ->
-      match Sc_rollup.Commitment_hash.of_b58check_opt commitment_hash with
+      match Sc_rollup.Commitment.Hash.of_b58check_opt commitment_hash with
       | None ->
           failwith
             "Parameter '%s' is not a valid B58-encoded rollup commitment hash"

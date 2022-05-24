@@ -266,8 +266,8 @@ end
     increment from that state to its successor. *)
 val initial :
   Sc_rollup_inbox_repr.t ->
-  parent:Commitment.t ->
-  child:Commitment.t ->
+  parent:Sc_rollup_commitment_repr.t ->
+  child:Sc_rollup_commitment_repr.t ->
   refuter:Staker.t ->
   defender:Staker.t ->
   t

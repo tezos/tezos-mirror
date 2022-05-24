@@ -1540,9 +1540,9 @@ module Sc_rollup = struct
         let name = ["last_cemented_commitment"]
       end)
       (struct
-        type t = Sc_rollup_repr.Commitment_hash.t
+        type t = Sc_rollup_commitment_repr.Hash.t
 
-        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+        let encoding = Sc_rollup_commitment_repr.Hash.encoding
       end)
 
   module Stakers =
@@ -1553,9 +1553,9 @@ module Sc_rollup = struct
          end))
          (Public_key_hash_index)
       (struct
-        type t = Sc_rollup_repr.Commitment_hash.t
+        type t = Sc_rollup_commitment_repr.Hash.t
 
-        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+        let encoding = Sc_rollup_commitment_repr.Hash.encoding
       end)
 
   module Staker_count =
@@ -1575,11 +1575,11 @@ module Sc_rollup = struct
          (struct
            let name = ["commitments"]
          end))
-         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (Make_index (Sc_rollup_commitment_repr.Hash_index))
       (struct
-        type t = Sc_rollup_repr.Commitment.t
+        type t = Sc_rollup_commitment_repr.t
 
-        let encoding = Sc_rollup_repr.Commitment.encoding
+        let encoding = Sc_rollup_commitment_repr.encoding
       end)
 
   module Commitment_stake_count =
@@ -1588,7 +1588,7 @@ module Sc_rollup = struct
          (struct
            let name = ["commitment_stake_count"]
          end))
-         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (Make_index (Sc_rollup_commitment_repr.Hash_index))
       (struct
         type t = int32
 
@@ -1601,7 +1601,7 @@ module Sc_rollup = struct
          (struct
            let name = ["commitment_added"]
          end))
-         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (Make_index (Sc_rollup_commitment_repr.Hash_index))
       (struct
         type t = Raw_level_repr.t
 

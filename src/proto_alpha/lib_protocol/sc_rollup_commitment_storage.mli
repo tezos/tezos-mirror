@@ -110,7 +110,8 @@
     correct).
     *)
 
-module Commitment_hash = Sc_rollup_repr.Commitment_hash
+module Commitment = Sc_rollup_commitment_repr
+module Commitment_hash = Commitment.Hash
 
 (** [last_cemented_commitment context rollup] returns the last cemented
     commitment of the rollup.
@@ -124,7 +125,7 @@ module Commitment_hash = Sc_rollup_repr.Commitment_hash
 val last_cemented_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  (Sc_rollup_repr.Commitment_hash.t * Raw_context.t) tzresult Lwt.t
+  (Commitment_hash.t * Raw_context.t) tzresult Lwt.t
 
 (** [last_cemented_commitment_hash_with_level ctxt sc_rollup] returns the hash
     and level of the last cemented commitment (lcc) for [sc_rollup]. If the
@@ -139,8 +140,7 @@ val last_cemented_commitment :
 val last_cemented_commitment_hash_with_level :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  (Sc_rollup_repr.Commitment_hash.t * Raw_level_repr.t * Raw_context.t) tzresult
-  Lwt.t
+  (Commitment_hash.t * Raw_level_repr.t * Raw_context.t) tzresult Lwt.t
 
 (** [get_commitment context rollup commitment_hash] returns the commitment with
     the given hash.
@@ -154,8 +154,8 @@ val last_cemented_commitment_hash_with_level :
 val get_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_repr.Commitment_hash.t ->
-  (Sc_rollup_repr.Commitment.t * Raw_context.t) tzresult Lwt.t
+  Commitment_hash.t ->
+  (Commitment.t * Raw_context.t) tzresult Lwt.t
 
 (** [get_commitment_unsafe context rollup commitment_hash] returns the commitment
     with the given hash.
@@ -172,8 +172,8 @@ val get_commitment :
 val get_commitment_unsafe :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_repr.Commitment_hash.t ->
-  (Sc_rollup_repr.Commitment.t * Raw_context.t) tzresult Lwt.t
+  Commitment_hash.t ->
+  (Commitment.t * Raw_context.t) tzresult Lwt.t
 
 (** [set_commitment_added ctxt rollup node current] sets the commitment
     addition time of [node] to [current] iff the commitment time was

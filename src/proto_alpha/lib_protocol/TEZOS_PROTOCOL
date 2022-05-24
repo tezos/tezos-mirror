@@ -38,6 +38,7 @@
         "Skip_list_repr",
         "Sc_rollup_inbox_repr",
         "Sc_rollup_tick_repr",
+        "Sc_rollup_commitment_repr",
         "Sc_rollup_game_repr",
         "Seed_repr",
         "Sampler",

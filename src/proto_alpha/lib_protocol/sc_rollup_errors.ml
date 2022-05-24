@@ -39,7 +39,7 @@ type error +=
   | (* `Temporary *) Sc_rollup_too_recent
   | (* `Temporary *)
       Sc_rollup_unknown_commitment of
-      Sc_rollup_repr.Commitment_hash.t
+      Sc_rollup_commitment_repr.Hash.t
   | (* `Temporary *) Sc_rollup_bad_inbox_level
   | (* `Temporary *) Sc_rollup_max_number_of_available_messages_reached
   | (* `Temporary *) Sc_rollup_wrong_turn
@@ -243,10 +243,10 @@ let () =
       Format.fprintf
         ppf
         "Commitment %a does not exist"
-        Sc_rollup_repr.Commitment_hash.pp
+        Sc_rollup_commitment_repr.Hash.pp
         x)
     Data_encoding.(
-      obj1 (req "commitment" Sc_rollup_repr.Commitment_hash.encoding))
+      obj1 (req "commitment" Sc_rollup_commitment_repr.Hash.encoding))
     (function Sc_rollup_unknown_commitment x -> Some x | _ -> None)
     (fun x -> Sc_rollup_unknown_commitment x) ;
   let description = "Attempted to commit to a bad inbox level." in

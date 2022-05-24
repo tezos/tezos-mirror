@@ -31,7 +31,7 @@ let commitment_with_hash_and_level_encoding =
   Data_encoding.(
     obj3
       (req "commitment" Sc_rollup.Commitment.encoding)
-      (req "hash" Sc_rollup.Commitment_hash.encoding)
+      (req "hash" Sc_rollup.Commitment.Hash.encoding)
       (opt "published_at_level" Raw_level.encoding))
 
 let sc_rollup_address () =

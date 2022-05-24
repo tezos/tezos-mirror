@@ -26,7 +26,8 @@
 
 open Sc_rollup_errors
 module Store = Storage.Sc_rollup
-module Commitment_hash = Sc_rollup_repr.Commitment_hash
+module Commitment = Sc_rollup_commitment_repr
+module Commitment_hash = Commitment.Hash
 
 let get_commitment_unsafe ctxt rollup commitment =
   let open Lwt_tzresult_syntax in

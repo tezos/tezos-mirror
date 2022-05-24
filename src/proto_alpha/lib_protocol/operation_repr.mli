@@ -439,12 +439,12 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment_hash.t;
+      commitment : Sc_rollup_commitment_repr.Hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment.t;
+      commitment : Sc_rollup_commitment_repr.t;
     }
       -> Kind.sc_rollup_publish manager_operation
   | Sc_rollup_refute : {

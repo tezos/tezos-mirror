@@ -26,9 +26,9 @@
 
 open Sc_rollup_errors
 module Store = Storage.Sc_rollup
-module Commitment = Sc_rollup_repr.Commitment
+module Commitment = Sc_rollup_commitment_repr
 module Commitment_storage = Sc_rollup_commitment_storage
-module Commitment_hash = Sc_rollup_repr.Commitment_hash
+module Commitment_hash = Commitment.Hash
 module Stake_storage = Sc_rollup_stake_storage
 
 type conflict_point = Commitment_hash.t * Commitment_hash.t

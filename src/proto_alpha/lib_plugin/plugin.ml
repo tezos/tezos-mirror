@@ -3374,7 +3374,7 @@ module RPC = struct
           ~query:RPC_query.empty
           ~output:
             (obj2
-               (req "hash" Sc_rollup.Commitment_hash.encoding)
+               (req "hash" Sc_rollup.Commitment.Hash.encoding)
                (req "level" Raw_level.encoding))
           RPC_path.(
             path /: Sc_rollup.Address.rpc_arg
@@ -3387,7 +3387,7 @@ module RPC = struct
           ~output:Sc_rollup.Commitment.encoding
           RPC_path.(
             path /: Sc_rollup.Address.rpc_arg / "commitment"
-            /: Sc_rollup.Commitment_hash.rpc_arg)
+            /: Sc_rollup.Commitment.Hash.rpc_arg)
 
       let root =
         RPC_service.get_service
@@ -3431,7 +3431,7 @@ module RPC = struct
       @@ fun ctxt address () () ->
       let open Lwt_tzresult_syntax in
       let+ last_cemented_commitment, level, _ctxt =
-        Alpha_context.Sc_rollup.Commitment_storage
+        Alpha_context.Sc_rollup.Commitment
         .last_cemented_commitment_hash_with_level
           ctxt
           address
@@ -3443,7 +3443,7 @@ module RPC = struct
       @@ fun ctxt address commitment_hash () () ->
       let open Lwt_result_syntax in
       let+ commitment, _ =
-        Alpha_context.Sc_rollup.Commitment_storage.get_commitment
+        Alpha_context.Sc_rollup.Commitment.get_commitment
           ctxt
           address
           commitment_hash

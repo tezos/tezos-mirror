@@ -57,7 +57,7 @@ module type Mutable_level_store =
 val last_commitment_with_hash :
   (module Mutable_level_store) ->
   Store.t ->
-  (Sc_rollup.Commitment.t * Sc_rollup.Commitment_hash.t) option Lwt.t
+  (Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t) option Lwt.t
 
 module type S = sig
   module PVM : Pvm.S

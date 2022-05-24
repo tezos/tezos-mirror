@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Commitment_hash = Sc_rollup_repr.Commitment_hash
-
 (** [remove_staker context rollup staker] forcibly removes the given [staker]
     and confiscates their frozen deposits.
 
@@ -74,8 +72,8 @@ val publish_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
-  Sc_rollup_repr.Commitment.t ->
-  (Sc_rollup_repr.Commitment_hash.t * Raw_level_repr.t * Raw_context.t) tzresult
+  Sc_rollup_commitment_repr.t ->
+  (Sc_rollup_commitment_repr.Hash.t * Raw_level_repr.t * Raw_context.t) tzresult
   Lwt.t
 
 (** [cement_commitment context rollup commitment] cements the given
@@ -108,7 +106,7 @@ val publish_commitment :
 val cement_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_repr.Commitment_hash.t ->
+  Sc_rollup_commitment_repr.Hash.t ->
   Raw_context.t tzresult Lwt.t
 
 (** [find_staker ctxt rollup staker] returns the branch on which the stake
@@ -119,7 +117,7 @@ val find_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Signature.public_key_hash ->
-  (Commitment_hash.t * Raw_context.t) tzresult Lwt.t
+  (Sc_rollup_commitment_repr.Hash.t * Raw_context.t) tzresult Lwt.t
 
 (**/**)
 
@@ -205,8 +203,8 @@ module Internal_for_tests : sig
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->
-    Sc_rollup_repr.Commitment.t ->
-    (Sc_rollup_repr.Commitment_hash.t * Raw_level_repr.t * Raw_context.t)
+    Sc_rollup_commitment_repr.t ->
+    (Sc_rollup_commitment_repr.Hash.t * Raw_level_repr.t * Raw_context.t)
     tzresult
     Lwt.t
 end

@@ -706,13 +706,13 @@ module Sc_rollup : sig
   module Last_cemented_commitment :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
-       and type value = Sc_rollup_repr.Commitment_hash.t
+       and type value = Sc_rollup_commitment_repr.Hash.t
        and type t := Raw_context.t
 
   module Stakers :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Signature.Public_key_hash.t
-       and type value = Sc_rollup_repr.Commitment_hash.t
+       and type value = Sc_rollup_commitment_repr.Hash.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   (** Cache: This should always be the number of entries in [Stakers].
@@ -729,8 +729,8 @@ module Sc_rollup : sig
 
   module Commitments :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.Commitment_hash.t
-       and type value = Sc_rollup_repr.Commitment.t
+      with type key = Sc_rollup_commitment_repr.Hash.t
+       and type value = Sc_rollup_commitment_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   (** Cache: This should always be the number of stakers that are directly or
@@ -755,13 +755,13 @@ module Sc_rollup : sig
    *)
   module Commitment_stake_count :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.Commitment_hash.t
+      with type key = Sc_rollup_commitment_repr.Hash.t
        and type value = int32
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   module Commitment_added :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.Commitment_hash.t
+      with type key = Sc_rollup_commitment_repr.Hash.t
        and type value = Raw_level_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
