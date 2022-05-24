@@ -392,7 +392,7 @@ and iset_iter : type a b c d e f g. (a, b, c, d, e, f, g) iset_iter_type =
 
 and imap_map : type a b c d e f g h i. (a, b, c, d, e, f, g, h, i) imap_map_type
     =
- fun log_if_needed g gas (body, k) ks accu stack ->
+ fun log_if_needed g gas body k ks accu stack ->
   let map = accu in
   let xs = List.rev (Script_map.fold (fun k v a -> (k, v) :: a) map []) in
   let ys = Script_map.empty_from map in
@@ -608,7 +608,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_map.empty ty and stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_map (_, body, k) ->
-          (imap_map [@ocaml.tailcall]) id g gas (body, k) ks accu stack
+          (imap_map [@ocaml.tailcall]) id g gas body k ks accu stack
       | IMap_iter (_, body, k) ->
           (imap_iter [@ocaml.tailcall]) id g gas (body, k) ks accu stack
       | IMap_mem (_, k) ->
@@ -1538,7 +1538,7 @@ and log :
   | ISet_iter (_, body, k) ->
       (iset_iter [@ocaml.tailcall]) with_log g gas body k ks accu stack
   | IMap_map (_, body, k) ->
-      (imap_map [@ocaml.tailcall]) with_log g gas (body, k) ks accu stack
+      (imap_map [@ocaml.tailcall]) with_log g gas body k ks accu stack
   | IMap_iter (_, body, k) ->
       (imap_iter [@ocaml.tailcall]) with_log g gas (body, k) ks accu stack
   | ILoop (_, body, k) ->

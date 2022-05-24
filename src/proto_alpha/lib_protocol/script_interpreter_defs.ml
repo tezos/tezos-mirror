@@ -850,8 +850,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) imap_map_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr
-  * (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
+  ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
+  (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
   ('h, 'i, 'c, 'd) continuation ->
   ('e, 'f) map ->
   'a * 'b ->
