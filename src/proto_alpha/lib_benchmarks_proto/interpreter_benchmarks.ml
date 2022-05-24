@@ -1412,11 +1412,11 @@ module Registration_section = struct
         raise_if_error
           (Lwt_main.run
              ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-               let big_map = Script_ir_translator.empty_big_map int unit_t in
+               let big_map = Script_big_map.empty int unit_t in
                Script_map.fold
                  (fun k v acc ->
                    acc >>=? fun (bm, ctxt_acc) ->
-                   Script_ir_translator.big_map_update ctxt_acc k v bm)
+                   Script_big_map.update ctxt_acc k v bm)
                  map
                  (return (big_map, ctxt))
                >|= Environment.wrap_tzresult
@@ -1463,7 +1463,7 @@ module Registration_section = struct
              ( kinfo (int @$ big_map int unit @$ unit @$ bot),
                halt (option unit @$ unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_big_map int unit in
+          (let map = Script_big_map.empty int unit in
            (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
@@ -1483,7 +1483,7 @@ module Registration_section = struct
              ( kinfo (int @$ option unit @$ big_map int unit @$ bot),
                halt (big_map int unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_big_map int unit in
+          (let map = Script_big_map.empty int unit in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
@@ -1504,7 +1504,7 @@ module Registration_section = struct
              ( kinfo (int @$ option unit @$ big_map int unit @$ bot),
                halt (option unit @$ big_map int unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_big_map int unit in
+          (let map = Script_big_map.empty int unit in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in

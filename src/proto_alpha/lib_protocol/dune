@@ -185,6 +185,7 @@
   Script_tc_context
   Apply_results
   Script_ir_translator
+  Script_big_map
   Script_cache
   Script_tc_errors_registration
   Ticket_costs
@@ -391,6 +392,7 @@
   script_tc_context.ml script_tc_context.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
+  script_big_map.ml script_big_map.mli
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_costs.ml ticket_costs.mli
@@ -583,6 +585,7 @@
   script_tc_context.ml script_tc_context.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
+  script_big_map.ml script_big_map.mli
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_costs.ml ticket_costs.mli
@@ -796,6 +799,7 @@
   script_tc_context.ml script_tc_context.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
+  script_big_map.ml script_big_map.mli
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_costs.ml ticket_costs.mli
@@ -1004,6 +1008,7 @@
   script_tc_context.ml script_tc_context.mli
   apply_results.ml apply_results.mli
   script_ir_translator.ml script_ir_translator.mli
+  script_big_map.ml script_big_map.mli
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_costs.ml ticket_costs.mli

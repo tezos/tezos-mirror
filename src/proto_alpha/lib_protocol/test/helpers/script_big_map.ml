@@ -21,10 +21,10 @@
 (* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 
-let update k v m ctxt = Protocol.Script_ir_translator.big_map_update ctxt k v m
+let update k v m ctxt = Protocol.Script_big_map.update ctxt k v m
 
 let of_list key_ty ty xs ctxt =
   List.fold_left_es
     (fun (bm, ctxt) (k, v) -> update k (Some v) bm ctxt)
-    (Protocol.Script_ir_translator.empty_big_map key_ty ty, ctxt)
+    (Protocol.Script_big_map.empty key_ty ty, ctxt)
     xs

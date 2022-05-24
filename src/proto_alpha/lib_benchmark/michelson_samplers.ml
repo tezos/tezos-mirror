@@ -654,7 +654,7 @@ end)
         let result =
           Lwt_main.run
             ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-              let big_map = Script_ir_translator.empty_big_map key_ty elt_ty in
+              let big_map = Script_big_map.empty key_ty elt_ty in
               (* Cannot have big maps under big maps *)
               option_t (-1) elt_ty |> Environment.wrap_tzresult
               >>?= fun opt_elt_ty ->
@@ -662,7 +662,7 @@ end)
               Script_map.fold
                 (fun k v acc ->
                   acc >>=? fun (bm, ctxt_acc) ->
-                  Script_ir_translator.big_map_update ctxt_acc k v bm)
+                  Script_big_map.update ctxt_acc k v bm)
                 map
                 (return (big_map, ctxt))
               >|= Environment.wrap_tzresult
