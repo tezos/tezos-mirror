@@ -25,7 +25,8 @@ module Test = struct
   (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
   let bench_DAL_crypto_params () =
     let shards_amount = 2048 in
-    let slot_size = 1000000 in
+    let slot_size = 1048576 in
+    let slot_segment_size = 4096 in
     let msg_size = slot_size in
     let msg = Bytes.create msg_size in
     for i = 0 to (msg_size / 64) - 1 do
@@ -39,7 +40,7 @@ module Test = struct
 
           let slot_size = slot_size
 
-          let slot_segment_size = 4096
+          let slot_segment_size = slot_segment_size
 
           let shards_amount = shards_amount
         end) in
@@ -48,18 +49,15 @@ module Test = struct
 
           let* cm = DAL_crypto.commit p in
 
-          let* pi =
-            DAL_crypto.prove_slot_segment
-              p
-              ~slot:msg
-              ~offset:(31 * 2)
-              ~length:(31 * 132)
-          in
+          let pis = DAL_crypto.prove_slot_segments p in
 
-          let slot_segment = Bytes.sub msg (31 * 2) (31 * 132) in
+          let slot_segment = Bytes.sub msg 0 slot_segment_size in
           assert (
-            DAL_crypto.verify_slot_segment cm ~slot_segment ~offset:(31 * 2) pi) ;
-
+            DAL_crypto.verify_slot_segment
+              cm
+              ~slot_segment
+              ~slot_segment_index:0
+              pis.(0)) ;
           let enc_shards = DAL_crypto.to_shards p in
 
           (* Only take half of the buckets *)
@@ -104,21 +102,14 @@ module Test = struct
               assert check ;
 
               let point = Scalar.random () in
-              let* pi_slot = DAL_crypto.prove_single p point in
+              let+ pi_slot = DAL_crypto.prove_single p point in
 
               assert (
                 DAL_crypto.verify_single
                   comm
                   ~point
                   ~evaluation:(DAL_crypto.polynomial_evaluate p point)
-                  pi_slot) ;
-              let points = [Scalar.random (); Scalar.random ()] in
-              let evaluations =
-                List.map (DAL_crypto.polynomial_evaluate p) points
-              in
-              let+ proofs_multi = DAL_crypto.prove_multi p points in
-              assert (
-                DAL_crypto.verify_multi comm ~points ~evaluations proofs_multi)
+                  pi_slot)
         with
         | Ok () -> ()
         | Error _ -> assert false)

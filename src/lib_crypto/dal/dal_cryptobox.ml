@@ -45,8 +45,8 @@ module type DAL_cryptobox_sig = sig
   (** Proof of evaluation at a single point. *)
   type proof_single
 
-  (** Proof of evaluation at multiple points. *)
-  type proof_multi
+  (** Proof of a slot segment. *)
+  type proof_slot_segment
 
   (** A share is a part of the encoded data. *)
   type share = Scalar.t array
@@ -67,8 +67,6 @@ module type DAL_cryptobox_sig = sig
 
     val proof_single_encoding : proof_single Data_encoding.t
 
-    val proof_multi_encoding : proof_multi Data_encoding.t
-
     val share_encoding : share Data_encoding.t
 
     val shard_encoding : shard Data_encoding.t
@@ -86,7 +84,7 @@ module type DAL_cryptobox_sig = sig
 
   (** [polynomial_from_bytes slot] returns a polynomial from the input [slot]. *)
   val polynomial_from_bytes :
-    bytes -> (polynomial, [> `Slot_too_large of string]) Result.t
+    bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
 
   (** [polynomial_to_bytes polynomial] returns a slot from a [polynomial]. *)
   val polynomial_to_bytes : polynomial -> bytes
@@ -139,35 +137,19 @@ module type DAL_cryptobox_sig = sig
   val verify_single :
     commitment -> point:Scalar.t -> evaluation:Scalar.t -> proof_single -> bool
 
-  (** [prove_multi p points] returns a proof of evaluations of [p] at [points]. *)
-  val prove_multi :
-    polynomial ->
-    Scalar.t list ->
-    (proof_multi, [> `Degree_exceeds_srs_length of string]) Result.t
+  (** [prove_slot_segment p] where [p] is the output of
+      [polynomial_from_bytes slot], returns proofs for all slot segments. *)
+  val prove_slot_segments : polynomial -> proof_slot_segment array
 
-  (** [verify_multi cm ~points ~evaluations proof] returns true if the [proof]
-      is correct with regard to the openings. *)
-  val verify_multi :
-    commitment ->
-    points:Scalar.t list ->
-    evaluations:Scalar.t list ->
-    proof_multi ->
-    bool
-
-  (** [prove_slot_segment p ~slot ~offset ~length] where [p] is the output of
-      [polynomial_from_bytes slot], returns a proof for the segment of the slot
-      starting from [offset] and of length [length]. *)
-  val prove_slot_segment :
-    polynomial ->
-    slot:bytes ->
-    offset:int ->
-    length:int ->
-    (proof_multi, [> `Degree_exceeds_srs_length of string]) result
-
-  (** [verify_slot_segment cm ~slot_segment ~offset proof] returns true if the
-      [slot_segment] is correct. *)
+  (** [verify_slot_segment cm ~slot_segment ~slot_segment_index proof] returns
+      true if the [slot_segment] whose index is [slot_segment_index] is
+      correct. *)
   val verify_slot_segment :
-    commitment -> slot_segment:bytes -> offset:int -> proof_multi -> bool
+    commitment ->
+    slot_segment:bytes ->
+    slot_segment_index:int ->
+    proof_slot_segment ->
+    bool
 end
 
 (** Parameters of the DAL relevant to the cryptographic primitives. *)
@@ -175,10 +157,10 @@ module type Params_sig = sig
   (** Redundancy factor of the erasure code. *)
   val redundancy_factor : int
 
-  (** Size in bytes of a slot. *)
+  (** Size in bytes of a slot, must be a power of two. *)
   val slot_size : int
 
-  (** Size in bytes of a slot segment. *)
+  (** Size in bytes of a slot segment, must be a power of two. *)
   val slot_segment_size : int
 
   (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
@@ -209,7 +191,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   type proof_single = Bls12_381.G1.t
 
-  type proof_multi = Bls12_381.G1.t list
+  type proof_slot_segment = Bls12_381.G1.t
 
   type share = Scalar.t array
 
@@ -235,8 +217,6 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     let proof_degree_encoding = g1_encoding
 
     let proof_single_encoding = g1_encoding
-
-    let proof_multi_encoding = list g1_encoding
 
     let share_encoding = array fr_encoding
 
@@ -269,6 +249,11 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       1 lsl logx = x
     in
 
+    (* According to the specification the lengths of a slot a slot segment are
+       in MiB *)
+    assert (is_pow_of_two slot_size) ;
+    assert (is_pow_of_two slot_segment_size) ;
+
     assert (is_pow_of_two n) ;
 
     (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
@@ -296,6 +281,14 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   (* Length of a shard in terms of scalar elements. *)
   let shard_size = Params.(n / shards_amount)
+
+  let nb_segments = Params.(slot_size / slot_segment_size)
+
+  (* Since the remainder of the division of slot_segment_size (power of 2) by
+     scalar_bytes_amount (= 31) is non-zero. *)
+  let segment_len = Int.div Params.slot_segment_size scalar_bytes_amount + 1
+
+  let remaining_bytes = Params.slot_segment_size mod scalar_bytes_amount
 
   let polynomial_degree = Polynomial.degree
 
@@ -349,49 +342,59 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   (* We encode by segments of [slot_segment_size] bytes each. *)
   let polynomial_from_bytes' slot =
-    let vector_length = Int.div (Bytes.length slot) scalar_bytes_amount in
-    if not (vector_length < k) then
+    if Bytes.length slot <> Params.slot_size then
       Error
-        (`Slot_too_large
-          (Printf.sprintf
-             "message must be at most %d bytes long"
-             (scalar_bytes_amount * k)))
+        (`Slot_wrong_size
+          (Printf.sprintf "message must be %d bytes long" Params.slot_size))
     else
-      let remaining_bytes = Bytes.length slot mod scalar_bytes_amount in
-      Ok
-        (Array.init k (fun i ->
-             match i with
-             | i when i < vector_length ->
-                 let dst = Bytes.create scalar_bytes_amount in
-                 Bytes.blit
-                   slot
-                   (i * scalar_bytes_amount)
-                   dst
-                   0
-                   scalar_bytes_amount ;
-                 Scalar.of_bytes_exn dst
-             | i when i = vector_length ->
-                 let dst = Bytes.create remaining_bytes in
-                 Bytes.blit slot (i * scalar_bytes_amount) dst 0 remaining_bytes ;
-                 Scalar.of_bytes_exn dst
-             | _ -> Scalar.(copy zero)))
+      let offset = ref 0 in
+      let res = Array.init k (fun _ -> Scalar.(copy zero)) in
+      for segment = 0 to nb_segments - 1 do
+        for elt = 0 to segment_len - 1 do
+          if !offset > Params.slot_size then ()
+          else if elt = segment_len - 1 then (
+            let dst = Bytes.create remaining_bytes in
+            Bytes.blit slot !offset dst 0 remaining_bytes ;
+            offset := !offset + remaining_bytes ;
+            res.((elt * nb_segments) + segment) <- Scalar.of_bytes_exn dst)
+          else
+            let dst = Bytes.create scalar_bytes_amount in
+            Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
+            offset := !offset + scalar_bytes_amount ;
+            res.((elt * nb_segments) + segment) <- Scalar.of_bytes_exn dst
+        done
+      done ;
+      Ok res
 
   let polynomial_from_bytes slot =
     let open Result_syntax in
     let* data = polynomial_from_bytes' slot in
     Ok (Evaluations.interpolation_fft2 domain_k data)
 
+  (* The segments are arranged in cosets to evaluate in batch with Kate
+     amortized. *)
   let polynomial_to_bytes p =
     let p = Evaluations.evaluation_fft2 domain_k p in
-    let convert p =
-      List.map
-        (fun b -> Bytes.sub (Scalar.to_bytes b) 0 scalar_bytes_amount)
-        (Array.to_list p)
-    in
-    Bytes.(sub (concat empty (convert p))) 0 Params.slot_size
+    let slot = Bytes.init Params.slot_size (fun _ -> '0') in
+    let offset = ref 0 in
+    for segment = 0 to nb_segments - 1 do
+      for elt = 0 to segment_len - 1 do
+        let idx = (elt * nb_segments) + segment in
+        let coeff = Scalar.to_bytes (Array.get p idx) in
+        if elt = segment_len - 1 then (
+          Bytes.blit coeff 0 slot !offset remaining_bytes ;
+          offset := !offset + remaining_bytes)
+        else (
+          Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
+          offset := !offset + scalar_bytes_amount)
+      done
+    done ;
+    slot
 
   let encode = Evaluations.evaluation_fft2 domain_n
 
+  (* The shards are arranged in cosets to evaluate in batch with Kate
+     amortized. *)
   let to_shards p =
     let codeword = encode p in
     let len_shard = n / Params.shards_amount in
@@ -515,9 +518,13 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   (* Mock SRS, TODO: import srs files *)
   let secret = Scalar.random ()
 
-  let kate_amortized_srs =
-    let l = 1 lsl evaluations_per_proof_log in
-    Kate_amortized.gen_srs ~l ~size:k secret
+  let kate_amortized_srs_g1 = Kate_amortized.gen_srs_g1 ~size:k secret
+
+  let kate_amortized_srs_g2_shards =
+    Kate_amortized.gen_srs_g2 ~l:(1 lsl evaluations_per_proof_log) secret
+
+  let kate_amortized_srs_g2_segments =
+    Kate_amortized.gen_srs_g2 ~l:(1 lsl Z.(log2up (of_int segment_len))) secret
 
   let kzg_srs_size = k
 
@@ -538,11 +545,11 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   let kzg_srs = create_srs (module Bls12_381.G1) kzg_srs_size secret
 
-  let preprocess =
+  let preprocess_shards_proofs =
     Kate_amortized.preprocess_multi_reveals
       ~chunk_len:evaluations_per_proof_log
       ~degree:k
-      kate_amortized_srs
+      (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
 
   let commit' :
       type t.
@@ -601,7 +608,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       ~chunk_len:evaluations_per_proof_log
       ~chunk_count:proofs_log
       ~degree:k
-      ~preprocess
+      ~preprocess:preprocess_shards_proofs
       (Polynomial.to_dense_coefficients p |> Array.to_list)
 
   let verify_shard ct (shard_index, shard_evaluations) proof =
@@ -609,7 +616,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     let domain = Kate_amortized.Domain.build evaluations_per_proof_log in
     Kate_amortized.verify
       ct
-      kate_amortized_srs
+      (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
       domain
       (d_n.(shard_index), shard_evaluations)
       proof
@@ -628,65 +635,33 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
           (proof, G2.(add h_secret (negate (mul (copy one) point))));
         ])
 
-  let prove_multi p points =
-    Tezos_error_monad.TzLwtreslib.List.map_e
-      (fun z ->
-        commit'
-          (module Bls12_381.G1)
-          Polynomial.(division_x_z (p - constant (evaluate p z)) z)
-          kzg_srs)
-      points
+  let preprocess_segments_proofs =
+    Kate_amortized.preprocess_multi_reveals
+      ~chunk_len:Z.(log2up (of_int segment_len))
+      ~degree:k
+      (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
 
-  let verify_multi cm ~points ~evaluations proofs =
-    let r = Scalar.random () in
-    let n_eval = List.length evaluations in
-    let pow_r = build_array Scalar.(copy one) (Scalar.mul r) n_eval in
-    let open Bls12_381 in
-    let fk =
-      List.map (fun s -> G1.(add cm (negate (mul (copy one) s)))) evaluations
-      |> Array.of_list
+  let prove_slot_segments p =
+    Kate_amortized.multiple_multi_reveals
+      ~chunk_len:Z.(log2up (of_int segment_len))
+      ~chunk_count:Z.(log2 (of_int nb_segments))
+      ~degree:k
+      ~preprocess:preprocess_segments_proofs
+      (Polynomial.to_dense_coefficients p |> Array.to_list)
+
+  (* Parses the [slot_segment] to get the evaluations that it contains. The
+     evaluation points are given by the [slot_segment_index]. *)
+  let verify_slot_segment ct ~slot_segment ~slot_segment_index proof =
+    let segment_domain =
+      Kate_amortized.Domain.build
+        (Z.log2 (Z.of_int (segment_len * nb_segments)))
     in
-    let f = G1.pippenger fk pow_r in
-    let proofs = Array.of_list proofs in
-    let points = Array.of_list points in
-    (* list such as rzi=ri*zi *)
-    let rz_list = Array.map2 Scalar.mul pow_r points in
-    (* Sum of ri*zi*Wi *)
-    let rzw_sum = G1.pippenger proofs rz_list in
-    (* Sum of ri*Wi *)
-    let rw_sum = G1.pippenger proofs pow_r in
-    Pairing.pairing_check
-      [
-        (G1.add f rzw_sum, G2.(copy one));
-        (G1.negate rw_sum, G2.(copy (Array.get kzg_srs_g2 1)));
-      ]
-
-  let prove_slot_segment p ~slot ~offset ~length =
-    assert (offset mod scalar_bytes_amount = 0) ;
-    let slot_length = Bytes.length slot in
-    assert (length mod scalar_bytes_amount = 0 || offset + length = slot_length) ;
-    let length' = length / scalar_bytes_amount in
-    let offset' = offset / scalar_bytes_amount in
-    let rem = if length mod scalar_bytes_amount > 0 then 1 else 0 in
-    prove_multi
-      p
-      (List.init (length' + rem) (fun i -> Domains.get domain_k (offset' + i)))
-
-  let verify_slot_segment cm ~slot_segment ~offset proof =
-    let len_slot_segment = Bytes.length slot_segment in
-    assert (offset mod scalar_bytes_amount = 0) ;
-    let vector_length = len_slot_segment / scalar_bytes_amount in
-    let remaining_bytes = len_slot_segment mod scalar_bytes_amount in
-    let rem = if remaining_bytes > 0 then 1 else 0 in
-    let offset' = offset / scalar_bytes_amount in
-    let points =
-      List.init (vector_length + rem) (fun i ->
-          Domains.get domain_k (offset' + i))
-    in
-    let evaluations =
-      List.init (vector_length + rem) (fun i ->
-          match i with
-          | i when i < vector_length ->
+    let domain = Kate_amortized.Domain.build Z.(log2up (of_int segment_len)) in
+    let slot_segment_evaluations =
+      Array.init
+        (1 lsl Z.(log2up (of_int segment_len)))
+        (function
+          | i when i < segment_len - 1 ->
               let dst = Bytes.create scalar_bytes_amount in
               Bytes.blit
                 slot_segment
@@ -695,7 +670,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
                 0
                 scalar_bytes_amount ;
               Scalar.of_bytes_exn dst
-          | i when i = vector_length ->
+          | i when i = segment_len - 1 ->
               let dst = Bytes.create remaining_bytes in
               Bytes.blit
                 slot_segment
@@ -706,5 +681,10 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
               Scalar.of_bytes_exn dst
           | _ -> Scalar.(copy zero))
     in
-    verify_multi cm ~points ~evaluations proof
+    Kate_amortized.verify
+      ct
+      (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
+      domain
+      (segment_domain.(slot_segment_index), slot_segment_evaluations)
+      proof
 end

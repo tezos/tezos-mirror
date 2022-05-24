@@ -52,6 +52,14 @@ module Kate_amortized = struct
     let l1 = create_srs1 d x in
     (l1, srs2)
 
+  (* Returns [[x⁰]₁, [x¹]₁, …, [x^(d-1)]₁] for x ∈ F and d. *)
+  let gen_srs_g1 ~size:d x = create_srs1 d x
+
+  (* Returns [x^l]₂ for x ∈ F and l int. *)
+  let gen_srs_g2 ~l x =
+    let xl = Scalar.pow x (Z.of_int l) in
+    G2.(mul (copy one) xl)
+
   type commitment = G1.t
 
   let commit p (srs1, _) =
@@ -295,6 +303,10 @@ module type Kate_amortized_sig = sig
   type srs
 
   val gen_srs : l:int -> size:int -> Scalar.t -> srs
+
+  val gen_srs_g1 : size:int -> Scalar.t -> srs
+
+  val gen_srs_g2 : l:int -> Scalar.t -> srs
 
   type proof
 
