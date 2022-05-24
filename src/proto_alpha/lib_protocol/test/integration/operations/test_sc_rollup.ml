@@ -65,10 +65,7 @@ let test_disable_feature_flag () =
     | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ ->
-        failwith
-          "It should not be possible to send a smart contract rollup operation \
-           when the feature flag is disabled."
+    | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
   in
   let*! _ = Incremental.add_operation ~expect_failure i op in
   return_unit
@@ -192,7 +189,7 @@ let test_publish_fails_on_backtrack () =
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ -> failwith "It should not be possible for a staker to backtrack."
+    | _ -> failwith "It should have failed with [Sc_rollup_staker_backtracked]"
   in
   let* _ = Incremental.add_operation ~expect_failure i operation2 in
   return_unit
@@ -230,9 +227,9 @@ let test_cement_fails_on_conflict () =
       ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ ->
-        failwith "It should not be possible to cement a contested commitment."
+    | _ -> failwith "It should have failed with [Sc_rollup_disputed]"
   in
+
   let* _ = Incremental.add_operation ~expect_failure i cement_op in
   return_unit
 
@@ -266,10 +263,7 @@ let test_challenge_window_period_boundaries () =
         :: _ ->
           Assert.test_error_encodings e ;
           return_unit
-      | _ ->
-          failwith
-            "It should not be possible to cement a commitment before waiting \
-             the challenge window."
+      | _ -> failwith "It should have failed with [Sc_rollup_too_recent]"
     in
     commit_and_cement_after_n_bloc
       ~expect_failure
