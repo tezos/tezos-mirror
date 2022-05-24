@@ -68,6 +68,9 @@ Node
 - Deprecated the CLI argument `--enable-testchain` and the corresponding
   configuration-file option `p2p.enable_testchain`.
 
+- Added metrics to track the pending requests of chain validator, block
+  validator and prevalidator workers.
+
 Client
 ------
 
