@@ -32,8 +32,6 @@ module type S = sig
   val grow : ?produce_value:(key -> 'a) -> key -> 'a t -> 'a t
 end
 
-exception OutOfBounds
-
 exception UnexpectedAccess
 
 module Make (Key : KeyS) : S with type key = Key.t = struct
@@ -67,7 +65,7 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     if
       Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
     then
-      raise OutOfBounds;
+      raise Memory_exn.Bounds;
     match Map.find_opt key map.values with
     | None ->
       (* Need to create the missing key-value association. *)
@@ -81,7 +79,7 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     if
       Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
     then
-      raise OutOfBounds;
+      raise Memory_exn.Bounds;
     { map with values = Map.add key value map.values }
 
   let grow ?produce_value delta map =

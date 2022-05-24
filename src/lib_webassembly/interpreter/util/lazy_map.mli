@@ -56,9 +56,6 @@ module type S = sig
   val grow : ?produce_value:(key -> 'a) -> key -> 'a t -> 'a t
 end
 
-(** [OutOfBounds] is raised when accessing an entry out of bounds. *)
-exception OutOfBounds
-
 (** [UnexpectedAccess] is raised in the default of the [produce_value] argument
     to [S.create]. *)
 exception UnexpectedAccess

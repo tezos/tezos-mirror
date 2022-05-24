@@ -8,11 +8,8 @@ type address = int64
 type offset = int32
 type count = int32
 
-exception Type
-exception Bounds
-exception SizeOverflow
-exception SizeLimit
-exception OutOfMemory
+(* Expose exception types *)
+include Memory_exn
 
 (* Copied from [Memory] module *)
 let page_size = 0x10000L (* 64 KiB *)
@@ -59,18 +56,12 @@ module SubPage = struct
   let total_size map = Int64.mul (Map.num_elements map) size
 
   let load_byte page_map address =
-    try
-      let sub_page = Map.get (index_of_address address) page_map in
-      Array1_64.get sub_page (mask_address address)
-    with
-      Lazy_map.OutOfBounds -> raise Bounds
+    let sub_page = Map.get (index_of_address address) page_map in
+    Array1_64.get sub_page (mask_address address)
 
   let store_byte page_map address byte =
-    try
-      let sub_page = Map.get (index_of_address address) page_map in
-      Array1_64.set sub_page (mask_address address) byte
-    with
-      Lazy_map.OutOfBounds -> raise Bounds
+    let sub_page = Map.get (index_of_address address) page_map in
+    Array1_64.set sub_page (mask_address address) byte
 end
 
 type memory = {mutable ty : memory_type; content : SubPage.map}
