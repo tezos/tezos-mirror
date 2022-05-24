@@ -122,8 +122,11 @@ module type S = sig
   (** [state_hash state] returns a compressed representation of [state]. *)
   val state_hash : state -> hash Lwt.t
 
-  (** [initial_state context boot_sector] is the state of the PVM
-     before booting. *)
+  (** [initial_state context boot_sector] is the initial state of the PVM,
+      which is a pure function of [boot_sector].
+
+      The [context] argument is required for technical reasons and does
+      not impact the result. *)
   val initial_state : context -> string -> state Lwt.t
 
   (** [is_input_state state] returns [Some (level, counter)] if
