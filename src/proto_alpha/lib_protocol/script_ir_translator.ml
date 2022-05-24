@@ -2183,6 +2183,28 @@ let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
+let parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
+  function
+  | String (loc, v) as expr ->
+      (* The limitation of length of string is same as entrypoint *)
+      if Compare.Int.(String.length v > 31) then error (View_name_too_long v)
+      else
+        let rec check_char i =
+          if Compare.Int.(i < 0) then ok v
+          else if Script_ir_annot.is_allowed_char v.[i] then check_char (i - 1)
+          else error (Bad_view_name loc)
+        in
+        Gas.consume ctxt (Typecheck_costs.check_printable v) >>? fun ctxt ->
+        record_trace
+          (Invalid_syntactic_constant
+             ( loc,
+               strip_locations expr,
+               "string [a-zA-Z0-9_.%@] and the maximum string length of 31 \
+                characters" ))
+          ( check_char (String.length v - 1) >>? fun v ->
+            Script_string.of_string v >|? fun s -> (s, ctxt) )
+  | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
+
 (* -- parse data of any type -- *)
 
 (*
@@ -4865,28 +4887,6 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
       (* TODO #2800
          Implement typechecking of sc rollup deposits. *)
       fail (No_such_entrypoint entrypoint)
-
-and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
-  function
-  | String (loc, v) as expr ->
-      (* The limitation of length of string is same as entrypoint *)
-      if Compare.Int.(String.length v > 31) then error (View_name_too_long v)
-      else
-        let rec check_char i =
-          if Compare.Int.(i < 0) then ok v
-          else if Script_ir_annot.is_allowed_char v.[i] then check_char (i - 1)
-          else error (Bad_view_name loc)
-        in
-        Gas.consume ctxt (Typecheck_costs.check_printable v) >>? fun ctxt ->
-        record_trace
-          (Invalid_syntactic_constant
-             ( loc,
-               strip_locations expr,
-               "string [a-zA-Z0-9_.%@] and the maximum string length of 31 \
-                characters" ))
-          ( check_char (String.length v - 1) >>? fun v ->
-            Script_string.of_string v >|? fun s -> (s, ctxt) )
-  | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
 
 and parse_toplevel :
     context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
