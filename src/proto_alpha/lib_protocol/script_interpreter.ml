@@ -250,7 +250,7 @@ let () =
 let rec kmap_exit :
     type a b c d e f g h m n o. (a, b, c, d, e, f, g, h, m, n, o) kmap_exit_type
     =
- fun mk g gas (body, xs, ys, yk) ks accu stack ->
+ fun mk g gas body xs ys yk ks accu stack ->
   let ys = Script_map.update yk (Some accu) ys in
   let ks = mk (KMap_enter_body (body, xs, ys, ks)) in
   let accu, stack = stack in
@@ -347,8 +347,7 @@ and next :
           let extra = (body, xs, ys) in
           (kmap_enter [@ocaml.tailcall]) id g gas extra ks accu stack
       | KMap_exit_body (body, xs, ys, yk, ks) ->
-          let extra = (body, xs, ys, yk) in
-          (kmap_exit [@ocaml.tailcall]) id g gas extra ks accu stack
+          (kmap_exit [@ocaml.tailcall]) id g gas body xs ys yk ks accu stack
       | KView_exit (orig_step_constants, ks) ->
           let g = (fst g, orig_step_constants) in
           (next [@ocaml.tailcall]) g gas ks accu stack)
@@ -1626,7 +1625,7 @@ and klog :
       (kmap_enter [@ocaml.tailcall]) mk g gas (body, xs, ys) ks' accu stack
   | KMap_exit_body (body, xs, ys, yk, ks') ->
       let ks' = mk ks' in
-      (kmap_exit [@ocaml.tailcall]) mk g gas (body, xs, ys, yk) ks' accu stack
+      (kmap_exit [@ocaml.tailcall]) mk g gas body xs ys yk ks' accu stack
   | KView_exit (orig_step_constants, ks') ->
       let g = (fst g, orig_step_constants) in
       (next [@ocaml.tailcall]) g gas ks' accu stack

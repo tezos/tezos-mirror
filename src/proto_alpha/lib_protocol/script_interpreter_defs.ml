@@ -735,7 +735,10 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'm, 'n, 'o) kmap_exit_type =
   (('c, 'd, 'e, 'f) continuation -> ('a, 'b, 'g, 'h) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr * ('m * 'n) list * ('m, 'o) map * 'm ->
+  ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr ->
+  ('m * 'n) list ->
+  ('m, 'o) map ->
+  'm ->
   (('m, 'o) map, 'c * 'd, 'e, 'f) continuation ->
   'o ->
   'a * 'b ->
