@@ -828,7 +828,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) ilist_iter_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'f, 'g) kinstr ->
+  ('e, 'a * 'b, 'a, 'b) kinstr ->
+  ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
   'e boxed_list ->
   'a * 'b ->

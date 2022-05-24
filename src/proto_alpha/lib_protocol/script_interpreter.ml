@@ -374,7 +374,7 @@ and ilist_map : type a b c d e f g h. (a, b, c, d, e, f, g, h) ilist_map_type =
  [@@inline]
 
 and ilist_iter : type a b c d e f g. (a, b, c, d, e, f, g) ilist_iter_type =
- fun log_if_needed g gas (body, k) ks accu stack ->
+ fun log_if_needed g gas body k ks accu stack ->
   let xs = accu.elements in
   let ks = log_if_needed (KIter (body, xs, KCons (k, ks))) in
   let accu, stack = stack in
@@ -584,7 +584,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let len = Script_int.(abs (of_int list.length)) in
           (step [@ocaml.tailcall]) g gas k ks len stack
       | IList_iter (_, body, k) ->
-          (ilist_iter [@ocaml.tailcall]) id g gas (body, k) ks accu stack
+          (ilist_iter [@ocaml.tailcall]) id g gas body k ks accu stack
       (* sets *)
       | IEmpty_set (_, ty, k) ->
           let res = Script_set.empty ty in
@@ -1534,7 +1534,7 @@ and log :
   | IList_map (_, body, k) ->
       (ilist_map [@ocaml.tailcall]) with_log g gas body k ks accu stack
   | IList_iter (_, body, k) ->
-      (ilist_iter [@ocaml.tailcall]) with_log g gas (body, k) ks accu stack
+      (ilist_iter [@ocaml.tailcall]) with_log g gas body k ks accu stack
   | ISet_iter (_, body, k) ->
       (iset_iter [@ocaml.tailcall]) with_log g gas (body, k) ks accu stack
   | IMap_map (_, body, k) ->
