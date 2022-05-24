@@ -760,7 +760,10 @@ type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('i, 'a * 'b, 'j, 'a * 'b) kinstr * 'i list * 'j list * int ->
+  ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
+  'i list ->
+  'j list ->
+  int ->
   ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->

@@ -269,7 +269,7 @@ and kmap_enter : type a b c d i j k. (a, b, c, d, i, j, k) kmap_enter_type =
  [@@inline]
 
 and klist_exit : type a b c d i j. (a, b, c, d, i, j) klist_exit_type =
- fun mk g gas (body, xs, ys, len) ks accu stack ->
+ fun mk g gas body xs ys len ks accu stack ->
   let ks = mk (KList_enter_body (body, xs, accu :: ys, len, ks)) in
   let accu, stack = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
@@ -341,8 +341,7 @@ and next :
           let extra = (body, xs, ys, len) in
           (klist_enter [@ocaml.tailcall]) id g gas extra ks accu stack
       | KList_exit_body (body, xs, ys, len, ks) ->
-          let extra = (body, xs, ys, len) in
-          (klist_exit [@ocaml.tailcall]) id g gas extra ks accu stack
+          (klist_exit [@ocaml.tailcall]) id g gas body xs ys len ks accu stack
       | KMap_enter_body (body, xs, ys, ks) ->
           (kmap_enter [@ocaml.tailcall]) id g gas body xs ys ks accu stack
       | KMap_exit_body (body, xs, ys, yk, ks) ->
@@ -1617,8 +1616,7 @@ and klog :
       (klist_enter [@ocaml.tailcall]) mk g gas extra ks' accu stack
   | KList_exit_body (body, xs, ys, len, ks') ->
       let ks' = mk ks' in
-      let extra = (body, xs, ys, len) in
-      (klist_exit [@ocaml.tailcall]) mk g gas extra ks' accu stack
+      (klist_exit [@ocaml.tailcall]) mk g gas body xs ys len ks' accu stack
   | KMap_enter_body (body, xs, ys, ks') ->
       let ks' = mk ks' in
       (kmap_enter [@ocaml.tailcall]) mk g gas body xs ys ks' accu stack
