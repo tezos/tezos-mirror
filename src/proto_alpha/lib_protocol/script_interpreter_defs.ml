@@ -894,8 +894,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo
-  * (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
+  (Script_int.n Script_int.num, 'a) kinfo ->
+  (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Script_int.n Script_int.num * 'b ->
