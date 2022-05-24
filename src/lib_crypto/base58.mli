@@ -153,7 +153,7 @@ module Alphabet : sig
 
   val make : string -> t
 
-  val all_in_alphabet : t -> string -> bool
+  val all_in_alphabet : ?ignore_case:bool -> t -> string -> bool
 
   val pp : Format.formatter -> t -> unit
 end
