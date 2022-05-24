@@ -2952,6 +2952,7 @@ end = struct
                "test_bitset" |> some_if N.(number >= 013);
                "test_sc_rollup_tick_repr" |> some_if N.(number >= 013);
                "refutation_game_pbt" |> some_if N.(number == 013);
+               "test_refutation_game" |> some_if N.(number >= 014);
                "test_carbonated_map" |> some_if N.(number >= 013);
              ])
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"

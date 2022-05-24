@@ -320,6 +320,10 @@ val pp_outcome : Format.formatter -> outcome -> unit
 
 val outcome_encoding : outcome Data_encoding.t
 
+(** Checks that the tick count chosen by the current move is one of
+    the ones in the current dissection. Returns a tuple containing
+    the current dissection interval (including the two states) between
+    this tick and the next. *)
 val find_choice :
   t ->
   Sc_rollup_tick_repr.t ->
@@ -338,6 +342,19 @@ val find_choice :
     being provided this returns an [outcome]. *)
 val play : t -> refutation -> (outcome, t) Either.t
 
+(** We check firstly that [dissection] is the correct length. It must be
+    32 values long, unless the distance between [start_tick] and
+    [stop_tick] is too small to make this possible, in which case it
+    should be as long as possible. (If the distance is one we fail
+    immediately as there is no possible legal dissection).
+    
+    Then we check that [dissection] starts at the correct tick and state,
+    and that it ends at the correct tick and with a different state to
+    the current dissection.
+
+    Finally, we check that [dissection] is well formed: it has correctly
+    ordered the ticks, and it contains no [None] states except for
+    possibly the last one. *)
 val check_dissection :
   Sc_rollup_repr.State_hash.t option ->
   Sc_rollup_tick_repr.t ->

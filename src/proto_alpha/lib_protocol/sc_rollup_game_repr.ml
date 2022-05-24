@@ -381,10 +381,6 @@ let outcome_encoding =
     (fun (loser, reason) -> {loser; reason})
     (obj2 (req "loser" player_encoding) (req "reason" reason_encoding))
 
-(** Checks that the tick count chosen by the current move is one of
-    the ones in the current dissection. Returns a tuple containing
-    the current dissection interval (including the two states) between
-    this tick and the next. *)
 let find_choice game tick =
   let open Result_syntax in
   let rec traverse states =
@@ -401,19 +397,6 @@ let check pred =
   let open Result_syntax in
   if pred then return () else error ()
 
-(** We check firstly that [dissection] is the correct length. It must be
-    32 values long, unless the distance between [start_tick] and
-    [stop_tick] is too small to make this possible, in which case it
-    should be as long as possible. (If the distance is one we fail
-    immediately as there is no possible legal dissection).
-    
-    Then we check that [dissection] starts at the correct tick and state,
-    and that it ends at the correct tick and with a different state to
-    the current dissection.
-
-    Finally, we check that [dissection] is well formed: it has correctly
-    ordered the ticks, and it contains no [None] states except for
-    possibly the last one. *)
 let check_dissection start start_tick stop stop_tick dissection =
   let open Result_syntax in
   let len = Z.of_int @@ List.length dissection in
