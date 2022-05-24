@@ -522,8 +522,6 @@ can use to originate a transaction rollup.
 
 where ``tx`` is an abbreviation for transaction.
 
-.. TODO: https://gitlab.com/tezos/tezos/-/issues/2152
-
 The origination of a transaction rollup burns ꜩ1.
 
 A transaction rollup address is attributed to the new transaction
