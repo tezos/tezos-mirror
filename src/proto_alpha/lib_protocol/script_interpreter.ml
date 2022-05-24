@@ -302,7 +302,7 @@ and kloop_in : type a b c r f s. (a, b, c, r, f, s) kloop_in_type =
  [@@inline]
 
 and kiter : type a b s r f. (a, b, s, r, f) kiter_type =
- fun mk g gas (body, xs) ks accu stack ->
+ fun mk g gas body xs ks accu stack ->
   match xs with
   | [] -> (next [@ocaml.tailcall]) g gas ks accu stack
   | x :: xs ->
@@ -335,8 +335,7 @@ and next :
           (kloop_in_left [@ocaml.tailcall]) g gas ks0 ki ks' accu stack
       | KUndip (x, ks) -> (next [@ocaml.tailcall]) g gas ks x (accu, stack)
       | KIter (body, xs, ks) ->
-          let extra = (body, xs) in
-          (kiter [@ocaml.tailcall]) id g gas extra ks accu stack
+          (kiter [@ocaml.tailcall]) id g gas body xs ks accu stack
       | KList_enter_body (body, xs, ys, len, ks) ->
           (klist_enter [@ocaml.tailcall]) id g gas body xs ys len ks accu stack
       | KList_exit_body (body, xs, ys, len, ks) ->
@@ -363,7 +362,7 @@ and next :
 
 *)
 and ilist_map : type a b c d e f g h. (a, b, c, d, e, f, g, h) ilist_map_type =
- fun log_if_needed g gas (body, k) ks accu stack ->
+ fun log_if_needed g gas body k ks accu stack ->
   let xs = accu.elements in
   let ys = [] in
   let len = accu.length in
@@ -579,7 +578,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 hd
                 (tl, stack))
       | IList_map (_, body, k) ->
-          (ilist_map [@ocaml.tailcall]) id g gas (body, k) ks accu stack
+          (ilist_map [@ocaml.tailcall]) id g gas body k ks accu stack
       | IList_size (_, k) ->
           let list = accu in
           let len = Script_int.(abs (of_int list.length)) in
@@ -1533,7 +1532,7 @@ and log :
   let with_log k = match k with KLog _ -> k | _ -> KLog (k, logger) in
   match k with
   | IList_map (_, body, k) ->
-      (ilist_map [@ocaml.tailcall]) with_log g gas (body, k) ks accu stack
+      (ilist_map [@ocaml.tailcall]) with_log g gas body k ks accu stack
   | IList_iter (_, body, k) ->
       (ilist_iter [@ocaml.tailcall]) with_log g gas (body, k) ks accu stack
   | ISet_iter (_, body, k) ->
@@ -1608,7 +1607,7 @@ and klog :
   | KIter (body, xs, ks') ->
       let ks' = mk ks' in
       let body = enable_log body in
-      (kiter [@ocaml.tailcall]) mk g gas (body, xs) ks' accu stack
+      (kiter [@ocaml.tailcall]) mk g gas body xs ks' accu stack
   | KList_enter_body (body, xs, ys, len, ks') ->
       let ks' = mk ks' in
       (klist_enter [@ocaml.tailcall]) mk g gas body xs ys len ks' accu stack

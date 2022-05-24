@@ -806,7 +806,8 @@ type ('a, 'b, 's, 'r, 'f) kiter_type =
   (('a, 's, 'r, 'f) continuation -> ('a, 's, 'r, 'f) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('b, 'a * 's, 'a, 's) kinstr * 'b list ->
+  ('b, 'a * 's, 'a, 's) kinstr ->
+  'b list ->
   ('a, 's, 'r, 'f) continuation ->
   'a ->
   's ->
@@ -816,7 +817,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) ilist_map_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'f, 'a * 'b) kinstr * ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
+  ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
+  ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
   'e boxed_list ->
   'a * 'b ->
