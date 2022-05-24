@@ -88,5 +88,10 @@ module Mutable : sig
 
     val snapshot : 'a t -> 'a Map.t
   end
+
   module Make (Key : KeyS) : S with type key = Key.t
+
+  module IntMap : S with type key = int
+
+  module Int64Map : S with type key = int64
 end

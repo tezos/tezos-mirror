@@ -142,7 +142,7 @@ let table_oob frame x i n =
 
 let elem_oob frame x i n =
   I64.gt_u (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (I64.of_int_u (List.length !(elem frame.inst x)))
+    (I64.of_int_u (Instance.IntMap.num_elements !(elem frame.inst x)))
 
 let rec step (c : config) : config =
   let {frame; code = vs, es; _} = c in
@@ -305,7 +305,11 @@ let rec step (c : config) : config =
           let seg = !(elem frame.inst y) in
           vs', List.map (at e.at) [
             Plain (Const (I32 d @@ e.at));
-            Refer (List.nth seg (Int32.to_int s));
+            (* Note, the [Instance.IntMap.get] is logarithmic in the number of
+               contained elements in [seg]. However, in a scenario where the PVM
+               runs, only the element that will be looked up is in the map
+               making the look up cheap. *)
+            Refer (Instance.IntMap.get (Int32.to_int s) seg);
             Plain (TableSet x);
             Plain (Const (I32 (I32.add d 1l) @@ e.at));
             Plain (Const (I32 (I32.add s 1l) @@ e.at));
@@ -315,7 +319,7 @@ let rec step (c : config) : config =
 
       | ElemDrop x, vs ->
         let seg = elem frame.inst x in
-        seg := [];
+        seg := Instance.IntMap.create 0;
         vs, []
 
       | Load {offset; ty; pack; _}, Num (I32 i) :: vs' ->
@@ -715,7 +719,13 @@ let create_export (inst : module_inst) (ex : export) : export_inst =
 
 let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst =
   let {etype; einit; _} = seg.it in
-  ref (List.map (fun c -> as_ref (eval_const inst c)) einit)
+  (* TODO: #3076
+     [List.map] and [Instance.IntMap.of_list] all have at least linear time
+     complexity and are therefore not suited for a single PVM tick. This
+     function needs to be broken up into ticks. *)
+  List.map (fun v -> eval_const inst v |> as_ref) einit
+  |> Instance.IntMap.of_list
+  |> ref
 
 let create_data (inst : module_inst) (seg : data_segment) : data_inst =
   let {dinit; _} = seg.it in

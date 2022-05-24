@@ -1,5 +1,7 @@
 open Types
 
+module IntMap = Lazy_map.IntMap
+
 type module_inst =
 {
   types : func_type list;
@@ -17,8 +19,8 @@ and table_inst = Table.t
 and memory_inst = Memory.t
 and global_inst = Global.t
 and export_inst = Ast.name * extern
-and elem_inst = Values.ref_ list ref
-and data_inst = string ref
+and elem_inst = Values.ref_ IntMap.t ref
+and data_inst = Chunked_byte_vector.t ref
 
 and extern =
   | ExternFunc of func_inst

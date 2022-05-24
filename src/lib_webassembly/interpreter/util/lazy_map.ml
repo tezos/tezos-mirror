@@ -148,4 +148,8 @@ module Mutable = struct
 
     let snapshot map_ref = !map_ref
   end
+
+  module IntMap = Make (Int)
+
+  module Int64Map = Make (Int64)
 end
