@@ -110,6 +110,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
       ~src:bootstrap1_key
       ~kind:"arith"
       ~boot_sector:""
+      ~parameters_ty:"unit"
       tezos_client
   in
   let sc_rollup_node =
@@ -199,6 +200,7 @@ let test_origination =
           ~burn_cap:Tez.(of_int 9999999)
           ~src:bootstrap1_key
           ~kind:"arith"
+          ~parameters_ty:"unit"
           ~boot_sector:""
           client
       in
@@ -217,6 +219,7 @@ let with_fresh_rollup ?(boot_sector = "") f tezos_node tezos_client
       ~burn_cap:Tez.(of_int 9999999)
       ~src:bootstrap1_key
       ~kind:"arith"
+      ~parameters_ty:"unit"
       ~boot_sector
       tezos_client
   in
