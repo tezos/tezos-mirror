@@ -748,7 +748,9 @@ type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
   (('a, 'b * 'c, 'd, 'e) continuation -> ('a, 'b * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr * ('j * 'k) list * ('j, 'a) map ->
+  ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
+  ('j * 'k) list ->
+  ('j, 'a) map ->
   (('j, 'a) map, 'b * 'c, 'd, 'e) continuation ->
   'b ->
   'c ->
