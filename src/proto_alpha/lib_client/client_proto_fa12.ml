@@ -778,7 +778,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ~source
     ~src_pk
     ~src_sk
-    ~destination:(Contract (Originated contract))
+    ~destination:(Originated contract)
     ~parameters
     ~amount:tez_amount
     ~entrypoint
@@ -907,7 +907,7 @@ let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
       ?fee
       ?gas_limit
       ?storage_limit
-      (Contract (Originated token))
+      (Originated token)
       action
   in
   return (Annotated_manager_operation.Annotated_manager_operation operation)

@@ -48,9 +48,6 @@ type 'kind internal_manager_operation =
       Signature.Public_key_hash.t option
       -> Kind.delegation internal_manager_operation
 
-val manager_operation_of_internal_operation :
-  'kind internal_manager_operation -> 'kind Alpha_context.manager_operation
-
 type 'kind internal_contents = {
   source : Contract.t;
   operation : 'kind internal_manager_operation;

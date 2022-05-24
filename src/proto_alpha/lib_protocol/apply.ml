@@ -96,7 +96,6 @@ type error +=
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
-  | Tx_rollup_non_internal_transaction
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
@@ -521,17 +520,6 @@ let () =
     Data_encoding.unit
     (function Cannot_transfer_ticket_to_implicit -> Some () | _ -> None)
     (fun () -> Cannot_transfer_ticket_to_implicit) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"operation.tx_rollup_non_internal_transaction"
-    ~title:"Non-internal transaction to a transaction rollup"
-    ~description:"Non-internal transactions to a tx rollup are forbidden."
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Transaction to a transaction rollup must be internal.")
-    Data_encoding.unit
-    (function Tx_rollup_non_internal_transaction -> Some () | _ -> None)
-    (fun () -> Tx_rollup_non_internal_transaction) ;
 
   let description =
     "Smart contract rollups will be enabled in a future proposal."
@@ -1259,8 +1247,7 @@ let apply_external_manager_operation_content :
              {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
             : kind successful_manager_operation_result),
           [] )
-  | Transaction
-      {amount; parameters; destination = Contract (Implicit pkh); entrypoint} ->
+  | Transaction {amount; parameters; destination = Implicit pkh; entrypoint} ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
@@ -1275,12 +1262,8 @@ let apply_external_manager_operation_content :
         ~entrypoint
         ~before_operation
   | Transaction
-      {
-        amount;
-        parameters;
-        destination = Contract (Originated contract_hash);
-        entrypoint;
-      } ->
+      {amount; parameters; destination = Originated contract_hash; entrypoint}
+    ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
@@ -1298,8 +1281,6 @@ let apply_external_manager_operation_content :
         ~mode
         ~internal:false
         ~parameter:(Untyped_arg parameters)
-  | Transaction {destination = Tx_rollup _; _} ->
-      fail Tx_rollup_non_internal_transaction
   | Tx_rollup_dispatch_tickets
       {
         tx_rollup;
@@ -1880,13 +1861,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
      deserialized before (e.g. when retrieve in JSON format). *)
   (match operation with
   | Reveal pk -> Contract.reveal_manager_key ctxt source pk
-  | Transaction {parameters; destination; _} ->
-      (* Precheck is only called for non-internal operations
-       * and rollup transactions must be internal. *)
-      fail_when
-        (match destination with Tx_rollup _ -> true | _ -> false)
-        Tx_rollup_non_internal_transaction
-      >>=? fun () ->
+  | Transaction {parameters; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
       @@ (* Fail early if not enough gas for complete deserialization

@@ -1437,22 +1437,6 @@ let test_deposit_too_many_tickets () =
   ignore i ;
   return_unit
 
-(** [test_deposit_by_non_internal_operation] checks that a transaction
-    to the deposit entrypoint of a transaction rollup fails if it is
-    not internal. *)
-let test_deposit_by_non_internal_operation () =
-  context_init1 () >>=? fun (b, account) ->
-  originate b account >>=? fun (b, tx_rollup) ->
-  Op.unsafe_transaction (B b) account (Tx_rollup tx_rollup) Tez.zero
-  >>=? fun operation ->
-  Incremental.begin_construction b >>=? fun i ->
-  Incremental.add_operation i operation >>= function
-  | Ok _ ->
-      failwith
-        "Tx_rollup_non_internal_transaction error expected, but the operation \
-         succeeded"
-  | Error err -> check_proto_error Apply.Tx_rollup_non_internal_transaction err
-
 (** Test that block finalization changes gas rates *)
 let test_finalization () =
   context_init2 ~tx_rollup_max_inboxes_count:5_000 () >>=? fun (b, contracts) ->
@@ -5748,10 +5732,6 @@ let tests =
       "Test valid deposit to invalid L2 address"
       `Quick
       test_invalid_l2_address;
-    Tztest.tztest
-      "Test valid deposit non internal operation"
-      `Quick
-      test_deposit_by_non_internal_operation;
     Tztest.tztest
       "Test valid deposit with non-zero amount"
       `Quick

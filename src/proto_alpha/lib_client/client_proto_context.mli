@@ -198,7 +198,7 @@ val build_transaction_operation :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  Destination.t ->
+  Contract.t ->
   Kind.transaction Annotated_manager_operation.t
 
 (** Same as {!transfer}, but takes parameters as {!Script.lazy_expr} instead of
@@ -218,7 +218,7 @@ val transfer_with_script :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  destination:Destination.t ->
+  destination:Contract.t ->
   ?entrypoint:Entrypoint.t ->
   parameters:Script.lazy_expr ->
   amount:Tez.t ->
@@ -246,7 +246,7 @@ val transfer :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  destination:Destination.t ->
+  destination:Contract.t ->
   ?entrypoint:Entrypoint.t ->
   ?arg:string ->
   amount:Tez.t ->

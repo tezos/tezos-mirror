@@ -73,15 +73,6 @@ type 'kind internal_contents = {
 type packed_internal_contents =
   | Internal_contents : 'kind internal_contents -> packed_internal_contents
 
-let manager_operation_of_internal_operation (type kind)
-    (operation : kind internal_manager_operation) :
-    kind Alpha_context.manager_operation =
-  match operation with
-  | Transaction {amount; parameters; entrypoint; destination} ->
-      Transaction {amount; parameters; entrypoint; destination}
-  | Origination origination -> Origination origination
-  | Delegation delegate -> Delegation delegate
-
 let contents_of_internal_operation (type kind)
     ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
     kind internal_contents =
