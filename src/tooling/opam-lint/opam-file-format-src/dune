@@ -3,6 +3,7 @@
 
 (library
  (name opam_file_format)
+ (package tezos-tooling)
  (instrumentation (backend bisect_ppx))
  (libraries
   unix)

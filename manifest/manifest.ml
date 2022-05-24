@@ -1107,7 +1107,26 @@ module Target = struct
     in
     let opam =
       match opam with
-      | Some "" -> None
+      | Some "" -> (
+          match kind with
+          | Test_executable {names = name, _; run = true; _} ->
+              invalid_argf
+                "for targets which provide test executables such as %S, you \
+                 must specify a non-empty ~opam or have it not run by default \
+                 with ~runtest:false"
+                name
+          | Public_library {public_name; _} ->
+              invalid_argf
+                "public_library %s cannot have ~opam set to empty string (\"\")"
+                public_name
+          | Public_executable ({public_name; _}, _) ->
+              invalid_argf
+                "for targets which provide public executables such as %S, you \
+                 cannot have ~opam set to empty string (\"\")"
+                public_name
+          | Test_executable {run = false; _}
+          | Private_library _ | Private_executable _ ->
+              None)
       | Some opam as x ->
           if
             string_for_all
@@ -1115,7 +1134,22 @@ module Target = struct
                 | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' -> true
                 | _ -> false)
               opam
-          then x
+          then (
+            (match kind with
+            | Public_library {public_name; _} -> (
+                (* We allow an opam package on public_library even if
+                   it's not necessary.  We just need to make sure
+                   [package] agrees with [public_name] *)
+                match String.split_on_char '.' public_name with
+                | [] -> assert false
+                | first :: _ ->
+                    if first <> opam then
+                      error
+                        "Mismatch between public_name %S and opam package %S\n"
+                        public_name
+                        opam)
+            | _ -> ()) ;
+            x)
           else
             invalid_argf
               "%s is not a valid opam package name: should be of the form \
@@ -1438,6 +1472,10 @@ module Target = struct
     | None -> None
     | Some package ->
         Some (Select {package; source_if_present; source_if_absent; target})
+
+  let all_internal_deps internal =
+    List.map (fun (PPS (target, _)) -> target) internal.preprocess
+    @ internal.deps @ internal.opam_only_deps
 end
 
 type target = Target.t option
@@ -1636,9 +1674,32 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   in
   let package =
     match (internal.kind, internal.opam) with
-    | Public_executable _, Some opam -> Some opam
-    | _ -> None
+    | Public_executable _, None ->
+        (* Prevented by [Target.internal]. *)
+        assert false
+    | Public_executable _, (Some _ as opam) -> opam
+    | Private_executable _, None -> None
+    | Private_executable _, Some _opam ->
+        (* private executable can't have a package stanza, but we still want the manifest to know about the package *)
+        None
+    | Public_library _, None ->
+        (* Prevented by [Target.internal]. *)
+        assert false
+    | Public_library _, Some _ -> None
+    | Private_library _, opam ->
+        (* Private library can have an optional package.
+           - No package means: global to the entire repo
+           - A package means: private for the [opam] package only *)
+        opam
+    | Test_executable _, Some _ ->
+        (* private executable can't have a package stanza, but we still want the manifest to know about the package *)
+        None
+    | Test_executable {run = false; _}, None -> None
+    | Test_executable {run = true; _}, None ->
+        (* Prevented by [Target.internal]. *)
+        assert false
   in
+
   let instrumentation =
     let bisect_ppx =
       if internal.bisect_ppx then Some (Dune.backend "bisect_ppx") else None
@@ -1795,18 +1856,24 @@ let generate_dune_files () =
    If [fix_version] is [true], require [target]'s version to be
    exactly the same as [for_package]'s version, but only if [target] is internal. *)
 let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
-    (target : Target.t) : Opam.dependency option =
+    (target : Target.t) : Opam.dependency list =
   match target with
-  | Internal {opam = None; _} | External {opam = None; _} -> None
+  | External {opam = None; _} -> []
   | Internal {opam = Some package; _} ->
-      if package = for_package then None
+      if package = for_package then []
       else
         let version =
           if fix_version then Version.(Exactly Version) else Version.True
         in
-        Some {Opam.package; version; with_test; optional = false}
+        [{Opam.package; version; with_test; optional = false}]
+  | Internal ({opam = None; _} as internal) ->
+      (* If a target depends on a global "private" target, we must include its dependencies as well *)
+      let deps = Target.all_internal_deps internal in
+      List.concat_map
+        (as_opam_dependency ~fix_version ~for_package ~with_test)
+        deps
   | Vendored {name = package; _} ->
-      Some {Opam.package; version = True; with_test; optional = false}
+      [{Opam.package; version = True; with_test; optional = false}]
   | External {opam = Some opam; version; _}
   | Opam_only {name = opam; version; _} ->
       let version =
@@ -1822,9 +1889,9 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
         then Version.(Exactly Version)
         else version
       in
-      Some {Opam.package = opam; version; with_test; optional = false}
+      [{Opam.package = opam; version; with_test; optional = false}]
   | Optional target | Select {package = target; _} ->
-      Option.map
+      List.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
         (as_opam_dependency ~fix_version ~for_package ~with_test target)
   | Open (target, _) ->
@@ -1844,20 +1911,16 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     let with_test =
       match internal.kind with Test_executable _ -> true | _ -> false
     in
-    let deps = internal.deps @ internal.opam_only_deps in
+    let deps = Target.all_internal_deps internal in
     let x_opam_monorepo_opam_provided =
       List.filter_map as_opam_monorepo_opam_provided deps
     in
     let deps =
-      List.filter_map
+      List.concat_map
         (as_opam_dependency ~fix_version:for_release ~for_package ~with_test)
         deps
     in
-    let get_preprocess_dep (Target.PPS (target, _)) =
-      as_opam_dependency ~fix_version:for_release ~for_package ~with_test target
-    in
-    ( List.filter_map get_preprocess_dep internal.preprocess @ deps,
-      x_opam_monorepo_opam_provided )
+    (deps, x_opam_monorepo_opam_provided)
   in
   let depends = List.flatten depends in
   let x_opam_monorepo_opam_provided =
@@ -1901,7 +1964,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let conflicts =
     List.flatten @@ map internals
     @@ fun internal ->
-    List.filter_map
+    List.concat_map
       (as_opam_dependency ~fix_version:false ~for_package ~with_test:false)
       internal.conflicts
   in
@@ -2262,12 +2325,7 @@ let check_circular_opam_deps () =
   let list_iter l f = List.iter f l in
   let name i = Target.name_for_errors (Internal i) in
   let deps_of (t : Target.internal) =
-    let pp =
-      List.map (function Target.PPS (target, _) -> target) t.preprocess
-    in
-    List.concat_map
-      (List.filter_map Target.get_internal)
-      [t.deps; t.opam_only_deps; pp]
+    List.filter_map Target.get_internal (Target.all_internal_deps t)
   in
   Target.iter_internal_by_opam @@ fun this_package internals ->
   let error_header = ref true in
@@ -2299,8 +2357,21 @@ let check_circular_opam_deps () =
         if not (Hashtbl.mem shortest_path dep.kind) then (
           let path = dep :: elt_path in
           Hashtbl.add shortest_path dep.kind path ;
-          if dep.opam = Some this_package then
-            report_circular_dep internal_from_this_package (List.rev path)
+          if
+            dep.opam = Some this_package
+            && List.exists
+                 (fun (i : Target.internal) ->
+                   match (i.opam : string option) with
+                   | None ->
+                       (* Targets that do not have a package are private and act
+                          as if they belonged to all packages.
+                          If the shortest path from package A to package A only goes
+                          through package A or private packages, it thus only goes
+                          through package A and is not a circular dependency. *)
+                       false
+                   | Some p -> p <> this_package)
+                 path
+          then report_circular_dep internal_from_this_package (List.rev path)
           else Queue.push dep to_visit))
   done
 
