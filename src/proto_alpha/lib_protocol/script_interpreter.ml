@@ -276,7 +276,7 @@ and klist_exit : type a b c d i j. (a, b, c, d, i, j) klist_exit_type =
  [@@inline]
 
 and klist_enter : type a b c d e j. (a, b, c, d, e, j) klist_enter_type =
- fun mk g gas (body, xs, ys, len) ks' accu stack ->
+ fun mk g gas body xs ys len ks' accu stack ->
   match xs with
   | [] ->
       let ys = {elements = List.rev ys; length = len} in
@@ -338,8 +338,7 @@ and next :
           let extra = (body, xs) in
           (kiter [@ocaml.tailcall]) id g gas extra ks accu stack
       | KList_enter_body (body, xs, ys, len, ks) ->
-          let extra = (body, xs, ys, len) in
-          (klist_enter [@ocaml.tailcall]) id g gas extra ks accu stack
+          (klist_enter [@ocaml.tailcall]) id g gas body xs ys len ks accu stack
       | KList_exit_body (body, xs, ys, len, ks) ->
           (klist_exit [@ocaml.tailcall]) id g gas body xs ys len ks accu stack
       | KMap_enter_body (body, xs, ys, ks) ->
@@ -1612,8 +1611,7 @@ and klog :
       (kiter [@ocaml.tailcall]) mk g gas (body, xs) ks' accu stack
   | KList_enter_body (body, xs, ys, len, ks') ->
       let ks' = mk ks' in
-      let extra = (body, xs, ys, len) in
-      (klist_enter [@ocaml.tailcall]) mk g gas extra ks' accu stack
+      (klist_enter [@ocaml.tailcall]) mk g gas body xs ys len ks' accu stack
   | KList_exit_body (body, xs, ys, len, ks') ->
       let ks' = mk ks' in
       (klist_exit [@ocaml.tailcall]) mk g gas body xs ys len ks' accu stack

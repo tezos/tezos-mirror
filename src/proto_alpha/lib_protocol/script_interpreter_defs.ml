@@ -773,7 +773,10 @@ type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
   (('b, 'a * 'c, 'd, 'e) continuation -> ('b, 'a * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('j, 'a * 'c, 'b, 'a * 'c) kinstr * 'j list * 'b list * int ->
+  ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
+  'j list ->
+  'b list ->
+  int ->
   ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
   'a ->
   'c ->
