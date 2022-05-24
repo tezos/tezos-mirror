@@ -420,7 +420,7 @@ and imul_teznat : type a b c d e f. (a, b, c, d, e, f) imul_teznat_type =
       Tez.(x *? y) >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack
 
 and imul_nattez : type a b c d e f. (a, b, c, d, e, f) imul_nattez_type =
- fun logger g gas (kinfo, k) ks accu stack ->
+ fun logger g gas kinfo k ks accu stack ->
   let y = accu in
   let x, stack = stack in
   match Script_int.to_int64 y with
@@ -767,8 +767,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           Tez.(x -? y) >>?= fun res ->
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMul_teznat (kinfo, k) -> imul_teznat None g gas kinfo k ks accu stack
-      | IMul_nattez (kinfo, k) ->
-          imul_nattez None g gas (kinfo, k) ks accu stack
+      | IMul_nattez (kinfo, k) -> imul_nattez None g gas kinfo k ks accu stack
       (* boolean operations *)
       | IOr (_, k) ->
           let x = accu in
@@ -1549,8 +1548,7 @@ and log :
   | IMul_teznat (kinfo, k) ->
       (imul_teznat [@ocaml.tailcall]) (Some logger) g gas kinfo k ks accu stack
   | IMul_nattez (kinfo, k) ->
-      let extra = (kinfo, k) in
-      (imul_nattez [@ocaml.tailcall]) (Some logger) g gas extra ks accu stack
+      (imul_nattez [@ocaml.tailcall]) (Some logger) g gas kinfo k ks accu stack
   | ILsl_nat (kinfo, k) ->
       let extra = (kinfo, k) in
       (ilsl_nat [@ocaml.tailcall]) (Some logger) g gas extra ks accu stack

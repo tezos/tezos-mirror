@@ -883,7 +883,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo * (Tez.t, 'b, 'c, 'd) kinstr ->
+  (Script_int.n Script_int.num, 'a) kinfo ->
+  (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Tez.t * 'b ->
