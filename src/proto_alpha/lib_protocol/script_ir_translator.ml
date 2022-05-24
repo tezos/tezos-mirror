@@ -5019,10 +5019,41 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
             error ctxt (fun loc ->
                 Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg))
       else error ctxt (fun _loc -> No_such_entrypoint entrypoint)
-  | Sc_rollup _ ->
-      (* TODO #2800
-         Implement typechecking of sc rollup deposits. *)
-      return (error ctxt (fun _loc -> No_such_entrypoint entrypoint))
+  | Sc_rollup sc_rollup ->
+      Sc_rollup.parameters_type ctxt sc_rollup
+      >>=? fun (parameters_type, ctxt) ->
+      Lwt.return
+        (match parameters_type with
+        | None ->
+            ok
+              (error ctxt (fun _loc ->
+                   Sc_rollup.Errors.Sc_rollup_does_not_exist sc_rollup))
+        | Some parameters_type ->
+            Script.force_decode_in_context
+              ~consume_deserialization_gas:When_needed
+              ctxt
+              parameters_type
+            >>? fun (parameters_type, ctxt) ->
+            parse_parameter_ty_and_entrypoints
+              ctxt
+              ~stack_depth:(stack_depth + 1)
+              ~legacy:true
+              (root parameters_type)
+            >>? fun ( Ex_parameter_ty_and_entrypoints
+                        {arg_type = full; entrypoints},
+                      ctxt ) ->
+            Gas_monad.run ctxt
+            @@ find_entrypoint_for_type
+                 ~error_details
+                 ~full
+                 ~expected:arg
+                 entrypoints
+                 entrypoint
+            >|? fun (entrypoint_arg, ctxt) ->
+            ( ctxt,
+              entrypoint_arg >|? fun (entrypoint, arg_ty) ->
+              let address = {destination; entrypoint} in
+              Typed_contract {arg_ty; address} ))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
