@@ -2205,6 +2205,98 @@ let parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
             Script_string.of_string v >|? fun s -> (s, ctxt) )
   | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
 
+let parse_toplevel :
+    context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
+ fun ctxt ~legacy toplevel ->
+  record_trace (Ill_typed_contract (toplevel, []))
+  @@
+  match root toplevel with
+  | Int (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Int_kind))
+  | String (loc, _) -> error (Invalid_kind (loc, [Seq_kind], String_kind))
+  | Bytes (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Bytes_kind))
+  | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [Seq_kind], Prim_kind))
+  | Seq (_, fields) -> (
+      let rec find_fields ctxt p s c views fields =
+        match fields with
+        | [] -> ok (ctxt, (p, s, c, views))
+        | Int (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Int_kind))
+        | String (loc, _) :: _ ->
+            error (Invalid_kind (loc, [Prim_kind], String_kind))
+        | Bytes (loc, _) :: _ ->
+            error (Invalid_kind (loc, [Prim_kind], Bytes_kind))
+        | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Seq_kind))
+        | Prim (loc, K_parameter, [arg], annot) :: rest -> (
+            match p with
+            | None -> find_fields ctxt (Some (arg, loc, annot)) s c views rest
+            | Some _ -> error (Duplicate_field (loc, K_parameter)))
+        | Prim (loc, K_storage, [arg], annot) :: rest -> (
+            match s with
+            | None -> find_fields ctxt p (Some (arg, loc, annot)) c views rest
+            | Some _ -> error (Duplicate_field (loc, K_storage)))
+        | Prim (loc, K_code, [arg], annot) :: rest -> (
+            match c with
+            | None -> find_fields ctxt p s (Some (arg, loc, annot)) views rest
+            | Some _ -> error (Duplicate_field (loc, K_code)))
+        | Prim (loc, ((K_parameter | K_storage | K_code) as name), args, _) :: _
+          ->
+            error (Invalid_arity (loc, name, 1, List.length args))
+        | Prim (loc, K_view, [name; input_ty; output_ty; view_code], _) :: rest
+          ->
+            parse_view_name ctxt name >>? fun (str, ctxt) ->
+            Gas.consume
+              ctxt
+              (Michelson_v1_gas.Cost_of.Interpreter.view_update str views)
+            >>? fun ctxt ->
+            if Script_map.mem str views then error (Duplicated_view_name loc)
+            else
+              let views' =
+                Script_map.update
+                  str
+                  (Some {input_ty; output_ty; view_code})
+                  views
+              in
+              find_fields ctxt p s c views' rest
+        | Prim (loc, K_view, args, _) :: _ ->
+            error (Invalid_arity (loc, K_view, 4, List.length args))
+        | Prim (loc, name, _, _) :: _ ->
+            let allowed = [K_parameter; K_storage; K_code; K_view] in
+            error (Invalid_primitive (loc, allowed, name))
+      in
+      find_fields ctxt None None None (Script_map.empty string_t) fields
+      >>? fun (ctxt, toplevel) ->
+      match toplevel with
+      | None, _, _, _ -> error (Missing_field K_parameter)
+      | Some _, None, _, _ -> error (Missing_field K_storage)
+      | Some _, Some _, None, _ -> error (Missing_field K_code)
+      | ( Some (p, ploc, pannot),
+          Some (s, sloc, sannot),
+          Some (c, cloc, cannot),
+          views ) ->
+          let p_pannot =
+            (* root name can be attached to either the parameter
+               primitive or the toplevel constructor (legacy only).
+
+               In the latter case we move it to the parameter type.
+            *)
+            Script_ir_annot.has_field_annot p >>? function
+            | true -> ok (p, pannot)
+            | false -> (
+                match pannot with
+                | [single] when legacy -> (
+                    is_field_annot ploc single >|? fun is_field_annot ->
+                    match (is_field_annot, p) with
+                    | true, Prim (loc, prim, args, annots) ->
+                        (Prim (loc, prim, args, single :: annots), [])
+                    | _ -> (p, []))
+                | _ -> ok (p, pannot))
+          in
+          (* only one field annot is allowed to set the root entrypoint name *)
+          p_pannot >>? fun (arg_type, pannot) ->
+          Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
+          Script_ir_annot.error_unexpected_annot cloc cannot >>? fun () ->
+          Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
+          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
+
 (* -- parse data of any type -- *)
 
 (*
@@ -4887,98 +4979,6 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
       (* TODO #2800
          Implement typechecking of sc rollup deposits. *)
       fail (No_such_entrypoint entrypoint)
-
-and parse_toplevel :
-    context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
- fun ctxt ~legacy toplevel ->
-  record_trace (Ill_typed_contract (toplevel, []))
-  @@
-  match root toplevel with
-  | Int (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Int_kind))
-  | String (loc, _) -> error (Invalid_kind (loc, [Seq_kind], String_kind))
-  | Bytes (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Bytes_kind))
-  | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [Seq_kind], Prim_kind))
-  | Seq (_, fields) -> (
-      let rec find_fields ctxt p s c views fields =
-        match fields with
-        | [] -> ok (ctxt, (p, s, c, views))
-        | Int (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Int_kind))
-        | String (loc, _) :: _ ->
-            error (Invalid_kind (loc, [Prim_kind], String_kind))
-        | Bytes (loc, _) :: _ ->
-            error (Invalid_kind (loc, [Prim_kind], Bytes_kind))
-        | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Seq_kind))
-        | Prim (loc, K_parameter, [arg], annot) :: rest -> (
-            match p with
-            | None -> find_fields ctxt (Some (arg, loc, annot)) s c views rest
-            | Some _ -> error (Duplicate_field (loc, K_parameter)))
-        | Prim (loc, K_storage, [arg], annot) :: rest -> (
-            match s with
-            | None -> find_fields ctxt p (Some (arg, loc, annot)) c views rest
-            | Some _ -> error (Duplicate_field (loc, K_storage)))
-        | Prim (loc, K_code, [arg], annot) :: rest -> (
-            match c with
-            | None -> find_fields ctxt p s (Some (arg, loc, annot)) views rest
-            | Some _ -> error (Duplicate_field (loc, K_code)))
-        | Prim (loc, ((K_parameter | K_storage | K_code) as name), args, _) :: _
-          ->
-            error (Invalid_arity (loc, name, 1, List.length args))
-        | Prim (loc, K_view, [name; input_ty; output_ty; view_code], _) :: rest
-          ->
-            parse_view_name ctxt name >>? fun (str, ctxt) ->
-            Gas.consume
-              ctxt
-              (Michelson_v1_gas.Cost_of.Interpreter.view_update str views)
-            >>? fun ctxt ->
-            if Script_map.mem str views then error (Duplicated_view_name loc)
-            else
-              let views' =
-                Script_map.update
-                  str
-                  (Some {input_ty; output_ty; view_code})
-                  views
-              in
-              find_fields ctxt p s c views' rest
-        | Prim (loc, K_view, args, _) :: _ ->
-            error (Invalid_arity (loc, K_view, 4, List.length args))
-        | Prim (loc, name, _, _) :: _ ->
-            let allowed = [K_parameter; K_storage; K_code; K_view] in
-            error (Invalid_primitive (loc, allowed, name))
-      in
-      find_fields ctxt None None None (Script_map.empty string_t) fields
-      >>? fun (ctxt, toplevel) ->
-      match toplevel with
-      | None, _, _, _ -> error (Missing_field K_parameter)
-      | Some _, None, _, _ -> error (Missing_field K_storage)
-      | Some _, Some _, None, _ -> error (Missing_field K_code)
-      | ( Some (p, ploc, pannot),
-          Some (s, sloc, sannot),
-          Some (c, cloc, cannot),
-          views ) ->
-          let p_pannot =
-            (* root name can be attached to either the parameter
-               primitive or the toplevel constructor (legacy only).
-
-               In the latter case we move it to the parameter type.
-            *)
-            Script_ir_annot.has_field_annot p >>? function
-            | true -> ok (p, pannot)
-            | false -> (
-                match pannot with
-                | [single] when legacy -> (
-                    is_field_annot ploc single >|? fun is_field_annot ->
-                    match (is_field_annot, p) with
-                    | true, Prim (loc, prim, args, annots) ->
-                        (Prim (loc, prim, args, single :: annots), [])
-                    | _ -> (p, []))
-                | _ -> ok (p, pannot))
-          in
-          (* only one field annot is allowed to set the root entrypoint name *)
-          p_pannot >>? fun (arg_type, pannot) ->
-          Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
-          Script_ir_annot.error_unexpected_annot cloc cannot >>? fun () ->
-          Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
-          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
