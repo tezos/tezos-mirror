@@ -3028,21 +3028,6 @@ let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
   in
   return (ctxt, contents_result_list)
 
-let handle_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
-    contents_list operation =
-  let open Lwt_result_syntax in
-  let* public_key =
-    precheck_manager_contents_list ctxt contents_list ~mempool_mode
-  in
-  let*? () = Operation.check_signature public_key chain_id operation in
-  apply_manager_operation
-    ctxt
-    mode
-    ~payload_producer
-    chain_id
-    ~mempool_mode
-    contents_list
-
 let check_denunciation_age ctxt kind given_level =
   let max_slashing_period = Constants.max_slashing_period ctxt in
   let current_cycle = (Level.current ctxt).cycle in
@@ -3363,23 +3348,21 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) ->
-      handle_manager_operation
+      apply_manager_operation
         ctxt
         mode
         ~payload_producer
         chain_id
         ~mempool_mode
         contents_list
-        operation
   | Cons (Manager_operation _, _) ->
-      handle_manager_operation
+      apply_manager_operation
         ctxt
         mode
         ~payload_producer
         chain_id
         ~mempool_mode
         contents_list
-        operation
 
 let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
     ~payload_producer hash operation =

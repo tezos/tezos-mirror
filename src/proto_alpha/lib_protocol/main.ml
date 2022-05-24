@@ -374,17 +374,25 @@ let apply_operation_with_mode mode ctxt chain_id data op_count operation
     ~payload_producer =
   let {shell; protocol_data = Operation_data protocol_data} = operation in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
+  let oph = Alpha_context.Operation.hash operation in
+  Validate_operation.validate_operation
+    data.validate_operation_info
+    data.validate_operation_state
+    oph
+    operation
+  >>=? fun validate_operation_state ->
   Apply.apply_operation
     ctxt
     chain_id
     mode
     Optimized
     ~payload_producer
-    (Alpha_context.Operation.hash operation)
+    oph
     operation
   >|=? fun (ctxt, result) ->
   let op_count = op_count + 1 in
-  ({data with ctxt; op_count}, Operation_metadata result)
+  ( {data with ctxt; op_count; validate_operation_state},
+    Operation_metadata result )
 
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
     (operation : Alpha_context.packed_operation) =
