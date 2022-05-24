@@ -250,12 +250,17 @@ let apply_outcome ctxt rollup stakers (outcome : Sc_rollup_game_repr.outcome) =
   let open Lwt_tzresult_syntax in
   let alice, bob = Sc_rollup_game_repr.Index.normalize stakers in
   let losing_staker = Sc_rollup_game_repr.Index.staker stakers outcome.loser in
-  let* ctxt = Stake_storage.remove_staker ctxt rollup losing_staker in
+  let* ctxt, balance_updates =
+    Stake_storage.remove_staker ctxt rollup losing_staker
+  in
   let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) (alice, bob) in
   let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) (alice, bob) in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) alice in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) bob in
-  return (Sc_rollup_game_repr.Ended (outcome.reason, losing_staker), ctxt)
+  return
+    ( Sc_rollup_game_repr.Ended (outcome.reason, losing_staker),
+      ctxt,
+      balance_updates )
 
 module Internal_for_tests = struct
   let get_conflict_point = get_conflict_point

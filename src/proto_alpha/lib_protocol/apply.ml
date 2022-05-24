@@ -1764,10 +1764,11 @@ let apply_external_manager_operation_content :
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
       Sc_rollup.Stake_storage.publish_commitment ctxt rollup source commitment
-      >>=? fun (staked_hash, published_at_level, ctxt) ->
+      >>=? fun (staked_hash, published_at_level, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result =
-        Sc_rollup_publish_result {staked_hash; consumed_gas; published_at_level}
+        Sc_rollup_publish_result
+          {staked_hash; consumed_gas; published_at_level; balance_updates}
       in
       return (ctxt, result, [])
   | Sc_rollup_refute {rollup; opponent; refutation} ->
@@ -1779,24 +1780,28 @@ let apply_external_manager_operation_content :
         refutation
       >>=? fun (outcome, ctxt) ->
       (match outcome with
-      | None -> return (Sc_rollup.Game.Ongoing, ctxt)
+      | None -> return (Sc_rollup.Game.Ongoing, ctxt, [])
       | Some o ->
           Sc_rollup.Refutation_storage.apply_outcome
             ctxt
             rollup
             (source, opponent)
             o)
-      >>=? fun (status, ctxt) ->
+      >>=? fun (status, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
-      let result = Sc_rollup_refute_result {status; consumed_gas} in
+      let result =
+        Sc_rollup_refute_result {status; consumed_gas; balance_updates}
+      in
       return (ctxt, result, [])
   | Sc_rollup_timeout {rollup; stakers} ->
       Sc_rollup.Refutation_storage.timeout ctxt rollup stakers
       >>=? fun (outcome, ctxt) ->
       Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers outcome
-      >>=? fun (status, ctxt) ->
+      >>=? fun (status, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
-      let result = Sc_rollup_timeout_result {status; consumed_gas} in
+      let result =
+        Sc_rollup_timeout_result {status; consumed_gas; balance_updates}
+      in
       return (ctxt, result, [])
   | Sc_rollup_atomic_batch
       {

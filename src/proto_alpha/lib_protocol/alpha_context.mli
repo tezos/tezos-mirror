@@ -2683,7 +2683,9 @@ module Sc_rollup : sig
       t ->
       Staker.t ->
       Commitment.t ->
-      (Commitment.Hash.t * Raw_level.t * context) tzresult Lwt.t
+      (Commitment.Hash.t * Raw_level.t * context * Receipt.balance_updates)
+      tzresult
+      Lwt.t
 
     val cement_commitment :
       context -> t -> Commitment.Hash.t -> context tzresult Lwt.t
@@ -2711,7 +2713,7 @@ module Sc_rollup : sig
       t ->
       Staker.t * Staker.t ->
       Game.outcome ->
-      (Game.status * context) tzresult Lwt.t
+      (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
   end
 
   val rpc_arg : t RPC_arg.t

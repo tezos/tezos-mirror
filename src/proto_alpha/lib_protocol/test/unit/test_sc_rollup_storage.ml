@@ -105,7 +105,7 @@ let deposit_stake_and_check_balances ctxt rollup staker =
     rollup
     staker
     (fun ctxt rollup staker_contract stake ->
-      let* ctxt' =
+      let* ctxt', _ =
         lift
         @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
              ctxt
@@ -266,7 +266,7 @@ let remove_staker_and_check_balances ctxt rollup staker =
     rollup
     staker
     (fun ctxt rollup staker_contract stake ->
-      let* ctxt' =
+      let* ctxt', _ =
         lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
       in
       let* () =
@@ -296,7 +296,7 @@ let withdraw_stake_and_check_balances ctxt rollup staker =
     rollup
     staker
     (fun ctxt rollup staker_contract stake ->
-      let* ctxt' =
+      let* ctxt', _ =
         lift
         @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
              ctxt
@@ -451,7 +451,7 @@ let test_publish () =
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
-     let* _node, _level, ctxt =
+     let* _node, _level, ctxt, _balance_updates =
        Sc_rollup_stake_storage.publish_commitment ctxt rollup staker commitment
      in
      assert_true ctxt
@@ -470,7 +470,7 @@ let test_publish_returns_oldest_publish_level () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _node, level1, ctxt =
+  let* _node, level1, ctxt, _balance_updates =
     lift
     @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup staker1 commitment
   in
@@ -484,7 +484,7 @@ let test_publish_returns_oldest_publish_level () =
       current_level
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
-  let* _node, level2, _ctxt =
+  let* _node, level2, _ctxt, _balance_updates =
     lift
     @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup staker2 commitment
   in
@@ -542,7 +542,7 @@ let test_deposit_then_publish () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* _node, _level, ctxt =
+  let* _node, _level, ctxt, _balance_updates =
     lift
     @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup staker commitment
   in
@@ -1220,7 +1220,7 @@ let test_removed_staker_can_not_withdraw () =
          staker2
          commitment2
   in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker2
   in
   assert_fails_with

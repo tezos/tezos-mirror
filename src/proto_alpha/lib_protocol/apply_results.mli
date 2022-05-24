@@ -284,16 +284,19 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
       staked_hash : Sc_rollup.Commitment.Hash.t;
       published_at_level : Raw_level.t;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_publish successful_manager_operation_result
   | Sc_rollup_refute_result : {
       consumed_gas : Gas.Arith.fp;
       status : Sc_rollup.Game.status;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_refute successful_manager_operation_result
   | Sc_rollup_timeout_result : {
       consumed_gas : Gas.Arith.fp;
       status : Sc_rollup.Game.status;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_timeout successful_manager_operation_result
   | Sc_rollup_atomic_batch_result : {

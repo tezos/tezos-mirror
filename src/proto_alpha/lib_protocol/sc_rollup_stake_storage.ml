@@ -72,7 +72,7 @@ let deposit_stake ctxt rollup staker =
          })
   in
   let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
-  let* ctxt, _balance_updates =
+  let* ctxt, balance_updates =
     Token.transfer
       ctxt
       (`Contract staker_contract)
@@ -81,7 +81,7 @@ let deposit_stake ctxt rollup staker =
   in
   let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
   let* ctxt = modify_staker_count ctxt rollup Int32.succ in
-  return ctxt
+  return (ctxt, balance_updates)
 
 let withdraw_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
@@ -97,7 +97,7 @@ let withdraw_stake ctxt rollup staker =
       in
       let staker_contract, stake = get_contract_and_stake ctxt staker in
       let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
-      let* ctxt, _balance_updates =
+      let* ctxt, balance_updates =
         Token.transfer
           ctxt
           (`Frozen_bonds (staker_contract, bond_id))
@@ -107,7 +107,8 @@ let withdraw_stake ctxt rollup staker =
       let* ctxt, _size_freed =
         Store.Stakers.remove_existing (ctxt, rollup) staker
       in
-      modify_staker_count ctxt rollup Int32.pred
+      let+ ctxt = modify_staker_count ctxt rollup Int32.pred in
+      (ctxt, balance_updates)
 
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
@@ -297,8 +298,13 @@ let refine_stake ctxt rollup staker commitment =
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Stakers.mem (ctxt, rollup) staker in
-  let* ctxt = if res then return ctxt else deposit_stake ctxt rollup staker in
-  refine_stake ctxt rollup staker commitment
+  let* ctxt, balance_updates =
+    if res then return (ctxt, []) else deposit_stake ctxt rollup staker
+  in
+  let+ commitment_hash, ctxt, level =
+    refine_stake ctxt rollup staker commitment
+  in
+  (commitment_hash, ctxt, level, balance_updates)
 
 (** Try to consume n messages. *)
 let consume_n_messages ctxt rollup n =
@@ -380,7 +386,7 @@ let remove_staker ctxt rollup staker =
       in
       let staker_contract, stake = get_contract_and_stake ctxt staker in
       let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
-      let* ctxt, _balance_updates =
+      let* ctxt, balance_updates =
         Token.transfer
           ctxt
           (`Frozen_bonds (staker_contract, bond_id))
@@ -400,7 +406,8 @@ let remove_staker ctxt rollup staker =
           let* ctxt = decrease_commitment_stake_count ctxt rollup node in
           (go [@ocaml.tailcall]) pred ctxt
       in
-      go staked_on ctxt
+      let+ ctxt = go staked_on ctxt in
+      (ctxt, balance_updates)
 
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake
