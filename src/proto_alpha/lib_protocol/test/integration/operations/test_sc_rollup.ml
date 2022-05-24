@@ -54,13 +54,17 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10) tup =
     }
 
 (** [test_disable_feature_flag ()] tries to originate a smart contract
-   rollup when the feature flag is deactivated and checks that it
-   fails. *)
+    rollup when the feature flag is deactivated and checks that it
+    fails. *)
 let test_disable_feature_flag () =
   let* b, contract = Context.init1 () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
-  let* op, _ = Op.sc_rollup_origination (I i) contract kind "" in
+  let* op, _ =
+    let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
+    Op.sc_rollup_origination (I i) contract kind "" parameters_ty
+  in
+
   let expect_failure = function
     | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->
         Assert.test_error_encodings e ;
@@ -102,13 +106,20 @@ let test_sc_rollups_all_well_defined () =
   all_names_are_valid ()
 
 (** Initializes the context and originates a SCORU. *)
-let init_and_originate ?sc_rollup_challenge_window_in_blocks tup =
+let init_and_originate ?sc_rollup_challenge_window_in_blocks tup parameters_ty =
   let* ctxt, contracts =
     context_init ?sc_rollup_challenge_window_in_blocks tup
   in
   let contract = Context.tup_hd tup contracts in
   let kind = Sc_rollup.Kind.Example_arith in
-  let* operation, rollup = Op.sc_rollup_origination (B ctxt) contract kind "" in
+  let* operation, rollup =
+    Op.sc_rollup_origination
+      (B ctxt)
+      contract
+      kind
+      ""
+      (Script.lazy_expr @@ Expr.from_string parameters_ty)
+  in
   let* b = Block.bake ~operation ctxt in
   return (b, contracts, rollup)
 
@@ -150,7 +161,7 @@ let dummy_commitment ctxt rollup =
 (** [test_publish_and_cement] creates a rollup, publishes a
     commitment and then [commitment_freq] blocks later cements that commitment *)
 let test_publish_and_cement () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 in
+  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
   let* i = Incremental.begin_construction ctxt in
   let* c = dummy_commitment i rollup in
@@ -171,7 +182,7 @@ let test_publish_and_cement () =
     publishes two different commitments with the same staker. We check
     that the second publish fails. *)
 let test_publish_fails_on_backtrack () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 in
+  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
   let* i = Incremental.begin_construction ctxt in
   let* commitment1 = dummy_commitment i rollup in
@@ -199,7 +210,7 @@ let test_publish_fails_on_backtrack () =
     cement one of the commitments; it checks that this fails because the
     commitment is contested. *)
 let test_cement_fails_on_conflict () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T3 in
+  let* ctxt, contracts, rollup = init_and_originate Context.T3 "unit" in
   let _, contract1, contract2 = contracts in
   let* i = Incremental.begin_construction ctxt in
   let* commitment1 = dummy_commitment i rollup in
@@ -253,7 +264,7 @@ let commit_and_cement_after_n_bloc ?expect_failure ctxt contract rollup n =
 let test_challenge_window_period_boundaries () =
   let sc_rollup_challenge_window_in_blocks = 10 in
   let* ctxt, contract, rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks Context.T1
+    init_and_originate ~sc_rollup_challenge_window_in_blocks Context.T1 "unit"
   in
   (* Should fail because the waiting period is not strictly greater than the
      challenge window period. *)
