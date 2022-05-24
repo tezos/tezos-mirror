@@ -134,7 +134,7 @@ let mem_oob frame x i n =
 
 let data_oob frame x i n =
   I64.gt_u (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (I64.of_int_u (String.length !(data frame.inst x)))
+    (Chunked_byte_vector.length !(data frame.inst x))
 
 let table_oob frame x i n =
   I64.gt_u (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
@@ -470,7 +470,9 @@ let rec step (c : config) : config =
           vs', []
         else
           let seg = !(data frame.inst x) in
-          let b = Int32.of_int (Char.code seg.[Int32.to_int s]) in
+          let b =
+            Int32.of_int (Chunked_byte_vector.load_byte seg (Int64.of_int32 s))
+          in
           vs', List.map (at e.at) [
             Plain (Const (I32 d @@ e.at));
             Plain (Const (I32 b @@ e.at));
@@ -484,7 +486,7 @@ let rec step (c : config) : config =
 
       | DataDrop x, vs ->
         let seg = data frame.inst x in
-        seg := "";
+        seg := Chunked_byte_vector.create 0L;
         vs, []
 
       | RefNull t, vs' ->
@@ -729,7 +731,11 @@ let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst =
 
 let create_data (inst : module_inst) (seg : data_segment) : data_inst =
   let {dinit; _} = seg.it in
-  ref dinit
+  (* TODO: #3076
+     [Chunked_byte_vector.of_string] has linear time complexity. It is not
+     suited for evaluation in a PVM tick. This function needs to be broken up
+     into ticks. *)
+  ref (Chunked_byte_vector.of_string dinit)
 
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst)
