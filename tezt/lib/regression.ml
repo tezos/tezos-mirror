@@ -84,19 +84,44 @@ let log_regression_diff diff =
    In the map, output files can be in subdirectories (i.e. they can contain '/'). *)
 let output_dirs_and_files : String_set.t String_map.t ref = ref String_map.empty
 
-let register ~__FILE__ ~title ~tags ~output_file f =
+let register ~__FILE__ ~title ~tags ~output_file:_ f =
   let tags = "regression" :: tags in
-  let output_dir = "tezt/_regressions" in
-  let relative_output_file = output_file ^ ".out" in
+  let output_dir = Filename.dirname __FILE__ // "expected" in
+  let relative_output_file =
+    let sanitized_title =
+      (* We exclude ':' because of Windows. *)
+      let sanitize_char = function
+        | ( 'a' .. 'z'
+          | 'A' .. 'Z'
+          | '0' .. '9'
+          | '_' | '-' | '.' | ' ' | '(' | ')' ) as x ->
+            x
+        | _ -> '-'
+      in
+      let full = String.map sanitize_char title in
+      let max_length = 80 in
+      if String.length full > max_length then String.sub full 0 max_length
+      else full
+    in
+    Filename.basename __FILE__ // (sanitized_title ^ ".out")
+  in
+  let old_relative_output_files =
+    String_map.find_opt output_dir !output_dirs_and_files
+    |> Option.value ~default:String_set.empty
+  in
+  let stored_full_output_file = output_dir // relative_output_file in
+  if String_set.mem relative_output_file old_relative_output_files then
+    invalid_arg
+      (sf
+         "the output of test %S would be stored in %S, which is already used \
+          by another test"
+         title
+         stored_full_output_file) ;
   output_dirs_and_files :=
     String_map.add
       output_dir
-      (String_set.add
-         relative_output_file
-         (String_map.find_opt output_dir !output_dirs_and_files
-         |> Option.value ~default:String_set.empty))
+      (String_set.add relative_output_file old_relative_output_files)
       !output_dirs_and_files ;
-  let stored_full_output_file = output_dir // relative_output_file in
   Test.register ~__FILE__ ~title ~tags (fun () ->
       (* when the stored output doesn't already exists, must reset regressions *)
       if
@@ -116,7 +141,7 @@ let register ~__FILE__ ~title ~tags ~output_file f =
         capture_f ~full_output_file:stored_full_output_file
       else
         (* store the current run into a temp file *)
-        let temp_full_output_file = Temp.file output_file in
+        let temp_full_output_file = Temp.file relative_output_file in
         let* () = capture_f ~full_output_file:temp_full_output_file in
         (* compare the captured output with the stored output *)
         let diff_process =

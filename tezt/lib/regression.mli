@@ -35,14 +35,13 @@
     This function is a wrapper around [Test.register]. It adds the "regression" tag
     to the [tags] list provided by the argument.
 
-    The [output_file] specifies the name of the file where the output of the test is stored
-    and read to be compared on subsequent runs. The actual filename is
-    [Cli.options.regression_dir // output_file ^ ".out"].
-
-    Note that [output_file] can contain subdirectories.
-    For instance, [~output_file:"math/sqrt"] will result in the creation of directory
-    ["tezt/_regressions/math"] if needed and regression output will be written
-    in ["tezt/_regressions/math/sqrt.out"]. *)
+    Output which is captured (with {!capture}) is recorded in a file named
+    [<ROOT>/<DIR>/expected/<BASE>/<TITLE>.out] where:
+    - [<ROOT>] is the root directory of the project, read from environment variable
+      [DUNE_SOURCEROOT] if available, else [PWD] if available, else using [Sys.getcwd];
+    - [<DIR>] is [Filename.dirname __FILE__];
+    - [<BASE>] is [Filename.basename __FILE__];
+    - [<TITLE>] is a sanitized and possibly truncated version of [~title]. *)
 val register :
   __FILE__:string ->
   title:string ->
@@ -53,7 +52,7 @@ val register :
 
 (** Capture some output of a regression test.
 
-    Call this to record a string into the [output_file] given to [register].
+    Call this to record a string into the expected output file of the current test.
     A newline character [\n] will be added after it.
 
     This function only records its argument when called while a regression test is running,
@@ -69,5 +68,5 @@ val capture : string -> unit
     {!register}ed regression test function.
 
     The hooks will {!capture} the spawned command, its arguments and the output of
-    its execution into the registered [output_file]. *)
+    its execution. *)
 val hooks : Process.hooks
