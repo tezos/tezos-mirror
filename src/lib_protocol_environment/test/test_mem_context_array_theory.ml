@@ -56,9 +56,10 @@ type key = Context.key
 let equal_key : key -> key -> bool =
  fun (a : string list) (b : string list) -> Stdlib.( = ) a b
 
-(** Using [QCheck.small_list] for performance reasons: using [QCheck.list] here
-    makes the file 40 times slower, which is not acceptable. *)
-let key_gen = Gen.(small_list string)
+(** Using [QCheck2.small_list] and [QCheck2.small_string] for performance reasons:
+    using [QCheck2.list] makes the test 40 times slower, and using [QCheck2.string]
+    makes the test 10 times slower, none of which are acceptable. *)
+let key_gen = Gen.(small_list (small_string ~gen:char))
 
 (* As bytes are mutable this is fine because the test doesn't do any
    mutation. Otherwise [rev] could be called on a value different than

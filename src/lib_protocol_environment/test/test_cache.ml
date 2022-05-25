@@ -58,7 +58,7 @@ let high_size = 100_000
 
 let low_init_entries = 100
 
-let high_init_entries = 10_000
+let high_init_entries = 1_000
 
 let entry_size = 10
 
