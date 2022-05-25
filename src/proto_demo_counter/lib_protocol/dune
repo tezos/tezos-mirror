@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard
-   -w +a-4-40..42-44-45-48-51-70
+   -w +a-4-40..42-44-45-48-70
    -warn-error +a
    -nostdlib
    -nopervasives
@@ -52,7 +52,7 @@
   tezos-protocol-environment
   tezos-protocol-environment.sigs
   tezos-protocol-demo-counter.raw)
- (flags (-w +a-4-40..42-44-45-48-51-70
+ (flags (-w +a-4-40..42-44-45-48-70
          -warn-error +a
          -nopervasives))
  (modules Protocol))
@@ -112,7 +112,7 @@
   tezos-protocol-environment
   tezos-protocol-environment.sigs
   tezos-protocol-demo-counter.raw)
- (flags (-w +a-4-40..42-44-45-48-51-70
+ (flags (-w +a-4-40..42-44-45-48-70
          -warn-error +a
          -nopervasives))
  (modules Functor))
@@ -146,7 +146,7 @@
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags (:standard
-         -w +a-4-40..42-44-45-48-51-70
+         -w +a-4-40..42-44-45-48-70
          -warn-error +a))
  (modules Registerer))
 
