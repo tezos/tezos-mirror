@@ -82,7 +82,7 @@ let () =
     (function Error_decode_outbox_message -> Some () | _ -> None)
     (fun () -> Error_decode_outbox_message)
 
-type sc_message = {
+type internal_inbox_message = {
   payload : Script_repr.expr;
       (** A Micheline value containing the parameters passed to the rollup. *)
   sender : Alpha_context.Contract.t;  (** The L1 caller contract. *)
@@ -90,7 +90,7 @@ type sc_message = {
       (** The implicit account that originated the transaction. *)
 }
 
-type inbox_message = Sc_message of sc_message
+type inbox_message = Internal of internal_inbox_message
 
 type transaction_internal = {
   unparsed_parameters_ty : Script_repr.expr;  (** The type of the parameters. *)
@@ -131,17 +131,7 @@ let make_inbox_message ctxt ty ~payload ~sender ~source =
       payload
   in
   let payload = Micheline.strip_locations payload in
-  (Sc_message {payload; sender; source}, ctxt)
-
-let sc_message_encoding =
-  let open Data_encoding in
-  conv
-    (fun {payload; sender; source} -> (payload, sender, source))
-    (fun (payload, sender, source) -> {payload; sender; source})
-  @@ obj3
-       (req "payload" Script_repr.expr_encoding)
-       (req "sender" Contract.encoding)
-       (req "source" Signature.Public_key_hash.encoding)
+  (Internal {payload; sender; source}, ctxt)
 
 let transaction_internal_encoding =
   let open Data_encoding in
@@ -173,9 +163,27 @@ let internal_outbox_message_encoding =
     (fun m -> Atomic_transaction_batch_internal m)
     atomic_message_batch_encoding
 
+let internal_message_encoding =
+  let open Data_encoding in
+  conv
+    (fun {payload; sender; source} -> (payload, sender, source))
+    (fun (payload, sender, source) -> {payload; sender; source})
+  @@ obj3
+       (req "payload" Script_repr.expr_encoding)
+       (req "sender" Contract.encoding)
+       (req "source" Signature.Public_key_hash.encoding)
+
 let inbox_message_encoding =
   let open Data_encoding in
-  conv (fun (Sc_message m) -> m) (fun m -> Sc_message m) sc_message_encoding
+  Data_encoding.union
+    [
+      case
+        (Tag 0)
+        ~title:"Internal"
+        internal_message_encoding
+        (function Internal msg -> Some msg)
+        (fun msg -> Internal msg);
+    ]
 
 (** TODO: #2951
     Carbonate [to_bytes] step.
