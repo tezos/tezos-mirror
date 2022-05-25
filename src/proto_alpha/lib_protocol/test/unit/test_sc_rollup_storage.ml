@@ -112,15 +112,11 @@ let originate_rollup_and_deposit_with_two_stakers () =
 let assert_true _ctxt = return ()
 
 (** Assert that the computation fails with the given message. *)
-let assert_fails_with ~loc k msg =
-  let expected_error_msg = "Error:\n  " ^ msg ^ "\n" in
-  k >>= function
-  | Ok _ -> Stdlib.failwith "Expected failure"
-  | Error err ->
-      let actual_error_msg =
-        Format.asprintf "%a" Environment.Error_monad.pp_trace err
-      in
-      Assert.equal_string ~loc expected_error_msg actual_error_msg
+let assert_fails_with ~loc k expected_err =
+  let open Lwt_result_syntax in
+  let*! res = k in
+  let res = Environment.wrap_tzresult res in
+  Assert.proto_error ~loc res (( = ) expected_err)
 
 (** Assert operation fails because of missing rollup *)
 let assert_fails_with_missing_rollup ~loc op =
@@ -128,9 +124,8 @@ let assert_fails_with_missing_rollup ~loc op =
   let rollup = Sc_rollup_repr.Address.hash_bytes [] in
   assert_fails_with
     ~loc
-    (op ctxt rollup)
-    (* Hash of empty sequence *)
-    "Rollup scr1Ew52VCdi6nF1JuokRGMqfmSeiAEXymW2m does not exist"
+    (op ctxt rollup) (* Hash of empty sequence *)
+    (Sc_rollup_errors.Sc_rollup_does_not_exist rollup)
 
 (** Assert commitment hash equality.
 
@@ -203,7 +198,7 @@ let test_removing_staker_from_lcc_fails () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
-    "Can not remove a cemented commitment."
+    Sc_rollup_errors.Sc_rollup_remove_lcc
 
 let test_deposit_then_withdraw () =
   let* ctxt = new_context () in
@@ -247,7 +242,7 @@ let test_withdraw_when_not_staked () =
        ctxt
        rollup
        staker)
-    "Unknown staker."
+    Sc_rollup_errors.Sc_rollup_not_staked
 
 let test_withdrawing_twice () =
   let* ctxt = new_context () in
@@ -276,7 +271,7 @@ let test_withdrawing_twice () =
        ctxt
        rollup
        staker)
-    "Unknown staker."
+    Sc_rollup_errors.Sc_rollup_not_staked
 
 let number_of_messages_exn n =
   match Sc_rollup_repr.Number_of_messages.of_int32 n with
@@ -360,7 +355,7 @@ let test_deposit_then_refine_bad_inbox () =
        rollup
        staker
        commitment)
-    "Attempted to commit to a bad inbox level."
+    Sc_rollup_errors.Sc_rollup_bad_inbox_level
 
 let test_publish () =
   let* ctxt = new_context () in
@@ -663,7 +658,7 @@ let test_cement_then_remove () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
-    "Can not remove a cemented commitment."
+    Sc_rollup_errors.Sc_rollup_remove_lcc
 
 let test_cement_consumes_available_messages () =
   let* ctxt = new_context () in
@@ -749,8 +744,7 @@ let test_cement_unknown_commitment_fails () =
        ctxt
        rollup
        Commitment_repr.Hash.zero)
-    "Commitment scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG does \
-     not exist"
+    (Sc_rollup_errors.Sc_rollup_unknown_commitment Commitment_repr.Hash.zero)
 
 let test_cement_with_zero_stakers_fails () =
   let* ctxt = new_context () in
@@ -794,7 +788,7 @@ let test_cement_with_zero_stakers_fails () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-    "No stakers."
+    Sc_rollup_errors.Sc_rollup_no_stakers
 
 let test_cement_fail_too_recent () =
   let* ctxt = new_context () in
@@ -835,7 +829,7 @@ let test_cement_fail_too_recent () =
     assert_fails_with
       ~loc:__LOC__
       (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-      "Attempted to cement a commitment before its refutation deadline."
+      Sc_rollup_errors.Sc_rollup_too_recent
   in
   let ctxt =
     Raw_context.Internal_for_tests.add_level ctxt (challenge_window - 1)
@@ -844,7 +838,7 @@ let test_cement_fail_too_recent () =
     assert_fails_with
       ~loc:__LOC__
       (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-      "Attempted to cement a commitment before its refutation deadline."
+      Sc_rollup_errors.Sc_rollup_too_recent
   in
   assert_true ctxt
 
@@ -976,7 +970,7 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
        ctxt
        rollup
        staker)
-    "Attempted to withdraw while not staked on the last cemented commitment."
+    Sc_rollup_errors.Sc_rollup_not_staked_on_lcc
 
 let test_initial_level_of_rollup () =
   let* ctxt = new_context () in
@@ -1221,7 +1215,7 @@ let test_removed_staker_can_not_withdraw () =
        ctxt
        rollup
        staker2)
-    "Unknown staker."
+    Sc_rollup_errors.Sc_rollup_not_staked
 
 let test_no_cement_on_conflict () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1268,7 +1262,7 @@ let test_no_cement_on_conflict () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-    "Attempted to cement a disputed commitment."
+    Sc_rollup_errors.Sc_rollup_disputed
 
 (** Tests that [c1] can not be finalized in the following scenario:
    staker2     staker1
@@ -1305,7 +1299,7 @@ let test_no_cement_with_one_staker_at_zero_commitment () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-    "Attempted to cement a disputed commitment."
+    Sc_rollup_errors.Sc_rollup_disputed
 
 let test_non_cemented_parent () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1355,7 +1349,7 @@ let test_non_cemented_parent () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.cement_commitment ctxt rollup c2)
-    "Parent is not cemented."
+    Sc_rollup_errors.Sc_rollup_parent_not_lcc
 
 let test_finds_conflict_point_at_lcc () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1689,7 +1683,7 @@ let test_no_conflict_point_one_staker_at_lcc_preboot () =
        rollup
        staker1
        staker2)
-    "No conflict."
+    Sc_rollup_errors.Sc_rollup_no_conflict
 
 let test_no_conflict_point_both_stakers_at_lcc_preboot () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1702,7 +1696,7 @@ let test_no_conflict_point_both_stakers_at_lcc_preboot () =
        rollup
        staker1
        staker2)
-    "No conflict."
+    Sc_rollup_errors.Sc_rollup_no_conflict
 
 let test_no_conflict_point_one_staker_at_lcc () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1759,7 +1753,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
        rollup
        staker1
        staker2)
-    "No conflict."
+    Sc_rollup_errors.Sc_rollup_no_conflict
 
 let test_no_conflict_point_both_stakers_at_lcc () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1805,7 +1799,7 @@ let test_no_conflict_point_both_stakers_at_lcc () =
        rollup
        staker1
        staker2)
-    "No conflict."
+    Sc_rollup_errors.Sc_rollup_no_conflict
 
 let test_staker_cannot_backtrack () =
   let* ctxt = new_context () in
@@ -1864,7 +1858,7 @@ let test_staker_cannot_backtrack () =
        rollup
        staker
        commitment1)
-    "Staker backtracked."
+    Sc_rollup_errors.Sc_rollup_staker_backtracked
 
 let test_staker_cannot_change_branch () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1951,7 +1945,7 @@ let test_staker_cannot_change_branch () =
        rollup
        staker2
        commitment4)
-    "Staker backtracked."
+    Sc_rollup_errors.Sc_rollup_staker_backtracked
 
 let test_kind_of_missing_rollup () =
   let* ctxt = new_context () in
@@ -2020,8 +2014,7 @@ let test_get_missing_commitment () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_commitment_storage.get_commitment ctxt rollup commitment_hash)
-    "Commitment scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG does \
-     not exist"
+    (Sc_rollup_errors.Sc_rollup_unknown_commitment commitment_hash)
 
 let test_remove_staker_from_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
@@ -2317,7 +2310,7 @@ let test_storage_outbox () =
     assert_fails_with
       ~loc:__LOC__
       (record ctxt rollup1 level1 1)
-      "Outbox message already applied"
+      Sc_rollup_errors.Sc_rollup_outbox_message_already_applied
   in
   let* _size_diff, ctxt = lift @@ record ctxt rollup1 level1 2 in
   let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 2 in
@@ -2348,13 +2341,13 @@ let test_storage_outbox_exceed_limits () =
     assert_fails_with
       ~loc:__LOC__
       (record ctxt rollup level max_message_index)
-      "Invalid rollup outbox message index"
+      Sc_rollup_errors.Sc_rollup_invalid_outbox_message_index
   in
   let* () =
     assert_fails_with
       ~loc:__LOC__
       (record ctxt rollup level (-1))
-      "Invalid rollup outbox message index"
+      Sc_rollup_errors.Sc_rollup_invalid_outbox_message_index
   in
   let max_active_levels =
     Int32.to_int @@ Constants_storage.sc_rollup_max_active_outbox_levels ctxt
@@ -2371,7 +2364,7 @@ let test_storage_outbox_exceed_limits () =
     assert_fails_with
       ~loc:__LOC__
       (record ctxt rollup 15 42)
-      "Outbox level expired"
+      Sc_rollup_errors.Sc_rollup_outbox_level_expired
   in
   return ()
 
