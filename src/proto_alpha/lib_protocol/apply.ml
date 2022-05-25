@@ -2649,15 +2649,13 @@ let rec precheck_effects :
       let+ ctxt, result_rest = precheck_effects ctxt rest in
       (ctxt, PrecheckedCons (prechecked_contents, result_rest))
 
-(** Return an updated context, a list of prechecked contents
-    containing balance updates for fees related to each manager
-    operation in [contents_list], and the contract's public key. *)
+(** Check the solvability of the given standalone manager operation or
+    batch of manager operations, except that the signature is not
+    checked here. Return the contract's public key. This function is
+    effect-free. *)
 let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
-  let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  let* public_key = precheck_checks ctxt contents_list ~mempool_mode in
-  let* ctxt, prechecked_contents_list = precheck_effects ctxt contents_list in
-  return (ctxt, prechecked_contents_list, public_key)
+  precheck_checks ctxt contents_list ~mempool_mode
 
 let rec apply_manager_contents_list_rec :
     type kind.
@@ -3015,13 +3013,11 @@ let apply_manager_contents_list ctxt mode ~payload_producer chain_id
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
-let handle_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
-    contents_list operation =
+let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
+    contents_list =
   let open Lwt_result_syntax in
-  let* ctxt, prechecked_contents_list, public_key =
-    precheck_manager_contents_list ctxt contents_list ~mempool_mode
-  in
-  let*? () = Operation.check_signature public_key chain_id operation in
+  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+  let* ctxt, prechecked_contents_list = precheck_effects ctxt contents_list in
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
       ctxt
@@ -3031,6 +3027,21 @@ let handle_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
       prechecked_contents_list
   in
   return (ctxt, contents_result_list)
+
+let handle_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
+    contents_list operation =
+  let open Lwt_result_syntax in
+  let* public_key =
+    precheck_manager_contents_list ctxt contents_list ~mempool_mode
+  in
+  let*? () = Operation.check_signature public_key chain_id operation in
+  apply_manager_operation
+    ctxt
+    mode
+    ~payload_producer
+    chain_id
+    ~mempool_mode
+    contents_list
 
 let check_denunciation_age ctxt kind given_level =
   let max_slashing_period = Constants.max_slashing_period ctxt in

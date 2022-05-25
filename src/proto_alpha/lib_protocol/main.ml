@@ -807,14 +807,6 @@ let check_signature {chain_id; _} public_key raw_op =
   Alpha_context.Operation.check_signature public_key chain_id raw_op
 
 let precheck_manager {ctxt; _} op =
-  (* We do not account for the gas limit of the batch in the block
-     since this function does not return a context, but we check that
-     this limit is within bounds (and fail otherwise with a
-     permanenent error). *)
-  let open Lwt_result_syntax in
-  let* _ctxt, _prechecked_contents_list, public_key =
-    Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-  in
-  return public_key
+  Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
 
 (* Vanity nonce: TBD *)

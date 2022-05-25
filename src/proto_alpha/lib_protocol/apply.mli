@@ -146,14 +146,6 @@ val finalize_application :
   migration_balance_updates:Receipt.balance_updates ->
   (context * Fitness.t * block_metadata, error trace) result Lwt.t
 
-val apply_manager_contents_list :
-  context ->
-  Script_ir_translator.unparsing_mode ->
-  payload_producer:public_key_hash ->
-  Chain_id.t ->
-  'a Kind.manager prechecked_contents_list ->
-  (context * 'a Kind.manager contents_result_list) Lwt.t
-
 val apply_contents_list :
   context ->
   Chain_id.t ->
@@ -164,28 +156,52 @@ val apply_contents_list :
   'kind contents_list ->
   (context * 'kind contents_result_list) tzresult Lwt.t
 
-(** Check whether the manager operation represented by the given
-    [contents_list] is solvable, return an error otherwise. An
-    operation is solvable if it is well-formed and can pay the fees to
-    be included in a block, regardless of whether the application will
-    then succeed or fail.
+(** Update the context to reflect the application of a manager
+    operation.
 
-    If successful, return an updated context, a list of prechecked
-    contents containing balance updates for fees related to each
-    individual operation in [contents_list], and the contract's public
-    key.
+    This function first updates the context to:
 
-   If [mempool_mode], the function checks whether the total gas limit
-   of this batch of operation is below the [gas_limit] of a block and
-   fails with a permanent error when above. Otherwise, the gas limit
-   of the batch is removed from the one of the block (when possible)
-   before moving on. *)
+    - take the fees;
+
+    - increment the account's counter;
+
+    - decrease of the available block gas by operation's [gas_limit].
+
+    These updates are mandatory. In particular, taking the fees is
+    critically important. That's why [apply_manager_operation] **should
+    only be called after {!precheck_manager_contents_list}**,
+    which is responsible for ensuring that the operation is solvable,
+    i.e. this first stage of [apply_manager_operation] will not
+    fail. If this stage fails nevertheless, the function returns an
+    error.
+
+    The second stage of this function consists in applying all the
+    other effects, in accordance with the semantic of the operation's
+    kind.
+
+    An error may happen during this second phase: in that case, the
+    function returns the context obtained at the end of the first
+    stage, and a [contents_result_list] that contains the error. This
+    means that the operation has no other effects than those described
+    above during the first phase. *)
+val apply_manager_operation :
+  context ->
+  Script_ir_translator.unparsing_mode ->
+  payload_producer:public_key_hash ->
+  Chain_id.t ->
+  mempool_mode:bool ->
+  'a Kind.manager contents_list ->
+  (context * 'a Kind.manager contents_result_list) tzresult Lwt.t
+
+(** Check the solvability of the given standalone manager operation or
+    batch of manager operations, except that the signature is not
+    checked here. Return the contract's public key. This function is
+    effect-free. *)
 val precheck_manager_contents_list :
   context ->
   'kind Kind.manager contents_list ->
   mempool_mode:bool ->
-  (context * 'kind Kind.manager prechecked_contents_list * public_key) tzresult
-  Lwt.t
+  public_key tzresult Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)
