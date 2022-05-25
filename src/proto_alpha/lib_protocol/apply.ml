@@ -1971,7 +1971,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
 
 let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
     remaining_block_gas (op : kind Kind.manager contents) ~(only_batch : bool) :
-    (context * Tez.t * bool * Gas.Arith.fp) tzresult Lwt.t =
+    (Tez.t * bool * Gas.Arith.fp) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let[@coq_match_with_default] (Manager_operation
                                  {
@@ -2139,7 +2139,7 @@ let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
       ~amount:fee
       source
   in
-  (ctxt, new_balance, still_allocated, remaining_block_gas)
+  (new_balance, still_allocated, remaining_block_gas)
 
 let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
   match trr with
@@ -2556,7 +2556,7 @@ let rec precheck_checks_rec :
     Gas.Arith.fp ->
     kind Kind.manager contents_list ->
     only_batch:bool ->
-    context tzresult Lwt.t =
+    unit tzresult Lwt.t =
  fun ctxt
      remaining_balance
      ~still_allocated
@@ -2566,7 +2566,7 @@ let rec precheck_checks_rec :
   let open Lwt_result_syntax in
   match contents_list with
   | Single contents ->
-      let* ctxt, _remaining_balance, _still_allocated, _remaining_block_gas =
+      let* _ =
         precheck_checks_contents
           ctxt
           remaining_balance
@@ -2575,9 +2575,9 @@ let rec precheck_checks_rec :
           contents
           ~only_batch
       in
-      return ctxt
+      return_unit
   | Cons (contents, rest) ->
-      let* ctxt, remaining_balance, still_allocated, remaining_block_gas =
+      let* remaining_balance, still_allocated, remaining_block_gas =
         precheck_checks_contents
           ctxt
           remaining_balance
@@ -2594,8 +2594,8 @@ let rec precheck_checks_rec :
         rest
         ~only_batch
 
-(** Check the solvability of an operation batch. The goal is to make
-    this function effect-free, moving all effects to {!precheck_effects}. *)
+(** Check the solvability of an operation batch.
+    This function is effect-free. *)
 let precheck_checks ctxt contents_list ~mempool_mode =
   let open Lwt_result_syntax in
   let* source, public_key =
@@ -2604,7 +2604,7 @@ let precheck_checks ctxt contents_list ~mempool_mode =
   let* ctxt, initial_balance =
     Token.balance ctxt (`Contract (Contract.Implicit source))
   in
-  let* ctxt =
+  let* () =
     precheck_checks_rec
       ctxt
       initial_balance
@@ -2615,7 +2615,7 @@ let precheck_checks ctxt contents_list ~mempool_mode =
       contents_list
       ~only_batch:mempool_mode
   in
-  return (ctxt, public_key)
+  return public_key
 
 (** Return balance updates for fees and an updated context that accounts for:
     - fees spending
@@ -2655,7 +2655,7 @@ let rec precheck_effects :
 let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  let* ctxt, public_key = precheck_checks ctxt contents_list ~mempool_mode in
+  let* public_key = precheck_checks ctxt contents_list ~mempool_mode in
   let* ctxt, prechecked_contents_list = precheck_effects ctxt contents_list in
   return (ctxt, prechecked_contents_list, public_key)
 
