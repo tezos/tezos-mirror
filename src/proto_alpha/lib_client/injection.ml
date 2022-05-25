@@ -272,7 +272,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
 
 let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ?(successor_level = false) ?branch
-    ?(latency = Plugin.default_operation_inclusion_latency)
+    ?(latency = Plugin.RPC.default_operation_inclusion_latency)
     (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let op : _ Operation.t =
