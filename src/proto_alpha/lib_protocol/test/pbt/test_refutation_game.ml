@@ -86,7 +86,7 @@ let number_of_ticks_exn n =
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
 let get_comm pred inbox_level messages ticks state =
-  Sc_rollup_repr.Commitment.
+  Sc_rollup_commitment_repr.
     {
       predecessor = pred;
       inbox_level = Raw_level_repr.of_int32_exn inbox_level;
@@ -581,7 +581,7 @@ struct
     let number_of_ticks = Int32.of_int int_tick in
     let parent =
       get_comm
-        Sc_rollup_repr.Commitment_hash.zero
+        Sc_rollup_commitment_repr.Hash.zero
         0l
         3l
         1l
@@ -589,7 +589,7 @@ struct
     in
     let child =
       get_comm
-        Sc_rollup_repr.Commitment_hash.zero
+        Sc_rollup_commitment_repr.Hash.zero
         0l
         3l
         number_of_ticks

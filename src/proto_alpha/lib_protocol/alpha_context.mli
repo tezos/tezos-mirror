@@ -2474,6 +2474,8 @@ module Sc_rollup : sig
 
   type t = Address.t
 
+  type rollup := t
+
   module Kind : sig
     type t = Example_arith
 
@@ -2483,8 +2485,6 @@ module Sc_rollup : sig
   module Staker :
     S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
 
-  module Commitment_hash : S.HASH
-
   module State_hash : S.HASH
 
   module Number_of_messages : Bounded.Int32.S
@@ -2492,10 +2492,12 @@ module Sc_rollup : sig
   module Number_of_ticks : Bounded.Int32.S
 
   module Commitment : sig
+    module Hash : S.HASH
+
     type t = {
       compressed_state : State_hash.t;
       inbox_level : Raw_level.t;
-      predecessor : Commitment_hash.t;
+      predecessor : Hash.t;
       number_of_messages : Number_of_messages.t;
       number_of_ticks : Number_of_ticks.t;
     }
@@ -2504,7 +2506,13 @@ module Sc_rollup : sig
 
     val pp : Format.formatter -> t -> unit
 
-    val hash : t -> Commitment_hash.t
+    val hash : t -> Hash.t
+
+    val get_commitment :
+      context -> rollup -> Hash.t -> (t * context) tzresult Lwt.t
+
+    val last_cemented_commitment_hash_with_level :
+      context -> rollup -> (Hash.t * Raw_level.t * context) tzresult Lwt.t
   end
 
   val originate :
@@ -2599,6 +2607,11 @@ module Sc_rollup : sig
 
     module MakeHashingScheme (Tree : TREE) :
       MerkelizedOperations with type tree = Tree.tree
+
+    val add_messages :
+      context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
+
+    val inbox : context -> rollup -> (t * context) tzresult Lwt.t
   end
 
   module Game : sig
@@ -2655,84 +2668,50 @@ module Sc_rollup : sig
     val outcome_encoding : outcome Data_encoding.t
   end
 
+  module Stake_storage : sig
+    val publish_commitment :
+      context ->
+      t ->
+      Staker.t ->
+      Commitment.t ->
+      (Commitment.Hash.t * Raw_level.t * context) tzresult Lwt.t
+
+    val cement_commitment :
+      context -> t -> Commitment.Hash.t -> context tzresult Lwt.t
+  end
+
+  module Refutation_storage : sig
+    type conflict_point = Commitment.Hash.t * Commitment.Hash.t
+
+    val update_game :
+      context ->
+      t ->
+      player:Staker.t ->
+      opponent:Staker.t ->
+      Game.refutation ->
+      (Game.outcome option * context) tzresult Lwt.t
+
+    val timeout :
+      context ->
+      t ->
+      Staker.t * Staker.t ->
+      (Game.outcome * context) tzresult Lwt.t
+
+    val apply_outcome :
+      context ->
+      t ->
+      Staker.t * Staker.t ->
+      Game.outcome ->
+      (Game.status * context) tzresult Lwt.t
+  end
+
   val rpc_arg : t RPC_arg.t
-
-  val add_messages :
-    context -> t -> string list -> (Inbox.t * Z.t * context) tzresult Lwt.t
-
-  val inbox : context -> t -> (Inbox.t * context) tzresult Lwt.t
-
-  val deposit_stake : context -> t -> Staker.t -> context tzresult Lwt.t
-
-  val withdraw_stake : context -> t -> Staker.t -> context tzresult Lwt.t
-
-  val refine_stake :
-    context ->
-    t ->
-    Staker.t ->
-    Commitment.t ->
-    (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
-
-  val publish_commitment :
-    context ->
-    t ->
-    Staker.t ->
-    Commitment.t ->
-    (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
-
-  val cement_commitment :
-    context -> t -> Commitment_hash.t -> context tzresult Lwt.t
-
-  type conflict_point = Commitment_hash.t * Commitment_hash.t
-
-  val get_conflict_point :
-    context ->
-    t ->
-    Staker.t ->
-    Staker.t ->
-    (conflict_point * context) tzresult Lwt.t
-
-  val get_commitment :
-    context -> t -> Commitment_hash.t -> (Commitment.t * context) tzresult Lwt.t
-
-  val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
 
   val list : context -> t list tzresult Lwt.t
 
   val initial_level : context -> t -> Raw_level.t tzresult Lwt.t
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
-
-  val last_cemented_commitment_hash_with_level :
-    context -> t -> (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
-
-  val get_or_init_game :
-    context ->
-    t ->
-    refuter:Staker.t ->
-    defender:Staker.t ->
-    (Game.t * context) tzresult Lwt.t
-
-  val update_game :
-    context ->
-    t ->
-    player:Staker.t ->
-    opponent:Staker.t ->
-    Game.refutation ->
-    (Game.outcome option * context) tzresult Lwt.t
-
-  val timeout :
-    context ->
-    t ->
-    Staker.t * Staker.t ->
-    (Game.outcome * context) tzresult Lwt.t
-
-  val apply_outcome :
-    context ->
-    t ->
-    Staker.t * Staker.t ->
-    Game.outcome ->
-    (Game.status * context) tzresult Lwt.t
 
   module Outbox : sig
     val record_applied_message :
@@ -3143,7 +3122,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup.t;
-      commitment : Sc_rollup.Commitment_hash.t;
+      commitment : Sc_rollup.Commitment.Hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {

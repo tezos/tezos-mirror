@@ -105,7 +105,8 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
     let workload = () in
     let closure () =
       ignore
-        (Sc_rollup_storage.Internal.update_num_and_size_of_messages
+        (Sc_rollup_inbox_storage.Internal_for_tests
+         .update_num_and_size_of_messages
            ~num_messages
            ~total_messages_size
            new_message)
@@ -217,7 +218,7 @@ module Sc_rollup_add_messages_benchmark = struct
       let open Lwt_result_syntax in
       let+ inbox, _, ctxt =
         Lwt.map Environment.wrap_tzresult
-        @@ Sc_rollup_storage.add_messages ctxt rollup ["CAFEBABE"]
+        @@ Sc_rollup_inbox_storage.add_messages ctxt rollup ["CAFEBABE"]
       in
       let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
       (inbox, ctxt)

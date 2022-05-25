@@ -1743,18 +1743,19 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [])
   | Sc_rollup_add_messages {rollup; messages} ->
-      Sc_rollup.add_messages ctxt rollup messages
+      Sc_rollup.Inbox.add_messages ctxt rollup messages
       >>=? fun (inbox_after, _size, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
-      Sc_rollup.cement_commitment ctxt rollup commitment >>=? fun ctxt ->
+      Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
+      >>=? fun ctxt ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_cement_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
-      Sc_rollup.publish_commitment ctxt rollup source commitment
+      Sc_rollup.Stake_storage.publish_commitment ctxt rollup source commitment
       >>=? fun (staked_hash, published_at_level, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result =
@@ -1762,18 +1763,29 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [])
   | Sc_rollup_refute {rollup; opponent; refutation} ->
-      Sc_rollup.update_game ctxt rollup ~player:source ~opponent refutation
+      Sc_rollup.Refutation_storage.update_game
+        ctxt
+        rollup
+        ~player:source
+        ~opponent
+        refutation
       >>=? fun (outcome, ctxt) ->
       (match outcome with
       | None -> return (Sc_rollup.Game.Ongoing, ctxt)
-      | Some o -> Sc_rollup.apply_outcome ctxt rollup (source, opponent) o)
+      | Some o ->
+          Sc_rollup.Refutation_storage.apply_outcome
+            ctxt
+            rollup
+            (source, opponent)
+            o)
       >>=? fun (status, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_refute_result {status; consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_timeout {rollup; stakers} ->
-      Sc_rollup.timeout ctxt rollup stakers >>=? fun (outcome, ctxt) ->
-      Sc_rollup.apply_outcome ctxt rollup stakers outcome
+      Sc_rollup.Refutation_storage.timeout ctxt rollup stakers
+      >>=? fun (outcome, ctxt) ->
+      Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers outcome
       >>=? fun (status, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_timeout_result {status; consumed_gas} in

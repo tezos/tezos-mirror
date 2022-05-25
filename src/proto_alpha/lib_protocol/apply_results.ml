@@ -227,7 +227,7 @@ type _ successful_manager_operation_result =
       -> Kind.sc_rollup_cement successful_manager_operation_result
   | Sc_rollup_publish_result : {
       consumed_gas : Gas.Arith.fp;
-      staked_hash : Sc_rollup.Commitment_hash.t;
+      staked_hash : Sc_rollup.Commitment.Hash.t;
       published_at_level : Raw_level.t;
     }
       -> Kind.sc_rollup_publish successful_manager_operation_result
@@ -951,7 +951,7 @@ module Manager_result = struct
         (obj4
            (req "consumed_gas" Gas.Arith.n_integral_encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "staked_hash" Sc_rollup.Commitment_hash.encoding)
+           (req "staked_hash" Sc_rollup.Commitment.Hash.encoding)
            (req "published_at_level" Raw_level.encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_publish_result _ as op) ->

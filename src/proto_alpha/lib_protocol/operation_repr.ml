@@ -370,12 +370,12 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment_hash.t;
+      commitment : Sc_rollup_commitment_repr.Hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment.t;
+      commitment : Sc_rollup_commitment_repr.t;
     }
       -> Kind.sc_rollup_publish manager_operation
   | Sc_rollup_refute : {
@@ -954,7 +954,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
-              (req "commitment" Sc_rollup_repr.Commitment_hash.encoding);
+              (req "commitment" Sc_rollup_commitment_repr.Hash.encoding);
           select =
             (function
             | Manager (Sc_rollup_cement _ as op) -> Some op | _ -> None);
@@ -973,7 +973,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
-              (req "commitment" Sc_rollup_repr.Commitment.encoding);
+              (req "commitment" Sc_rollup_commitment_repr.encoding);
           select =
             (function
             | Manager (Sc_rollup_publish _ as op) -> Some op | _ -> None);

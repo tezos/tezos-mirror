@@ -121,7 +121,7 @@ let last_commitment_hash (module Last_commitment_level : Mutable_level_store)
   let+ last_commitment = last_commitment (module Last_commitment_level) store in
   match last_commitment with
   | Some commitment -> Sc_rollup.Commitment.hash commitment
-  | None -> Sc_rollup.Commitment_hash.zero
+  | None -> Sc_rollup.Commitment.Hash.zero
 
 let must_store_commitment ~origination_level current_level store =
   let open Lwt_result_syntax in
@@ -306,7 +306,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         if check_lcc_hash then
           let open Lwt_syntax in
           let* lcc_hash = Store.Last_cemented_commitment_hash.get store in
-          if Sc_rollup.Commitment_hash.equal lcc_hash commitment.predecessor
+          if Sc_rollup.Commitment.Hash.equal lcc_hash commitment.predecessor
           then return ()
           else
             let+ () =

@@ -81,35 +81,6 @@ module Internal_for_tests = struct
 end
 
 (* 32 *)
-let commitment_hash_prefix = "\017\144\021\100" (* scc1(54) *)
-
-module Commitment_hash = struct
-  let prefix = "scc1"
-
-  let encoded_size = 54
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "commitment_hash"
-
-        let title = "The hash of a commitment of a smart contract rollup"
-
-        let b58check_prefix = commitment_hash_prefix
-
-        (* defaults to 32 *)
-        let size = None
-      end)
-
-  include H
-
-  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
-
-  include Path_encoding.Make_hex (H)
-end
-
-(* 32 *)
 let state_hash_prefix = "\017\144\122\202" (* scs1(54) *)
 
 module State_hash = struct
@@ -217,10 +188,6 @@ module Index = struct
   let compare = Address.compare
 end
 
-module Commitment_hash_index = struct
-  include Commitment_hash
-end
-
 module Number_of_messages = Bounded.Int32.Make (struct
   let min_int = 0l
 
@@ -235,77 +202,6 @@ module Number_of_ticks = Bounded.Int32.Make (struct
 
   let max_int = Int32.max_int
 end)
-
-module Commitment = struct
-  type t = {
-    compressed_state : State_hash.t;
-    inbox_level : Raw_level_repr.t;
-    predecessor : Commitment_hash.t;
-    number_of_messages : Number_of_messages.t;
-    number_of_ticks : Number_of_ticks.t;
-  }
-
-  let pp fmt
-      {
-        compressed_state;
-        inbox_level;
-        predecessor;
-        number_of_messages;
-        number_of_ticks;
-      } =
-    Format.fprintf
-      fmt
-      "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
-       predecessor: %a@ number_of_messages: %ld@ number_of_ticks: %ld@]"
-      State_hash.pp
-      compressed_state
-      Raw_level_repr.pp
-      inbox_level
-      Commitment_hash.pp
-      predecessor
-      (Number_of_messages.to_int32 number_of_messages)
-      (Number_of_ticks.to_int32 number_of_ticks)
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {
-             compressed_state;
-             inbox_level;
-             predecessor;
-             number_of_messages;
-             number_of_ticks;
-           } ->
-        ( compressed_state,
-          inbox_level,
-          predecessor,
-          number_of_messages,
-          number_of_ticks ))
-      (fun ( compressed_state,
-             inbox_level,
-             predecessor,
-             number_of_messages,
-             number_of_ticks ) ->
-        {
-          compressed_state;
-          inbox_level;
-          predecessor;
-          number_of_messages;
-          number_of_ticks;
-        })
-      (obj5
-         (req "compressed_state" State_hash.encoding)
-         (req "inbox_level" Raw_level_repr.encoding)
-         (req "predecessor" Commitment_hash.encoding)
-         (req "number_of_messages" Number_of_messages.encoding)
-         (req "number_of_ticks" Number_of_ticks.encoding))
-
-  let hash commitment =
-    let commitment_bytes =
-      Data_encoding.Binary.to_bytes_exn encoding commitment
-    in
-    Commitment_hash.hash_bytes [commitment_bytes]
-end
 
 module Kind = struct
   (*

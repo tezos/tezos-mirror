@@ -216,8 +216,8 @@ module Index = struct
     match player with Alice -> alice | Bob -> bob
 end
 
-let initial inbox ~(parent : Commitment.t) ~(child : Commitment.t) ~refuter
-    ~defender =
+let initial inbox ~(parent : Sc_rollup_commitment_repr.t)
+    ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender =
   let alice, _ = Index.normalize (refuter, defender) in
   let alice_to_play = Staker.equal alice refuter in
   let tick = Sc_rollup_tick_repr.of_number_of_ticks child.number_of_ticks in

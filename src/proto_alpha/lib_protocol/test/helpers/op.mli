@@ -389,5 +389,5 @@ val sc_rollup_cement :
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
-  Sc_rollup.Commitment_hash.t ->
+  Sc_rollup.Commitment.Hash.t ->
   Operation.packed tzresult Lwt.t

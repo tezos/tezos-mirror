@@ -286,7 +286,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       Format.fprintf
         ppf
         "Cement the commitment %a in the smart contract rollup at address %a"
-        Sc_rollup.Commitment_hash.pp
+        Sc_rollup.Commitment.Hash.pp
         commitment
         Sc_rollup.Address.pp
         rollup
@@ -672,7 +672,7 @@ let pp_manager_operation_contents_and_result ppf
     Format.fprintf
       ppf
       "@,Hash of commit: %a"
-      Sc_rollup.Commitment_hash.pp
+      Sc_rollup.Commitment.Hash.pp
       staked_hash ;
     Format.fprintf
       ppf
