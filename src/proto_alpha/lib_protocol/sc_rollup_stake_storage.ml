@@ -68,15 +68,18 @@ let withdraw_stake ctxt rollup staker =
   match res with
   | None -> fail Sc_rollup_not_staked
   | Some staked_on_commitment ->
-      if Commitment_hash.(staked_on_commitment = lcc) then
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
-           We should refund stake here.
-        *)
-        let* ctxt, _size_freed =
-          Store.Stakers.remove_existing (ctxt, rollup) staker
-        in
-        modify_staker_count ctxt rollup Int32.pred
-      else fail Sc_rollup_not_staked_on_lcc
+      let* () =
+        fail_unless
+          Commitment_hash.(staked_on_commitment = lcc)
+          Sc_rollup_not_staked_on_lcc
+      in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
+         We should refund stake here.
+      *)
+      let* ctxt, _size_freed =
+        Store.Stakers.remove_existing (ctxt, rollup) staker
+      in
+      modify_staker_count ctxt rollup Int32.pred
 
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
@@ -91,14 +94,16 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
       return (ctxt, Commitment.(lcc.inbox_level))
   in
   let max_level = Commitment.(commitment.inbox_level) in
-  if
-    let sc_rollup_max_lookahead =
-      Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt
-    in
-    Compare.Int32.(
-      sc_rollup_max_lookahead < Raw_level_repr.diff max_level min_level)
-  then fail Sc_rollup_too_far_ahead
-  else return ctxt
+  let* () =
+    fail_when
+      (let sc_rollup_max_lookahead =
+         Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt
+       in
+       Compare.Int32.(
+         sc_rollup_max_lookahead < Raw_level_repr.diff max_level min_level))
+      Sc_rollup_too_far_ahead
+  in
+  return ctxt
 
 (** Enfore that a commitment's inbox level increases by an exact fixed amount over its predecessor.
     This property is used in several places - not obeying it causes severe breakage.
@@ -136,11 +141,13 @@ let assert_commitment_period ctxt rollup commitment =
   let sc_rollup_commitment_period =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
-  if
-    Raw_level_repr.(
-      commitment.inbox_level = add pred_level sc_rollup_commitment_period)
-  then return ctxt
-  else fail Sc_rollup_bad_inbox_level
+  let* () =
+    fail_unless
+      Raw_level_repr.(
+        commitment.inbox_level = add pred_level sc_rollup_commitment_period)
+      Sc_rollup_bad_inbox_level
+  in
+  return ctxt
 
 (** Check invariants on [inbox_level], enforcing overallocation of storage and
     regularity of block production.
@@ -244,12 +251,13 @@ let refine_stake ctxt rollup staker commitment =
       assert (Compare.Int.(size_diff = 0 || size_diff = expected_size_diff)) ;
       return (new_hash, commitment_added_level, ctxt)
       (* See WARNING above. *))
-    else if Commitment_hash.(node = lcc) then
-      (* We reached the LCC, but [staker] is not staked directly on it.
-         Thus, we backtracked. Note that everyone is staked indirectly on
-         the LCC. *)
-      fail Sc_rollup_staker_backtracked
     else
+      let* () =
+        (* We reached the LCC, but [staker] is not staked directly on it.
+           Thus, we backtracked. Note that everyone is staked indirectly on
+           the LCC. *)
+        fail_when Commitment_hash.(node = lcc) Sc_rollup_staker_backtracked
+      in
       let* pred, ctxt =
         Commitment_storage.get_predecessor_unsafe ctxt rollup node
       in
@@ -290,43 +298,50 @@ let cement_commitment ctxt rollup new_lcc =
   in
   (* Get is safe, as [Stakers_size] is initialized on origination. *)
   let* ctxt, total_staker_count = Store.Staker_count.get ctxt rollup in
-  if Compare.Int32.(total_staker_count <= 0l) then fail Sc_rollup_no_stakers
-  else
-    let* new_lcc_commitment, ctxt =
-      Commitment_storage.get_commitment_unsafe ctxt rollup new_lcc
-    in
-    let* ctxt, new_lcc_added =
-      Store.Commitment_added.get (ctxt, rollup) new_lcc
-    in
-    if Commitment_hash.(new_lcc_commitment.predecessor <> old_lcc) then
-      fail Sc_rollup_parent_not_lcc
-    else
-      let* new_lcc_stake_count, ctxt =
-        get_commitment_stake_count ctxt rollup new_lcc
-      in
-      if Compare.Int32.(total_staker_count <> new_lcc_stake_count) then
-        fail Sc_rollup_disputed
-      else if
-        let level = (Raw_context.current_level ctxt).level in
-        Raw_level_repr.(level < add new_lcc_added refutation_deadline_blocks)
-      then fail Sc_rollup_too_recent
-      else
-        (* update LCC *)
-        let* ctxt, lcc_size_diff =
-          Store.Last_cemented_commitment.update ctxt rollup new_lcc
-        in
-        assert (Compare.Int.(lcc_size_diff = 0)) ;
-        (* At this point we know all stakers are implicitly staked
-           on the new LCC, and no one is directly staked on the old LCC. We
-           can safely deallocate the old LCC.
-        *)
-        let* ctxt = deallocate ctxt rollup old_lcc in
-        consume_n_messages
-          ctxt
-          rollup
-          (Int32.to_int
-          @@ Sc_rollup_repr.Number_of_messages.to_int32
-               new_lcc_commitment.number_of_messages)
+  let* () =
+    fail_when Compare.Int32.(total_staker_count <= 0l) Sc_rollup_no_stakers
+  in
+  let* new_lcc_commitment, ctxt =
+    Commitment_storage.get_commitment_unsafe ctxt rollup new_lcc
+  in
+  let* ctxt, new_lcc_added =
+    Store.Commitment_added.get (ctxt, rollup) new_lcc
+  in
+  let* () =
+    fail_when
+      Commitment_hash.(new_lcc_commitment.predecessor <> old_lcc)
+      Sc_rollup_parent_not_lcc
+  in
+  let* new_lcc_stake_count, ctxt =
+    get_commitment_stake_count ctxt rollup new_lcc
+  in
+  let* () =
+    fail_when
+      Compare.Int32.(total_staker_count <> new_lcc_stake_count)
+      Sc_rollup_disputed
+  in
+  let* () =
+    fail_when
+      (let level = (Raw_context.current_level ctxt).level in
+       Raw_level_repr.(level < add new_lcc_added refutation_deadline_blocks))
+      Sc_rollup_too_recent
+  in
+  (* update LCC *)
+  let* ctxt, lcc_size_diff =
+    Store.Last_cemented_commitment.update ctxt rollup new_lcc
+  in
+  assert (Compare.Int.(lcc_size_diff = 0)) ;
+  (* At this point we know all stakers are implicitly staked
+     on the new LCC, and no one is directly staked on the old LCC. We
+     can safely deallocate the old LCC.
+  *)
+  let* ctxt = deallocate ctxt rollup old_lcc in
+  consume_n_messages
+    ctxt
+    rollup
+    (Int32.to_int
+    @@ Sc_rollup_repr.Number_of_messages.to_int32
+         new_lcc_commitment.number_of_messages)
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in
@@ -335,22 +350,23 @@ let remove_staker ctxt rollup staker =
   match res with
   | None -> fail Sc_rollup_not_staked
   | Some staked_on ->
-      if Commitment_hash.(staked_on = lcc) then fail Sc_rollup_remove_lcc
-      else
-        let* ctxt, _size_diff =
-          Store.Stakers.remove_existing (ctxt, rollup) staker
-        in
-        let* ctxt = modify_staker_count ctxt rollup Int32.pred in
-        let rec go node ctxt =
-          if Commitment_hash.(node = lcc) then return ctxt
-          else
-            let* pred, ctxt =
-              Commitment_storage.get_predecessor_unsafe ctxt rollup node
-            in
-            let* ctxt = decrease_commitment_stake_count ctxt rollup node in
-            (go [@ocaml.tailcall]) pred ctxt
-        in
-        go staked_on ctxt
+      let* () =
+        fail_when Commitment_hash.(staked_on = lcc) Sc_rollup_remove_lcc
+      in
+      let* ctxt, _size_diff =
+        Store.Stakers.remove_existing (ctxt, rollup) staker
+      in
+      let* ctxt = modify_staker_count ctxt rollup Int32.pred in
+      let rec go node ctxt =
+        if Commitment_hash.(node = lcc) then return ctxt
+        else
+          let* pred, ctxt =
+            Commitment_storage.get_predecessor_unsafe ctxt rollup node
+          in
+          let* ctxt = decrease_commitment_stake_count ctxt rollup node in
+          (go [@ocaml.tailcall]) pred ctxt
+      in
+      go staked_on ctxt
 
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake

@@ -126,12 +126,15 @@ let get_conflict_point ctxt rollup staker1 staker2 =
         commit1_info.predecessor
         commit2_info.predecessor
   in
-  if Commitment_hash.(commit1 = commit2) then
-    (* This case will most dominantly happen when either commit is part of the other's history.
-       It occurs when the commit that is farther ahead gets dereferenced to its predecessor often
-       enough to land at the other commit. *)
-    fail Sc_rollup_no_conflict
-  else traverse_in_parallel ctxt commit1 commit2
+  let* () =
+    fail_when
+      (* This case will most dominantly happen when either commit is part of the other's history.
+         It occurs when the commit that is farther ahead gets dereferenced to its predecessor often
+         enough to land at the other commit. *)
+      Commitment_hash.(commit1 = commit2)
+      Sc_rollup_no_conflict
+  in
+  traverse_in_parallel ctxt commit1 commit2
 
 (** [get_or_init_game ctxt rollup refuter defender] returns the current
     game between the two stakers [refuter] and [defender] if it exists.
@@ -205,10 +208,11 @@ let update_game ctxt rollup ~player ~opponent refutation =
   let* game, ctxt =
     get_or_init_game ctxt rollup ~refuter:player ~defender:opponent
   in
-  let* _ =
-    let turn = match game.turn with Alice -> alice | Bob -> bob in
-    if Sc_rollup_repr.Staker.equal turn player then return ()
-    else fail Sc_rollup_wrong_turn
+  let* () =
+    fail_unless
+      (let turn = match game.turn with Alice -> alice | Bob -> bob in
+       Sc_rollup_repr.Staker.equal turn player)
+      Sc_rollup_wrong_turn
   in
   match Sc_rollup_game_repr.play game refutation with
   | Either.Left outcome -> return (Some outcome, ctxt)
@@ -234,9 +238,12 @@ let timeout ctxt rollup stakers =
       let* ctxt, timeout_level =
         Store.Game_timeout.get (ctxt, rollup) (alice, bob)
       in
-      if Raw_level_repr.(level > timeout_level) then
-        return (Sc_rollup_game_repr.{loser = game.turn; reason = Timeout}, ctxt)
-      else fail Sc_rollup_timeout_level_not_reached
+      let* () =
+        fail_unless
+          Raw_level_repr.(level > timeout_level)
+          Sc_rollup_timeout_level_not_reached
+      in
+      return (Sc_rollup_game_repr.{loser = game.turn; reason = Timeout}, ctxt)
 
 (* TODO: #2926 this requires carbonation *)
 let apply_outcome ctxt rollup stakers (outcome : Sc_rollup_game_repr.outcome) =
