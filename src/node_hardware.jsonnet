@@ -46,7 +46,7 @@ local prometheus = grafana.prometheus;
       linewidth=1,
       format='percent',
       aliasColors={
-        [load]: 'light-green',
+        [load]: 'light-yellow',
       },
     ).addTarget(
       prometheus.target(
