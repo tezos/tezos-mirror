@@ -78,15 +78,26 @@ let log_regression_diff diff =
         Log.log ~level:Error ~color "%s" line)
     (String.split_on_char '\n' diff)
 
-let all_output_files = ref String_set.empty
-
-let full_output_file output_file = "tezt/_regressions" // (output_file ^ ".out")
+(* Map from output directories to output files.
+   Output directories are directories that are supposed to only contain output files.
+   Subdirectories of output directories do not appear as keys in this map.
+   In the map, output files can be in subdirectories (i.e. they can contain '/'). *)
+let output_dirs_and_files : String_set.t String_map.t ref = ref String_map.empty
 
 let register ~__FILE__ ~title ~tags ~output_file f =
   let tags = "regression" :: tags in
-  all_output_files := String_set.add output_file !all_output_files ;
+  let output_dir = "tezt/_regressions" in
+  let relative_output_file = output_file ^ ".out" in
+  output_dirs_and_files :=
+    String_map.add
+      output_dir
+      (String_set.add
+         relative_output_file
+         (String_map.find_opt output_dir !output_dirs_and_files
+         |> Option.value ~default:String_set.empty))
+      !output_dirs_and_files ;
+  let stored_full_output_file = output_dir // relative_output_file in
   Test.register ~__FILE__ ~title ~tags (fun () ->
-      let stored_full_output_file = full_output_file output_file in
       (* when the stored output doesn't already exists, must reset regressions *)
       if
         not
@@ -145,8 +156,12 @@ let register ~__FILE__ ~title ~tags ~output_file f =
               (Log.quote_shell stored_full_output_file)
               (Log.quote_shell title))
 
-let check_unknown_output_files () =
-  let full_output_files = String_set.map full_output_file !all_output_files in
+let check_unknown_output_files output_dir relative_output_files =
+  let full_output_files =
+    String_set.map
+      (fun relative_output_file -> output_dir // relative_output_file)
+      relative_output_files
+  in
   let found_unknown = ref false in
   let mode = Cli.options.on_unknown_regression_files_mode in
   let log_unused = match mode with Fail -> Log.error | _ -> Log.warn in
@@ -185,7 +200,7 @@ let check_unknown_output_files () =
           found_unknown := true)
     | _ -> ()
   in
-  browse "tezt/_regressions" ;
+  browse output_dir ;
   if !found_unknown then (
     Log.warn
       "Use --on-unknown-regression-files delete to delete those files and/or \
@@ -197,6 +212,6 @@ let () =
   (* We cannot run [check_unknown_output_files] before [Cli.init],
      and we cannot run it from the [Test] module because it would create
      a circular dependency. *)
-  Test.before_test_run (fun () ->
-      if Cli.options.on_unknown_regression_files_mode <> Ignore then
-        check_unknown_output_files ())
+  Test.before_test_run @@ fun () ->
+  if Cli.options.on_unknown_regression_files_mode <> Ignore then
+    String_map.iter check_unknown_output_files !output_dirs_and_files
