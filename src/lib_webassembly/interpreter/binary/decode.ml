@@ -821,12 +821,6 @@ let instr_block_step s cont =
   (* The empty continuation cannot reduce. *)
   | [] -> assert false
 
-let instr_block s =
-  let rec loop  = function
-    | [ IKStop res ] -> res
-    | k -> loop (instr_block_step s k) in
-  loop [IKNext []]
-
 (** Vector and size continuations *)
 
 (** Vector accumulator, used in two steps: first accumulating the values, then
@@ -961,20 +955,83 @@ let local s =
   let t = value_type s in
   n, t
 
-let code _ s =
-  let pos = pos s in
-  let nts = vec local s in
-  let ns = List.map (fun (n, _) -> I64_convert.extend_i32_u n) nts in
-  require (I64.lt_u (List.fold_left I64.add 0L ns) 0x1_0000_0000L)
-    s pos "too many locals";
-  let locals = List.flatten (List.map (Lib.Fun.uncurry Lib.List32.make) nts) in
-  let body = instr_block s in
-  end_ s;
-  {locals; body; ftype = Source.((-1l) @@ Source.no_region)}
+(** Code section parsing. *)
+type code_kont =
+  | CKStart
+  (** Starting point of a function parsing. *)
+  | CKLocals of
+      { left: pos;
+        size : size;
+        pos : pos;
+        vec_kont: (int32 * value_type, value_type) vec_map_kont;
+        locals_size: Int64.t;
+      }
+  (** Parsing step of local values of a function. *)
+  | CKBody of
+      { left: pos;
+        size : size;
+        locals: value_type list;
+        const_kont: instr_block_kont list;
+      }
+  (** Parsing step of the body of a function. *)
+  | CKStop of func
+  (** Final step of a parsed function, irreducible. *)
 
-let _code_section s =
-  section `CodeSection (vec (at (sized code))) [] s
+let at' left s x =
+  let right = pos s in
+  Source.(x @@ region s left right)
 
+let code_step s = function
+  | CKStart ->
+    (* `at` left *)
+    let left = pos s in
+    let size = size s in
+    let pos = pos s in
+    (* `vec` size *)
+    let n = len32 s in
+    CKLocals {
+      left;
+      size;
+      pos;
+      vec_kont = Collect (n, []);
+      locals_size = 0L;
+    }
+
+  | CKLocals { left; size; pos; vec_kont = Collect (0, l); locals_size; } ->
+    require (I64.lt_u locals_size 0x1_0000_0000L)
+      s pos "too many locals";
+    CKLocals { left; size; pos; vec_kont = Rev (l, []); locals_size; }
+  | CKLocals { left; size; pos; vec_kont =  Collect (n, l); locals_size; } ->
+    let local = local s in (* small enough to fit in a tick *)
+    let locals_size =
+      I64.add locals_size (I64_convert.extend_i32_u (fst local)) in
+    CKLocals
+      { left; size; pos; vec_kont = Collect (n - 1, local :: l); locals_size; }
+
+  | CKLocals
+      { left; size; pos; vec_kont = Rev ([], locals);
+        locals_size; }->
+    CKBody { left; size; locals; const_kont = [ IKNext [] ] }
+  | CKLocals
+      { left; size; pos; vec_kont = Rev ((0l, t) :: l, l'); locals_size } ->
+    CKLocals { left; size; pos; vec_kont = Rev (l, l'); locals_size; }
+  | CKLocals
+      { left; size; pos; vec_kont = Rev ((n, t) :: l, l'); locals_size; } ->
+    let n' = I32.sub n 1l in
+    CKLocals
+      { left; size; pos; vec_kont = Rev ((n', t) :: l, t :: l'); locals_size; }
+
+
+  | CKBody { left; size; locals; const_kont = [ IKStop body ] } ->
+    end_ s;
+    check_size size s;
+    let func =
+      at' left s @@ {locals; body; ftype = Source.((-1l) @@ Source.no_region)} in
+    CKStop func
+  | CKBody { left; size; locals; const_kont } ->
+    CKBody { left; size; locals; const_kont = instr_block_step s const_kont }
+
+  | CKStop _ -> assert false (* final step, cannot reduce *)
 
 (* Element section *)
 
@@ -1332,6 +1389,10 @@ type module_kont' =
   (** Data segments section parsing, containing the current data parsing
       continuation, the starting position of the current data, the size of the
       section. *)
+  | MKCode of code_kont * int * size * func vec_kont
+  (** Code section parsing, containing the current function parsing
+      continuation, the starting position of the current function, the size of
+      the section. *)
 
 type module_kont =
   { building_state : field list; (** Accumulated parsed sections. *)
@@ -1432,7 +1493,7 @@ let module_ s =
          (* not a vector *)
          assert false
        | CodeField ->
-         failwith "HERE" (* do something incremental, like Global, but more complex *)
+         next @@ MKCode (CKStart, pos s, size, Collect (n, l))
        | DataField ->
          next @@ MKData (DKStart, pos s, size, Collect (n, l))
       )
@@ -1467,6 +1528,14 @@ let module_ s =
       assert false
     | MKData (data_kont, pos, size, curr_vec) ->
       next @@ MKData (data_step s data_kont, pos, size, curr_vec)
+
+    | MKCode (CKStop func, left, size, Collect (n, l)) ->
+      next @@ MKField (CodeField, size, Collect (n - 1, func :: l))
+    | MKCode (CKStop _, _, _ , Rev _) ->
+      (* Impossible case, there's no need for reversal. *)
+      assert false
+    | MKCode (code_kont, pos, size, curr_vec) ->
+      next @@ MKCode (code_step s code_kont, pos, size, curr_vec)
 
     (* Transitions steps from the end of a section to the next one.
 
