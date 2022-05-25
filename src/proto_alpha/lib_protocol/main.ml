@@ -837,10 +837,12 @@ let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
   Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, _, _) -> return (Apply.value_of_key ctxt)
 
-let check_signature {chain_id; _} public_key raw_op =
-  Alpha_context.Operation.check_signature public_key chain_id raw_op
-
-let precheck_manager {ctxt; _} op =
-  Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
+let precheck_manager {validate_operation_info; validate_operation_state; _}
+    contents_list should_check_signature =
+  Validate_operation.TMP_for_plugin.precheck_manager
+    validate_operation_info
+    validate_operation_state
+    contents_list
+    should_check_signature
 
 (* Vanity nonce: TBD *)

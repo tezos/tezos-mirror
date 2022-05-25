@@ -118,23 +118,13 @@ type operation = Alpha_context.packed_operation = {
   protocol_data : operation_data;
 }
 
-(** Call {!Alpha_context.Operation.check_signature}.
-
-    @return [Error Alpha_context.Operation.Invalid_signature] if the
-    signature check fails. *)
-val check_signature :
-  validation_state ->
-  Signature.public_key ->
-  'a Alpha_context.operation ->
-  unit tzresult
-
-(** Call {Apply.precheck_manager_contents_list} and discard the
-    context and balance updates, so that only the contract's public key
-    is returned. *)
+(** See {!Validate_operation.precheck_manager}. *)
 val precheck_manager :
   validation_state ->
   'a Alpha_context.Kind.manager Alpha_context.contents_list ->
-  Signature.public_key tzresult Lwt.t
+  'a Alpha_context.Kind.manager
+  Validate_operation.TMP_for_plugin.should_check_signature ->
+  unit tzresult Lwt.t
 
 include
   Updater.PROTOCOL

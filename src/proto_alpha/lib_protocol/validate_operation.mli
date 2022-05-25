@@ -133,3 +133,48 @@ val validate_operation :
   Operation_hash.t ->
   'kind Alpha_context.operation ->
   validate_operation_state tzresult Lwt.t
+
+(** Functions for the plugin.
+
+    These functions are temporary.
+
+    TODO: https://gitlab.com/tezos/tezos/-/issues/3245
+    Update the plugin to call directly {!validate_operation} then
+    remove these functions. *)
+module TMP_for_plugin : sig
+  (** Indicate whether the signature should be checked in
+      {!precheck_manager}; if so, provide the raw operation.
+
+      We could have used an [option], but this makes calls to
+      {!precheck_manager} more readable. *)
+  type 'a should_check_signature =
+    | Check_signature of 'a Alpha_context.operation
+    | Skip_signature_check
+
+  (** Similar to {!validate_operation}, but do not check the
+      one-operation-per-manager-per-block restriction (1M).
+
+      Indeed, 1M is already handled by the plugin. This function is
+      purposefully close to the former
+      [Apply.precheck_manager_contents_list], so that few changes are
+      needed in the plugin.
+
+      The signature is only checked if the [should_check_signature]
+      argument is [Check_signature _].
+
+      The {!validate_operation_state} does not need to be updated
+      because:
+
+      + 1M is not handled here anyway.
+
+      + In mempool mode, the block gas limit is not tracked.
+
+      This function is called by {!Main.precheck_manager}, which is
+      called in [lib_plugin/mempool.ml]. *)
+  val precheck_manager :
+    validate_operation_info ->
+    validate_operation_state ->
+    'a Alpha_context.Kind.manager Alpha_context.contents_list ->
+    'a Alpha_context.Kind.manager should_check_signature ->
+    unit tzresult Lwt.t
+end
