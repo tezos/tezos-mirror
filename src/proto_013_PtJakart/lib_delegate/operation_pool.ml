@@ -35,6 +35,16 @@ type 'collection t = {
   managers : 'collection;
 }
 
+let compare_op op1 op2 =
+  try Stdlib.compare op1 op2
+  with _ ->
+    (* FIXME some operations (e.g. tx_rollup_rejection) pack
+       functional values which could raise an exception. In this
+       specific case, we default to comparing their hashes. *)
+    Operation_hash.compare
+      (Alpha_context.Operation.hash_packed op1)
+      (Alpha_context.Operation.hash_packed op2)
+
 module Prioritized_operation = struct
   (* Higher priority operations will be included first *)
   type t = High of packed_operation | Low of packed_operation
@@ -53,13 +63,13 @@ module Prioritized_operation = struct
 
   let compare a b =
     let c = compare_priority a b in
-    if c <> 0 then c else compare (packed a) (packed b)
+    if c <> 0 then c else compare_op (packed a) (packed b)
 end
 
 module Operation_set = Set.Make (struct
   type t = packed_operation
 
-  let compare = Stdlib.compare
+  let compare = compare_op
 end)
 
 module Prioritized_operation_set = struct
