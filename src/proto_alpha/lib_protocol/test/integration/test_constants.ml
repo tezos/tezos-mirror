@@ -97,13 +97,15 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
   let commitment_period =
     Int64.of_int constants.sc_rollup_commitment_period_in_blocks
   in
-  let stake_amount = Int64.of_int constants.sc_rollup_stake_amount_in_mutez in
+  let stake_amount_in_mutez =
+    Alpha_context.Tez.to_mutez constants.sc_rollup_stake_amount
+  in
   Assert.leq_int64
     ~loc:__LOC__
     (Int64.mul
        commitment_storage_cost
        (Int64.div max_lookahead commitment_period))
-    stake_amount
+    stake_amount_in_mutez
 
 (* Check that
    [sc_rollup_commitment_storage_size_in_bytes = commitments_entry_size +

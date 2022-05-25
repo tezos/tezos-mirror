@@ -49,8 +49,7 @@ let modify_staker_count ctxt rollup f =
 
 let get_contract_and_stake ctxt staker =
   let staker_contract = Contract_repr.Implicit staker in
-  let mutez_amount = Constants_storage.sc_rollup_stake_amount_in_mutez ctxt in
-  let stake = Tez_repr.of_mutez_exn (Int64.of_int mutez_amount) in
+  let stake = Constants_storage.sc_rollup_stake_amount ctxt in
   (staker_contract, stake)
 
 (** Warning: must be called only if [rollup] exists and [staker] is not to be

@@ -133,7 +133,7 @@ val sc_rollup_challenge_window_in_blocks : Raw_context.t -> int
 
 val sc_rollup_max_available_messages : Raw_context.t -> int
 
-val sc_rollup_stake_amount_in_mutez : Raw_context.t -> int
+val sc_rollup_stake_amount : Raw_context.t -> Tez_repr.t
 
 val sc_rollup_commitment_period_in_blocks : Raw_context.t -> int
 

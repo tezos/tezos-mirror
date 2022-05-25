@@ -95,8 +95,7 @@ let assert_balance_decreased ctxt ctxt' account amount =
 
 let perform_staking_action_and_check ctxt rollup staker do_and_check =
   let staker_contract = Contract_repr.Implicit staker in
-  let mutez_amount = Constants_storage.sc_rollup_stake_amount_in_mutez ctxt in
-  let stake = Tez_repr.of_mutez_exn (Int64.of_int mutez_amount) in
+  let stake = Constants_storage.sc_rollup_stake_amount ctxt in
   do_and_check ctxt rollup staker_contract stake
 
 let deposit_stake_and_check_balances ctxt rollup staker =
@@ -203,10 +202,7 @@ let test_deposit_by_underfunded_staker () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1hhNZvjed6McQQLWtR7MRzPHpgSFZTXxdW"
   in
-  let stake =
-    Tez_repr.of_mutez_exn @@ Int64.of_int
-    @@ Constants_storage.sc_rollup_stake_amount_in_mutez ctxt
-  in
+  let stake = Constants_storage.sc_rollup_stake_amount ctxt in
   let* () =
     assert_fails_with
       ~loc:__LOC__

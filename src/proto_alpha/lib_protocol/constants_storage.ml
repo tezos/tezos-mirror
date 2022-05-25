@@ -226,9 +226,9 @@ let sc_rollup_max_available_messages c =
   let constants = Raw_context.constants c in
   constants.sc_rollup_max_available_messages
 
-let sc_rollup_stake_amount_in_mutez c =
+let sc_rollup_stake_amount c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_stake_amount_in_mutez
+  constants.sc_rollup_stake_amount
 
 let sc_rollup_commitment_period_in_blocks c =
   let constants = Raw_context.constants c in
