@@ -2287,26 +2287,20 @@ let burn_internal_storage_fees :
       >|=? fun (ctxt, storage_limit, origination_result) ->
       (ctxt, storage_limit, Origination_result origination_result)
   | Reveal_result _ | Delegation_result _ -> return (ctxt, storage_limit, smopr)
-  | Register_global_constant_result payload ->
+  | Register_global_constant_result ({balance_updates; _} as payload) ->
       let consumed = payload.size_of_constant in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
       >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
+      let balance_updates = storage_bus @ balance_updates in
       return
         ( ctxt,
           storage_limit,
-          Register_global_constant_result
-            {
-              balance_updates;
-              consumed_gas = payload.consumed_gas;
-              size_of_constant = payload.size_of_constant;
-              global_address = payload.global_address;
-            } )
+          Register_global_constant_result {payload with balance_updates} )
   | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
-  | Tx_rollup_origination_result payload ->
+  | Tx_rollup_origination_result ({balance_updates; _} as payload) ->
       Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
       >>=? fun (ctxt, storage_limit, origination_bus) ->
-      let balance_updates = origination_bus @ payload.balance_updates in
+      let balance_updates = origination_bus @ balance_updates in
       return
         ( ctxt,
           storage_limit,
@@ -2315,39 +2309,35 @@ let burn_internal_storage_fees :
   | Tx_rollup_rejection_result _ | Tx_rollup_finalize_commitment_result _
   | Tx_rollup_commit_result _ ->
       return (ctxt, storage_limit, smopr)
-  | Transfer_ticket_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+  | Transfer_ticket_result
+      ({balance_updates; paid_storage_size_diff; _} as payload) ->
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
       >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = payload.balance_updates @ storage_bus in
+      let balance_updates = balance_updates @ storage_bus in
       return
         ( ctxt,
           storage_limit,
           Transfer_ticket_result {payload with balance_updates} )
-  | Tx_rollup_submit_batch_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+  | Tx_rollup_submit_batch_result
+      ({balance_updates; paid_storage_size_diff; _} as payload) ->
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
       >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
+      let balance_updates = storage_bus @ balance_updates in
       return
         ( ctxt,
           storage_limit,
           Tx_rollup_submit_batch_result {payload with balance_updates} )
-  | Tx_rollup_dispatch_tickets_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+  | Tx_rollup_dispatch_tickets_result
+      ({balance_updates; paid_storage_size_diff; _} as payload) ->
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
       >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
+      let balance_updates = storage_bus @ balance_updates in
       return
         ( ctxt,
           storage_limit,
           Tx_rollup_dispatch_tickets_result {payload with balance_updates} )
-  | Sc_rollup_originate_result payload ->
-      Fees.burn_sc_rollup_origination_fees
-        ctxt
-        ~storage_limit
-        ~payer
-        payload.size
+  | Sc_rollup_originate_result ({size; _} as payload) ->
+      Fees.burn_sc_rollup_origination_fees ctxt ~storage_limit ~payer size
       >>=? fun (ctxt, storage_limit, balance_updates) ->
       let result = Sc_rollup_originate_result {payload with balance_updates} in
       return (ctxt, storage_limit, result)
