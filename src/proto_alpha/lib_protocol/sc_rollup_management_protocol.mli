@@ -77,6 +77,10 @@ val make_internal_inbox_message :
   source:public_key_hash ->
   (inbox_message * context) tzresult Lwt.t
 
+(** [make_external_inbox_message msg] creates an external inbox message with the
+    the message as payload. *)
+val make_external_inbox_message : string -> inbox_message
+
 (** [bytes_of_inbox_message msg] encodes the inbox message [msg] in binary
     format. *)
 val bytes_of_inbox_message : inbox_message -> bytes tzresult

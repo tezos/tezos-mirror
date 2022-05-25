@@ -133,6 +133,8 @@ let make_internal_inbox_message ctxt ty ~payload ~sender ~source =
   let payload = Micheline.strip_locations payload in
   (Internal {payload; sender; source}, ctxt)
 
+let make_external_inbox_message msg = External msg
+
 let transaction_internal_encoding =
   let open Data_encoding in
   conv
