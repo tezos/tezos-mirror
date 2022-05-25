@@ -1970,8 +1970,8 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   apply ctxt [] ops
 
 let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
-    (op : kind Kind.manager contents) ~(only_batch : bool) :
-    (context * Tez.t * bool) tzresult Lwt.t =
+    remaining_block_gas (op : kind Kind.manager contents) ~(only_batch : bool) :
+    (context * Tez.t * bool * Gas.Arith.fp) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let[@coq_match_with_default] (Manager_operation
                                  {
@@ -1984,9 +1984,10 @@ let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
                                  }) =
     op
   in
-  let*? ctxt =
+  let*? remaining_block_gas =
     (if only_batch then
-     (* Gas.consume_limit_in_block will only raise a "temporary" error, however
+     (* {!Gas.check_limit_and_consume_from_block_gas}
+        will only raise a "temporary" error, however
         when the precheck is called on a batch in isolation (like e.g. in the
         mempool) it must "refuse" operations whose total gas_limit (the sum of
         the gas_limits of each operation) is already above the block limit. We
@@ -1994,7 +1995,11 @@ let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
         this effect. *)
      record_trace Gas.Gas_limit_too_high
     else fun errs -> errs)
-    @@ Gas.consume_limit_in_block ctxt gas_limit
+    @@ Gas.check_limit_and_consume_from_block_gas
+         ~hard_gas_limit_per_operation:
+           (Constants.hard_gas_limit_per_operation ctxt)
+         ~remaining_block_gas
+         ~gas_limit
   in
   let ctxt = Gas.set_limit ctxt gas_limit in
   let*? ctxt =
@@ -2123,7 +2128,7 @@ let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
       ~amount:fee
       source
   in
-  (ctxt, new_balance, still_allocated)
+  (ctxt, new_balance, still_allocated, remaining_block_gas)
 
 let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
   match trr with
@@ -2537,28 +2542,36 @@ let rec precheck_checks_rec :
     context ->
     Tez.t ->
     still_allocated:bool ->
+    Gas.Arith.fp ->
     kind Kind.manager contents_list ->
     only_batch:bool ->
     context tzresult Lwt.t =
- fun ctxt remaining_balance ~still_allocated contents_list ~only_batch ->
+ fun ctxt
+     remaining_balance
+     ~still_allocated
+     remaining_block_gas
+     contents_list
+     ~only_batch ->
   let open Lwt_result_syntax in
   match contents_list with
   | Single contents ->
-      let* ctxt, _remaining_balance, _still_allocated =
+      let* ctxt, _remaining_balance, _still_allocated, _remaining_block_gas =
         precheck_checks_contents
           ctxt
           remaining_balance
           ~still_allocated
+          remaining_block_gas
           contents
           ~only_batch
       in
       return ctxt
   | Cons (contents, rest) ->
-      let* ctxt, remaining_balance, still_allocated =
+      let* ctxt, remaining_balance, still_allocated, remaining_block_gas =
         precheck_checks_contents
           ctxt
           remaining_balance
           ~still_allocated
+          remaining_block_gas
           contents
           ~only_batch
       in
@@ -2566,6 +2579,7 @@ let rec precheck_checks_rec :
         ctxt
         remaining_balance
         ~still_allocated
+        remaining_block_gas
         rest
         ~only_batch
 
@@ -2586,6 +2600,7 @@ let precheck_checks ctxt contents_list ~mempool_mode =
       (* The contract's allocation has been checked in
          {!check_batch_sanity_and_find_public_key}. *)
       ~still_allocated:true
+      (Gas.block_level ctxt)
       contents_list
       ~only_batch:mempool_mode
   in
@@ -2594,6 +2609,7 @@ let precheck_checks ctxt contents_list ~mempool_mode =
 (** Return balance updates for fees and an updated context that accounts for:
     - fees spending
     - counter incrementation
+    - consumption of each operation's [gas_limit] from the available block gas
 
     This function should never return an error when called after
     {!precheck_checks}. *)
@@ -2604,28 +2620,23 @@ let rec precheck_effects :
     (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
  fun ctxt contents_list ->
   let open Lwt_result_syntax in
+  let contents_effects contents =
+    let (Manager_operation {source; fee; gas_limit; _}) = contents in
+    let*? ctxt = Gas.consume_limit_in_block ctxt gas_limit in
+    let* ctxt = Contract.increment_counter ctxt source in
+    let+ ctxt, balance_updates =
+      Token.transfer ctxt (`Contract (Contract.Implicit source)) `Block_fees fee
+    in
+    (ctxt, {contents; balance_updates})
+  in
   match contents_list with
-  | Single (Manager_operation {source; fee; _} as contents) ->
-      let* ctxt = Contract.increment_counter ctxt source in
-      let+ ctxt, balance_updates =
-        Token.transfer
-          ctxt
-          (`Contract (Contract.Implicit source))
-          `Block_fees
-          fee
-      in
-      (ctxt, PrecheckedSingle {contents; balance_updates})
-  | Cons ((Manager_operation {source; fee; _} as contents), rest) ->
-      let* ctxt = Contract.increment_counter ctxt source in
-      let* ctxt, balance_updates =
-        Token.transfer
-          ctxt
-          (`Contract (Contract.Implicit source))
-          `Block_fees
-          fee
-      in
+  | Single contents ->
+      let+ ctxt, prechecked_contents = contents_effects contents in
+      (ctxt, PrecheckedSingle prechecked_contents)
+  | Cons (contents, rest) ->
+      let* ctxt, prechecked_contents = contents_effects contents in
       let+ ctxt, result_rest = precheck_effects ctxt rest in
-      (ctxt, PrecheckedCons ({contents; balance_updates}, result_rest))
+      (ctxt, PrecheckedCons (prechecked_contents, result_rest))
 
 (** Return an updated context, a list of prechecked contents
     containing balance updates for fees related to each manager

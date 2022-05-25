@@ -213,3 +213,22 @@ let ( *@ ) x y = S.mul x y
 
 let alloc_mbytes_cost n =
   alloc_cost (S.mul_safe_of_int_exn 12) +@ alloc_bytes_cost n
+
+type error += Gas_limit_too_high (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"gas_limit_too_high"
+    ~title:"Gas limit out of protocol hard bounds"
+    ~description:"A transaction tried to exceed the hard limit on gas"
+    empty
+    (function Gas_limit_too_high -> Some () | _ -> None)
+    (fun () -> Gas_limit_too_high)
+
+let check_gas_limit ~(hard_gas_limit_per_operation : Arith.integral)
+    ~(gas_limit : Arith.integral) =
+  error_unless
+    Arith.(gas_limit <= hard_gas_limit_per_operation && gas_limit >= zero)
+    Gas_limit_too_high

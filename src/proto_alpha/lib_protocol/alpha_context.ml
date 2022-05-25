@@ -177,13 +177,9 @@ end
 module Gas = struct
   include Gas_limit_repr
 
-  type error += Gas_limit_too_high = Raw_context.Gas_limit_too_high
-
   type error += Block_quota_exceeded = Raw_context.Block_quota_exceeded
 
   type error += Operation_quota_exceeded = Raw_context.Operation_quota_exceeded
-
-  let check_limit_is_valid = Raw_context.check_gas_limit_is_valid
 
   let set_limit = Raw_context.set_gas_limit
 
@@ -192,6 +188,19 @@ module Gas = struct
   let set_unlimited = Raw_context.set_gas_unlimited
 
   let consume = Raw_context.consume_gas
+
+  let check_limit_and_consume_from_block_gas
+      ~(hard_gas_limit_per_operation : Arith.integral)
+      ~(remaining_block_gas : Arith.fp) ~(gas_limit : Arith.integral) =
+    let open Result_syntax in
+    let* () = check_gas_limit ~hard_gas_limit_per_operation ~gas_limit in
+    let gas_limit_fp = Arith.fp gas_limit in
+    let* () =
+      error_unless
+        Arith.(gas_limit_fp <= remaining_block_gas)
+        Block_quota_exceeded
+    in
+    return (Arith.sub remaining_block_gas gas_limit_fp)
 
   let remaining_operation_gas = Raw_context.remaining_operation_gas
 

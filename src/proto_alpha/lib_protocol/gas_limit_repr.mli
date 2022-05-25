@@ -114,3 +114,15 @@ val ( *@ ) : _ Saturation_repr.t -> cost -> cost
 
 (** Add two costs together. *)
 val ( +@ ) : cost -> cost -> cost
+
+(** Ill-formed [gas_limit]: see {!check_gas_limit}. *)
+type error += Gas_limit_too_high (* `Permanent *)
+
+(** Check that [gas_limit] is well-formed, i.e. it is at most the
+    given [hard_gas_limit_per_operation], and it is nonnegative.
+
+    @return [Error Gas_limit_too_high] otherwise. *)
+val check_gas_limit :
+  hard_gas_limit_per_operation:Arith.integral ->
+  gas_limit:'a Arith.t ->
+  unit tzresult

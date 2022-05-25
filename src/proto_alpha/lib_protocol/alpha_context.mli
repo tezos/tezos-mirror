@@ -375,11 +375,6 @@ module Gas : sig
 
   val pp : Format.formatter -> t -> unit
 
-  (** [check_limit_is_valid ctxt limit] checks that the given gas
-     [limit] is well-formed, i.e., it does not exceed the hard gas
-     limit per operation as defined in [ctxt] and it is positive. *)
-  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
-
   (** [set_limit ctxt limit] returns a context with a given
      [limit] level of gas allocated for an operation. *)
   val set_limit : context -> 'a Arith.t -> context
@@ -434,17 +429,30 @@ module Gas : sig
 
   type error += Operation_quota_exceeded (* `Temporary *)
 
-  (** [consume_limit_in_block ctxt limit] consumes [limit] in
-     the current block gas level of the context. This operation may
-     fail with error [Block_quota_exceeded] if not enough gas remains
-     in the block. This operation may also fail with
-     [Gas_limit_too_high] if [limit] is greater than the allowed
-     limit for operation gas level. *)
-  val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
-
   type error += Block_quota_exceeded (* `Temporary *)
 
   type error += Gas_limit_too_high (* `Permanent *)
+
+  (** See {!Raw_context.consume_gas_limit_in_block}. *)
+  val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
+
+  (** Check that [gas_limit] is a valid operation gas limit (at most
+      [hard_gas_limit_per_operation] and nonnegative), then subtract it
+      from [remaining_block_gas] and return the difference.
+
+      @return [Error Gas_limit_too_high] if [gas_limit] is greater
+      than [hard_gas_limit_per_operation] or negative.
+
+      @return [Error Block_quota_exceeded] if [gas_limit] is greater
+      than [remaining_block_gas].
+
+      This function mimics {!consume_limit_in_block} but bypasses the
+      context. *)
+  val check_limit_and_consume_from_block_gas :
+    hard_gas_limit_per_operation:Arith.integral ->
+    remaining_block_gas:Arith.fp ->
+    gas_limit:Arith.integral ->
+    Arith.fp tzresult
 
   (** The cost of free operation is [0]. *)
   val free : cost

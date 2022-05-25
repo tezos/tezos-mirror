@@ -129,10 +129,17 @@ val spend_collected_fees_only_call_from_token : t -> Tez_repr.t -> t tzresult
     producer's account at finalize_application *)
 val get_collected_fees : t -> Tez_repr.t
 
-type error += Gas_limit_too_high (* `Permanent *)
+(** [consume_gas_limit_in_block ctxt gas_limit] checks that
+    [gas_limit] is well-formed (i.e. it does not exceed the hard gas
+    limit per operation as defined in [ctxt], and it is positive), then
+    consumes [gas_limit] in the current block gas level of [ctxt].
 
-val check_gas_limit_is_valid : t -> 'a Gas_limit_repr.Arith.t -> unit tzresult
+    @return [Error Gas_limit_repr.Gas_limit_too_high] if [gas_limit]
+    is greater than the allowed limit for operation gas level or
+    negative.
 
+    @return [Error Block_quota_exceeded] if not enough gas remains in
+    the block. *)
 val consume_gas_limit_in_block : t -> 'a Gas_limit_repr.Arith.t -> t tzresult
 
 val set_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> t
