@@ -32,7 +32,7 @@ install_bin_focal:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - ./docs/introduction/install-bin-rc-ubuntu.sh
+    - ./docs/introduction/install-bin-ubuntu.sh rc
 
 install_bin_rc_bionic:
   image: public.ecr.aws/lts/ubuntu:18.04_stable
@@ -60,7 +60,7 @@ install_bin_fedora_34:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - ./docs/introduction/install-bin-rc-fedora.sh
+    - ./docs/introduction/install-bin-fedora.sh rc
 
 install_bin_rc_fedora_34:
   image: fedora:34
@@ -87,12 +87,18 @@ install_opam_focal:
     - .default_settings_template
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
-  script:
-    - ./docs/introduction/compile-sources.sh
 
-compile_sources_buster:
+compile_release_sources_buster:
   image: ocaml/opam:debian-10
   extends: .compile_sources_template
+  script:
+    - ./docs/introduction/compile-sources.sh latest-release
+
+compile_master_sources_buster:
+  image: ocaml/opam:debian-10
+  extends: .compile_sources_template
+  script:
+    - ./docs/introduction/compile-sources.sh master
 
 .install_python_debian_ubuntu_template:
   extends:

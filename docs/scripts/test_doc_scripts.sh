@@ -35,7 +35,8 @@ where <test-name> can be:
 * install-opam-scratch
 * install-opam-bionic
 * install-opam-focal
-* compile-sources-buster
+* compile-release-sources-buster
+* compile-master-sources-buster
 * install-python-bionic
 * install-python-focal
 * install-python-buster
@@ -56,22 +57,22 @@ for test_case in "$@"; do
             docker run --rm -i --privileged debian:buster <"$DOCS_DIR"/introduction/use-docker-ithacanet.sh
             ;;
         "install-bin-bionic" )
-            docker run --rm -i $UBUNTU_BIONIC <"$DOCS_DIR"/introduction/install-bin-ubuntu.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_BIONIC /Scripts/install-bin-ubuntu.sh
             ;;
         "install-bin-focal" )
-            docker run --rm -i $UBUNTU_FOCAL <"$DOCS_DIR"/introduction/install-bin-ubuntu.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_FOCAL /Scripts/install-bin-ubuntu.sh
             ;;
         "install-bin-fedora34" )
-            docker run --rm -i fedora:34 <"$DOCS_DIR"/introduction/install-bin-fedora.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:34 /Scripts/install-bin-fedora.sh
             ;;
         "install-bin-rc-bionic" )
-            docker run --rm -i $UBUNTU_BIONIC <"$DOCS_DIR"/introduction/install-bin-rc-ubuntu.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_BIONIC /Scripts/install-bin-ubuntu.sh rc
             ;;
         "install-bin-rc-focal" )
-            docker run --rm -i $UBUNTU_FOCAL <"$DOCS_DIR"/introduction/install-bin-rc-ubuntu.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_FOCAL /Scripts/install-bin-ubuntu.sh rc
             ;;
         "install-bin-rc-fedora34" )
-            docker run --rm -i fedora:34 <"$DOCS_DIR"/introduction/install-bin-rc-fedora.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:34 /Scripts/install-bin-fedora.sh rc
             ;;
         "install-opam-scratch" )
             docker run --rm -i --privileged $UBUNTU_BIONIC <"$DOCS_DIR"/introduction/install-opam-scratch.sh
@@ -82,8 +83,11 @@ for test_case in "$@"; do
         "install-opam-focal" )
             docker run --rm -i ocaml/opam:ubuntu-20.04 <"$DOCS_DIR"/introduction/install-opam.sh
             ;;
-        "compile-sources-buster" )
-            docker run --rm -i ocaml/opam:debian-10 <"$DOCS_DIR"/introduction/compile-sources.sh
+        "compile-release-sources-buster" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh latest-release
+            ;;
+        "compile-master-sources-buster" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh master
             ;;
         "install-python-bionic" )
             docker run --rm -i $UBUNTU_BIONIC <"$DOCS_DIR"/developer/install-python-debian-ubuntu.sh
@@ -101,7 +105,7 @@ for test_case in "$@"; do
 
     esac
 
-    echo "test $1 returned $?"
+    echo "test $test_case returned $?"
     echo "*******************************************************************"
 done
 

@@ -6,6 +6,26 @@
 # shellcheck disable=SC2086
 # for omitting quotes in: source $HOME/.cargo/env
 
+usage () {
+    cat >&2 <<!EOF
+usage:
+  $0 [<branch>]
+!EOF
+}
+
+if [ $# -eq 1 ]
+then
+  BRANCH=$1
+elif [ $# -eq 0 ]
+then
+  # [select branch]
+  BRANCH="latest-release"
+  # [end]
+else
+  usage
+  exit 1
+fi
+
 set -e
 set -x
 cd
@@ -25,7 +45,7 @@ chmod +x rustup-init.sh
 # [get sources]
 git clone https://gitlab.com/tezos/tezos.git
 cd tezos
-git checkout latest-release
+git checkout $BRANCH
 # [install Tezos dependencies]
 opam init --bare
 make build-deps
