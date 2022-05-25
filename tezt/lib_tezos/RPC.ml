@@ -39,3 +39,12 @@ let get_connection peer_id =
   make GET ["network"; "connections"; peer_id] @@ fun json ->
   let id_point = JSON.(json |-> "id_point") in
   (JSON.(id_point |-> "addr" |> as_string), JSON.(id_point |-> "port" |> as_int))
+
+let private_injection_operations ?(force = false) ?(async = false) ~ops () =
+  let query_string =
+    [("async", string_of_bool async); ("force", string_of_bool force)]
+  in
+  let data = `A (List.map (fun (`Hex op) -> `String op) ops) in
+  make ~data ~query_string POST ["private"; "injection"; "operations"]
+  @@ fun json ->
+  JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
