@@ -121,7 +121,7 @@ type atomic_transaction_batch = {transactions : transaction list}
 
 type outbox_message = Atomic_transaction_batch of atomic_transaction_batch
 
-let make_inbox_message ctxt ty ~payload ~sender ~source =
+let make_internal_inbox_message ctxt ty ~payload ~sender ~source =
   let open Lwt_tzresult_syntax in
   let+ payload, ctxt =
     Script_ir_translator.unparse_data

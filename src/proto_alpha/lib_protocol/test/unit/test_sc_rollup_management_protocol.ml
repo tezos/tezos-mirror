@@ -108,7 +108,7 @@ let test_encode_decode_inbox_message () =
   in
   let* deposit, _ctxt =
     wrap
-    @@ Sc_rollup_management_protocol.make_inbox_message
+    @@ Sc_rollup_management_protocol.make_internal_inbox_message
          ctxt
          pair_nat_ticket_string_ty
          ~payload
