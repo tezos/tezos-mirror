@@ -1969,8 +1969,9 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   in
   apply ctxt [] ops
 
-let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
-    ~(only_batch : bool) : (context * Receipt.balance_updates) tzresult Lwt.t =
+let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
+    (op : kind Kind.manager contents) ~(only_batch : bool) :
+    (context * Tez.t * bool) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let[@coq_match_with_default] (Manager_operation
                                  {
@@ -2002,8 +2003,11 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation)
   in
   let*? () = Fees.check_storage_limit ctxt ~storage_limit in
-  let source_contract = Contract.Implicit source in
-  let* () = Contract.must_be_allocated ctxt source_contract in
+  let*? () =
+    error_unless
+      still_allocated
+      (Contract_storage.Empty_implicit_contract source)
+  in
   let consume_decoding_gas ctxt lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
     @@ (* Fail early if the operation does not have enough gas to
@@ -2113,7 +2117,14 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         return ctxt
   in
   let* ctxt = Contract.increment_counter ctxt source in
-  Token.transfer ctxt (`Contract source_contract) `Block_fees fee
+  let+ new_balance, still_allocated =
+    Contract.simulate_spending
+      ctxt
+      ~balance:remaining_balance
+      ~amount:fee
+      source
+  in
+  (ctxt, new_balance, still_allocated)
 
 let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
   match trr with
@@ -2429,7 +2440,7 @@ let rec mark_skipped :
 
 (** Check a few simple properties of the given batch or standalone
     manager operation represented by [contents_list]. Then return its
-    [public_key].
+    [source] (aka [public_key_hash]) and [public_key].
 
     Invariants checked:
 
@@ -2515,32 +2526,104 @@ let check_batch_sanity_and_find_public_key ctxt
   let*? source, revealed_key, first_counter = check_batch contents_list in
   let* () = Contract.must_be_allocated ctxt (Contract.Implicit source) in
   let* () = Contract.check_counter_increment ctxt source first_counter in
-  match revealed_key with
-  | None -> Contract.get_manager_key ctxt source
-  | Some pk -> return pk
+  let* pk =
+    match revealed_key with
+    | None -> Contract.get_manager_key ctxt source
+    | Some pk -> return pk
+  in
+  return (source, pk)
 
-let rec rec_precheck_manager_contents_list :
+let rec precheck_checks_rec :
     type kind.
     context ->
+    Tez.t ->
+    still_allocated:bool ->
     kind Kind.manager contents_list ->
     only_batch:bool ->
-    (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
- fun ctxt contents_list ~only_batch ->
+    context tzresult Lwt.t =
+ fun ctxt remaining_balance ~still_allocated contents_list ~only_batch ->
   let open Lwt_result_syntax in
   match contents_list with
   | Single contents ->
-      let* ctxt, balance_updates =
-        precheck_manager_contents ctxt contents ~only_batch
+      let* ctxt, _remaining_balance, _still_allocated =
+        precheck_checks_contents
+          ctxt
+          remaining_balance
+          ~still_allocated
+          contents
+          ~only_batch
       in
-      return (ctxt, PrecheckedSingle {contents; balance_updates})
+      return ctxt
   | Cons (contents, rest) ->
+      let* ctxt, remaining_balance, still_allocated =
+        precheck_checks_contents
+          ctxt
+          remaining_balance
+          ~still_allocated
+          contents
+          ~only_batch
+      in
+      precheck_checks_rec
+        ctxt
+        remaining_balance
+        ~still_allocated
+        rest
+        ~only_batch
+
+(** Check the solvability of an operation batch. The goal is to make
+    this function effect-free, moving all effects to {!precheck_effects}. *)
+let precheck_checks ctxt contents_list ~mempool_mode =
+  let open Lwt_result_syntax in
+  let* source, public_key =
+    check_batch_sanity_and_find_public_key ctxt contents_list
+  in
+  let* ctxt, initial_balance =
+    Token.balance ctxt (`Contract (Contract.Implicit source))
+  in
+  let* ctxt =
+    precheck_checks_rec
+      ctxt
+      initial_balance
+      (* The contract's allocation has been checked in
+         {!check_batch_sanity_and_find_public_key}. *)
+      ~still_allocated:true
+      contents_list
+      ~only_batch:mempool_mode
+  in
+  return (ctxt, public_key)
+
+(** Return balance updates for fees and an updated context that accounts for:
+    - fees spending
+
+    This function should never return an error when called after
+    {!precheck_checks}. *)
+let rec precheck_effects :
+    type kind.
+    context ->
+    kind Kind.manager contents_list ->
+    (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
+ fun ctxt contents_list ->
+  let open Lwt_result_syntax in
+  match contents_list with
+  | Single (Manager_operation {source; fee; _} as contents) ->
+      let+ ctxt, balance_updates =
+        Token.transfer
+          ctxt
+          (`Contract (Contract.Implicit source))
+          `Block_fees
+          fee
+      in
+      (ctxt, PrecheckedSingle {contents; balance_updates})
+  | Cons ((Manager_operation {source; fee; _} as contents), rest) ->
       let* ctxt, balance_updates =
-        precheck_manager_contents ctxt contents ~only_batch
+        Token.transfer
+          ctxt
+          (`Contract (Contract.Implicit source))
+          `Block_fees
+          fee
       in
-      let* ctxt, results_rest =
-        rec_precheck_manager_contents_list ctxt rest ~only_batch
-      in
-      return (ctxt, PrecheckedCons ({contents; balance_updates}, results_rest))
+      let+ ctxt, result_rest = precheck_effects ctxt rest in
+      (ctxt, PrecheckedCons ({contents; balance_updates}, result_rest))
 
 (** Return an updated context, a list of prechecked contents
     containing balance updates for fees related to each manager
@@ -2548,15 +2631,8 @@ let rec rec_precheck_manager_contents_list :
 let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  (* Retrieve the [public_key] first: the contract may be deleted by the
-     fee transfer in [rec_precheck_manager_contents_list]. *)
-  let* public_key = check_batch_sanity_and_find_public_key ctxt contents_list in
-  let* ctxt, prechecked_contents_list =
-    rec_precheck_manager_contents_list
-      ctxt
-      contents_list
-      ~only_batch:mempool_mode
-  in
+  let* ctxt, public_key = precheck_checks ctxt contents_list ~mempool_mode in
+  let* ctxt, prechecked_contents_list = precheck_effects ctxt contents_list in
   return (ctxt, prechecked_contents_list, public_key)
 
 let rec apply_manager_contents_list_rec :
