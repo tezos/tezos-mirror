@@ -147,25 +147,24 @@ test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_compile_protocol
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
-PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d 2>/dev/null | LC_COLLATE=C sort)
+PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
+NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
 test-proto-unit:
 	DUNE_PROFILE=$(PROFILE) \
 		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
 		scripts/test_wrapper.sh test-proto-unit \
-		$(addprefix @, $(addsuffix /runtest,$(PROTO_LIBS)))
+		$(addprefix @, $(addsuffix /runtest,$(PROTO_DIRS)))
 
 
-# We do not run vendor tests because they are a no-op from dune
-NONPROTO_LIBS := $(shell find src/ -path src/proto_\* -prune -o -name test -type d -exec test -f \{\}/dune \; -print | LC_COLLATE=C sort)
 
 .PHONY: test-nonproto-unit
 test-nonproto-unit:
 	DUNE_PROFILE=$(PROFILE) \
 		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
 		scripts/test_wrapper.sh test-nonproto-unit \
-		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_LIBS)))
+		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_DIRS)))
 
 .PHONY: test-unit
 test-unit: test-nonproto-unit test-proto-unit
@@ -251,16 +250,13 @@ lint-tests-pkg:
 	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
 
 
-
-NONPROTO_LIBS_DIR := $(addsuffix /,${NONPROTO_LIBS})
-EXCLUDE_NONPROTO_LIBS_DIR := $(addprefix --exclude-file ,${NONPROTO_LIBS_DIR})
-PROTO_LIBS_DIR = $(addsuffix /,${PROTO_LIBS})
-EXCLUDE_PROTO_LIBS_DIR := $(addprefix --exclude-file ,${PROTO_LIBS_DIR})
+TEST_DIRS := $(shell find src -name "test" -type d -print -o -name "test-*" -type d -print)
+EXCLUDE_TEST_DIRS := $(addprefix --exclude-file ,$(addsuffix /,${TEST_DIRS}))
 
 .PHONY: lint-ometrics
 lint-ometrics:
-	@echo "Running ometrics analysis in your changes."
-	@ometrics check ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+	@echo "Running ometrics analysis in your changes"
+	@ometrics check ${EXCLUDE_TEST_DIRS} \
         --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
         --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
         --exclude-file "tezt/tests/" \
@@ -273,7 +269,7 @@ lint-ometrics-gitlab:
 	@echo "Running ometrics analysis in your changes."
 	@mkdir -p _reports
 	@ometrics check-clone ${OMETRICS_GIT} --branch ${OMETRICS_BRANCH} \
-        ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+        ${EXCLUDE_TEST_DIRS} \
         --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
         --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
         --exclude-file "tezt/tests/" \
