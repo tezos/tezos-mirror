@@ -996,9 +996,6 @@ let active_zero s =
   let offset = const s in
   Active {index; offset}
 
-let declarative s =
-  Declarative
-
 let elem_index s =
   let x = at var s in
   [Source.(ref_func x @@ x.at)]
@@ -1008,51 +1005,218 @@ let elem_kind s =
   | 0x00 -> FuncRefType
   | _ -> error s (pos s - 1) "malformed element kind"
 
-let elem s =
-  match vu32 s with
+type index_kind = Indexed | Const
+
+type elem_kont =
+  | EKStart
+  (** Starting point of an element segment parsing. *)
+  | EKMode of
+      {
+        left: pos;
+        index : int32 Source.phrase;
+        index_kind: index_kind;
+        early_ref_type : ref_type option;
+        offset_kont: pos * instr_block_kont list
+      }
+  (** Element segment mode parsing step. *)
+  | EKInitIndexed of
+      { mode: segment_mode;
+        ref_type: ref_type;
+        einit_vec: const vec_kont
+      }
+  (** Element segment initialization code parsing step for referenced values. *)
+  | EKInitConst of
+      { mode: segment_mode;
+        ref_type: ref_type;
+        einit_vec: const vec_kont;
+        einit_kont: pos * instr_block_kont list
+      }
+  (** Element segment initialization code parsing step for constant values. *)
+  | EKStop of elem_segment'
+  (** Final step of a segment parsing. *)
+
+let ek_start s =
+  let v = vu32 s in
+  match v with
   | 0x00l ->
-    let emode = at active_zero s in
-    let einit = vec (at elem_index) s in
-    {etype = FuncRefType; einit; emode}
+    (* active_zero *)
+    let index = Source.(0l @@ Source.no_region) in
+    let left = pos s in
+    EKMode {
+      left;
+      index;
+      index_kind = Indexed;
+      early_ref_type = Some FuncRefType;
+      offset_kont = (left, (IKNext []) :: [])
+    }
   | 0x01l ->
-    let emode = at passive s in
-    let etype = elem_kind s in
-    let einit = vec (at elem_index) s in
-    {etype; einit; emode}
+    (* passive *)
+    let mode_pos = pos s in
+    let ref_type = elem_kind s in
+    let n = len32 s in
+    let mode = Source.(Passive @@ region s mode_pos mode_pos) in
+    EKInitIndexed
+      { mode; ref_type; einit_vec = Collect (n, []) }
   | 0x02l ->
-    let emode = at active s in
-    let etype = elem_kind s in
-    let einit = vec (at elem_index) s in
-    {etype; einit; emode}
+    (* active *)
+    let left = pos s in
+    let index = at var s in
+    let left_offset = pos s in
+    EKMode
+      { left;
+        index;
+        index_kind = Indexed;
+        early_ref_type = None;
+        offset_kont = (left_offset, (IKNext []) :: [])
+      }
   | 0x03l ->
-    let emode = at declarative s in
-    let etype = elem_kind s in
-    let einit = vec (at elem_index) s in
-    {etype; einit; emode}
+    (* declarative *)
+    let mode_pos = pos s in
+    let mode = Source.(Declarative @@ region s mode_pos mode_pos) in
+    let ref_type = elem_kind s in
+    let n = len32 s in
+    EKInitIndexed
+      { mode; ref_type; einit_vec = Collect (n,  []) }
   | 0x04l ->
-    let emode = at active_zero s in
-    let einit = vec const s in
-    {etype = FuncRefType; einit; emode}
+    (* active_zero *)
+    let index = Source.(0l @@ Source.no_region) in
+    let left = pos s in
+    EKMode {
+      left;
+      index;
+      index_kind = Const;
+      early_ref_type = Some FuncRefType;
+      offset_kont = (left, (IKNext []) :: [])
+    }
   | 0x05l ->
-    let emode = at passive s in
-    let etype = ref_type s in
-    let einit = vec const s in
-    {etype; einit; emode}
+    (* passive *)
+    let mode_pos = pos s in
+    let mode = Source.(Passive @@ region s mode_pos mode_pos) in
+    let ref_type = ref_type s in
+    let n = len32 s in
+    let left = pos s in
+    EKInitConst {
+      mode;
+      ref_type;
+      einit_vec = Collect (n, []);
+      einit_kont = (left, IKNext [] :: [])
+    }
   | 0x06l ->
-    let emode = at active s in
-    let etype = ref_type s in
-    let einit = vec const s in
-    {etype; einit; emode}
+    (* active *)
+    let left = pos s in
+    let index = at var s in
+    let left_offset = pos s in
+    EKMode
+      { left;
+        index;
+        index_kind = Const;
+        early_ref_type = None;
+        offset_kont = (left_offset, (IKNext []) :: [])
+      }
   | 0x07l ->
-    let emode = at declarative s in
-    let etype = ref_type s in
-    let einit = vec const s in
-    {etype; einit; emode}
+    (* declarative *)
+    let mode_pos = pos s in
+    let mode = Source.(Declarative @@ region s mode_pos mode_pos) in
+    let ref_type = ref_type s in
+    let n = len32 s in
+    let left = pos s in
+    EKInitConst {
+      mode;
+      ref_type;
+      einit_vec = Collect (n, []);
+      einit_kont = (left, IKNext [] :: [])
+    }
   | _ -> error s (pos s - 1) "malformed elements segment kind"
 
-let _elem_section s =
-  section `ElemSection (vec (at elem)) [] s
+let elem_step s =
+  function
+  | EKStart -> ek_start s
+  | EKMode
+      {
+        left;
+        index;
+        index_kind;
+        early_ref_type;
+        offset_kont = (left_offset, [IKStop offset]) } ->
+    end_ s;
+    let right = pos s in
+    let offset = Source.(offset @@ region s left_offset right) in
+    let mode = Source.(Active {index; offset} @@ region s left right) in
+    let ref_type =
+      match early_ref_type with
+      | Some t -> t
+      | None -> if index_kind = Indexed then elem_kind s else ref_type s
+    in
+    (* `vec` size *)
+    let n = len32 s in
+    if index_kind = Indexed then
+      EKInitIndexed
+        { mode;
+          ref_type;
+          einit_vec = Collect (n, [])
+        }
+    else
+      let left = pos s in
+      EKInitConst
+        { mode;
+          ref_type;
+          einit_vec = Collect (n, []);
+          einit_kont = (left, IKNext [] :: []);
+        }
+  | EKMode
+      { left; index; index_kind; early_ref_type; offset_kont = (left_offset, k) } ->
+    let k' = instr_block_step s k in
+    EKMode {
+      left;
+      index;
+      index_kind;
+      early_ref_type;
+      offset_kont = (left_offset, k')
+    }
 
+  (* COLLECT Indexed *)
+  | EKInitIndexed { mode; ref_type; einit_vec = Collect(0, l) } ->
+    EKInitIndexed { mode; ref_type; einit_vec = Rev(l, []) }
+  | EKInitIndexed { mode; ref_type; einit_vec = Collect(n, l) } ->
+    let elem_index = at elem_index s in
+    EKInitIndexed { mode; ref_type; einit_vec = Collect(n-1, elem_index :: l) }
+
+  (* COLLECT CONST *)
+  | EKInitConst
+      { mode; ref_type; einit_vec = Collect(0, l); einit_kont = (left, _)} ->
+    EKInitConst { mode; ref_type; einit_vec = Rev(l, []); einit_kont = (left, [])}
+  | EKInitConst {
+      mode;
+      ref_type;
+      einit_vec = Collect(n, l);
+      einit_kont = (left, [ IKStop einit ])
+    } ->
+    end_ s;
+    let right = pos s in
+    let einit = Source.(einit @@ region s left right) in
+    EKInitConst {
+      mode;
+      ref_type;
+      einit_vec = Collect(n-1, einit :: l);
+      einit_kont = (right, [IKNext []])
+    }
+
+  | EKInitConst
+      { mode; ref_type; einit_vec = Collect(n, l); einit_kont = (left, k) } ->
+    let k' = instr_block_step s k in
+    EKInitConst
+      { mode; ref_type; einit_vec = Collect(n, l); einit_kont = (left, k') }
+
+  (* REV *)
+  | EKInitConst { mode; ref_type; einit_vec = Rev ([], einit); _ }
+  | EKInitIndexed { mode; ref_type; einit_vec = Rev ([], einit) } ->
+    EKStop { etype = ref_type; einit; emode = mode }
+  | EKInitConst { mode; ref_type; einit_vec = Rev (c :: l, l'); einit_kont } ->
+    EKInitConst { mode; ref_type; einit_vec = Rev (l, c :: l'); einit_kont }
+  | EKInitIndexed { mode; ref_type; einit_vec = Rev (c :: l, l') } ->
+    EKInitIndexed { mode; ref_type; einit_vec = Rev (l, c :: l') }
+
+  | EKStop _  -> assert false (* Final step, cannot reduce *)
 
 (* Data section *)
 
@@ -1150,6 +1314,10 @@ type module_kont' =
   (** Globals section parsing, containing the starting position, the
       continuation of the current global block instruction, and the size of the
       section. *)
+  | MKElem of elem_kont * int * size * elem_segment vec_kont
+  (** Element segments section parsing, containing the current element parsing
+      continuation, the starting position of the current element, the size of
+      the section. *)
 
 type module_kont =
   { building_state : field list; (** Accumulated parsed sections. *)
@@ -1245,7 +1413,7 @@ let module_ s =
          (* not a vector *)
          assert false
        | ElemField ->
-         failwith "HERE" (* do something incremental, like Global, but more complex *)
+         next @@ MKElem (EKStart, pos s, size, Collect (n, l))
        | DataCountField ->
          (* not a vector *)
          assert false
@@ -1267,6 +1435,15 @@ let module_ s =
       assert false
     | MKGlobal (ty, pos, k, size, curr_vec) ->
       next @@ MKGlobal (ty, pos, instr_block_step s k, size, curr_vec)
+
+    | MKElem (EKStop elem, left, size, Collect (n, l)) ->
+      let elem = Source.(elem @@ region s left (pos s)) in
+      next @@ MKField (ElemField, size, Collect ((n - 1), elem :: l))
+    | MKElem (EKStop _, _, _, Rev _) ->
+      (* Impossible case, there's no need for reversal. *)
+      assert false
+    | MKElem (elem_kont, pos, size, curr_vec) ->
+      next @@ MKElem (elem_step s elem_kont, pos, size, curr_vec)
 
     (* Transitions steps from the end of a section to the next one.
 
