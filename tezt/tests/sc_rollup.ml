@@ -502,6 +502,28 @@ module Sc_rollup_inbox = struct
 
   include Tezos_context_helpers.Context.Make_tree (Conf) (Store)
 
+  (* A message is tagged with a prefix. It consists of 5 bytes:
+     - Byte 0 is the tag (1 for external and 0 for internal).
+     - Bytes 1-4 is the length of the message encoded as:
+        [ prefix[1] * 256^3 + prefix[2] * 256^2 prefix[3] * 256^1 prefix[4]]
+  *)
+  let encode_external_message message =
+    let length = String.length message in
+    let pow m n = Z.to_int @@ Z.(of_int m ** n) in
+    let prefix =
+      [
+        (* This is the tag of external messages. *)
+        1;
+        (* The length of the message encoded in base 256. *)
+        length / pow 256 3 mod 256;
+        length / pow 256 2 mod 256;
+        length / 256 mod 256;
+        length mod 256;
+      ]
+      |> List.map Char.chr |> List.to_seq |> String.of_seq
+    in
+    Bytes.of_string (Printf.sprintf "%s%s" prefix message)
+
   (*
       The hash for empty messages is the hash of empty bytes, and not of an empty
       tree.
@@ -518,7 +540,7 @@ module Sc_rollup_inbox = struct
     | [] -> return tree
     | message :: rest ->
         let key = Data_encoding.Binary.to_string_exn Data_encoding.z counter in
-        let payload = Bytes.of_string message in
+        let payload = encode_external_message message in
         let* tree = add tree [key; "payload"] payload in
         build_current_messages_tree (Z.succ counter) tree rest
 
