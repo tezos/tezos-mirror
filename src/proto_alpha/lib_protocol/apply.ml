@@ -797,16 +797,6 @@ let apply_delegation ~ctxt ~source ~delegate ~before_operation =
   Delegate.set ctxt source delegate >|=? fun ctxt ->
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
 
-let apply_internal_delegation ~ctxt ~source ~delegate ~before_operation =
-  apply_delegation ~ctxt ~source ~delegate ~before_operation
-  >|=? fun (ctxt, consumed_gas, ops) ->
-  (ctxt, Delegation_result {consumed_gas}, ops)
-
-let apply_manager_delegation ~ctxt ~source ~delegate ~before_operation =
-  apply_delegation ~ctxt ~source ~delegate ~before_operation
-  >|=? fun (ctxt, consumed_gas, ops) ->
-  (ctxt, Delegation_result {consumed_gas}, ops)
-
 type execution_arg =
   | Typed_arg :
       Script.location * ('a, _) Script_typed_ir.ty * 'a
@@ -855,30 +845,6 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
           }
       in
       (ctxt, result, []) )
-
-let apply_internal_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
-    ~entrypoint ~before_operation =
-  apply_transaction_to_implicit
-    ~ctxt
-    ~source
-    ~amount
-    ~pkh
-    ~parameter
-    ~entrypoint
-    ~before_operation
-  >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
-
-let apply_manager_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
-    ~entrypoint ~before_operation =
-  apply_transaction_to_implicit
-    ~ctxt
-    ~source
-    ~amount
-    ~pkh
-    ~parameter
-    ~entrypoint
-    ~before_operation
-  >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~parameter =
@@ -982,40 +948,6 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
               }
           in
           (ctxt, result, operations) )
-
-let apply_internal_transaction_to_smart_contract ~ctxt ~source ~contract_hash
-    ~amount ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal
-    ~parameter =
-  apply_transaction_to_smart_contract
-    ~ctxt
-    ~source
-    ~contract_hash
-    ~amount
-    ~entrypoint
-    ~before_operation
-    ~payer
-    ~chain_id
-    ~mode
-    ~internal
-    ~parameter
-  >>=? fun (ctxt, res, ops) -> return (ctxt, Transaction_result res, ops)
-
-let apply_manager_transaction_to_smart_contract ~ctxt ~source ~contract_hash
-    ~amount ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal
-    ~parameter =
-  apply_transaction_to_smart_contract
-    ~ctxt
-    ~source
-    ~contract_hash
-    ~amount
-    ~entrypoint
-    ~before_operation
-    ~payer
-    ~chain_id
-    ~mode
-    ~internal
-    ~parameter
-  >>=? fun (ctxt, res, ops) -> return (ctxt, Transaction_result res, ops)
 
 let ex_ticket_size :
     context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
@@ -1149,36 +1081,6 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   in
   (ctxt, result, [])
 
-let apply_internal_origination ~ctxt ~storage_type ~storage ~unparsed_code
-    ~contract ~delegate ~source ~credit ~before_operation =
-  apply_origination
-    ~ctxt
-    ~storage_type
-    ~storage
-    ~unparsed_code
-    ~contract
-    ~delegate
-    ~source
-    ~credit
-    ~before_operation
-  >|=? fun (ctxt, origination_result, ops) ->
-  (ctxt, Origination_result origination_result, ops)
-
-let apply_manager_origination ~ctxt ~storage_type ~storage ~unparsed_code
-    ~contract ~delegate ~source ~credit ~before_operation =
-  apply_origination
-    ~ctxt
-    ~storage_type
-    ~storage
-    ~unparsed_code
-    ~contract
-    ~delegate
-    ~source
-    ~credit
-    ~before_operation
-  >|=? fun (ctxt, origination_result, ops) ->
-  (ctxt, Origination_result origination_result, ops)
-
 (**
 
    Retrieving the source code of a contract from its address is costly
@@ -1239,15 +1141,18 @@ let apply_internal_manager_operation_content :
         parameters_ty;
         parameters = typed_parameters;
       } ->
-      (apply_internal_transaction_to_implicit
-         ~ctxt
-         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
-         ~source
-         ~pkh
-         ~amount
-         ~entrypoint
-         ~before_operation
-        : (_ * kind successful_manager_operation_result * _) tzresult Lwt.t)
+      apply_transaction_to_implicit
+        ~ctxt
+        ~source
+        ~amount
+        ~pkh
+        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
+        ~entrypoint
+        ~before_operation
+      >|=? fun (ctxt, res, ops) ->
+      ( ctxt,
+        (Transaction_result res : kind successful_manager_operation_result),
+        ops )
   | Transaction_to_contract
       {
         amount;
@@ -1258,7 +1163,7 @@ let apply_internal_manager_operation_content :
         parameters = typed_parameters;
         unparsed_parameters = _;
       } ->
-      apply_internal_transaction_to_smart_contract
+      apply_transaction_to_smart_contract
         ~ctxt
         ~source
         ~contract_hash
@@ -1270,6 +1175,7 @@ let apply_internal_manager_operation_content :
         ~mode
         ~internal:true
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
+      >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       apply_transaction_to_tx_rollup
@@ -1291,7 +1197,7 @@ let apply_internal_manager_operation_content :
         ctxt
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
-      apply_internal_origination
+      apply_origination
         ~ctxt
         ~storage_type
         ~storage
@@ -1301,8 +1207,12 @@ let apply_internal_manager_operation_content :
         ~source
         ~credit
         ~before_operation
+      >|=? fun (ctxt, origination_result, ops) ->
+      (ctxt, Origination_result origination_result, ops)
   | Delegation delegate ->
-      apply_internal_delegation ~ctxt ~source ~delegate ~before_operation
+      apply_delegation ~ctxt ~source ~delegate ~before_operation
+      >|=? fun (ctxt, consumed_gas, ops) ->
+      (ctxt, Delegation_result {consumed_gas}, ops)
 
 let apply_external_manager_operation_content :
     type kind.
@@ -1339,7 +1249,7 @@ let apply_external_manager_operation_content :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      apply_manager_transaction_to_implicit
+      apply_transaction_to_implicit
         ~ctxt
         ~source:source_contract
         ~amount
@@ -1347,6 +1257,7 @@ let apply_external_manager_operation_content :
         ~parameter:(Untyped_arg parameters)
         ~entrypoint
         ~before_operation
+      >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
       {amount; parameters; destination = Originated contract_hash; entrypoint}
     ->
@@ -1355,7 +1266,7 @@ let apply_external_manager_operation_content :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      apply_manager_transaction_to_smart_contract
+      apply_transaction_to_smart_contract
         ~ctxt
         ~source:source_contract
         ~contract_hash
@@ -1367,6 +1278,7 @@ let apply_external_manager_operation_content :
         ~mode
         ~internal:false
         ~parameter:(Untyped_arg parameters)
+      >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Tx_rollup_dispatch_tickets
       {
         tx_rollup;
@@ -1525,7 +1437,7 @@ let apply_external_manager_operation_content :
         (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
         views_result
       >>=? fun (_typed_views, ctxt) ->
-      apply_manager_origination
+      apply_origination
         ~ctxt
         ~storage_type
         ~storage
@@ -1535,12 +1447,12 @@ let apply_external_manager_operation_content :
         ~source:source_contract
         ~credit
         ~before_operation
+      >|=? fun (ctxt, origination_result, ops) ->
+      (ctxt, Origination_result origination_result, ops)
   | Delegation delegate ->
-      apply_manager_delegation
-        ~ctxt
-        ~source:source_contract
-        ~delegate
-        ~before_operation
+      apply_delegation ~ctxt ~source:source_contract ~delegate ~before_operation
+      >|=? fun (ctxt, consumed_gas, ops) ->
+      (ctxt, Delegation_result {consumed_gas}, ops)
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
       Script.force_decode_in_context ~consume_deserialization_gas ctxt value
