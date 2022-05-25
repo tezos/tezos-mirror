@@ -86,6 +86,10 @@ let call_raw ?(log_request = true) ?(log_response_status = true)
   let* response, response_body =
     Cohttp_lwt_unix.Client.call
       ~headers:(Cohttp.Header.of_list headers)
+      ?body:
+        (Option.map
+           (fun body -> Cohttp_lwt.Body.of_string (JSON.encode_u body))
+           rpc.data)
       (cohttp_of_verb rpc.verb)
       uri
   in
