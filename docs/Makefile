@@ -98,17 +98,17 @@ xrefscheck:
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
-	introduction/test_howtoget.sh install-bin-bionic
-	introduction/test_howtoget.sh install-bin-focal
-	introduction/test_howtoget.sh install-bin-fedora34
-	introduction/test_howtoget.sh install-bin-rc-bionic
-	introduction/test_howtoget.sh install-bin-rc-focal
-	introduction/test_howtoget.sh install-bin-rc-fedora34
-	introduction/test_howtoget.sh install-opam-scratch
-	introduction/test_howtoget.sh install-opam-bionic
-	introduction/test_howtoget.sh install-opam-focal
-	introduction/test_howtoget.sh compile-sources-buster
-	#introduction/test_howtoget.sh use-docker # returns 1 (and eats alot of disk)
+	scripts/test_doc_scripts.sh install-bin-bionic
+	scripts/test_doc_scripts.sh install-bin-focal
+	scripts/test_doc_scripts.sh install-bin-fedora34
+	scripts/test_doc_scripts.sh install-bin-rc-bionic
+	scripts/test_doc_scripts.sh install-bin-rc-focal
+	scripts/test_doc_scripts.sh install-bin-rc-fedora34
+	scripts/test_doc_scripts.sh install-opam-scratch
+	scripts/test_doc_scripts.sh install-opam-bionic
+	scripts/test_doc_scripts.sh install-opam-focal
+	scripts/test_doc_scripts.sh compile-sources-buster
+	#scripts/test_doc_scripts.sh use-docker # returns 1 (and eats alot of disk)
 
 sanitycheck:
 	@if grep -Rq alpha 0*; then					\

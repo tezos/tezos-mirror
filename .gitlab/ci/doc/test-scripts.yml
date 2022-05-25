@@ -93,3 +93,23 @@ install_opam_focal:
 compile_sources_buster:
   image: ocaml/opam:debian-10
   extends: .compile_sources_template
+
+.install_python_debian_ubuntu_template:
+  extends:
+    - .default_settings_template
+    - .base-test-doc-scripts-template
+    - .rules_template__development_documentation
+  script:
+    - ./docs/developer/install-python-debian-ubuntu.sh
+
+install_python_bionic:
+  image: public.ecr.aws/lts/ubuntu:18.04_stable
+  extends: .install_python_debian_ubuntu_template
+
+install_python_focal:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  extends: .install_python_debian_ubuntu_template
+
+install_python_buster:
+  image: debian:buster
+  extends: .install_python_debian_ubuntu_template
