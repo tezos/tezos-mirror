@@ -827,11 +827,6 @@ let instr_block s =
     | k -> loop (instr_block_step s k) in
   loop [IKNext []]
 
-let const s =
-  let c = at instr_block s in
-  end_ s;
-  c
-
 (** Vector and size continuations *)
 
 (** Vector accumulator, used in two steps: first accumulating the values, then
@@ -982,19 +977,6 @@ let _code_section s =
 
 
 (* Element section *)
-
-let passive s =
-  Passive
-
-let active s =
-  let index = at var s in
-  let offset = const s in
-  Active {index; offset}
-
-let active_zero s =
-  let index = Source.(0l @@ Source.no_region) in
-  let offset = const s in
-  Active {index; offset}
 
 let elem_index s =
   let x = at var s in
@@ -1220,25 +1202,53 @@ let elem_step s =
 
 (* Data section *)
 
-let data s =
+type data_kont =
+  | DKStart
+  (** Starting point of a data segment parsing. *)
+  | DKMode of
+      { left : pos;
+        index: int32 Source.phrase;
+        offset_kont: pos * instr_block_kont list
+      }
+  (** Data segment mode parsing step. *)
+  | DKStop of data_segment'
+  (** Final step of a data segment parsing. *)
+
+let data_start s =
   match vu32 s with
   | 0x00l ->
-    let dmode = at active_zero s in
-    let dinit = string s in
-    {dinit; dmode}
+    (* active_zero *)
+    let index = Source.(0l @@ Source.no_region) in
+    let left = pos s in
+    DKMode { left; index; offset_kont = (left, (IKNext []) :: []) }
   | 0x01l ->
-    let dmode = at passive s in
+    (* passive *)
+    let mode_pos = pos s in
     let dinit = string s in
-    {dinit; dmode}
+    let dmode = Source.(Passive @@ region s mode_pos mode_pos) in
+    DKStop {dmode; dinit}
   | 0x02l ->
-    let dmode = at active s in
-    let dinit = string s in
-    {dinit; dmode}
+    (* active *)
+    let left = pos s in
+    let index = at var s in
+    let left_offset = pos s in
+    DKMode { left; index; offset_kont = (left_offset, (IKNext []) :: []) }
   | _ -> error s (pos s - 1) "malformed data segment kind"
 
-let _data_section s =
-  section `DataSection (vec (at data)) [] s
-
+let data_step s =
+  function
+  | DKStart -> data_start s
+  | DKMode { left; index; offset_kont = (left_offset, [ IKStop offset ]) } ->
+    end_ s;
+    let right = pos s in
+    let offset = Source.(offset @@ region s left_offset right) in
+    let dmode = Source.(Active {index; offset} @@ region s left right) in
+    let dinit = string s in
+    DKStop {dmode; dinit}
+  | DKMode { left; index; offset_kont = (left_offset, k) } ->
+    let k' = instr_block_step s k in
+    DKMode { left; index; offset_kont = (left_offset, k') }
+  | DKStop _ -> assert false (* final step, cannot reduce *)
 
 (* DataCount section *)
 
@@ -1318,6 +1328,10 @@ type module_kont' =
   (** Element segments section parsing, containing the current element parsing
       continuation, the starting position of the current element, the size of
       the section. *)
+  | MKData of data_kont * int * size * data_segment vec_kont
+  (** Data segments section parsing, containing the current data parsing
+      continuation, the starting position of the current data, the size of the
+      section. *)
 
 type module_kont =
   { building_state : field list; (** Accumulated parsed sections. *)
@@ -1420,7 +1434,7 @@ let module_ s =
        | CodeField ->
          failwith "HERE" (* do something incremental, like Global, but more complex *)
        | DataField ->
-         failwith "HERE" (* do something incremental, like Global, but more complex *)
+         next @@ MKData (DKStart, pos s, size, Collect (n, l))
       )
 
     (* These sections have a distinct step mechanism. *)
@@ -1444,6 +1458,15 @@ let module_ s =
       assert false
     | MKElem (elem_kont, pos, size, curr_vec) ->
       next @@ MKElem (elem_step s elem_kont, pos, size, curr_vec)
+
+    | MKData (DKStop data, left, size, Collect (n, l)) ->
+      let data = Source.(data @@ region s left (pos s)) in
+      next @@ MKField (DataField, size, Collect (n - 1, data :: l))
+    | MKData (DKStop _, _, _, Rev _) ->
+      (* Impossible case, there's no need for reversal. *)
+      assert false
+    | MKData (data_kont, pos, size, curr_vec) ->
+      next @@ MKData (data_step s data_kont, pos, size, curr_vec)
 
     (* Transitions steps from the end of a section to the next one.
 
