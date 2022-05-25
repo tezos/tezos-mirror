@@ -52,7 +52,11 @@ let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
     let parent = Filename.dirname filename in
     if String.length parent < String.length filename then (
       create_parent parent ;
-      if not (Sys.file_exists parent) then Unix.mkdir parent 0o755)
+      if not (Sys.file_exists parent) then
+        try Unix.mkdir parent 0o755
+        with Unix.Unix_error (EEXIST, _, _) ->
+          (* Can happen with [-j] in particular. *)
+          ())
   in
   create_parent output_file ;
   let channel = open_out output_file in
@@ -210,9 +214,10 @@ let check_unknown_output_files output_dir relative_output_files =
               log_unused "%s is not used by any test and can be deleted." full ;
               found_unknown := true)
     in
-    Array.iter handle_file (Sys.readdir path) ;
+    Array.iter handle_file (try Sys.readdir path with Sys_error _ -> [||]) ;
     (* Check whether directory is empty now that we may have deleted files. *)
     match Sys.readdir path with
+    | exception Sys_error _ -> ()
     | [||] ->
         if mode = Delete then
           try
