@@ -87,51 +87,69 @@ let check_sample ~name ~file =
       (JSON.encode decoded_json) ;
   return ()
 
+let iter_sample_s base_path func =
+  Sys.readdir base_path |> Array.to_list |> List.sort String.compare
+  |> Lwt_list.iter_s (fun file -> func (base_path // file))
+
 (** The given sample must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
-let check_sample_encoding ?supports sample =
+let check_protocol_sample_encoding ?supports sample =
   Protocol.register_regression_test
     ~__FILE__
-    ~title:(sf "encoding regression test: %s" sample)
-    ~tags:["encoding"]
+    ~title:(sf "protocol encoding regression test: %s" sample)
+    ~tags:["encoding"; "protocol"]
     ?supports
     ~output_file:(fun p -> "encoding" // sf "%s.%s" (Protocol.tag p) sample)
   @@ fun protocol ->
   let base_path =
     "tezt" // "tests" // "encoding_samples" // Protocol.tag protocol // sample
   in
-  Sys.readdir base_path |> Array.to_list |> List.sort String.compare
-  |> Lwt_list.iter_s (fun file ->
-         check_sample
-           ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample)
-           ~file:(base_path // file))
+  iter_sample_s base_path @@ fun file ->
+  check_sample ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample) ~file
+
+(** The given sample must be included in registered encodings. These can be
+    found with [tezos-codec list encodings]. *)
+let check_shell_sample_encoding sample =
+  Regression.register
+    ~__FILE__
+    ~title:(sf "shell encoding regression test: %s" sample)
+    ~tags:["encoding"; "shell"]
+    ~output_file:("encoding" // sf "shell.%s" sample)
+  @@ fun () ->
+  let base_path =
+    "tezt" // "tests" // "encoding_samples" // "shell" // sample
+  in
+  iter_sample_s base_path @@ fun file -> check_sample ~name:sample ~file
 
 let check_samples protocols =
-  let sample ?supports name = check_sample_encoding ?supports name protocols in
-  sample "block_header" ;
-  sample "block_header.raw" ;
-  sample "block_header.unsigned" ;
-  sample "contract" ;
-  sample "cycle" ;
-  sample "fitness" ;
-  sample "gas.cost" ;
-  sample "gas" ;
-  sample "level" ;
-  sample "nonce" ;
-  sample "operation.internal" ;
-  sample "operation" ;
-  sample "operation.raw" ;
-  sample "operation.unsigned" ;
-  sample "period" ;
-  sample "raw_level" ;
-  sample "seed" ;
-  sample "tez" ;
-  sample "timestamp" ;
-  sample "vote.ballot" ;
-  sample "vote.ballots" ;
-  sample "vote.listings" ;
-  sample "voting_period.kind" ;
-  sample "voting_period" ;
+  let protocol_sample ?supports name =
+    check_protocol_sample_encoding ?supports name protocols
+  in
+  check_shell_sample_encoding "network_version" ;
+  protocol_sample "block_header" ;
+  protocol_sample "block_header.raw" ;
+  protocol_sample "block_header.unsigned" ;
+  protocol_sample "contract" ;
+  protocol_sample "cycle" ;
+  protocol_sample "fitness" ;
+  protocol_sample "gas.cost" ;
+  protocol_sample "gas" ;
+  protocol_sample "level" ;
+  protocol_sample "nonce" ;
+  protocol_sample "operation.internal" ;
+  protocol_sample "operation" ;
+  protocol_sample "operation.raw" ;
+  protocol_sample "operation.unsigned" ;
+  protocol_sample "period" ;
+  protocol_sample "raw_level" ;
+  protocol_sample "seed" ;
+  protocol_sample "tez" ;
+  protocol_sample "timestamp" ;
+  protocol_sample "vote.ballot" ;
+  protocol_sample "vote.ballots" ;
+  protocol_sample "vote.listings" ;
+  protocol_sample "voting_period.kind" ;
+  protocol_sample "voting_period" ;
   ()
 
 let register ~protocols =
