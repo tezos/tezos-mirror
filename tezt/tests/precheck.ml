@@ -139,12 +139,7 @@ let forge_block ?client node ~key ~with_op =
   let* () = Client.Admin.kick_peer ~peer:node2_id client in
   let* () =
     if with_op then
-      let* _ =
-        Operation.inject_transfer
-          ~source:Constant.bootstrap1
-          ~dest:Constant.bootstrap2
-          client2
-      in
+      let* _ = Operation.Manager.(inject [make @@ transfer ()] client2) in
       unit
     else unit
   in

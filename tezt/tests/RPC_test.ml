@@ -693,10 +693,7 @@ let test_mempool protocol ?endpoint client =
      transfer to trigger the counter_in_the_past error for the following
      transfer. *)
   let* _ =
-    Operation.inject_transfer
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      client
+    Operation.Manager.(inject ~force:true [make @@ transfer ()] client)
   in
   let* _ = Client.bake_for_and_wait ?endpoint client in
 
@@ -726,12 +723,7 @@ let test_mempool protocol ?endpoint client =
   let counter = JSON.as_int counter in
   (* Branch_refused op: counter_in_the_past *)
   let* _ =
-    Operation.inject_transfer
-      ~force:true
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      ~counter
-      client
+    Operation.Manager.(inject ~force:true [make ~counter @@ transfer ()] client)
   in
   let*! counter =
     RPC.Contracts.get_counter
@@ -741,27 +733,31 @@ let test_mempool protocol ?endpoint client =
   let counter = JSON.as_int counter in
   (* Branch_delayed op: counter_in_the_future *)
   let* _ =
-    Operation.inject_transfer
-      ~force:true
-      ~source:Constant.bootstrap2
-      ~dest:Constant.bootstrap2
-      ~counter:(counter + 5)
-      client
+    Operation.Manager.(
+      inject
+        ~force:true
+        [make ~source:Constant.bootstrap2 ~counter:(counter + 5) @@ transfer ()]
+        client)
   in
   (* Refused op: fees_too_low *)
   let* _ =
-    Operation.inject_transfer
-      ~source:Constant.bootstrap3
-      ~dest:Constant.bootstrap2
-      ~fee:0
-      client
+    Operation.Manager.(
+      inject
+        [
+          make ~source:Constant.bootstrap3 ~fee:0
+          @@ transfer ~dest:Constant.bootstrap2 ();
+        ]
+        client)
   in
   (* Applied op *)
   let* _ =
-    Operation.inject_transfer
-      ~source:Constant.bootstrap4
-      ~dest:Constant.bootstrap2
-      client
+    Operation.Manager.(
+      inject
+        [
+          make ~source:Constant.bootstrap4
+          @@ transfer ~dest:Constant.bootstrap2 ();
+        ]
+        client)
   in
   let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
   let flush_waiter = Node_event_level.wait_for_flush node in
