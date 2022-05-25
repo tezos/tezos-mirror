@@ -90,7 +90,7 @@ type internal_inbox_message = {
       (** The implicit account that originated the transaction. *)
 }
 
-type inbox_message = Internal of internal_inbox_message
+type inbox_message = Internal of internal_inbox_message | External of string
 
 type transaction_internal = {
   unparsed_parameters_ty : Script_repr.expr;  (** The type of the parameters. *)
@@ -181,8 +181,14 @@ let inbox_message_encoding =
         (Tag 0)
         ~title:"Internal"
         internal_message_encoding
-        (function Internal msg -> Some msg)
+        (function Internal msg -> Some msg | External _ -> None)
         (fun msg -> Internal msg);
+      case
+        (Tag 1)
+        ~title:"External"
+        Data_encoding.string
+        (function External msg -> Some msg | Internal _ -> None)
+        (fun msg -> External msg);
     ]
 
 (** TODO: #2951
