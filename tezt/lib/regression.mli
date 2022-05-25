@@ -46,7 +46,6 @@ val register :
   __FILE__:string ->
   title:string ->
   tags:string list ->
-  output_file:string ->
   (unit -> unit Lwt.t) ->
   unit
 

@@ -99,7 +99,6 @@ let check_protocol_sample_encoding ?supports sample =
     ~title:(sf "protocol encoding regression test: %s" sample)
     ~tags:["encoding"; "protocol"]
     ?supports
-    ~output_file:(fun p -> "encoding" // sf "%s.%s" (Protocol.tag p) sample)
   @@ fun protocol ->
   let base_path =
     "tezt" // "tests" // "encoding_samples" // Protocol.tag protocol // sample
@@ -114,7 +113,6 @@ let check_shell_sample_encoding sample =
     ~__FILE__
     ~title:(sf "shell encoding regression test: %s" sample)
     ~tags:["encoding"; "shell"]
-    ~output_file:("encoding" // sf "shell.%s" sample)
   @@ fun () ->
   let base_path =
     "tezt" // "tests" // "encoding_samples" // "shell" // sample

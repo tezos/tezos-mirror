@@ -68,8 +68,6 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
     ~__FILE__
     ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
     ~tags:["rpc"; sub_group]
-    ~output_file:(fun p ->
-      "rpc" // sf "%s.%s.%s" (Protocol.tag p) title_tag sub_group)
   @@ fun protocol ->
   (* Initialize a node with alpha protocol and data to be used for RPC calls.
      The log of the node is not captured in the regression output. *)
@@ -1000,7 +998,6 @@ let register protocols =
     ~__FILE__
     ~title:"Binary RPC regression tests"
     ~tags:["rpc"; "regression"; "binary"]
-    ~output_file:"rpc/binary_rpc"
     binary_regression_test ;
   let register protocols test_mode_tag =
     let check_rpc ?parameter_overrides ?node_parameters ~test_function sub_group

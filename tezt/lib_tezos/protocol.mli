@@ -208,7 +208,6 @@ val register_regression_test :
   title:string ->
   tags:string list ->
   ?supports:supported_protocols ->
-  output_file:(t -> string) ->
   (t -> unit Lwt.t) ->
   t list ->
   unit

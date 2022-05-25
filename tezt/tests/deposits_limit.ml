@@ -32,7 +32,6 @@
 let test_set_deposits_limit =
   Protocol.register_regression_test
     ~__FILE__
-    ~output_file:(fun _ -> "deposits_limit" // "set_desposits_limit")
     ~title:"set deposits limit"
     ~tags:["deposits_limit"]
   @@ fun protocol ->
@@ -45,7 +44,6 @@ let test_set_deposits_limit =
 let test_unset_deposits_limit =
   Protocol.register_regression_test
     ~__FILE__
-    ~output_file:(fun _ -> "deposits_limit" // "unset_desposits_limit")
     ~title:"unset deposits limit"
     ~tags:["deposits_limit"]
   @@ fun protocol ->

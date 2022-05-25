@@ -88,7 +88,7 @@ let log_regression_diff diff =
    In the map, output files can be in subdirectories (i.e. they can contain '/'). *)
 let output_dirs_and_files : String_set.t String_map.t ref = ref String_map.empty
 
-let register ~__FILE__ ~title ~tags ~output_file:_ f =
+let register ~__FILE__ ~title ~tags f =
   let tags = "regression" :: tags in
   let output_dir = Filename.dirname __FILE__ // "expected" in
   let relative_output_file =

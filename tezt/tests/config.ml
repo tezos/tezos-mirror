@@ -28,11 +28,7 @@ let config_reset args =
   Process.run Constant.tezos_node ["config"; "show"] ~hooks:Regression.hooks
 
 let register () =
-  Regression.register
-    ~__FILE__
-    ~title:"config reset"
-    ~tags:["config"]
-    ~output_file:"config"
+  Regression.register ~__FILE__ ~title:"config reset" ~tags:["config"]
   @@ fun () ->
   let* () = config_reset [] in
   let* () = config_reset ["--rpc-addr=:1234"] in
