@@ -18,9 +18,9 @@ Default value for OPAM_REPOSITORY_CLONE_DIR is 'opam-repository'.
 TARBALL_URL is the URL to put in opam files.
 The script downloads it to compute sha256 and sha512 checksums for you."
 
-version="$1"
-url="$2"
-opam_dir="$3"
+version="${1:-}"
+url="${2:-}"
+opam_dir="${3:-opam-repository}"
 
 if [ -z "$version" ] ; then
     echo "$usage"
@@ -30,10 +30,6 @@ fi
 if [ -z "$url" ] ; then
     echo "$usage"
     exit 1
-fi
-
-if [ -z "$opam_dir" ] ; then
-    opam_dir="opam-repository"
 fi
 
 log () {

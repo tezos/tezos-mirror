@@ -4823,6 +4823,8 @@ let exclude filename =
   | "vendors" :: _ -> true
   | "scripts" :: _ -> true
   | "docs" :: _ -> true
+  (* opam-repository is used by scripts/opam-release.sh *)
+  | "opam-repository" :: _ -> true
   (* Tezt is only partially managed by the manifest.
      There is no real good reason for that but only the core Tezt library is released. *)
   | "tezt" :: "long_tests" :: _ -> true
