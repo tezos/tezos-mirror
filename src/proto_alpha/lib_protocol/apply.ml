@@ -2116,7 +2116,6 @@ let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
         Dal_apply.validate_publish_slot_header ctxt slot >>?= fun () ->
         return ctxt
   in
-  let* ctxt = Contract.increment_counter ctxt source in
   let+ new_balance, still_allocated =
     Contract.simulate_spending
       ctxt
@@ -2594,6 +2593,7 @@ let precheck_checks ctxt contents_list ~mempool_mode =
 
 (** Return balance updates for fees and an updated context that accounts for:
     - fees spending
+    - counter incrementation
 
     This function should never return an error when called after
     {!precheck_checks}. *)
@@ -2606,6 +2606,7 @@ let rec precheck_effects :
   let open Lwt_result_syntax in
   match contents_list with
   | Single (Manager_operation {source; fee; _} as contents) ->
+      let* ctxt = Contract.increment_counter ctxt source in
       let+ ctxt, balance_updates =
         Token.transfer
           ctxt
@@ -2615,6 +2616,7 @@ let rec precheck_effects :
       in
       (ctxt, PrecheckedSingle {contents; balance_updates})
   | Cons ((Manager_operation {source; fee; _} as contents), rest) ->
+      let* ctxt = Contract.increment_counter ctxt source in
       let* ctxt, balance_updates =
         Token.transfer
           ctxt
