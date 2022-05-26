@@ -825,7 +825,10 @@ let test_cement_consumes_available_messages () =
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   let* inbox, _n, ctxt =
     lift
-    @@ Sc_rollup_inbox_storage.add_messages ctxt rollup ["one"; "two"; "three"]
+    @@ Sc_rollup_inbox_storage.add_external_messages
+         ctxt
+         rollup
+         ["one"; "two"; "three"]
   in
   let available_messages =
     Sc_rollup_inbox_repr.number_of_available_messages inbox
@@ -2064,7 +2067,10 @@ let test_kind_of_missing_rollup () =
 
 let test_add_messages_from_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
-      Sc_rollup_inbox_storage.add_messages ctxt rollup ["Dummy message"])
+      Sc_rollup_inbox_storage.add_external_messages
+        ctxt
+        rollup
+        ["Dummy message"])
 
 let test_inbox_of_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ Sc_rollup_inbox_storage.inbox
@@ -2321,7 +2327,7 @@ let test_carbonated_memory_inbox_set_messages () =
   let* current_messages, _ =
     lift
     @@ Sc_rollup_inbox_repr.(
-         add_messages_no_history
+         add_external_messages_no_history
            inbox
            level
            ["CAFEBABE"; "CAFEBABE"; "CAFEBABE"]
@@ -2359,7 +2365,8 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
           else ctxt
         in
         let* _inbox, _size_diff, ctxt =
-          lift @@ Sc_rollup_inbox_storage.add_messages ctxt rollup payload
+          lift
+          @@ Sc_rollup_inbox_storage.add_external_messages ctxt rollup payload
         in
         return ctxt)
       ctxt

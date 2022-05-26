@@ -61,7 +61,7 @@ let setup_inbox_with_messages list_of_payloads f =
   let rec aux level history inbox inboxes messages = function
     | [] -> return (messages, history, inbox, inboxes)
     | payloads :: ps ->
-        add_messages history inbox level payloads messages
+        add_external_messages history inbox level payloads messages
         >>=? fun (messages, history, inbox') ->
         let level = Raw_level_repr.succ level in
         aux level history inbox' (inbox :: inboxes) messages ps
