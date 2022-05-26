@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,14 +43,14 @@ let err x = Exn (Sc_rollup_test_error x)
 (** [context_init tup] initializes a context for testing in which the
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
-let context_init tup =
+let context_init ?(sc_rollup_challenge_window_in_blocks = 10) tup =
   Context.init_with_constants_gen
     tup
     {
       Context.default_test_constants with
       sc_rollup_enable = true;
       consensus_threshold = 0;
-      sc_rollup_challenge_window_in_blocks = 10;
+      sc_rollup_challenge_window_in_blocks;
     }
 
 (** [test_disable_feature_flag ()] tries to originate a smart contract
@@ -65,10 +65,7 @@ let test_disable_feature_flag () =
     | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ ->
-        failwith
-          "It should not be possible to send a smart contract rollup operation \
-           when the feature flag is disabled."
+    | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
   in
   let*! _ = Incremental.add_operation ~expect_failure i op in
   return_unit
@@ -105,8 +102,10 @@ let test_sc_rollups_all_well_defined () =
   all_names_are_valid ()
 
 (** Initializes the context and originates a SCORU. *)
-let init_and_originate tup =
-  let* ctxt, contracts = context_init tup in
+let init_and_originate ?sc_rollup_challenge_window_in_blocks tup =
+  let* ctxt, contracts =
+    context_init ?sc_rollup_challenge_window_in_blocks tup
+  in
   let contract = Context.tup_hd tup contracts in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup = Op.sc_rollup_origination (B ctxt) contract kind "" in
@@ -122,13 +121,6 @@ let number_of_ticks_exn n =
   match Sc_rollup.Number_of_ticks.of_int32 n with
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
-
-let rec bake_until i top =
-  let level = Incremental.level i in
-  if level >= top then return i
-  else
-    Incremental.finalize_block i >>=? fun b ->
-    Incremental.begin_construction b >>=? fun i -> bake_until i top
 
 let dummy_commitment ctxt rollup =
   let ctxt = Incremental.alpha_ctxt ctxt in
@@ -165,37 +157,14 @@ let test_publish_and_cement () =
   let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
+  let* constants = Context.get_constants (B b) in
+  let* b =
+    Block.bake_n constants.parametric.sc_rollup_challenge_window_in_blocks b
+  in
   let* i = Incremental.begin_construction b in
-  let* i = bake_until i 20l in
   let hash = Sc_rollup.Commitment.hash c in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* _ = Incremental.add_operation i cement_op in
-  return_unit
-
-(** [test_cement_fails_if_premature] creates a rollup, publishes a
-    commitment and then tries to cement the commitment immediately
-    without waiting for the challenge period to elapse. We check that
-    this fails with the correct error. *)
-let test_cement_fails_if_premature () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 in
-  let _, contract = contracts in
-  let* i = Incremental.begin_construction ctxt in
-  let* c = dummy_commitment i rollup in
-  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
-  let* i = Incremental.add_operation i operation in
-  let* b = Incremental.finalize_block i in
-  let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash c in
-  let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
-  let expect_failure = function
-    | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_too_recent as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ ->
-        failwith "It should not be possible to cement a commitment prematurely."
-  in
-  let* _ = Incremental.add_operation ~expect_failure i cement_op in
   return_unit
 
 (** [test_publish_fails_on_backtrack] creates a rollup and then
@@ -220,7 +189,7 @@ let test_publish_fails_on_backtrack () =
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ -> failwith "It should not be possible for a staker to backtrack."
+    | _ -> failwith "It should have failed with [Sc_rollup_staker_backtracked]"
   in
   let* _ = Incremental.add_operation ~expect_failure i operation2 in
   return_unit
@@ -246,8 +215,11 @@ let test_cement_fails_on_conflict () =
   let* i = Incremental.begin_construction b in
   let* i = Incremental.add_operation i operation2 in
   let* b = Incremental.finalize_block i in
+  let* constants = Context.get_constants (B b) in
+  let* b =
+    Block.bake_n constants.parametric.sc_rollup_challenge_window_in_blocks b
+  in
   let* i = Incremental.begin_construction b in
-  let* i = bake_until i 20l in
   let hash = Sc_rollup.Commitment.hash commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
   let expect_failure = function
@@ -255,10 +227,59 @@ let test_cement_fails_on_conflict () =
       ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ ->
-        failwith "It should not be possible to cement a contested commitment."
+    | _ -> failwith "It should have failed with [Sc_rollup_disputed]"
   in
+
   let* _ = Incremental.add_operation ~expect_failure i cement_op in
+  return_unit
+
+let commit_and_cement_after_n_bloc ?expect_failure ctxt contract rollup n =
+  let* i = Incremental.begin_construction ctxt in
+  let* commitment = dummy_commitment i rollup in
+  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup commitment in
+  let* i = Incremental.add_operation i operation in
+  let* b = Incremental.finalize_block i in
+  (* This pattern would add an additional block, so we decrement [n] by one. *)
+  let* b = Block.bake_n (n - 1) b in
+  let* i = Incremental.begin_construction b in
+  let hash = Sc_rollup.Commitment.hash commitment in
+  let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
+  let* _ = Incremental.add_operation ?expect_failure i cement_op in
+  return_unit
+
+(** [test_challenge_window_period_boundaries] checks that cementing a commitment
+    without waiting for the whole challenge window period fails. Whereas,
+    succeeds when the period is over. *)
+let test_challenge_window_period_boundaries () =
+  let sc_rollup_challenge_window_in_blocks = 10 in
+  let* ctxt, contract, rollup =
+    init_and_originate ~sc_rollup_challenge_window_in_blocks Context.T1
+  in
+  (* Should fail because the waiting period is not strictly greater than the
+     challenge window period. *)
+  let* () =
+    let expect_failure = function
+      | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_too_recent as e)
+        :: _ ->
+          Assert.test_error_encodings e ;
+          return_unit
+      | _ -> failwith "It should have failed with [Sc_rollup_too_recent]"
+    in
+    commit_and_cement_after_n_bloc
+      ~expect_failure
+      ctxt
+      contract
+      rollup
+      (sc_rollup_challenge_window_in_blocks - 1)
+  in
+  (* Succeeds because the challenge period is over. *)
+  let* () =
+    commit_and_cement_after_n_bloc
+      ctxt
+      contract
+      rollup
+      sc_rollup_challenge_window_in_blocks
+  in
   return_unit
 
 let tests =
@@ -276,10 +297,6 @@ let tests =
       `Quick
       test_publish_and_cement;
     Tztest.tztest
-      "cement will fail if it is too soon"
-      `Quick
-      test_cement_fails_if_premature;
-    Tztest.tztest
       "publish will fail if staker is backtracking"
       `Quick
       test_publish_fails_on_backtrack;
@@ -287,4 +304,8 @@ let tests =
       "cement will fail if commitment is contested"
       `Quick
       test_cement_fails_on_conflict;
+    Tztest.tztest
+      "check the challenge window period boundaries"
+      `Quick
+      test_challenge_window_period_boundaries;
   ]
