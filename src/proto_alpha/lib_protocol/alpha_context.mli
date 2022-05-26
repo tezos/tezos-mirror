@@ -2464,7 +2464,7 @@ module Vote : sig
 end
 
 (** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
-module Sc_rollup : sig
+module rec Sc_rollup : sig
   (** See {!Sc_rollup_tick_repr}. *)
   module Tick : sig
     type t
@@ -2663,6 +2663,23 @@ module Sc_rollup : sig
 
   module Inbox : sig
     type t
+
+    (** See {!Sc_rollup_inbox_message_repr}. *)
+    module Message : sig
+      type t =
+        | Internal of {
+            payload : Script.expr;
+            sender : Contract.t;
+            source : Signature.public_key_hash;
+          }
+        | External of string
+
+      val to_bytes : t -> string tzresult
+
+      module Internal_for_tests : sig
+        val of_bytes : string -> t tzresult
+      end
+    end
 
     val pp : Format.formatter -> t -> unit
 
@@ -2897,6 +2914,24 @@ module Sc_rollup : sig
   val get_boot_sector : context -> t -> string tzresult Lwt.t
 
   module Outbox : sig
+    (** See {!Sc_rollup_outbox_message_repr}. *)
+    module Message : sig
+      type transaction = {
+        unparsed_parameters_ty : Script.expr;
+        unparsed_parameters : Script.expr;
+        destination : Destination.t;
+        entrypoint : Entrypoint.t;
+      }
+
+      type t = Atomic_transaction_batch of {transactions : transaction list}
+
+      val of_bytes : string -> t tzresult
+
+      module Internal_for_tests : sig
+        val to_bytes : t -> string tzresult
+      end
+    end
+
     val record_applied_message :
       context ->
       t ->
@@ -2911,7 +2946,7 @@ module Sc_rollup : sig
 end
 
 (** This simply re-exports {!Destination_repr}. *)
-module Destination : sig
+and Destination : sig
   type t =
     | Contract of Contract.t
     | Tx_rollup of Tx_rollup.t
