@@ -27,19 +27,22 @@ open Protocol
 open Alpha_context
 
 module Request : sig
-  type 'a t =
+  type ('a, 'b) t =
     | Register : {
         tr : L2_transaction.t;
         apply : bool;
         eager_batch : bool;
       }
-        -> L2_transaction.hash t
-    | New_head : L2block.t -> unit t
-    | Batch : unit t
+        -> (L2_transaction.hash, error trace) t
+    | New_head : L2block.t -> (unit, error trace) t
+    | Batch : (unit, error trace) t
 
   type view = View : _ t -> view
 
-  include Worker_intf.REQUEST with type 'a t := 'a t and type view := view
+  include
+    Worker_intf.REQUEST
+      with type ('a, 'request_error) t := ('a, 'request_error) t
+       and type view := view
 end
 
 module Name : Worker_intf.NAME with type t = Tx_rollup.t

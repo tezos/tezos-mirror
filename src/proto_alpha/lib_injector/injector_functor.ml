@@ -701,32 +701,44 @@ module Make (Rollup : PARAMETERS) = struct
   module Handlers = struct
     type self = worker
 
-    let on_request : type r. worker -> r Request.t -> r tzresult Lwt.t =
+    let on_request :
+        type r request_error.
+        worker ->
+        (r, request_error) Request.t ->
+        (r, request_error) result Lwt.t =
      fun w request ->
       let open Lwt_result_syntax in
       let state = Worker.state w in
       match request with
       | Request.Add_pending op ->
+          (* The execution of the request handler is protected to avoid stopping the
+             worker in case of an exception. *)
+          protect @@ fun () ->
           let*! () = add_pending_operation state op in
           return_unit
       | Request.New_tezos_head (head, reorg) ->
-          on_new_tezos_head state head reorg
-      | Request.Inject -> on_inject state
+          protect @@ fun () -> on_new_tezos_head state head reorg
+      | Request.Inject -> protect @@ fun () -> on_inject state
 
-    let on_request w r =
-      (* The execution of the request handler is protected to avoid stopping the
-         worker in case of an exception. *)
-      protect @@ fun () -> on_request w r
+    type launch_error = error trace
 
     let on_launch _w signer Types.{cctxt; rollup_node_state; strategy; tags} =
       init_injector cctxt rollup_node_state ~signer strategy tags
 
-    let on_error w r st errs =
+    let on_error (type a b) w st (r : (a, b) Request.t) (errs : b) :
+        unit tzresult Lwt.t =
       let open Lwt_result_syntax in
       let state = Worker.state w in
-      (* Errors do not stop the worker but emit an entry in the log. *)
-      let*! () = Event.(emit3 request_failed) state r st errs in
-      return_unit
+      let request_view = Request.view r in
+      let emit_and_return_errors errs =
+        (* Errors do not stop the worker but emit an entry in the log. *)
+        let*! () = Event.(emit3 request_failed) state request_view st errs in
+        return_unit
+      in
+      match r with
+      | Request.Add_pending _ -> emit_and_return_errors errs
+      | Request.New_tezos_head _ -> emit_and_return_errors errs
+      | Request.Inject -> emit_and_return_errors errs
 
     let on_completion w r _ st =
       let state = Worker.state w in
@@ -736,7 +748,7 @@ module Make (Rollup : PARAMETERS) = struct
       | View Inject ->
           Event.(emit2 request_completed_notice) state (Request.view r) st
 
-    let on_no_request _ = return_unit
+    let on_no_request _ = Lwt.return_unit
 
     let on_close _w = Lwt.return_unit
   end
@@ -799,14 +811,20 @@ module Make (Rollup : PARAMETERS) = struct
     let open Lwt_result_syntax in
     let*? w = worker_of_signer source in
     let l1_operation = L1_operation.make op in
-    let*! () = Worker.Queue.push_request w (Request.Add_pending l1_operation) in
+    let*! (_pushed : bool) =
+      Worker.Queue.push_request w (Request.Add_pending l1_operation)
+    in
     return_unit
 
   let new_tezos_head h reorg =
+    let open Lwt_syntax in
     let workers = Worker.list table in
     List.iter_p
       (fun (_signer, w) ->
-        Worker.Queue.push_request w (Request.New_tezos_head (h, reorg)))
+        let* (_pushed : bool) =
+          Worker.Queue.push_request w (Request.New_tezos_head (h, reorg))
+        in
+        return_unit)
       workers
 
   let has_tag_in ~tags state =
@@ -828,9 +846,12 @@ module Make (Rollup : PARAMETERS) = struct
     let tags = Option.map Tags.of_list tags in
     List.iter_p
       (fun (_signer, w) ->
+        let open Lwt_syntax in
         let worker_state = Worker.state w in
         if has_tag_in ~tags worker_state && has_strategy ~strategy worker_state
-        then Worker.Queue.push_request w Request.Inject
+        then
+          let* _pushed = Worker.Queue.push_request w Request.Inject in
+          return_unit
         else Lwt.return_unit)
       workers
 end

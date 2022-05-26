@@ -115,3 +115,59 @@ module Filename : sig
 end
 
 module Bounded = Bounded
+
+(** The main purpose of this module is to be used with parametric
+   types such as [('a, Empty.t) result]. Such type is actually
+   isomorphic to ['a] (see [get_ok] function). This is useful if a
+   module signature expects a generic [('a,'b) result] type, but for
+   some instantiation, ['b] is actually empty. Here is a small example
+   how such module can be used:
+
+   {[ module type S = sig
+
+       type error
+
+       type 'a t
+
+       val return : 'a -> 'a t
+
+       val fail : error -> 'a t
+
+       val bind : 'a t -> ('a -> 'a t) -> (error -> 'a t) -> 'a t end
+
+     module M : S with type error = Empty.t and type 'a t = ('a,
+   Empty.t) result = struct
+
+       type error = Empty.t
+
+       type 'a t = ('a, Empty.t) result
+
+       let return = fun x -> Ok x
+
+       let fail = Empty.absurd
+
+       let bind = fun data left _right -> match data with | Ok x ->
+   left x | Error err -> Empty.absurd err end
+
+     let _ = let data = M.bind (M.return 5) (fun x -> M.return (x +
+   2)) (Empty.absurd) in assert (data |> Empty.get_ok = 7) ]} *)
+module Empty : sig
+  (** This type has no canonical inhabitant (there is no terminating
+     OCaml value which inhabits this type). *)
+  type t = |
+
+  (** [get_ok r] eliminates the impossible case. This function is
+       total and does not raise any exception. *)
+  val get_ok : ('a, t) result -> 'a
+
+  (** [absurd empty] allows constructing any type from the absurd
+      case. This is useful to typecheck impossible branches, e.g.
+      {[
+        Result.fold ~ok:(fun i -> i + 1) ~error:Empty.absurd (Ok 41)
+      ]}
+      Note that this particular example using `result` can be rewritten as:
+      {[
+        let i = Empty.get_ok (Ok 41) in i + 1
+      ]} *)
+  val absurd : t -> 'a
+end

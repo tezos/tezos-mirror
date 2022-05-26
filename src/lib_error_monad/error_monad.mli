@@ -284,6 +284,11 @@ val catch_s :
 val catch_es :
   ?catch_only:(exn -> bool) -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
+(** [protect_result] is similar to {!protect} except that any non runtime exception
+    raised by [Lwt.catch] is wrapped under an [Error] value. *)
+val protect_result :
+  ?canceler:Lwt_canceler.t -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
+
 (** {1 Misc} *)
 
 type error += Timeout
@@ -309,7 +314,7 @@ val errs_tag : error trace Tag.def
 val cancel_with_exceptions : Lwt_canceler.t -> unit Lwt.t
 
 (** [either_f left right] returns [left] if it's a success and [right] is not
-    called. If [left] fails, [right] is evaluated and its result is returned if 
+    called. If [left] fails, [right] is evaluated and its result is returned if
     it's a success. If both [left] and [right] fail, their traces are merged. *)
 val either_f :
   'a tzresult Lwt.t -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t

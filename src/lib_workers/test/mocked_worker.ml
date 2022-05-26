@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,23 +22,24 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Protocol
-open Alpha_context
+
+type void = |
+
+type failure = Simple | Crash | RaiseExn
 
 module Request = struct
   type ('a, 'b) t =
-    | Register : {
-        tr : L2_transaction.t;
-        apply : bool;
-        eager_batch : bool;
-      }
-        -> (L2_transaction.hash, error trace) t
-    | New_head : L2block.t -> (unit, error trace) t
-    | Batch : (unit, error trace) t
+    | RqA : int -> (unit, string option) t
+    | RqB : (unit, void) t
+    | RqErr : failure -> (unit, [`SimpleError | `CrashError]) t
 
   type view = View : _ t -> view
 
   let view req = View req
+
+  let int_of_failure = function Simple -> 0 | Crash -> 1 | RaiseExn -> 2
+
+  let failure_of_int = function 1 -> Simple | 2 -> Crash | 3 | _ -> RaiseExn
 
   let encoding =
     let open Data_encoding in
@@ -46,75 +47,68 @@ module Request = struct
       [
         case
           (Tag 0)
-          ~title:"Register"
-          (obj4
-             (req "request" (constant "register"))
-             (req "transaction" L2_transaction.encoding)
-             (dft "apply" bool true)
-             (dft "eager_batch" bool false))
-          (function
-            | View (Register {tr; apply; eager_batch}) ->
-                Some ((), tr, apply, eager_batch)
-            | _ -> None)
-          (fun ((), tr, apply, eager_batch) ->
-            View (Register {tr; apply; eager_batch}));
+          ~title:"RqA"
+          (obj2 (req "request" (constant "a")) (req "val" int31))
+          (function View (RqA i) -> Some ((), i) | _ -> None)
+          (fun ((), i) -> View (RqA i));
         case
           (Tag 1)
-          ~title:"New_head"
-          (obj2
-             (req "request" (constant "new_head"))
-             (req "block" L2block.encoding))
-          (function View (New_head b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (New_head b));
+          ~title:"RqB"
+          (obj1 (req "request" (constant "b")))
+          (function View RqB -> Some () | _ -> None)
+          (fun () -> View RqB);
         case
           (Tag 2)
-          ~title:"Batch"
-          (obj1 (req "request" (constant "batch")))
-          (function View Batch -> Some () | _ -> None)
-          (fun () -> View Batch);
+          ~title:"RqErr"
+          (obj2
+             (req "request" (constant "err"))
+             (req "failure" Data_encoding.int8))
+          (function
+            | View (RqErr fl) -> Some ((), int_of_failure fl) | _ -> None)
+          (fun ((), b) -> View (RqErr (failure_of_int b)));
       ]
 
   let pp ppf (View r) =
     match r with
-    | Register {tr; _} ->
-        Format.fprintf
-          ppf
-          "register new L2 transaction %a"
-          L2_transaction.Hash.pp
-          (L2_transaction.hash tr)
-    | New_head b ->
-        Format.fprintf
-          ppf
-          "switching to new L2 head %a"
-          L2block.Hash.pp
-          (L2block.hash_header b.header)
-    | Batch -> Format.pp_print_string ppf "batch"
+    | RqA i -> Format.fprintf ppf "RqA %d" i
+    | RqB -> Format.fprintf ppf "RqB"
+    | RqErr _ -> Format.fprintf ppf "RqErr"
 end
 
 module Name = struct
-  type t = Tx_rollup.t
+  type t = string
 
-  let encoding = Tx_rollup.encoding
+  let encoding = Data_encoding.string
 
-  let base = ["tx_rollup_batcher"]
+  let base = ["base"]
 
-  let pp = Tx_rollup.pp
+  let pp fmt = Format.fprintf fmt "%s"
 
-  let equal = Tx_rollup.equal
+  let equal = ( = )
 end
 
 module Dummy_event = struct
-  type t = unit
+  type t = string
 
-  let pp = Format.pp_print_cut
+  let pp = Format.pp_print_string
 
-  let encoding = Data_encoding.unit
+  let encoding = Data_encoding.string
 
-  let level () = Internal_event.Debug
+  let level _ = Internal_event.Debug
+end
+
+module Types = struct
+  type parameters = int
+
+  (** An accumulated history of completed requests modified by
+      [on_completion] *)
+  type state = string list ref
 end
 
 module Logger =
   Worker_logger.Make (Dummy_event) (Request)
     (struct
-      let worker_name = "tx_rollup_batcher"
+      let worker_name = "mocked_worker"
     end)
+
+module Worker = Worker.Make (Name) (Dummy_event) (Request) (Types) (Logger)

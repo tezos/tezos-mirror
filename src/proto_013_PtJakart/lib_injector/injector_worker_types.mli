@@ -29,16 +29,19 @@ open Alpha_context
 open Common
 
 module Request : sig
-  type 'a t =
-    | Add_pending : L1_operation.t -> unit t
+  type ('a, 'b) t =
+    | Add_pending : L1_operation.t -> (unit, error trace) t
     | New_tezos_head :
         Alpha_block_services.block_info * Alpha_block_services.block_info reorg
-        -> unit t
-    | Inject : unit t
+        -> (unit, error trace) t
+    | Inject : (unit, error trace) t
 
   type view = View : _ t -> view
 
-  include Worker_intf.REQUEST with type 'a t := 'a t and type view := view
+  include
+    Worker_intf.REQUEST
+      with type ('a, 'request_error) t := ('a, 'request_error) t
+       and type view := view
 end
 
 module Name : Worker_intf.NAME with type t = public_key_hash

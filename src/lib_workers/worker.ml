@@ -28,25 +28,6 @@
     has been closed.*)
 type worker_name = {base : string; name : string}
 
-type Error_monad.error += Closed of worker_name
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"worker.closed"
-    ~title:"Worker closed"
-    ~description:
-      "An operation on a worker could not complete before it was shut down."
-    ~pp:(fun ppf w ->
-      Format.fprintf ppf "Worker %s[%s] has been shut down." w.base w.name)
-    Data_encoding.(
-      conv
-        (fun {base; name} -> (base, name))
-        (fun (name, base) -> {base; name})
-        (obj1 (req "worker" (tup2 string string))))
-    (function Closed w -> Some w | _ -> None)
-    (fun w -> Closed w)
-
 module type T = sig
   module Name : Worker_intf.NAME
 
@@ -72,6 +53,11 @@ module type T = sig
 
   type dropbox
 
+  type 'a message_error =
+    | Closed of error list option
+    | Request_error of 'a
+    | Any of exn
+
   (** Supported kinds of internal buffers. *)
   type _ buffer_kind =
     | Queue : infinite queue buffer_kind
@@ -93,18 +79,26 @@ module type T = sig
         provided by the type of buffer chosen at {!launch}.*)
     type self
 
+    type launch_error
+
     (** Builds the initial internal state of a worker at launch.
         It is possible to initialize the message queue.
         Of course calling {!state} will fail at that point. *)
     val on_launch :
-      self -> Name.t -> Types.parameters -> Types.state tzresult Lwt.t
+      self ->
+      Name.t ->
+      Types.parameters ->
+      (Types.state, launch_error) result Lwt.t
 
     (** The main request processor, i.e. the body of the event loop. *)
-    val on_request : self -> 'a Request.t -> 'a tzresult Lwt.t
+    val on_request :
+      self ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error) result Lwt.t
 
     (** Called when no request has been made before the timeout, if
         the parameter has been passed to {!launch}. *)
-    val on_no_request : self -> unit tzresult Lwt.t
+    val on_no_request : self -> unit Lwt.t
 
     (** A function called when terminating a worker. *)
     val on_close : self -> unit Lwt.t
@@ -117,15 +111,19 @@ module type T = sig
         {!trigger_shutdown} to kill the worker. *)
     val on_error :
       self ->
-      Request.view ->
       Worker_types.request_status ->
-      error list ->
+      ('a, 'request_error) Request.t ->
+      'request_error ->
       unit tzresult Lwt.t
 
     (** A function called at the end of the worker loop in case of a
         successful treatment of the current request. *)
     val on_completion :
-      self -> 'a Request.t -> 'a -> Worker_types.request_status -> unit Lwt.t
+      self ->
+      ('a, 'request_error) Request.t ->
+      'a ->
+      Worker_types.request_status ->
+      unit Lwt.t
   end
 
   (** Creates a new worker instance.
@@ -135,8 +133,10 @@ module type T = sig
     ?timeout:Time.System.Span.t ->
     Name.t ->
     Types.parameters ->
-    (module HANDLERS with type self = 'kind t) ->
-    'kind t tzresult Lwt.t
+    (module HANDLERS
+       with type self = 'kind t
+        and type launch_error = 'launch_error) ->
+    ('kind t, 'launch_error) result Lwt.t
 
   (** Triggers a worker termination and waits for its completion.
       Cannot be called from within the handlers.  *)
@@ -145,17 +145,23 @@ module type T = sig
   module type BOX = sig
     type t
 
-    val put_request : t -> 'a Request.t -> unit
+    val put_request : t -> ('a, 'request_error) Request.t -> unit
 
-    val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
+    val put_request_and_wait :
+      t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
   end
 
   module type QUEUE = sig
     type 'a t
 
-    val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
+    val push_request_and_wait :
+      'q t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
 
-    val push_request : 'q t -> 'a Request.t -> unit Lwt.t
+    val push_request : 'q t -> ('a, 'request_error) Request.t -> bool Lwt.t
 
     val pending_requests : 'a t -> (Time.System.t * Request.view) list
 
@@ -170,16 +176,9 @@ module type T = sig
     include QUEUE with type 'a t := 'a queue t
 
     (** Adds a message to the queue immediately. *)
-    val push_request_now : infinite queue t -> 'a Request.t -> unit
+    val push_request_now :
+      infinite queue t -> ('a, 'request_error) Request.t -> unit
   end
-
-  (** Detects cancellation from within the request handler to stop
-      asynchronous operations. *)
-  val protect :
-    _ t ->
-    ?on_error:(error list -> 'b tzresult Lwt.t) ->
-    (unit -> 'b tzresult Lwt.t) ->
-    'b tzresult Lwt.t
 
   (** Exports the canceler to allow cancellation of other tasks when this
       worker is shut down or when it dies. *)
@@ -196,6 +195,9 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
+
+  val with_state :
+    _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list
@@ -244,7 +246,15 @@ struct
 
   let base_name = String.concat "-" Name.base
 
-  type message = Message : 'a Request.t * 'a tzresult Lwt.u option -> message
+  type 'a message_error =
+    | Closed of error list option
+    | Request_error of 'a
+    | Any of exn
+
+  type message =
+    | Message :
+        ('a, 'b) Request.t * ('a, 'b message_error) result Lwt.u option
+        -> message
 
   type 'a queue
 
@@ -296,6 +306,11 @@ struct
     instances : 'kind t Nametbl.t;
   }
 
+  let extract_status_errors w =
+    match w.status with
+    | Worker_types.Launching _ | Running _ | Closing _ -> None
+    | Closed (_, _, errs) -> errs
+
   let queue_item ?u r = (Time.System.now (), Message (r, u))
 
   let drop_request w merge message_box request =
@@ -320,29 +335,34 @@ struct
         t)
       (function
         | Lwt_dropbox.Closed ->
-            let name = Format.asprintf "%a" Name.pp w.name in
-            Lwt_result_syntax.tzfail (Closed {base = base_name; name})
+            Lwt.return_error (Closed (extract_status_errors w))
         | exn ->
             (* [Lwt_dropbox.put] can only raise [Closed] which is caught above.
                We don't want to catch any other exception but we cannot use an
                incomplete pattern like we would in a [try]-[with] construct so
                we must explicitly match and re-raise [exn]. *)
-            raise exn)
+            Lwt.return_error (Any exn))
 
   module type BOX = sig
     type t
 
-    val put_request : t -> 'a Request.t -> unit
+    val put_request : t -> ('a, 'request_error) Request.t -> unit
 
-    val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
+    val put_request_and_wait :
+      t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
   end
 
   module type QUEUE = sig
     type 'a t
 
-    val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
+    val push_request_and_wait :
+      'q t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
 
-    val push_request : 'q t -> 'a Request.t -> unit Lwt.t
+    val push_request : 'q t -> ('a, 'request_error) Request.t -> bool Lwt.t
 
     val pending_requests : 'a t -> (Time.System.t * Request.view) list
 
@@ -364,12 +384,20 @@ struct
     let push_request (type a) (w : a queue t) request =
       match w.buffer with
       | Queue_buffer message_queue ->
-          Lwt_pipe.Unbounded.push message_queue (queue_item request) ;
-          (* because pushing on an unbounded pipe is immediate, we return within
-             Lwt explicitly for compatibility with the other case *)
-          Lwt.return_unit
+          if Lwt_pipe.Unbounded.is_closed message_queue then Lwt.return_false
+          else (
+            Lwt_pipe.Unbounded.push message_queue (queue_item request) ;
+            (* because pushing on an unbounded pipe is immediate, we return within
+               Lwt explicitly for compatibility with the other case *)
+            Lwt.return_true)
       | Bounded_buffer message_queue ->
-          Lwt_pipe.Bounded.push message_queue (queue_item request)
+          if Lwt_pipe.Bounded.is_closed message_queue then Lwt.return_false
+          else
+            let open Lwt_syntax in
+            let* () =
+              Lwt_pipe.Bounded.push message_queue (queue_item request)
+            in
+            Lwt.return_true
 
     let push_request_now (w : infinite queue t) request =
       let (Queue_buffer message_queue) = w.buffer in
@@ -384,8 +412,7 @@ struct
             Lwt_pipe.Unbounded.push message_queue (queue_item ~u request) ;
             t
           with Lwt_pipe.Closed ->
-            let name = Format.asprintf "%a" Name.pp w.name in
-            Lwt_result_syntax.tzfail (Closed {base = base_name; name}))
+            Lwt.return_error (Closed (extract_status_errors w)))
       | Bounded_buffer message_queue ->
           let t, u = Lwt.wait () in
           Lwt.try_bind
@@ -394,9 +421,8 @@ struct
             (fun () -> t)
             (function
               | Lwt_pipe.Closed ->
-                  let name = Format.asprintf "%a" Name.pp w.name in
-                  Lwt_result_syntax.tzfail (Closed {base = base_name; name})
-              | exn -> raise exn)
+                  Lwt.return_error (Closed (extract_status_errors w))
+              | exn -> Lwt.return_error (Any exn))
 
     let pending_requests (type a) (w : a queue t) =
       let peeked =
@@ -423,10 +449,7 @@ struct
   let close (type a) (w : a t) =
     let wakeup = function
       | _, Message (_, Some u) ->
-          let name = Format.asprintf "%a" Name.pp w.name in
-          Lwt.wakeup_later
-            u
-            (Result_syntax.tzfail (Closed {base = base_name; name}))
+          Lwt.wakeup_later u (Error (Closed (extract_status_errors w)))
       | _, Message (_, None) -> ()
     in
     let close_queue message_queue =
@@ -508,47 +531,61 @@ struct
   module type HANDLERS = sig
     type self
 
+    type launch_error
+
     val on_launch :
-      self -> Name.t -> Types.parameters -> Types.state tzresult Lwt.t
+      self ->
+      Name.t ->
+      Types.parameters ->
+      (Types.state, launch_error) result Lwt.t
 
-    val on_request : self -> 'a Request.t -> 'a tzresult Lwt.t
+    val on_request :
+      self ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error) result Lwt.t
 
-    val on_no_request : self -> unit tzresult Lwt.t
+    val on_no_request : self -> unit Lwt.t
 
     val on_close : self -> unit Lwt.t
 
     val on_error :
       self ->
-      Request.view ->
       Worker_types.request_status ->
-      error list ->
+      ('a, 'request_error) Request.t ->
+      'request_error ->
       unit tzresult Lwt.t
 
     val on_completion :
-      self -> 'a Request.t -> 'a -> Worker_types.request_status -> unit Lwt.t
+      self ->
+      ('a, 'request_error) Request.t ->
+      'a ->
+      Worker_types.request_status ->
+      unit Lwt.t
   end
 
   let create_table buffer_kind =
     {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
+  let close (type kind) handlers (w : kind t) errs =
+    let (module Handlers : HANDLERS with type self = kind t) = handlers in
+    let open Lwt_syntax in
+    let t0 =
+      match w.status with
+      | Running t0 -> t0
+      | Launching _ | Closing _ | Closed _ -> assert false
+    in
+    w.status <- Closing (t0, Time.System.now ()) ;
+    close w ;
+    let* () = Error_monad.cancel_with_exceptions w.canceler in
+    w.status <- Closed (t0, Time.System.now (), errs) ;
+    let* () = Handlers.on_close w in
+    Nametbl.remove w.table.instances w.name ;
+    w.state <- None ;
+    return_unit
+
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
-    let do_close errs =
-      let open Lwt_syntax in
-      let t0 =
-        match w.status with
-        | Running t0 -> t0
-        | Launching _ | Closing _ | Closed _ -> assert false
-      in
-      w.status <- Closing (t0, Time.System.now ()) ;
-      close w ;
-      let* () = Error_monad.cancel_with_exceptions w.canceler in
-      w.status <- Closed (t0, Time.System.now (), errs) ;
-      let* () = Handlers.on_close w in
-      Nametbl.remove w.table.instances w.name ;
-      w.state <- None ;
-      return_unit
-    in
+    let open Lwt_syntax in
     let rec loop () =
       (* The call to [protect] here allows the call to [pop] (responsible
          for fetching the next request) to be canceled by the use of the
@@ -562,86 +599,95 @@ struct
          processed, the processing eventually resolves, at which point a
          recursive call to this [loop] at which point this call to [protect]
          fails immediately with [Canceled]. *)
-      Lwt.bind
-        Lwt_result_syntax.(
-          let* popped =
-            protect ~canceler:w.canceler (fun () -> Lwt_result.ok @@ pop w)
+      let* popped = protect_result (fun () -> pop w) in
+      match popped with
+      | Error exn -> raise exn
+      | Ok None ->
+          let* () = Handlers.on_no_request w in
+          loop ()
+      | Ok (Some (pushed, Message (request, u))) -> (
+          let current_request = Request.view request in
+          let treated = Time.System.now () in
+          w.current_request <- Some (pushed, treated, current_request) ;
+          let* r =
+            match u with
+            | None -> (
+                let open Lwt_result_syntax in
+                let*! res = Handlers.on_request w request in
+                match res with
+                | Error err -> Lwt.return_error err
+                | Ok res ->
+                    let completed = Time.System.now () in
+                    w.current_request <- None ;
+                    let status = Worker_types.{pushed; treated; completed} in
+                    let*! () = Handlers.on_completion w request res status in
+                    let*! () =
+                      lwt_emit w (Request (current_request, status, None))
+                    in
+                    return_unit)
+            | Some u -> (
+                (* [res] is a result. But the side effect [wakeup]
+                   needs to happen regardless of success (Ok) or failure
+                   (Error). To that end, we treat it locally like a regular
+                   promise (which happens to carry a [result]) within the Lwt
+                   monad. *)
+                let* res = Handlers.on_request w request in
+                match res with
+                | Error err ->
+                    Lwt.wakeup_later u (Error (Request_error err)) ;
+                    Lwt.return (Error err)
+                | Ok res ->
+                    Lwt.wakeup_later u (Ok res) ;
+                    let completed = Time.System.now () in
+                    let status = Worker_types.{pushed; treated; completed} in
+                    w.current_request <- None ;
+                    let* () = Handlers.on_completion w request res status in
+                    let* () =
+                      lwt_emit w (Request (current_request, status, None))
+                    in
+                    return (Ok ()))
           in
-          match popped with
-          | None -> Handlers.on_no_request w
-          | Some (pushed, Message (request, u)) -> (
-              let current_request = Request.view request in
-              let treated = Time.System.now () in
-              w.current_request <- Some (pushed, treated, current_request) ;
-              match u with
-              | None ->
-                  let* res = Handlers.on_request w request in
-                  let completed = Time.System.now () in
-                  w.current_request <- None ;
-                  let status = Worker_types.{pushed; treated; completed} in
-                  let*! () = Handlers.on_completion w request res status in
-                  let*! () =
-                    lwt_emit w (Request (current_request, status, None))
-                  in
-                  return_unit
-              | Some u ->
-                  (* [res] is a result. But the side effect [wakeup]
-                     needs to happen regardless of success (Ok) or failure
-                     (Error). To that end, we treat it locally like a regular
-                     promise (which happens to carry a [result]) within the Lwt
-                     monad. *)
-                  let*! res = Handlers.on_request w request in
-                  Lwt.wakeup_later u res ;
-                  let*? res = res in
-                  let completed = Time.System.now () in
-                  let status = Worker_types.{pushed; treated; completed} in
-                  w.current_request <- None ;
-                  let*! () = Handlers.on_completion w request res status in
-                  let*! () =
-                    lwt_emit w (Request (current_request, status, None))
-                  in
-                  return_unit))
-        Lwt_syntax.(
-          function
+          match r with
           | Ok () -> loop ()
-          | Error (Canceled :: _)
-          | Error (Exn Lwt.Canceled :: _)
-          | Error (Exn Lwt_pipe.Closed :: _)
-          | Error (Exn Lwt_dropbox.Closed :: _) ->
-              let* () = lwt_emit w Terminated in
-              do_close None
-          | Error errs -> (
+          | Error err -> (
               let* r =
                 match w.current_request with
-                | Some (pushed, treated, request) ->
+                | Some (pushed, treated, _request_view) ->
                     let completed = Time.System.now () in
                     w.current_request <- None ;
                     Handlers.on_error
                       w
-                      request
                       Worker_types.{pushed; treated; completed}
-                      errs
+                      request
+                      err
                 | None -> assert false
               in
               match r with
               | Ok () -> loop ()
-              | Error (Timeout :: _ as errs) ->
-                  let* () = lwt_emit w Terminated in
-                  do_close (Some errs)
               | Error errs ->
                   let* () = lwt_emit w (Crashed errs) in
-                  do_close (Some errs)))
+                  close handlers w (Some errs)))
     in
-    loop ()
+    let* r = protect_result ~canceler:w.canceler (fun () -> loop ()) in
+    match r with
+    | Ok () -> Lwt.return_unit
+    | Error Lwt.Canceled | Error Lwt_pipe.Closed | Error Lwt_dropbox.Closed ->
+        let* () = lwt_emit w Terminated in
+        close handlers w None
+    | Error exn ->
+        let* () = lwt_emit w (Crashed [Exn exn]) in
+        raise exn
 
   let launch :
-      type kind.
+      type kind launch_error.
       kind table ->
       ?timeout:Time.System.Span.t ->
       Name.t ->
       Types.parameters ->
-      (module HANDLERS with type self = kind t) ->
-      kind t tzresult Lwt.t =
+      (module HANDLERS
+         with type self = kind t
+          and type launch_error = launch_error) ->
+      (kind t, launch_error) result Lwt.t =
    fun table ?timeout name parameters (module Handlers) ->
     let name_s = Format.asprintf "%a" Name.pp name in
     let full_name =
@@ -731,6 +777,14 @@ struct
     | None, _ -> assert false
     | Some state, _ -> state
 
+  let with_state :
+      _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t
+      =
+   fun w f ->
+    match w.state with
+    | Some state -> f state
+    | None -> Lwt_result_syntax.return_unit
+
   let pending_requests q = Queue.pending_requests q
 
   let status {status; _} = status
@@ -752,9 +806,6 @@ struct
     Nametbl.fold (fun n w acc -> (n, w) :: acc) instances []
 
   let find_opt {instances; _} = Nametbl.find instances
-
-  (* TODO? add a list of cancelers for nested protection ? *)
-  let protect {canceler; _} ?on_error f = protect ?on_error ~canceler f
 
   let () =
     Internal_event.register_section

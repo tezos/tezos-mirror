@@ -25,19 +25,19 @@
 (*****************************************************************************)
 
 module Request = struct
-  type 'a t =
+  type ('a, 'b) t =
     | Flush :
         Block_hash.t
         * Chain_validator_worker_state.Event.update
         * Block_hash.Set.t
         * Operation_hash.Set.t
-        -> unit t
-    | Notify : P2p_peer.Id.t * Mempool.t -> unit t
-    | Leftover : unit t
-    | Inject : {op : Operation.t; force : bool} -> unit t
-    | Arrived : Operation_hash.t * Operation.t -> unit t
-    | Advertise : unit t
-    | Ban : Operation_hash.t -> unit t
+        -> (unit, error trace) t
+    | Notify : P2p_peer.Id.t * Mempool.t -> (unit, Empty.t) t
+    | Leftover : (unit, Empty.t) t
+    | Inject : {op : Operation.t; force : bool} -> (unit, error trace) t
+    | Arrived : Operation_hash.t * Operation.t -> (unit, Empty.t) t
+    | Advertise : (unit, Empty.t) t
+    | Ban : Operation_hash.t -> (unit, error trace) t
 
   type view = View : _ t -> view
 

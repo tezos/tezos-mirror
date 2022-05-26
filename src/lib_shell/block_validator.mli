@@ -55,7 +55,7 @@ val create :
   Distributed_db.t ->
   Block_validator_process.t ->
   start_testchain:bool ->
-  t tzresult Lwt.t
+  t Lwt.t
 
 type block_validity =
   | Valid
