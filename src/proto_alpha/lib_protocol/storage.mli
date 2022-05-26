@@ -666,6 +666,7 @@ module Sc_rollup : sig
 
       - a PVM kind (provided at creation time, read-only)
       - a boot sector (provided at creation time, read-only)
+      - a parameters type specifying the types of parameters the rollup accepts
       - the L1 block level at which the rollup was created
       - a merkelized inbox, of which only the root hash is stored
       - a tree of commitments, rooted at the last cemented commitment
@@ -689,6 +690,12 @@ module Sc_rollup : sig
     Indexed_data_storage
       with type key = Sc_rollup_repr.t
        and type value = string
+       and type t := Raw_context.t
+
+  module Parameters_type :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Script_repr.lazy_expr
        and type t := Raw_context.t
 
   module Initial_level :

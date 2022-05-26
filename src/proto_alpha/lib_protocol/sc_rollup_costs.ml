@@ -54,7 +54,6 @@ end
     cost_add_message_per_bytes * \sum_{i=1}^n length(m_i) +
     cost_add_inbox_per_level * l`.
 *)
-
 let cost_add_messages ~num_messages ~total_messages_size l =
   let open S_syntax in
   let log_level =
@@ -65,3 +64,9 @@ let cost_add_messages ~num_messages ~total_messages_size l =
   (S.safe_int num_messages * Constants.cost_add_message_base)
   + level_cost
   + (Constants.cost_add_message_per_byte * S.safe_int total_messages_size)
+
+(* Reusing model from {!Ticket_costs.has_tickets_of_ty_cost}. *)
+let is_valid_parameters_ty_cost ~ty_size =
+  let fixed_cost = S.safe_int 10 in
+  let coeff = S.safe_int 6 in
+  S.add fixed_cost (S.mul coeff ty_size)

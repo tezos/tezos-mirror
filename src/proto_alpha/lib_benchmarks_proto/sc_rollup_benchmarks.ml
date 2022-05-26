@@ -207,9 +207,17 @@ module Sc_rollup_add_messages_benchmark = struct
     let ctxt_with_rollup =
       let open Lwt_result_syntax in
       let* ctxt = new_ctxt in
+      let {Michelson_v1_parser.expanded; _}, _ =
+        Michelson_v1_parser.parse_expression "unit"
+      in
+      let parameters_ty = Alpha_context.Script.lazy_expr expanded in
       let+ rollup, _size, ctxt =
         Lwt.map Environment.wrap_tzresult
-        @@ Sc_rollup_storage.originate ctxt ~kind:Example_arith ~boot_sector:""
+        @@ Sc_rollup_storage.originate
+             ctxt
+             ~kind:Example_arith
+             ~boot_sector:""
+             ~parameters_ty
       in
       (rollup, ctxt)
     in

@@ -364,6 +364,7 @@ val sc_rollup_origination :
   Contract.t ->
   Sc_rollup.Kind.t ->
   string ->
+  Script.lazy_expr ->
   (packed_operation * Sc_rollup.t) tzresult Lwt.t
 
 (** [sc_rollup_publish ctxt source rollup commitment] tries to publish a

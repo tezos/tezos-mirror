@@ -2568,6 +2568,11 @@ let commands_rw () =
            ~name:"sc_rollup_kind"
            ~desc:"kind of the smart-contract rollup to be originated"
            rollup_kind_param
+      @@ prefixes ["of"; "type"]
+      @@ param
+           ~name:"parameters_type"
+           ~desc:"the type of parameters that the smart-contract rollup accepts"
+           data_parameter
       @@ prefixes ["booting"; "with"]
       @@ param
            ~name:"boot_sector"
@@ -2583,6 +2588,7 @@ let commands_rw () =
              counter )
            source
            pvm
+           parameters_ty
            boot_sector
            cctxt ->
         match source with
@@ -2592,6 +2598,8 @@ let commands_rw () =
         | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let (module R : Sc_rollups.PVM.S) = pvm in
+            let Michelson_v1_parser.{expanded; _} = parameters_ty in
+            let parameters_ty = Script.lazy_expr expanded in
             boot_sector pvm >>=? fun boot_sector ->
             sc_rollup_originate
               cctxt
@@ -2610,6 +2618,7 @@ let commands_rw () =
               ~fee_parameter
               ~kind:(Sc_rollups.kind_of pvm)
               ~boot_sector
+              ~parameters_ty
               ()
             >>=? fun _res -> return_unit);
     command

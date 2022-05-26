@@ -26,12 +26,15 @@
 (** High-level operations over smart contract rollups. *)
 open Alpha_context
 
+type error += (* Temporary *) Sc_rollup_invalid_parameters_type
+
 type origination_result = {address : Sc_rollup.Address.t; size : Z.t}
 
 (** [originate context ~kind ~boot_sector] adds a new rollup running in a
-   given [kind] initialized with a [boot_sector]. *)
+    given [kind] initialized with a [boot_sector]. *)
 val originate :
   context ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
+  parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t

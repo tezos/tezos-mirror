@@ -33,8 +33,14 @@ let originated_rollup op =
   Contract.Internal_for_tests.originated_contract nonce
 
 (** Returns a block in which a rollup originated. *)
-let originate_rollup src b baker kind boot_sector =
-  Op.sc_rollup_origination (B b) src ~fee:(Test_tez.of_int 10) kind boot_sector
+let originate_rollup src b baker kind boot_sector parameters_ty =
+  Op.sc_rollup_origination
+    (B b)
+    src
+    ~fee:(Test_tez.of_int 10)
+    kind
+    boot_sector
+    parameters_ty
   >>=? fun (operation, _) ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
   >>=? fun incr ->

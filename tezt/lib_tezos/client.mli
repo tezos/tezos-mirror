@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1187,6 +1188,7 @@ module Sc_rollup : sig
     ?burn_cap:Tez.t ->
     src:string ->
     kind:string ->
+    parameters_ty:string ->
     boot_sector:string ->
     t ->
     string Lwt.t
@@ -1198,6 +1200,7 @@ module Sc_rollup : sig
     ?burn_cap:Tez.t ->
     src:string ->
     kind:string ->
+    parameters_ty:string ->
     boot_sector:string ->
     t ->
     Process.t

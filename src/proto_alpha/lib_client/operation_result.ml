@@ -268,12 +268,20 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         source
   | Transfer_ticket _ ->
       Format.fprintf ppf "Transfer tickets:@,From: %a" Contract.pp source
-  | Sc_rollup_originate {kind; boot_sector} ->
+  | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
+      let parameters_ty =
+        WithExceptions.Option.to_exn
+          ~none:(Failure "ill-serialized parameters type")
+          (Data_encoding.force_decode parameters_ty)
+      in
       Format.fprintf
         ppf
-        "Originate smart contract rollup of kind %s with boot sector '%a'"
+        "Originate smart contract rollup of kind %s and type %a with boot \
+         sector '%a'"
         R.name
+        Michelson_v1_printer.print_expr
+        parameters_ty
         R.pp_boot_sector
         boot_sector
   | Sc_rollup_add_messages {rollup; messages = _} ->

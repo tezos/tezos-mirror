@@ -1512,6 +1512,17 @@ module Sc_rollup = struct
         let encoding = Data_encoding.string
       end)
 
+  module Parameters_type =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["parameters_type"]
+      end)
+      (struct
+        type t = Script_repr.lazy_expr
+
+        let encoding = Script_repr.lazy_expr_encoding
+      end)
+
   module Initial_level =
     Indexed_context.Make_map
       (struct

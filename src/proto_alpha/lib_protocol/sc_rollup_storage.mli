@@ -35,6 +35,7 @@ val originate :
   Raw_context.t ->
   kind:Sc_rollup_repr.Kind.t ->
   boot_sector:string ->
+  parameters_ty:Script_repr.lazy_expr ->
   (Sc_rollup_repr.Address.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** [kind context address] returns [Some kind] iff [address] is an
@@ -54,6 +55,14 @@ val initial_level :
 
 (** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
 val get_boot_sector : Raw_context.t -> Sc_rollup_repr.t -> string tzresult Lwt.t
+
+(** [parameters_type ctxt rollup] returns the registered type of a rollup.
+    Fails with an [Sc_rollup_does_not_exist] error in case there is no
+    registered type for the rollup. *)
+val parameters_type :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Script_repr.lazy_expr * Raw_context.t) tzresult Lwt.t
 
 (** A module for managing state concerning a rollup's outbox. *)
 module Outbox : sig

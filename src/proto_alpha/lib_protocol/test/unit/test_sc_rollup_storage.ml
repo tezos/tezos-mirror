@@ -50,7 +50,15 @@ let new_context () =
 
 let new_sc_rollup ctxt =
   let+ rollup, _size, ctxt =
-    Sc_rollup_storage.originate ctxt ~kind:Example_arith ~boot_sector:""
+    let {Michelson_v1_parser.expanded; _}, _ =
+      Michelson_v1_parser.parse_expression "unit"
+    in
+    let parameters_ty = Alpha_context.Script.lazy_expr expanded in
+    Sc_rollup_storage.originate
+      ctxt
+      ~kind:Example_arith
+      ~boot_sector:""
+      ~parameters_ty
   in
   (rollup, ctxt)
 
