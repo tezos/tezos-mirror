@@ -396,7 +396,7 @@ module Synths = struct
      corresponding added line is found; the statistics are then updated
      accordingly. *)
   type t = {
-    previous_kinds : (string * kind) list;
+    previous_kinds : (string * kind * int (* line number *)) list;
     estimated : synth;
     consumed : synth;
     gas_remaining : synth;
@@ -562,9 +562,10 @@ module Synths = struct
   let consume_kind line line_nb synths kind =
     match synths.previous_kinds with
     | [] ->
-        Printf.printf "* No line to consume `%s`.\n%!" line ;
+        Printf.printf "* No line to consume for line %d `%s`.\n%!" line_nb line ;
         synths
-    | (_, previous_kind) :: previous_kinds when same_kind previous_kind kind ->
+    | (_, previous_kind, _) :: previous_kinds when same_kind previous_kind kind
+      ->
         let synths =
           match builders previous_kind kind with
           | None -> synths
@@ -572,18 +573,25 @@ module Synths = struct
               setter (update line_nb (getter synths) old_v new_v) synths
         in
         {synths with previous_kinds}
-    | (line', _) :: _ ->
-        Printf.printf "* Unmatched lines `%s` and `%s`.\n%!" line line' ;
+    | (line', _, line_nb) :: _ ->
+        Printf.printf
+          "* At line %d, unmatched lines `%s` and `%s`.\n%!"
+          line_nb
+          line
+          line' ;
         synths
 
   let add_line synths line line_nb =
     match categorize line with
     | Garbage -> synths
     | Unsupported ->
-        Printf.printf "* Could not parse `%s`.\n%!" line ;
+        Printf.printf "* Could not parse line %d `%s`.\n%!" line_nb line ;
         synths
     | Diff (Removed, k) ->
-        {synths with previous_kinds = synths.previous_kinds @ [(line, k)]}
+        {
+          synths with
+          previous_kinds = synths.previous_kinds @ [(line, k, line_nb)];
+        }
     | Diff (Added, k) -> consume_kind line line_nb synths k
 
   let show
@@ -599,7 +607,8 @@ module Synths = struct
         fee;
       } =
     List.iter
-      (fun (line, _) -> Printf.printf "* Leftover line: `%s`.\n%!" line)
+      (fun (line, _, line_nb) ->
+        Printf.printf "* Leftover at line %d: `%s`.\n%!" line_nb line)
       previous_kinds ;
     Printf.printf "\n%!" ;
     Synth.show estimated ;
