@@ -405,6 +405,8 @@ module Synths = struct
     baker_fee : synth;
     payload_fee : synth;
     fee : synth;
+    total_lines : int;
+    total_degradations : int;
   }
 
   let empty =
@@ -418,6 +420,8 @@ module Synths = struct
       baker_fee = empty_synth baker_fee_str Dec;
       payload_fee = empty_synth payload_fee_str Dec;
       fee = empty_synth fee_str Dec;
+      total_lines = 0;
+      total_degradations = 0;
     }
 
   type category =
@@ -537,22 +541,22 @@ module Synths = struct
       update_max line_nb old_v synth.max_gain synth.max_gain_pct (opp loss)
     in
     let open Stdlib in
-    let degradations =
-      synth.degradations + if Decimal.gt loss zero then 1 else 0
-    in
+    let is_degraded = Decimal.gt loss zero in
+    let degradations = synth.degradations + if is_degraded then 1 else 0 in
     let total = synth.total + 1 in
-    {
-      old;
-      new_;
-      max_loss;
-      max_loss_pct;
-      max_gain;
-      max_gain_pct;
-      degradations;
-      total;
-      win;
-      str = synth.str;
-    }
+    ( {
+        old;
+        new_;
+        max_loss;
+        max_loss_pct;
+        max_gain;
+        max_gain_pct;
+        degradations;
+        total;
+        win;
+        str = synth.str;
+      },
+      is_degraded )
 
   (* [consume_kind line line_nb synths kind] tries to match the added line
      [line] at line number [line_nb], that was successfully parsed as [kind],
@@ -570,7 +574,15 @@ module Synths = struct
           match builders previous_kind kind with
           | None -> synths
           | Some (old_v, new_v, getter, setter) ->
-              setter (update line_nb (getter synths) old_v new_v) synths
+              let new_synth, is_degraded =
+                update line_nb (getter synths) old_v new_v
+              in
+              let total_lines = synths.total_lines + 1 in
+              let total_degradations =
+                synths.total_degradations + if is_degraded then 1 else 0
+              in
+              let synths = setter new_synth synths in
+              {synths with total_lines; total_degradations}
         in
         {synths with previous_kinds}
     | (line', _, line_nb) :: _ ->
@@ -605,6 +617,8 @@ module Synths = struct
         baker_fee;
         payload_fee;
         fee;
+        total_lines;
+        total_degradations;
       } =
     List.iter
       (fun (line, _, line_nb) ->
@@ -619,6 +633,10 @@ module Synths = struct
     Synth.show baker_fee ;
     Synth.show payload_fee ;
     Synth.show fee ;
+    Printf.printf "Total number of lines with a change: %d.\n" total_lines ;
+    Printf.printf
+      "Total number of lines with a degradation: %d.\n\n"
+      total_degradations ;
     Printf.printf "Lines with the following strings were ignored:\n%!" ;
     List.iter
       (Printf.printf "  `%s`\n%!")
