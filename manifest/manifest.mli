@@ -33,8 +33,7 @@ val has_prefix : prefix:string -> string -> bool
 (** [string_for_all p str] returns true if [p c] is true for all char [c] of [str] *)
 val string_for_all : (char -> bool) -> string -> bool
 
-(** [dir // file] returns a file name that designates file
-    [file] in directory [dir]. *)
+(** Same as [Filename.concat]. *)
 val ( // ) : string -> string -> string
 
 module Dune : sig
