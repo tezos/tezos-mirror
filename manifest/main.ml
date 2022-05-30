@@ -1216,10 +1216,6 @@ let _tezos_tooling =
            it is added to tezos/opam-repository. *)
         ocamlformat;
         ometrics;
-        (* Keep a fake dependency on ppx_blob so that we don't need to
-           do the opam-repository dance just for this.  It will be
-           removed later when bumping opam-repository is mandatory *)
-        external_lib "ppx_blob" V.True;
       ]
 
 let _tezos_tooling_opam_file_format =
