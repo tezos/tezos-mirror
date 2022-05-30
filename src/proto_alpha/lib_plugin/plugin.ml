@@ -1711,7 +1711,7 @@ module RPC = struct
              (req "chain_id" Chain_id.encoding)
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
-             (opt "self" Contract.encoding)
+             (opt "self" Contract.originated_encoding)
              (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
           (obj4
              (opt "unparsing_mode" unparsing_mode_encoding)
@@ -2439,7 +2439,7 @@ module RPC = struct
     (* A convenience type for return values of [ensure_contracts_exist] below. *)
     type run_code_config = {
       balance : Tez.t;
-      self : Contract.t;
+      self : Contract_hash.t;
       payer : Contract.t;
       source : Contract.t;
     }
@@ -2452,13 +2452,13 @@ module RPC = struct
         let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
         Contract.fresh_contract_from_current_nonce ctxt
         >>?= fun (ctxt, dummy_contract_hash) ->
-        let dummy_contract = Contract.Originated dummy_contract_hash in
         Contract.raw_originate
           ctxt
           ~prepaid_bootstrap_storage:false
-          dummy_contract
+          dummy_contract_hash
           ~script:(script, None)
         >>=? fun ctxt ->
+        let dummy_contract = Contract.Originated dummy_contract_hash in
         Token.transfer
           ~origin:Simulation
           ctxt
@@ -2472,18 +2472,19 @@ module RPC = struct
         | None ->
             let balance = Option.value ~default:default_balance balance in
             originate_dummy_contract ctxt script balance
-            >>=? fun (ctxt, addr) ->
-            return (ctxt, Contract.Originated addr, balance)
+            >>=? fun (ctxt, addr) -> return (ctxt, addr, balance)
         | Some addr ->
             default_from_context
               ctxt
-              (fun c -> Contract.get_balance c addr)
+              (fun c -> Contract.get_balance c (Contract.Originated addr))
               balance
             >>=? fun bal -> return (ctxt, addr, bal))
         >>=? fun (ctxt, self, balance) ->
         let source, payer =
           match (src_opt, pay_opt) with
-          | None, None -> (self, self)
+          | None, None ->
+              let self = Contract.Originated self in
+              (self, self)
           | Some c, None | None, Some c -> (c, c)
           | Some src, Some pay -> (src, pay)
         in
@@ -2669,7 +2670,7 @@ module RPC = struct
         (fun
           ctxt
           ()
-          ( contract,
+          ( contract_hash,
             entrypoint,
             input,
             chain_id,
@@ -2680,7 +2681,7 @@ module RPC = struct
             now,
             level )
         ->
-          let contract = Contract.Originated contract in
+          let contract = Contract.Originated contract_hash in
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
             ~some:ok
@@ -2727,7 +2728,7 @@ module RPC = struct
             {
               source;
               payer;
-              self = contract;
+              self = contract_hash;
               amount = Tez.zero;
               balance;
               chain_id;
@@ -2769,7 +2770,7 @@ module RPC = struct
         (fun
           ctxt
           ()
-          ( ( contract,
+          ( ( contract_hash,
               view,
               input,
               unlimited_gas,
@@ -2781,7 +2782,7 @@ module RPC = struct
               now ),
             level )
         ->
-          let contract = Contract.Originated contract in
+          let contract = Contract.Originated contract_hash in
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
             ~some:ok
@@ -2828,7 +2829,7 @@ module RPC = struct
             {
               Script_interpreter.source;
               payer;
-              self = contract;
+              self = contract_hash;
               amount = Tez.zero;
               balance;
               chain_id;

@@ -110,7 +110,8 @@ val transfer :
   ?counter:counter ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+  tzresult
   Lwt.t
 
 val build_lambda_for_set_delegate : delegate:public_key_hash option -> string

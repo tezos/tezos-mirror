@@ -145,7 +145,7 @@ val spend_only_call_from_token :
 val raw_originate :
   Raw_context.t ->
   prepaid_bootstrap_storage:bool ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   script:Script_repr.t * Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t
 

@@ -119,4 +119,4 @@ val inject_manager_operation :
     by looking at the operation results. Fails if an operation in the batch is
     failed unless [force] is given. *)
 val originated_contracts :
-  force:bool -> 'kind contents_result_list -> Contract.t list tzresult
+  force:bool -> 'kind contents_result_list -> Contract_hash.t list tzresult

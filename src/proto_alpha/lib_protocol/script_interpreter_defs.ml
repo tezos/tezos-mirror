@@ -625,7 +625,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
       failwith "Transferring to smart-contract rollups is not yet supported")
   >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let iop = {source = sc.self; operation; nonce} in
+  let iop = {source = Contract.Originated sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
@@ -664,7 +664,8 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
     Origination {origination; preorigination; storage_type; storage = init}
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let piop = Internal_operation {source = sc.self; operation; nonce} in
+  let source = Contract.Originated sc.self in
+  let piop = Internal_operation {source; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, preorigination, ctxt, gas)

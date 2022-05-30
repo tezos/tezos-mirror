@@ -109,7 +109,8 @@ val call_contract :
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+  tzresult
   Lwt.t
 
 (** Single transfer operation. *)

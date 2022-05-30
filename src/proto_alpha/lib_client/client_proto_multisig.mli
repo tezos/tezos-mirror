@@ -120,7 +120,8 @@ val call_multisig :
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+  tzresult
   Lwt.t
 
 (* Same as [call_multisig] but the action to be performed is reconstructed from
@@ -146,5 +147,6 @@ val call_multisig_on_bytes :
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+  tzresult
   Lwt.t

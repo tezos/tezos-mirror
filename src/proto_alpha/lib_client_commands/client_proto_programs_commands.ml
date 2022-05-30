@@ -97,7 +97,7 @@ let commands () =
       ()
   in
   let self_arg =
-    ContractAlias.destination_arg
+    OriginatedContractAlias.destination_arg
       ~name:"self-address"
       ~doc:"address of the contract (i.e. SELF_ADDRESS) for the transaction"
       ()

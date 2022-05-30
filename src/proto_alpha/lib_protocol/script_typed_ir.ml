@@ -43,7 +43,7 @@ type step_constants = {
       (** The address calling this contract, as returned by SENDER. *)
   payer : Contract.t;
       (** The address of the implicit account that initiated the chain of contract calls, as returned by SOURCE. *)
-  self : Contract.t;
+  self : Contract_hash.t;
       (** The address of the contract being executed, as returned by SELF and SELF_ADDRESS.
      Also used:
      - as ticketer in TICKET

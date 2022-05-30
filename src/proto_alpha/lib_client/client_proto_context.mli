@@ -229,7 +229,8 @@ val transfer_with_script :
   fee_parameter:Injection.fee_parameter ->
   ?replace_by_fees:bool ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+  tzresult
   Lwt.t
 
 val transfer :
@@ -257,7 +258,8 @@ val transfer :
   fee_parameter:Injection.fee_parameter ->
   ?replace_by_fees:bool ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+  tzresult
   Lwt.t
 
 val build_reveal_operation :
