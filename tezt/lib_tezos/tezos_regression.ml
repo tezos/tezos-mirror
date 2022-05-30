@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,7 +41,7 @@ let hooks =
         ("scr1\\w{33}\\b", "[SC_ROLLUP_HASH]");
         ("scc1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
         ("scs1\\w{50}\\b", "[SC_ROLLUP_STATE_HASH]");
-        ("scib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
+        ("Co\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
         ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
         ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
         ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
