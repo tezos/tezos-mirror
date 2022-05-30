@@ -73,13 +73,11 @@ let default_options =
     pdf_target_cm_size = None;
   }
 
-let opts = ref default_options
+let point_size opts = opts.point_size
 
-let point_size () = !opts.point_size
+let qt_pixel_size opts = opts.qt_target_pixel_size
 
-let qt_pixel_size () = !opts.qt_target_pixel_size
-
-let pdf_cm_size () = !opts.pdf_target_cm_size
+let pdf_cm_size opts = opts.pdf_target_cm_size
 
 (* A [raw_row] is consists in a list of named values called a workload
    (corresponding to time measurement of events) together with the
@@ -90,25 +88,25 @@ type raw_row = {workload : (string * float) list; qty : float}
 (* Gnuplot interprets by default underscores as subscript symbols *)
 let underscore_to_dash = String.map (fun c -> if c = '_' then '-' else c)
 
-let style i =
+let style opts i =
   let open Style in
   match i with
   | 0 ->
       default |> set_color Color.blue
-      |> set_point ~ptyp:Pointtype.disk ~psize:(point_size ())
+      |> set_point ~ptyp:Pointtype.disk ~psize:(point_size opts)
   | 1 ->
       default |> set_color Color.red
-      |> set_point ~ptyp:Pointtype.box ~psize:(point_size ())
+      |> set_point ~ptyp:Pointtype.box ~psize:(point_size opts)
   | 2 ->
       default |> set_color Color.green
-      |> set_point ~ptyp:Pointtype.delta_solid ~psize:(point_size ())
+      |> set_point ~ptyp:Pointtype.delta_solid ~psize:(point_size opts)
   | _ -> Stdlib.failwith "Display.style: style overflow"
 
-let scatterplot_2d title (xaxis, input) outputs =
+let scatterplot_2d opts title (xaxis, input) outputs =
   let plots =
     List.mapi
       (fun i output ->
-        let style = style i in
+        let style = style opts i in
         let points = Data.of_array @@ Array.map2 Plot.r2 input output in
         Scatter.points_2d ~points ~style ())
       outputs
@@ -123,11 +121,11 @@ let rec map3 f l1 l2 l3 () =
   | Cons (x1, l1'), Cons (x2, l2'), Cons (x3, l3') ->
       Cons (f x1 x2 x3, map3 f l1' l2' l3')
 
-let scatterplot_3d title (xaxis, input_x) (yaxis, input_y) outputs =
+let scatterplot_3d opts title (xaxis, input_x) (yaxis, input_y) outputs =
   let plots =
     List.mapi
       (fun i output ->
-        let style = style i in
+        let style = style opts i in
         let xs = Array.to_seq input_x in
         let ys = Array.to_seq input_y in
         let zs = Array.to_seq output in
@@ -142,7 +140,7 @@ let scatterplot_3d title (xaxis, input_x) (yaxis, input_y) outputs =
 (* Scatter plot/s/ of the input vectors specified by [input_columns]
    against the [outputs]. This will superpose [List.length outputs]
    scatter plots on the same page. *)
-let plot_scatter title input_columns outputs =
+let plot_scatter opts title input_columns outputs =
   let open Result_syntax in
   match input_columns with
   | [] ->
@@ -151,10 +149,10 @@ let plot_scatter title input_columns outputs =
         "Display.plot_scatter (%s): empty scatter data"
         title
   | [column] ->
-      let plot = scatterplot_2d title column outputs in
+      let plot = scatterplot_2d opts title column outputs in
       return [plot]
   | [column1; column2] ->
-      let plot = scatterplot_3d title column1 column2 outputs in
+      let plot = scatterplot_3d opts title column1 column2 outputs in
       return [plot]
   | _ ->
       let subsets = Benchmark_helpers.enumerate_subsets 2 input_columns in
@@ -165,7 +163,7 @@ let plot_scatter title input_columns outputs =
                 let dim1 = underscore_to_dash dim1 in
                 let dim2 = underscore_to_dash dim2 in
                 let title = Format.asprintf "%s (%s, %s)" title dim1 dim2 in
-                scatterplot_3d title col1 col2 outputs
+                scatterplot_3d opts title col1 col2 outputs
             | cols ->
                 let len = List.length cols in
                 Format.kasprintf
@@ -258,7 +256,8 @@ let column_to_array (m : Matrix.t) =
   assert (cols = 1) ;
   Array.init rows (fun i -> Matrix.get m i 0)
 
-let validator (problem : Inference.problem) (solution : Inference.solution) =
+let validator opts (problem : Inference.problem) (solution : Inference.solution)
+    =
   let open Result_syntax in
   match problem with
   | Inference.Degenerate _ -> Error "Display.validator: degenerate plot"
@@ -275,14 +274,18 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
       let timings = column_to_array timings in
       let predicted = column_to_array predicted in
       let* plots =
-        plot_scatter "Validation (chosen basis)" columns [timings; predicted]
+        plot_scatter
+          opts
+          "Validation (chosen basis)"
+          columns
+          [timings; predicted]
       in
       return plots
 
-let empirical (workload_data : (Sparse_vec.String.t * float) list) =
+let empirical opts (workload_data : (Sparse_vec.String.t * float) list) =
   let open Result_syntax in
   let* columns, timings = empirical_data workload_data in
-  let* plots = plot_scatter "Empirical" columns [timings] in
+  let* plots = plot_scatter opts "Empirical" columns [timings] in
   return plots
 
 let eval_mset (mset : Free_variable.Sparse_vec.t)
@@ -295,7 +298,7 @@ let eval_mset (mset : Free_variable.Sparse_vec.t)
 let eval_affine (aff : Costlang.affine) (eval : Free_variable.t -> float) =
   eval_mset aff.linear_comb eval +. aff.const
 
-let validator_empirical workload_data (problem : Inference.problem)
+let validator_empirical opts workload_data (problem : Inference.problem)
     (solution : Inference.solution) =
   let open Result_syntax in
   let {Inference.mapping; _} = solution in
@@ -317,13 +320,14 @@ let validator_empirical workload_data (problem : Inference.problem)
         Array.of_list predicted_list
   in
   let* columns, timings = empirical_data workload_data in
-  let* plots = plot_scatter "Validation (raw)" columns [timings; predicted] in
+  let* plots =
+    plot_scatter opts "Validation (raw)" columns [timings; predicted]
+  in
   return plots
 
 type plot_target = Save | Show
 
 let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
-  opts := options ;
   let (Measure.Measurement ((module Bench), measurement)) = measure in
   let filename ?index kind =
     let dir = options.save_directory in
@@ -346,12 +350,12 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
             List.mapi
               (fun i plot ->
                 let pdf_file = filename ~index:i kind in
-                let target = pdf ?cm_size:(pdf_cm_size ()) ~pdf_file () in
+                let target = pdf ?cm_size:(pdf_cm_size options) ~pdf_file () in
                 Plot.run ~target exec_detach plot ;
                 pdf_file)
               plots
         | Show ->
-            let target = qt ?pixel_size:(qt_pixel_size ()) () in
+            let target = qt ?pixel_size:(qt_pixel_size options) () in
             let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
             Plot.run_matrix ~target exec_detach plots ;
             [])
@@ -359,7 +363,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
         Format.eprintf "Failed performing plot: %s@." msg ;
         []
   in
-  (try_plot "emp" @@ empirical workload_data)
-  @ (try_plot "validation" @@ validator problem solution)
+  (try_plot "emp" @@ empirical options workload_data)
+  @ (try_plot "validation" @@ validator options problem solution)
   @ try_plot "emp-validation"
-  @@ validator_empirical workload_data problem solution
+  @@ validator_empirical options workload_data problem solution
