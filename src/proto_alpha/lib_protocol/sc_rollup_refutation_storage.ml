@@ -186,7 +186,12 @@ let init_game ctxt rollup ~refuter ~defender =
       let* _ =
         match (opp_1, opp_2) with
         | None, None -> return ()
-        | _ -> fail Sc_rollup_staker_in_game
+        | Some refuter, None ->
+            fail (Sc_rollup_staker_in_game (`Refuter refuter))
+        | None, Some defender ->
+            fail (Sc_rollup_staker_in_game (`Defender defender))
+        | Some refuter, Some defender ->
+            fail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
       in
       let* (_, child), ctxt = get_conflict_point ctxt rollup refuter defender in
       let* child, ctxt =
