@@ -1,4 +1,4 @@
-all: octez-basic.jsonnet
+all: octez-basic.jsonnet octez-full.jsonnet
 
 BRANCH ?= master
 

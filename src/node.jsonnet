@@ -2,16 +2,18 @@ local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local dashboard = grafana.dashboard;
 local template = grafana.template;
 local singlestat = grafana.singlestat;
+local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local heatmapPanel = grafana.heatmapPanel;
 local prometheus = grafana.prometheus;
+local namespace = "octez";
 
 //##
 // Octez related stats
 //##
 
 {
-  buildInfo:
+  releaseVersionInfo:
     singlestat.new(
       title='Node release version',
       datasource='Prometheus',
@@ -19,8 +21,136 @@ local prometheus = grafana.prometheus;
       valueName='name',
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_info_version',
-        legendFormat='{{ version }} {{ commit_hash }}'
+	namespace + '_version',
+	legendFormat='{{ version }}',
+	instant=true
+      )
+    ),
+
+  releaseCommitInfo:
+    singlestat.new(
+      title='Node release commit',
+      datasource='Prometheus',
+      format='none',
+      valueName='name',
+    ).addTarget(
+      prometheus.target(
+	'(label_replace(' + namespace + '_version,"commit_hash_short","$1","commit_hash","^(.{8}).*$"))',
+	legendFormat='{{ commit_hash_short }}',
+	instant=true
+      )
+    ),
+
+  chainNameInfo:
+    singlestat.new(
+      title='Chain name',
+      datasource='Prometheus',
+      format='none',
+      valueName='name',
+    ).addTarget(
+      prometheus.target(
+	namespace + '_version',
+	legendFormat='{{ chain_name }}',
+	instant=true
+      )
+    ),
+
+  p2pVersion:
+    singlestat.new(
+      title='P2p version',
+      datasource='Prometheus',
+      format='none',
+      valueName='name',
+    ).addTarget(
+      prometheus.target(
+	namespace + '_version',
+	legendFormat='{{ p2p_version }}',
+	instant=true
+      )
+    ),
+
+  distributedDbVersion:
+    singlestat.new(
+      title='Distributed db version',
+      datasource='Prometheus',
+      format='none',
+      valueName='value',
+    ).addTarget(
+      prometheus.target(
+	namespace + '_version',
+	legendFormat='{{ distributed_db_version }}',
+	instant=true
+      )
+    ),
+
+  bootstrapStatus:
+    statPanel.new(
+      title='Bootstrap status',
+      datasource='Prometheus',
+      ).addMappings([
+	{
+          "options": {
+            "0": {
+              "color": "red",
+              "index": 1,
+              "text": "Bootstrapping"
+            },
+            "1": {
+              "color": "green",
+              "index": 0,
+              "text": "Bootstrapped"
+            },
+            "null": {
+              "color": "yellow",
+              "index": 2,
+              "text": "Unknown"
+            }
+          },
+          "type": "value"
+        }
+      ],
+    ).addTarget(
+      prometheus.target(
+	namespace + '_validator_chain_is_bootstrapped',
+	instant=true
+      )
+    ),
+
+  syncStatus:
+    statPanel.new(
+      title='Sync status',
+      datasource='Prometheus',
+    ).addMappings([
+	{
+          "options": {
+            "0": {
+              "color": "red",
+              "index": 0,
+              "text": "Unsync"
+            },
+            "1": {
+              "color": "green",
+              "index": 1,
+              "text": "Sync"
+            },
+	    "2": {
+              "color": "green",
+              "index": 2,
+              "text": "Stuck"
+            },
+            "null": {
+              "color": "yellow",
+              "index": 3,
+              "text": "Unknow"
+            }
+          },
+          "type": "value"
+        }
+      ],
+    ).addTarget(
+      prometheus.target(
+	namespace + '_validator_chain_synchronisation_status',
+	instant=true
       )
     ),
 
@@ -36,7 +166,8 @@ local prometheus = grafana.prometheus;
     ).addTarget(
       prometheus.target(
 	'time()-(process_start_time_seconds{job="node"})',
-	legendFormat='node uptime'
+	legendFormat='node uptime',
+	instant=true
       )
     ),
 
@@ -45,11 +176,11 @@ local prometheus = grafana.prometheus;
       title='Current head level',
       datasource='Prometheus',
       format='none',
-      valueName='max',
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_current_level',
+        namespace + '_validator_chain_head_level',
         legendFormat='current head level',
+	instant=true
       )
     ),
 
@@ -58,11 +189,24 @@ local prometheus = grafana.prometheus;
       title='Current savepoint level',
       datasource='Prometheus',
       format='none',
-      valueName='max',
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_checkpoint_savepoint',
+        namespace + '_store_savepoint_level',
         legendFormat='current savepoint',
+	instant=true
+      )
+    ),
+
+  checkpointLevel:
+    singlestat.new(
+      title='Current checkpoint level',
+      datasource='Prometheus',
+      format='none'
+    ).addTarget(
+      prometheus.target(
+        namespace + '_store_checkpoint_level',
+        legendFormat='current checkpoint',
+	instant=true
       )
     ),
 
@@ -70,12 +214,12 @@ local prometheus = grafana.prometheus;
     singlestat.new(
       title='Current caboose level',
       datasource='Prometheus',
-      format='none',
-      valueName='max',
+      format='none'
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_checkpoint_caboose',
+        namespace + '_store_caboose_level',
         legendFormat='current caboose',
+	instant=true
       )
     ),
 
@@ -83,12 +227,12 @@ local prometheus = grafana.prometheus;
     singlestat.new(
       title='Current cycle',
       datasource='Prometheus',
-      format='none',
-      valueName='max',
+      format='none'
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_current_cycle',
+        namespace + '_validator_chain_head_cycle',
         legendFormat='Current cycle',
+	instant=true
       )
     ),
 
@@ -99,15 +243,17 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      legend_show=false,
       aliasColors={
-        [head]: 'light-green',
+        [head]: 'green',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_current_level',
-        legendFormat=head,
+        namespace + '_validator_chain_head_level',
+	legendFormat=head
       )
     ),
+
 
   invalidBlocksHistory:
     local blocks = 'Invalid blocks';
@@ -116,12 +262,15 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      legend_alignAsTable=true,
+      legend_total=true,
+      legend_values=true,
       aliasColors={
-        [blocks]: 'light-green',
+        [blocks]: 'light-red',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_invalid_blocks',
+        namespace + '_store_invalid_blocks',
         legendFormat=blocks,
       )
     ),
@@ -132,62 +281,74 @@ local prometheus = grafana.prometheus;
       title='Gas consumed history',
       datasource='Prometheus',
       linewidth=1,
-      format='none',
+      format='sci',
+      legend_alignAsTable=true,
+      legend_current=true,
+      legend_avg=true,
+      legend_min=true,
+      legend_max=true,
+      legend_total=true,
+      legend_values=true,
       aliasColors={
         [blocks]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_current_gas_consumed',
+        namespace + '_validator_chain_head_consumed_gas',
         legendFormat=blocks,
       )
     ),
 
-  priorityHistory:
-    local blocks = 'Priority';
+  roundHistory:
+    local blocks = 'Round';
     graphPanel.new(
-      title='Priority history',
+      title='Round history',
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      legend_max=true,
+      legend_alignAsTable=true,
+      legend_values=true,
       aliasColors={
         [blocks]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_current_priority',
+        namespace + '_validator_chain_head_round',
         legendFormat=blocks,
       )
     ),
 
-  blocksPerSecond:
-    heatmapPanel.new(
-      title='Blocks per second',
+  blocksValidationTime:
+    local treatment =  namespace + '_validator_block_last_finished_request_treatment_timestamp';
+    local completion = namespace + '_validator_block_last_finished_request_completion_timestamp';
+    local validation = 'Validation time';
+    graphPanel.new(
+      title='Block validation time',
       datasource='Prometheus',
-      hideZeroBuckets=false,
-      highlightCards=true,
-      tooltip_show=true,
-      tooltip_showHistogram=true,
+      linewidth=1,
+      format='s',
+      legend_alignAsTable=true,
+      legend_avg=true,
+      legend_min=true,
+      legend_max=true,
+      legend_values=true,
+      aliasColors={
+        [validation]: 'light-blue',
+      },
     ).addTarget(
       prometheus.target(
-	'rate(tezos_metrics_chain_current_level[5m])',
+	completion + ' - ' + treatment,
 	format='time_series',
-	legendFormat='5 minutes mean',)
+	legendFormat=validation,
+      )
     ),
 
   headOperations:
-    local transaction = 'Transaction';
-    local endorsement = 'Endorsement';
-    local double_baking_evidence = 'Double baking evidence';
-    local delegation = 'Delegation';
-    local ballot = 'Ballot';
-    local double_endorsement_evidence = 'Double endorsement evidence';
-    local origination = 'Origination';
-    local proposals = 'Proposals';
-    local seed_nonce_revelation = 'Seed nonce revelation';
-    local reveal = 'Reveal';
-    local register_global_constant = 'Register global constant';
-    local set_deposits_limit = 'Set deposits limit';
+    local consensus = 'Consensus';
+    local vote = 'Vote';
+    local anonymous = 'Anonymous';
+    local manager = 'Manager';
     graphPanel.new(
       title='Head operations',
       datasource='Prometheus',
@@ -201,71 +362,78 @@ local prometheus = grafana.prometheus;
       legend_max=true,
       legend_rightSide=true,
       legend_show=true,
-      legend_total=true,
       legend_values=true,
       aliasColors={
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_transaction',
-        legendFormat=transaction,
+        namespace + '_validator_block_operations_per_pass{pass_id="0"}',
+        legendFormat=consensus,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_endorsement_with_slot',
-        legendFormat=endorsement,
+        namespace + '_validator_block_operations_per_pass{pass_id="1"}',
+        legendFormat=vote,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_delegation',
-        legendFormat=delegation,
+        namespace + '_validator_block_operations_per_pass{pass_id="2"}',
+        legendFormat=anonymous,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_ballot',
-        legendFormat=ballot,
+        namespace + '_validator_block_operations_per_pass{pass_id="3"}',
+        legendFormat=manager,
       )
+    )
+    ,
+
+  storeMergeTime:
+    local mergeTime = 'Merge time';
+    graphPanel.new(
+      title='Store merge time',
+      datasource='Prometheus',
+      linewidth=1,
+      format='s',
+      legend_alignAsTable=true,
+      legend_max=true,
+      legend_current=true,
+      legend_values=true,
+      aliasColors={
+        [mergeTime]: 'light-blue',
+      },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_origination',
-        legendFormat=origination,
+        namespace + '_store_last_merge_time',
+	legendFormat=mergeTime,
       )
+    )
+    ,
+
+  writtenBlockSize:
+    local writtenBlockSize = 'Written block size';
+    graphPanel.new(
+      title='Last written block size',
+      datasource='Prometheus',
+      linewidth=1,
+      format='bytes',
+      legend_alignAsTable=true,
+      legend_min=true,
+      legend_avg=true,
+      legend_max=true,
+      legend_total=true,
+      legend_current=true,
+      legend_values=true,
+      aliasColors={
+        [writtenBlockSize]: 'light-green',
+      },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_proposals',
-        legendFormat=proposals,
+        namespace + '_store_last_written_block_size',
+	legendFormat=writtenBlockSize,
       )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_chain_head_seed_nonce_revelation',
-        legendFormat=seed_nonce_revelation,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_chain_head_reveal',
-        legendFormat=reveal,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_chain_head_double_baking_evidence',
-        legendFormat=double_baking_evidence,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_chain_head_double_endorsement_evidence',
-        legendFormat=double_endorsement_evidence,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_chain_head_register_global_constant',
-        legendFormat=register_global_constant,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_chain_head_set_deposits_limit',
-        legendFormat=set_deposits_limit,
-      )
-    ),
+    )
+    ,
 
   //## GC
 
@@ -279,63 +447,47 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      logBase1Y=10,
       aliasColors={
         [minor]: 'light-green',
         [major]: 'light-yellow',
         [forced]: 'light-blue',
         [compact]: 'light-red',
       },
-    ).addTarget(
+    ).addTargets([
       prometheus.target(
-        'tezos_metrics_stats_gc_minor_collections',
+        'ocaml_gc_minor_collections',
         legendFormat=minor,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_gc_major_collections',
+        'ocaml_gc_major_collections',
         legendFormat=major,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_gc_forced_major_collections',
+        'ocaml_gc_forced_major_collections',
         legendFormat=forced,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_gc_compactions',
+        'ocaml_gc_compactions',
         legendFormat=compact,
       )
-    ),
+    ]),
 
   gcMajorHeap:
     local major = 'Major heap';
-    local top = 'Top major heap';
-    local live = 'Live words';
     graphPanel.new(
-      title='GC minor and major word sizes',
+      title='GC major word sizes',
       datasource='Prometheus',
       linewidth=1,
       format='bytes',
+      legend_show=false,
       aliasColors={
         [major]: 'light-green',
-        [top]: 'light-red',
-        [live]: 'light-blue',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_stats_gc_heap_words',
+        'ocaml_gc_heap_words',
         legendFormat=major,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_gc_top_heap_words',
-        legendFormat=top,
-      )
-     ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_gc_live_words',
-        legendFormat=live,
-      )
-    ),
+    ))
 
 }

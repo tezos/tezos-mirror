@@ -2,6 +2,7 @@ local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local singlestat = grafana.singlestat;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
+local namespace = 'octez';
 
 //##
 // P2P
@@ -16,7 +17,7 @@ local prometheus = grafana.prometheus;
       valueName='max',
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_points_trusted',
+        namespace + '_p2p_points_trusted',
         legendFormat='trusted points',
       )
     ),
@@ -29,7 +30,7 @@ local prometheus = grafana.prometheus;
       valueName='max',
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_connections_private',
+        namespace + '_p2p_connections_private',
         legendFormat='Private Connections',
       )
     ),
@@ -43,6 +44,13 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      legend_alignAsTable=true,
+      legend_rightSide=true,
+      legend_avg=true,
+      legend_min=true,
+      legend_max=true,
+      legend_show=true,
+      legend_values=true,
       aliasColors={
         [disconnected]: 'light-yellow',
         [running]: 'light-green',
@@ -50,17 +58,17 @@ local prometheus = grafana.prometheus;
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_peers_disconnected',
+        namespace + '_p2p_peers_disconnected',
         legendFormat=disconnected,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_peers_running',
+        namespace +  '_p2p_peers_running',
         legendFormat=running,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_points_greylisted',
+        namespace +  '_p2p_points_greylisted',
         legendFormat=greylisted,
       )
     ),
@@ -73,18 +81,24 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      legend_alignAsTable=true,
+      legend_avg=true,
+      legend_min=true,
+      legend_max=true,
+      legend_show=true,
+      legend_values=true,
       aliasColors={
-        [disconnected]: 'light-yellow',
+        [disconnected]: 'light-red',
         [running]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_points_disconnected',
+        namespace +  '_p2p_points_disconnected',
         legendFormat=disconnected,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_points_running',
+        namespace + '_p2p_points_running',
         legendFormat=running,
       )
     ),
@@ -97,18 +111,24 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      legend_alignAsTable=true,
+      legend_avg=true,
+      legend_min=true,
+      legend_max=true,
+      legend_show=true,
+      legend_values=true,
       aliasColors={
-        [outgoing]: 'light-yellow',
+        [outgoing]: 'light-red',
         [incoming]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_connections_total - tezos_metrics_p2p_connections_incoming',
+        namespace + '_p2p_connections_outgoing',
         legendFormat=outgoing,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_p2p_connections_incoming',
+        namespace + '_p2p_connections_incoming',
         legendFormat=incoming,
       )
     ),
@@ -135,42 +155,43 @@ local prometheus = grafana.prometheus;
       legend_show=true,
       legend_total=true,
       legend_values=true,
+      logBase1Y=10,
       aliasColors={
-        [applied]: 'light-green',
-        [refused]: 'light-yellow',
-        [outdated]: 'light-blue',
+        [applied]: 'green',
+        [refused]: 'red',
+        [outdated]: 'blue',
         [branch_refused]: 'light-orange',
         [branch_delayed]: 'light-red',
-        [unprocessed]: 'blue',
+        [unprocessed]: 'light-yellow',
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_mempool_pending_applied',
+        namespace + '_mempool_pending_applied',
         legendFormat=applied,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_mempool_pending_refused',
+        namespace + '_mempool_pending_refused',
         legendFormat=refused,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_mempool_pending_outdated',
+        namespace + '_mempool_pending_outdated',
         legendFormat=outdated,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_mempool_pending_branch_refused',
+        namespace + '_mempool_pending_branch_refused',
         legendFormat=branch_refused,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_mempool_pending_branch_delayed',
+        namespace + '_mempool_pending_branch_delayed',
         legendFormat=branch_delayed,
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_mempool_pending_unprocessed',
+        namespace + '_mempool_pending_unprocessed',
         legendFormat=unprocessed,
       )
     ),
