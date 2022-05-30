@@ -2706,8 +2706,7 @@ module Protocol : sig
 
   val status : t -> status
 
-  (** Name without the number, e.g. "alpha" or "PsDELPH1". *)
-  val name : t -> string
+  val name_dash : t -> string
 
   val main : t -> target
 
@@ -2763,12 +2762,72 @@ module Protocol : sig
 end = struct
   type number = Alpha | V of int | Other
 
+  module Name : sig
+    type t
+
+    (** [alpha] is a protocol name with protocol number [Alpha] *)
+    val alpha : t
+
+    (** [v name num] constuct a protocol name with protocol number [V num] *)
+    val v : string -> int -> t
+
+    (** [other name] constuct a protocol name with protocol number [Other] *)
+    val other : string -> t
+
+    val number : t -> number
+
+    val name_underscore : t -> string
+
+    val name_dash : t -> string
+
+    val base_path : t -> string
+  end = struct
+    type t = {name_underscore : string; name_dash : string; number : number}
+
+    let make name number =
+      if
+        not
+          (string_for_all
+             (function
+               | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' -> true | _ -> false)
+             name)
+      then
+        invalid_arg
+          (sf
+             "Protocol.Name.make: %s is not a valid protocol name: should be \
+              of the form [A-Za-Z0-9-]+"
+             name) ;
+      let make_full_name sep name =
+        match number with
+        | Alpha | Other -> name
+        | V number -> sf "%03d%c%s" number sep name
+      in
+      let name_dash = make_full_name '-' name in
+      let name_underscore =
+        make_full_name '_' (String.map (function '-' -> '_' | c -> c) name)
+      in
+      {number; name_dash; name_underscore}
+
+    let v name number = make name (V number)
+
+    let alpha = make "alpha" Alpha
+
+    let other name = make name Other
+
+    let number t = t.number
+
+    let name_underscore t = t.name_underscore
+
+    let name_dash t = t.name_dash
+
+    let base_path t = Format.sprintf "src/proto_%s" (name_underscore t)
+  end
+
   type status = Active | Frozen | Overridden | Not_mainnet
 
   type t = {
-    number : number;
     status : status;
-    name : string;
+    name : Name.t;
     main : target;
     embedded : target;
     client : target option;
@@ -2783,12 +2842,10 @@ end = struct
     baking : target option;
   }
 
-  let make ?(number = Other) ?client ?client_commands
-      ?client_commands_registration ?baking_commands_registration ?plugin
-      ?plugin_registerer ?test_helpers ?parameters ?benchmarks_proto ?baking
-      ~status ~name ~main ~embedded () =
+  let make ?client ?client_commands ?client_commands_registration
+      ?baking_commands_registration ?plugin ?plugin_registerer ?test_helpers
+      ?parameters ?benchmarks_proto ?baking ~status ~name ~main ~embedded () =
     {
-      number;
       status;
       name;
       main;
@@ -2819,11 +2876,11 @@ end = struct
           ("protocol " ^ name_for_errors main ^ " has no " ^ what ^ " package")
     | Some x -> x
 
-  let number p = p.number
+  let number p = Name.number p.name
 
   let status p = p.status
 
-  let name p = p.name
+  let name_dash p = Name.name_dash p.name
 
   let main p = p.main
 
@@ -2897,16 +2954,16 @@ end = struct
     type lib_protocol_architecture_version = AV0 | AV1
 
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
-        ?benchmark_type_inference ~main ~environment ~name_underscore ~name_dash
-        ~number () =
+        ?benchmark_type_inference ~main ~environment ~name () =
+      let name_dash = Name.name_dash name in
+      let number = Name.number name in
+      let path = Name.base_path name in
+
       let some_if condition make = if condition then Some make else None in
       let _integration_consensus =
         test
           "main"
-          ~path:
-            (sf
-               "src/proto_%s/lib_protocol/test/integration/consensus"
-               name_underscore)
+          ~path:(path // "lib_protocol/test/integration/consensus")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
@@ -2923,10 +2980,7 @@ end = struct
       let _integration_gas =
         test
           "main"
-          ~path:
-            (sf
-               "src/proto_%s/lib_protocol/test/integration/gas"
-               name_underscore)
+          ~path:(path // "lib_protocol/test/integration/gas")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
@@ -2941,10 +2995,7 @@ end = struct
       let _integration_michelson =
         test
           "main"
-          ~path:
-            (sf
-               "src/proto_%s/lib_protocol/test/integration/michelson"
-               name_underscore)
+          ~path:(path // "lib_protocol/test/integration/michelson")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~dep_globs:
             (List.filter_map
@@ -2973,10 +3024,7 @@ end = struct
       let _integration_operations =
         test
           "main"
-          ~path:
-            (sf
-               "src/proto_%s/lib_protocol/test/integration/operations"
-               name_underscore)
+          ~path:(path // "lib_protocol/test/integration/operations")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ?dep_globs:(["contracts/*"] |> some_if N.(number >= 013))
           ~deps:
@@ -2993,8 +3041,7 @@ end = struct
       let _integration =
         test
           "main"
-          ~path:
-            (sf "src/proto_%s/lib_protocol/test/integration" name_underscore)
+          ~path:(path // "lib_protocol/test/integration")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
@@ -3030,7 +3077,7 @@ end = struct
                "test_carbonated_map" |> some_if N.(number >= 013);
              ])
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
-          ~path:(sf "src/proto_%s/lib_protocol/test/pbt" name_underscore)
+          ~path:(path // "lib_protocol/test/pbt")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
@@ -3052,7 +3099,7 @@ end = struct
       let _unit =
         test
           "main"
-          ~path:(sf "src/proto_%s/lib_protocol/test/unit" name_underscore)
+          ~path:(path // "lib_protocol/test/unit")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~runtest:false
           ~deps:
@@ -3086,10 +3133,7 @@ end = struct
           Some
             (test
                "main"
-               ~path:
-                 (sf
-                    "src/proto_%s/lib_protocol/test/regression"
-                    name_underscore)
+               ~path:(path // "lib_protocol/test/regression")
                ~opam:(sf "tezos-protocol-%s-tests" name_dash)
                ~deps:
                  [
@@ -3106,9 +3150,12 @@ end = struct
       in
       ()
 
-    let make ~template_version ~name_dash ~name_underscore ~number () =
-      let dirname = sf "../src/proto_%s/lib_protocol" name_underscore in
-      let ( // ) = Filename.concat in
+    let make ~template_version ~name =
+      let name_underscore = Name.name_underscore name in
+      let name_dash = Name.name_dash name in
+      let number = Name.number name in
+      let path = Name.base_path name in
+      let dirname = ".." // path // "lib_protocol" in
       let tezos_protocol_filename = dirname // "TEZOS_PROTOCOL" in
       let tezos_protocol = Tezos_protocol.of_file_exn tezos_protocol_filename in
       let modules_as_deps =
@@ -3149,7 +3196,7 @@ end = struct
         public_lib
           (sf "tezos-protocol-%s.environment" name_dash)
           ~internal_name:(sf "tezos_protocol_environment_%s" name_underscore)
-          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~path:(path // "lib_protocol")
           ~opam:(sf "tezos-protocol-%s" name_dash)
           ~modules:["Environment"]
           ~linkall:true
@@ -3178,7 +3225,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
         public_lib
           (sf "tezos-protocol-%s.raw" name_dash)
           ~internal_name:(sf "tezos_raw_protocol_%s" name_underscore)
-          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~path:(path // "lib_protocol")
           ~opam:(sf "tezos-protocol-%s" name_dash)
           ~linkall:true
           ~modules:tezos_protocol.modules
@@ -3192,21 +3239,19 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
       let main =
         public_lib
           (sf "tezos-protocol-%s" name_dash)
-          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~path:(path // "lib_protocol")
           ~synopsis:
             (match number with
-            | (Alpha | V _) as number when N.(number <= 003) ->
+            | V _ as number when N.(number <= 003) ->
                 sf
                   "Tezos/Protocol: %s (economic-protocol definition, functor \
                    version)"
                   name_underscore
-            | Alpha | V _ | Other -> (
-                match name_dash with
-                | "genesis" | "demo-noops" | "demo-counter" ->
-                    sf
-                      "Tezos/Protocol: %s economic-protocol definition"
-                      name_underscore
-                | _ -> "Tezos/Protocol: economic-protocol definition"))
+            | Other ->
+                sf
+                  "Tezos/Protocol: %s economic-protocol definition"
+                  name_underscore
+            | Alpha | V _ -> "Tezos/Protocol: economic-protocol definition")
           ~modules:["Protocol"]
           ~warnings:
             (match template_version with
@@ -3283,7 +3328,7 @@ include Tezos_raw_protocol_%s.Main
       let _functor =
         private_lib
           (sf "tezos_protocol_%s_functor" name_underscore)
-          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~path:(path // "lib_protocol")
           ~opam:""
           ~synopsis:
             (match number with
@@ -3292,16 +3337,14 @@ include Tezos_raw_protocol_%s.Main
                   "Tezos/Protocol: %s (economic-protocol definition \
                    parameterized by its environment implementation)"
                   (if N.(number == 000) then name_dash else name_underscore)
-            | Alpha | V _ | Other -> (
-                match name_dash with
-                | "genesis" | "demo-noops" | "demo-counter" ->
-                    sf
-                      "Tezos/Protocol: %s (economic-protocol definition \
-                       parameterized by its environment implementation)"
-                      name_underscore
-                | _ ->
-                    "Tezos/Protocol: economic-protocol definition \
-                     parameterized by its environment implementation"))
+            | Other ->
+                sf
+                  "Tezos/Protocol: %s (economic-protocol definition \
+                   parameterized by its environment implementation)"
+                  name_underscore
+            | Alpha | V _ ->
+                "Tezos/Protocol: economic-protocol definition parameterized by \
+                 its environment implementation")
           ~modules:["Functor"]
             (* The instrumentation is removed as it can lead to a stack overflow *)
             (* https://gitlab.com/tezos/tezos/-/issues/1927 *)
@@ -3347,24 +3390,22 @@ include Tezos_raw_protocol_%s.Main
         public_lib
           (sf "tezos-embedded-protocol-%s" name_dash)
           ~internal_name:(sf "tezos_embedded_protocol_%s" name_underscore)
-          ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~path:(path // "lib_protocol")
           ~synopsis:
             (match number with
-            | (Alpha | V _) as number when N.(number <= 003) ->
+            | V _ as number when N.(number <= 003) ->
                 sf
                   "Tezos/Protocol: %s (economic-protocol definition, embedded \
                    in `tezos-node`)"
                   (if N.(number == 000) then name_dash else name_underscore)
-            | Alpha | V _ | Other -> (
-                match name_dash with
-                | "genesis" | "demo-noops" | "demo-counter" ->
-                    sf
-                      "Tezos/Protocol: %s (economic-protocol definition, \
-                       embedded in `tezos-node`)"
-                      name_underscore
-                | _ ->
-                    "Tezos/Protocol: economic-protocol definition, embedded in \
-                     `tezos-node`"))
+            | Other ->
+                sf
+                  "Tezos/Protocol: %s (economic-protocol definition, embedded \
+                   in `tezos-node`)"
+                  name_underscore
+            | Alpha | V _ ->
+                "Tezos/Protocol: economic-protocol definition, embedded in \
+                 `tezos-node`")
           ~modules:["Registerer"]
           ~linkall:true
           ~warnings:
@@ -3400,20 +3441,14 @@ include Tezos_raw_protocol_%s.Main
   end
 
   let genesis =
-    let name_dash = "genesis" in
-    let name_underscore = "genesis" in
+    let name = Name.other "genesis" in
     let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make
-        ~template_version:AV0
-        ~name_dash
-        ~name_underscore
-        ~number:Other
-        ()
+      Lib_protocol.make ~template_version:AV0 ~name
     in
     let client =
       public_lib
-        (sf "tezos-client-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_client" name_underscore)
+        (sf "tezos-client-%s" (Name.name_dash name))
+        ~path:(Name.base_path name // "lib_client")
         ~synopsis:"Tezos/Protocol: protocol specific library for `tezos-client`"
         ~deps:
           [
@@ -3429,37 +3464,24 @@ include Tezos_raw_protocol_%s.Main
           ]
         ~linkall:true
     in
-    register
-    @@ make ~name:"genesis" ~status:Not_mainnet ~main ~embedded ~client ()
+    register @@ make ~name ~status:Not_mainnet ~main ~embedded ~client ()
 
   let demo_noops =
-    let name_dash = "demo-noops" in
-    let name_underscore = "demo_noops" in
+    let name = Name.other "demo-noops" in
     let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make
-        ~template_version:AV1
-        ~name_dash
-        ~name_underscore
-        ~number:Other
-        ()
+      Lib_protocol.make ~template_version:AV1 ~name
     in
-    register @@ make ~name:"demo-noops" ~status:Not_mainnet ~main ~embedded ()
+    register @@ make ~name ~status:Not_mainnet ~main ~embedded ()
 
   let _demo_counter =
-    let name_dash = "demo-counter" in
-    let name_underscore = "demo_counter" in
+    let name = Name.other "demo-counter" in
     let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make
-        ~template_version:AV1
-        ~name_dash
-        ~name_underscore
-        ~number:Other
-        ()
+      Lib_protocol.make ~template_version:AV1 ~name
     in
     let client =
       public_lib
-        (sf "tezos-client-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_client" name_underscore)
+        (sf "tezos-client-%s" (Name.name_dash name))
+        ~path:(Name.base_path name // "lib_client")
         ~synopsis:"Tezos/Protocol: protocol specific library for `tezos-client`"
         ~deps:
           [
@@ -3472,20 +3494,13 @@ include Tezos_raw_protocol_%s.Main
           ]
         ~linkall:true
     in
-    register
-    @@ make ~name:"demo-counter" ~status:Not_mainnet ~main ~embedded ~client ()
+    register @@ make ~name ~status:Not_mainnet ~main ~embedded ~client ()
 
-  let register_alpha_family status number name =
-    let make_full_name sep =
-      match number with
-      | Alpha -> name
-      | V number -> sf "%03d%c%s" number sep name
-      | Other ->
-          invalid_arg
-            "cannot use register_alpha_family to register Other protocols"
-    in
-    let name_dash = make_full_name '-' in
-    let name_underscore = make_full_name '_' in
+  let register_alpha_family status name =
+    let name_dash = Name.name_dash name in
+    let name_underscore = Name.name_underscore name in
+    let number = Name.number name in
+    let path = Name.base_path name in
     let some_if condition make = if condition then Some (make ()) else None in
     let active =
       match status with
@@ -3505,13 +3520,13 @@ include Tezos_raw_protocol_%s.Main
       let template_version =
         if N.(number >= 011) then Lib_protocol.AV1 else AV0
       in
-      Lib_protocol.make ~template_version ~name_dash ~name_underscore ~number ()
+      Lib_protocol.make ~template_version ~name
     in
     let parameters =
       some_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-protocol-%s.parameters" name_dash)
-        ~path:(sf "src/proto_%s/lib_parameters" name_underscore)
+        ~path:(path // "lib_parameters")
         ~all_modules_except:["gen"]
         ~deps:
           [
@@ -3525,7 +3540,7 @@ include Tezos_raw_protocol_%s.Main
       opt_map parameters @@ fun parameters ->
       private_exe
         "gen"
-        ~path:(sf "src/proto_%s/lib_parameters" name_underscore)
+        ~path:(path // "lib_parameters")
         ~opam:(sf "tezos-protocol-%s" name_dash)
         ~deps:
           [
@@ -3563,7 +3578,7 @@ include Tezos_raw_protocol_%s.Main
       some_if (N.(number >= 007) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-protocol-plugin-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_plugin" name_underscore)
+        ~path:(path // "lib_plugin")
         ~synopsis:"Tezos/Protocol: protocol plugin"
         ~deps:
           [
@@ -3578,7 +3593,7 @@ include Tezos_raw_protocol_%s.Main
       opt_map plugin @@ fun plugin ->
       public_lib
         (sf "tezos-protocol-plugin-%s-registerer" name_dash)
-        ~path:(sf "src/proto_%s/lib_plugin" name_underscore)
+        ~path:(path // "lib_plugin")
         ~synopsis:"Tezos/Protocol: protocol plugin registerer"
         ~deps:
           [
@@ -3595,7 +3610,7 @@ include Tezos_raw_protocol_%s.Main
       some_if not_overridden @@ fun () ->
       public_lib
         (sf "tezos-client-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_client" name_underscore)
+        ~path:(path // "lib_client")
         ~synopsis:"Tezos/Protocol: protocol specific library for `tezos-client`"
         ~deps:
           [
@@ -3622,9 +3637,8 @@ include Tezos_raw_protocol_%s.Main
       public_lib
         (sf "tezos-%s-test-helpers" name_dash)
         ~path:
-          (if active then
-           sf "src/proto_%s/lib_protocol/test/helpers" name_underscore
-          else sf "src/proto_%s/lib_protocol" name_underscore)
+          (if active then path // "lib_protocol/test/helpers"
+          else path // "lib_protocol")
         ~opam:
           (if active then sf "tezos-%s-test-helpers" name_dash
           else sf "tezos-%s-test-helpers" name_dash)
@@ -3654,7 +3668,7 @@ include Tezos_raw_protocol_%s.Main
       some_if (active && N.(number <> 011)) @@ fun () ->
       tests
         ["test_consensus_filter"; "test_filter_state"; "test_plugin"]
-        ~path:(sf "src/proto_%s/lib_plugin/test" name_underscore)
+        ~path:(path // "lib_plugin/test")
         ~synopsis:"Tezos/Protocol: protocol plugin tests"
         ~opam:(sf "tezos-protocol-plugin-%s-tests" name_dash)
         ~deps:
@@ -3684,7 +3698,7 @@ include Tezos_raw_protocol_%s.Main
           "test_client_proto_context";
           "test_proxy";
         ]
-        ~path:(sf "src/proto_%s/lib_client/test" name_underscore)
+        ~path:(path // "lib_client/test")
         ~opam:(sf "tezos-client-%s" name_dash)
         ~deps:
           [
@@ -3703,7 +3717,7 @@ include Tezos_raw_protocol_%s.Main
       some_if (N.(number >= 001) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-client-%s-commands" name_dash)
-        ~path:(sf "src/proto_%s/lib_client_commands" name_underscore)
+        ~path:(path // "lib_client_commands")
         ~synopsis:
           "Tezos/Protocol: protocol-specific commands for `tezos-client`"
         ~deps:
@@ -3733,7 +3747,7 @@ include Tezos_raw_protocol_%s.Main
       some_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-client-sapling-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_client_sapling" name_underscore)
+        ~path:(path // "lib_client_sapling")
         ~synopsis:"Tezos: sapling support for `tezos-client`"
         ~deps:
           [
@@ -3757,7 +3771,7 @@ include Tezos_raw_protocol_%s.Main
       public_lib
         (if is_sublib then sf "tezos-client-%s-commands.registration" name_dash
         else sf "tezos-client-%s-commands-registration" name_dash)
-        ~path:(sf "src/proto_%s/lib_client_commands" name_underscore)
+        ~path:(path // "lib_client_commands")
         ?opam:
           ( some_if is_sublib @@ fun () ->
             sf "tezos-client-%s-commands" name_dash )
@@ -3789,7 +3803,7 @@ include Tezos_raw_protocol_%s.Main
       some_if active @@ fun () ->
       public_lib
         ("tezos-baking-" ^ name_dash)
-        ~path:(sf "src/proto_%s/lib_delegate" name_underscore)
+        ~path:(path // "lib_delegate")
         ~synopsis:
           (if N.(number <= 011) then
            "Tezos/Protocol: base library for `tezos-baker/endorser/accuser`"
@@ -3828,8 +3842,7 @@ include Tezos_raw_protocol_%s.Main
       public_lib
         (sf "tezos-baking-%s.tenderbrute" name_dash)
         ~internal_name:(sf "tenderbrute_%s" name_underscore)
-        ~path:
-          (sf "src/proto_%s/lib_delegate/test/tenderbrute/lib" name_underscore)
+        ~path:(path // "lib_delegate/test/tenderbrute/lib")
         ~deps:
           [
             data_encoding |> open_;
@@ -3848,7 +3861,7 @@ include Tezos_raw_protocol_%s.Main
       test
         "tenderbrute_main"
         ~runtest:false
-        ~path:(sf "src/proto_%s/lib_delegate/test/tenderbrute" name_underscore)
+        ~path:(path // "lib_delegate/test/tenderbrute")
         ~opam:(sf "tezos-baking-%s" name_dash)
         ~deps:
           [
@@ -3870,10 +3883,7 @@ include Tezos_raw_protocol_%s.Main
         public_lib
           (sf "tezos-baking-%s.mockup-simulator" name_dash)
           ~internal_name:(sf "tezos_%s_mockup_simulator" name_underscore)
-          ~path:
-            (sf
-               "src/proto_%s/lib_delegate/test/mockup_simulator"
-               name_underscore)
+          ~path:(path // "lib_delegate/test/mockup_simulator")
           ~deps:
             [
               tezos_base |> open_ ~m:"TzPervasives"
@@ -3895,7 +3905,7 @@ include Tezos_raw_protocol_%s.Main
       in
       test
         "main"
-        ~path:(sf "src/proto_%s/lib_delegate/test" name_underscore)
+        ~path:(path // "lib_delegate/test")
         ~opam:(sf "tezos-baking-%s" name_dash)
         ~deps:
           [
@@ -3921,7 +3931,7 @@ include Tezos_raw_protocol_%s.Main
       some_if active @@ fun () ->
       public_lib
         (sf "tezos-baking-%s-commands" name_dash)
-        ~path:(sf "src/proto_%s/lib_delegate" name_underscore)
+        ~path:(path // "lib_delegate")
         ~synopsis:"Tezos/Protocol: protocol-specific commands for baking"
         ~deps:
           [
@@ -3948,7 +3958,7 @@ include Tezos_raw_protocol_%s.Main
       some_if active @@ fun () ->
       public_lib
         (sf "tezos-baking-%s-commands.registration" name_dash)
-        ~path:(sf "src/proto_%s/lib_delegate" name_underscore)
+        ~path:(path // "lib_delegate")
         ~deps:
           [
             tezos_base |> open_ ~m:"TzPervasives";
@@ -3974,7 +3984,7 @@ include Tezos_raw_protocol_%s.Main
       public_exe
         (sf "tezos-%s-%s" daemon name_dash)
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
-        ~path:(sf "src/proto_%s/bin_%s" name_underscore daemon)
+        ~path:(path // sf "bin_%s" daemon)
         ~synopsis:(sf "Tezos/Protocol: %s binary" daemon)
         ~deps:
           [
@@ -3995,7 +4005,7 @@ include Tezos_raw_protocol_%s.Main
       some_if N.(number >= 013) @@ fun () ->
       public_lib
         (sf "tezos-injector-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_injector" name_underscore)
+        ~path:(path // "lib_injector")
         ~synopsis:"Tezos/Protocol: protocol specific library building injectors"
         ~deps:
           [
@@ -4018,7 +4028,7 @@ include Tezos_raw_protocol_%s.Main
       some_if N.(number >= 013) @@ fun () ->
       public_lib
         (sf "tezos-sc-rollup-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_sc_rollup" name_underscore)
+        ~path:(path // "lib_sc_rollup")
         ~synopsis:
           "Tezos/Protocol: protocol specific library for `tezos-sc-rollup`"
         ~deps:
@@ -4037,7 +4047,7 @@ include Tezos_raw_protocol_%s.Main
       public_exe
         (sf "tezos-sc-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
-        ~path:(sf "src/proto_%s/bin_sc_rollup_client" name_underscore)
+        ~path:(path // "bin_sc_rollup_client")
         ~synopsis:"Tezos/Protocol: `tezos-sc-rollup-client-alpha` client binary"
         ~deps:
           [
@@ -4059,7 +4069,7 @@ include Tezos_raw_protocol_%s.Main
       public_exe
         (sf "tezos-sc-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
-        ~path:(sf "src/proto_%s/bin_sc_rollup_node" name_underscore)
+        ~path:(path // "bin_sc_rollup_node")
         ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
         ~deps:
           [
@@ -4092,7 +4102,7 @@ include Tezos_raw_protocol_%s.Main
       some_if N.(number >= 013) @@ fun () ->
       public_lib
         (sf "tezos-tx-rollup-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_tx_rollup" name_underscore)
+        ~path:(path // "lib_tx_rollup")
         ~synopsis:
           "Tezos/Protocol: protocol specific library for `tezos-tx-rollup`"
         ~deps:
@@ -4130,7 +4140,7 @@ include Tezos_raw_protocol_%s.Main
       public_exe
         (sf "tezos-tx-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
-        ~path:(sf "src/proto_%s/bin_tx_rollup_client" name_underscore)
+        ~path:(path // "bin_tx_rollup_client")
         ~synopsis:"Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"
         ~deps:
           [
@@ -4150,7 +4160,7 @@ include Tezos_raw_protocol_%s.Main
       public_exe
         (sf "tezos-tx-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
-        ~path:(sf "src/proto_%s/bin_tx_rollup_node" name_underscore)
+        ~path:(path // "bin_tx_rollup_node")
         ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
         ~deps:
           [
@@ -4168,10 +4178,7 @@ include Tezos_raw_protocol_%s.Main
       some_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmark-type-inference-%s" name_dash)
-        ~path:
-          (sf
-             "src/proto_%s/lib_benchmark/lib_benchmark_type_inference"
-             name_underscore)
+        ~path:(path // "lib_benchmark/lib_benchmark_type_inference")
         ~synopsis:"Tezos: type inference for partial Michelson expressions"
         ~deps:
           [
@@ -4188,10 +4195,7 @@ include Tezos_raw_protocol_%s.Main
       some_if active @@ fun () ->
       tests
         ["test_uf"; "test_inference"]
-        ~path:
-          (sf
-             "src/proto_%s/lib_benchmark/lib_benchmark_type_inference/test"
-             name_underscore)
+        ~path:(path // "lib_benchmark/lib_benchmark_type_inference/test")
         ~opam:(sf "tezos-benchmark-type-inference-%s" name_dash)
         ~deps:
           [
@@ -4208,7 +4212,7 @@ include Tezos_raw_protocol_%s.Main
       some_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmark-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_benchmark" name_underscore)
+        ~path:(path // "lib_benchmark")
         ~synopsis:
           "Tezos/Protocol: library for writing benchmarks (protocol-specific \
            part)"
@@ -4246,7 +4250,7 @@ include Tezos_raw_protocol_%s.Main
           "test_autocompletion";
           "test_distribution";
         ]
-        ~path:(sf "src/proto_%s/lib_benchmark/test" name_underscore)
+        ~path:(path // "lib_benchmark/test")
         ~opam:(sf "tezos-benchmark-%s" name_dash)
         ~deps:
           [
@@ -4289,7 +4293,7 @@ include Tezos_raw_protocol_%s.Main
       some_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmarks-proto-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_benchmarks_proto" name_underscore)
+        ~path:(path // "lib_benchmarks_proto")
         ~synopsis:"Tezos/Protocol: protocol benchmarks"
         ~deps:
           [
@@ -4325,14 +4329,11 @@ include Tezos_raw_protocol_%s.Main
           ?benchmark_type_inference
           ~main
           ~environment
-          ~name_underscore
-          ~name_dash
-          ~number
+          ~name
           ()
     in
     register
     @@ make
-         ~number
          ~status
          ~name
          ~main
@@ -4355,39 +4356,39 @@ include Tezos_raw_protocol_%s.Main
 
   let overridden = register_alpha_family Overridden
 
-  let _000_Ps9mPmXa = frozen (V 000) "Ps9mPmXa"
+  let _000_Ps9mPmXa = frozen (Name.v "Ps9mPmXa" 000)
 
-  let _001_PtCJ7pwo = frozen (V 001) "PtCJ7pwo"
+  let _001_PtCJ7pwo = frozen (Name.v "PtCJ7pwo" 001)
 
-  let _002_PsYLVpVv = frozen (V 002) "PsYLVpVv"
+  let _002_PsYLVpVv = frozen (Name.v "PsYLVpVv" 002)
 
-  let _003_PsddFKi3 = frozen (V 003) "PsddFKi3"
+  let _003_PsddFKi3 = frozen (Name.v "PsddFKi3" 003)
 
-  let _004_Pt24m4xi = frozen (V 004) "Pt24m4xi"
+  let _004_Pt24m4xi = frozen (Name.v "Pt24m4xi" 004)
 
-  let _005_PsBABY5H = overridden (V 005) "PsBABY5H"
+  let _005_PsBABY5H = overridden (Name.v "PsBABY5H" 005)
 
-  let _005_PsBabyM1 = frozen (V 005) "PsBabyM1"
+  let _005_PsBabyM1 = frozen (Name.v "PsBabyM1" 005)
 
-  let _006_PsCARTHA = frozen (V 006) "PsCARTHA"
+  let _006_PsCARTHA = frozen (Name.v "PsCARTHA" 006)
 
-  let _007_PsDELPH1 = frozen (V 007) "PsDELPH1"
+  let _007_PsDELPH1 = frozen (Name.v "PsDELPH1" 007)
 
-  let _008_PtEdoTez = overridden (V 008) "PtEdoTez"
+  let _008_PtEdoTez = overridden (Name.v "PtEdoTez" 008)
 
-  let _008_PtEdo2Zk = frozen (V 008) "PtEdo2Zk"
+  let _008_PtEdo2Zk = frozen (Name.v "PtEdo2Zk" 008)
 
-  let _009_PsFLoren = frozen (V 009) "PsFLoren"
+  let _009_PsFLoren = frozen (Name.v "PsFLoren" 009)
 
-  let _010_PtGRANAD = frozen (V 010) "PtGRANAD"
+  let _010_PtGRANAD = frozen (Name.v "PtGRANAD" 010)
 
-  let _011_PtHangz2 = frozen (V 011) "PtHangz2"
+  let _011_PtHangz2 = frozen (Name.v "PtHangz2" 011)
 
-  let _012_Psithaca = active (V 012) "Psithaca"
+  let _012_Psithaca = active (Name.v "Psithaca" 012)
 
-  let _013_PtJakart = active (V 013) "PtJakart"
+  let _013_PtJakart = active (Name.v "PtJakart" 013)
 
-  let alpha = active Alpha "alpha"
+  let alpha = active Name.alpha
 
   let all = List.rev !all_rev
 
@@ -4945,8 +4946,7 @@ let () =
 let () =
   let write_protocol fmt protocol =
     match Protocol.number protocol with
-    | Alpha -> Format.fprintf fmt "%s\n" (Protocol.name protocol)
-    | V number -> Format.fprintf fmt "%03d-%s\n" number (Protocol.name protocol)
+    | Alpha | V _ -> Format.fprintf fmt "%s\n" (Protocol.name_dash protocol)
     | Other -> ()
   in
   write "active_protocol_versions" @@ fun fmt ->

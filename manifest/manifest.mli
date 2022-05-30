@@ -28,6 +28,15 @@
 (** Return whether [prefix] is a prefix of a string. *)
 val has_prefix : prefix:string -> string -> bool
 
+(* The function [String.for_all] is part of the stdlib starting with ocaml.4.13 *)
+
+(** [string_for_all p str] returns true if [p c] is true for all char [c] of [str] *)
+val string_for_all : (char -> bool) -> string -> bool
+
+(** [dir // file] returns a file name that designates file
+    [file] in directory [dir]. *)
+val ( // ) : string -> string -> string
+
 module Dune : sig
   (** Dune AST. *)
 
