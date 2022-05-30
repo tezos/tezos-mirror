@@ -557,7 +557,7 @@ val inline_tests_backend : target -> inline_tests
     - [preprocess]: preprocessor directives to add using the [(preprocess ...)] stanza.
       Those preprocessors are also added as dependencies in the [.opam] file.
 
-    - [preprocessor_deps]: preprocessor dependencies, such as files for [ppx_blob].
+    - [preprocessor_deps]: preprocessor dependencies.
 
     - [private_modules]: similar to [modules], but those modules are not part of the
       library interface. They are not part of the toplevel module of the library.

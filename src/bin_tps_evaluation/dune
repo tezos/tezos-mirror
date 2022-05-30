@@ -13,7 +13,6 @@
   caqti-lwt
   data-encoding
   lwt
-  ppx_blob
   tezos-baking-alpha
   tezos-client-alpha-commands
   tezos-client-base-unix
@@ -21,8 +20,6 @@
   tezt
   tezt-tezos
   tezt-performance-regression)
- (preprocess (pps ppx_blob))
- (preprocessor_deps (file ./sql/get_all_operations.sql))
  (flags
   (:standard
    -open Tezos_base.TzPervasives
@@ -30,3 +27,10 @@
    -open Tezt.Base
    -open Tezt_tezos
    -open Tezt_performance_regression)))
+
+(rule
+ (targets sql.ml)
+ (action
+  (run
+   %{bin:ocp-ocamlres} -format ocaml -o %{targets}
+   %{dep:sql/get_all_operations.sql})))
