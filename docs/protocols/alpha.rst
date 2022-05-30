@@ -33,6 +33,8 @@ RPC Changes
 
   ``/chains/<chain_id>/blocks/<block>/helpers/scripts/run_script_view``
 
+- Deprecate the ``endorsing_rights`` RPC for whole cycles, by deprecating the ``cycle`` parameter. (:gl:`!5082`)
+
 Bug Fixes
 ---------
 
