@@ -161,6 +161,8 @@ val starting_level_of_current_commitment_period : t -> Raw_level_repr.t
     available in [inbox]. *)
 val consume_n_messages : int -> t -> t option tzresult
 
+module Hash : S.HASH
+
 (** The following operations are subject to cross-validation between
     rollup nodes and the layer 1. *)
 module type MerkelizedOperations = sig

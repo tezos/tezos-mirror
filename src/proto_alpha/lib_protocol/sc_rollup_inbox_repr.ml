@@ -87,22 +87,51 @@ let () =
     (function Invalid_number_of_messages_to_consume n -> Some n | _ -> None)
     (fun n -> Invalid_number_of_messages_to_consume n)
 
+(* 32 *)
+let hash_prefix = "\003\250\174\238\208" (* scib1(55) *)
+
+module Hash = struct
+  let prefix = "scib1"
+
+  let encoded_size = 55
+
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "inbox_hash"
+
+        let title = "The hash of an inbox of a smart contract rollup"
+
+        let b58check_prefix = hash_prefix
+
+        (* defaults to 32 *)
+        let size = None
+      end)
+
+  include H
+
+  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
+
+  include Path_encoding.Make_hex (H)
+end
+
 module Skip_list_parameters = struct
   let basis = 2
 end
 
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
 
-type proof_hash = Context.Proof.hash
+type proof_hash = Hash.t
 
-type history_proof_hash = Context.Proof.hash
+type history_proof_hash = Hash.t
 
 type history_proof = (proof_hash, history_proof_hash) Skip_list.cell
 
-let equal_history_proof = Skip_list.equal Context_hash.equal Context_hash.equal
+let equal_history_proof = Skip_list.equal Hash.equal Hash.equal
 
-let history_proof_encoding =
-  Skip_list.encoding Context_hash.encoding Context_hash.encoding
+let history_proof_encoding : history_proof Data_encoding.t =
+  Skip_list.encoding Hash.encoding Hash.encoding
 
 let pp_history_proof fmt cell =
   Format.fprintf
@@ -112,10 +141,10 @@ let pp_history_proof fmt cell =
        index = %d
        back_pointers = %a
     |}
-    Context_hash.pp
+    Hash.pp
     (Skip_list.content cell)
     (Skip_list.index cell)
-    (Format.pp_print_list Context_hash.pp)
+    (Format.pp_print_list Hash.pp)
     (Skip_list.back_pointers cell)
 
 (*
@@ -163,7 +192,7 @@ type t = {
   starting_level_of_current_commitment_period : Raw_level_repr.t;
   message_counter : Z.t;
   (* Lazy to avoid hashing O(n^2) time in [add_messages] *)
-  current_messages_hash : unit -> Context.Proof.hash;
+  current_messages_hash : unit -> Hash.t;
   old_levels_messages : history_proof;
 }
 
@@ -193,9 +222,7 @@ let equal inbox1 inbox2 =
          starting_level_of_current_commitment_period
          inbox2.starting_level_of_current_commitment_period)
   && Z.equal message_counter inbox2.message_counter
-  && Context_hash.equal
-       (current_messages_hash ())
-       (inbox2.current_messages_hash ())
+  && Hash.equal (current_messages_hash ()) (inbox2.current_messages_hash ())
   && equal_history_proof old_levels_messages inbox2.old_levels_messages
 
 let pp fmt
@@ -225,7 +252,7 @@ let pp fmt
     rollup
     Raw_level_repr.pp
     level
-    Context_hash.pp
+    Hash.pp
     (current_messages_hash ())
     nb_available_messages
     (Int64.to_string nb_messages_in_commitment_period)
@@ -239,7 +266,7 @@ let pp fmt
 let inbox_level inbox = inbox.level
 
 let old_levels_messages_encoding =
-  Skip_list.encoding Context_hash.encoding Context_hash.encoding
+  Skip_list.encoding Hash.encoding Hash.encoding
 
 let encoding =
   Data_encoding.(
@@ -289,7 +316,7 @@ let encoding =
             "starting_level_of_current_commitment_period"
             Raw_level_repr.encoding)
          (req "level" Raw_level_repr.encoding)
-         (req "current_messages_hash" Context_hash.encoding)
+         (req "current_messages_hash" Hash.encoding)
          (req "old_levels_messages" old_levels_messages_encoding)))
 
 let number_of_available_messages inbox = Z.of_int64 inbox.nb_available_messages
@@ -307,7 +334,7 @@ let start_new_commitment_period inbox level =
 let starting_level_of_current_commitment_period inbox =
   inbox.starting_level_of_current_commitment_period
 
-let no_messages_hash = Context_hash.hash_bytes [Bytes.empty]
+let no_messages_hash = Hash.hash_bytes [Bytes.empty]
 
 let empty rollup level =
   {
@@ -440,27 +467,27 @@ module MakeHashingScheme (Tree : TREE) :
   let hash_old_levels_messages cell =
     let current_messages_hash = Skip_list.content cell in
     let back_pointers_hashes = Skip_list.back_pointers cell in
-    let open Context_hash in
-    List.map to_bytes (current_messages_hash :: back_pointers_hashes)
-    |> hash_bytes
+    Hash.to_bytes current_messages_hash
+    :: List.map Hash.to_bytes back_pointers_hashes
+    |> Hash.hash_bytes
 
   module Int64_map = Map.Make (Int64)
 
   type history = {
-    events : history_proof Context_hash.Map.t;
-    sequence : Context_hash.t Int64_map.t;
+    events : history_proof Hash.Map.t;
+    sequence : Hash.t Int64_map.t;
     bound : int64;
     counter : int64;
   }
 
-  let history_encoding =
+  let history_encoding : history Data_encoding.t =
     let open Data_encoding in
-    let events_encoding = Context_hash.Map.encoding history_proof_encoding in
+    let events_encoding = Hash.Map.encoding history_proof_encoding in
     let sequence_encoding =
       conv
         (fun m -> Int64_map.bindings m)
         (List.fold_left (fun m (k, v) -> Int64_map.add k v m) Int64_map.empty)
-        (list (tup2 int64 Context_hash.encoding))
+        (list (tup2 int64 Hash.encoding))
     in
     conv
       (fun {events; sequence; bound; counter} ->
@@ -474,12 +501,12 @@ module MakeHashingScheme (Tree : TREE) :
          (req "counter" int64))
 
   let pp_history fmt history =
-    Context_hash.Map.bindings history.events |> fun bindings ->
+    Hash.Map.bindings history.events |> fun bindings ->
     let pp_binding fmt (hash, history_proof) =
       Format.fprintf
         fmt
         "@[%a -> %a@]"
-        Context_hash.pp
+        Hash.pp
         hash
         pp_history_proof
         history_proof
@@ -487,12 +514,7 @@ module MakeHashingScheme (Tree : TREE) :
     Format.pp_print_list pp_binding fmt bindings
 
   let history_at_genesis ~bound =
-    {
-      events = Context_hash.Map.empty;
-      sequence = Int64_map.empty;
-      bound;
-      counter = 0L;
-    }
+    {events = Hash.Map.empty; sequence = Int64_map.empty; bound; counter = 0L}
 
   type without_history_witness
 
@@ -510,7 +532,7 @@ module MakeHashingScheme (Tree : TREE) :
   let remember_history ptr cell history =
     if Compare.Int64.(history.bound <= 0L) then history
     else
-      let events = Context_hash.Map.add ptr cell history.events in
+      let events = Hash.Map.add ptr cell history.events in
       let counter = Int64.succ history.counter in
       let history =
         {
@@ -525,7 +547,7 @@ module MakeHashingScheme (Tree : TREE) :
         | None -> history
         | Some (l, h) ->
             let sequence = Int64_map.remove l history.sequence in
-            let events = Context_hash.Map.remove h events in
+            let events = Hash.Map.remove h events in
             {
               counter = Int64.pred history.counter;
               bound = history.bound;
@@ -580,6 +602,12 @@ module MakeHashingScheme (Tree : TREE) :
     in
     aux (history, inbox)
 
+  let hash_messages messages =
+    if Tree.is_empty messages then no_messages_hash
+    else
+      let context_hash = Tree.hash messages in
+      Hash.hash_bytes [Context_hash.to_bytes context_hash]
+
   let add_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
     if Raw_level_repr.(level < inbox.level) then
@@ -593,9 +621,7 @@ module MakeHashingScheme (Tree : TREE) :
           (messages, inbox)
           payloads
       in
-      let current_messages_hash () =
-        if Tree.is_empty messages then no_messages_hash else Tree.hash messages
-      in
+      let current_messages_hash () = hash_messages messages in
       return (messages, history, {inbox with current_messages_hash})
 
   let add_messages history inbox level payloads messages =
@@ -640,7 +666,7 @@ module MakeHashingScheme (Tree : TREE) :
     let (With_history history) =
       remember cell_ptr inbox2.old_levels_messages (With_history history)
     in
-    let deref ptr = Context_hash.Map.find_opt ptr history.events in
+    let deref ptr = Hash.Map.find_opt ptr history.events in
     Skip_list.back_path ~deref ~cell_ptr ~target_index
     |> Option.map (lift_ptr_path deref)
     |> Option.join
@@ -649,14 +675,14 @@ module MakeHashingScheme (Tree : TREE) :
     let assoc = List.map (fun c -> (hash_old_levels_messages c, c)) proof in
     let path = List.split assoc |> fst in
     let deref =
-      let open Context_hash.Map in
+      let open Hash.Map in
       let map = of_seq (List.to_seq assoc) in
       fun ptr -> find_opt ptr map
     in
     let cell_ptr = hash_old_levels_messages inbox2.old_levels_messages in
     let target_ptr = hash_old_levels_messages inbox1.old_levels_messages in
     Skip_list.valid_back_path
-      ~equal_ptr:Context_hash.equal
+      ~equal_ptr:Hash.equal
       ~deref
       ~cell_ptr
       ~target_ptr

@@ -2521,6 +2521,8 @@ module Sc_rollup : sig
 
     val consume_n_messages : int -> t -> t option tzresult
 
+    module Hash : S.HASH
+
     module type MerkelizedOperations = sig
       type tree
 
