@@ -494,12 +494,20 @@ module MakeHashingScheme (Tree : TREE) :
       counter = 0L;
     }
 
-  (** [remember ptr cell history] extends [history] with a new
+  type without_history_witness
+
+  type with_history_witness
+
+  type _ with_history =
+    | No_history : without_history_witness with_history
+    | With_history : history -> with_history_witness with_history
+
+  (** [remember_history ptr cell history] extends [history] with a new
       mapping from [ptr] to [cell]. If [history] is full, the
       oldest mapping is removed. If the history bound is less
       or equal to zero, then this function returns [history]
       untouched. *)
-  let remember ptr cell history =
+  let remember_history ptr cell history =
     if Compare.Int64.(history.bound <= 0L) then history
     else
       let events = Context_hash.Map.add ptr cell history.events in
@@ -525,6 +533,17 @@ module MakeHashingScheme (Tree : TREE) :
               events;
             }
       else history
+
+  let remember :
+      type history_witness.
+      history_proof_hash ->
+      history_proof ->
+      history_witness with_history ->
+      history_witness with_history =
+   fun ptr cell history ->
+    match history with
+    | No_history -> No_history
+    | With_history history -> With_history (remember_history ptr cell history)
 
   let archive_if_needed history inbox target_level =
     let archive_level history inbox =
@@ -561,7 +580,7 @@ module MakeHashingScheme (Tree : TREE) :
     in
     aux (history, inbox)
 
-  let add_messages history inbox level payloads messages =
+  let add_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
     if Raw_level_repr.(level < inbox.level) then
       fail (Invalid_level_add_messages level)
@@ -579,11 +598,17 @@ module MakeHashingScheme (Tree : TREE) :
       in
       return (messages, history, {inbox with current_messages_hash})
 
+  let add_messages history inbox level payloads messages =
+    let open Lwt_tzresult_syntax in
+    let* messages, With_history history, inbox =
+      add_messages_aux (With_history history) inbox level payloads messages
+    in
+    return (messages, history, inbox)
+
   let add_messages_no_history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
-    let history = history_at_genesis ~bound:0L in
-    let* messages, _, inbox =
-      add_messages history inbox level payloads messages
+    let* messages, No_history, inbox =
+      add_messages_aux No_history inbox level payloads messages
     in
     return (messages, inbox)
 
@@ -612,7 +637,9 @@ module MakeHashingScheme (Tree : TREE) :
   let produce_inclusion_proof history inbox1 inbox2 =
     let cell_ptr = hash_old_levels_messages inbox2.old_levels_messages in
     let target_index = Skip_list.index inbox1.old_levels_messages in
-    let history = remember cell_ptr inbox2.old_levels_messages history in
+    let (With_history history) =
+      remember cell_ptr inbox2.old_levels_messages (With_history history)
+    in
     let deref ptr = Context_hash.Map.find_opt ptr history.events in
     Skip_list.back_path ~deref ~cell_ptr ~target_index
     |> Option.map (lift_ptr_path deref)
