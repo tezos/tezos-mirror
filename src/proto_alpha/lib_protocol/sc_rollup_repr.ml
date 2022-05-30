@@ -70,6 +70,8 @@ module Address = struct
     |> function
     | None -> error Error_sc_rollup_address_generation
     | Some nonce -> ok @@ hash_bytes [nonce]
+
+  let of_b58data = function H.Data h -> Some h | _ -> None
 end
 
 module Internal_for_tests = struct
@@ -110,8 +112,6 @@ module State_hash = struct
 end
 
 type t = Address.t
-
-module Staker = Signature.Public_key_hash
 
 let description =
   "A smart contract rollup is identified by a base58 address starting with "
@@ -163,6 +163,12 @@ let rpc_arg =
     ~construct
     ~destruct
     ()
+
+let in_memory_size (_ : t) =
+  let open Cache_memory_helpers in
+  h1w +! string_size_gen Address.size
+
+module Staker = Signature.Public_key_hash
 
 module Index = struct
   type t = Address.t

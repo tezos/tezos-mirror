@@ -74,6 +74,13 @@ let liquidity_baking_dex = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
 
 let tx_rollup_address = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi"
 
+(* The following address has been extracted like this:
+     - turn [sc_rollup_enable] to [true] in [src/proto_alpha/parameters/test-parameters.json]
+     - [./tezos-client -M mockup create mockup --protocol-constants src/proto_alpha/parameters/test-parameters.json]
+     - [./tezos-client -M mockup originate sc rollup from bootstrap1 of kind arith booting with '' --burn-cap 2]
+*)
+let sc_rollup_address = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
+
 let assert_compat contract destination =
   match destination with
   | Destination_repr.Contract contract'
@@ -172,10 +179,12 @@ let test_compare_destination () =
   let tz1 = !!(Destination_repr.of_b58check null_address) in
   let kt1 = !!(Destination_repr.of_b58check liquidity_baking_dex) in
   let txr1 = !!(Destination_repr.of_b58check tx_rollup_address) in
+  let scr1 = !!(Destination_repr.of_b58check sc_rollup_address) in
 
   assert (Destination_repr.(tz1 < kt1)) ;
   assert (Destination_repr.(kt1 < txr1)) ;
   assert (Destination_repr.(tz1 < txr1)) ;
+  assert (Destination_repr.(txr1 < scr1)) ;
 
   return_unit
 

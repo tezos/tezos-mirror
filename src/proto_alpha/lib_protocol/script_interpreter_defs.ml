@@ -618,7 +618,11 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~amount
         ~entrypoint
         ~parameters_ty
-        ~parameters)
+        ~parameters
+  | Sc_rollup _ ->
+      (* TODO #2801
+         Implement transfers to sc rollups. *)
+      failwith "Transferring to smart-contract rollups is not yet supported")
   >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in

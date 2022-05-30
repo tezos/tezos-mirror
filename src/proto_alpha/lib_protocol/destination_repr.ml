@@ -25,10 +25,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Contract of Contract_repr.t | Tx_rollup of Tx_rollup_repr.t
+type t =
+  | Contract of Contract_repr.t
+  | Tx_rollup of Tx_rollup_repr.t
+  | Sc_rollup of Sc_rollup_repr.t
 (* If you add more cases to this type, please update the
    [test_compare_destination] test in
-   [test/unit/test_destinatino_repr.ml] to ensure that the compare
+   [test/unit/test_destination_repr.ml] to ensure that the compare
    function keeps its expected behavior to distinguish between
    implicit accounts and smart contracts. *)
 
@@ -39,6 +42,7 @@ include Compare.Make (struct
     match (l1, l2) with
     | Contract k1, Contract k2 -> Contract_repr.compare k1 k2
     | Tx_rollup k1, Tx_rollup k2 -> Tx_rollup_repr.compare k1 k2
+    | Sc_rollup k1, Sc_rollup k2 -> Sc_rollup_repr.Address.compare k1 k2
     (* This function is used by the Michelson interpreter to compare
        addresses. It is of significant importance to remember that in
        Michelson, address comparison is used to distinguish between
@@ -48,11 +52,14 @@ include Compare.Make (struct
        modified when new constructors are added to [t]. *)
     | Contract _, _ -> -1
     | _, Contract _ -> 1
+    | Tx_rollup _, Sc_rollup _ -> -1
+    | Sc_rollup _, Tx_rollup _ -> 1
 end)
 
 let to_b58check = function
   | Contract k -> Contract_repr.to_b58check k
   | Tx_rollup k -> Tx_rollup_repr.to_b58check k
+  | Sc_rollup k -> Sc_rollup_repr.Address.to_b58check k
 
 type error += Invalid_destination_b58check of string
 
@@ -71,9 +78,12 @@ let () =
 let of_b58data data =
   match Contract_repr.of_b58data data with
   | Some c -> Some (Contract c)
-  | None ->
-      Tx_rollup_repr.of_b58data data
-      |> Option.map (fun tx_rollup -> Tx_rollup tx_rollup)
+  | None -> (
+      match Tx_rollup_repr.of_b58data data with
+      | Some tx_rollup -> Some (Tx_rollup tx_rollup)
+      | None ->
+          Sc_rollup_repr.Address.of_b58data data
+          |> Option.map (fun sc_rollup -> Sc_rollup sc_rollup))
 
 let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
 
@@ -90,8 +100,8 @@ let encoding =
     ~description:
       "A destination notation compatible with the contract notation as given \
        to an RPC or inside scripts. Can be a base58 implicit contract hash, a \
-       base58 originated contract hash, or a base58 originated transaction \
-       rollup."
+       base58 originated contract hash, a base58 originated transaction \
+       rollup, or a base58 originated smart-contract rollup."
   @@ splitted
        ~binary:
          (union
@@ -106,6 +116,12 @@ let encoding =
                   ~title:"Tx_rollup"
                   (function Tx_rollup k -> Some k | _ -> None)
                   (fun k -> Tx_rollup k);
+                case
+                  (Tag 3)
+                  (Fixed.add_padding Sc_rollup_repr.Address.encoding 1)
+                  ~title:"Sc_rollup"
+                  (function Sc_rollup k -> Some k | _ -> None)
+                  (fun k -> Sc_rollup k);
               ]))
        ~json:
          (conv
@@ -122,9 +138,11 @@ let pp : Format.formatter -> t -> unit =
  fun fmt -> function
   | Contract k -> Contract_repr.pp fmt k
   | Tx_rollup k -> Tx_rollup_repr.pp fmt k
+  | Sc_rollup k -> Sc_rollup_repr.pp fmt k
 
 let in_memory_size =
   let open Cache_memory_helpers in
   function
   | Contract k -> h1w +! Contract_repr.in_memory_size k
   | Tx_rollup k -> h1w +! Tx_rollup_repr.in_memory_size k
+  | Sc_rollup k -> h1w +! Sc_rollup_repr.in_memory_size k

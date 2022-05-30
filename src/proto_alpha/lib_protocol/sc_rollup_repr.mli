@@ -50,6 +50,8 @@ module Address : sig
 
   (** [encoded_size] is the number of bytes needed to represent an address. *)
   val encoded_size : int
+
+  val of_b58data : Base58.data -> t option
 end
 
 module Internal_for_tests : sig
@@ -75,15 +77,19 @@ module Number_of_ticks : Bounded.Int32.S
 (** A smart contract rollup is identified by its address. *)
 type t = Address.t
 
-(** A [Staker] is an implicit account, identified by its public key hash. *)
-module Staker :
-  S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
-
 val encoding : t Data_encoding.t
 
 val rpc_arg : t RPC_arg.t
 
 val pp : Format.formatter -> t -> unit
+
+(** [in_memory_size sc_rollup] returns the number of bytes [sc_rollup]
+    uses in RAM. *)
+val in_memory_size : t -> Cache_memory_helpers.sint
+
+(** A [Staker] is an implicit account, identified by its public key hash. *)
+module Staker :
+  S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
 
 (** The data model uses an index of these addresses. *)
 module Index : Storage_description.INDEX with type t = Address.t

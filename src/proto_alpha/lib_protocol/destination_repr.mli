@@ -41,7 +41,10 @@
     remains compatible with {!Contract_repr.encoding}, for the
     introduction to this type to remain transparent from the existing
     tooling perspective.  *)
-type t = Contract of Contract_repr.t | Tx_rollup of Tx_rollup_repr.t
+type t =
+  | Contract of Contract_repr.t
+  | Tx_rollup of Tx_rollup_repr.t
+  | Sc_rollup of Sc_rollup_repr.t
 
 include Compare.S with type t := t
 
