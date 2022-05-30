@@ -524,6 +524,29 @@ let create ?(monitor_node_operations = true)
       Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
   Lwt.return state
 
+let retrieve_pending_operations cctxt state =
+  let open Protocol_client_context in
+  Alpha_block_services.Mempool.pending_operations
+    cctxt
+    ~chain:cctxt#chain
+    ~applied:true
+    ~branch_delayed:true
+    ~branch_refused:false
+    ~refused:false
+    ~outdated:false
+    ()
+  >>=? fun pending_mempool ->
+  state.operation_pool <-
+    Operation_pool.add_operations state.operation_pool
+    @@ List.rev_map snd pending_mempool.applied ;
+  state.operation_pool <-
+    Operation_pool.add_operations
+      state.operation_pool
+      (List.rev_map
+         (fun (_, (op, _)) -> op)
+         (Operation_hash.Map.bindings pending_mempool.branch_delayed)) ;
+  return_unit
+
 let get_current_operations state = state.operation_pool
 
 let get_quorum_event_stream state = state.qc_event_stream.stream

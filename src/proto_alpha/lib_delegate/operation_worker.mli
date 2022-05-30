@@ -59,13 +59,18 @@ type event =
 val create :
   ?monitor_node_operations:bool -> #Protocol_client_context.full -> t Lwt.t
 
-(** {2 Accessors}*)
+(** {1 Utilities} *)
+
+val retrieve_pending_operations :
+  #Protocol_client_context.full -> t -> unit tzresult Lwt.t
+
+(** {1 Accessors}*)
 
 val get_current_operations : t -> Operation_pool.pool
 
 val get_quorum_event_stream : t -> event Lwt_stream.t
 
-(** {3 Observers} *)
+(** {1 Observers} *)
 
 val monitor_preendorsement_quorum :
   t ->

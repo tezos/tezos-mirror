@@ -459,8 +459,8 @@ let baking_minimal_timestamp state =
 
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
-    ?(minimal_timestamp = false) ?extra_operations ?monitor_node_mempool
-    ?context_path delegates =
+    ?(minimal_timestamp = false) ?extra_operations
+    ?(monitor_node_mempool = true) ?context_path delegates =
   let config =
     Baking_configuration.make
       ?minimal_fees
@@ -474,11 +474,18 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
   get_current_proposal cctxt >>=? fun (block_stream, current_proposal) ->
   create_state
     cctxt
-    ?monitor_node_mempool
+    ~monitor_node_mempool
     ~synchronize:(not minimal_timestamp)
     ~config
     ~current_proposal
     delegates
   >>=? fun state ->
+  when_ monitor_node_mempool (fun () ->
+      (* Make sure the operation worker is populated to avoid empty
+         blocks being baked *)
+      Operation_worker.retrieve_pending_operations
+        cctxt
+        state.global_state.operation_worker)
+  >>=? fun () ->
   if not minimal_timestamp then bake_using_automaton config state block_stream
   else baking_minimal_timestamp state
