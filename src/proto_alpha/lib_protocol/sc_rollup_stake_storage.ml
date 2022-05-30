@@ -47,19 +47,17 @@ let modify_staker_count ctxt rollup f =
   assert (Compare.Int.(size_diff = 0)) ;
   return ctxt
 
+(** Warning: must be called only if [rollup] exists and [staker] is not to be
+    found in {!Store.Stakers.} *)
 let deposit_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
-  match res with
-  | None ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
-         We should lock stake here, and fail if there aren't enough funds.
-      *)
-      let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
-      let* ctxt = modify_staker_count ctxt rollup Int32.succ in
-      return ctxt
-  | Some _ -> fail Sc_rollup_already_staked
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
+     We should lock stake here, and fail if there aren't enough funds.
+  *)
+  let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
+  let* ctxt = modify_staker_count ctxt rollup Int32.succ in
+  return ctxt
 
 let withdraw_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
@@ -268,12 +266,9 @@ let refine_stake ctxt rollup staker commitment =
 
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
-  match res with
-  | None ->
-      let* ctxt = deposit_stake ctxt rollup staker in
-      refine_stake ctxt rollup staker commitment
-  | Some _ -> refine_stake ctxt rollup staker commitment
+  let* ctxt, res = Store.Stakers.mem (ctxt, rollup) staker in
+  let* ctxt = if res then return ctxt else deposit_stake ctxt rollup staker in
+  refine_stake ctxt rollup staker commitment
 
 (** Try to consume n messages. *)
 let consume_n_messages ctxt rollup n =

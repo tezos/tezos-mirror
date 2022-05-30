@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 type error +=
-  | (* `Temporary *) Sc_rollup_already_staked
   | (* `Temporary *) Sc_rollup_disputed
   | (* `Temporary *) Sc_rollup_does_not_exist of Sc_rollup_repr.t
   | (* `Temporary *) Sc_rollup_no_conflict
@@ -106,16 +105,6 @@ let () =
           Some ()
       | _ -> None)
     (fun () -> Sc_rollup_max_number_of_messages_reached_for_commitment_period) ;
-  let description = "Already staked." in
-  register_error_kind
-    `Temporary
-    ~id:"Sc_rollup_already_staked"
-    ~title:"Already staked"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.empty
-    (function Sc_rollup_already_staked -> Some () | _ -> None)
-    (fun () -> Sc_rollup_already_staked) ;
   let description = "Attempted to cement a disputed commitment." in
   register_error_kind
     `Temporary

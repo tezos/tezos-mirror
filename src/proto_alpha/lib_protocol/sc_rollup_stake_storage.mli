@@ -126,10 +126,11 @@ module Internal_for_tests : sig
       cemented commitment, freezing [sc_rollup_deposit] from [staker]'s account
       balance.
 
+      Warning: must be called only if [rollup] exists and [staker] is not to be
+      found in {!Store.Stakers.}
+
       May fail with:
       {ul
-        {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-        {li [Sc_rollup_already_staked] if [staker] is already staked}
         {li [Sc_rollup_staker_funds_too_low] if [staker] does not have enough
             funds to cover the deposit}
       }
