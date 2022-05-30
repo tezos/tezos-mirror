@@ -8,72 +8,32 @@ type address = int64
 type offset = int32
 type count = int32
 
-exception Type
-exception Bounds
-exception SizeOverflow
-exception SizeLimit
-exception OutOfMemory
+(* Expose exception types *)
+include Memory_exn
 
 (* Copied from [Memory] module *)
 let page_size = 0x10000L (* 64 KiB *)
 
-module SubPage = struct
-  module Map = Lazy_map.Mutable.Make (Int64)
+module Chunked = struct
+  type t = Chunked_byte_vector.t
 
-  type t = (int, int8_unsigned_elt, c_layout) Array1.t
+  let length_from_pages pages = Int64.(mul (of_int32 pages) page_size)
 
-  (** Number of bits in a sub-page address *)
-  let num_bits = 12
+  let create pages = Chunked_byte_vector.create (length_from_pages pages)
 
-  (** Size of a sub-page in bytes *)
-  let size = Int64.shift_left 1L num_bits
+  let grow delta_pages pages =
+    Chunked_byte_vector.grow pages (length_from_pages delta_pages)
 
-  (** Number of sub-pages in a WebAssembly page *)
-  let sub_pages_per_page = Int64.div page_size size
+  let total_size = Chunked_byte_vector.length
 
-  (** [Int64.logand address_mask x] gives you the sub-page address of  *)
-  let address_mask = Int64.sub size 1L
+  let total_pages vector = Int64.(div (total_size vector) page_size |> to_int32)
 
-  let index_of_address address = Int64.shift_right address num_bits
+  let load_byte = Chunked_byte_vector.load_byte
 
-  let mask_address address = Int64.logand address address_mask
-
-  type map = t Map.t
-
-  let create_sub_page () =
-    let sub_page = Array1_64.create Int8_unsigned C_layout size in
-    Array1.fill sub_page 0;
-    sub_page
-
-  let create_map pages =
-    Map.create
-      ~produce_value:(fun _ -> create_sub_page ())
-      Int64.(mul (of_int32 pages) sub_pages_per_page)
-
-  let grow delta_pages =
-    Map.grow Int64.(mul (of_int32 delta_pages) sub_pages_per_page)
-
-  let total_pages map =
-    Int64.(div (Map.num_elements map) sub_pages_per_page |> to_int32)
-
-  let total_size map = Int64.mul (Map.num_elements map) size
-
-  let load_byte page_map address =
-    try
-      let sub_page = Map.get (index_of_address address) page_map in
-      Array1_64.get sub_page (mask_address address)
-    with
-      Lazy_map.OutOfBounds -> raise Bounds
-
-  let store_byte page_map address byte =
-    try
-      let sub_page = Map.get (index_of_address address) page_map in
-      Array1_64.set sub_page (mask_address address) byte
-    with
-      Lazy_map.OutOfBounds -> raise Bounds
+  let store_byte = Chunked_byte_vector.store_byte
 end
 
-type memory = {mutable ty : memory_type; content : SubPage.map}
+type memory = { mutable ty : memory_type; content : Chunked.t }
 
 (* Copied from [Memory] module *)
 type t = memory
@@ -99,11 +59,11 @@ let _create n =
 (* Copied from [Memory] module *)
 let alloc (MemoryType lim as ty) =
   if not (valid_limits lim) then raise Type;
-  {ty; content = SubPage.create_map lim.min}
+  {ty; content = Chunked.create lim.min}
 
-let bound mem = SubPage.total_size mem.content
+let bound mem = Chunked.total_size mem.content
 
-let size mem = SubPage.total_pages mem.content
+let size mem = Chunked.total_pages mem.content
 
 (* Copied from [Memory] module *)
 let type_of mem = mem.ty
@@ -118,11 +78,11 @@ let grow mem delta =
   let lim' = {lim with min = new_size} in
   if not (valid_limits lim') then raise SizeLimit else
   mem.ty <- MemoryType lim';
-  SubPage.grow delta mem.content
+  Chunked.grow delta mem.content
 
-let load_byte mem = SubPage.load_byte mem.content
+let load_byte mem = Chunked.load_byte mem.content
 
-let store_byte mem = SubPage.store_byte mem.content
+let store_byte mem = Chunked.store_byte mem.content
 
 (* Copied from [Memory] module *)
 let load_bytes mem a n =

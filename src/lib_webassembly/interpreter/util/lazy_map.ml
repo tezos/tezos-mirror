@@ -7,6 +7,8 @@ module type KeyS = sig
 
   val sub : t -> t -> t
 
+  val succ : t -> t
+
   val to_string : t -> string
 end
 
@@ -21,14 +23,14 @@ module type S = sig
 
   val create : ?values:'a Map.t -> ?produce_value:(key -> 'a) -> key -> 'a t
 
-  val get : key -> 'a t -> 'a * 'a t
+  val of_list : 'a list -> 'a t
+
+  val get : key -> 'a t -> 'a
 
   val set : key -> 'a -> 'a t -> 'a t
 
   val grow : ?produce_value:(key -> 'a) -> key -> 'a t -> 'a t
 end
-
-exception OutOfBounds
 
 exception UnexpectedAccess
 
@@ -40,7 +42,7 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   type 'a t = {
     num_elements: Key.t;
     produce_value : Key.t -> 'a;
-    values : 'a Map.t
+    mutable values : 'a Map.t
   }
 
   let num_elements map = map.num_elements
@@ -50,25 +52,34 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   let create ?(values = Map.empty) ?(produce_value = def_produce_value) num_elements =
     { num_elements; produce_value; values }
 
+  let of_list values =
+    let fold (map, len) value =
+      Map.add len value map, Key.succ len
+    in
+    let values, num_elements =
+      List.fold_left fold (Map.empty, Key.zero) values
+    in
+    create ~values num_elements
+
   let get key map =
     if
       Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
     then
-      raise OutOfBounds;
+      raise Memory_exn.Bounds;
     match Map.find_opt key map.values with
     | None ->
       (* Need to create the missing key-value association. *)
       let value = map.produce_value key in
-      let values = Map.add key value map.values in
-      value, { map with values }
+      map.values <- Map.add key value map.values;
+      value
     | Some value ->
-      value, map
+      value
 
   let set key value map =
     if
       Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
     then
-      raise OutOfBounds;
+      raise Memory_exn.Bounds;
     { map with values = Map.add key value map.values }
 
   let grow ?produce_value delta map =
@@ -89,6 +100,10 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     else
       map
 end
+
+module IntMap = Make (Int)
+
+module Int64Map = Make (Int64)
 
 module Mutable = struct
   module type S = sig
@@ -123,10 +138,7 @@ module Mutable = struct
     let create ?values ?produce_value num_elements =
       ref (Map.create ?values ?produce_value num_elements )
 
-    let get key map_ref =
-      let value, map = Map.get key !map_ref in
-      map_ref := map;
-      value
+    let get key map_ref = Map.get key !map_ref
 
     let set key value map_ref =
       map_ref := Map.set key value !map_ref
@@ -136,4 +148,8 @@ module Mutable = struct
 
     let snapshot map_ref = !map_ref
   end
+
+  module IntMap = Make (Int)
+
+  module Int64Map = Make (Int64)
 end

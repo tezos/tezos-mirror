@@ -10,11 +10,7 @@ module Map = Lazy_map.Mutable.Make (Int32)
 type table = {mutable ty : table_type; mutable content : ref_ Map.t}
 type t = table
 
-exception Type
-exception Bounds
-exception SizeOverflow
-exception SizeLimit
-exception OutOfMemory
+include Memory_exn
 
 let valid_limits {min; max} =
   match max with
@@ -47,13 +43,12 @@ let grow tab delta r =
   tab.ty <- TableType (lim', t);
   ()
 
-let load tab i =
-  try Map.get i tab.content with Lazy_map.OutOfBounds -> raise Bounds
+let load tab i = Map.get i tab.content
 
 let store tab i r =
   let TableType (lim, t) = tab.ty in
   if type_of_ref r <> t then raise Type;
-  try Map.set i r tab.content with Lazy_map.OutOfBounds -> raise Bounds
+  Map.set i r tab.content
 
 let blit tab offset rs =
   List.iteri (fun i r -> store tab Int32.(of_int i |> add offset) r) rs

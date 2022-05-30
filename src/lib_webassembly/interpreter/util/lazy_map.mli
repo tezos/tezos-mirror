@@ -17,6 +17,8 @@ module type KeyS = sig
 
   val sub : t -> t -> t
 
+  val succ : t -> t
+
   val to_string : t -> string
 end
 
@@ -37,10 +39,13 @@ module type S = sig
       [values] may be provided to supply an initial set of entries. *)
   val create : ?values:'a Map.t -> ?produce_value:(key -> 'a) -> key -> 'a t
 
-  (** [get key map] retrieves the element at [key] and for the case where that
-      value needed to be instantiated first, it also returns the potentially
-      extended [map]. *)
-  val get : key -> 'a t -> 'a * 'a t
+  (** [of_list values] creates a map where each association is the index in the
+      list to its value. The first item's key is [zero], the second is
+      [succ zero] and so on. *)
+  val of_list : 'a list -> 'a t
+
+  (** [get key map] retrieves the element at [key]. *)
+  val get : key -> 'a t -> 'a
 
   (** [set key value map] sets the element at [key] to [value]. *)
   val set : key -> 'a -> 'a t -> 'a t
@@ -51,14 +56,15 @@ module type S = sig
   val grow : ?produce_value:(key -> 'a) -> key -> 'a t -> 'a t
 end
 
-(** [OutOfBounds] is raised when accessing an entry out of bounds. *)
-exception OutOfBounds
-
 (** [UnexpectedAccess] is raised in the default of the [produce_value] argument
     to [S.create]. *)
 exception UnexpectedAccess
 
 module Make (Key : KeyS) : S with type key = Key.t
+
+module IntMap : S with type key = int
+
+module Int64Map : S with type key = int64
 
 (** [Make] generates a lazy map module using a given [Key] module. *)
 module Mutable : sig
@@ -82,5 +88,10 @@ module Mutable : sig
 
     val snapshot : 'a t -> 'a Map.t
   end
+
   module Make (Key : KeyS) : S with type key = Key.t
+
+  module IntMap : S with type key = int
+
+  module Int64Map : S with type key = int64
 end
