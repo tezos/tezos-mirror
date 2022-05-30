@@ -23,6 +23,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type Error_monad.error += Injection_operations_error
+
+type Error_monad.error += Injection_operation_succeed_case of Operation_hash.t
+
+type Error_monad.error += Injection_operation_error_case of Operation_hash.t
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"injection_operations_error"
+    ~title:"Injection operations error"
+    ~description:
+      "While injecting several operations at once, one or several injections \
+       failed."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "While injecting several operations, one or several injections failed. \
+         Errors are the one below in the trace.")
+    unit
+    (function Injection_operations_error -> Some () | _ -> None)
+    (function () -> Injection_operations_error) ;
+  register_error_kind
+    `Permanent
+    ~id:"injection_operation_succeed_case"
+    ~title:"Injection operation succeed"
+    ~description:
+      "The injection of this operation succeed among a list of injections \
+       containing at least one error."
+    ~pp:(fun ppf oph ->
+      Format.fprintf ppf "Injection of %a succeeded." Operation_hash.pp oph)
+    (obj1 (req "oph" Operation_hash.encoding))
+    (function Injection_operation_succeed_case oph -> Some oph | _ -> None)
+    (function oph -> Injection_operation_succeed_case oph) ;
+  register_error_kind
+    `Permanent
+    ~id:"injection_operation_error_case"
+    ~title:"Injection operation error"
+    ~description:
+      "The injection of this operation failed. The error trace are the \
+       following errors in this list."
+    ~pp:(fun ppf oph ->
+      Format.fprintf
+        ppf
+        "Injection of %a failed. Error is next."
+        Operation_hash.pp
+        oph)
+    (obj1 (req "oph" Operation_hash.encoding))
+    (function Injection_operation_error_case oph -> Some oph | _ -> None)
+    (function oph -> Injection_operation_error_case oph)
+
 module S = struct
   open Data_encoding
 
@@ -80,6 +132,21 @@ module S = struct
     |+ opt_field "chain" Chain_services.chain_arg (fun t -> t#chain)
     |> seal
 
+  let operations_query =
+    let open RPC_query in
+    query (fun async force chain ->
+        object
+          method async = async
+
+          method force = force
+
+          method chain = chain
+        end)
+    |+ flag "async" (fun t -> t#async)
+    |+ flag "force" (fun t -> t#force)
+    |+ opt_field "chain" Chain_services.chain_arg (fun t -> t#chain)
+    |> seal
+
   (* If [private_] is set, the [private/injection/operation] path is used,
    * otherwise, it is [/injection/operation].
      This RPC does less checks than [injection/operation] and should be used for
@@ -103,6 +170,29 @@ module S = struct
       ~output:Operation_hash.encoding
       (if private_ then RPC_path.(root / "private" / "injection" / "operation")
       else RPC_path.(path / "operation"))
+
+  let private_operations =
+    RPC_service.post_service
+      ~description:
+        "Inject a list of operations in a node. If [force] is [true] then the \
+         operations are immediatly injected. The injection will succeed, but \
+         it does not mean the operations are (all) valid. In any case, the \
+         injection will be quick, hence [async] will be taken into account but \
+         should have almost no impact. If [async] is [true], all the promises \
+         returned by injecting an operation will be dropped. Each injection is \
+         done independently, and does not depend on the other injected \
+         operations result. Otherwise ([async]=[force]=[false]), for each \
+         operation, we record a list of promises. If all the injections \
+         succeed, the result is the list of operation hashes injected, \
+         otherwise an error (\"injection_operations_error\") is returned. This \
+         error is followed by markers for each operation: \
+         \"injection_operation_succeed\" for success and \
+         \"injection_operation_error\" for failure (followed by the errors \
+         specific to this injection)."
+      ~query:operations_query
+      ~input:(list (dynamic_size bytes))
+      ~output:(list Operation_hash.encoding)
+      RPC_path.(root / "private" / "injection" / "operations")
 
   let private_operation = operation ~private_:true
 
@@ -159,6 +249,21 @@ let operation_rpc ctxt ~private_rpc ?(async = false) ?chain operation =
 
 let private_operation ctxt ?async ?chain operation =
   operation_rpc ctxt ~private_rpc:true ?async ?chain operation
+
+let private_operations ctxt ?(async = false) ?(force = false) ?chain operations
+    =
+  make_call
+    S.private_operations
+    ctxt
+    ()
+    (object
+       method async = async
+
+       method chain = chain
+
+       method force = force
+    end)
+    operations
 
 let operation ctxt ?async ?chain operation =
   operation_rpc ctxt ~private_rpc:false ?async ?chain operation

@@ -25,6 +25,24 @@
 
 open RPC_context
 
+(** While injecting several operations (see
+   {!val:private_operations}), if one injection failed, we have to
+   report the error. To avoid using recursive errors we do the
+   reporting as follows:
+
+   - We wrap the error into [Injection_operations_error]
+
+   - If injecting the operation [oph] succeeded we use
+   [Injection_operation_succeed_case oph]
+
+   - If injecting the operation [oph] failed with [err], we use
+   [Injection_operation_error_case oph] followed by [err].  *)
+type Error_monad.error += Injection_operations_error
+
+type Error_monad.error += Injection_operation_succeed_case of Operation_hash.t
+
+type Error_monad.error += Injection_operation_error_case of Operation_hash.t
+
 (** [block cctxt ?async ?force raw_block] tries to inject
     [raw_block] inside the node. If [?async] is [true], [raw_block]
     will be validated before the result is returned. If [?force] is
@@ -52,6 +70,18 @@ val private_operation :
   ?chain:Chain_services.chain ->
   Bytes.t ->
   Operation_hash.t tzresult Lwt.t
+
+(** [private_operations] injects multiple operations. The [private_]
+   prefix is because the service is bound to the /private/ path-prefix
+   which is intended for tests only. See the ~description argument in
+   the definition in the ml file for more information.  *)
+val private_operations :
+  #simple ->
+  ?async:bool ->
+  ?force:bool ->
+  ?chain:Chain_services.chain ->
+  Bytes.t list ->
+  Operation_hash.t list tzresult Lwt.t
 
 val protocol :
   #simple -> ?async:bool -> Protocol.t -> Protocol_hash.t tzresult Lwt.t
@@ -82,6 +112,15 @@ module S : sig
       < async : bool ; chain : Chain_services.chain option >,
       Bytes.t,
       Operation_hash.t )
+    RPC_service.t
+
+  val private_operations :
+    ( [`POST],
+      unit,
+      unit,
+      < async : bool ; force : bool ; chain : Chain_services.chain option >,
+      Bytes.t list,
+      Operation_hash.t list )
     RPC_service.t
 
   val protocol :

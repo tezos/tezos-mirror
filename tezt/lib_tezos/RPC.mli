@@ -37,3 +37,10 @@ val get_connections : (string * int) list t
     Result is the address and port of the given peer ID if connected.
     This RPC returns 404 Not Found if the peer ID is not connected. *)
 val get_connection : string -> (string * int) t
+
+val private_injection_operations :
+  ?force:bool ->
+  ?async:bool ->
+  ops:Hex.t list ->
+  unit ->
+  [`OpHash of string] list t

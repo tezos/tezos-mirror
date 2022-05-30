@@ -56,6 +56,48 @@ let inject_operation validator ~force ?chain bytes =
   let hash = Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
 
+let inject_operations validator ~force ?chain bytes_list =
+  let open Lwt_syntax in
+  let* rev_hashes, rev_promises =
+    List.fold_left_s
+      (fun (hashes, promises) bytes ->
+        let* hash, promise = inject_operation validator ~force ?chain bytes in
+        return (hash :: hashes, promise :: promises))
+      ([], [])
+      bytes_list
+  in
+  let hashes = List.rev rev_hashes in
+  let promises = List.rev rev_promises in
+  let fold_errors (has_failed, result) promise_result oph =
+    match promise_result with
+    | Ok () ->
+        ( has_failed,
+          Injection_services.Injection_operation_succeed_case oph :: result )
+    | Error trace ->
+        (* The list will be reversed. *)
+        ( true,
+          List.rev_append trace
+          @@ (Injection_services.Injection_operation_error_case oph :: result)
+        )
+  in
+  let join_results l =
+    let has_failed, result =
+      WithExceptions.Result.get_ok ~loc:__LOC__
+      @@ List.fold_left2
+           ~when_different_lengths:()
+           fold_errors
+           (false, [])
+           l
+           hashes
+    in
+    if not has_failed then Ok ()
+    else
+      Result_syntax.fail
+        (Injection_services.Injection_operations_error :: List.rev result)
+  in
+  let t = Lwt.map join_results (Lwt.all promises) in
+  return (hashes, t)
+
 let inject_protocol store proto =
   let open Lwt_result_syntax in
   let proto_bytes = Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
@@ -91,6 +133,13 @@ let build_rpc_directory validator =
     let* () = if q#async then return_unit else wait in
     return hash
   in
+  let inject_operations q contents =
+    let*! hashes, wait =
+      inject_operations validator ~force:q#force ?chain:q#chain contents
+    in
+    let* () = if q#async then return_unit else wait in
+    return hashes
+  in
   register0 Injection_services.S.block (fun q (raw, operations) ->
       let* hash, wait =
         inject_block validator ?chain:q#chain ~force:q#force raw operations
@@ -101,6 +150,7 @@ let build_rpc_directory validator =
   register0
     Injection_services.S.private_operation
     (inject_operation ~force:true) ;
+  register0 Injection_services.S.private_operations inject_operations ;
   register0 Injection_services.S.protocol (fun q protocol ->
       let*! hash, wait = inject_protocol state protocol in
       let* () = if q#async then return_unit else wait in
