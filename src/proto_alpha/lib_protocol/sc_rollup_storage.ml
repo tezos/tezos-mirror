@@ -34,8 +34,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
   let level = Raw_context.current_level ctxt in
   Sc_rollup_repr.Address.from_nonce nonce >>?= fun address ->
   Store.PVM_kind.add ctxt address kind >>= fun ctxt ->
-  Store.Initial_level.add ctxt address (Level_storage.current ctxt).level
-  >>= fun ctxt ->
+  Store.Initial_level.add ctxt address level.level >>= fun ctxt ->
   Store.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
   Store.Parameters_type.add ctxt address parameters_ty
   >>=? fun (ctxt, param_ty_size_diff, _added) ->
