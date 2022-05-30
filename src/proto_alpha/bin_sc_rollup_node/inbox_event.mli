@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,43 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Simple = struct
-  include Internal_event.Simple
+(** This module defines functions that emit the events used by the rollup node
+    for incoming messages (see {!Inbox}). *)
 
-  let section = ["sc_rollup_node"; "inbox"]
+val starting : unit -> unit Lwt.t
 
-  let starting =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_inbox_starting"
-      ~msg:"Starting inbox tracker of the smart contract rollup node"
-      ~level:Notice
-      ()
+val stopping : unit -> unit Lwt.t
 
-  let stopping =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_inbox_stopping"
-      ~msg:"Stopping inbox tracker of the smart contract rollup node"
-      ~level:Notice
-      ()
-
-  let get_messages =
-    declare_3
-      ~section
-      ~name:"sc_rollup_node_layer_1_get_messages"
-      ~msg:
-        "Fetching {number_of_messages} messages from block {hash} at level \
-         {level}"
-      ~level:Notice
-      ("hash", Block_hash.encoding)
-      ("level", Data_encoding.int32)
-      ("number_of_messages", Data_encoding.int32)
-end
-
-let starting = Simple.(emit starting)
-
-let stopping = Simple.(emit stopping)
-
-let get_messages hash level number_of_messages =
-  Simple.(emit get_messages (hash, level, Int32.of_int number_of_messages))
+(** [get_messages hash level n] emits the event that [n] messages are being
+    fetched from the block of the given [hash] at the given [level]. *)
+val get_messages : Block_hash.t -> int32 -> int -> unit Lwt.t

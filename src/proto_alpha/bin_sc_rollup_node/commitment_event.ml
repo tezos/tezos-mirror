@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2880
-   Add corresponding .mli file. *)
-
 open Protocol
 open Alpha_context
 

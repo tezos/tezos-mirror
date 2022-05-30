@@ -23,43 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Simple = struct
-  include Internal_event.Simple
+(** This module defines functions that emit the events used when the smart
+    contract rollup node is running (see {!Daemon}). *)
 
-  let section = ["sc_rollup_node"; "inbox"]
+open Protocol.Alpha_context
 
-  let starting =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_inbox_starting"
-      ~msg:"Starting inbox tracker of the smart contract rollup node"
-      ~level:Notice
-      ()
+val starting_node : unit -> unit Lwt.t
 
-  let stopping =
-    declare_0
-      ~section
-      ~name:"sc_rollup_node_inbox_stopping"
-      ~msg:"Stopping inbox tracker of the smart contract rollup node"
-      ~level:Notice
-      ()
+val node_is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
 
-  let get_messages =
-    declare_3
-      ~section
-      ~name:"sc_rollup_node_layer_1_get_messages"
-      ~msg:
-        "Fetching {number_of_messages} messages from block {hash} at level \
-         {level}"
-      ~level:Notice
-      ("hash", Block_hash.encoding)
-      ("level", Data_encoding.int32)
-      ("number_of_messages", Data_encoding.int32)
-end
+(** [rollup_exists addr kind] emits the event that the smart contract rollup
+    node is interacting with the rollup at address [addr] and of the given
+    [kind]. *)
+val rollup_exists : addr:Sc_rollup.t -> kind:Sc_rollup.Kind.t -> unit Lwt.t
 
-let starting = Simple.(emit starting)
-
-let stopping = Simple.(emit stopping)
-
-let get_messages hash level number_of_messages =
-  Simple.(emit get_messages (hash, level, Int32.of_int number_of_messages))
+(** [shutdown_node exit_status] emits the event that the smart contract rollup
+    node is stopping with exit status [exit_status]. *)
+val shutdown_node : int -> unit Lwt.t
