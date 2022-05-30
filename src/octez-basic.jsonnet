@@ -69,6 +69,7 @@ dashboard.new(
     node.gasConsumedHistory  + {gridPos: {h: 8, w: 14, x: 0, y: 14 } },
     node.roundHistory        + {gridPos: {h: 8, w: 10, x: 14, y: 14}},
     node.storeMergeTime      + {gridPos: {h: 8, w: 14, x: 0, y: 22}},
+    node.writtenBlockSize    + {gridPos: {h: 8, w: 10, x: 14, y: 22}},
 
     //#######
     row.new(
