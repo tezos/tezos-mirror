@@ -410,6 +410,31 @@ local namespace = "octez";
     )
     ,
 
+  writtenBlockSize:
+    local writtenBlockSize = 'Written block size';
+    graphPanel.new(
+      title='Last written block size',
+      datasource='Prometheus',
+      linewidth=1,
+      format='bytes',
+      legend_alignAsTable=true,
+      legend_min=true,
+      legend_avg=true,
+      legend_max=true,
+      legend_total=true,
+      legend_current=true,
+      legend_values=true,
+      aliasColors={
+        [writtenBlockSize]: 'light-green',
+      },
+    ).addTarget(
+      prometheus.target(
+        namespace + '_store_last_written_block_size',
+	legendFormat=writtenBlockSize,
+      )
+    )
+    ,
+
   //## GC
 
   gcOperations:
