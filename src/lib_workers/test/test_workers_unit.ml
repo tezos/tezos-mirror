@@ -272,7 +272,7 @@ let test_cancel_worker () =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3004
    in follow-up MR: fix the handling of exceptions and
    integrate this test *)
-let test_raise_exn () =
+let _test_raise_exn () =
   let open Lwt_result_syntax in
   let* w = create_queue "exn_worker" in
   assert_status w "Running" ;
