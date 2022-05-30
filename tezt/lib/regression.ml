@@ -229,9 +229,19 @@ let check_unknown_output_files output_dir relative_output_files =
               log_unused "%s is not used by any test and can be deleted." full ;
               found_unknown := true)
     in
-    Array.iter handle_file (try Sys.readdir path with Sys_error _ -> [||]) ;
+    let try_to_read_dir () =
+      try Sys.readdir path
+      with Sys_error _ ->
+        (* Mostly happens if [path] does not exist or is not a
+           directory, in which case we have nothing to browse.
+           Could also happen because of permissions or other system issues,
+           but since this is just a check to help developers, we
+           don't want to bother them if this happens. *)
+        [||]
+    in
+    Array.iter handle_file (try_to_read_dir ()) ;
     (* Check whether directory is empty now that we may have deleted files. *)
-    match Sys.readdir path with
+    match try_to_read_dir () with
     | exception Sys_error _ -> ()
     | [||] ->
         if mode = Delete then
