@@ -3471,7 +3471,6 @@ include Tezos_raw_protocol_%s.Main
             main |> open_;
           ]
         ~linkall:true
-        ~warnings:"-9+27-30-32-40@8"
     in
     register
     @@ make ~name:"demo-counter" ~status:Not_mainnet ~main ~embedded ~client ()
