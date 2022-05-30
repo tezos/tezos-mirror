@@ -70,8 +70,10 @@ let test_context () =
   Incremental.begin_construction b >>=? fun v ->
   return (Incremental.alpha_ctxt v)
 
-let test_context_with_nat_nat_big_map () =
-  Context.init3 () >>=? fun (b, (source, _c2, _c3)) ->
+let test_context_with_nat_nat_big_map ?(sc_rollup_enable = false) () =
+  Context.init_with_constants1
+    {Context.default_test_constants with sc_rollup_enable}
+  >>=? fun (b, source) ->
   Op.contract_origination (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation b >>=? fun b ->
