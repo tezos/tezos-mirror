@@ -35,7 +35,6 @@ type plot_target =
           - "emp-validation" corresponds to the raw empirical data and
             predicted execution time. *)
   | Show  (** Display to screen (requires Qt) *)
-  | ShowAndSave  (** Combines previous options *)
 
 (** [options] specifies some display parameters. *)
 type options = {

@@ -320,7 +320,7 @@ let validator_empirical workload_data (problem : Inference.problem)
   let* plots = plot_scatter "Validation (raw)" columns [timings; predicted] in
   return plots
 
-type plot_target = Save | Show | ShowAndSave
+type plot_target = Save | Show
 
 let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   opts := options ;
@@ -350,10 +350,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
                 Plot.run ~target exec_detach plot ;
                 pdf_file)
               plots
-        | Show | ShowAndSave ->
-            if plot_target = ShowAndSave then
-              Format.eprintf
-                "display: ShowAndSave target deprecated, using qt target@." ;
+        | Show ->
             let target = qt ?pixel_size:(qt_pixel_size ()) () in
             let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
             Plot.run_matrix ~target exec_detach plots ;
