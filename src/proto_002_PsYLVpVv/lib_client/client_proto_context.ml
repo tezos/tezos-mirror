@@ -69,9 +69,6 @@ let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Alpha_client_context.full) name =
-  cctxt#message "Contract memorized as %s." name
-
 let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
   Client_proto_contracts.get_manager cctxt ~chain ~block source
   >>=? fun src_pkh ->

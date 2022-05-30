@@ -58,7 +58,8 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
             expr) ;
       pp_result ppf result ;
       Format.fprintf ppf "@]"
-  | Origination {manager; delegate; credit; spendable; delegatable; script} ->
+  | Origination {manager; delegate; credit; spendable; delegatable; script; _}
+    ->
       Format.fprintf
         ppf
         "@[<v 2>%s:@,From: %a@,For: %a@,Credit: %s%a"
@@ -82,7 +83,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
               ~none:(Failure "ill-serialized storage")
               (Data_encoding.force_decode storage)
           in
-          let {Michelson_v1_parser.source} =
+          let {Michelson_v1_parser.source; _} =
             Michelson_v1_printer.unparse_toplevel code
           in
           Format.fprintf
@@ -210,6 +211,7 @@ let pp_manager_operation_contents_and_result ppf
           originated_contracts;
           storage_size;
           paid_storage_size_diff;
+          _;
         }) =
     (match originated_contracts with
     | [] -> ()
@@ -484,7 +486,7 @@ let pp_operation_result ppf
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
 
-let pp_internal_operation ppf (Internal_operation {source; operation}) =
+let pp_internal_operation ppf (Internal_operation {source; operation; _}) =
   pp_manager_operation_content
     source
     true

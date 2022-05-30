@@ -85,7 +85,7 @@ let print_type_map ppf (parsed, type_map) =
   and print_item ppf loc =
     (let ( >?? ) = Option.bind in
      List.assoc ~equal:Int.equal loc parsed.Michelson_v1_parser.expansion_table
-     >?? fun ({start = {point = s}; stop = {point = e}}, locs) ->
+     >?? fun ({start = {point = s; _}; stop = {point = e; _}}, locs) ->
      let locs = List.sort Stdlib.compare locs in
      List.hd locs >?? fun hd_loc ->
      List.assoc ~equal:Int.equal hd_loc type_map >?? fun (bef, aft) ->
@@ -182,7 +182,7 @@ let report_errors ppf (parsed, errs) =
                  ~parsed)
               errs
           in
-          let {start = {point = s}; stop = {point = e}} = loc in
+          let {start = {point = s; _}; stop = {point = e; _}} = loc in
           Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) message
       | [] -> ())
     eco
@@ -210,9 +210,9 @@ let report_errors ppf (parsed, errs) =
            | Unterminated_integer loc
            | Unterminated_comment loc
            | Invalid_hex_bytes loc
-           | Unclosed {loc}
-           | Unexpected {loc}
-           | Extra {loc} ->
+           | Unclosed {loc; _}
+           | Unexpected {loc; _}
+           | Extra {loc; _} ->
                loc
            | Misaligned node -> location node
            | _ -> find_location 0
@@ -226,6 +226,6 @@ let report_errors ppf (parsed, errs) =
                 ~parsed)
              [err]
          in
-         let {start = {point = s}; stop = {point = e}} = loc in
+         let {start = {point = s; _}; stop = {point = e; _}} = loc in
          Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) message))
     out
