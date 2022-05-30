@@ -241,8 +241,6 @@ let message_result_withdrawal : Message_result.t QCheck2.Gen.t =
   let+ mres = message_result and+ withdrawals = list withdrawal in
   (mres, withdrawals)
 
-let pp fmt _ = Format.fprintf fmt "{}"
-
 (* ------ test template ----------------------------------------------------- *)
 
 let test_quantity ~count =

@@ -61,11 +61,6 @@ let init_queue capacity n =
   add_multiple_values q vs ;
   q
 
-let string_of_opt_int = function None -> "None" | Some i -> string_of_int i
-
-let string_of_int_list l =
-  Printf.sprintf "[%s]" @@ (List.map string_of_int l |> String.concat ";")
-
 let test_create () =
   let q = Queue.create 10 in
   Assert.Int.equal ~loc:__LOC__ 10 (Queue.capacity q)
@@ -198,6 +193,7 @@ let () =
         [
           ("capacity (create n) = n", `Quick, test_create);
           ("replace", `Quick, test_replace);
+          ("replace_incr_length", `Quick, test_replace_incr_length);
           ("replace_existing", `Quick, test_replace_existing);
           ("peek", `Quick, test_peek);
           ("peek_empty", `Quick, test_peek_empty);

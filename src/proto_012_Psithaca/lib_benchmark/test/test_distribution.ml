@@ -40,8 +40,6 @@ let pp_type_name fmtr (t : type_name) =
 module Type_name = struct
   type t = type_name
 
-  let compare (x : t) (y : t) = Stdlib.compare x y
-
   let equal (x : t) (y : t) = x = y
 
   let pp = pp_type_name

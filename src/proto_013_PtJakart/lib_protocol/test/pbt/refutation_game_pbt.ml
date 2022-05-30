@@ -695,20 +695,6 @@ module Strategies (P : TestPVM) = struct
       ( {failing_level = 0; branching = 2; max_failure = None},
         fun _ -> assert false )
 
-  (** This is a commuter client having a strategy that forgets a tick*)
-  let failing_committer max_failure =
-    MachineDirected
-      ( {failing_level = 1; branching = 2; max_failure},
-        fun tick ->
-          let s = match max_failure with None -> 20 | Some x -> x in
-          assume_some (Sc_rollup_tick_repr.to_int tick) @@ fun tick -> tick >= s
-      )
-
-  (** This is a commuter client having a strategy that forgets a tick*)
-  let failing_refuter max_failure =
-    MachineDirected
-      ({failing_level = 1; branching = 2; max_failure}, fun _ -> assert false)
-
   (** the possible expectation functions *)
   let commiter_wins x =
     Lwt_main.run
@@ -741,20 +727,6 @@ let random_perfect (module P : TestPVM) _max_failure =
 let perfect_random (module P : TestPVM) _max_failure =
   let module S = Strategies (P) in
   S.test_strategies S.perfect_committer Random S.commiter_wins
-
-let failing_perfect (module P : TestPVM) max_failure =
-  let module S = Strategies (P) in
-  S.test_strategies
-    (S.failing_committer max_failure)
-    S.perfect_refuter
-    S.refuter_wins
-
-let perfect_failing (module P : TestPVM) max_failure =
-  let module S = Strategies (P) in
-  S.test_strategies
-    S.perfect_committer
-    (S.failing_refuter max_failure)
-    S.commiter_wins
 
 (** this assembles a test from a RandomPVM and a function that choses the
 type of strategies *)

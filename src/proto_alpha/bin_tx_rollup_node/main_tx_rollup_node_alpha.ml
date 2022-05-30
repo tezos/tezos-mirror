@@ -102,13 +102,6 @@ let rollup_id_param =
         [("alias", from_alias); ("key", from_key)]
         s)
 
-let rollup_id_arg =
-  Clic.arg
-    ~long:"rollup-id"
-    ~placeholder:"rollup-id"
-    ~doc:"The rollup id of the rollup to target"
-    rollup_id_param
-
 let origination_level_arg =
   Clic.arg
     ~long:"origination-level"
@@ -193,8 +186,6 @@ let group =
       name = "tx_rollup.node";
       title = "Commands related to the transaction rollup node";
     }
-
-let to_tzresult msg = function Some x -> return x | None -> failwith msg
 
 let config_from_args data_dir rollup_id mode operator batch_signer
     finalize_commitment_signer remove_commitment_signer rejection_signer
