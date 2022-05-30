@@ -83,7 +83,7 @@ let () =
     ~description:
       "Sc_rollup_inbox.consume_n_messages must be called with a non negative \
        integer."
-    (obj1 (req "n" int64))
+    (obj1 (req "consume_n_messages" int64))
     (function Invalid_number_of_messages_to_consume n -> Some n | _ -> None)
     (fun n -> Invalid_number_of_messages_to_consume n)
 
