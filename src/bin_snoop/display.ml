@@ -355,7 +355,22 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
                 pdf_file)
               plots
         | Show ->
-            let target = qt ?pixel_size:(qt_pixel_size options) () in
+            let target =
+              match Plot.get_targets () with
+              | None ->
+                  Format.eprintf
+                    "Failed performing plot: could not get list of terminal \
+                     types, defaulting to x11@." ;
+                  x11
+              | Some available_targets ->
+                  if List.mem ~equal:String.equal "qt" available_targets then
+                    qt ?pixel_size:(qt_pixel_size options) ()
+                  else (
+                    Format.eprintf
+                      "\"qt\" gnuplot terminal not available, defaulting to \
+                       x11@." ;
+                    x11)
+            in
             let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
             Plot.run_matrix ~target exec_detach plots ;
             [])

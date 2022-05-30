@@ -1076,3 +1076,30 @@ let run_matrix ?path ~target ?(title = "") action plots =
   | Exec_and_save_to filename ->
       write_and_run_matrix ?path ~title ~filename ~target ~plots ()
   | Exec_detach -> run_matrix ?path ~detach:true ~title ~plots ~target ()
+
+let get_targets ?(path = "gnuplot") () =
+  let for_reading_by_parent, for_writing_by_child =
+    Unix.pipe ~cloexec:false ()
+  in
+  match Unix.fork () with
+  | 0 ->
+      let _ = Unix.dup2 ~cloexec:false for_writing_by_child Unix.stdout in
+      let _ = Unix.dup2 ~cloexec:false for_writing_by_child Unix.stderr in
+      Unix.execvp path [|path; "-e"; "print(GPVAL_TERMINALS); quit"|]
+  | child_pid -> (
+      Unix.close for_writing_by_child ;
+      match Unix.waitpid [] child_pid with
+      | _, WEXITED 0 ->
+          let ic = Unix.in_channel_of_descr for_reading_by_parent in
+          let buf = Buffer.create 1024 in
+          (try
+             while true do
+               Buffer.add_channel buf ic 512
+             done
+           with End_of_file -> ()) ;
+          close_in ic ;
+          let file = Buffer.contents buf in
+          Option.some (String.split_on_char ' ' (String.trim file))
+      | _ ->
+          Format.eprintf "Child process terminated abnormally@." ;
+          None)

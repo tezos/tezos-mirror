@@ -499,6 +499,10 @@ val x11 : target
     If not specified, Gnuplot will select the aspect ratio and size automatically. *)
 val qt : ?pixel_size:int * int -> unit -> target
 
+(** [get_targets ()] returns a list of all available targets (called 'terminals' by
+    gnuplot). Returns [None] if the list of targets could not be obtained. *)
+val get_targets : ?path:string -> unit -> string list option
+
 (** The type of actions to perform with a plot. *)
 type action
 
