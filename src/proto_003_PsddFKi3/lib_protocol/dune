@@ -286,7 +286,6 @@
 
 (library
  (name tezos_protocol_003_PsddFKi3_functor)
- (public_name tezos-protocol-functor-003-PsddFKi3)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

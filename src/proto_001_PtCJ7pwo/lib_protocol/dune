@@ -283,7 +283,6 @@
 
 (library
  (name tezos_protocol_001_PtCJ7pwo_functor)
- (public_name tezos-protocol-functor-001-PtCJ7pwo)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

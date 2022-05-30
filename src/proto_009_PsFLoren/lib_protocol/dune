@@ -319,7 +319,6 @@
 
 (library
  (name tezos_protocol_009_PsFLoren_functor)
- (public_name tezos-protocol-functor-009-PsFLoren)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

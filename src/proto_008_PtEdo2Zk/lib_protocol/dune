@@ -310,7 +310,6 @@
 
 (library
  (name tezos_protocol_008_PtEdo2Zk_functor)
- (public_name tezos-protocol-functor-008-PtEdo2Zk)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

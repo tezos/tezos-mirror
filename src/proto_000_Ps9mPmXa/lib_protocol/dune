@@ -85,7 +85,6 @@
 
 (library
  (name tezos_protocol_000_Ps9mPmXa_functor)
- (public_name tezos-protocol-functor-000-Ps9mPmXa)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

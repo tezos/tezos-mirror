@@ -283,7 +283,6 @@
 
 (library
  (name tezos_protocol_002_PsYLVpVv_functor)
- (public_name tezos-protocol-functor-002-PsYLVpVv)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

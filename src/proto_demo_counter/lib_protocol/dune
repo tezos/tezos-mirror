@@ -108,7 +108,6 @@
 
 (library
  (name tezos_protocol_demo_counter_functor)
- (public_name tezos-protocol-functor-demo-counter)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

@@ -295,7 +295,6 @@
 
 (library
  (name tezos_protocol_007_PsDELPH1_functor)
- (public_name tezos-protocol-functor-007-PsDELPH1)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

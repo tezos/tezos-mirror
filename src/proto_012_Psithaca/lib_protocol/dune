@@ -423,7 +423,6 @@
 
 (library
  (name tezos_protocol_012_Psithaca_functor)
- (public_name tezos-protocol-functor-012-Psithaca)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

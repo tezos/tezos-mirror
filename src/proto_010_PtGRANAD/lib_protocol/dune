@@ -334,7 +334,6 @@
 
 (library
  (name tezos_protocol_010_PtGRANAD_functor)
- (public_name tezos-protocol-functor-010-PtGRANAD)
  (libraries
   tezos-protocol-environment
   tezos-protocol-environment.sigs

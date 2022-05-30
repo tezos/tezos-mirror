@@ -3281,10 +3281,10 @@ include Tezos_raw_protocol_%s.Main
               ]
       in
       let _functor =
-        public_lib
-          (sf "tezos-protocol-functor-%s" name_dash)
-          ~internal_name:(sf "tezos_protocol_%s_functor" name_underscore)
+        private_lib
+          (sf "tezos_protocol_%s_functor" name_underscore)
           ~path:(sf "src/proto_%s/lib_protocol" name_underscore)
+          ~opam:""
           ~synopsis:
             (match number with
             | V _ as number when N.(number <= 003) ->
