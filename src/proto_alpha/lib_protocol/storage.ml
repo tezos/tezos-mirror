@@ -1586,7 +1586,7 @@ module Sc_rollup = struct
          (struct
            let name = ["commitments"]
          end))
-         (Make_index (Sc_rollup_commitment_repr.Hash_index))
+         (Make_index (Sc_rollup_commitment_repr.Hash))
       (struct
         type t = Sc_rollup_commitment_repr.t
 
@@ -1599,7 +1599,7 @@ module Sc_rollup = struct
          (struct
            let name = ["commitment_stake_count"]
          end))
-         (Make_index (Sc_rollup_commitment_repr.Hash_index))
+         (Make_index (Sc_rollup_commitment_repr.Hash))
       (struct
         type t = int32
 
@@ -1612,7 +1612,7 @@ module Sc_rollup = struct
          (struct
            let name = ["commitment_added"]
          end))
-         (Make_index (Sc_rollup_commitment_repr.Hash_index))
+         (Make_index (Sc_rollup_commitment_repr.Hash))
       (struct
         type t = Raw_level_repr.t
 

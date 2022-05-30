@@ -50,9 +50,11 @@
 
 open Sc_rollup_repr
 
-module Hash : S.HASH
+module Hash : sig
+  include S.HASH
 
-module Hash_index : Storage_description.INDEX with type t = Hash.t
+  include Storage_description.INDEX with type t := t
+end
 
 type t = {
   compressed_state : State_hash.t;
