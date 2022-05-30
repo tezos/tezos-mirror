@@ -98,7 +98,7 @@ local namespace = "octez";
             "1": {
               "color": "green",
               "index": 0,
-              "text": "Bootstraped"
+              "text": "Bootstrapped"
             },
             "null": {
               "color": "yellow",
