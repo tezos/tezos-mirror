@@ -55,15 +55,15 @@ This sequence of operations was run:
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 3
-         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         current messages hash  = [SC_ROLLUP_INBOX_HASH]
          nb_available_messages = 5
          nb_messages_in_commitment_period = 5
          starting_level_of_current_commitment_period = 2
          message_counter = 5
          old_levels_messages = 
-       content = [SC_ROLLUP_COMMITMENT_HASH]
+       content = [SC_ROLLUP_INBOX_HASH]
        index = 1
-       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+       back_pointers = [SC_ROLLUP_INBOX_HASH]
     
     
 
@@ -94,16 +94,16 @@ This sequence of operations was run:
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 4
-         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         current messages hash  = [SC_ROLLUP_INBOX_HASH]
          nb_available_messages = 11
          nb_messages_in_commitment_period = 11
          starting_level_of_current_commitment_period = 2
          message_counter = 6
          old_levels_messages = 
-       content = [SC_ROLLUP_COMMITMENT_HASH]
+       content = [SC_ROLLUP_INBOX_HASH]
        index = 2
-       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
-      [SC_ROLLUP_COMMITMENT_HASH]
+       back_pointers = [SC_ROLLUP_INBOX_HASH]
+      [SC_ROLLUP_INBOX_HASH]
     
     
 
@@ -134,16 +134,16 @@ This sequence of operations was run:
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 5
-         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         current messages hash  = [SC_ROLLUP_INBOX_HASH]
          nb_available_messages = 11
          nb_messages_in_commitment_period = 11
          starting_level_of_current_commitment_period = 2
          message_counter = 0
          old_levels_messages = 
-       content = [SC_ROLLUP_COMMITMENT_HASH]
+       content = [SC_ROLLUP_INBOX_HASH]
        index = 3
-       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
-      [SC_ROLLUP_COMMITMENT_HASH]
+       back_pointers = [SC_ROLLUP_INBOX_HASH]
+      [SC_ROLLUP_INBOX_HASH]
     
     
 
