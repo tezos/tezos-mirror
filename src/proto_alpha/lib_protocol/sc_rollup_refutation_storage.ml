@@ -31,7 +31,12 @@ module Commitment_storage = Sc_rollup_commitment_storage
 module Commitment_hash = Commitment.Hash
 module Stake_storage = Sc_rollup_stake_storage
 
-type conflict_point = Commitment_hash.t * Commitment_hash.t
+type point = {
+  commitment : Sc_rollup_commitment_repr.t;
+  hash : Commitment_hash.t;
+}
+
+type conflict_point = point * point
 
 (** TODO: #2902 replace with protocol constant and consider good value. *)
 let timeout_period_in_blocks = 500
@@ -118,7 +123,10 @@ let get_conflict_point ctxt rollup staker1 staker2 =
     if Commitment_hash.(commit1_info.predecessor = commit2_info.predecessor)
     then
       (* Same predecessor means we've found the conflict points. *)
-      return ((commit1, commit2), ctxt)
+      return
+        ( ( {hash = commit1; commitment = commit1_info},
+            {hash = commit2; commitment = commit2_info} ),
+          ctxt )
     else
       (* Different predecessors means they run in parallel. *)
       (traverse_in_parallel [@ocaml.tailcall])
@@ -193,12 +201,10 @@ let init_game ctxt rollup ~refuter ~defender =
         | Some refuter, Some defender ->
             fail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
       in
-      let* (_, child), ctxt = get_conflict_point ctxt rollup refuter defender in
-      let* child, ctxt =
-        Commitment_storage.get_commitment_unsafe ctxt rollup child
-      in
-      let* parent, ctxt =
-        Commitment_storage.get_commitment_unsafe ctxt rollup child.predecessor
+      let* ( ( {hash = _parent; commitment = parent_info},
+               {hash = _child; commitment = child_info} ),
+             ctxt ) =
+        get_conflict_point ctxt rollup refuter defender
       in
       let* ctxt, inbox = Store.Inbox.get ctxt rollup in
       let* kind = Store.PVM_kind.get ctxt rollup in
@@ -206,8 +212,8 @@ let init_game ctxt rollup ~refuter ~defender =
         Sc_rollup_game_repr.initial
           inbox
           ~pvm_name:(Sc_rollups.Kind.name_of kind)
-          ~parent
-          ~child
+          ~parent:parent_info
+          ~child:child_info
           ~refuter
           ~defender
       in

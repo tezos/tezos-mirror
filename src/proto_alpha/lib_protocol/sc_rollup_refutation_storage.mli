@@ -26,7 +26,12 @@
 
 module Commitment_hash = Sc_rollup_commitment_repr.Hash
 
-type conflict_point = Commitment_hash.t * Commitment_hash.t
+type point = {
+  commitment : Sc_rollup_commitment_repr.t;
+  hash : Commitment_hash.t;
+}
+
+type conflict_point = point * point
 
 (** [game_move ctxt rollup player opponent refutation is_opening_move]
     handles the storage-side logic for when one of the players makes a
