@@ -12,7 +12,7 @@
   tezos-baking-013-PtJakart
   tezos-stdlib-unix
   tezos-client-base-unix
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-mockup
   tezos-mockup-proxy
   tezos-mockup-commands

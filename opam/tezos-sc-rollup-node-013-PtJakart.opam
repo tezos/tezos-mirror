@@ -18,7 +18,6 @@ depends: [
   "tezos-context"
   "tezos-protocol-013-PtJakart"
   "tezos-protocol-plugin-013-PtJakart"
-  "tezos-protocol-013-PtJakart-parameters"
   "tezos-rpc"
   "tezos-rpc-http"
   "tezos-rpc-http-server"

@@ -18,7 +18,6 @@ depends: [
   "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-plugin-alpha"
-  "tezos-protocol-alpha-parameters"
   "tezos-rpc"
   "tezos-micheline" {with-test}
   "tezos-base-test-helpers" {with-test}

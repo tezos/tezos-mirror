@@ -9,7 +9,7 @@
   tezos-base
   tezos-protocol-013-PtJakart
   tezos-protocol-plugin-013-PtJakart
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-rpc)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))

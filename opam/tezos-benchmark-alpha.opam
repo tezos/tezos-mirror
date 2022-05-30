@@ -18,7 +18,6 @@ depends: [
   "tezos-benchmark-type-inference-alpha"
   "tezos-protocol-alpha"
   "tezos-crypto"
-  "tezos-protocol-alpha-parameters"
   "hashcons"
   "tezos-alpha-test-helpers"
   "prbnmcn-stats" { = "0.0.4" }

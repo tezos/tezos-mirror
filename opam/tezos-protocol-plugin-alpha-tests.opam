@@ -18,7 +18,6 @@ depends: [
   "tezos-micheline" {with-test}
   "tezos-protocol-plugin-alpha" {with-test}
   "tezos-protocol-alpha" {with-test}
-  "tezos-protocol-alpha-parameters" {with-test}
   "tezos-alpha-test-helpers" {with-test}
 ]
 build: [

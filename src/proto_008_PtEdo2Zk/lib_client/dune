@@ -14,7 +14,7 @@
   tezos-proxy
   tezos-signer-backends
   tezos-protocol-plugin-008-PtEdo2Zk
-  tezos-protocol-008-PtEdo2Zk-parameters
+  tezos-protocol-008-PtEdo2Zk.parameters
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

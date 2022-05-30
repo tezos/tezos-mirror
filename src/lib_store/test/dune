@@ -12,7 +12,7 @@
   tezos-embedded-protocol-demo-noops
   tezos-embedded-protocol-genesis
   tezos-embedded-protocol-alpha
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-protocol-plugin-alpha
   alcotest-lwt
   tezos-test-helpers

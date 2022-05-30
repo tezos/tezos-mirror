@@ -18,7 +18,6 @@ depends: [
   "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-plugin-010-PtGRANAD"
-  "tezos-protocol-010-PtGRANAD-parameters"
   "tezos-rpc"
 ]
 build: [

@@ -10,7 +10,7 @@
   tezos-stdlib
   tezos-base
   tezos-error-monad
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   tezos-benchmark
   tezos-benchmark-012-Psithaca
   tezos-benchmark-type-inference-012-Psithaca

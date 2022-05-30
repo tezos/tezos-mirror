@@ -18,7 +18,6 @@ depends: [
   "tezos-micheline" {with-test}
   "tezos-protocol-plugin-012-Psithaca" {with-test}
   "tezos-protocol-012-Psithaca" {with-test}
-  "tezos-protocol-012-Psithaca-parameters" {with-test}
   "tezos-012-Psithaca-test-helpers" {with-test}
 ]
 build: [

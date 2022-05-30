@@ -8,7 +8,7 @@
   tezos-base
   tezos-client-013-PtJakart
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-013-PtJakart-test-helpers
   tezos-base-test-helpers)
  (flags

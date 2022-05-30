@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_alpha_parameters)
- (public_name tezos-protocol-alpha-parameters)
+ (public_name tezos-protocol-alpha.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -19,7 +19,7 @@
  (name gen)
  (libraries
   tezos-base
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-protocol-alpha)
  (link_flags (:standard -linkall))
  (flags
@@ -45,6 +45,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
- (package tezos-protocol-alpha-parameters)
+ (package tezos-protocol-alpha)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

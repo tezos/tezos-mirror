@@ -18,7 +18,6 @@ depends: [
   "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-plugin-009-PsFLoren"
-  "tezos-protocol-009-PsFLoren-parameters"
   "tezos-rpc"
 ]
 build: [

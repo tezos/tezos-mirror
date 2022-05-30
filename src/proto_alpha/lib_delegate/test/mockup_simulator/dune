@@ -12,7 +12,7 @@
   tezos-baking-alpha
   tezos-stdlib-unix
   tezos-client-base-unix
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-mockup
   tezos-mockup-proxy
   tezos-mockup-commands

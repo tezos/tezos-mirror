@@ -18,7 +18,6 @@ depends: [
   "tezos-micheline" {with-test}
   "tezos-protocol-plugin-013-PtJakart" {with-test}
   "tezos-protocol-013-PtJakart" {with-test}
-  "tezos-protocol-013-PtJakart-parameters" {with-test}
   "tezos-013-PtJakart-test-helpers" {with-test}
 ]
 build: [

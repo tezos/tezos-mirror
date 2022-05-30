@@ -10,7 +10,7 @@
   tezos-stdlib
   tezos-base
   tezos-error-monad
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha

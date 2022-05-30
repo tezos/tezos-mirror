@@ -9,7 +9,7 @@
   tezos-protocol-013-PtJakart
   tezos-013-PtJakart-test-helpers
   tezos-base-test-helpers
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-protocol-plugin-013-PtJakart)
  (flags
   (:standard

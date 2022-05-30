@@ -10,7 +10,7 @@
   tezos-stdlib
   tezos-base
   tezos-error-monad
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-benchmark
   tezos-benchmark-013-PtJakart
   tezos-benchmark-type-inference-013-PtJakart

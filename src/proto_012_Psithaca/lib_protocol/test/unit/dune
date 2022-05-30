@@ -9,7 +9,7 @@
   tezos-micheline
   tezos-client-012-Psithaca
   tezos-client-base
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   tezos-protocol-environment
   tezos-stdlib-unix
   tezos-protocol-012-Psithaca
