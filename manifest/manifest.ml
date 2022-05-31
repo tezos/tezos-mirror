@@ -2546,10 +2546,6 @@ let generate_opam_ci () =
     # Never run on branch pipelines for master.
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
       when: never
-    # Run when the branch name contains the `opam` keyword.
-    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
-      when: delayed
-      start_in: %d minutes
     # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
       when: delayed
@@ -2572,7 +2568,6 @@ let generate_opam_ci () =
       start_in: %d minutes
     - when: never # default
 |}
-      d
       d
       d
       d

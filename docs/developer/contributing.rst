@@ -161,18 +161,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
      the developer to make it clear at a glance who is working on what: e.g.
      ``john@new-feature``.
 
-   * Note that some extra CI jobs are only run on demand for branches other
-     than master. You can (should) activate these jobs by including keywords in
-     the branch name.
-
-     + Use ``opam`` in the branch name if you want to explicitly trigger
-       the opam packaging pipeline. Note that any opam related changes
-       will automatically trigger it.
-     + Use ``doc`` in the branch name if you change the documentation.
-     + Use ``arm64`` in the branch name if you need to build ARM64 artifacts.
-     + Use ``docker`` in the branch name if you need an automatic (instead of manual)
-       CI job for building Docker images.
-     + Suffix the branch name by ``-release`` if it is a release branch.
+   * Suffix the branch name by ``-release`` if it is a release branch.
 
 -  Prefer small atomic commits over a large one that does many things.
 -  Don’t mix refactoring, reindentation, whitespace deletion, or other style
