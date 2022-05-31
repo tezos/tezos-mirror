@@ -1379,7 +1379,11 @@ type module_kont' =
   (** Starting point of a section, handles parsing generic section header. *)
   | MKField : 'a field_type * size * 'a vec_kont -> module_kont'
   (** Section currently parsed, accumulating each element from the underlying vector. *)
-  | MKBuild
+  | MKElaborateFunc : var list * func list * func vec_kont * bool -> module_kont'
+  (** Elaboration of functions from the code section with their declared type in
+      the func section, and accumulating invariants conditions associated to
+      functions. *)
+  | MKBuild of func list option * bool
   (** Accumulating the parsed sections vectors into a module and checking
       invariants. *)
   | MKStop of module_' (* TODO (#3120): actually, should be module_ *)
@@ -1407,6 +1411,50 @@ type module_kont' =
 type module_kont =
   { building_state : field list; (** Accumulated parsed sections. *)
     kont : module_kont' }
+
+
+let rec find_vec
+  : type t. t field_type -> _ -> t list * int
+  = fun ty fields -> match fields with
+    | [] -> assert false
+    | SingleField _ :: rest -> find_vec ty rest
+    | VecField (ty', v, len) :: rest ->
+      let v = (v, len) in
+      match ty, ty' with (* TODO (#3120): factor this out with a Leibnitz equality witness *)
+      | TypeField, TypeField -> v
+      | ImportField, ImportField -> v
+      | FuncField, FuncField -> v
+      | TableField, TableField -> v
+      | MemoryField, MemoryField -> v
+      | GlobalField, GlobalField -> v
+      | ExportField, ExportField -> v
+      | StartField, StartField -> v
+      | ElemField, ElemField -> v
+      | DataCountField, DataCountField -> v
+      | CodeField, CodeField -> v
+      | DataField, DataField -> v
+      | _ -> find_vec ty rest
+
+let rec find_single
+  : type t. t field_type -> _ -> t option
+  = fun ty fields -> match fields with
+    | [] -> assert false
+    | VecField _ :: rest -> find_single ty rest
+    | SingleField (ty', v) :: rest ->
+      match ty, ty' with
+      | TypeField, TypeField -> v
+      | ImportField, ImportField -> v
+      | FuncField, FuncField -> v
+      | TableField, TableField -> v
+      | MemoryField, MemoryField -> v
+      | GlobalField, GlobalField -> v
+      | ExportField, ExportField -> v
+      | StartField, StartField -> v
+      | ElemField, ElemField -> v
+      | DataCountField, DataCountField -> v
+      | CodeField, CodeField -> v
+      | DataField, DataField -> v
+      | _ -> find_single ty rest
 
 let module_ s =
   let step state =
@@ -1437,7 +1485,15 @@ let module_ s =
          next @@ MKSkipCustom k
        | _ ->
          (match k with
-          | None -> next MKBuild
+          | None ->
+            let func_types, func_types_len =
+              find_vec FuncField state.building_state in
+            let func_bodies, func_bodies_len =
+              find_vec CodeField state.building_state in
+
+            next @@
+            MKElaborateFunc
+              (func_types, func_bodies, Collect (func_types_len, []), true)
           | Some (ty, tag) -> next @@ MKFieldStart (ty, tag)))
 
     | MKFieldStart (DataCountField, `DataCountSection) ->
@@ -1608,54 +1664,40 @@ let module_ s =
         (* All sections are parsed, time to build the module *)
         (MKSkipCustom None)
 
-    | MKBuild ->
-      let rec find_vec
-        : type t. t field_type -> _ -> t list * int
-        = fun ty fields -> match fields with
-          | [] -> assert false
-          | SingleField _ :: rest -> find_vec ty rest
-          | VecField (ty', v, len) :: rest ->
-            let v = (v, len) in
-            match ty, ty' with (* TODO (#3120): factor this out with a Leibnitz equality witness *)
-            | TypeField, TypeField -> v
-            | ImportField, ImportField -> v
-            | FuncField, FuncField -> v
-            | TableField, TableField -> v
-            | MemoryField, MemoryField -> v
-            | GlobalField, GlobalField -> v
-            | ExportField, ExportField -> v
-            | StartField, StartField -> v
-            | ElemField, ElemField -> v
-            | DataCountField, DataCountField -> v
-            | CodeField, CodeField -> v
-            | DataField, DataField -> v
-            | _ -> find_vec ty rest
-      in
-      let rec find_single
-        : type t. t field_type -> _ -> t option
-        = fun ty fields -> match fields with
-          | [] -> assert false
-          | VecField _ :: rest -> find_single ty rest
-          | SingleField (ty', v) :: rest ->
-            match ty, ty' with
-            | TypeField, TypeField -> v
-            | ImportField, ImportField -> v
-            | FuncField, FuncField -> v
-            | TableField, TableField -> v
-            | MemoryField, MemoryField -> v
-            | GlobalField, GlobalField -> v
-            | ExportField, ExportField -> v
-            | StartField, StartField -> v
-            | ElemField, ElemField -> v
-            | DataCountField, DataCountField -> v
-            | CodeField, CodeField -> v
-            | DataField, DataField -> v
-            | _ -> find_single ty rest
-      in
+    | MKElaborateFunc ([], _ :: _, _, no_datas_in_func)
+    | MKElaborateFunc (_ :: _, [], _, no_datas_in_func) ->
+      (* Impossible cases where the two does not have the same legnth, which is
+         checked earlier. *)
+      next @@ MKBuild (None, no_datas_in_func)
+
+    | MKElaborateFunc
+        ([], [], Collect (_, func_types), no_datas_in_func) ->
+      next @@
+      MKElaborateFunc
+        ([], [], Rev (func_types, [], 0), no_datas_in_func)
+    | MKElaborateFunc
+        (ft :: fts, fb :: fbs, Collect (n, fbs'), no_datas_in_func) ->
+      next @@
+      MKElaborateFunc
+        (fts,
+         fbs,
+         Collect (n - 1, Source.({fb.it with ftype = ft} @@ fb.at) :: fbs'),
+         no_datas_in_func)
+
+    | MKElaborateFunc (_, _, Rev ([], funcs, _), no_datas_in_func) ->
+      next @@ MKBuild (Some funcs, no_datas_in_func)
+    | MKElaborateFunc (fts, fbs, Rev (f :: l, l', len), no_datas_in_func) ->
+      next @@
+      MKElaborateFunc
+        (fts,
+         fbs,
+         Rev (l, f :: l', len + 1),
+         no_datas_in_func && Free.((func f).datas = Set.empty)
+        )
+
+    | MKBuild (funcs, no_datas_in_func) ->
       let fields = state.building_state in
       let types, _ = find_vec TypeField fields in
-      let func_types, func_types_len = find_vec FuncField fields in
-      let func_bodies, func_bodies_len = find_vec CodeField fields in
       let data_count = find_single DataCountField fields in
       let datas, datas_len = find_vec DataField fields in
       let elems, _ = find_vec ElemField fields in
@@ -1667,20 +1709,30 @@ let module_ s =
       let exports, _ = find_vec ExportField fields in
       ignore types;
       require (pos s = len s) s (len s) "unexpected content after last section";
-      require (func_types_len = func_bodies_len)
-        s (len s) "function and code section have inconsistent lengths";
       require (data_count = None || data_count = Some (I32.of_int_s datas_len))
         s (len s) "data count and data section have inconsistent lengths";
-      require (data_count <> None ||
-               List.for_all Free.(fun f -> (func f).datas = Set.empty) func_bodies)
-        s (len s) "data count section required";
       let funcs =
-        (* TODO: maybe make this incremental *)
-        List.map2 Source.(fun t f -> {f.it with ftype = t} @@ f.at)
-          func_types func_bodies
+        match funcs with
+        | None ->
+          error s (len s) "function and code section have inconsistent lengths"
+        | Some l -> l
       in
+      require (data_count <> None || no_datas_in_func)
+        s (len s) "data count section required";
       { building_state = [];
-        kont = MKStop {types; tables; memories; globals; funcs; imports; exports; elems; datas; start}
+        kont =
+          MKStop {
+            types;
+            tables;
+            memories;
+            globals;
+            funcs;
+            imports;
+            exports;
+            elems;
+            datas;
+            start
+          }
       }
 
     | MKField (StartField, _, _) ->
