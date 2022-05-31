@@ -779,27 +779,64 @@ let const s =
   end_ s;
   c
 
+(** Vector and size continuations *)
+
+(** Vector accumulator, used in two steps: first accumulating the values, then
+    reversing them and possibly mapping them. Continuation passing style
+    transformation of {!List.map}. *)
+type ('a, 'b) vec_map_kont = Collect of int * 'a list | Rev of 'a list * 'b list
+
+type 'a vec_kont = ('a, 'a) vec_map_kont
+
+type pos = int
+
+(** Size checking version of {!sized} for CPS-style parsing. *)
+type size = { size: int; start: pos}
+
+let size s =
+  let size = len32 s in
+  let start = pos s in
+  { size; start }
+
+let check_size { size; start } s =
+  require (pos s = start + size) s start "section size mismatch"
 
 (* Sections *)
+
+(** Representation of a section tag. *)
+type section_tag =
+  [ `CodeSection
+  | `CustomSection
+  | `DataCountSection
+  | `DataSection
+  | `ElemSection
+  | `ExportSection
+  | `FuncSection
+  | `GlobalSection
+  | `ImportSection
+  | `MemorySection
+  | `StartSection
+  | `TableSection
+  | `TypeSection ]
 
 let id s =
   let bo = peek s in
   Lib.Option.map
     (function
-    | 0 -> `CustomSection
-    | 1 -> `TypeSection
-    | 2 -> `ImportSection
-    | 3 -> `FuncSection
-    | 4 -> `TableSection
-    | 5 -> `MemorySection
-    | 6 -> `GlobalSection
-    | 7 -> `ExportSection
-    | 8 -> `StartSection
-    | 9 -> `ElemSection
-    | 10 -> `CodeSection
-    | 11 -> `DataSection
-    | 12 -> `DataCountSection
-    | _ -> error s (pos s) "malformed section id"
+      | 0 -> `CustomSection
+      | 1 -> `TypeSection
+      | 2 -> `ImportSection
+      | 3 -> `FuncSection
+      | 4 -> `TableSection
+      | 5 -> `MemorySection
+      | 6 -> `GlobalSection
+      | 7 -> `ExportSection
+      | 8 -> `StartSection
+      | 9 -> `ElemSection
+      | 10 -> `CodeSection
+      | 11 -> `DataSection
+      | 12 -> `DataCountSection
+      | _ -> error s (pos s) "malformed section id"
     ) bo
 
 let section_with_size tag f default s =
@@ -814,10 +851,6 @@ let section tag f default s =
 (* Type section *)
 
 let type_ s = at func_type s
-
-let type_section s =
-  section `TypeSection (vec type_) [] s
-
 
 (* Import section *)
 
@@ -835,24 +868,12 @@ let import s =
   let idesc = at import_desc s in
   {module_name; item_name; idesc}
 
-let import_section s =
-  section `ImportSection (vec (at import)) [] s
-
-
-(* Function section *)
-
-let func_section s =
-  section `FuncSection (vec (at var)) [] s
-
 
 (* Table section *)
 
 let table s =
   let ttype = table_type s in
   {ttype}
-
-let table_section s =
-  section `TableSection (vec (at table)) [] s
 
 
 (* Memory section *)
@@ -861,10 +882,6 @@ let memory s =
   let mtype = memory_type s in
   {mtype}
 
-let memory_section s =
-  section `MemorySection (vec (at memory)) [] s
-
-
 (* Global section *)
 
 let global s =
@@ -872,7 +889,7 @@ let global s =
   let ginit = const s in
   {gtype; ginit}
 
-let global_section s =
+let _global_section s =
   section `GlobalSection (vec (at global)) [] s
 
 
@@ -891,10 +908,6 @@ let export s =
   let edesc = at export_desc s in
   {name; edesc}
 
-let export_section s =
-  section `ExportSection (vec (at export)) [] s
-
-
 (* Start section *)
 
 let start s =
@@ -903,7 +916,6 @@ let start s =
 
 let start_section s =
   section `StartSection (opt (at start) true) None s
-
 
 (* Code section *)
 
@@ -923,7 +935,7 @@ let code _ s =
   end_ s;
   {locals; body; ftype = Source.((-1l) @@ Source.no_region)}
 
-let code_section s =
+let _code_section s =
   section `CodeSection (vec (at (sized code))) [] s
 
 
@@ -996,7 +1008,7 @@ let elem s =
     {etype; einit; emode}
   | _ -> error s (pos s - 1) "malformed elements segment kind"
 
-let elem_section s =
+let _elem_section s =
   section `ElemSection (vec (at elem)) [] s
 
 
@@ -1018,7 +1030,7 @@ let data s =
     {dinit; dmode}
   | _ -> error s (pos s - 1) "malformed data segment kind"
 
-let data_section s =
+let _data_section s =
   section `DataSection (vec (at data)) [] s
 
 
@@ -1054,49 +1066,294 @@ let rec iterate f s = if f s <> None then iterate f s
 
 let magic = 0x6d736100l
 
-let module_ s =
-  let header = u32 s in
-  require (header = magic) s 0 "magic header not detected";
-  let version = u32 s in
-  require (version = Encode.version) s 4 "unknown binary version";
-  iterate custom_section s;
-  let types = type_section s in
-  iterate custom_section s;
-  let imports = import_section s in
-  iterate custom_section s;
-  let func_types = func_section s in
-  iterate custom_section s;
-  let tables = table_section s in
-  iterate custom_section s;
-  let memories = memory_section s in
-  iterate custom_section s;
-  let globals = global_section s in
-  iterate custom_section s;
-  let exports = export_section s in
-  iterate custom_section s;
-  let start = start_section s in
-  iterate custom_section s;
-  let elems = elem_section s in
-  iterate custom_section s;
-  let data_count = data_count_section s in
-  iterate custom_section s;
-  let func_bodies = code_section s in
-  iterate custom_section s;
-  let datas = data_section s in
-  iterate custom_section s;
-  require (pos s = len s) s (len s) "unexpected content after last section";
-  require (List.length func_types = List.length func_bodies)
-    s (len s) "function and code section have inconsistent lengths";
-  require (data_count = None || data_count = Some (Lib.List32.length datas))
-    s (len s) "data count and data section have inconsistent lengths";
-  require (data_count <> None ||
-    List.for_all Free.(fun f -> (func f).datas = Set.empty) func_bodies)
-    s (len s) "data count section required";
-  let funcs =
-    List.map2 Source.(fun t f -> {f.it with ftype = t} @@ f.at)
-      func_types func_bodies
-  in {types; tables; memories; globals; funcs; imports; exports; elems; datas; start}
+(** Sections representation. *)
+type _ field_type =
+  | TypeField : type_ field_type
+  | ImportField : import field_type
+  | FuncField : var field_type
+  | TableField : table field_type
+  | MemoryField : memory field_type
+  | GlobalField : global field_type
+  | ExportField : export field_type
+  | StartField : start field_type
+  | ElemField : elem_segment field_type
+  | DataCountField : int32 field_type
+  | CodeField : func field_type
+  | DataField : data_segment field_type
 
+(** Result of a section parsing, being either a single value or a vector. *)
+type field =
+  | VecField : 'a field_type * 'a list -> field
+  | SingleField : 'a field_type * 'a option -> field
+
+(** Module parsing steps *)
+type module_kont' =
+  | MKStart
+  (** Initial state of a module parsing *)
+  | MKSkipCustom : ('a field_type * section_tag) option -> module_kont'
+  (** Custom section which are skipped, with the next section to parse. *)
+  | MKFieldStart : 'a field_type * section_tag -> module_kont'
+  (** Starting point of a section, handles parsing generic section header. *)
+  | MKField : 'a field_type * size * 'a vec_kont -> module_kont'
+  (** Section currently parsed, accumulating each element from the underlying vector. *)
+  | MKBuild
+  (** Accumulating the parsed sections vectors into a module and checking
+      invariants. *)
+  | MKStop of module_' (* TODO (#3120): actually, should be module_ *)
+  (** Final step of the parsing, cannot reduce. *)
+
+type module_kont =
+  { building_state : field list; (** Accumulated parsed sections. *)
+    kont : module_kont' }
+
+let module_ s =
+  let step state =
+    let next kont = { state with kont } in
+    let next_with_field field kont =
+      { building_state = field :: state.building_state; kont } in
+    match state.kont with
+    | MKStart ->
+      (* Module header *)
+      let header = u32 s in
+      require (header = magic) s 0 "magic header not detected";
+      let version = u32 s in
+      require (version = Encode.version) s 4 "unknown binary version";
+      (* Module header *)
+      next @@ MKSkipCustom (Some (TypeField, `TypeSection))
+
+    | MKSkipCustom k ->
+      (match id s with
+       | Some `CustomSection ->
+         (* section_with_size *)
+         ignore (u8 s);
+         (* sized *)
+         let l = len32 s in
+         (* custom *)
+         let start = pos s in
+         let _id = name s in
+         let _bs = get_string (l - (pos s - start)) s in
+         next @@ MKSkipCustom k
+       | _ ->
+         (match k with
+          | None -> next MKBuild
+          | Some (ty, tag) -> next @@ MKFieldStart (ty, tag)))
+
+    | MKFieldStart (DataCountField, `DataCountSection) ->
+      let v = data_count_section s in
+      next_with_field
+        (SingleField (DataCountField, v))
+        (MKSkipCustom (Some (CodeField, `CodeSection)))
+
+    | MKFieldStart (StartField, `StartSection) ->
+      let v = start_section s in
+      next_with_field
+        (SingleField (StartField, v))
+        (MKSkipCustom (Some (ElemField, `ElemSection)))
+
+    (* Parsing of vectors. Fields reduce into two mutual steps:
+       - First collecting the elements from the vector into a list
+       - Then once everything as been parsed, reverse the list
+    *)
+
+    | MKFieldStart (ty, tag) ->
+      (match id s with
+       | Some t when t = tag ->
+         ignore (u8 s);
+         let size = size s in
+         (* length of `vec` *)
+         let l = len32 s in
+         next @@ MKField (ty, size, Collect (l, []))
+       | _ ->
+         let size = { size = 0; start = pos s } in
+         next @@ MKField (ty, size, Rev ([], [])))
+    | MKField (ty, size, Collect (0, l)) ->
+      next @@ MKField (ty, size, Rev ([], l))
+
+    | MKField (ty, size, Collect (n, l)) ->
+      (match ty with
+       | TypeField ->
+         let f = type_ s in (* TODO (#3096): check if small enough to fit in a tick *)
+         next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       | ImportField ->
+         let f = at import s in (* TODO (#3096): check if small enough to fit in a tick *)
+         next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       | FuncField ->
+         let f = at var s in (* small enough to fit in a tick *)
+         next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       | TableField ->
+         let f = at table s in (* small enough to fit in a tick *)
+         next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       | MemoryField ->
+         let f = at memory s in (* small enough to fit in a tick *)
+         next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       | GlobalField ->
+         failwith "HERE" (* do something incremental *)
+       | ExportField ->
+         let f = at export s in (* small enough to fit in a tick *)
+         next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       | StartField ->
+         (* not a vector *)
+         assert false
+       | ElemField ->
+         failwith "HERE" (* do something incremental, like Global, but more complex *)
+       | DataCountField ->
+         (* not a vector *)
+         assert false
+       | CodeField ->
+         failwith "HERE" (* do something incremental, like Global, but more complex *)
+       | DataField ->
+         failwith "HERE" (* do something incremental, like Global, but more complex *)
+      )
+
+    (* Transitions steps from the end of a section to the next one.
+
+       The values accumulated from the section are accumulated into the `Next`
+       continuation that will be used to build the module.*)
+
+    | MKField (ty, size, Rev (l, f :: fs)) ->
+      next @@ MKField (ty, size, Rev (f :: l, fs))
+
+      (* TODO (#3120): maybe we can factor-out these similarly shaped module section transitions *)
+    | MKField (TypeField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (TypeField, l))
+        (MKSkipCustom (Some (ImportField, `ImportSection)))
+    | MKField (ImportField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (ImportField, l))
+        (MKSkipCustom (Some (FuncField, `FuncSection)))
+    | MKField (FuncField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (FuncField, l))
+        (MKSkipCustom (Some (TableField, `TableSection)))
+    | MKField (TableField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (TableField, l))
+        (MKSkipCustom (Some (MemoryField, `MemorySection)))
+     | MKField (MemoryField, size, Rev (l, [])) ->
+       check_size size s;
+       next_with_field
+         (VecField (MemoryField, l))
+         (MKSkipCustom (Some (GlobalField, `GlobalSection)))
+    | MKField (GlobalField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (GlobalField, l))
+        (MKSkipCustom (Some (ExportField, `ExportSection)))
+    | MKField (ExportField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (ExportField, l))
+        (MKSkipCustom (Some (StartField, `StartSection)))
+    | MKField (ElemField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (ElemField, l))
+        (MKSkipCustom (Some (DataCountField, `DataCountSection)))
+    | MKField (CodeField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (CodeField, l))
+        (MKSkipCustom (Some (DataField, `DataSection)))
+    | MKField (DataField, size, Rev (l, [])) ->
+      check_size size s;
+      next_with_field
+        (VecField (DataField, l))
+        (* All sections are parsed, time to build the module *)
+        (MKSkipCustom None)
+
+    | MKBuild ->
+      let rec find_vec
+        : type t. t field_type -> _ -> t list
+        = fun ty fields -> match fields with
+          | [] -> assert false
+          | SingleField _ :: rest -> find_vec ty rest
+          | VecField (ty', v) :: rest ->
+            match ty, ty' with (* TODO (#3120): factor this out with a Leibnitz equality witness *)
+            | TypeField, TypeField -> v
+            | ImportField, ImportField -> v
+            | FuncField, FuncField -> v
+            | TableField, TableField -> v
+            | MemoryField, MemoryField -> v
+            | GlobalField, GlobalField -> v
+            | ExportField, ExportField -> v
+            | StartField, StartField -> v
+            | ElemField, ElemField -> v
+            | DataCountField, DataCountField -> v
+            | CodeField, CodeField -> v
+            | DataField, DataField -> v
+            | _ -> find_vec ty rest
+      in
+      let rec find_single
+        : type t. t field_type -> _ -> t option
+        = fun ty fields -> match fields with
+          | [] -> assert false
+          | VecField _ :: rest -> find_single ty rest
+          | SingleField (ty', v) :: rest ->
+            match ty, ty' with
+            | TypeField, TypeField -> v
+            | ImportField, ImportField -> v
+            | FuncField, FuncField -> v
+            | TableField, TableField -> v
+            | MemoryField, MemoryField -> v
+            | GlobalField, GlobalField -> v
+            | ExportField, ExportField -> v
+            | StartField, StartField -> v
+            | ElemField, ElemField -> v
+            | DataCountField, DataCountField -> v
+            | CodeField, CodeField -> v
+            | DataField, DataField -> v
+            | _ -> find_single ty rest
+      in
+      let fields = state.building_state in
+      let types = find_vec TypeField fields in
+      let func_types = find_vec FuncField fields in
+      let func_bodies = find_vec CodeField fields in
+      let data_count = find_single DataCountField fields in
+      let datas = find_vec DataField fields in
+      let elems = find_vec ElemField fields in
+      let start = find_single StartField fields in
+      let tables = find_vec TableField fields in
+      let memories = find_vec MemoryField fields in
+      let globals = find_vec GlobalField fields in
+      let imports = find_vec ImportField fields in
+      let exports = find_vec ExportField fields in
+      ignore types;
+      require (pos s = len s) s (len s) "unexpected content after last section";
+      require (List.length func_types = List.length func_bodies)
+        s (len s) "function and code section have inconsistent lengths";
+      require (data_count = None || data_count = Some (Lib.List32.length datas))
+        s (len s) "data count and data section have inconsistent lengths";
+      require (data_count <> None ||
+               List.for_all Free.(fun f -> (func f).datas = Set.empty) func_bodies)
+        s (len s) "data count section required";
+      let funcs =
+        (* TODO: maybe make this incremental *)
+        List.map2 Source.(fun t f -> {f.it with ftype = t} @@ f.at)
+          func_types func_bodies
+      in
+      { building_state = [];
+        kont = MKStop {types; tables; memories; globals; funcs; imports; exports; elems; datas; start}
+      }
+
+    | MKField (StartField, _, _) ->
+      (* StarField is not a vector. *)
+      assert false
+    | MKField (DataCountField, _, _) ->
+      (* DataCountField is not a vector. *)
+      assert false
+    | MKStop _
+      (* Stop cannot reduce. *)
+      -> assert false
+  in
+  let rec loop = function
+    | { kont = MKStop m; _ } -> m
+    | k -> loop (step k) in
+  loop { building_state = []; kont = MKStart }
 
 let decode name bs = at module_ (stream name bs)
 
