@@ -76,7 +76,7 @@ let commands () =
   let resolve_max_gas cctxt block = function
     | None ->
         Alpha_services.Constants.all cctxt (cctxt#chain, block)
-        >>=? fun {parametric = {hard_gas_limit_per_operation}} ->
+        >>=? fun {parametric = {hard_gas_limit_per_operation; _}; _} ->
         return hard_gas_limit_per_operation
     | Some gas -> return gas
   in

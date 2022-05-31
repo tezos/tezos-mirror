@@ -76,7 +76,7 @@ let commands () =
       (fixed ["get"; "timestamp"])
       (fun seconds (cctxt : Alpha_client_context.full) ->
         Shell_services.Blocks.Header.shell_header cctxt ~block:cctxt#block ()
-        >>=? fun {timestamp = v} ->
+        >>=? fun {timestamp = v; _} ->
         (if seconds then cctxt#message "%Ld" (Time.Protocol.to_seconds v)
         else cctxt#message "%s" (Time.Protocol.to_notation v))
         >>= fun () -> return_unit);
@@ -162,7 +162,7 @@ let commands () =
                      Environment.Error_monad.pp)
                   errs
             | Ok (code, _) ->
-                let {Michelson_v1_parser.source} =
+                let {Michelson_v1_parser.source; _} =
                   Michelson_v1_printer.unparse_toplevel code
                 in
                 cctxt#answer "%s" source >>= return));

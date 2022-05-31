@@ -39,13 +39,13 @@ module Program = Client_aliases.Alias (struct
 
   let encoding =
     Data_encoding.conv
-      (fun ({Michelson_v1_parser.source}, _) -> source)
+      (fun ({Michelson_v1_parser.source; _}, _) -> source)
       (fun source -> Michelson_v1_parser.parse_toplevel source)
       Data_encoding.string
 
   let of_source source = return (Michelson_v1_parser.parse_toplevel source)
 
-  let to_source ({Michelson_v1_parser.source}, _) = return source
+  let to_source ({Michelson_v1_parser.source; _}, _) = return source
 
   let name = "script"
 end)

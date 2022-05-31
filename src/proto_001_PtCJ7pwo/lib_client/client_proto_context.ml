@@ -64,36 +64,8 @@ let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Alpha_client_context.full) name =
-  cctxt#message "Contract memorized as %s." name
-
 let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
   Client_proto_contracts.get_manager cctxt ~chain ~block source
   >>=? fun src_pkh ->
   Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
   return (src_name, src_pkh, src_pk, src_sk)
-
-let get_operation_from_block (cctxt : #Client_context.full) ~chain predecessors
-    operation_hash =
-  Client_confirmations.lookup_operation_in_previous_blocks
-    cctxt
-    ~chain
-    ~predecessors
-    operation_hash
-  >>=? function
-  | None -> return_none
-  | Some (block, i, j) ->
-      cctxt#message
-        "Operation found in block: %a (pass: %d, offset: %d)"
-        Block_hash.pp
-        block
-        i
-        j
-      >>= fun () ->
-      Alpha_client_context.Alpha_block_services.Operations.operation
-        cctxt
-        ~chain
-        ~block:(`Hash (block, 0))
-        i
-        j
-      >>=? fun op' -> return_some op'

@@ -3471,7 +3471,6 @@ include Tezos_raw_protocol_%s.Main
             main |> open_;
           ]
         ~linkall:true
-        ~warnings:"-9+27-30-32-40@8"
     in
     register
     @@ make ~name:"demo-counter" ~status:Not_mainnet ~main ~embedded ~client ()
@@ -3501,10 +3500,6 @@ include Tezos_raw_protocol_%s.Main
     let opt_map l f = Option.map f l in
     let both o1 o2 =
       match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
-    in
-    let warnings =
-      if N.(number == 002 || number == 001) then Some "-9+27-30-32-40@8"
-      else None
     in
     let {Lib_protocol.main; embedded; environment; raw_protocol} =
       let template_version =
@@ -3621,7 +3616,6 @@ include Tezos_raw_protocol_%s.Main
         ~bisect_ppx:N.(number >= 008)
         ?inline_tests:(if N.(number >= 009) then Some ppx_inline_test else None)
         ~linkall:true
-        ?warnings
     in
     let test_helpers =
       some_if active @@ fun () ->
@@ -3734,7 +3728,6 @@ include Tezos_raw_protocol_%s.Main
         ~bisect_ppx:N.(number >= 008)
         ~linkall:true
         ~all_modules_except:["alpha_commands_registration"]
-        ?warnings
     in
     let client_sapling =
       some_if (N.(number >= 008) && not_overridden) @@ fun () ->
@@ -3791,7 +3784,6 @@ include Tezos_raw_protocol_%s.Main
         ~bisect_ppx:N.(number >= 008)
         ~linkall:true
         ~modules:["alpha_commands_registration"]
-        ?warnings
     in
     let baking =
       some_if active @@ fun () ->
