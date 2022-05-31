@@ -225,8 +225,8 @@ module type MerkelizedOperations = sig
     t ->
     Raw_level_repr.t ->
     string list ->
-    message ->
-    (message * t, error trace) result Lwt.t
+    messages ->
+    (messages * t, error trace) result Lwt.t
 
   (** [get_message messages idx] returns [Some message] if the
      sequence of [messages] has a more than [idx] messages and

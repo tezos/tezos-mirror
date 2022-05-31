@@ -2550,8 +2550,8 @@ module Sc_rollup : sig
         t ->
         Raw_level_repr.t ->
         string list ->
-        message ->
-        (message * t, error trace) result Lwt.t
+        messages ->
+        (messages * t, error trace) result Lwt.t
 
       val get_message : messages -> Z.t -> message option Lwt.t
 
