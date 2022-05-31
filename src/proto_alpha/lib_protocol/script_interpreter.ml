@@ -413,35 +413,35 @@ and imap_iter :
  [@@inline]
 
 and imul_teznat : type a b c d e f. (a, b, c, d, e, f) imul_teznat_type =
- fun logger g gas location k ks accu stack ->
+ fun logger g gas loc k ks accu stack ->
   let x = accu in
   let y, stack = stack in
   match Script_int.to_int64 y with
-  | None -> get_log logger >>=? fun log -> fail (Overflow (location, log))
+  | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
   | Some y ->
       Tez.(x *? y) >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack
 
 and imul_nattez : type a b c d e f. (a, b, c, d, e, f) imul_nattez_type =
- fun logger g gas location k ks accu stack ->
+ fun logger g gas loc k ks accu stack ->
   let y = accu in
   let x, stack = stack in
   match Script_int.to_int64 y with
-  | None -> get_log logger >>=? fun log -> fail (Overflow (location, log))
+  | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
   | Some y ->
       Tez.(x *? y) >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack
 
 and ilsl_nat : type a b c d e f. (a, b, c, d, e, f) ilsl_nat_type =
- fun logger g gas location k ks accu stack ->
+ fun logger g gas loc k ks accu stack ->
   let x = accu and y, stack = stack in
   match Script_int.shift_left_n x y with
-  | None -> get_log logger >>=? fun log -> fail (Overflow (location, log))
+  | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
   | Some x -> (step [@ocaml.tailcall]) g gas k ks x stack
 
 and ilsr_nat : type a b c d e f. (a, b, c, d, e, f) ilsr_nat_type =
- fun logger g gas location k ks accu stack ->
+ fun logger g gas loc k ks accu stack ->
   let x = accu and y, stack = stack in
   match Script_int.shift_right_n x y with
-  | None -> get_log logger >>=? fun log -> fail (Overflow (location, log))
+  | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
   | Some r -> (step [@ocaml.tailcall]) g gas k ks r stack
 
 and ifailwith : ifailwith_type =
@@ -772,10 +772,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let y, stack = stack in
           Tez.(x -? y) >>?= fun res ->
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_teznat (location, k) ->
-          imul_teznat None g gas location k ks accu stack
-      | IMul_nattez (location, k) ->
-          imul_nattez None g gas location k ks accu stack
+      | IMul_teznat (loc, k) -> imul_teznat None g gas loc k ks accu stack
+      | IMul_nattez (loc, k) -> imul_nattez None g gas loc k ks accu stack
       (* boolean operations *)
       | IOr (_, k) ->
           let x = accu in
@@ -871,8 +869,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let x = accu and y, stack = stack in
           let res = Script_int.ediv_n x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | ILsl_nat (location, k) -> ilsl_nat None g gas location k ks accu stack
-      | ILsr_nat (location, k) -> ilsr_nat None g gas location k ks accu stack
+      | ILsl_nat (loc, k) -> ilsl_nat None g gas loc k ks accu stack
+      | ILsr_nat (loc, k) -> ilsr_nat None g gas loc k ks accu stack
       | IOr_nat (_, k) ->
           let x = accu and y, stack = stack in
           let res = Script_int.logor x y in
@@ -989,7 +987,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | IAddress (_, k) ->
           let (Typed_contract {address; _}) = accu in
           (step [@ocaml.tailcall]) g gas k ks address stack
-      | IContract (location, t, entrypoint, k) -> (
+      | IContract (loc, t, entrypoint, k) -> (
           let addr = accu in
           let entrypoint_opt =
             if Entrypoint.is_default addr.entrypoint then Some entrypoint
@@ -1001,7 +999,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               let ctxt = update_context gas ctxt in
               Script_ir_translator.parse_contract_for_script
                 ctxt
-                location
+                loc
                 t
                 addr.destination
                 ~entrypoint
@@ -1010,19 +1008,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               let accu = maybe_contract in
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
-      | ITransfer_tokens (location, k) ->
+      | ITransfer_tokens (loc, k) ->
           let p = accu in
           let amount, (Typed_contract {arg_ty; address}, stack) = stack in
           let {destination; entrypoint} = address in
-          transfer
-            (ctxt, sc)
-            gas
-            amount
-            location
-            arg_ty
-            p
-            destination
-            entrypoint
+          transfer (ctxt, sc) gas amount loc arg_ty p destination entrypoint
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
       | IImplicit_account (_, k) ->
@@ -1553,30 +1543,14 @@ and log :
         stack) ;
   Script_interpreter_logging.log_next_kinstr logger sty k >>?= fun k ->
   match k with
-  | IMul_teznat (location, k) ->
-      (imul_teznat [@ocaml.tailcall])
-        (Some logger)
-        g
-        gas
-        location
-        k
-        ks
-        accu
-        stack
-  | IMul_nattez (location, k) ->
-      (imul_nattez [@ocaml.tailcall])
-        (Some logger)
-        g
-        gas
-        location
-        k
-        ks
-        accu
-        stack
-  | ILsl_nat (location, k) ->
-      (ilsl_nat [@ocaml.tailcall]) (Some logger) g gas location k ks accu stack
-  | ILsr_nat (location, k) ->
-      (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas location k ks accu stack
+  | IMul_teznat (loc, k) ->
+      (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
+  | IMul_nattez (loc, k) ->
+      (imul_nattez [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
+  | ILsl_nat (loc, k) ->
+      (ilsl_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
+  | ILsr_nat (loc, k) ->
+      (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
   | IFailwith (kloc, tv) ->
       let {ifailwith} = ifailwith in
       (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
@@ -1611,8 +1585,8 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
   | None -> step (outdated_ctxt, sc) gas descr.kinstr KNil accu stack
   | Some logger ->
       (if log_now then
-       let location = kinstr_location descr.kinstr in
-       logger.log_interp descr.kinstr ctxt location descr.kbef (accu, stack)) ;
+       let loc = kinstr_location descr.kinstr in
+       logger.log_interp descr.kinstr ctxt loc descr.kbef (accu, stack)) ;
       let log =
         ILog
           ( kinstr_location descr.kinstr,
@@ -1658,11 +1632,11 @@ let lift_execution_arg (type a ac) ctxt ~internal (entrypoint_ty : (a, ac) ty)
   | Untyped_arg arg ->
       let arg = Micheline.root arg in
       parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg
-  | Typed_arg (location, parsed_arg_ty, parsed_arg) ->
+  | Typed_arg (loc, parsed_arg_ty, parsed_arg) ->
       Gas_monad.run
         ctxt
         (Script_ir_translator.ty_eq
-           ~error_details:(Informative location)
+           ~error_details:(Informative loc)
            entrypoint_ty
            parsed_arg_ty)
       >>?= fun (res, ctxt) ->
