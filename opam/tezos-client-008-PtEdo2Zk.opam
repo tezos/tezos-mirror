@@ -13,8 +13,6 @@ depends: [
   "tezos-shell-services"
   "tezos-client-base"
   "tezos-protocol-008-PtEdo2Zk"
-  "tezos-mockup-registration"
-  "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-plugin-008-PtEdo2Zk"
   "tezos-rpc"

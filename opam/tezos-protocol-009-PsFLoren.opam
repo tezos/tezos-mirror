@@ -10,7 +10,6 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" & < "3.0" }
   "tezos-protocol-environment"
-  "tezos-base"
 ]
 build: [
   ["rm" "-r" "vendors"]

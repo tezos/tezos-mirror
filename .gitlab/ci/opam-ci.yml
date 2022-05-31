@@ -357,21 +357,6 @@ opam:tezos-client-genesis:
   variables:
     package: tezos-client-genesis
 
-opam:tezos-client-sapling-008-PtEdo2Zk:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-008-PtEdo2Zk
-
-opam:tezos-client-sapling-009-PsFLoren:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-009-PsFLoren
-
-opam:tezos-client-sapling-010-PtGRANAD:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-010-PtGRANAD
-
 opam:tezos-client-sapling-011-PtHangz2:
   extends: .opam_template
   variables:

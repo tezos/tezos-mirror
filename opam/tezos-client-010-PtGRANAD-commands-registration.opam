@@ -17,7 +17,6 @@ depends: [
   "tezos-client-010-PtGRANAD"
   "tezos-client-commands"
   "tezos-client-010-PtGRANAD-commands"
-  "tezos-client-sapling-010-PtGRANAD"
   "tezos-rpc"
   "tezos-protocol-plugin-010-PtGRANAD"
 ]

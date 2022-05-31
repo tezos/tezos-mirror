@@ -10,11 +10,8 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-010-PtGRANAD
-  tezos-mockup-registration
-  tezos-proxy
   tezos-signer-backends
   tezos-protocol-plugin-010-PtGRANAD
-  tezos-protocol-010-PtGRANAD.parameters
   tezos-rpc)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
@@ -27,5 +24,4 @@
    -open Tezos_client_base
    -open Tezos_protocol_010_PtGRANAD
    -open Tezos_protocol_plugin_010_PtGRANAD
-   -open Tezos_protocol_010_PtGRANAD_parameters
    -open Tezos_rpc)))
