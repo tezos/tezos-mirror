@@ -935,17 +935,6 @@ let memory s =
   let mtype = memory_type s in
   {mtype}
 
-(* Global section *)
-
-let global s =
-  let gtype = global_type s in
-  let ginit = const s in
-  {gtype; ginit}
-
-let _global_section s =
-  section `GlobalSection (vec (at global)) [] s
-
-
 (* Export section *)
 
 let export_desc s =
@@ -1155,6 +1144,13 @@ type module_kont' =
   | MKStop of module_' (* TODO (#3120): actually, should be module_ *)
   (** Final step of the parsing, cannot reduce. *)
 
+  (* For the next continuations, the vectors are only used for accumulation, and
+     reduce to `MK_Field(.., Rev ..)`. *)
+  | MKGlobal of global_type * int * instr_block_kont list * size * global vec_kont
+  (** Globals section parsing, containing the starting position, the
+      continuation of the current global block instruction, and the size of the
+      section. *)
+
 type module_kont =
   { building_state : field list; (** Accumulated parsed sections. *)
     kont : module_kont' }
@@ -1240,7 +1236,8 @@ let module_ s =
          let f = at memory s in (* small enough to fit in a tick *)
          next @@ MKField (ty, size, Collect (n - 1, f :: l))
        | GlobalField ->
-         failwith "HERE" (* do something incremental *)
+         let gtype = global_type s in
+         next @@ MKGlobal (gtype, pos s, [IKNext []], size, Collect (n, l))
        | ExportField ->
          let f = at export s in (* small enough to fit in a tick *)
          next @@ MKField (ty, size, Collect (n - 1, f :: l))
@@ -1257,6 +1254,19 @@ let module_ s =
        | DataField ->
          failwith "HERE" (* do something incremental, like Global, but more complex *)
       )
+
+    (* These sections have a distinct step mechanism. *)
+
+    | MKGlobal (gtype, left, [ IKStop res], size, Collect (n, l)) ->
+      end_ s ;
+      let ginit = Source.(res @@ region s left (pos s)) in
+      let f = Source.({gtype; ginit} @@ region s left (pos s)) in
+      next @@ MKField (GlobalField, size, Collect (n - 1, f :: l))
+    | MKGlobal (ty, pos, [ IKStop res], _, Rev (_, _))  ->
+      (* Impossible case, there's no need for reversal. *)
+      assert false
+    | MKGlobal (ty, pos, k, size, curr_vec) ->
+      next @@ MKGlobal (ty, pos, instr_block_step s k, size, curr_vec)
 
     (* Transitions steps from the end of a section to the next one.
 
