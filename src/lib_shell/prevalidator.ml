@@ -664,7 +664,8 @@ module Make_s
       in
       advertise pv_shell mempool_to_advertise ;
       let our_mempool =
-        let rev_prechecked_hashes =
+        let prechecked_hashes =
+          (* Outputs hashes in "decreasing" order which should not matter *)
           Classification.Sized_map.fold
             (fun x _ acc -> x :: acc)
             pv_shell.classification.prechecked
@@ -676,7 +677,7 @@ module Make_s
           Mempool.known_valid =
             List.fold_left
               (fun acc op -> op.Prevalidation.hash :: acc)
-              (List.rev rev_prechecked_hashes)
+              prechecked_hashes
               pv_shell.classification.applied_rev;
           pending = Pending_ops.hashes pv_shell.pending;
         }
