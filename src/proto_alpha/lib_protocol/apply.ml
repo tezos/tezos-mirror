@@ -3725,6 +3725,7 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
   may_start_new_cycle ctxt
   >>=? fun (ctxt, cycle_end_balance_updates, deactivated) ->
   Amendment.may_start_new_voting_period ctxt >>=? fun ctxt ->
+  Dal_apply.dal_finalisation ctxt >>=? fun (ctxt, dal_slot_availability) ->
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in
@@ -3747,6 +3748,7 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
         balance_updates;
         liquidity_baking_toggle_ema;
         implicit_operations_results;
+        dal_slot_availability;
       }
   in
   (ctxt, fitness, receipt)

@@ -3095,6 +3095,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
+  dal_slot_availability : Dal.Endorsement.t option;
 }
 
 let block_metadata_encoding =
@@ -3112,6 +3113,7 @@ let block_metadata_encoding =
               balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
+              dal_slot_availability;
             } ->
          ( ( proposer,
              baker,
@@ -3123,7 +3125,7 @@ let block_metadata_encoding =
              balance_updates,
              liquidity_baking_toggle_ema,
              implicit_operations_results ),
-           consumed_gas ))
+           (consumed_gas, dal_slot_availability) ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -3134,7 +3136,7 @@ let block_metadata_encoding =
                 balance_updates,
                 liquidity_baking_toggle_ema,
                 implicit_operations_results ),
-              _consumed_millgas ) ->
+              (_consumed_millgas, dal_slot_availability) ) ->
          {
            proposer;
            baker;
@@ -3146,6 +3148,7 @@ let block_metadata_encoding =
            balance_updates;
            liquidity_baking_toggle_ema;
            implicit_operations_results;
+           dal_slot_availability;
          })
        (merge_objs
           (obj10
@@ -3163,7 +3166,14 @@ let block_metadata_encoding =
              (req
                 "implicit_operations_results"
                 (list successful_manager_operation_result_encoding)))
-          (obj1 (req "consumed_milligas" Gas.Arith.n_fp_encoding)))
+          (obj2
+             (req "consumed_milligas" Gas.Arith.n_fp_encoding)
+             (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3119
+
+                This varopt is here while the DAL is behind a feature
+                flag. This should be replaced by a required field once
+                the feature flag will be activated. *)
+             (varopt "dal_slot_availability" Dal.Endorsement.encoding)))
 
 type precheck_result = {
   consumed_gas : Gas.Arith.fp;

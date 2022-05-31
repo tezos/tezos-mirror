@@ -380,6 +380,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
+  dal_slot_availability : Dal.Endorsement.t option;
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding

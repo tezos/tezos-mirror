@@ -583,6 +583,7 @@ let finalize_block
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
+              dal_slot_availability = None;
             } )
   | Partial_application {fitness; block_producer; _} ->
       (* For partial application we do not completely check the block validity.
@@ -622,6 +623,7 @@ let finalize_block
             balance_updates = migration_balance_updates;
             liquidity_baking_toggle_ema;
             implicit_operations_results;
+            dal_slot_availability = None;
           } )
   | Application
       {
