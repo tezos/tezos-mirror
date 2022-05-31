@@ -387,15 +387,11 @@ let create_empty ~name = Latex_syntax.{title = name; sections = []}
 
 let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     ~(problem : Inference.problem) ~(solution : Inference.solution)
-    ~overrides_map ~short ?report_folder document =
+    ~overrides_map ~short ~display_options document =
   let (Measure.Measurement ((module Bench), _)) = measure in
   let figs_files =
     let plot_target = Display.Save in
-    let save_directory =
-      match report_folder with
-      | None -> Filename.get_temp_dir_name ()
-      | Some directory -> directory
-    in
+    let save_directory = display_options.Display.save_directory in
     (match Unix.stat save_directory with
     | exception Unix.Unix_error _ ->
         Format.eprintf "Folder %s does not exist, creating it.@." save_directory ;
@@ -405,14 +401,13 @@ let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
         Format.eprintf "%s is not a folder, exiting.@." save_directory ;
         exit 1) ;
     Format.eprintf "Saving plot in folder %s@." save_directory ;
-    let options = {Display.default_options with save_directory} in
     Display.perform_plot
       ~measure
       ~model_name
       ~problem
       ~solution
       ~plot_target
-      ~options
+      ~options:display_options
   in
   let section = report ~measure ~solution ~figs_files ~overrides_map ~short in
   let open Latex_syntax in

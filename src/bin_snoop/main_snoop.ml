@@ -144,6 +144,7 @@ and infer_cmd_one_shot model_name workload_data solver
               ~solution
               ~overrides_map
               ~short:false
+              ~display_options:infer_opts.display
               (Report.create_empty ~name:"Report")
           in
           Report.to_latex report
@@ -171,10 +172,11 @@ and infer_cmd_full_auto model_name workload_data solver
     | None -> Free_variable.Map.empty
     | Some filenames -> Override.load ~filenames
   in
-  let report_folder =
+  let display_options =
     match infer_opts.report with
-    | Cmdline.ReportToFile s -> Some (Filename.dirname s)
-    | _ -> None
+    | Cmdline.ReportToFile s ->
+        {infer_opts.display with Display.save_directory = Filename.dirname s}
+    | _ -> infer_opts.display
   in
   let solver = solver_of_string solver infer_opts in
   let graph, measurements = Dep_graph.load_files model_name workload_files in
@@ -224,7 +226,7 @@ and infer_cmd_full_auto model_name workload_data solver
                ~problem
                ~solution
                ~overrides_map
-               ?report_folder
+               ~display_options
                ~short:true)
             report
         in
@@ -313,7 +315,7 @@ and perform_plot measure model_name problem solution
          ~problem
          ~solution
          ~plot_target:Display.Show
-         ~options:Display.default_options
+         ~options:infer_opts.Cmdline.display
   else ()
 
 and get_all_workload_data_files directory =
