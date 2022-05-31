@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_004_Pt24m4xi_commands)
- (public_name tezos-client-004-Pt24m4xi-commands)
+ (public_name tezos-client-004-Pt24m4xi.commands)
  (libraries
   tezos-base
   tezos-protocol-004-Pt24m4xi
@@ -30,7 +30,7 @@
 
 (library
  (name tezos_client_004_Pt24m4xi_commands_registration)
- (public_name tezos-client-004-Pt24m4xi-commands.registration)
+ (public_name tezos-client-004-Pt24m4xi.commands-registration)
  (libraries
   tezos-base
   tezos-protocol-004-Pt24m4xi
@@ -39,7 +39,7 @@
   tezos-client-base
   tezos-client-004-Pt24m4xi
   tezos-client-commands
-  tezos-client-004-Pt24m4xi-commands
+  tezos-client-004-Pt24m4xi.commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

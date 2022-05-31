@@ -16,7 +16,7 @@ depends: [
   "data-encoding" { >= "0.5.3" & < "0.6" }
   "lwt" { >= "5.4.0" }
   "tezos-baking-alpha"
-  "tezos-client-alpha-commands"
+  "tezos-client-alpha"
   "tezos-client-base-unix"
   "tezos-protocol-alpha"
   "tezt"

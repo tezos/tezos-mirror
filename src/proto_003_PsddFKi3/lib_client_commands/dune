@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_003_PsddFKi3_commands)
- (public_name tezos-client-003-PsddFKi3-commands)
+ (public_name tezos-client-003-PsddFKi3.commands)
  (libraries
   tezos-base
   tezos-protocol-003-PsddFKi3
@@ -30,7 +30,7 @@
 
 (library
  (name tezos_client_003_PsddFKi3_commands_registration)
- (public_name tezos-client-003-PsddFKi3-commands.registration)
+ (public_name tezos-client-003-PsddFKi3.commands-registration)
  (libraries
   tezos-base
   tezos-protocol-003-PsddFKi3
@@ -39,7 +39,7 @@
   tezos-client-base
   tezos-client-003-PsddFKi3
   tezos-client-commands
-  tezos-client-003-PsddFKi3-commands
+  tezos-client-003-PsddFKi3.commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_006_PsCARTHA_commands)
- (public_name tezos-client-006-PsCARTHA-commands)
+ (public_name tezos-client-006-PsCARTHA.commands)
  (libraries
   tezos-base
   tezos-protocol-006-PsCARTHA
@@ -30,7 +30,7 @@
 
 (library
  (name tezos_client_006_PsCARTHA_commands_registration)
- (public_name tezos-client-006-PsCARTHA-commands.registration)
+ (public_name tezos-client-006-PsCARTHA.commands-registration)
  (libraries
   tezos-base
   tezos-protocol-006-PsCARTHA
@@ -39,7 +39,7 @@
   tezos-client-base
   tezos-client-006-PsCARTHA
   tezos-client-commands
-  tezos-client-006-PsCARTHA-commands
+  tezos-client-006-PsCARTHA.commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

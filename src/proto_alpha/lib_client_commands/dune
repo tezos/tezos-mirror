@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_alpha_commands)
- (public_name tezos-client-alpha-commands)
+ (public_name tezos-client-alpha.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -40,7 +40,7 @@
 
 (library
  (name tezos_client_alpha_commands_registration)
- (public_name tezos-client-alpha-commands-registration)
+ (public_name tezos-client-alpha.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -51,8 +51,8 @@
   tezos-client-base
   tezos-client-alpha
   tezos-client-commands
-  tezos-client-alpha-commands
-  tezos-client-sapling-alpha
+  tezos-client-alpha.commands
+  tezos-client-alpha.sapling
   tezos-rpc
   tezos-protocol-plugin-alpha)
  (library_flags (:standard -linkall))

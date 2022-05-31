@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_007_PsDELPH1_commands)
- (public_name tezos-client-007-PsDELPH1-commands)
+ (public_name tezos-client-007-PsDELPH1.commands)
  (libraries
   tezos-base
   tezos-protocol-007-PsDELPH1
@@ -30,7 +30,7 @@
 
 (library
  (name tezos_client_007_PsDELPH1_commands_registration)
- (public_name tezos-client-007-PsDELPH1-commands-registration)
+ (public_name tezos-client-007-PsDELPH1.commands-registration)
  (libraries
   tezos-base
   tezos-protocol-007-PsDELPH1
@@ -39,7 +39,7 @@
   tezos-client-base
   tezos-client-007-PsDELPH1
   tezos-client-commands
-  tezos-client-007-PsDELPH1-commands
+  tezos-client-007-PsDELPH1.commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

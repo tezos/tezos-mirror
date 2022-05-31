@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_010_PtGRANAD_commands)
- (public_name tezos-client-010-PtGRANAD-commands)
+ (public_name tezos-client-010-PtGRANAD.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -35,7 +35,7 @@
 
 (library
  (name tezos_client_010_PtGRANAD_commands_registration)
- (public_name tezos-client-010-PtGRANAD-commands-registration)
+ (public_name tezos-client-010-PtGRANAD.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -45,7 +45,7 @@
   tezos-client-base
   tezos-client-010-PtGRANAD
   tezos-client-commands
-  tezos-client-010-PtGRANAD-commands
+  tezos-client-010-PtGRANAD.commands
   tezos-rpc
   tezos-protocol-plugin-010-PtGRANAD)
  (library_flags (:standard -linkall))

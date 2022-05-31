@@ -157,180 +157,70 @@ opam:tezos-client-001-PtCJ7pwo:
   variables:
     package: tezos-client-001-PtCJ7pwo
 
-opam:tezos-client-001-PtCJ7pwo-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-001-PtCJ7pwo-commands
-
 opam:tezos-client-002-PsYLVpVv:
   extends: .opam_template
   variables:
     package: tezos-client-002-PsYLVpVv
-
-opam:tezos-client-002-PsYLVpVv-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-002-PsYLVpVv-commands
 
 opam:tezos-client-003-PsddFKi3:
   extends: .opam_template
   variables:
     package: tezos-client-003-PsddFKi3
 
-opam:tezos-client-003-PsddFKi3-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-003-PsddFKi3-commands
-
 opam:tezos-client-004-Pt24m4xi:
   extends: .opam_template
   variables:
     package: tezos-client-004-Pt24m4xi
-
-opam:tezos-client-004-Pt24m4xi-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-004-Pt24m4xi-commands
 
 opam:tezos-client-005-PsBabyM1:
   extends: .opam_template
   variables:
     package: tezos-client-005-PsBabyM1
 
-opam:tezos-client-005-PsBabyM1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-005-PsBabyM1-commands
-
 opam:tezos-client-006-PsCARTHA:
   extends: .opam_template
   variables:
     package: tezos-client-006-PsCARTHA
-
-opam:tezos-client-006-PsCARTHA-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-006-PsCARTHA-commands
 
 opam:tezos-client-007-PsDELPH1:
   extends: .opam_template
   variables:
     package: tezos-client-007-PsDELPH1
 
-opam:tezos-client-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-007-PsDELPH1-commands
-
-opam:tezos-client-007-PsDELPH1-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-007-PsDELPH1-commands-registration
-
 opam:tezos-client-008-PtEdo2Zk:
   extends: .opam_template
   variables:
     package: tezos-client-008-PtEdo2Zk
-
-opam:tezos-client-008-PtEdo2Zk-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-008-PtEdo2Zk-commands
-
-opam:tezos-client-008-PtEdo2Zk-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-008-PtEdo2Zk-commands-registration
 
 opam:tezos-client-009-PsFLoren:
   extends: .opam_template
   variables:
     package: tezos-client-009-PsFLoren
 
-opam:tezos-client-009-PsFLoren-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-009-PsFLoren-commands
-
-opam:tezos-client-009-PsFLoren-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-009-PsFLoren-commands-registration
-
 opam:tezos-client-010-PtGRANAD:
   extends: .opam_template
   variables:
     package: tezos-client-010-PtGRANAD
-
-opam:tezos-client-010-PtGRANAD-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-010-PtGRANAD-commands
-
-opam:tezos-client-010-PtGRANAD-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-010-PtGRANAD-commands-registration
 
 opam:tezos-client-011-PtHangz2:
   extends: .opam_template
   variables:
     package: tezos-client-011-PtHangz2
 
-opam:tezos-client-011-PtHangz2-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-011-PtHangz2-commands
-
-opam:tezos-client-011-PtHangz2-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-011-PtHangz2-commands-registration
-
 opam:tezos-client-012-Psithaca:
   extends: .opam_template
   variables:
     package: tezos-client-012-Psithaca
-
-opam:tezos-client-012-Psithaca-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-012-Psithaca-commands
-
-opam:tezos-client-012-Psithaca-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-012-Psithaca-commands-registration
 
 opam:tezos-client-013-PtJakart:
   extends: .opam_template
   variables:
     package: tezos-client-013-PtJakart
 
-opam:tezos-client-013-PtJakart-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-013-PtJakart-commands
-
-opam:tezos-client-013-PtJakart-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-013-PtJakart-commands-registration
-
 opam:tezos-client-alpha:
   extends: .opam_template
   variables:
     package: tezos-client-alpha
-
-opam:tezos-client-alpha-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-client-alpha-commands
-
-opam:tezos-client-alpha-commands-registration:
-  extends: .opam_template
-  variables:
-    package: tezos-client-alpha-commands-registration
 
 opam:tezos-client-base:
   extends: .opam_template
@@ -356,26 +246,6 @@ opam:tezos-client-genesis:
   extends: .opam_template
   variables:
     package: tezos-client-genesis
-
-opam:tezos-client-sapling-011-PtHangz2:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-011-PtHangz2
-
-opam:tezos-client-sapling-012-Psithaca:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-012-Psithaca
-
-opam:tezos-client-sapling-013-PtJakart:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-013-PtJakart
-
-opam:tezos-client-sapling-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-client-sapling-alpha
 
 opam:tezos-codec:
   extends: .opam_template

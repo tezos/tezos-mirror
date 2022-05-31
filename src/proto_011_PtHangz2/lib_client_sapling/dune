@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_sapling_011_PtHangz2)
- (public_name tezos-client-sapling-011-PtHangz2)
+ (public_name tezos-client-011-PtHangz2.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -12,7 +12,7 @@
   tezos-client-base
   tezos-signer-backends
   tezos-client-011-PtHangz2
-  tezos-client-011-PtHangz2-commands
+  tezos-client-011-PtHangz2.commands
   tezos-protocol-011-PtHangz2
   tezos-protocol-011-PtHangz2.environment)
  (library_flags (:standard -linkall))

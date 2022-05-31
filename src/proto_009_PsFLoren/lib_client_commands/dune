@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_009_PsFLoren_commands)
- (public_name tezos-client-009-PsFLoren-commands)
+ (public_name tezos-client-009-PsFLoren.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -35,7 +35,7 @@
 
 (library
  (name tezos_client_009_PsFLoren_commands_registration)
- (public_name tezos-client-009-PsFLoren-commands-registration)
+ (public_name tezos-client-009-PsFLoren.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -45,7 +45,7 @@
   tezos-client-base
   tezos-client-009-PsFLoren
   tezos-client-commands
-  tezos-client-009-PsFLoren-commands
+  tezos-client-009-PsFLoren.commands
   tezos-rpc
   tezos-protocol-plugin-009-PsFLoren)
  (library_flags (:standard -linkall))

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_001_PtCJ7pwo_commands)
- (public_name tezos-client-001-PtCJ7pwo-commands)
+ (public_name tezos-client-001-PtCJ7pwo.commands)
  (libraries
   tezos-base
   tezos-protocol-001-PtCJ7pwo
@@ -30,7 +30,7 @@
 
 (library
  (name tezos_client_001_PtCJ7pwo_commands_registration)
- (public_name tezos-client-001-PtCJ7pwo-commands.registration)
+ (public_name tezos-client-001-PtCJ7pwo.commands-registration)
  (libraries
   tezos-base
   tezos-protocol-001-PtCJ7pwo
@@ -39,7 +39,7 @@
   tezos-client-base
   tezos-client-001-PtCJ7pwo
   tezos-client-commands
-  tezos-client-001-PtCJ7pwo-commands
+  tezos-client-001-PtCJ7pwo.commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

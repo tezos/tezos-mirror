@@ -16,6 +16,9 @@ depends: [
   "tezos-signer-backends"
   "tezos-protocol-plugin-007-PsDELPH1"
   "tezos-rpc"
+  "tezos-stdlib-unix"
+  "tezos-protocol-environment"
+  "tezos-client-commands"
 ]
 build: [
   ["rm" "-r" "vendors"]
