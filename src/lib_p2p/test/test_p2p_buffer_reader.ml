@@ -284,7 +284,7 @@ let test_read_full_waits =
       ~name:
         "read_full fills the buffer and waits for enough data to be available \
          if needed"
-      Gen.(list string))
+      Gen.(small_list string))
   @@ fun data_to_write_list ->
   let total_size =
     List.fold_left (fun size s -> size + String.length s) 0 data_to_write_list
