@@ -43,18 +43,21 @@
     for decoding and interpreting these messages.
   *)
 
+(** [internal_inbox_message] represent an internal message in a inbox (L1 ->
+    L2). This is not inline so it can easily be used by
+    {!Sc_rollup_costs.cost_serialize_internal_inbox_message}. *)
+type internal_inbox_message = {
+  payload : Script_repr.expr;
+      (** A Micheline value containing the parameters passed to the rollup. *)
+  sender : Contract_repr.t;  (** The L1 caller contract. *)
+  source : Signature.public_key_hash;
+      (** The implicit account that originated the transaction. *)
+}
+
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from
     an external manager operation. *)
-type t =
-  | Internal of {
-      payload : Script_repr.expr;
-          (** A Micheline value containing the parameters passed to the rollup. *)
-      sender : Contract_repr.t;  (** The L1 caller contract. *)
-      source : Signature.public_key_hash;
-          (** The implicit account that originated the transaction. *)
-    }
-  | External of string
+type t = Internal of internal_inbox_message | External of string
 
 (** A typed version of a message serialized in binary format. *)
 type serialized = private string
@@ -62,6 +65,7 @@ type serialized = private string
 (** [to_bytes msg] encodes the inbox message [msg] in binary format. *)
 val to_bytes : t -> serialized tzresult
 
+(** Module containing functions exposed so they can be used in test. *)
 module Internal_for_tests : sig
   (** [of_bytes bs] decodes [bs] as an [inbox_message]. *)
   val of_bytes : string -> t tzresult

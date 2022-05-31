@@ -2705,13 +2705,13 @@ module Sc_rollup : sig
 
     (** See {!Sc_rollup_inbox_message_repr}. *)
     module Message : sig
-      type t =
-        | Internal of {
-            payload : Script.expr;
-            sender : Contract.t;
-            source : Signature.public_key_hash;
-          }
-        | External of string
+      type internal_inbox_message = {
+        payload : Script.expr;
+        sender : Contract.t;
+        source : Signature.public_key_hash;
+      }
+
+      type t = Internal of internal_inbox_message | External of string
 
       type serialized = private string
 

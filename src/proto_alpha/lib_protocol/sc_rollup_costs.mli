@@ -47,3 +47,20 @@ val is_valid_parameters_ty_cost :
     function is used internally in the [Sc_rollup_storage] module. *)
 val cost_add_external_messages :
   num_messages:int -> total_messages_size:int -> int32 -> Gas_limit_repr.cost
+
+(** [cost_serialize_internal_inbox_message internal_inbox_message] is the cost
+    of the serialization of an internal inbox message. It's equal to the cost of
+    serializing the script expression, with {!Script_repr.force_bytes_cost} plus
+    a fixed amount for the serialized addresses.
+
+    It traverses the payload expression to find the precise cost. It is safe to
+    use {!Script_repr.force_bytes_cost} because the payload of an internal inbox
+    message is bounded.
+*)
+val cost_serialize_internal_inbox_message :
+  Sc_rollup_inbox_message_repr.internal_inbox_message -> Gas_limit_repr.cost
+
+(** [cost_deserialize_outbox_message ~bytes_len] is the cost of the
+    deserialization of an outbox message. It's equal to the cost of
+    deserializing script expression of size [bytes_len]. *)
+val cost_deserialize_outbox_message : bytes_len:int -> Gas_limit_repr.cost

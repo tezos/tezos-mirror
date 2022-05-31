@@ -45,6 +45,12 @@ module Constants = struct
   let cost_add_inbox_per_level = S.safe_int 15
 
   let cost_update_num_and_size_of_messages = S.safe_int 15
+
+  (* equal to Michelson_v1_gas.Cost_of.Unparsing.contract_optimized *)
+  let cost_decoding_contract_optimized = S.safe_int 70
+
+  (* equal to Michelson_v1_gas.Cost_of.Unparsing.key_hash_optimized *)
+  let cost_decoding_key_hash_optimized = S.safe_int 50
 end
 
 (* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
@@ -70,3 +76,20 @@ let is_valid_parameters_ty_cost ~ty_size =
   let fixed_cost = S.safe_int 10 in
   let coeff = S.safe_int 6 in
   S.add fixed_cost (S.mul coeff ty_size)
+
+let cost_serialize_internal_inbox_message
+    Sc_rollup_inbox_message_repr.{payload; sender = _; source = _} =
+  let lexpr = Script_repr.lazy_expr payload in
+  let expr_cost = Script_repr.force_bytes_cost lexpr in
+  S_syntax.(
+    expr_cost + Constants.cost_decoding_contract_optimized
+    + Constants.cost_decoding_key_hash_optimized)
+
+(** We assume that the cost of deserializing an expression of [bytes_len] is
+    greater by a notch to the real cost here.
+
+    TODO: checks if the estimated cost is close to the more precise cost: To
+    check the real cost we could traverse the list of expression in the
+    deserialized output message. *)
+let cost_deserialize_outbox_message ~bytes_len =
+  Script_repr.deserialization_cost_estimated_from_bytes bytes_len
