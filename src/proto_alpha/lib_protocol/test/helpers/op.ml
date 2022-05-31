@@ -701,3 +701,26 @@ let sc_rollup_cement ?counter ?fee ?gas_limit ?storage_limit ctxt
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk ctxt to_sign_op
+
+let sc_rollup_atomic_batch ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (src : Contract.t) rollup cemented_commitment ~outbox_level ~message_index
+    ~inclusion_proof ~atomic_transaction_batch =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    (Sc_rollup_atomic_batch
+       {
+         rollup;
+         cemented_commitment;
+         outbox_level;
+         message_index;
+         inclusion_proof;
+         atomic_transaction_batch;
+       })
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
+  sign account.sk ctxt to_sign_op

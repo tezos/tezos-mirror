@@ -392,3 +392,18 @@ val sc_rollup_cement :
   Sc_rollup.t ->
   Sc_rollup.Commitment.Hash.t ->
   Operation.packed tzresult Lwt.t
+
+val sc_rollup_atomic_batch :
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Sc_rollup.Commitment.Hash.t ->
+  outbox_level:Raw_level.t ->
+  message_index:int ->
+  inclusion_proof:string ->
+  atomic_transaction_batch:string ->
+  (packed_operation, tztrace) result Lwt.t
