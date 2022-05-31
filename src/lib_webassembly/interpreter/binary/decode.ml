@@ -824,9 +824,12 @@ let instr_block_step s cont =
 (** Vector and size continuations *)
 
 (** Vector accumulator, used in two steps: first accumulating the values, then
-    reversing them and possibly mapping them. Continuation passing style
-    transformation of {!List.map}. *)
-type ('a, 'b) vec_map_kont = Collect of int * 'a list | Rev of 'a list * 'b list
+    reversing them and possibly mapping them, counting the number of values in
+    the list. Continuation passing style transformation of {!List.map} also
+    returning length. *)
+type ('a, 'b) vec_map_kont =
+    Collect of int * 'a list
+  | Rev of 'a list * 'b list * int
 
 type 'a vec_kont = ('a, 'a) vec_map_kont
 
@@ -1000,7 +1003,7 @@ let code_step s = function
   | CKLocals { left; size; pos; vec_kont = Collect (0, l); locals_size; } ->
     require (I64.lt_u locals_size 0x1_0000_0000L)
       s pos "too many locals";
-    CKLocals { left; size; pos; vec_kont = Rev (l, []); locals_size; }
+    CKLocals { left; size; pos; vec_kont = Rev (l, [], 0); locals_size; }
   | CKLocals { left; size; pos; vec_kont =  Collect (n, l); locals_size; } ->
     let local = local s in (* small enough to fit in a tick *)
     let locals_size =
@@ -1009,17 +1012,22 @@ let code_step s = function
       { left; size; pos; vec_kont = Collect (n - 1, local :: l); locals_size; }
 
   | CKLocals
-      { left; size; pos; vec_kont = Rev ([], locals);
+      { left; size; pos; vec_kont = Rev ([], locals, _len);
         locals_size; }->
     CKBody { left; size; locals; const_kont = [ IKNext [] ] }
   | CKLocals
-      { left; size; pos; vec_kont = Rev ((0l, t) :: l, l'); locals_size } ->
-    CKLocals { left; size; pos; vec_kont = Rev (l, l'); locals_size; }
+      { left; size; pos; vec_kont = Rev ((0l, t) :: l, l', len); locals_size } ->
+    CKLocals { left; size; pos; vec_kont = Rev (l, l', len); locals_size; }
   | CKLocals
-      { left; size; pos; vec_kont = Rev ((n, t) :: l, l'); locals_size; } ->
+      { left; size; pos; vec_kont = Rev ((n, t) :: l, l', len); locals_size; } ->
     let n' = I32.sub n 1l in
     CKLocals
-      { left; size; pos; vec_kont = Rev ((n', t) :: l, t :: l'); locals_size; }
+      { left;
+        size;
+        pos;
+        vec_kont = Rev ((n', t) :: l, t :: l', len + 1);
+        locals_size;
+      }
 
 
   | CKBody { left; size; locals; const_kont = [ IKStop body ] } ->
@@ -1215,7 +1223,7 @@ let elem_step s =
 
   (* COLLECT Indexed *)
   | EKInitIndexed { mode; ref_type; einit_vec = Collect(0, l) } ->
-    EKInitIndexed { mode; ref_type; einit_vec = Rev(l, []) }
+    EKInitIndexed { mode; ref_type; einit_vec = Rev(l, [], 0) }
   | EKInitIndexed { mode; ref_type; einit_vec = Collect(n, l) } ->
     let elem_index = at elem_index s in
     EKInitIndexed { mode; ref_type; einit_vec = Collect(n-1, elem_index :: l) }
@@ -1223,7 +1231,7 @@ let elem_step s =
   (* COLLECT CONST *)
   | EKInitConst
       { mode; ref_type; einit_vec = Collect(0, l); einit_kont = (left, _)} ->
-    EKInitConst { mode; ref_type; einit_vec = Rev(l, []); einit_kont = (left, [])}
+    EKInitConst { mode; ref_type; einit_vec = Rev(l, [], 0); einit_kont = (left, [])}
   | EKInitConst {
       mode;
       ref_type;
@@ -1247,13 +1255,15 @@ let elem_step s =
       { mode; ref_type; einit_vec = Collect(n, l); einit_kont = (left, k') }
 
   (* REV *)
-  | EKInitConst { mode; ref_type; einit_vec = Rev ([], einit); _ }
-  | EKInitIndexed { mode; ref_type; einit_vec = Rev ([], einit) } ->
+  | EKInitConst { mode; ref_type; einit_vec = Rev ([], einit, _len); _ }
+  | EKInitIndexed { mode; ref_type; einit_vec = Rev ([], einit, _len) } ->
     EKStop { etype = ref_type; einit; emode = mode }
-  | EKInitConst { mode; ref_type; einit_vec = Rev (c :: l, l'); einit_kont } ->
-    EKInitConst { mode; ref_type; einit_vec = Rev (l, c :: l'); einit_kont }
-  | EKInitIndexed { mode; ref_type; einit_vec = Rev (c :: l, l') } ->
-    EKInitIndexed { mode; ref_type; einit_vec = Rev (l, c :: l') }
+  | EKInitConst
+      { mode; ref_type; einit_vec = Rev (c :: l, l', len); einit_kont } ->
+    EKInitConst
+      { mode; ref_type; einit_vec = Rev (l, c :: l', len + 1); einit_kont }
+  | EKInitIndexed { mode; ref_type; einit_vec = Rev (c :: l, l', len) } ->
+    EKInitIndexed { mode; ref_type; einit_vec = Rev (l, c :: l', len + 1) }
 
   | EKStop _  -> assert false (* Final step, cannot reduce *)
 
@@ -1356,7 +1366,7 @@ type _ field_type =
 
 (** Result of a section parsing, being either a single value or a vector. *)
 type field =
-  | VecField : 'a field_type * 'a list -> field
+  | VecField : 'a field_type * 'a list * int -> field
   | SingleField : 'a field_type * 'a option -> field
 
 (** Module parsing steps *)
@@ -1457,9 +1467,9 @@ let module_ s =
          next @@ MKField (ty, size, Collect (l, []))
        | _ ->
          let size = { size = 0; start = pos s } in
-         next @@ MKField (ty, size, Rev ([], [])))
+         next @@ MKField (ty, size, Rev ([], [], 0)))
     | MKField (ty, size, Collect (0, l)) ->
-      next @@ MKField (ty, size, Rev ([], l))
+      next @@ MKField (ty, size, Rev (l, [], 0))
 
     | MKField (ty, size, Collect (n, l)) ->
       (match ty with
@@ -1505,8 +1515,8 @@ let module_ s =
       let ginit = Source.(res @@ region s left (pos s)) in
       let f = Source.({gtype; ginit} @@ region s left (pos s)) in
       next @@ MKField (GlobalField, size, Collect (n - 1, f :: l))
-    | MKGlobal (ty, pos, [ IKStop res], _, Rev (_, _))  ->
-      (* Impossible case, there's no need for reversal. *)
+    | MKGlobal (ty, pos, [ IKStop res], _, Rev (_, _, _))  ->
+     (* Impossible case, there's no need for reversal. *)
       assert false
     | MKGlobal (ty, pos, k, size, curr_vec) ->
       next @@ MKGlobal (ty, pos, instr_block_step s k, size, curr_vec)
@@ -1542,69 +1552,70 @@ let module_ s =
        The values accumulated from the section are accumulated into the `Next`
        continuation that will be used to build the module.*)
 
-    | MKField (ty, size, Rev (l, f :: fs)) ->
-      next @@ MKField (ty, size, Rev (f :: l, fs))
+    | MKField (ty, size, Rev (f :: l, fs, len)) ->
+      next @@ MKField (ty, size, Rev (l, f :: fs, len + 1))
 
       (* TODO (#3120): maybe we can factor-out these similarly shaped module section transitions *)
-    | MKField (TypeField, size, Rev (l, [])) ->
+    | MKField (TypeField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (TypeField, l))
+        (VecField (TypeField, l, len))
         (MKSkipCustom (Some (ImportField, `ImportSection)))
-    | MKField (ImportField, size, Rev (l, [])) ->
+    | MKField (ImportField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (ImportField, l))
+        (VecField (ImportField, l, len))
         (MKSkipCustom (Some (FuncField, `FuncSection)))
-    | MKField (FuncField, size, Rev (l, [])) ->
+    | MKField (FuncField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (FuncField, l))
+        (VecField (FuncField, l, len))
         (MKSkipCustom (Some (TableField, `TableSection)))
-    | MKField (TableField, size, Rev (l, [])) ->
+    | MKField (TableField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (TableField, l))
+        (VecField (TableField, l, len))
         (MKSkipCustom (Some (MemoryField, `MemorySection)))
-     | MKField (MemoryField, size, Rev (l, [])) ->
+     | MKField (MemoryField, size, Rev ([], l, len)) ->
        check_size size s;
        next_with_field
-         (VecField (MemoryField, l))
+         (VecField (MemoryField, l, len))
          (MKSkipCustom (Some (GlobalField, `GlobalSection)))
-    | MKField (GlobalField, size, Rev (l, [])) ->
+    | MKField (GlobalField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (GlobalField, l))
+        (VecField (GlobalField, l, len))
         (MKSkipCustom (Some (ExportField, `ExportSection)))
-    | MKField (ExportField, size, Rev (l, [])) ->
+    | MKField (ExportField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (ExportField, l))
+        (VecField (ExportField, l, len))
         (MKSkipCustom (Some (StartField, `StartSection)))
-    | MKField (ElemField, size, Rev (l, [])) ->
+    | MKField (ElemField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (ElemField, l))
+        (VecField (ElemField, l, len))
         (MKSkipCustom (Some (DataCountField, `DataCountSection)))
-    | MKField (CodeField, size, Rev (l, [])) ->
+    | MKField (CodeField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (CodeField, l))
+        (VecField (CodeField, l, len))
         (MKSkipCustom (Some (DataField, `DataSection)))
-    | MKField (DataField, size, Rev (l, [])) ->
+    | MKField (DataField, size, Rev ([], l, len)) ->
       check_size size s;
       next_with_field
-        (VecField (DataField, l))
+        (VecField (DataField, l, len))
         (* All sections are parsed, time to build the module *)
         (MKSkipCustom None)
 
     | MKBuild ->
       let rec find_vec
-        : type t. t field_type -> _ -> t list
+        : type t. t field_type -> _ -> t list * int
         = fun ty fields -> match fields with
           | [] -> assert false
           | SingleField _ :: rest -> find_vec ty rest
-          | VecField (ty', v) :: rest ->
+          | VecField (ty', v, len) :: rest ->
+            let v = (v, len) in
             match ty, ty' with (* TODO (#3120): factor this out with a Leibnitz equality witness *)
             | TypeField, TypeField -> v
             | ImportField, ImportField -> v
@@ -1642,23 +1653,23 @@ let module_ s =
             | _ -> find_single ty rest
       in
       let fields = state.building_state in
-      let types = find_vec TypeField fields in
-      let func_types = find_vec FuncField fields in
-      let func_bodies = find_vec CodeField fields in
+      let types, _ = find_vec TypeField fields in
+      let func_types, func_types_len = find_vec FuncField fields in
+      let func_bodies, func_bodies_len = find_vec CodeField fields in
       let data_count = find_single DataCountField fields in
-      let datas = find_vec DataField fields in
-      let elems = find_vec ElemField fields in
+      let datas, datas_len = find_vec DataField fields in
+      let elems, _ = find_vec ElemField fields in
       let start = find_single StartField fields in
-      let tables = find_vec TableField fields in
-      let memories = find_vec MemoryField fields in
-      let globals = find_vec GlobalField fields in
-      let imports = find_vec ImportField fields in
-      let exports = find_vec ExportField fields in
+      let tables, _ = find_vec TableField fields in
+      let memories, _ = find_vec MemoryField fields in
+      let globals, _ = find_vec GlobalField fields in
+      let imports, _ = find_vec ImportField fields in
+      let exports, _ = find_vec ExportField fields in
       ignore types;
       require (pos s = len s) s (len s) "unexpected content after last section";
-      require (List.length func_types = List.length func_bodies)
+      require (func_types_len = func_bodies_len)
         s (len s) "function and code section have inconsistent lengths";
-      require (data_count = None || data_count = Some (Lib.List32.length datas))
+      require (data_count = None || data_count = Some (I32.of_int_s datas_len))
         s (len s) "data count and data section have inconsistent lengths";
       require (data_count <> None ||
                List.for_all Free.(fun f -> (func f).datas = Set.empty) func_bodies)
