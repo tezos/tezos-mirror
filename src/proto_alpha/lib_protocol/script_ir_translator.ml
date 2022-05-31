@@ -3731,6 +3731,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                 {
                   apply =
                     (fun k ->
+                      let loc = kinstr_location k in
                       let ibody = ibody.instr.apply (IHalt loc) in
                       ILoop (loc, ibody, k));
                 }
@@ -3741,6 +3742,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             {
               apply =
                 (fun k ->
+                  let loc = kinstr_location k in
                   let ibody = descr stack in
                   let ibody = ibody.instr.apply (IHalt loc) in
                   ILoop (loc, ibody, k));
@@ -3775,6 +3777,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                 {
                   apply =
                     (fun k ->
+                      let loc = kinstr_location k in
                       let ibody = ibody.instr.apply (IHalt loc) in
                       ILoop_left (loc, ibody, k));
                 }
@@ -3786,6 +3789,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             {
               apply =
                 (fun k ->
+                  let loc = kinstr_location k in
                   let ibody = descr stack in
                   let ibody = ibody.instr.apply (IHalt loc) in
                   ILoop_left (loc, ibody, k));
