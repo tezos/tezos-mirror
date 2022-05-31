@@ -8,6 +8,7 @@ cd
 apt-get update
 apt-get install -y docker.io docker-compose kmod wget
 dockerd &
+sleep 10
 # [get testnet]
 wget -O ithacanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
 chmod +x ithacanet.sh
