@@ -81,7 +81,7 @@ module Raw = struct
           Data_encoding.Binary.to_bytes_exn
             Tezos_crypto.P256.Secret_key.encoding
             sk
-      | Decrypted_aggregate_sk (Bls12_381 sk) ->
+      | Decrypted_sk (Bls sk) | Decrypted_aggregate_sk (Bls12_381 sk) ->
           Data_encoding.Binary.to_bytes_exn
             Tezos_crypto.Bls.Secret_key.encoding
             sk
@@ -139,7 +139,9 @@ module Raw = struct
             failwith
               "Corrupted wallet, deciphered key is not a valid \
                Tezos_crypto.P256 secret key")
-    | Some bytes, Encrypted_aggregate_sk -> (
+    | ( Some bytes,
+        (Encrypted_aggregate_sk | Encrypted_sk Tezos_crypto.Signature.Bls) )
+      -> (
         match
           Data_encoding.Binary.of_bytes_opt
             Tezos_crypto.Bls.Secret_key.encoding
@@ -398,7 +400,8 @@ let common_encrypt sk password =
     | Decrypted_sk (Ed25519 _) -> Encodings.ed25519
     | Decrypted_sk (Secp256k1 _) -> Encodings.secp256k1
     | Decrypted_sk (P256 _) -> Encodings.p256
-    | Decrypted_aggregate_sk (Bls12_381 _) -> Encodings.bls12_381
+    | Decrypted_sk (Bls _) | Decrypted_aggregate_sk (Bls12_381 _) ->
+        Encodings.bls12_381
   in
   Tezos_crypto.Base58.simple_encode encoding payload
 
