@@ -1153,7 +1153,7 @@ module Target = struct
           else
             invalid_argf
               "%s is not a valid opam package name: should be of the form \
-               [A-Za-Z0-9_-]+"
+               [A-Za-z0-9_-]+"
               opam
       | None -> (
           match kind with

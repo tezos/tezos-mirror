@@ -2795,7 +2795,7 @@ end = struct
         invalid_arg
           (sf
              "Protocol.Name.make: %s is not a valid protocol name: should be \
-              of the form [A-Za-Z0-9-]+"
+              of the form [A-Za-z0-9-]+"
              name) ;
       let make_full_name sep name =
         match number with
