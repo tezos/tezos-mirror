@@ -765,3 +765,33 @@ val sc_rollup_publish :
   * Kind.sc_rollup_publish Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
+
+val sc_rollup_atomic_batch :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  ?counter:counter ->
+  source:public_key_hash ->
+  rollup:Sc_rollup.t ->
+  cemented_commitment:Sc_rollup.Commitment.Hash.t ->
+  outbox_level:Raw_level.t ->
+  message_index:int ->
+  inclusion_proof:string ->
+  atomic_transaction_batch:string ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  ( Operation_hash.t
+    * Kind.sc_rollup_atomic_batch Kind.manager contents
+    * Kind.sc_rollup_atomic_batch Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
+  Lwt.t

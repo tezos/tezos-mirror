@@ -131,6 +131,8 @@ module Kind : sig
 
   type sc_rollup_timeout = Sc_rollup_timeout_kind
 
+  type sc_rollup_atomic_batch = Sc_rollup_atomic_batch_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -156,6 +158,7 @@ module Kind : sig
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
     | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
+    | Sc_rollup_atomic_batch_manager_kind : sc_rollup_atomic_batch manager
 end
 
 type 'a consensus_operation_type =
@@ -460,6 +463,24 @@ and _ manager_operation =
       stakers : Sc_rollup_repr.Staker.t * Sc_rollup_repr.Staker.t;
     }
       -> Kind.sc_rollup_timeout manager_operation
+  (* [Sc_rollup_atomic_batch] executes an atomic batch of transactions
+      corresponding to a message in the rollup's outbox. Transactions are
+      smart-contract calls and may include any valid payload including ticket
+      transfers. *)
+  | Sc_rollup_atomic_batch : {
+      rollup : Sc_rollup_repr.t;  (** The smart-contract rollup. *)
+      cemented_commitment : Sc_rollup_commitment_repr.Hash.t;
+          (** The hash of the last cemented commitment that the proof refers to. *)
+      outbox_level : Raw_level_repr.t;
+          (** The level of the outbox containing transaction batch message. *)
+      message_index : int;
+          (** The index of the message in the outbox at that level. *)
+      inclusion_proof : string;
+          (** A proof that the message is included in the outbox. *)
+      atomic_transaction_batch : string;
+          (** The bytes corresponding to a serialized batch of transactions. *)
+    }
+      -> Kind.sc_rollup_atomic_batch manager_operation
 
 (** Counters are used as anti-replay protection mechanism in
     manager operations: each manager account stores a counter and
@@ -605,6 +626,9 @@ module Encoding : sig
 
   val sc_rollup_timeout_case : Kind.sc_rollup_timeout Kind.manager case
 
+  val sc_rollup_atomic_batch_case :
+    Kind.sc_rollup_atomic_batch Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -659,5 +683,7 @@ module Encoding : sig
     val sc_rollup_refute_case : Kind.sc_rollup_refute case
 
     val sc_rollup_timeout_case : Kind.sc_rollup_timeout case
+
+    val sc_rollup_atomic_batch_case : Kind.sc_rollup_atomic_batch case
   end
 end

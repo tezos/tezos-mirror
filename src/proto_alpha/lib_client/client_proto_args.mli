@@ -145,6 +145,8 @@ val json_parameter : (Data_encoding.Json.t, full) Clic.parameter
 
 val data_parameter : (Michelson_v1_parser.parsed, full) Clic.parameter
 
+val raw_level_parameter : (Raw_level.t, full) Clic.parameter
+
 val unparsing_mode_arg :
   default:string -> (Script_ir_translator.unparsing_mode, full) Clic.arg
 

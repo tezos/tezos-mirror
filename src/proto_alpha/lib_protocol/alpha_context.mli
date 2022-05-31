@@ -2920,6 +2920,8 @@ module Kind : sig
 
   type sc_rollup_timeout = Sc_rollup_timeout_kind
 
+  type sc_rollup_atomic_batch = Sc_rollup_atomic_batch_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -2945,6 +2947,7 @@ module Kind : sig
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
     | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
+    | Sc_rollup_atomic_batch_manager_kind : sc_rollup_atomic_batch manager
 end
 
 type 'a consensus_operation_type =
@@ -3149,6 +3152,15 @@ and _ manager_operation =
       stakers : Sc_rollup.Staker.t * Sc_rollup.Staker.t;
     }
       -> Kind.sc_rollup_timeout manager_operation
+  | Sc_rollup_atomic_batch : {
+      rollup : Sc_rollup.t;
+      cemented_commitment : Sc_rollup.Commitment.Hash.t;
+      outbox_level : Raw_level.t;
+      message_index : int;
+      inclusion_proof : string;
+      atomic_transaction_batch : string;
+    }
+      -> Kind.sc_rollup_atomic_batch manager_operation
 
 and counter = Z.t
 
@@ -3314,6 +3326,9 @@ module Operation : sig
 
     val sc_rollup_timeout_case : Kind.sc_rollup_timeout Kind.manager case
 
+    val sc_rollup_atomic_batch_case :
+      Kind.sc_rollup_atomic_batch Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -3369,6 +3384,8 @@ module Operation : sig
       val sc_rollup_refute_case : Kind.sc_rollup_refute case
 
       val sc_rollup_timeout_case : Kind.sc_rollup_timeout case
+
+      val sc_rollup_atomic_batch_case : Kind.sc_rollup_atomic_batch case
     end
   end
 

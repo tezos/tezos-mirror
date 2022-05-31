@@ -26,19 +26,33 @@
 
 open Alpha_context
 
-type error += (* Temporary *) Sc_rollup_invalid_parameters_type
+type error +=
+  | (* Permanent *) Sc_rollup_invalid_parameters_type
+  | (* Permanent *) Sc_rollup_invalid_atomic_batch
 
 let () =
   let description = "Invalid parameters type for rollup" in
   register_error_kind
-    `Temporary
+    `Permanent
     ~id:"Sc_rollup_invalid_parameters_type"
     ~title:"Invalid parameters type"
     ~description
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" description)
     Data_encoding.unit
     (function Sc_rollup_invalid_parameters_type -> Some () | _ -> None)
-    (fun () -> Sc_rollup_invalid_parameters_type)
+    (fun () -> Sc_rollup_invalid_parameters_type) ;
+  let description =
+    "Smart-contract rollup atomic batch operation is not yet supported"
+  in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_invalid_atomic_batch"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Sc_rollup_invalid_atomic_batch -> Some () | _ -> None)
+    (fun () -> Sc_rollup_invalid_atomic_batch)
 
 type origination_result = {address : Sc_rollup.Address.t; size : Z.t}
 
@@ -140,3 +154,12 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
     Sc_rollup.originate ctxt ~kind ~boot_sector ~parameters_ty
   in
   ({address; size}, ctxt)
+
+let atomic_batch _ctx _rollup _last_cemented_commitment ~outbox_level:_
+    ~message_index:_ ~inclusion_proof:_ ~atomic_transaction_batch:_ =
+  (* TODO: 3106
+     Implement business logic.
+     Involves validate inclusion proofs, transferring tickets  and outputting
+     operations etc.
+  *)
+  fail Sc_rollup_invalid_atomic_batch

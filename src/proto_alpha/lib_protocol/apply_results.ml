@@ -245,6 +245,12 @@ type _ successful_manager_operation_result =
       status : Sc_rollup.Game.status;
     }
       -> Kind.sc_rollup_timeout successful_manager_operation_result
+  | Sc_rollup_atomic_batch_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.sc_rollup_atomic_batch successful_manager_operation_result
 
 let migration_origination_result_to_successful_manager_operation_result
     ({
@@ -1019,6 +1025,41 @@ module Manager_result = struct
       ~inj:(fun (consumed_gas, consumed_milligas, status) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Sc_rollup_timeout_result {consumed_gas = consumed_milligas; status})
+
+  let sc_rollup_atomic_batch_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.sc_rollup_atomic_batch_case
+      ~encoding:
+        Data_encoding.(
+          obj4
+            (req "balance_updates" Receipt.balance_updates_encoding)
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+            (dft "paid_storage_size_diff" z Z.zero))
+      ~select:(function
+        | Successful_manager_result (Sc_rollup_atomic_batch_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~kind:Kind.Sc_rollup_atomic_batch_manager_kind
+      ~proj:(function
+        | Sc_rollup_atomic_batch_result
+            {balance_updates; consumed_gas; paid_storage_size_diff} ->
+            ( balance_updates,
+              Gas.Arith.ceil consumed_gas,
+              consumed_gas,
+              paid_storage_size_diff ))
+      ~inj:
+        (fun ( balance_updates,
+               consumed_gas,
+               consumed_milligas,
+               paid_storage_size_diff ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Sc_rollup_atomic_batch_result
+          {
+            balance_updates;
+            consumed_gas = consumed_milligas;
+            paid_storage_size_diff;
+          })
 end
 
 type 'kind iselect =
@@ -1513,6 +1554,10 @@ let equal_manager_kind :
   | Kind.Sc_rollup_timeout_manager_kind, Kind.Sc_rollup_timeout_manager_kind ->
       Some Eq
   | Kind.Sc_rollup_timeout_manager_kind, _ -> None
+  | ( Kind.Sc_rollup_atomic_batch_manager_kind,
+      Kind.Sc_rollup_atomic_batch_manager_kind ) ->
+      Some Eq
+  | Kind.Sc_rollup_atomic_batch_manager_kind, _ -> None
 
 module Encoding = struct
   type 'kind case =
@@ -2031,6 +2076,17 @@ module Encoding = struct
           ->
             Some (op, res)
         | _ -> None)
+
+  let[@coq_axiom_with_reason "gadt"] sc_rollup_atomic_batch_case =
+    make_manager_case
+      Operation.Encoding.sc_rollup_atomic_batch_case
+      Manager_result.sc_rollup_atomic_batch_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Sc_rollup_atomic_batch _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
 end
 
 let contents_result_encoding =
@@ -2082,6 +2138,7 @@ let contents_result_encoding =
          make sc_rollup_publish_case;
          make sc_rollup_refute_case;
          make sc_rollup_timeout_case;
+         make sc_rollup_atomic_batch_case;
        ]
 
 let contents_and_result_encoding =
@@ -2814,6 +2871,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Sc_rollup_timeout _; _}, _ -> None
+  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
+      Manager_operation_result
+        {operation_result = Applied (Sc_rollup_atomic_batch_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Sc_rollup_atomic_batch_result _, _); _}
+    ) ->
+      Some Eq
+  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Sc_rollup_atomic_batch_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Sc_rollup_atomic_batch_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Sc_rollup_atomic_batch _; _}, _ -> None
 
 let rec kind_equal_list :
     type kind kind2.

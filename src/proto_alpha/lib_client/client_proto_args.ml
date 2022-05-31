@@ -340,6 +340,16 @@ let level_arg =
     ~doc:"Set the level to be returned by the LEVEL instruction"
     level_kind
 
+let raw_level_parameter =
+  parameter (fun _ s ->
+      match Int32.of_string_opt s with
+      | Some i when i >= 0l ->
+          Lwt.return @@ Environment.wrap_tzresult (Raw_level.of_int32 i)
+      | _ ->
+          failwith
+            "'%s' is not a valid level (should be a non-negative int32 value)"
+            s)
+
 let timestamp_parameter =
   parameter (fun _ s ->
       match Script_timestamp.of_string s with

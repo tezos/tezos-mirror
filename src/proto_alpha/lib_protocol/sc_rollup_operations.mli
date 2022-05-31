@@ -26,7 +26,9 @@
 (** High-level operations over smart contract rollups. *)
 open Alpha_context
 
-type error += (* Temporary *) Sc_rollup_invalid_parameters_type
+type error +=
+  | (* Permanent *) Sc_rollup_invalid_parameters_type
+  | (* Permanent *) Sc_rollup_invalid_atomic_batch
 
 type origination_result = private {address : Sc_rollup.Address.t; size : Z.t}
 
@@ -38,3 +40,13 @@ val originate :
   boot_sector:string ->
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
+
+val atomic_batch :
+  context ->
+  Sc_rollup.t ->
+  Sc_rollup.Commitment.Hash.t ->
+  outbox_level:Raw_level.t ->
+  message_index:int ->
+  inclusion_proof:string ->
+  atomic_transaction_batch:string ->
+  context tzresult Lwt.t
