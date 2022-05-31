@@ -23,55 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include RPC_core
-include RPC_legacy
+(** [optional_switch "flag" b] is [["--flag"]] if [b] is true, otherwise [[]] *)
+val optional_switch : string -> bool -> string list
 
-let get_connections =
-  make GET ["network"; "connections"] @@ fun json ->
-  let decode_connection json =
-    let id_point = JSON.(json |-> "id_point") in
-    ( JSON.(id_point |-> "addr" |> as_string),
-      JSON.(id_point |-> "port" |> as_int) )
-  in
-  List.map decode_connection (JSON.as_list json)
-
-let get_connection peer_id =
-  make GET ["network"; "connections"; peer_id] @@ fun json ->
-  let id_point = JSON.(json |-> "id_point") in
-  (JSON.(id_point |-> "addr" |> as_string), JSON.(id_point |-> "port" |> as_int))
-
-let private_injection_operations ?(force = false) ?(async = false) ~ops () =
-  let query_string =
-    [("async", string_of_bool async); ("force", string_of_bool force)]
-  in
-  let data = `A (List.map (fun (`Hex op) -> `String op) ops) in
-  make ~data ~query_string POST ["private"; "injection"; "operations"]
-  @@ fun json ->
-  JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
-
-let get_block ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block] Fun.id
-
-let get_block_metadata ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
-
-let get_block_header ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
-
-type block_descriptor = {block_hash : string; level : int}
-
-let parse_block_descriptor json =
-  JSON.
-    {
-      block_hash = json |-> "block_hash" |> as_string;
-      level = json |-> "level" |> as_int;
-    }
-
-let get_checkpoint ?(chain = "main") () =
-  make GET ["chains"; chain; "levels"; "checkpoint"] parse_block_descriptor
-
-let get_savepoint ?(chain = "main") () =
-  make GET ["chains"; chain; "levels"; "savepoint"] parse_block_descriptor
-
-let get_caboose ?(chain = "main") () =
-  make GET ["chains"; chain; "levels"; "caboose"] parse_block_descriptor
+(** [optional_arg "arg" f opt_v] is [["--arg"; f x]] if [opt_v] is [Some v], otherwise [[]] *)
+val optional_arg : string -> ('a -> string) -> 'a option -> string list

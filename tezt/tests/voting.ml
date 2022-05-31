@@ -210,9 +210,9 @@ let parse_block_metadata block_metadata =
 let check_protocols ?level client expected_protocols =
   let open Lwt.Infix in
   let* {protocol; next_protocol} =
-    RPC.(
-      get_block_metadata ?block:(Option.map string_of_int level) client
-      >|= parse_block_metadata)
+    RPC.Client.call client
+    @@ RPC.get_block_metadata ?block:(Option.map string_of_int level) ()
+    >|= parse_block_metadata
   in
   Check.(
     ((protocol, next_protocol) = expected_protocols) (tuple2 string string))

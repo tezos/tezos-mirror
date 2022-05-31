@@ -57,7 +57,9 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
   (* Bake until migration *)
   let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   (* Ensure that we did migrate *)
-  let* migration_block = RPC.get_block_metadata ~block:"2" client in
+  let* migration_block =
+    RPC.Client.call client @@ RPC.get_block_metadata ~block:"2" ()
+  in
   let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Log.info "Checking migration block consistency" ;
   Check.(
@@ -109,7 +111,7 @@ let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
   let block =
     match level with Some level -> Some (string_of_int level) | None -> None
   in
-  let* metadata = RPC.get_block_metadata ?block client in
+  let* metadata = RPC.Client.call client @@ RPC.get_block_metadata ?block () in
   let protocol = JSON.(metadata |-> "protocol" |> as_string) in
   let next_protocol = JSON.(metadata |-> "next_protocol" |> as_string) in
   (match expected_block_type with
@@ -348,7 +350,7 @@ let disconnect (client_1, node_1) (client_2, node_2) =
 
 let get_proposer ~level client =
   let block = string_of_int level in
-  let* metadata = RPC.get_block_metadata ~block client in
+  let* metadata = RPC.Client.call client @@ RPC.get_block_metadata ~block () in
   Lwt.return JSON.(metadata |-> "proposer" |> as_string)
 
 let all_account_keys =
@@ -728,8 +730,11 @@ let test_forked_migration_bakers ?(migration_level = 4)
       else (
         Log.info "Checking level %d" level ;
         let block_id = string_of_int level in
-        let* block_content_1 = RPC.get_block ~block:block_id client_1
-        and* block_content_2 = RPC.get_block ~block:block_id client_2 in
+        let* block_content_1 =
+          RPC.Client.call client_1 @@ RPC.get_block ~block:block_id ()
+        and* block_content_2 =
+          RPC.Client.call client_2 @@ RPC.get_block ~block:block_id ()
+        in
         Check.(
           (JSON.encode block_content_1 = JSON.encode block_content_2)
             string

@@ -23,15 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* The functions below could be put in the Tezt library. *)
-let get_checkpoint ?endpoint client =
-  let* json = RPC.get_checkpoint ?endpoint client in
-  return JSON.(json |-> "level" |> as_int)
-
-let get_caboose ?endpoint client =
-  let* json = RPC.get_caboose ?endpoint client in
-  return JSON.(json |-> "level" |> as_int)
-
 let is_connected node ~peer_id =
   let* response = RPC.get_connection peer_id |> RPC.call_raw node in
   match response.code with
@@ -272,7 +263,9 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () =
     match hmode1 with
     | Full _ ->
-        let* savepoint = get_checkpoint ~endpoint:endpoint_1 client in
+        let* {level = savepoint; _} =
+          RPC.Client.call ~endpoint:endpoint_1 client @@ RPC.get_checkpoint ()
+        in
         if savepoint <= bakes_before_kill then
           Test.fail
             "checkpoint level (%d) is lower or equal to the starting level (%d)"
@@ -280,7 +273,9 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
             bakes_before_kill ;
         return ()
     | Rolling _ ->
-        let* caboose = get_caboose ~endpoint:endpoint_1 client in
+        let* {level = caboose; _} =
+          RPC.Client.call ~endpoint:endpoint_1 client @@ RPC.get_caboose ()
+        in
         if caboose <= bakes_before_kill then
           Test.fail
             "caboose level (%d) is lower or equal to the starting level (%d)"

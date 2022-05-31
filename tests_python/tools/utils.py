@@ -171,14 +171,6 @@ def get_block_at_level(
         assert False  # not reachable
 
 
-def get_block_header_at_level(client: Client, level: int) -> dict:
-    """Return the block header at a given level, level must be less
-    or equal than the current head. If the level is higher than
-    the current, it will fail"""
-    block = client.rpc_raw('get', f'/chains/main/blocks/{level}/header')
-    return block
-
-
 def get_block_metadata_at_level(
     client: Client, level: int, expect_failure: bool = False
 ) -> dict:
@@ -542,71 +534,6 @@ def assert_transfer_failwith(
     pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
         client.transfer(amount, sender, receiver, args)
-
-
-# Checks that the node's checkpoint, savepoint and caboose are the
-# expected ones after a snapshot import.
-def node_consistency_after_import(
-    node_id,
-    sandbox,
-    expected_level,
-    expected_checkpoint,
-    expected_savepoint,
-    expected_caboose,
-):
-    level = sandbox.client(node_id).get_head()['header']['level']
-    checkpoint = sandbox.client(node_id).get_checkpoint()['block']['level']
-    savepoint = sandbox.client(node_id).get_savepoint()
-    caboose = sandbox.client(node_id).get_caboose()
-    assert level == expected_level
-    assert checkpoint == expected_checkpoint
-    assert savepoint == expected_savepoint
-    assert caboose == expected_caboose
-    # the metadata of genesis are available
-    assert get_block_at_level(sandbox.client(node_id), 0)
-
-
-# Checks the availability of blocks and its metadata for a full node.
-# We assume that:
-# - genesis is available with metadata
-# - all block headers are available,
-# - blocks before the savepoint (excluded) have pruned metadata,
-# - blocks from the savepoint (included) have metadata.
-def full_node_blocks_availability(node_id, sandbox, savepoint, head):
-    # Genesis is available with metadata
-    assert get_block_at_level(sandbox.client(node_id), 0)
-    # [1;…;savepoint[ headers are available but metadata are not
-    for i in range(1, savepoint):
-        get_block_header_at_level(sandbox.client(node_id), i)
-        get_block_metadata_at_level(
-            sandbox.client(node_id), i, expect_failure=True
-        )
-    # [savepoint;…;head] are available with metadata
-    for i in range(savepoint, head + 1):
-        get_block_metadata_at_level(sandbox.client(node_id), i)
-
-
-# Checks the availability of blocks and its metadata for a rolling node.
-# We assume that:
-# - genesis is available with metadata
-# - blocks before caboose (excluded) are unknown,
-# - blocks from the caboose (included) and before the savepoint (excluded)
-#   have pruned metadata,
-# - blocks after the savepoint (included) have metadata.
-def rolling_node_blocks_availability(
-    node_id, sandbox, savepoint, caboose, head
-):
-    # Genesis is available with metadata
-    assert get_block_at_level(sandbox.client(node_id), 0)
-    if caboose == 0:
-        pass
-    else:
-        # [1;…;caboose[ blocks are unknown
-        for i in range(1, caboose):
-            get_block_at_level(sandbox.client(node_id), i, expect_failure=True)
-    # [savepoint;…;head] are available with metadata
-    for i in range(savepoint + 1, head):
-        get_block_header_at_level(sandbox.client(node_id), i)
 
 
 def file_basename(path):

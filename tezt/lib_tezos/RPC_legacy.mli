@@ -45,15 +45,6 @@ val get_chain_id :
   Client.t ->
   JSON.t Lwt.t
 
-(** Call RPC /chain/[chain]/blocks/[block] *)
-val get_block :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/blocks/[block]/hash *)
 val get_block_hash :
   ?endpoint:Client.endpoint ->
@@ -62,15 +53,6 @@ val get_block_hash :
   ?block:string ->
   Client.t ->
   string Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/metadata *)
-val get_block_metadata :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain] *)
 val force_bootstrapped :
@@ -83,30 +65,6 @@ val force_bootstrapped :
 
 (** Call RPC /chain/[chain]/is_bootstrapped *)
 val is_bootstrapped :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/levels/checkpoint *)
-val get_checkpoint :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/levels/savepoint *)
-val get_savepoint :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/levels/caboose *)
-val get_caboose :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->

@@ -52,7 +52,8 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
     repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
   in
   let* non_migration_block =
-    RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) client
+    RPC.Client.call client
+    @@ RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) ()
   in
   let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
   Log.info "checking consistency of block at level %d" (migration_level - 1) ;
@@ -69,7 +70,8 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
       ~error_msg:"expected next_protocol = %R, got %L") ;
   Log.info "checking consistency of block at level %d" migration_level ;
   let* migration_block =
-    RPC.get_block_metadata ~block:(string_of_int migration_level) client
+    RPC.Client.call client
+    @@ RPC.get_block_metadata ~block:(string_of_int migration_level) ()
   in
   let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Check.(
@@ -87,7 +89,8 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
     "checking consistency of block at level %d (again)"
     (migration_level - 1) ;
   let* non_migration_block =
-    RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) client
+    RPC.Client.call client
+    @@ RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) ()
   in
   let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
   Check.(

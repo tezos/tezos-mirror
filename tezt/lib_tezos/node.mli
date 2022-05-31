@@ -260,6 +260,31 @@ end
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init : t -> argument list -> Process.t
 
+(** A snapshot history mode for exports *)
+type snapshot_history_mode = Rolling_history | Full_history
+
+(** Run [tezos-node snapshot export]. *)
+val snapshot_export :
+  ?history_mode:snapshot_history_mode ->
+  ?export_level:int ->
+  t ->
+  string ->
+  unit Lwt.t
+
+(** Same as [snapshot_export], but do not wait for the process to exit. *)
+val spawn_snapshot_export :
+  ?history_mode:snapshot_history_mode ->
+  ?export_level:int ->
+  t ->
+  string ->
+  Process.t
+
+(** Run [tezos-node snapshot import]. *)
+val snapshot_import : ?reconstruct:bool -> t -> string -> unit Lwt.t
+
+(** Same as [snapshot_import], but do not wait for the process to exit. *)
+val spawn_snapshot_import : ?reconstruct:bool -> t -> string -> Process.t
+
 (** Spawn [tezos-node run].
 
     The resulting promise is fulfilled as soon as the node has been spawned.
@@ -377,7 +402,13 @@ val memory_consumption : t -> observe_memory_consumption Lwt.t
     Arguments are passed to {!config_init}. If you specified [Expected_pow],
     it is also passed to {!identity_generate}. Arguments are not passed to {!run}.
     If you do not wish the arguments to be stored in the configuration file
-    (which will affect future runs too), do not use [init]. *)
+    (which will affect future runs too), do not use [init].
+
+    To import a snapshot before calling {!run}, specify
+    [~snapshot:(file, do_reconstruct)], where file is the path to the snapshot.
+    If [reconstruct] is [true], then [--reconstruct] is passed to the import
+    command.
+ *)
 val init :
   ?runner:Runner.t ->
   ?path:string ->
@@ -391,6 +422,7 @@ val init :
   ?rpc_port:int ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?snapshot:string * bool ->
   argument list ->
   t Lwt.t
 

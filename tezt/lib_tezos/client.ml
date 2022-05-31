@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Runnable.Syntax
+open Cli_arg
 
 type endpoint = Node of Node.t | Proxy_server of Proxy_server.t
 
@@ -93,10 +94,6 @@ let address ?(hostname = false) ?from peer =
   | None -> Runner.address ~hostname (runner peer)
   | Some endpoint ->
       Runner.address ~hostname ?from:(runner endpoint) (runner peer)
-
-let optional_switch ~name = function false -> [] | true -> ["--" ^ name]
-
-let optional_arg ~name f = function None -> [] | Some x -> ["--" ^ name; f x]
 
 let create_with_mode ?(path = Constant.tezos_client)
     ?(admin_path = Constant.tezos_admin_client) ?name
@@ -476,22 +473,22 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
   spawn_command
     ?endpoint
     client
-    (optional_arg ~name:"protocol" Protocol.hash protocol
+    (optional_arg "protocol" Protocol.hash protocol
     @ ["bake"; "for"] @ keys
-    @ optional_arg ~name:"minimal-fees" string_of_int minimal_fees
+    @ optional_arg "minimal-fees" string_of_int minimal_fees
     @ optional_arg
-        ~name:"minimal-nanotez-per-gas-unit"
+        "minimal-nanotez-per-gas-unit"
         string_of_int
         minimal_nanotez_per_gas_unit
     @ optional_arg
-        ~name:"minimal-nanotez-per-byte"
+        "minimal-nanotez-per-byte"
         string_of_int
         minimal_nanotez_per_byte
-    @ optional_arg ~name:"operations-pool" Fun.id mempool
+    @ optional_arg "operations-pool" Fun.id mempool
     @ (if ignore_node_mempool then ["--ignore-node-mempool"] else [])
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
-    @ optional_arg ~name:"context" Fun.id context_path)
+    @ optional_arg "context" Fun.id context_path)
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
@@ -564,7 +561,7 @@ let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
   spawn_command
     ?endpoint
     client
-    (optional_arg ~name:"protocol" Protocol.hash protocol
+    (optional_arg "protocol" Protocol.hash protocol
     @ [tenderbake_action_to_string tenderbake_action; "for"]
     @ key
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
@@ -653,7 +650,7 @@ let spawn_bls_gen_keys ?hooks ?(force = false) ?alias client =
   ( spawn_command
       ?hooks
       client
-      (["bls"; "gen"; "keys"; alias] @ optional_switch ~name:"force" force),
+      (["bls"; "gen"; "keys"; alias] @ optional_switch "force" force),
     alias )
 
 let bls_gen_keys ?hooks ?force ?alias client =
@@ -723,11 +720,11 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
         ~none:[]
         ~some:(fun f -> ["--fee"; Tez.to_string f; "--force-low-fee"])
         fee
-    @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-    @ optional_arg ~name:"gas-limit" string_of_int gas_limit
-    @ optional_arg ~name:"storage-limit" string_of_int storage_limit
-    @ optional_arg ~name:"counter" string_of_int counter
-    @ optional_arg ~name:"arg" Fun.id arg
+    @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "gas-limit" string_of_int gas_limit
+    @ optional_arg "storage-limit" string_of_int storage_limit
+    @ optional_arg "counter" string_of_int counter
+    @ optional_arg "arg" Fun.id arg
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
@@ -765,11 +762,11 @@ let spawn_multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap
         ~none:[]
         ~some:(fun f -> ["--fee-cap"; Tez.to_string f; "--force-low-fee"])
         fee_cap
-    @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-    @ optional_arg ~name:"gas-limit" string_of_int gas_limit
-    @ optional_arg ~name:"storage-limit" string_of_int storage_limit
-    @ optional_arg ~name:"counter" string_of_int counter
-    @ optional_arg ~name:"arg" Fun.id arg)
+    @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "gas-limit" string_of_int gas_limit
+    @ optional_arg "storage-limit" string_of_int storage_limit
+    @ optional_arg "counter" string_of_int counter
+    @ optional_arg "arg" Fun.id arg)
 
 let multiple_transfers ?log_output ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
     ?storage_limit ?counter ?arg ~giver ~json_batch client =
@@ -805,8 +802,8 @@ let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
       client
       (["--wait"; wait]
       @ ["set"; "delegate"; "for"; src; "to"; delegate]
-      @ optional_arg ~name:"fee" Tez.to_string fee
-      @ optional_arg ~name:"fee-cap" Tez.to_string fee_cap
+      @ optional_arg "fee" Tez.to_string fee
+      @ optional_arg "fee-cap" Tez.to_string fee_cap
       @ if force_low_fee then ["--force-low-fee"] else [])
   in
   {value; run = Process.check}
@@ -819,8 +816,8 @@ let reveal ?endpoint ?(wait = "none") ?fee ?fee_cap ?(force_low_fee = false)
       client
       (["--wait"; wait]
       @ ["reveal"; "key"; "for"; src]
-      @ optional_arg ~name:"fee" Tez.to_string fee
-      @ optional_arg ~name:"fee-cap" Tez.to_string fee_cap
+      @ optional_arg "fee" Tez.to_string fee
+      @ optional_arg "fee-cap" Tez.to_string fee_cap
       @ if force_low_fee then ["--force-low-fee"] else [])
   in
   {value; run = Process.check}
@@ -850,7 +847,7 @@ let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file ~protocol
     (match sync_mode with
     | Synchronous -> common
     | Asynchronous -> common @ ["--asynchronous"])
-    @ optional_arg ~name:"protocol-constants" Fun.id parameter_file
+    @ optional_arg "protocol-constants" Fun.id parameter_file
   in
   spawn_command client cmd
 
@@ -923,8 +920,8 @@ let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
         "running";
         prg;
       ]
-    @ optional_arg ~name:"init" Fun.id init
-    @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+    @ optional_arg "init" Fun.id init
+    @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
 let convert_michelson_to_json ~kind ?endpoint ~input client =
   let* client_output =
@@ -1103,10 +1100,10 @@ let spawn_run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage
     ?hooks
     client
     (["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
-    @ optional_arg ~name:"payer" Fun.id payer
-    @ optional_arg ~name:"source" Fun.id source
-    @ optional_arg ~name:"balance" Tez.to_string balance
-    @ optional_arg ~name:"self-address" Fun.id self_address)
+    @ optional_arg "payer" Fun.id payer
+    @ optional_arg "source" Fun.id source
+    @ optional_arg "balance" Tez.to_string balance
+    @ optional_arg "self-address" Fun.id self_address)
 
 let stresstest_estimate_gas ?endpoint client =
   let* output =
@@ -1157,7 +1154,7 @@ let spawn_register_global_constant ?(wait = "none") ?burn_cap ~value ~src client
     client
     (["--wait"; wait]
     @ ["register"; "global"; "constant"; value; "from"; src]
-    @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+    @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
 let register_global_constant ?wait ?burn_cap ~src ~value client =
   let* client_output =
@@ -1268,13 +1265,10 @@ let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
     client
     (["run"; "view"; view; "on"; "contract"; contract]
     @ input_params
-    @ optional_arg ~name:"payer" Fun.id payer
-    @ optional_arg ~name:"source" Fun.id source
-    @ optional_arg
-        ~name:"unparsing-mode"
-        normalize_mode_to_string
-        unparsing_mode
-    @ optional_arg ~name:"gas" Int.to_string gas
+    @ optional_arg "payer" Fun.id payer
+    @ optional_arg "source" Fun.id source
+    @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode
+    @ optional_arg "gas" Int.to_string gas
     @ if unlimited_gas then ["--unlimited-gas"] else [])
 
 let run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract ?input
@@ -1383,8 +1377,8 @@ module Tx_rollup = struct
             "from";
             src;
           ]
-        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-        @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
+        @ optional_arg "burn-cap" Tez.to_string burn_cap
+        @ optional_arg "storage-limit" string_of_int storage_limit)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1401,9 +1395,9 @@ module Tx_rollup = struct
         @ ["with"; "inbox"; "hash"; inbox_merkle_root]
         @ ["and"; "messages"; "result"; "hash"]
         @ roots
-        @ optional_arg ~name:"predecessor-hash" (fun s -> s) predecessor
-        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-        @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
+        @ optional_arg "predecessor-hash" (fun s -> s) predecessor
+        @ optional_arg "burn-cap" Tez.to_string burn_cap
+        @ optional_arg "storage-limit" string_of_int storage_limit)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1416,8 +1410,8 @@ module Tx_rollup = struct
         client
         (["--wait"; wait]
         @ ["finalize"; "commitment"; "of"; "tx"; "rollup"; rollup; "from"; src]
-        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-        @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
+        @ optional_arg "burn-cap" Tez.to_string burn_cap
+        @ optional_arg "storage-limit" string_of_int storage_limit)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1430,8 +1424,8 @@ module Tx_rollup = struct
         client
         (["--wait"; wait]
         @ ["remove"; "commitment"; "of"; "tx"; "rollup"; rollup; "from"; src]
-        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-        @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
+        @ optional_arg "burn-cap" Tez.to_string burn_cap
+        @ optional_arg "storage-limit" string_of_int storage_limit)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1456,8 +1450,8 @@ module Tx_rollup = struct
         @ ["and"; "withdraw"; "list"; "hash"; withdraw_list_hash]
         @ ["and"; "result"; "path"; agreed_message_result_path]
         @ ["using"; "proof"; proof; "from"; src]
-        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-        @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
+        @ optional_arg "burn-cap" Tez.to_string burn_cap
+        @ optional_arg "storage-limit" string_of_int storage_limit)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1470,14 +1464,8 @@ module Tx_rollup = struct
         client
         (["--wait"; wait]
         @ ["recover"; "bond"; "of"; src; "for"; "tx"; "rollup"; rollup]
-        @ Option.fold
-            ~none:[]
-            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
-            burn_cap
-        @ Option.fold
-            ~none:[]
-            ~some:(fun s -> ["--storage-limit"; string_of_int s])
-            storage_limit)
+        @ optional_arg "burn-cap" Tez.to_string burn_cap
+        @ optional_arg "storage-limit" string_of_int storage_limit)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1521,8 +1509,8 @@ module Tx_rollup = struct
             "info";
           ]
         @ ticket_dispatch_info_data_list
-        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
-        @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
+        @ optional_arg "burn-cap" Tez.to_string burn_cap
+        @ optional_arg "storage-limit" string_of_int storage_limit)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1555,7 +1543,7 @@ module Tx_rollup = struct
             "ticketer";
             ticketer;
           ]
-        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+        @ optional_arg "burn-cap" Tez.to_string burn_cap)
     in
     let parse process = Process.check process in
     {value = process; run = parse}
@@ -1597,7 +1585,7 @@ module Sc_rollup = struct
           "with";
           boot_sector;
         ]
-      @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+      @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
   let parse_rollup_address_in_receipt output =
     match output =~* rex "Address: (.*)" with
@@ -1627,7 +1615,7 @@ module Sc_rollup = struct
       client
       (["--wait"; wait]
       @ ["send"; "sc"; "rollup"; "message"; msg; "from"; src; "to"; dst]
-      @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+      @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
   let send_message ?hooks ?wait ?burn_cap ~msg ~src ~dst client =
     let process =
@@ -1642,7 +1630,7 @@ module Sc_rollup = struct
       client
       (["--wait"; wait]
       @ ["cement"; "commitment"; hash; "from"; src; "for"; "sc"; "rollup"; dst]
-      @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+      @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
   let cement_commitment ?hooks ?wait ?burn_cap ~hash ~src ~dst client =
     let process =
@@ -1859,10 +1847,7 @@ let contract_storage ?unparsing_mode address client =
   spawn_command
     client
     (["get"; "contract"; "storage"; "for"; address]
-    @ optional_arg
-        ~name:"unparsing-mode"
-        normalize_mode_to_string
-        unparsing_mode)
+    @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode)
   |> Process.check_and_read_stdout
 
 let sign_bytes ~signer ~data client =

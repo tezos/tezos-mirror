@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Cli_arg
+
 type t = {
   name : string;
   path : string;
@@ -62,11 +64,6 @@ let wallet_dir_arg tx_client = ["--wallet-dir"; tx_client.wallet_dir]
 let endpoint_arg tx_client =
   ["--endpoint"; Tx_rollup_node.endpoint tx_client.tx_node]
 
-let optional_switch ~name switch = if switch then ["--" ^ name] else []
-
-let optional_arg ~name f =
-  Option.fold ~none:[] ~some:(fun x -> ["--" ^ name; f x])
-
 let spawn_command ?hooks tx_client command =
   Process.spawn
     ~name:tx_client.name
@@ -81,7 +78,7 @@ let get_balance ?block tx_client ~tz4_address ~ticket_id =
     spawn_command
       tx_client
       (["get"; "balance"; "for"; tz4_address; "of"; ticket_id]
-      @ optional_arg ~name:"block" Fun.id block)
+      @ optional_arg "block" Fun.id block)
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"tx_client_get_balance" out in
@@ -122,7 +119,7 @@ let craft_tx_transaction tx_client ~signer ?counter
          "for";
          ticket;
        ]
-      @ optional_arg ~name:"counter" Int64.to_string counter)
+      @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
   Lwt.return @@ JSON.parse ~origin:"tx_rollup_client" out
@@ -134,8 +131,8 @@ let sign_transaction ?(aggregate = false) ?aggregated_signature tx_client
       tx_client
       (["sign"; "transaction"; JSON.encode transaction; "with"]
       @ signers
-      @ optional_switch ~name:"aggregate" aggregate
-      @ optional_arg ~name:"aggregated-signature" Fun.id aggregated_signature)
+      @ optional_switch "aggregate" aggregate
+      @ optional_arg "aggregated-signature" Fun.id aggregated_signature)
     |> Process.check_and_read_stdout
   in
   Lwt.return @@ String.trim out
@@ -152,7 +149,7 @@ let craft_tx_transfers tx_client ~signer ?counter transfers =
     spawn_command
       tx_client
       (["craft"; "tx"; "transfers"; "from"; signer; "using"; contents_json]
-      @ optional_arg ~name:"counter" Int64.to_string counter)
+      @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
   Lwt.return @@ JSON.parse ~origin:"tx_rollup_client" out
@@ -174,7 +171,7 @@ let craft_tx_withdraw ?counter tx_client ~qty ~signer ~dest ~ticket =
          "for";
          ticket;
        ]
-      @ optional_arg ~name:"counter" Int64.to_string counter)
+      @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
   Lwt.return @@ JSON.parse ~origin:"tx_rollup_client" out
@@ -184,7 +181,7 @@ let craft_tx_batch ?(show_hex = false) tx_client ~transactions_and_sig =
     spawn_command
       tx_client
       (["craft"; "batch"; "with"; JSON.encode transactions_and_sig]
-      @ optional_switch ~name:"bytes" show_hex)
+      @ optional_switch "bytes" show_hex)
     |> Process.check_and_read_stdout
   in
   Lwt.return
@@ -199,7 +196,7 @@ let transfer ?counter tx_client ~source
     spawn_command
       tx_client
       (["transfer"; qty; "of"; ticket; "from"; source; "to"; destination]
-      @ optional_arg ~name:"counter" Int64.to_string counter)
+      @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
   Lwt.return out
@@ -211,7 +208,7 @@ let withdraw ?counter tx_client ~source
     spawn_command
       tx_client
       (["withdraw"; qty; "of"; ticket; "from"; source; "to"; destination]
-      @ optional_arg ~name:"counter" Int64.to_string counter)
+      @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
   Lwt.return out

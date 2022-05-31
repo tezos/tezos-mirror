@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Cli_arg
+
 type history_mode = Archive | Full of int option | Rolling of int option
 
 type media_type = Json | Binary | Any
@@ -286,6 +288,32 @@ module Config_file = struct
     in
     JSON.put ("network", network) old_config
 end
+
+type snapshot_history_mode = Rolling_history | Full_history
+
+let spawn_snapshot_export ?(history_mode = Full_history) ?export_level node file
+    =
+  spawn_command
+    node
+    (["snapshot"; "export"; "--data-dir"; node.persistent_state.data_dir]
+    @ (match history_mode with
+      | Full_history -> []
+      | Rolling_history -> ["--rolling"])
+    @ optional_arg "block" string_of_int export_level
+    @ [file])
+
+let snapshot_export ?history_mode ?export_level node file =
+  spawn_snapshot_export ?history_mode ?export_level node file |> Process.check
+
+let spawn_snapshot_import ?(reconstruct = false) node file =
+  spawn_command
+    node
+    (["snapshot"; "import"; "--data-dir"; node.persistent_state.data_dir]
+    @ (if reconstruct then ["--reconstruct"] else [])
+    @ [file])
+
+let snapshot_import ?reconstruct node file =
+  spawn_snapshot_import ?reconstruct node file |> Process.check
 
 let trigger_ready node value =
   let pending = node.persistent_state.pending_ready in
@@ -571,7 +599,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
-    arguments =
+    ?snapshot arguments =
   let node =
     create
       ?runner
@@ -588,6 +616,11 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
+  let* () =
+    match snapshot with
+    | Some (file, reconstruct) -> snapshot_import ~reconstruct node file
+    | None -> unit
+  in
   let* () = run ?event_level ?event_sections_levels node [] in
   let* () = wait_for_ready node in
   return node

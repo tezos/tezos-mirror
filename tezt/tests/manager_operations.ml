@@ -406,7 +406,7 @@ module Memchecks = struct
     List.map (fun err -> JSON.(err |-> "id" |> as_string)) errs
 
   let is_in_block ?block client oph =
-    let* head = RPC.get_block ?block client in
+    let* head = RPC.Client.call client @@ RPC.get_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     Lwt.return
     @@ List.exists (fun op -> oph = JSON.(op |-> "hash" |> as_string)) ops
@@ -512,7 +512,7 @@ module Memchecks = struct
   let check_status_in_block ~__LOC__ ~who ~oph ~expected_statuses
       ?expected_errors ?block client =
     Log.info "- Checking inclusion and status of operation in %s's block." who ;
-    let* head = RPC.get_block ?block client in
+    let* head = RPC.Client.call client @@ RPC.get_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     let head_hash = JSON.(head |-> "hash" |> as_string) in
     let op_contents =

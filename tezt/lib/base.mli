@@ -71,8 +71,8 @@ val mandatory : string -> 'a option -> 'a
 
 (** Make a list of all integers between two integers.
 
-    If the first argument is greater than the second argument,
-    return the empty list. *)
+    If the first argument [a] is greater than the second argument [b],
+    return the empty list. Otherwise, returns the list [a; ...; b].  *)
 val range : int -> int -> int list
 
 (** Backport of [List.find_map] from OCaml 4.10. *)
