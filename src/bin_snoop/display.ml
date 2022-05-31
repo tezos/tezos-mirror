@@ -50,20 +50,42 @@ type options = {
   point_size : float;
   qt_target_pixel_size : (int * int) option;
   pdf_target_cm_size : (float * float) option;
+  reduced_plot_verbosity : bool;
 }
 
 let options_encoding =
   let open Data_encoding in
   conv
-    (fun {save_directory; point_size; qt_target_pixel_size; pdf_target_cm_size} ->
-      (save_directory, point_size, qt_target_pixel_size, pdf_target_cm_size))
-    (fun (save_directory, point_size, qt_target_pixel_size, pdf_target_cm_size) ->
-      {save_directory; point_size; qt_target_pixel_size; pdf_target_cm_size})
-    (obj4
+    (fun {
+           save_directory;
+           point_size;
+           qt_target_pixel_size;
+           pdf_target_cm_size;
+           reduced_plot_verbosity;
+         } ->
+      ( save_directory,
+        point_size,
+        qt_target_pixel_size,
+        pdf_target_cm_size,
+        reduced_plot_verbosity ))
+    (fun ( save_directory,
+           point_size,
+           qt_target_pixel_size,
+           pdf_target_cm_size,
+           reduced_plot_verbosity ) ->
+      {
+        save_directory;
+        point_size;
+        qt_target_pixel_size;
+        pdf_target_cm_size;
+        reduced_plot_verbosity;
+      })
+    (obj5
        (req "save_directory" string)
        (req "point_size" float)
        (opt "qt_target_pixel_size" (tup2 int31 int31))
-       (opt "pdf_target_cm_size" (tup2 float float)))
+       (opt "pdf_target_cm_size" (tup2 float float))
+       (dft "reduced_plot_verbosity" bool true))
 
 let default_options =
   {
@@ -71,6 +93,7 @@ let default_options =
     point_size = 0.5;
     qt_target_pixel_size = None;
     pdf_target_cm_size = None;
+    reduced_plot_verbosity = true;
   }
 
 let point_size opts = opts.point_size
@@ -155,24 +178,26 @@ let plot_scatter opts title input_columns outputs =
       let plot = scatterplot_3d opts title column1 column2 outputs in
       return [plot]
   | _ ->
-      let subsets = Benchmark_helpers.enumerate_subsets 2 input_columns in
-      let plots =
-        List.map
-          (function
-            | [((dim1, _) as col1); ((dim2, _) as col2)] ->
-                let dim1 = underscore_to_dash dim1 in
-                let dim2 = underscore_to_dash dim2 in
-                let title = Format.asprintf "%s (%s, %s)" title dim1 dim2 in
-                scatterplot_3d opts title col1 col2 outputs
-            | cols ->
-                let len = List.length cols in
-                Format.kasprintf
-                  Stdlib.failwith
-                  "plot_scatter: bug found (got %d columns, expected 2)"
-                  len)
-          subsets
-      in
-      return plots
+      if opts.reduced_plot_verbosity then return []
+      else
+        let subsets = Benchmark_helpers.enumerate_subsets 2 input_columns in
+        let plots =
+          List.map
+            (function
+              | [((dim1, _) as col1); ((dim2, _) as col2)] ->
+                  let dim1 = underscore_to_dash dim1 in
+                  let dim2 = underscore_to_dash dim2 in
+                  let title = Format.asprintf "%s (%s, %s)" title dim1 dim2 in
+                  scatterplot_3d opts title col1 col2 outputs
+              | cols ->
+                  let len = List.length cols in
+                  Format.kasprintf
+                    Stdlib.failwith
+                    "plot_scatter: bug found (got %d columns, expected 2)"
+                    len)
+            subsets
+        in
+        return plots
 
 (* Extract size vs timing information from the [workload_data], e.g.
    if   workload_data = (Add_int_int 10 20, 2879) :: (Add_int_int 3 2, 768) :: []
@@ -284,9 +309,11 @@ let validator opts (problem : Inference.problem) (solution : Inference.solution)
 
 let empirical opts (workload_data : (Sparse_vec.String.t * float) list) =
   let open Result_syntax in
-  let* columns, timings = empirical_data workload_data in
-  let* plots = plot_scatter opts "Empirical" columns [timings] in
-  return plots
+  if opts.reduced_plot_verbosity then return []
+  else
+    let* columns, timings = empirical_data workload_data in
+    let* plots = plot_scatter opts "Empirical" columns [timings] in
+    return plots
 
 let eval_mset (mset : Free_variable.Sparse_vec.t)
     (eval : Free_variable.t -> float) =
@@ -344,6 +371,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   in
   let try_plot kind plot_result =
     match plot_result with
+    | Ok [] -> []
     | Ok plots -> (
         match plot_target with
         | Save ->
