@@ -44,30 +44,33 @@
 
     These tests complement [Test_mem_context]: while [Test_mem_context]
     creates values of Context.t manually, this file
-    use automatically generated values; thanks to [QCheck].
+    use automatically generated values; thanks to [QCheck2].
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
+open QCheck2
+module Test = QCheck2.Test
 
 type key = Context.key
 
 let equal_key : key -> key -> bool =
  fun (a : string list) (b : string list) -> Stdlib.( = ) a b
 
-(** Using [QCheck.small_list] for performance reasons: using [QCheck.list] here
-    makes the file 40 times slower, which is not acceptable. *)
-let key_arb = QCheck.small_list QCheck.string
+(** Using [QCheck2.small_list] and [QCheck2.small_string] for performance reasons:
+    using [QCheck2.list] makes the test 40 times slower, and using [QCheck2.string]
+    makes the test 10 times slower, none of which are acceptable. *)
+let key_gen = Gen.(small_list (small_string ~gen:char))
 
 (* As bytes are mutable this is fine because the test doesn't do any
    mutation. Otherwise [rev] could be called on a value different than
    the value passed to the test. *)
-let value_arb = QCheck.map ~rev:Bytes.to_string Bytes.of_string QCheck.string
+let value_gen = Gen.map Bytes.of_string Gen.string
 
-let key_value_arb = QCheck.pair key_arb value_arb
+let key_value_gen = Gen.pair key_gen value_gen
 
 (* We generate contexts by starting from a fresh one and
    doing a sequence of calls to [Context.add]. *)
-let context_arb : Context.t QCheck.arbitrary =
+let context_gen : Context.t Gen.t =
   let set_all key_value_list =
     Lwt_main.run
     @@ Lwt_list.fold_left_s
@@ -75,16 +78,7 @@ let context_arb : Context.t QCheck.arbitrary =
          Memory_context.empty
          key_value_list
   in
-  let rev ctxt =
-    let keys = Lwt_main.run @@ Test_mem_context.domain ctxt in
-    List.map
-      (fun key ->
-        ( key,
-          Lwt_main.run @@ Context.find ctxt key
-          |> WithExceptions.Option.get ~loc:__LOC__ ))
-      keys
-  in
-  QCheck.map ~rev set_all @@ QCheck.small_list key_value_arb
+  Gen.map set_all @@ Gen.small_list key_value_gen
 
 (** Some printers for passing to [check_eq*] functions *)
 
@@ -105,7 +99,7 @@ let test_domain_spec (ctxt, k) =
        [Test_mem_contex.domain] appropriately returns an empty list. One
        could complexify this test to support this case, but I didn't want
        to spend too much time on this; we're testing a test after all here. *)
-    QCheck.assume_fail ()
+    QCheck2.assume_fail ()
   else
     let domain = Lwt_main.run @@ Test_mem_context.domain ctxt in
     qcheck_eq
@@ -154,27 +148,27 @@ let test_set_domain (ctxt, (k, v)) =
 
 let () =
   let test_domain =
-    QCheck.Test.make
+    Test.make
       ~name:"Test_mem_context.domain's specification "
-      (QCheck.pair context_arb key_arb)
+      (Gen.pair context_gen key_gen)
       test_domain_spec
   in
   let test_set =
-    QCheck.Test.make
+    Test.make
       ~name:"get (set m k v) k = v "
-      (QCheck.pair context_arb key_value_arb)
+      (Gen.pair context_gen key_value_gen)
       test_get_set
   in
   let test_get_set_other =
-    QCheck.Test.make
+    Test.make
       ~name:"forall k1 <> k2, get (set m k1 v) k2 = get m k2 "
-      (QCheck.pair context_arb key_value_arb)
+      (Gen.pair context_gen key_value_gen)
       test_get_set_other
   in
   let test_get_set =
-    QCheck.Test.make
+    Test.make
       ~name:"forall k2 in domain (set m k1 v), k2 in domain m || k1 = k2 "
-      (QCheck.pair context_arb key_value_arb)
+      (Gen.pair context_gen key_value_gen)
       test_set_domain
   in
   Alcotest.run
