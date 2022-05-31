@@ -67,7 +67,7 @@
    (typically a low number of hashes) that witnesses its contents, so
    that the protocol can check the validity of a proof about its contents.
    This saves space in the context of the layer 1 and is sufficient for the
-   level 1 to provide a source of truth about the contents of the
+   layer 1 to provide a source of truth about the contents of the
    inbox at the current level.
 
    {1 A level-indexed chain of inboxes}
