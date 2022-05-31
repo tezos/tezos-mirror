@@ -37,6 +37,16 @@ dashboard.new(
   refresh='',
 )
 
+.addTemplate(
+  template.new(
+    name='node_instance',
+    datasource='Prometheus',
+    query='label_values(octez_version,instance)',
+    refresh='load',
+    label='Node instance'
+  )
+)
+
 #Node a grid is 24 slots wide
 .addPanels(
   [

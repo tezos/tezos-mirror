@@ -7,6 +7,7 @@ local graphPanel = grafana.graphPanel;
 local heatmapPanel = grafana.heatmapPanel;
 local prometheus = grafana.prometheus;
 local namespace = "octez";
+local node_instance = '{instance="$node_instance"}';
 
 //##
 // Octez related stats
@@ -21,7 +22,7 @@ local namespace = "octez";
       valueName='name',
     ).addTarget(
       prometheus.target(
-	namespace + '_version',
+	namespace + '_version' + node_instance,
 	legendFormat='{{ version }}',
 	instant=true
       )
@@ -35,7 +36,7 @@ local namespace = "octez";
       valueName='name',
     ).addTarget(
       prometheus.target(
-	'(label_replace(' + namespace + '_version,"commit_hash_short","$1","commit_hash","^(.{8}).*$"))',
+	'(label_replace(' + namespace + '_version' + node_instance + ',"commit_hash_short" ,"$1","commit_hash","^(.{8}).*$"))',
 	legendFormat='{{ commit_hash_short }}',
 	instant=true
       )
@@ -49,7 +50,7 @@ local namespace = "octez";
       valueName='name',
     ).addTarget(
       prometheus.target(
-	namespace + '_version',
+	namespace + '_version' + node_instance,
 	legendFormat='{{ chain_name }}',
 	instant=true
       )
@@ -63,7 +64,7 @@ local namespace = "octez";
       valueName='name',
     ).addTarget(
       prometheus.target(
-	namespace + '_version',
+	namespace + '_version' + node_instance,
 	legendFormat='{{ p2p_version }}',
 	instant=true
       )
@@ -77,7 +78,7 @@ local namespace = "octez";
       valueName='value',
     ).addTarget(
       prometheus.target(
-	namespace + '_version',
+	namespace + '_version' + node_instance,
 	legendFormat='{{ distributed_db_version }}',
 	instant=true
       )
@@ -111,7 +112,7 @@ local namespace = "octez";
       ],
     ).addTarget(
       prometheus.target(
-	namespace + '_validator_chain_is_bootstrapped',
+	namespace + '_validator_chain_is_bootstrapped' + node_instance,
 	instant=true
       )
     ),
@@ -149,7 +150,7 @@ local namespace = "octez";
       ],
     ).addTarget(
       prometheus.target(
-	namespace + '_validator_chain_synchronisation_status',
+	namespace + '_validator_chain_synchronisation_status' + node_instance,
 	instant=true
       )
     ),
@@ -165,7 +166,7 @@ local namespace = "octez";
       description= 'Reflects the uptime of the monitoring of the job, not the uptime of the process.',
     ).addTarget(
       prometheus.target(
-	'time()-(process_start_time_seconds{job="node"})',
+	'time()-(process_start_time_seconds' + node_instance + ')',
 	legendFormat='node uptime',
 	instant=true
       )
@@ -178,7 +179,7 @@ local namespace = "octez";
       format='none',
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_chain_head_level',
+        namespace + '_validator_chain_head_level' + node_instance,
         legendFormat='current head level',
 	instant=true
       )
@@ -191,7 +192,7 @@ local namespace = "octez";
       format='none',
     ).addTarget(
       prometheus.target(
-        namespace + '_store_savepoint_level',
+        namespace + '_store_savepoint_level' + node_instance,
         legendFormat='current savepoint',
 	instant=true
       )
@@ -204,7 +205,7 @@ local namespace = "octez";
       format='none'
     ).addTarget(
       prometheus.target(
-        namespace + '_store_checkpoint_level',
+        namespace + '_store_checkpoint_level' + node_instance,
         legendFormat='current checkpoint',
 	instant=true
       )
@@ -249,7 +250,7 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_chain_head_level',
+        namespace + '_validator_chain_head_level' + node_instance,
 	legendFormat=head
       )
     ),
@@ -270,7 +271,7 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_store_invalid_blocks',
+        namespace + '_store_invalid_blocks' + node_instance,
         legendFormat=blocks,
       )
     ),
@@ -294,7 +295,7 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_chain_head_consumed_gas',
+        namespace + '_validator_chain_head_consumed_gas' + node_instance,
         legendFormat=blocks,
       )
     ),
@@ -314,14 +315,14 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_chain_head_round',
+        namespace + '_validator_chain_head_round' + node_instance,
         legendFormat=blocks,
       )
     ),
 
   blocksValidationTime:
-    local treatment =  namespace + '_validator_block_last_finished_request_treatment_timestamp';
-    local completion = namespace + '_validator_block_last_finished_request_completion_timestamp';
+    local treatment =  namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
+    local completion = namespace + '_validator_block_last_finished_request_completion_timestamp' + node_instance;
     local validation = 'Validation time';
     graphPanel.new(
       title='Block validation time',
@@ -338,7 +339,7 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-	completion + ' - ' + treatment,
+	completion + ' - ' + treatment ,
 	format='time_series',
 	legendFormat=validation,
       )
@@ -367,22 +368,22 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="0"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="0",instance="$node_instance"}',
         legendFormat=consensus,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="1"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="1",instance="$node_instance"}',
         legendFormat=vote,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="2"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="2",instance="$node_instance"}',
         legendFormat=anonymous,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="3"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="3",instance="$node_instance"}',
         legendFormat=manager,
       )
     )
@@ -404,7 +405,7 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_store_last_merge_time',
+        namespace + '_store_last_merge_time' + node_instance,
 	legendFormat=mergeTime,
       )
     )
@@ -429,7 +430,7 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_store_last_written_block_size',
+        namespace + '_store_last_written_block_size' + node_instance,
 	legendFormat=writtenBlockSize,
       )
     )
@@ -456,19 +457,19 @@ local namespace = "octez";
       },
     ).addTargets([
       prometheus.target(
-        'ocaml_gc_minor_collections',
+        'ocaml_gc_minor_collections' + node_instance,
         legendFormat=minor,
       ),
       prometheus.target(
-        'ocaml_gc_major_collections',
+        'ocaml_gc_major_collections' + node_instance,
         legendFormat=major,
       ),
       prometheus.target(
-        'ocaml_gc_forced_major_collections',
+        'ocaml_gc_forced_major_collections' + node_instance,
         legendFormat=forced,
       ),
       prometheus.target(
-        'ocaml_gc_compactions',
+        'ocaml_gc_compactions' + node_instance,
         legendFormat=compact,
       )
     ]),
@@ -486,7 +487,7 @@ local namespace = "octez";
       },
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_heap_words',
+        'ocaml_gc_heap_words' + node_instance,
         legendFormat=major,
     ))
 
