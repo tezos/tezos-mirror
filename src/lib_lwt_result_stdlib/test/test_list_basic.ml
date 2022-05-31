@@ -260,7 +260,7 @@ module Shuffle = struct
         let rng = Random.State.make [|seed|] in
         let l1 = sort Int.compare l in
         let l2 = sort Int.compare (shuffle ~rng l) in
-        Lib_test.Qcheck_helpers.qcheck_eq'
+        Lib_test.Qcheck2_helpers.qcheck_eq'
           ~pp:pp_int_list
           ~eq:( = )
           ~actual:l2

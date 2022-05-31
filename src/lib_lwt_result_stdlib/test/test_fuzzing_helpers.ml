@@ -25,7 +25,7 @@
 
 open QCheck2.Gen
 open Support.Lib.Monad
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 let rec log_pause n =
   if n <= 0 then Lwt.return_unit

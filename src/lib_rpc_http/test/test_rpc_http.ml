@@ -215,7 +215,7 @@ let test_codec_identity =
       let decoded =
         Data_encoding.Json.destruct RPC_server.Acl.policy_encoding json
       in
-      Qcheck_helpers.qcheck_eq ~pp:pp_policy policy decoded)
+      Qcheck2_helpers.qcheck_eq ~pp:pp_policy policy decoded)
 
 (* Assert that the result of searching [searched_for] in
    [policy] is never worse than the result of searching in

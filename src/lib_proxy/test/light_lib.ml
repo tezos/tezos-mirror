@@ -26,7 +26,7 @@
 (** Definitions used in files with actual tests *)
 
 module Store = Tezos_proxy.Local_context
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 let check_irmin_tree_eq t1 t2 =
   qcheck_eq ~pp:Store.Tree.pp ~eq:Store.Tree.equal t1 t2
