@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -126,6 +127,15 @@ type successful_transaction_result =
       paid_storage_size_diff : Z.t;
     }
 
+type successful_origination_result = {
+  lazy_storage_diff : Lazy_storage.diffs option;
+  balance_updates : Receipt.balance_updates;
+  originated_contracts : Contract_hash.t list;
+  consumed_gas : Gas.Arith.fp;
+  storage_size : Z.t;
+  paid_storage_size_diff : Z.t;
+}
+
 type _ successful_manager_operation_result =
   | Reveal_result : {
       consumed_gas : Gas.Arith.fp;
@@ -134,14 +144,8 @@ type _ successful_manager_operation_result =
   | Transaction_result :
       successful_transaction_result
       -> Kind.transaction successful_manager_operation_result
-  | Origination_result : {
-      lazy_storage_diff : Lazy_storage.diffs option;
-      balance_updates : Receipt.balance_updates;
-      originated_contracts : Contract_hash.t list;
-      consumed_gas : Gas.Arith.fp;
-      storage_size : Z.t;
-      paid_storage_size_diff : Z.t;
-    }
+  | Origination_result :
+      successful_origination_result
       -> Kind.origination successful_manager_operation_result
   | Delegation_result : {
       consumed_gas : Gas.Arith.fp;
@@ -513,6 +517,11 @@ module Manager_result = struct
               storage_size;
               paid_storage_size_diff;
             } ->
+            (* There used to be a [legacy_lazy_storage_diff] returned as the
+               first component of the tuple below, and the non-legacy one
+               returned as the last component. The legacy one has been removed,
+               but it was chosen to keep the non-legacy one at its position,
+               hence the order difference with regards to the record above. *)
             ( balance_updates,
               originated_contracts,
               Gas.Arith.ceil consumed_gas,
@@ -1037,7 +1046,9 @@ module Internal_result = struct
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     MCase
       {
-        tag = Operation.Encoding.Manager_operations.transaction_tag;
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 1;
         name = "transaction";
         encoding =
           obj3
@@ -1080,7 +1091,9 @@ module Internal_result = struct
   let[@coq_axiom_with_reason "gadt"] origination_case =
     MCase
       {
-        tag = Operation.Encoding.Manager_operations.origination_tag;
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 2;
         name = "origination";
         encoding =
           obj3
@@ -1106,7 +1119,9 @@ module Internal_result = struct
   let[@coq_axiom_with_reason "gadt"] delegation_case =
     MCase
       {
-        tag = Operation.Encoding.Manager_operations.delegation_tag;
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 3;
         name = "delegation";
         encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
         iselect : Kind.delegation iselect =
@@ -1154,14 +1169,169 @@ let internal_contents_encoding : packed_internal_contents Data_encoding.t =
           (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
           Internal_result.encoding)
 
+module Internal_manager_result = struct
+  type 'kind case =
+    | MCase : {
+        op_case : 'kind Internal_result.case;
+        encoding : 'a Data_encoding.t;
+        kind : 'kind Kind.manager;
+        select :
+          packed_successful_manager_operation_result ->
+          'kind successful_manager_operation_result option;
+        proj : 'kind successful_manager_operation_result -> 'a;
+        inj : 'a -> 'kind successful_manager_operation_result;
+        t : 'kind manager_operation_result Data_encoding.t;
+      }
+        -> 'kind case
+
+  let make ~op_case ~encoding ~kind ~select ~proj ~inj =
+    let (Internal_result.MCase {name; _}) = op_case in
+    let t =
+      def (Format.asprintf "operation.alpha.operation_result.%s" name)
+      @@ union
+           ~tag_size:`Uint8
+           [
+             case
+               (Tag 0)
+               ~title:"Applied"
+               (merge_objs (obj1 (req "status" (constant "applied"))) encoding)
+               (fun o ->
+                 match o with
+                 | Skipped _ | Failed _ | Backtracked _ -> None
+                 | Applied o -> (
+                     match select (Successful_manager_result o) with
+                     | None -> None
+                     | Some o -> Some ((), proj o)))
+               (fun ((), x) -> Applied (inj x));
+             case
+               (Tag 1)
+               ~title:"Failed"
+               (obj2
+                  (req "status" (constant "failed"))
+                  (req "errors" trace_encoding))
+               (function Failed (_, errs) -> Some ((), errs) | _ -> None)
+               (fun ((), errs) -> Failed (kind, errs));
+             case
+               (Tag 2)
+               ~title:"Skipped"
+               (obj1 (req "status" (constant "skipped")))
+               (function Skipped _ -> Some () | _ -> None)
+               (fun () -> Skipped kind);
+             case
+               (Tag 3)
+               ~title:"Backtracked"
+               (merge_objs
+                  (obj2
+                     (req "status" (constant "backtracked"))
+                     (opt "errors" trace_encoding))
+                  encoding)
+               (fun o ->
+                 match o with
+                 | Skipped _ | Failed _ | Applied _ -> None
+                 | Backtracked (o, errs) -> (
+                     match select (Successful_manager_result o) with
+                     | None -> None
+                     | Some o -> Some (((), errs), proj o)))
+               (fun (((), errs), x) -> Backtracked (inj x, errs));
+           ]
+    in
+    MCase {op_case; encoding; kind; select; proj; inj; t}
+
+  let[@coq_axiom_with_reason "gadt"] transaction_case =
+    make
+      ~op_case:Internal_result.transaction_case
+      ~encoding:Manager_result.transaction_contract_variant_cases
+      ~select:(function
+        | Successful_manager_result (Transaction_result _ as op) -> Some op
+        | _ -> None)
+      ~kind:Kind.Transaction_manager_kind
+      ~proj:(function Transaction_result x -> x)
+      ~inj:(fun x -> Transaction_result x)
+
+  let[@coq_axiom_with_reason "gadt"] origination_case =
+    make
+      ~op_case:Internal_result.origination_case
+      ~encoding:
+        (obj7
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
+           (dft "originated_contracts" (list Contract.originated_encoding) [])
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+           (dft "storage_size" z Z.zero)
+           (dft "paid_storage_size_diff" z Z.zero)
+           (opt "lazy_storage_diff" Lazy_storage.encoding))
+      ~select:(function
+        | Successful_manager_result (Origination_result _ as op) -> Some op
+        | _ -> None)
+      ~proj:(function
+        | Origination_result
+            {
+              lazy_storage_diff;
+              balance_updates;
+              originated_contracts;
+              consumed_gas;
+              storage_size;
+              paid_storage_size_diff;
+            } ->
+            (* There used to be a [legacy_lazy_storage_diff] returned as the
+               first component of the tuple below, and the non-legacy one
+               returned as the last component. The legacy one has been removed,
+               but it was chosen to keep the non-legacy one at its position,
+               hence the order difference with regards to the record above. *)
+            ( balance_updates,
+              originated_contracts,
+              Gas.Arith.ceil consumed_gas,
+              consumed_gas,
+              storage_size,
+              paid_storage_size_diff,
+              lazy_storage_diff ))
+      ~kind:Kind.Origination_manager_kind
+      ~inj:
+        (fun ( balance_updates,
+               originated_contracts,
+               consumed_gas,
+               consumed_milligas,
+               storage_size,
+               paid_storage_size_diff,
+               lazy_storage_diff ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Origination_result
+          {
+            lazy_storage_diff;
+            balance_updates;
+            originated_contracts;
+            consumed_gas = consumed_milligas;
+            storage_size;
+            paid_storage_size_diff;
+          })
+
+  let delegation_case =
+    make
+      ~op_case:Internal_result.delegation_case
+      ~encoding:
+        Data_encoding.(
+          obj2
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Delegation_result _ as op) -> Some op
+        | _ -> None)
+      ~kind:Kind.Delegation_manager_kind
+      ~proj:(function[@coq_match_with_default]
+        | Delegation_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Delegation_result {consumed_gas = consumed_milligas})
+end
+
 let internal_manager_operation_result_encoding :
     packed_internal_manager_operation_result Data_encoding.t =
   let make (type kind)
-      (Manager_result.MCase res_case : kind Manager_result.case)
+      (Internal_manager_result.MCase res_case :
+        kind Internal_manager_result.case)
       (Internal_result.MCase ires_case : kind Internal_result.case) =
-    let (Operation.Encoding.Manager_operations.MCase op_case) =
-      res_case.op_case
-    in
+    let (Internal_result.MCase op_case) = res_case.op_case in
     case
       (Tag op_case.tag)
       ~title:op_case.name
@@ -1183,9 +1353,15 @@ let internal_manager_operation_result_encoding :
   def "apply_results.alpha.operation_result"
   @@ union
        [
-         make Manager_result.transaction_case Internal_result.transaction_case;
-         make Manager_result.origination_case Internal_result.origination_case;
-         make Manager_result.delegation_case Internal_result.delegation_case;
+         make
+           Internal_manager_result.transaction_case
+           Internal_result.transaction_case;
+         make
+           Internal_manager_result.origination_case
+           Internal_result.origination_case;
+         make
+           Internal_manager_result.delegation_case
+           Internal_result.delegation_case;
        ]
 
 let successful_manager_operation_result_encoding :

@@ -3328,15 +3328,9 @@ module Operation : sig
 
       val reveal_case : Kind.reveal case
 
-      val transaction_tag : int
-
       val transaction_case : Kind.transaction case
 
-      val origination_tag : int
-
       val origination_case : Kind.origination case
-
-      val delegation_tag : int
 
       val delegation_case : Kind.delegation case
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -618,15 +619,9 @@ module Encoding : sig
 
     val reveal_case : Kind.reveal case
 
-    val transaction_tag : int
-
     val transaction_case : Kind.transaction case
 
-    val origination_tag : int
-
     val origination_case : Kind.origination case
-
-    val delegation_tag : int
 
     val delegation_case : Kind.delegation case
 
