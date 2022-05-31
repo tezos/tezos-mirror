@@ -749,10 +749,10 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Tx_rollup_remove_commitment_result _
               | Tx_rollup_rejection_result _ | Transfer_ticket_result _
               | Tx_rollup_dispatch_tickets_result _
-              | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
-              | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
-              | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
-              | Sc_rollup_atomic_batch_result _ ->
+              | Dal_publish_slot_header_result _ | Sc_rollup_originate_result _
+              | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
+              | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
+              | Sc_rollup_timeout_result _ | Sc_rollup_atomic_batch_result _ ->
                   balance_updates_rev
               | Transaction_result
                   (Transaction_to_contract_result {balance_updates; _})
@@ -792,6 +792,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Tx_rollup_rejection_result _)
             | Successful_manager_result (Tx_rollup_dispatch_tickets_result _)
             | Successful_manager_result (Transfer_ticket_result _)
+            | Successful_manager_result (Dal_publish_slot_header_result _)
             | Successful_manager_result (Sc_rollup_originate_result _)
             | Successful_manager_result (Sc_rollup_add_messages_result _)
             | Successful_manager_result (Sc_rollup_cement_result _)

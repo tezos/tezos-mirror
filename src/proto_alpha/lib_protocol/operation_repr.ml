@@ -90,6 +90,8 @@ module Kind = struct
 
   type transfer_ticket = Transfer_ticket_kind
 
+  type dal_publish_slot_header = Dal_publish_slot_header_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -123,6 +125,7 @@ module Kind = struct
     | Tx_rollup_dispatch_tickets_manager_kind
         : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
+    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -362,6 +365,10 @@ and _ manager_operation =
       entrypoint : Entrypoint_repr.t;
     }
       -> Kind.transfer_ticket manager_operation
+  | Dal_publish_slot_header : {
+      slot : Dal_slot_repr.t;
+    }
+      -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup_repr.Kind.t;
       boot_sector : string;
@@ -425,6 +432,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Tx_rollup_rejection _ -> Kind.Tx_rollup_rejection_manager_kind
   | Tx_rollup_dispatch_tickets _ -> Kind.Tx_rollup_dispatch_tickets_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
+  | Dal_publish_slot_header _ -> Kind.Dal_publish_slot_header_manager_kind
   | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
   | Sc_rollup_add_messages _ -> Kind.Sc_rollup_add_messages_manager_kind
   | Sc_rollup_cement _ -> Kind.Sc_rollup_cement_manager_kind
@@ -520,6 +528,10 @@ let sc_rollup_operation_refute_tag = sc_rollup_operation_tag_offset + 4
 let sc_rollup_operation_timeout_tag = sc_rollup_operation_tag_offset + 5
 
 let sc_rollup_operation_atomic_batch_tag = sc_rollup_operation_tag_offset + 6
+
+let dal_offset = 230
+
+let dal_publish_slot_header_tag = dal_offset + 0
 
 module Encoding = struct
   open Data_encoding
@@ -938,6 +950,19 @@ module Encoding = struct
           inj =
             (fun (kind, boot_sector, parameters_ty) ->
               Sc_rollup_originate {kind; boot_sector; parameters_ty});
+        }
+
+    let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =
+      MCase
+        {
+          tag = dal_publish_slot_header_tag;
+          name = "dal_publish_slot_header";
+          encoding = obj1 (req "slot" Dal_slot_repr.encoding);
+          select =
+            (function
+            | Manager (Dal_publish_slot_header _ as op) -> Some op | _ -> None);
+          proj = (function Dal_publish_slot_header {slot} -> slot);
+          inj = (fun slot -> Dal_publish_slot_header {slot});
         }
 
     let[@coq_axiom_with_reason "gadt"] sc_rollup_add_messages_case =
@@ -1434,6 +1459,11 @@ module Encoding = struct
       transfer_ticket_tag
       Manager_operations.transfer_ticket_case
 
+  let dal_publish_slot_header_case =
+    make_manager_case
+      dal_publish_slot_header_tag
+      Manager_operations.dal_publish_slot_header_case
+
   let sc_rollup_originate_case =
     make_manager_case
       sc_rollup_operation_origination_tag
@@ -1506,6 +1536,7 @@ module Encoding = struct
            make tx_rollup_rejection_case;
            make tx_rollup_dispatch_tickets_case;
            make transfer_ticket_case;
+           make dal_publish_slot_header_case;
            make sc_rollup_originate_case;
            make sc_rollup_add_messages_case;
            make sc_rollup_cement_case;
@@ -1717,6 +1748,8 @@ let equal_manager_operation_kind :
   | Tx_rollup_dispatch_tickets _, _ -> None
   | Transfer_ticket _, Transfer_ticket _ -> Some Eq
   | Transfer_ticket _, _ -> None
+  | Dal_publish_slot_header _, Dal_publish_slot_header _ -> Some Eq
+  | Dal_publish_slot_header _, _ -> None
   | Sc_rollup_originate _, Sc_rollup_originate _ -> Some Eq
   | Sc_rollup_originate _, _ -> None
   | Sc_rollup_add_messages _, Sc_rollup_add_messages _ -> Some Eq

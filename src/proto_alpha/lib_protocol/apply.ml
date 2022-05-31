@@ -1221,13 +1221,14 @@ let apply_external_manager_operation_content :
     source:public_key_hash ->
     chain_id:Chain_id.t ->
     gas_consumed_in_precheck:Gas.cost option ->
+    fee:Tez.t ->
     kind manager_operation ->
     (context
     * kind successful_manager_operation_result
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~source ~chain_id ~gas_consumed_in_precheck operation ->
+ fun ctxt mode ~source ~chain_id ~gas_consumed_in_precheck ~fee operation ->
   let source_contract = Contract.Implicit source in
   prepare_apply_manager_operation_content
     ~ctxt
@@ -1735,6 +1736,11 @@ let apply_external_manager_operation_content :
           }
       in
       return (ctxt, result, [])
+  | Dal_publish_slot_header {slot} ->
+      Dal_apply.apply_publish_slot_header ctxt slot fee >>?= fun ctxt ->
+      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let result = Dal_publish_slot_header_result {consumed_gas} in
+      return (ctxt, result, [])        
   | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       Sc_rollup_operations.originate ctxt ~kind ~boot_sector ~parameters_ty
       >>=? fun ({address; size}, ctxt) ->
@@ -2013,6 +2019,9 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
   | Sc_rollup_atomic_batch _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
+  | Dal_publish_slot_header {slot} ->
+      Dal_apply.validate_publish_slot_header ctxt slot >>?= fun () ->
+      return ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source_contract) `Block_fees fee
@@ -2167,6 +2176,7 @@ let burn_manager_storage_fees :
       ( ctxt,
         storage_limit,
         Tx_rollup_dispatch_tickets_result {payload with balance_updates} )
+  | Dal_publish_slot_header_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_originate_result payload ->
       Fees.burn_sc_rollup_origination_fees
         ctxt
@@ -2272,6 +2282,7 @@ let burn_internal_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_dispatch_tickets_result {payload with balance_updates} )
+  | Dal_publish_slot_header_result _ -> return (ctxt, storage_limit, smopr)        
   | Sc_rollup_originate_result ({size; _} as payload) ->
       Fees.burn_sc_rollup_origination_fees ctxt ~storage_limit ~payer size
       >>=? fun (ctxt, storage_limit, balance_updates) ->
@@ -2304,6 +2315,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
                                    operation;
                                    gas_limit;
                                    storage_limit;
+                                   fee;
                                    _;
                                  }) =
     op
@@ -2317,6 +2329,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     ~source
     ~gas_consumed_in_precheck
     ~chain_id
+    ~fee
     operation
   >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (

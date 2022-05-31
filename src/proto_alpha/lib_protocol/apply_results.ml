@@ -213,6 +213,10 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.transfer_ticket successful_manager_operation_result
+  | Dal_publish_slot_header_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.dal_publish_slot_header successful_manager_operation_result
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;
@@ -891,6 +895,26 @@ module Manager_result = struct
             paid_storage_size_diff;
           })
 
+  let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =
+    make
+      ~op_case:
+        Operation.Encoding.Manager_operations.dal_publish_slot_header_case
+      ~encoding:
+        (obj2
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Dal_publish_slot_header_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~proj:(function
+        | Dal_publish_slot_header_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~kind:Kind.Dal_publish_slot_header_manager_kind
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Dal_publish_slot_header_result {consumed_gas = consumed_milligas})
+
   let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_originate_case
@@ -1534,6 +1558,10 @@ let equal_manager_kind :
   | Kind.Transfer_ticket_manager_kind, Kind.Transfer_ticket_manager_kind ->
       Some Eq
   | Kind.Transfer_ticket_manager_kind, _ -> None
+  | ( Kind.Dal_publish_slot_header_manager_kind,
+      Kind.Dal_publish_slot_header_manager_kind ) ->
+      Some Eq
+  | Kind.Dal_publish_slot_header_manager_kind, _ -> None
   | Kind.Sc_rollup_originate_manager_kind, Kind.Sc_rollup_originate_manager_kind
     ->
       Some Eq
@@ -2011,6 +2039,18 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
+  let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =
+    make_manager_case
+      Operation.Encoding.dal_publish_slot_header_case
+      Manager_result.dal_publish_slot_header_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Dal_publish_slot_header _; _} as
+              op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
+
   let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =
     make_manager_case
       Operation.Encoding.sc_rollup_originate_case
@@ -2132,6 +2172,7 @@ let contents_result_encoding =
          make tx_rollup_rejection_case;
          make tx_rollup_dispatch_tickets_case;
          make transfer_ticket_case;
+         make dal_publish_slot_header_case;
          make sc_rollup_originate_case;
          make sc_rollup_add_messages_case;
          make sc_rollup_cement_case;
@@ -2719,6 +2760,23 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Transfer_ticket _; _}, _ -> None
+  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Dal_publish_slot_header_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Dal_publish_slot_header_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Dal_publish_slot_header _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_originate _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_originate_result _); _} ) ->

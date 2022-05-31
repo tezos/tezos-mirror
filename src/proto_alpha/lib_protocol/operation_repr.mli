@@ -119,6 +119,8 @@ module Kind : sig
 
   type transfer_ticket = Transfer_ticket_kind
 
+  type dal_publish_slot_header = Dal_publish_slot_header_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -152,6 +154,7 @@ module Kind : sig
     | Tx_rollup_dispatch_tickets_manager_kind
         : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
+    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -426,6 +429,10 @@ and _ manager_operation =
           (** The entrypoint of the smart contract address that should receive the tickets. *)
     }
       -> Kind.transfer_ticket manager_operation
+  | Dal_publish_slot_header : {
+      slot : Dal_slot_repr.t;
+    }
+      -> Kind.dal_publish_slot_header manager_operation
   (* [Sc_rollup_originate] allows an implicit account to originate a new
      smart contract rollup (initialized with a given boot
      sector). *)
@@ -613,6 +620,9 @@ module Encoding : sig
 
   val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
+  val dal_publish_slot_header_case :
+    Kind.dal_publish_slot_header Kind.manager case
+
   val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
 
   val sc_rollup_add_messages_case :
@@ -671,6 +681,8 @@ module Encoding : sig
     val tx_rollup_dispatch_tickets_case : Kind.tx_rollup_dispatch_tickets case
 
     val transfer_ticket_case : Kind.transfer_ticket case
+
+    val dal_publish_slot_header_case : Kind.dal_publish_slot_header case
 
     val sc_rollup_originate_case : Kind.sc_rollup_originate case
 

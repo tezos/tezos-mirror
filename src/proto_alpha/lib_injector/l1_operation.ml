@@ -59,6 +59,7 @@ module Manager_operation = struct
            make tx_rollup_rejection_case;
            make tx_rollup_dispatch_tickets_case;
            make transfer_ticket_case;
+           make dal_publish_slot_header_case;
            make sc_rollup_originate_case;
            make sc_rollup_add_messages_case;
            make sc_rollup_cement_case;
@@ -89,6 +90,7 @@ module Manager_operation = struct
     | Tx_rollup_rejection _ -> tx_rollup_rejection_case
     | Tx_rollup_dispatch_tickets _ -> tx_rollup_dispatch_tickets_case
     | Transfer_ticket _ -> transfer_ticket_case
+    | Dal_publish_slot_header _ -> dal_publish_slot_header_case
     | Sc_rollup_originate _ -> sc_rollup_originate_case
     | Sc_rollup_add_messages _ -> sc_rollup_add_messages_case
     | Sc_rollup_cement _ -> sc_rollup_cement_case
