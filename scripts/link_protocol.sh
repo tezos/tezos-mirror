@@ -5,7 +5,7 @@ set -e
 usage="Usage:
 $ ./scripts/link_protocol.sh src/proto_<new_version>_<new_hash>
 
-This updates manifest/manifest.ml to add the new protocol.
+This updates manifest/main.ml to add the new protocol.
 Then, it runs make -C manifest to regenerate the relevant files.
 "
 
@@ -25,22 +25,8 @@ if [ -z "${new_hash}" ] ; then
     exit 1
 fi
 
-# Copy the part of manifest/main.ml that is before the declaration of alpha.
-echo "Updating manifest: copy header..."
-grep -B 1000000 'let alpha = active Alpha "alpha"' manifest/main.ml | head --lines=-1 > manifest/main.ml.new
 
-# Insert the new lines we want to insert.
-echo "Updating manifest: add new line..."
-echo "  let _${new_version}_${new_hash} = active (V ${new_version}) \"${new_hash}\"" >> manifest/main.ml.new
-echo "" >> manifest/main.ml.new
-
-# Copy the rest of the original file.
-echo "Updating manifest: copy footer..."
-grep -A 1000000 'let alpha = active Alpha "alpha"' manifest/main.ml >> manifest/main.ml.new
-
-# Replace the original file.
-echo "Updating manifest: replace file..."
-mv manifest/main.ml.new manifest/main.ml
+sed "/let alpha = active Name.alpha/i \  let _${new_version}_${new_hash} = active (Name.v \"${new_hash}\" ${new_version})\n" -i manifest/main.ml
 
 # Generate everything from the manifest.
 echo "Updating manifest: generate dune and opam files..."
