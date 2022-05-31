@@ -53,6 +53,8 @@ module Make_common (S : sig
 
   type secret_key = Secret_key.t
 
+  type signature = t
+
   type sk_uri = private Uri.t
 
   type pk_uri = private Uri.t
