@@ -106,19 +106,3 @@ module Name = struct
 
   let equal = Signature.Public_key_hash.equal
 end
-
-module Dummy_event = struct
-  type t = unit
-
-  let pp = Format.pp_print_cut
-
-  let encoding = Data_encoding.unit
-
-  let level () = Internal_event.Debug
-end
-
-module Logger =
-  Worker_logger.Make (Dummy_event) (Request)
-    (struct
-      let worker_name = "tx_rollup_injector"
-    end)
