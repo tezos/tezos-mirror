@@ -164,12 +164,16 @@ module Synth = struct
      (The recognized strings are defined further below.) *)
   type kind =
     | Estimated of Decimal.t
+    | Estimated_storage of Decimal.t
     | Consumed of Decimal.t
     | Gas_remaining of Decimal.t
+    | Storage_size of Decimal.t
     | Gas_limit of Decimal.t
+    | Storage_limit of Decimal.t
     | Remaining_gas of Decimal.t
     | Baker_fee of Decimal.t
     | Payload_fee of Decimal.t
+    | Storage_fee of Decimal.t
     | Fee of Decimal.t
     | Hash
     | Tezos_client
@@ -222,17 +226,25 @@ module Synth = struct
 
   let estimated_str = "Estimated gas: "
 
+  let estimated_storage_str = "Estimated storage: "
+
   let consumed_str = "Consumed gas: "
 
   let gas_remaining_str = "Gas remaining: "
 
+  let storage_size_str = "Storage size: "
+
   let gas_limit_str = "Gas limit: "
+
+  let storage_limit_str = "Storage limit: "
 
   let remaining_gas_str = "remaining gas: "
 
   let baker_fee_str = "Fee to the baker: ꜩ"
 
   let payload_fee_str = "payload fees(the block proposer) ....... +ꜩ"
+
+  let storage_fee_str = "storage fees ........................... +ꜩ"
 
   let fee_str = "fee = "
 
@@ -331,17 +343,26 @@ module Synth = struct
 
   let get_estimated = get_dec estimated_str (fun v -> Estimated v)
 
+  let get_estimated_storage =
+    get_dec estimated_storage_str (fun v -> Estimated_storage v)
+
   let get_consumed = get_dec consumed_str (fun v -> Consumed v)
 
   let get_gas_remaining = get_dec gas_remaining_str (fun v -> Gas_remaining v)
 
+  let get_storage_size = get_dec storage_size_str (fun v -> Storage_size v)
+
   let get_gas_limit = get_dec gas_limit_str (fun v -> Gas_limit v)
+
+  let get_storage_limit = get_dec storage_limit_str (fun v -> Storage_limit v)
 
   let get_remaining_gas = get_dec remaining_gas_str (fun v -> Remaining_gas v)
 
   let get_baker_fee = get_dec baker_fee_str (fun v -> Baker_fee v)
 
   let get_payload_fee = get_dec payload_fee_str (fun v -> Payload_fee v)
+
+  let get_storage_fee = get_dec storage_fee_str (fun v -> Storage_fee v)
 
   let get_fee = get_dec fee_str (fun v -> Fee v)
 
@@ -369,13 +390,17 @@ module Synth = struct
     either
       [
         get_estimated;
+        get_estimated_storage;
         get_consumed;
         get_gas_remaining;
+        get_storage_size;
         get_gas_limit;
+        get_storage_limit;
         get_remaining_gas;
         get_baker_fee;
         get_hash;
         get_payload_fee;
+        get_storage_fee;
         get_fee;
         get_tezos_client;
         get_operation_hash;
@@ -398,12 +423,16 @@ module Synths = struct
   type t = {
     previous_kinds : (string * kind * int (* line number *)) list;
     estimated : synth;
+    estimated_storage : synth;
     consumed : synth;
     gas_remaining : synth;
+    storage_size : synth;
     gas_limit : synth;
+    storage_limit : synth;
     remaining_gas : synth;
     baker_fee : synth;
     payload_fee : synth;
+    storage_fee : synth;
     fee : synth;
     total_lines : int;
     total_degradations : int;
@@ -413,12 +442,16 @@ module Synths = struct
     {
       previous_kinds = [];
       estimated = empty_synth estimated_str Dec;
+      estimated_storage = empty_synth estimated_storage_str Dec;
       consumed = empty_synth consumed_str Dec;
       gas_remaining = empty_synth gas_remaining_str Inc;
+      storage_size = empty_synth storage_size_str Dec;
       gas_limit = empty_synth gas_limit_str Dec;
+      storage_limit = empty_synth storage_limit_str Dec;
       remaining_gas = empty_synth remaining_gas_str Inc;
       baker_fee = empty_synth baker_fee_str Dec;
       payload_fee = empty_synth payload_fee_str Dec;
+      storage_fee = empty_synth storage_fee_str Dec;
       fee = empty_synth fee_str Dec;
       total_lines = 0;
       total_degradations = 0;
@@ -454,12 +487,16 @@ module Synths = struct
   let same_kind kind1 kind2 =
     match (kind1, kind2) with
     | Estimated _, Estimated _
+    | Estimated_storage _, Estimated_storage _
     | Consumed _, Consumed _
     | Gas_remaining _, Gas_remaining _
+    | Storage_size _, Storage_size _
     | Gas_limit _, Gas_limit _
+    | Storage_limit _, Storage_limit _
     | Remaining_gas _, Remaining_gas _
     | Baker_fee _, Baker_fee _
     | Payload_fee _, Payload_fee _
+    | Storage_fee _, Storage_fee _
     | Fee _, Fee _
     | Hash, Hash
     | Tezos_client, Tezos_client
@@ -476,6 +513,11 @@ module Synths = struct
           ( v,
             (fun synth -> synth.estimated),
             fun estimated synths -> {synths with estimated} )
+    | Estimated_storage v ->
+        Some
+          ( v,
+            (fun synth -> synth.estimated_storage),
+            fun estimated_storage synths -> {synths with estimated_storage} )
     | Consumed v ->
         Some
           ( v,
@@ -486,11 +528,21 @@ module Synths = struct
           ( v,
             (fun synth -> synth.gas_remaining),
             fun gas_remaining synths -> {synths with gas_remaining} )
+    | Storage_size v ->
+        Some
+          ( v,
+            (fun synth -> synth.storage_size),
+            fun storage_size synths -> {synths with storage_size} )
     | Gas_limit v ->
         Some
           ( v,
             (fun synth -> synth.gas_limit),
             fun gas_limit synths -> {synths with gas_limit} )
+    | Storage_limit v ->
+        Some
+          ( v,
+            (fun synth -> synth.storage_limit),
+            fun storage_limit synths -> {synths with storage_limit} )
     | Remaining_gas v ->
         Some
           ( v,
@@ -506,6 +558,11 @@ module Synths = struct
           ( v,
             (fun synth -> synth.payload_fee),
             fun payload_fee synths -> {synths with payload_fee} )
+    | Storage_fee v ->
+        Some
+          ( v,
+            (fun synth -> synth.storage_fee),
+            fun storage_fee synths -> {synths with storage_fee} )
     | Fee v ->
         Some (v, (fun synth -> synth.fee), fun fee synths -> {synths with fee})
     | Hash | Tezos_client | Operation_hash | New_contract | To | Parameter ->
@@ -610,12 +667,16 @@ module Synths = struct
       {
         previous_kinds;
         estimated;
+        estimated_storage;
         consumed;
         gas_remaining;
+        storage_size;
         gas_limit;
+        storage_limit;
         remaining_gas;
         baker_fee;
         payload_fee;
+        storage_fee;
         fee;
         total_lines;
         total_degradations;
@@ -626,12 +687,16 @@ module Synths = struct
       previous_kinds ;
     Printf.printf "\n%!" ;
     Synth.show estimated ;
+    Synth.show estimated_storage ;
     Synth.show consumed ;
     Synth.show gas_remaining ;
+    Synth.show storage_size ;
     Synth.show gas_limit ;
+    Synth.show storage_limit ;
     Synth.show remaining_gas ;
     Synth.show baker_fee ;
     Synth.show payload_fee ;
+    Synth.show storage_fee ;
     Synth.show fee ;
     Printf.printf "Total number of lines with a change: %d.\n" total_lines ;
     Printf.printf
