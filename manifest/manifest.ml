@@ -2471,35 +2471,147 @@ let generate_opam_ci () =
         | Test_executable _ -> true)
       l
   in
+  (* [deps] maps a package name to its (internal) opam deps. *)
+  let deps : (string, Opam.dependency list) Hashtbl.t = Hashtbl.create 17 in
+  Target.iter_internal_by_opam (fun package_name internal_pkgs ->
+      let opam_deps =
+        internal_pkgs
+        |> List.concat_map (fun i ->
+               Target.all_internal_deps i
+               |> List.filter_map Target.get_internal
+               |> List.map (fun i -> Target.Internal i)
+               |> List.concat_map
+                    (as_opam_dependency
+                       ~fix_version:false
+                       ~for_package:package_name
+                       ~with_test:false))
+        |> deduplicate_list
+             ~merge:(fun a _b -> a)
+             (fun {Opam.package; _} -> package)
+      in
+      Hashtbl.add deps package_name opam_deps) ;
+  (* [rank] is used to perform a topological sort. A package should
+     receive a rank higher than all its dependencies. *)
+  let rank : (string, int) Hashtbl.t = Hashtbl.create 17 in
+  let rec compute_rank (name : string) : int =
+    match Hashtbl.find_opt rank name with
+    | Some rank -> rank
+    | None ->
+        let deps = Hashtbl.find deps name in
+        let max_rank =
+          deps
+          |> List.map (fun (opam_dep : Opam.dependency) ->
+                 compute_rank opam_dep.package)
+          |> List.fold_left max 0
+        in
+        Hashtbl.replace rank name (max_rank + 1) ;
+        max_rank + 1
+  in
+  Target.iter_internal_by_opam (fun package_name _internal_pkgs ->
+      let (_ : int) = compute_rank package_name in
+      ()) ;
   write ".gitlab/ci/opam-ci.yml" @@ fun fmt ->
   Format.fprintf fmt "# This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "# Edit file manifest/manifest.ml instead.@." ;
-  Target.iter_internal_by_opam @@ fun package_name internal_pkgs ->
-  Format.fprintf fmt "@." ;
-  if only_test_or_private_targets internal_pkgs then
+  (* Decide whether an opam package should be tested in the CI or
+     not. If not, remove it from [rank] so that we do not consider it in
+     the later stage. *)
+  Target.iter_internal_by_opam (fun package_name internal_pkgs ->
+      if only_test_or_private_targets internal_pkgs then (
+        Hashtbl.remove rank package_name ;
+        Format.fprintf
+          fmt
+          "@.# Ignoring package %s, it only contains tests or private targets\n"
+          package_name)
+      else
+        let unreleased = depends_on_unreleased_packages internal_pkgs in
+        if not (String_set.is_empty unreleased) then (
+          Hashtbl.remove rank package_name ;
+          Format.fprintf
+            fmt
+            "@.# Ignoring package %s, it depends on vendored packages\n\
+             # that do not exists inside the official opam-repository:\n"
+            package_name ;
+          String_set.iter (Format.fprintf fmt "# - %s\n") unreleased)) ;
+
+  let template d =
     Format.fprintf
       fmt
-      "# Ignoring package %s, it only contains tests or private targets\n"
-      package_name
-  else
-    let unreleased = depends_on_unreleased_packages internal_pkgs in
-    if not (String_set.is_empty unreleased) then (
-      Format.fprintf
-        fmt
-        "# Ignoring package %s, it depends on vendored packages\n\
-         # that do not exists inside the official opam-repository:\n"
-        package_name ;
-      String_set.iter (Format.fprintf fmt "# - %s\n") unreleased)
-    else
-      Format.fprintf
-        fmt
-        {|opam:%s:
-  extends: .opam_template
+      {|@..rules_template__trigger_opam_batch_%d:
+  rules:
+    # Run on scheduled builds.
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: delayed
+      start_in: %d minutes
+    # Never run on branch pipelines for master.
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
+      when: never
+    # Run when the branch name contains the `opam` keyword.
+    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
+      when: delayed
+      start_in: %d minutes
+    # Run when there is label on the merge request
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+      when: delayed
+      start_in: %d minutes
+    # Run on merge requests when opam changes are detected.
+    - if: '$CI_MERGE_REQUEST_ID'
+      changes:
+        - "**/dune"
+        - "**/dune.inc"
+        - "**/*.dune.inc"
+        - "**/dune-project"
+        - "**/dune-workspace"
+        - "**/*.opam"
+        - .gitlab/ci/opam-ci.yml
+        - .gitlab/ci/packaging.yml
+        - manifest/manifest.ml
+        - scripts/opam-prepare-repo.sh
+        - scripts/version.sh
+      when: delayed
+      start_in: %d minutes
+    - when: never # default
+|}
+      d
+      d
+      d
+      d
+      d
+  in
+  for i = 1 to (Hashtbl.length rank / 30) + 1 do
+    template i
+  done ;
+  (* We setup one job per opam package and have around 200 packages.
+     Due to technical limitations of the CI, we want to avoid starting
+     that many jobs at the same time.  Gitlab allows to delay a job
+     using `when:delayed` and `start_in:SPAN`.  We start multiple
+     small batch of opam jobs leaving few seconds/minutes between them. *)
+  Hashtbl.fold (fun name rank acc -> (name, rank) :: acc) rank []
+  (* We sort elements in descending rank order. The goal is to assign
+     smaller delay to packages with the most dependencies (as the job should take longer to run). *)
+  |> List.sort (fun (n1, r1) (n2, r2) ->
+         match compare (r2 : int) r1 with
+         | 0 -> compare (n1 : string) n2
+         | c -> c)
+  |> List.mapi (fun i (name, _) ->
+         (* group jobs by 30, delay each group by 1 minute *)
+         let delayed_by = 1 + (i / 30) in
+         (name, delayed_by))
+  (* We sort elements by name because we don't want the jobs to move around when topological sort changes *)
+  |> List.sort (fun (n1, _) (n2, _) -> compare (n1 : string) n2)
+  |> List.iter (fun (package_name, delayed_by) ->
+         Format.fprintf
+           fmt
+           {|@.opam:%s:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_%d
   variables:
     package: %s
 |}
-        package_name
-        package_name
+           package_name
+           delayed_by
+           package_name)
 
 let generate () =
   Printexc.record_backtrace true ;
