@@ -328,7 +328,34 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         Sc_rollup.Staker.pp
         (snd stakers)
         Sc_rollup.Address.pp
-        rollup) ;
+        rollup
+  | Sc_rollup_atomic_batch
+      {
+        rollup;
+        cemented_commitment;
+        outbox_level;
+        message_index;
+        inclusion_proof;
+        atomic_transaction_batch;
+      } ->
+      (* TODO #3125
+         Improve pretty-printing of this content and sc operations above.
+         Should avoid printing on a single line and use indentation.
+      *)
+      Format.fprintf
+        ppf
+        "Execute the atomic transaction batch from the smart contract rollup \
+         at address %a, with cemented commit %a, outbox level %a, message  \
+         index %d, inclusion proof %s for the atomic batch of transactions %s"
+        Sc_rollup.Address.pp
+        rollup
+        Sc_rollup.Commitment.Hash.pp
+        cemented_commitment
+        Raw_level.pp
+        outbox_level
+        message_index
+        inclusion_proof
+        atomic_transaction_batch) ;
 
   Format.fprintf ppf "%a@]@]" pp_result result
 
@@ -706,6 +733,17 @@ let pp_manager_operation_contents_and_result ppf
       Sc_rollup.Game.pp_status
       status
   in
+  let pp_sc_rollup_atomic_batch_result
+      (Sc_rollup_atomic_batch_result
+        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+    if paid_storage_size_diff <> Z.zero then
+      Format.fprintf
+        ppf
+        "@,Paid storage size diff: %s bytes"
+        (Z.to_string paid_storage_size_diff) ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_balance_updates_opt ppf balance_updates
+  in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
@@ -940,6 +978,17 @@ let pp_manager_operation_contents_and_result ppf
            rollup by timeout was BACKTRACKED, its expected effects (as follow) \
            were NOT applied.@]" ;
         pp_sc_rollup_timeout_result op
+    | Applied (Sc_rollup_atomic_batch_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This sc rollup atomic batch operation was successfully applied." ;
+        pp_sc_rollup_atomic_batch_result op
+    | Backtracked ((Sc_rollup_atomic_batch_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This sc rollup atomic batch operation was BACKTRACKED, its \
+           expected effects (as follow) were NOT applied.@]" ;
+        pp_sc_rollup_atomic_batch_result op
   in
 
   Format.fprintf

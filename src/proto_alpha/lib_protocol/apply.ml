@@ -1792,6 +1792,25 @@ let apply_external_manager_operation_content :
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_timeout_result {status; consumed_gas} in
       return (ctxt, result, [])
+  | Sc_rollup_atomic_batch
+      {
+        rollup;
+        cemented_commitment;
+        outbox_level;
+        message_index;
+        inclusion_proof;
+        atomic_transaction_batch;
+      } ->
+      Sc_rollup_operations.atomic_batch
+        ctxt
+        rollup
+        cemented_commitment
+        ~outbox_level
+        ~message_index
+        ~inclusion_proof
+        ~atomic_transaction_batch
+      >>=? fun _ctxt ->
+      failwith "Sc_rolup_atomic_batch operation is not yet supported."
 
 type success_or_failure = Success of context | Failure
 
@@ -1991,7 +2010,8 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         ~count_limit:tx_rollup_max_messages_per_inbox
       >>?= fun () -> return ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
-  | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _ ->
+  | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
+  | Sc_rollup_atomic_batch _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
@@ -2161,6 +2181,15 @@ let burn_manager_storage_fees :
   | Sc_rollup_publish_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_refute_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_timeout_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_atomic_batch_result
+      ({paid_storage_size_diff; balance_updates; _} as payload) ->
+      let consumed = paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >|=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ balance_updates in
+      ( ctxt,
+        storage_limit,
+        Sc_rollup_atomic_batch_result {payload with balance_updates} )
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].
@@ -2253,6 +2282,15 @@ let burn_internal_storage_fees :
   | Sc_rollup_publish_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_refute_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_timeout_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_atomic_batch_result
+      ({balance_updates; paid_storage_size_diff; _} as payload) ->
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Sc_rollup_atomic_batch_result {payload with balance_updates} )
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :

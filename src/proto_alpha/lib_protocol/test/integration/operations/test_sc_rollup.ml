@@ -398,6 +398,45 @@ let test_originating_with_valid_type () =
   ]
   |> List.iter_es assert_parameters_ty
 
+let test_atomic_batch_fails () =
+  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let _, contract = contracts in
+  let* i = Incremental.begin_construction ctxt in
+  let* c = dummy_commitment i rollup in
+  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
+  let* i = Incremental.add_operation i operation in
+  let* b = Incremental.finalize_block i in
+  let* constants = Context.get_constants (B b) in
+  let* b =
+    Block.bake_n constants.parametric.sc_rollup_challenge_window_in_blocks b
+  in
+  let* i = Incremental.begin_construction b in
+  let hash = Sc_rollup.Commitment.hash c in
+  let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
+  let* _ = Incremental.add_operation i cement_op in
+  let* batch_op =
+    Op.sc_rollup_atomic_batch
+      (I i)
+      contract
+      rollup
+      hash
+      ~outbox_level:(Raw_level.of_int32_exn 0l)
+      ~message_index:0
+      ~inclusion_proof:"xyz"
+      ~atomic_transaction_batch:"xyz"
+  in
+  let expect_failure = function
+    | Environment.Ecoproto_error
+        (Sc_rollup_operations.Sc_rollup_invalid_atomic_batch as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ -> failwith "For some reason in did not fail with the right error"
+  in
+  let* _ = Incremental.add_operation ~expect_failure i batch_op in
+
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -432,4 +471,8 @@ let tests =
       "originating with valid type"
       `Quick
       test_originating_with_valid_type;
+    Tztest.tztest
+      "the atomic batch test will fail for now"
+      `Quick
+      test_atomic_batch_fails;
   ]

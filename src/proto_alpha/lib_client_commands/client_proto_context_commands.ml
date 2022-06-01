@@ -135,6 +135,8 @@ let rollup_address_param =
             name
       | Some addr -> return addr)
 
+let unchecked_payload_param = file_or_text_parameter ~from_text:return ()
+
 let group =
   {
     Clic.name = "context";
@@ -2771,6 +2773,104 @@ let commands_rw () =
           (fun addr -> cctxt#message "%s" (Sc_rollup.Address.to_b58check addr))
           rollups
         >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:
+        "Execute an atomic batch of transactions. The transactions are part of \
+         the smart-contract rollup's outbox of a cemented commitment."
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args
+         storage_limit_arg
+         counter_arg)
+      (prefixes ["execute"; "transactions"; "of"; "sc"; "rollup"]
+      @@ param
+           ~name:"rollup"
+           ~desc:
+             "The address of the sc rollup where the atomic batch of \
+              transactions resides."
+           rollup_address_param
+      @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"source"
+           ~desc:"The account used for executing the batch of transactions."
+      @@ prefixes ["for"; "commitment"; "hash"]
+      @@ param
+           ~name:"last cemented commitment"
+           ~desc:"The hash of the last cemented commitment of the rollup."
+           commitment_hash_param
+      @@ prefixes ["for"; "the"; "outbox"; "level"]
+      @@ param
+           ~name:"outbox level"
+           ~desc:"The level of the rollup's outbox."
+           raw_level_parameter
+      @@ prefixes ["for"; "the"; "message"; "at"; "index"]
+      @@ param
+           ~name:"message index"
+           ~desc:
+             "The index of the rollup's outbox message containing the batch of \
+              transactions."
+           non_negative_param
+      @@ prefixes ["and"; "inclusion"; "proof"]
+      @@ param
+           ~name:"inclusion proof"
+           ~desc:"The inclusion proof for the atomic batch of transactions."
+           unchecked_payload_param
+      @@ prefixes ["and"; "atomic"; "transaction"; "batch"]
+      @@ param
+           ~name:"atomic transaction batch"
+           ~desc:"The atomic batch of transactions to be executed."
+           unchecked_payload_param
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             fee_parameter,
+             storage_limit,
+             counter )
+           rollup
+           source
+           cemented_commitment
+           outbox_level
+           message_index
+           inclusion_proof
+           atomic_transaction_batch
+           cctxt ->
+        (match source with
+        | Originated _ ->
+            failwith
+              "Only implicit accounts can execute an sc rollup batch of \
+               transactions"
+        | Implicit source -> return source)
+        >>=? fun source ->
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        sc_rollup_atomic_batch
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~rollup
+          ~cemented_commitment
+          ~outbox_level
+          ~message_index
+          ~inclusion_proof
+          ~atomic_transaction_batch
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
   ]
 
 let commands network () =
