@@ -455,6 +455,9 @@ let pp_balance_updates_opt ppf balance_updates =
         pp_balance_updates
         balance_updates
 
+let pp_consumed_gas ppf consumed_gas =
+  Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+
 let pp_manager_operation_contents_and_result ppf
     ( Manager_operation
         {source; fee; operation; counter; gas_limit; storage_limit},
@@ -515,14 +518,13 @@ let pp_manager_operation_contents_and_result ppf
             ppf
             "@,Paid storage size diff: %s bytes"
             (Z.to_string paid_storage_size_diff) ;
-        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+        pp_consumed_gas ppf consumed_gas ;
         pp_balance_updates_opt ppf balance_updates
     | Transaction_to_tx_rollup_result
         {balance_updates; consumed_gas; ticket_hash; paid_storage_size_diff} ->
-        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+        pp_consumed_gas ppf consumed_gas ;
         pp_balance_updates_opt ppf balance_updates ;
         Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
-        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
         if paid_storage_size_diff <> Z.zero then
           Format.fprintf
             ppf
@@ -555,7 +557,7 @@ let pp_manager_operation_contents_and_result ppf
         ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_register_global_constant_result
@@ -567,7 +569,7 @@ let pp_manager_operation_contents_and_result ppf
            balance updates. *)
         assert false
     | balance_updates -> pp_balance_updates_opt ppf balance_updates) ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size_of_constant) ;
     Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
   in
@@ -579,7 +581,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
       "@,Originated tx rollup: %a"
@@ -594,7 +596,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     if paid_storage_size_diff <> Z.zero then
       Format.fprintf
         ppf
@@ -608,7 +610,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_return_bond_result
       (Tx_rollup_return_bond_result {balance_updates; consumed_gas}) =
@@ -617,7 +619,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_finalize_commitment_result
       (Tx_rollup_finalize_commitment_result
@@ -627,7 +629,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_remove_commitment_result
@@ -638,7 +640,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_rejection_result
@@ -648,7 +650,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_dispatch_tickets_result
       (Tx_rollup_dispatch_tickets_result
@@ -658,7 +660,7 @@ let pp_manager_operation_contents_and_result ppf
         ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_transfer_ticket_result
@@ -669,24 +671,24 @@ let pp_manager_operation_contents_and_result ppf
         ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_dal_publish_slot_header_result
       (Dal_publish_slot_header_result {consumed_gas}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_sc_rollup_originate_result
       (Sc_rollup_originate_result
         {address; consumed_gas; size; balance_updates}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size) ;
     Format.fprintf ppf "@,Address: %a" Sc_rollup.Address.pp address ;
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_add_messages_result
       (Sc_rollup_add_messages_result {consumed_gas; inbox_after}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
       "@,Resulting inbox state: %a"
@@ -694,12 +696,12 @@ let pp_manager_operation_contents_and_result ppf
       inbox_after
   in
   let pp_sc_rollup_cement_result (Sc_rollup_cement_result {consumed_gas}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_sc_rollup_publish_result
       (Sc_rollup_publish_result
         {consumed_gas; staked_hash; published_at_level; balance_updates}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
       "@,Hash of commit: %a"
@@ -714,7 +716,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_sc_rollup_refute_result
       (Sc_rollup_refute_result {consumed_gas; status; balance_updates}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
       "@,Refutation game status: %a"
@@ -724,7 +726,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_sc_rollup_timeout_result
       (Sc_rollup_timeout_result {consumed_gas; status; balance_updates}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
       "@,Refutation game status: %a"
@@ -740,7 +742,7 @@ let pp_manager_operation_contents_and_result ppf
         ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_return_bond_result
@@ -750,7 +752,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
@@ -759,7 +761,7 @@ let pp_manager_operation_contents_and_result ppf
     | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
     | Applied (Reveal_result {consumed_gas}) ->
         Format.fprintf ppf "This revelation was successfully applied" ;
-        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+        pp_consumed_gas ppf consumed_gas
     | Backtracked (Reveal_result _, _) ->
         Format.fprintf
           ppf
@@ -767,7 +769,7 @@ let pp_manager_operation_contents_and_result ppf
            NOT applied.@]"
     | Applied (Delegation_result {consumed_gas}) ->
         Format.fprintf ppf "This delegation was successfully applied" ;
-        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+        pp_consumed_gas ppf consumed_gas
     | Backtracked (Delegation_result _, _) ->
         Format.fprintf
           ppf
@@ -775,7 +777,7 @@ let pp_manager_operation_contents_and_result ppf
            NOT applied.@]"
     | Applied (Set_deposits_limit_result {consumed_gas}) ->
         Format.fprintf ppf "The deposits limit was successfully set" ;
-        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+        pp_consumed_gas ppf consumed_gas
     | Backtracked (Set_deposits_limit_result _, _) ->
         Format.fprintf
           ppf
@@ -1031,7 +1033,7 @@ let pp_manager_operation_contents_and_result ppf
     | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
     | Applied (IDelegation_result {consumed_gas}) ->
         Format.fprintf ppf "This delegation was successfully applied" ;
-        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+        pp_consumed_gas ppf consumed_gas
     | Backtracked (IDelegation_result _, _) ->
         Format.fprintf
           ppf
