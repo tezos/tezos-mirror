@@ -67,7 +67,7 @@ let rpc_tls_gen =
 
 (** A generator that generates valid values for the
     [sym_block_caching_time] field *)
-let sym_block_caching_time_gen = QCheck.Gen.(1 -- 256)
+let sym_block_caching_time_gen = QCheck.Gen.(Ptime.Span.of_int_s <$> 1 -- 256)
 
 (** A generator that generates random strings for the
     [data_dir_gen] field. This is still useful, since we are only
@@ -266,7 +266,7 @@ let test_to_runtime_err_implies_union_to_runtime_err =
       (opt url_gen)
       (opt rpc_addr_gen)
       (opt rpc_tls_gen)
-      (opt int)
+      (opt (Ptime.Span.of_int_s <$> int))
       (opt data_dir_gen)
   in
   let to_runtime_is_err config =
@@ -289,7 +289,7 @@ let test_to_runtime_err_implies_union_to_runtime_err =
 let test_wrong_sym_block_caching_time =
   let sym_block_caching_time_gen =
     (* generate negative times: *)
-    to_some QCheck.Gen.(neg_int)
+    to_some QCheck.Gen.(Ptime.Span.of_int_s <$> neg_int)
   in
   QCheck.Test.make
     ~name:"if [sym_block_caching_time] is <= 0, then [to_runtime] fails"
