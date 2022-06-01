@@ -194,7 +194,7 @@ let get_or_init_game ctxt rollup ~refuter ~defender =
       let game =
         Sc_rollup_game_repr.initial
           inbox
-          ~pvm_name:(Sc_rollups.Kind.string_of_kind kind)
+          ~pvm_name:(Sc_rollups.Kind.name_of kind)
           ~parent
           ~child
           ~refuter

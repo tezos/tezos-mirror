@@ -35,12 +35,15 @@ module type P = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val proof_start_state : proof -> State_hash.t
+  val proof_before : proof -> State_hash.t
 
-  val proof_stop_state : proof -> State_hash.t
+  val proof_after : proof -> State_hash.t
 
   val verify_proof :
     proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+  val produce_proof :
+    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
 end
 
 module type S = sig
@@ -106,13 +109,13 @@ module Make (Context : P) :
          (req "given" (option PS.input_encoding))
          (req "requested" PS.input_request_encoding))
 
-  let proof_start_state p = Context.proof_start_state p.tree_proof
+  let proof_start_state p = Context.proof_before p.tree_proof
 
   let proof_stop_state p =
     match (p.given, p.requested) with
-    | None, PS.No_input_required -> Some (Context.proof_stop_state p.tree_proof)
+    | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
     | None, _ -> None
-    | _ -> Some (Context.proof_stop_state p.tree_proof)
+    | _ -> Some (Context.proof_after p.tree_proof)
 
   let proof_input_given p = p.given
 
@@ -955,25 +958,38 @@ module Make (Context : P) :
 
   let eval state = state_of (ticked eval_step) state
 
+  let step_transition input_given state =
+    let open Lwt_syntax in
+    let* request = is_input_state state in
+    let* state =
+      match request with
+      | PS.No_input_required -> eval state
+      | _ -> (
+          match input_given with
+          | Some input -> set_input input state
+          | None -> return state)
+    in
+    return (state, request)
+
   let verify_proof proof =
     let open Lwt_syntax in
-    let transition state =
-      let* request = is_input_state state in
-      let* state =
-        match request with
-        | PS.No_input_required -> eval state
-        | _ -> (
-            match proof.given with
-            | Some input -> set_input input state
-            | None -> return state)
-      in
-      return (state, request)
+    let* result =
+      Context.verify_proof proof.tree_proof (step_transition proof.given)
     in
-    let* result = Context.verify_proof proof.tree_proof transition in
     match result with
     | None -> return false
     | Some (_, request) ->
         return (PS.input_request_equal request proof.requested)
+
+  let produce_proof context input_given state =
+    let open Lwt_syntax in
+    let* result =
+      Context.produce_proof context state (step_transition input_given)
+    in
+    match result with
+    | Some (tree_proof, requested) ->
+        return (Result.ok {tree_proof; given = input_given; requested})
+    | None -> return (Result.error "Context.produce_proof returned None")
 end
 
 module ProtocolImplementation = Make (struct
@@ -996,15 +1012,17 @@ module ProtocolImplementation = Make (struct
   let verify_proof p f =
     Lwt.map Result.to_option (Context.verify_tree_proof p f)
 
+  let produce_proof _context _state _f =
+    (* Can't produce proof without full context*)
+    Lwt.return None
+
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
         State_hash.hash_bytes [Context_hash.to_bytes hash]
 
-  let proof_start_state proof =
-    kinded_hash_to_state_hash proof.Context.Proof.before
+  let proof_before proof = kinded_hash_to_state_hash proof.Context.Proof.before
 
-  let proof_stop_state proof =
-    kinded_hash_to_state_hash proof.Context.Proof.after
+  let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
   let proof_encoding = Context.Proof_encoding.V2.Tree32.tree_proof_encoding
 end)

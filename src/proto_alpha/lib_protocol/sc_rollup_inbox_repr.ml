@@ -721,6 +721,9 @@ module Proof = struct
     message_proof : Context.Proof.tree Context.Proof.t;
   }
 
+  let pp fmt proof =
+    Format.fprintf fmt "Inbox proof with %d skips" (List.length proof.skips)
+
   let encoding =
     let open Data_encoding in
     conv
@@ -787,7 +790,8 @@ module Proof = struct
     | `Node h -> Context_hash.equal h hash
     | `Value h -> Context_hash.equal h hash
 
-  let drop_error result = Lwt.map (Result.map_error (fun _ -> ())) result
+  let drop_error result reason =
+    Lwt.map (Result.map_error (fun _ -> reason)) result
 
   let rec valid (l, n) inbox proof =
     assert (Z.(geq n zero)) ;
@@ -803,21 +807,30 @@ module Proof = struct
         then
           let* (_ : Context.tree), payload =
             drop_error
-            @@ Context.verify_tree_proof proof.message_proof (message_payload n)
+              (Context.verify_tree_proof
+                 proof.message_proof
+                 (message_payload n))
+              "message_proof invalid"
           in
           match payload with
-          | None -> if equal proof.level inbox then return None else fail ()
+          | None ->
+              if equal proof.level inbox then return None
+              else fail "payload is None, inbox proof.level not top"
           | Some msg ->
               return
               @@ Some
                    Sc_rollup_PVM_sem.
                      {inbox_level = l; message_counter = n; payload = msg}
-        else fail ()
+        else fail "Inbox proof parameters don't match (message level)"
     | Some (level, inc, remaining_proof) ->
         if
           verify_inclusion_proof inc level (bottom_level remaining_proof)
           && Raw_level_repr.equal (inbox_level level) l
           && Z.equal level.message_counter n
         then valid (Raw_level_repr.succ l, Z.zero) inbox remaining_proof
-        else fail ()
+        else fail "Inbox proof parameters don't match (lower level)"
+
+  (* TODO #2997 This needs to be implemented when the inbox structure is
+     improved. *)
+  let produce_proof _ _ = assert false
 end

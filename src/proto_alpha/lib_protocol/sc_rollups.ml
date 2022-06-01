@@ -45,7 +45,7 @@ module Kind = struct
       Each time we add a data constructor to [t], we also need:
       - to extend [Sc_rollups.all] with this new constructor ;
       - to update [Sc_rollups.of_name] and [encoding] ;
-      - to update [Sc_rollups.pvm_proof] and [pvm_proof_encoding].
+      - to update [Sc_rollups.wrapped_proof] and [wrapped_proof_encoding].
 
   *)
   type t = Example_arith
@@ -90,11 +90,11 @@ module Kind = struct
         M.name)
       all
 
-  let string_of_kind k =
+  let name_of k =
     let (module M) = pvm_of k in
     M.name
 
-  let pp fmt k = Format.fprintf fmt "%s" (string_of_kind k)
+  let pp fmt k = Format.fprintf fmt "%s" (name_of k)
 end
 
 module type PVM_with_proof = sig
@@ -144,3 +144,23 @@ let wrapped_proof_encoding =
           end in
           Arith_pvm_with_proof (module P));
     ]
+
+let wrap_proof pvm_with_proof =
+  let (module P : PVM_with_proof) = pvm_with_proof in
+  match Kind.of_name P.name with
+  | None -> Some (Unencodable pvm_with_proof)
+  | Some Kind.Example_arith ->
+      Option.map
+        (fun arith_proof ->
+          let module P_arith = struct
+            include Sc_rollup_arith.ProtocolImplementation
+
+            let proof = arith_proof
+          end in
+          Arith_pvm_with_proof (module P_arith))
+        (Option.bind
+           (Data_encoding.Binary.to_bytes_opt P.proof_encoding P.proof)
+           (fun bytes ->
+             Data_encoding.Binary.of_bytes_opt
+               Sc_rollup_arith.ProtocolImplementation.proof_encoding
+               bytes))

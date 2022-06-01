@@ -253,7 +253,7 @@ val refutation_encoding : refutation Data_encoding.t
 (** A game ends for one of three reasons: the conflict has been
     resolved via a proof, a player has been timed out, or a player has
     forfeited because of attempting to make an invalid move. *)
-type reason = Conflict_resolved | Invalid_move | Timeout
+type reason = Conflict_resolved | Invalid_move of string | Timeout
 
 val pp_reason : Format.formatter -> reason -> unit
 
@@ -295,7 +295,7 @@ val find_choice :
     * Sc_rollup_tick_repr.t
     * Sc_rollup_repr.State_hash.t option
     * Sc_rollup_tick_repr.t,
-    unit )
+    string )
   result
   Lwt.t
 
@@ -304,7 +304,7 @@ val find_choice :
     [stop_tick] is too small to make this possible, in which case it
     should be as long as possible. (If the distance is one we fail
     immediately as there is no possible legal dissection).
-    
+
     Then we check that [dissection] starts at the correct tick and state,
     and that it ends at the correct tick and with a different state to
     the current dissection.
@@ -318,7 +318,7 @@ val check_dissection :
   Sc_rollup_repr.State_hash.t option ->
   Sc_rollup_tick_repr.t ->
   (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
-  (unit, unit) result Lwt.t
+  (unit, string) result Lwt.t
 
 (** Applies the move [refutation] to the game. Checks the move is
     valid and returns an [Invalid_move] outcome if not.

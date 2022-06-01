@@ -29,7 +29,10 @@ open Alpha_context
 (** Desired module type of a PVM from the L2 node's perspective *)
 module type S = sig
   include
-    Sc_rollup_PVM_sem.S with type context = Store.t and type state = Store.tree
+    Sc_rollup.PVM.S
+      with type context = Store.t
+       and type state = Store.tree
+       and type hash = Sc_rollup.State_hash.t
 
   (** [get_tick state] gets the total tick counter for the given PVM state. *)
   val get_tick : state -> Sc_rollup.Tick.t Lwt.t

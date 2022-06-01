@@ -2494,6 +2494,30 @@ module Sc_rollup : sig
 
   type rollup := t
 
+  module Staker :
+    S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+
+  module State_hash : S.HASH
+
+  type input = {
+    inbox_level : Raw_level.t;
+    message_counter : Z.t;
+    payload : string;
+  }
+
+  val input_equal : input -> input -> bool
+
+  val input_encoding : input Data_encoding.t
+
+  type input_request =
+    | No_input_required
+    | Initial
+    | First_after of Raw_level_repr.t * Z.t
+
+  val input_request_encoding : input_request Data_encoding.t
+
+  val input_request_equal : input_request -> input_request -> bool
+
   module PVM : sig
     type boot_sector = string
 
@@ -2504,7 +2528,38 @@ module Sc_rollup : sig
 
       val pp_boot_sector : Format.formatter -> boot_sector -> unit
 
-      include Sc_rollup_PVM_sem.S
+      type state
+
+      type context
+
+      type hash = State_hash.t
+
+      type proof
+
+      val proof_encoding : proof Data_encoding.t
+
+      val proof_start_state : proof -> hash
+
+      val proof_stop_state : proof -> hash option
+
+      val proof_input_requested : proof -> input_request
+
+      val proof_input_given : proof -> input option
+
+      val state_hash : state -> hash Lwt.t
+
+      val initial_state : context -> string -> state Lwt.t
+
+      val is_input_state : state -> input_request Lwt.t
+
+      val set_input : input -> state -> state Lwt.t
+
+      val eval : state -> state Lwt.t
+
+      val verify_proof : proof -> bool Lwt.t
+
+      val produce_proof :
+        context -> input option -> state -> (proof, string) result Lwt.t
     end
 
     type t = (module S)
@@ -2521,6 +2576,8 @@ module Sc_rollup : sig
 
     val pvm_of_name : name:string -> PVM.t option
 
+    val name_of : t -> string
+
     val of_name : string -> t option
 
     val all : t list
@@ -2528,10 +2585,44 @@ module Sc_rollup : sig
     val all_names : string list
   end
 
-  module Staker :
-    S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+  module ArithPVM : sig
+    module type P = sig
+      module Tree :
+        Context.TREE with type key = string list and type value = bytes
 
-  module State_hash : S.HASH
+      type tree = Tree.tree
+
+      type proof
+
+      val proof_encoding : proof Data_encoding.t
+
+      val proof_before : proof -> State_hash.t
+
+      val proof_after : proof -> State_hash.t
+
+      val verify_proof :
+        proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+      val produce_proof :
+        Tree.t ->
+        tree ->
+        (tree -> (tree * 'a) Lwt.t) ->
+        (proof * 'a) option Lwt.t
+    end
+
+    module Make (C : P) : sig
+      include PVM.S with type context = C.Tree.t and type state = C.tree
+
+      val get_tick : state -> Tick.t Lwt.t
+
+      type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+
+      val get_status : state -> status Lwt.t
+
+      val produce_proof :
+        context -> input option -> state -> (proof, string) result Lwt.t
+    end
+  end
 
   module Number_of_messages : Bounded.Int32.S
 
@@ -2672,8 +2763,34 @@ module Sc_rollup : sig
     end
   end
 
+  module type PVM_with_proof = sig
+    include PVM.S
+
+    val proof : proof
+  end
+
+  type wrapped_proof =
+    | Unencodable of (module PVM_with_proof)
+    | Arith_pvm_with_proof of
+        (module PVM_with_proof
+           with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+
   module Proof : sig
-    type t
+    type t = {pvm_step : wrapped_proof; inbox : Inbox.Proof.t option}
+
+    module type PVM_with_context_and_state = sig
+      include Sc_rollups.PVM.S
+
+      val context : context
+
+      val state : state
+    end
+
+    val produce :
+      (module PVM_with_context_and_state) ->
+      Sc_rollup_inbox_repr.t ->
+      Raw_level_repr.t ->
+      (t, string) result Lwt.t
   end
 
   module Game : sig
@@ -2697,7 +2814,7 @@ module Sc_rollup : sig
 
     val pp_refutation : Format.formatter -> refutation -> unit
 
-    type reason = Conflict_resolved | Invalid_move | Timeout
+    type reason = Conflict_resolved | Invalid_move of string | Timeout
 
     val pp_reason : Format.formatter -> reason -> unit
 
@@ -2714,6 +2831,25 @@ module Sc_rollup : sig
     val pp_outcome : Format.formatter -> outcome -> unit
 
     val outcome_encoding : outcome Data_encoding.t
+
+    val initial :
+      Inbox.t ->
+      pvm_name:string ->
+      parent:Commitment.t ->
+      child:Commitment.t ->
+      refuter:Staker.t ->
+      defender:Staker.t ->
+      t
+
+    val check_dissection :
+      State_hash.t option ->
+      Tick.t ->
+      State_hash.t option ->
+      Tick.t ->
+      (State_hash.t option * Tick.t) list ->
+      (unit, string) result Lwt.t
+
+    val play : t -> refutation -> (outcome, t) Either.t Lwt.t
   end
 
   module Stake_storage : sig

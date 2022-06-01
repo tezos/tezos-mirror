@@ -230,7 +230,7 @@ let refutation_encoding =
        (req "choice" Sc_rollup_tick_repr.encoding)
        (req "step" step_encoding))
 
-type reason = Conflict_resolved | Invalid_move | Timeout
+type reason = Conflict_resolved | Invalid_move of string | Timeout
 
 let pp_reason ppf reason =
   Format.fprintf
@@ -238,7 +238,7 @@ let pp_reason ppf reason =
     "%s"
     (match reason with
     | Conflict_resolved -> "conflict resolved"
-    | Invalid_move -> "invalid move"
+    | Invalid_move reason -> Format.sprintf "invalid move(%s)" reason
     | Timeout -> "timeout")
 
 let reason_encoding =
@@ -255,9 +255,9 @@ let reason_encoding =
       case
         ~title:"Invalid_move"
         (Tag 1)
-        unit
-        (function Invalid_move -> Some () | _ -> None)
-        (fun () -> Invalid_move);
+        string
+        (function Invalid_move reason -> Some reason | _ -> None)
+        (fun s -> Invalid_move s);
       case
         ~title:"Timeout"
         (Tag 2)
@@ -325,45 +325,82 @@ let find_choice game tick =
         if Sc_rollup_tick_repr.(tick = state_tick) then
           return (state, tick, next_state, next_tick)
         else traverse ((next_state, next_tick) :: others)
-    | _ -> fail ()
+    | _ -> fail "This choice was not proposed"
   in
   traverse game.dissection
 
-let check pred =
+let check pred reason =
   let open Lwt_result_syntax in
-  if pred then return () else fail ()
+  if pred then return () else fail reason
 
 let check_dissection start start_tick stop stop_tick dissection =
   let open Lwt_result_syntax in
   let len = Z.of_int @@ List.length dissection in
   let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
+  let should_be_equal_to what =
+    Format.asprintf "The number of sections must be equal to %a" Z.pp_print what
+  in
   let* _ =
-    if Z.(geq dist (of_int 32)) then check Z.(equal len (of_int 32))
-    else if Z.(gt dist one) then check Z.(equal len (succ dist))
-    else fail ()
+    if Z.(geq dist (of_int 32)) then
+      check Z.(equal len (of_int 32)) (should_be_equal_to (Z.of_int 32))
+    else if Z.(gt dist one) then
+      check Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
+    else fail (Format.asprintf "Cannot have a dissection of only one section")
   in
   let* _ =
     match (List.hd dissection, List.last_opt dissection) with
     | Some (a, a_tick), Some (b, b_tick) ->
-        check
-          (Option.equal State_hash.equal a start
-          && (not (Option.equal State_hash.equal b stop))
-          && Sc_rollup_tick_repr.(a_tick = start_tick && b_tick = stop_tick))
-    | _ -> fail ()
+        let* () =
+          check
+            (Option.equal State_hash.equal a start)
+            (match start with
+            | None -> assert false
+            | Some start ->
+                Format.asprintf
+                  "The start hash should be equal to %a"
+                  State_hash.pp
+                  start)
+        in
+        let* () =
+          check
+            (not (Option.equal State_hash.equal b stop))
+            (match stop with
+            | None -> "The stop hash should be None."
+            | Some stop ->
+                Format.asprintf
+                  "The stop hash should be equal to %a"
+                  State_hash.pp
+                  stop)
+        in
+        Sc_rollup_tick_repr.(
+          check
+            (a_tick = start_tick && b_tick = stop_tick)
+            (Format.asprintf
+               "We should have section_start_tick(%a) = %a and \
+                section_stop_tick(%a) = %a"
+               pp
+               a_tick
+               pp
+               start_tick
+               pp
+               b_tick
+               pp
+               stop_tick))
+    | _ -> fail "Dissection should contain at least 2 elements"
   in
   let rec traverse states =
     match states with
     | (Some _, tick) :: (next_state, next_tick) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           traverse ((next_state, next_tick) :: others)
-        else fail ()
-    | (None, _) :: _ :: _ -> fail ()
+        else fail "Ticks should only increase in dissection"
+    | (None, _) :: _ :: _ -> fail "None should not occur before end"
     | _ -> return ()
   in
   traverse dissection
 
 (** We check firstly that the interval in question is a single tick.
-    
+
     Then we check the proof begins with the correct state and ends
     with a different state to the one in the current dissection.
 
@@ -374,16 +411,34 @@ let check_dissection start start_tick stop stop_tick dissection =
 let check_proof_start_stop start start_tick stop stop_tick proof =
   let open Lwt_result_syntax in
   let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
-  let* _ = check Z.(equal dist one) in
+  let* _ = check Z.(equal dist one) "dist should be equal to 1" in
+  let start_proof = Sc_rollup_proof_repr.start proof in
+  let stop_proof = Sc_rollup_proof_repr.stop proof in
   let* _ =
     check
-    @@ Option.equal
-         State_hash.equal
-         start
-         (Some (Sc_rollup_proof_repr.start proof))
+      (Option.equal State_hash.equal start (Some start_proof))
+      (match start with
+      | None -> "Start is absent and should not."
+      | Some start ->
+          Format.asprintf
+            "start(%a) should be equal to start_proof(%a)"
+            State_hash.pp
+            start
+            State_hash.pp
+            start_proof)
+  in
+  let option_pp pp fmt = function
+    | None -> Format.fprintf fmt "None"
+    | Some x -> pp fmt x
   in
   check
-  @@ not (Option.equal State_hash.equal stop (Sc_rollup_proof_repr.stop proof))
+    (not (Option.equal State_hash.equal stop stop_proof))
+    (Format.asprintf
+       "stop(%a) should not be equal to stop_proof(%a)"
+       (option_pp State_hash.pp)
+       stop
+       (option_pp State_hash.pp)
+       stop_proof)
 
 let play game refutation =
   let result =
@@ -403,19 +458,24 @@ let play game refutation =
                pvm_name = game.pvm_name;
                dissection = states;
              })
-    | Proof proof ->
+    | Proof proof -> (
         let* _ = check_proof_start_stop start start_tick stop stop_tick proof in
         let {inbox_snapshot; level; pvm_name; _} = game in
-        let* proof_valid =
+        let*! proof_valid =
           Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof
         in
-        let* _ = check proof_valid in
-        return
-          (Either.Left {loser = opponent game.turn; reason = Conflict_resolved})
+        match proof_valid with
+        | Error s ->
+            fail (Format.asprintf "Invalid proof: %s" s) (* Illformed? *)
+        | Ok proof_valid ->
+            let* _ = check proof_valid "Invalid proof" in
+            return
+              (Either.Left
+                 {loser = opponent game.turn; reason = Conflict_resolved}))
   in
   Lwt.map
     (fun r ->
-      match Option.of_result r with
-      | Some x -> x
-      | None -> Either.Left {loser = game.turn; reason = Invalid_move})
+      match r with
+      | Ok x -> x
+      | Error e -> Either.Left {loser = game.turn; reason = Invalid_move e})
     result

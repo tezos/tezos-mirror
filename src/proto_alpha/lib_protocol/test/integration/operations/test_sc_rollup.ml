@@ -100,9 +100,9 @@ let test_disable_feature_flag () =
   return_unit
 
 (** [test_sc_rollups_all_well_defined] checks that [Sc_rollup.Kind.all]
-    contains all the constructors of [Sc_rollup.Kind.t] and that
-    the [kind_of_string] is consistent with the names declared in
-    the PVM implementations. *)
+    contains all the constructors of [Sc_rollup.Kind.t] and that the
+    [of_name] is consistent with the names declared in the PVM
+    implementations. *)
 let test_sc_rollups_all_well_defined () =
   let all_contains_all_constructors () =
     let tickets = ref ["Example_arith"] in

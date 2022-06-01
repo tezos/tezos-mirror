@@ -59,14 +59,14 @@ let cut_at_level level input =
   let input_level = Sc_rollup_PVM_sem.(input.inbox_level) in
   if Raw_level_repr.(level <= input_level) then None else Some input
 
-let check p =
+let check p reason =
   let open Lwt_result_syntax in
-  if p then return () else fail ()
+  if p then return () else fail reason
 
 let valid snapshot commit_level ~pvm_name proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let open Lwt_result_syntax in
-  let* _ = check (String.equal P.name pvm_name) in
+  let* _ = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let input_requested = P.proof_input_requested P.proof in
   let input_given = P.proof_input_given P.proof in
   let* input =
@@ -82,7 +82,14 @@ let valid snapshot commit_level ~pvm_name proof =
           (level, Z.succ counter)
           snapshot
           inbox_proof
-    | _ -> fail ()
+    | _ ->
+        fail
+          (Format.asprintf
+             "input_requested is %a, inbox proof is %a"
+             Sc_rollup_PVM_sem.pp_input_request
+             input_requested
+             (Format.pp_print_option Sc_rollup_inbox_repr.Proof.pp)
+             proof.inbox)
   in
   let* _ =
     check
@@ -90,5 +97,43 @@ let valid snapshot commit_level ~pvm_name proof =
          Sc_rollup_PVM_sem.input_equal
          (Option.bind input (cut_at_level commit_level))
          input_given)
+      "Input given is not what inbox proof expects"
   in
   Lwt.map Result.ok (P.verify_proof P.proof)
+
+module type PVM_with_context_and_state = sig
+  include Sc_rollups.PVM.S
+
+  val context : context
+
+  val state : state
+end
+
+let produce pvm_and_state inbox commit_level =
+  let open Lwt_result_syntax in
+  let (module P : PVM_with_context_and_state) = pvm_and_state in
+  let* request = Lwt.map Result.ok (P.is_input_state P.state) in
+  let* inbox, input_given =
+    match request with
+    | Sc_rollup_PVM_sem.No_input_required -> return (None, None)
+    | Sc_rollup_PVM_sem.Initial ->
+        let* p, i =
+          Sc_rollup_inbox_repr.Proof.produce_proof
+            inbox
+            (Raw_level_repr.root, Z.zero)
+        in
+        return (Some p, i)
+    | Sc_rollup_PVM_sem.First_after (l, n) ->
+        let* p, i = Sc_rollup_inbox_repr.Proof.produce_proof inbox (l, n) in
+        return (Some p, i)
+  in
+  let input_given = Option.bind input_given (cut_at_level commit_level) in
+  let* pvm_step_proof = P.produce_proof P.context input_given P.state in
+  let module P_with_proof = struct
+    include P
+
+    let proof = pvm_step_proof
+  end in
+  match Sc_rollups.wrap_proof (module P_with_proof) with
+  | Some pvm_step -> return {pvm_step; inbox}
+  | None -> fail "Could not wrap proof"

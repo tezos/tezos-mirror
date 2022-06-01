@@ -74,11 +74,11 @@ module Kind : sig
   (** [all_names] returns all implemented PVM names. *)
   val all_names : string list
 
-  (** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
+  (** [of_name name] returns the kind of the PVM of the specified [name]. *)
   val of_name : string -> t option
 
-  (** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-  val string_of_kind : t -> string
+  (** [name_of kind] returns a human-readable representation of [kind]. *)
+  val name_of : t -> string
 end
 
 (** A module signature we can use to form first-class modules that carry
@@ -103,3 +103,12 @@ type wrapped_proof =
 val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
 val wrapped_proof_encoding : wrapped_proof Data_encoding.t
+
+(** Wrap a PVM module with proof into a [wrapped_proof]. This matches on
+    the [name] in the module---if that is recognisable as a [Kind], this
+    function will encode and decode to coerce the proof to a proof in
+    the protocol implementation of the PVM. If the [name] is not
+    recognised this will fall back to using [Unencodable], so the value
+    can still be used in tests but won't work as part of a
+    [Sc_rollup_refute] operation. *)
+val wrap_proof : (module PVM_with_proof) -> wrapped_proof option

@@ -44,10 +44,10 @@ module Make (PVM : Pvm.S) : S = struct
     let rec go state =
       let* input_request = PVM.is_input_state state in
       match input_request with
-      | Some _ -> return state
-      | None ->
+      | No_input_required ->
           let* next_state = PVM.eval state in
           go next_state
+      | _ -> return state
     in
     go state
 
@@ -98,7 +98,7 @@ module Make (PVM : Pvm.S) : S = struct
       List.fold_left_i_s
         (fun message_counter state payload ->
           let input =
-            Sc_rollup_PVM_sem.
+            Sc_rollup.
               {inbox_level; message_counter = Z.of_int message_counter; payload}
           in
           feed_input state input)

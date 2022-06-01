@@ -112,6 +112,19 @@ let input_request_encoding =
         (fun (level, counter) -> First_after (level, counter));
     ]
 
+let pp_input_request fmt request =
+  match request with
+  | No_input_required -> Format.fprintf fmt "No_input_required"
+  | Initial -> Format.fprintf fmt "Initial"
+  | First_after (l, n) ->
+      Format.fprintf
+        fmt
+        "First_after (level = %a, counter = %a)"
+        Raw_level_repr.pp
+        l
+        Z.pp_print
+        n
+
 let input_request_equal a b =
   match (a, b) with
   | No_input_required, No_input_required -> true
@@ -247,4 +260,13 @@ module type S = sig
 
   (** This checks the proof. See the doc-string for the [proof] type. *)
   val verify_proof : proof -> bool Lwt.t
+
+  (** [produce_proof ctxt input_given state] should return a [proof] for
+      the PVM step starting from [state], if possible. This may return
+      [None] for a few reasons:
+        - the [input_given] doesn't match the expectations of [state] ;
+        - the [context] for this instance of the PVM doesn't have access
+        to enough of the [state] to build the proof. *)
+  val produce_proof :
+    context -> input option -> state -> (proof, string) result Lwt.t
 end

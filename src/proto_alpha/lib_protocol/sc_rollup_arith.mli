@@ -47,7 +47,7 @@
    The machine has a boot sector which is a mere string used a prefix
    for each message.
 
-   The module implements the {!Sc_rollup_PVM_sem.S} interface to be
+   The module implements the {!Sc_rollup_PVM_sem.S}Î interface to be
    used in the smart contract rollup infrastructure.
 
    The machine exposes extra operations to be used in the rollup node.
@@ -132,14 +132,15 @@ module type P = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val proof_start_state : proof -> Sc_rollup_repr.State_hash.t
+  val proof_before : proof -> Sc_rollup_repr.State_hash.t
 
-  val proof_stop_state : proof -> Sc_rollup_repr.State_hash.t
+  val proof_after : proof -> Sc_rollup_repr.State_hash.t
 
-  (** A verson of [Context.verify_proof] without the annoying error
-      types, just to make life easier. *)
   val verify_proof :
     proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+  val produce_proof :
+    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
 end
 
 module Make (Context : P) :

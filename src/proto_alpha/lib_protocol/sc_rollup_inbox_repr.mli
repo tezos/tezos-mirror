@@ -345,6 +345,8 @@ module Proof : sig
     message_proof : Context.Proof.tree Context.Proof.t;
   }
 
+  val pp : Format.formatter -> t -> unit
+
   val encoding : t Data_encoding.t
 
   (** See the docstring for [Proof.t] for details of proof semantics.
@@ -355,5 +357,16 @@ module Proof : sig
     Raw_level_repr.t * Z.t ->
     inbox ->
     t ->
-    (Sc_rollup_PVM_sem.input option, unit) result Lwt.t
+    (Sc_rollup_PVM_sem.input option, string) result Lwt.t
+
+  (** TODO #2997 Currently a placeholder, needs implementation.
+
+      [produce_proof inbox (level, counter)] creates an inbox proof
+      proving the first message after the index [counter] at location
+      [level]. This will fail if the inbox given doesn't have sufficient
+      data (it needs to be run on an inbox with the full history). *)
+  val produce_proof :
+    inbox ->
+    Raw_level_repr.t * Z.t ->
+    (t * Sc_rollup_PVM_sem.input option, string) result Lwt.t
 end

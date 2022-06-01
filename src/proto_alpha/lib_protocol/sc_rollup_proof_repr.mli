@@ -94,4 +94,32 @@ val valid :
   Raw_level_repr.t ->
   pvm_name:string ->
   t ->
-  (bool, unit) result Lwt.t
+  (bool, string) result Lwt.t
+
+module type PVM_with_context_and_state = sig
+  include Sc_rollups.PVM.S
+
+  val context : context
+
+  val state : state
+end
+
+(** [produce pvm_and_state inbox commit_level] will construct a full
+    refutation game proof out of the [state] given in [pvm_and_state].
+    It uses the [inbox] if necessary to provide input in the proof. If
+    the input is above or at [commit_level] it will block it, and
+    produce a proof that the PVM is blocked.
+
+    This will fail if the [context] given doesn't have enough of the
+    [state] to make the proof. For example, the 'protocol
+    implementation' version of each PVM won't be able to run this
+    function.
+
+    This uses the [name] in the [pvm_and_state] module to produce an
+    encodable [wrapped_proof] if possible. See the [wrap_proof] function
+    in [Sc_rollups]. *)
+val produce :
+  (module PVM_with_context_and_state) ->
+  Sc_rollup_inbox_repr.t ->
+  Raw_level_repr.t ->
+  (t, string) result Lwt.t
