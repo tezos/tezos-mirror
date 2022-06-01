@@ -458,6 +458,13 @@ let pp_balance_updates_opt ppf balance_updates =
 let pp_consumed_gas ppf consumed_gas =
   Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
 
+let pp_paid_storage_size_diff ppf paid_storage_size_diff =
+  if paid_storage_size_diff <> Z.zero then
+    Format.fprintf
+      ppf
+      "@,Paid storage size diff: %s bytes"
+      (Z.to_string paid_storage_size_diff)
+
 let pp_manager_operation_contents_and_result ppf
     ( Manager_operation
         {source; fee; operation; counter; gas_limit; storage_limit},
@@ -513,11 +520,7 @@ let pp_manager_operation_contents_and_result ppf
             ppf
             "@,Storage size: %s bytes"
             (Z.to_string storage_size) ;
-        if paid_storage_size_diff <> Z.zero then
-          Format.fprintf
-            ppf
-            "@,Paid storage size diff: %s bytes"
-            (Z.to_string paid_storage_size_diff) ;
+        pp_paid_storage_size_diff ppf paid_storage_size_diff ;
         pp_consumed_gas ppf consumed_gas ;
         pp_balance_updates_opt ppf balance_updates
     | Transaction_to_tx_rollup_result
@@ -525,11 +528,7 @@ let pp_manager_operation_contents_and_result ppf
         pp_consumed_gas ppf consumed_gas ;
         pp_balance_updates_opt ppf balance_updates ;
         Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
-        if paid_storage_size_diff <> Z.zero then
-          Format.fprintf
-            ppf
-            "@,Paid storage size diff: %s bytes"
-            (Z.to_string paid_storage_size_diff)
+        pp_paid_storage_size_diff ppf paid_storage_size_diff
   in
 
   let pp_origination_result
@@ -552,11 +551,7 @@ let pp_manager_operation_contents_and_result ppf
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
     pp_lazy_storage_diff lazy_storage_diff ;
-    if paid_storage_size_diff <> Z.zero then
-      Format.fprintf
-        ppf
-        "@,Paid storage size diff: %s bytes"
-        (Z.to_string paid_storage_size_diff) ;
+    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
@@ -597,11 +592,7 @@ let pp_manager_operation_contents_and_result ppf
       pp_balance_updates
       balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
-    if paid_storage_size_diff <> Z.zero then
-      Format.fprintf
-        ppf
-        "@,Paid storage size diff: %s bytes"
-        (Z.to_string paid_storage_size_diff)
+    pp_paid_storage_size_diff ppf paid_storage_size_diff
   in
   let pp_tx_rollup_commit_result
       (Tx_rollup_commit_result {balance_updates; consumed_gas}) =
@@ -655,22 +646,14 @@ let pp_manager_operation_contents_and_result ppf
   let pp_tx_rollup_dispatch_tickets_result
       (Tx_rollup_dispatch_tickets_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    if paid_storage_size_diff <> Z.zero then
-      Format.fprintf
-        ppf
-        "@,Paid storage size diff: %s bytes"
-        (Z.to_string paid_storage_size_diff) ;
+    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    if paid_storage_size_diff <> Z.zero then
-      Format.fprintf
-        ppf
-        "@,Paid storage size diff: %s bytes"
-        (Z.to_string paid_storage_size_diff) ;
+    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
@@ -737,11 +720,7 @@ let pp_manager_operation_contents_and_result ppf
   let pp_sc_rollup_execute_outbox_message_result
       (Sc_rollup_execute_outbox_message_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    if paid_storage_size_diff <> Z.zero then
-      Format.fprintf
-        ppf
-        "@,Paid storage size diff: %s bytes"
-        (Z.to_string paid_storage_size_diff) ;
+    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
