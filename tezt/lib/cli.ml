@@ -51,7 +51,6 @@ type options = {
   mutable global_timeout : float option;
   mutable test_timeout : float option;
   mutable retry : int;
-  mutable regression_dir : string;
   mutable reset_regressions : bool;
   mutable on_unknown_regression_files_mode : on_unknown_regression_files_mode;
   mutable loop_mode : loop_mode;
@@ -86,7 +85,6 @@ let options =
     global_timeout = None;
     test_timeout = None;
     retry = 0;
-    regression_dir = "tezt/_regressions";
     reset_regressions = false;
     on_unknown_regression_files_mode = Warn;
     loop_mode = Count 1;
@@ -321,10 +319,6 @@ let init ?args () =
           Arg.Int (fun retry -> options.retry <- retry),
           "<COUNT> Retry each failing test up to COUNT times. If one retry is \
            successful, the test is considered successful." );
-        ( "--regression-dir",
-          Arg.String (fun dir -> options.regression_dir <- dir),
-          "<PATH> Where to store the output of regression tests. Default is: \
-           tezt/_regressions" );
         ( "--reset-regressions",
           Arg.Unit (fun () -> options.reset_regressions <- true),
           " Remove regression test outputs if they exist, and regenerate them."

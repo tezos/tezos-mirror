@@ -51,12 +51,13 @@ let make_parameter name value =
   Option.map (fun v -> ([name], Option.some @@ Int.to_string v)) value
   |> Option.to_list
 
-let test ~__FILE__ ?output_file ?(tags = []) title f =
+let test ~__FILE__ ?(tags = []) title f =
   let tags = "sc_rollup" :: tags in
-  match output_file with
-  | Some output_file ->
-      Protocol.register_regression_test ~output_file ~__FILE__ ~title ~tags f
-  | None -> Protocol.register_test ~__FILE__ ~title ~tags f
+  Protocol.register_test ~__FILE__ ~title ~tags f
+
+let regression_test ~__FILE__ ?(tags = []) title f =
+  let tags = "sc_rollup" :: tags in
+  Protocol.register_regression_test ~__FILE__ ~title ~tags f
 
 let setup ?commitment_period ?challenge_window f ~protocol =
   let parameters =
@@ -95,12 +96,7 @@ let sc_rollup_node_rpc sc_node service =
       let* response = curl ~url in
       return (Some response)
 
-type test = {
-  output_file_prefix : string;
-  variant : string;
-  tags : string list;
-  description : string;
-}
+type test = {variant : string; tags : string list; description : string}
 
 let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   let* rollup_address =
@@ -125,12 +121,10 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
    Many tests can be refactored using test_scenario. *)
 let test_scenario ?commitment_period ?challenge_window
-    {output_file_prefix; variant; tags; description} scenario =
-  let output_file _ = output_file_prefix ^ "_" ^ variant in
+    {variant; tags; description} scenario =
   let tags = tags @ [variant] in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
@@ -187,10 +181,8 @@ let cement_commitment client ~sc_rollup_address ~hash =
    - Rollup addresses are fully determined by operation hashes and origination nonce.
 *)
 let test_origination =
-  let output_file _ = "sc_rollup_origination" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     "origination of a SCORU executes without error"
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
@@ -245,10 +237,8 @@ let with_fresh_rollups n f node client bootstrap1 =
   go n String_set.empty f
 
 let test_rollup_node_configuration =
-  let output_file _ = "sc_rollup_node_configuration" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     "configuration of a smart contract optimistic rollup node"
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup
@@ -312,10 +302,8 @@ let test_rollup_node_running =
    node its rollup address.
 *)
 let test_rollup_client_gets_address =
-  let output_file _ = "sc_rollup_client_gets_address" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["run"; "client"]
     "getting a smart-contract rollup address through the client"
     (fun protocol ->
@@ -342,10 +330,8 @@ let test_rollup_client_gets_address =
    originated from the context.
 *)
 let test_rollup_get_initial_level =
-  let output_file _ = "sc_rollup_get_initial_level" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["initial_level"]
     "get initial level of a sc rollup"
     (fun protocol ->
@@ -380,10 +366,8 @@ let test_rollup_get_initial_level =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2944
    Revisit this test once the rollup node can cement commitments. *)
 let test_rollup_get_last_cemented_commitment_hash_with_level =
-  let output_file _ = "sc_rollup_get_lcc_hash_with_level" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["lcc_hash_with_level"]
     "get last cemented commitment hash and inbox level of a sc rollup"
     (fun protocol ->
@@ -487,10 +471,8 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
   | Some inbox -> parse_inbox inbox
 
 let test_rollup_inbox_size =
-  let output_file _ = "sc_rollup_inbox_size" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["inbox"]
     "pushing messages in the inbox - check inbox size"
     (fun protocol ->
@@ -568,10 +550,8 @@ let fetch_messages_from_block sc_rollup_address client =
   return messages
 
 let test_rollup_inbox_current_messages_hash =
-  let output_file _ = "sc_rollup_inbox_current_messages_hash" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["inbox"]
     "pushing messages in the inbox - current messages hash"
     (fun protocol ->
@@ -688,10 +668,8 @@ let test_rollup_inbox_current_messages_hash =
    protocol in the context.
 *)
 let test_rollup_inbox_of_rollup_node variant scenario =
-  let output_file _ = "sc_rollup_inbox_of_rollup_node_" ^ variant in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["inbox"; "node"; variant]
     (Printf.sprintf
        "observing the correct maintenance of inbox in the rollup node (%s)"
@@ -851,9 +829,8 @@ let test_rollup_list =
       bootstrap1
   in
 
-  test
+  regression_test
     ~__FILE__
-    ~output_file:(fun _ -> "sc_rollup_list")
     ~tags:["list"]
     "list originated rollups"
     (fun protocol -> setup ~protocol go)
@@ -892,10 +869,8 @@ let test_rollup_node_boots_into_initial_state =
     Lwt.return_unit
   in
 
-  let output_file _ = "sc_rollup_node_boots_into_initial_state" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["run"; "node"]
     "node boots into the initial state"
     (fun protocol ->
@@ -954,10 +929,8 @@ let test_rollup_node_advances_pvm_state =
     Lwt.return_unit
   in
 
-  let output_file _ = "sc_rollup_node_advances_pvm_state" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["run"; "node"]
     "node advances PVM state with messages"
     (fun protocol ->
@@ -1042,7 +1015,6 @@ let test_commitment_scenario ?commitment_period ?challenge_window variant =
     ?commitment_period
     ?challenge_window
     {
-      output_file_prefix = "sc_rollup_commitment_of_rollup_node";
       tags = ["commitment"; "node"];
       variant;
       description =
@@ -1638,10 +1610,8 @@ let test_rollup_origination_boot_sector =
     Lwt.return_unit
   in
 
-  let output_file _ = "sc_rollup_origination_bootsector" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["run"]
     "originate with boot sector"
     (fun protocol ->
@@ -1686,10 +1656,8 @@ let test_rollup_node_uses_boot_sector =
       client
   in
 
-  let output_file _ = "sc_rollup_node_uses_boot_sector" in
-  test
+  regression_test
     ~__FILE__
-    ~output_file
     ~tags:["run"; "node"]
     "ensure boot sector is used"
     (fun protocol ->

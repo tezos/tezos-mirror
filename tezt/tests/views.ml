@@ -99,7 +99,6 @@ let register =
     ~__FILE__
     ~title:"Run views"
     ~tags:["client"; "michelson"]
-    ~output_file:(fun _ -> "run_views")
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* register_callers =

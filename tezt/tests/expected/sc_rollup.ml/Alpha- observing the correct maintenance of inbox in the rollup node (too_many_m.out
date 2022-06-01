@@ -1,0 +1,839 @@
+
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1800.796 units (will add 100 for safety)
+Estimated storage: 6540 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000428
+    Expected counter: 1
+    Gas limit: 1901
+    Storage limit: 6560 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000428
+      payload fees(the block proposer) ....... +ꜩ0.000428
+    Originate smart contract rollup of kind arith and type unit with boot sector ''
+      This smart contract rollup origination was successfully applied
+      Consumed gas: 1800.796
+      Storage size: 6540 bytes
+      Address: [SC_ROLLUP_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.635
+        storage fees ........................... +ꜩ1.635
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1766.925 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 2
+    Gas limit: 1867
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.053
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 3
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 205
+         nb_messages_in_commitment_period = 205
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 1
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.149 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 3
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.277
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 4
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 410
+         nb_messages_in_commitment_period = 410
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 2
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.356 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 4
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.356
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 5
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 615
+         nb_messages_in_commitment_period = 615
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 3
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.356 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 5
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.484
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 6
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 820
+         nb_messages_in_commitment_period = 820
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 4
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.563 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 6
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.563
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 7
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 1025
+         nb_messages_in_commitment_period = 1025
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 5
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.563 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 7
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.563
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 8
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 1230
+         nb_messages_in_commitment_period = 1230
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 6
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.563 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 8
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.563
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 9
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 1435
+         nb_messages_in_commitment_period = 1435
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 7
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.563 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 9
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.691
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 10
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 1640
+         nb_messages_in_commitment_period = 1640
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 8
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 10
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.770
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 11
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 1845
+         nb_messages_in_commitment_period = 1845
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 9
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 11
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.770
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 12
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 2050
+         nb_messages_in_commitment_period = 2050
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 10
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 12
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.770
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 13
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 2255
+         nb_messages_in_commitment_period = 2255
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 11
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 13
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.770
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 14
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 2460
+         nb_messages_in_commitment_period = 2460
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 12
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 14
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.770
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 15
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 2665
+         nb_messages_in_commitment_period = 2665
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 13
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 15
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.770
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 16
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 2870
+         nb_messages_in_commitment_period = 2870
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 14
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 16
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.770
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 17
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 3075
+         nb_messages_in_commitment_period = 3075
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 15
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.770 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 17
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.898
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 18
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 3280
+         nb_messages_in_commitment_period = 3280
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 16
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.977 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 18
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.977
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 19
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 3485
+         nb_messages_in_commitment_period = 3485
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 17
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.977 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 19
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.977
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 20
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 3690
+         nb_messages_in_commitment_period = 3690
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 18
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+Estimated gas: 1767.977 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.002916
+    Expected counter: 20
+    Gas limit: 1868
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002916
+      payload fees(the block proposer) ....... +ꜩ0.002916
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation sending a message to a smart contract rollup was successfully applied
+      Consumed gas: 1767.977
+      Resulting inbox state: 
+         rollup = [SC_ROLLUP_HASH]
+         level = 21
+         current messages hash  = [SC_ROLLUP_COMMITMENT_HASH]
+         nb_available_messages = 3895
+         nb_messages_in_commitment_period = 3895
+         starting_level_of_current_commitment_period = 2
+         message_counter = 205
+         old_levels_messages = 
+       content = [SC_ROLLUP_COMMITMENT_HASH]
+       index = 19
+       back_pointers = [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+      [SC_ROLLUP_COMMITMENT_HASH]
+    
+    
+
+
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+Node is bootstrapped.
+This simulation failed:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0
+    Expected counter: 21
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
+    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+      This operation FAILED.
+
+Error:
+  { "id":
+    "proto.alpha.Sc_rollup_max_number_of_messages_reached_for_commitment_period",
+  "description": "Maximum number of messages reached for commitment period",
+  "data": {} }

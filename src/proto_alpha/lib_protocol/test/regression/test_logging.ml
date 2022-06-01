@@ -200,7 +200,6 @@ let register_script contract =
     ~__FILE__
     ~title:contract.filename
     ~tags:["protocol"; "regression"; "logging"]
-    ~output_file:contract.filename
     (fail_on_error @@ run_script contract)
 
 (* These tests should always cover:
