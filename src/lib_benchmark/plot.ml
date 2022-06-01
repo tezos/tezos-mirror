@@ -719,6 +719,15 @@ end = struct
       incr x ;
       sf "name_%d" !x
 
+  let set_fixed_z_range data =
+    let fulldata = namegen () in
+    concat
+      ([sf "set print $%s" fulldata]
+      @ List.map (fun x -> sf "print $%s" x) data
+      @ ["set print"]
+      @ [sf "stats $%s using 3 nooutput" fulldata]
+      @ ["set zrange [STATS_min:STATS_max]"])
+
   let rec seq_map2 (seq1 : 'a Seq.t) (seq2 : 'b Seq.t) f : _ Seq.t =
    fun () ->
     match (seq1 (), seq2 ()) with
@@ -742,7 +751,7 @@ end = struct
             let command_chunk =
               GP_subcommand.scatter_2d ~data_name style ~legend_opt:legend
             in
-            (`Data data_block, `Command command_chunk)
+            (`Data data_block, `Command command_chunk, data_name)
         | Some error_bars ->
             let data_with_errors =
               GP_data._4d ~data_name (make_error_bars data error_bars)
@@ -750,14 +759,14 @@ end = struct
             let command_chunk =
               GP_subcommand.y_error_bars ~data_name style ~legend_opt:legend
             in
-            (`Data data_with_errors, `Command command_chunk))
+            (`Data data_with_errors, `Command command_chunk, data_name))
     | Dim3_axes _ ->
         let data_name = namegen () in
         let data_block = GP_data._3d ~data_name data in
         let command_chunk =
           GP_subcommand.scatter_3d ~data_name style ~legend_opt:legend
         in
-        (`Data data_block, `Command command_chunk)
+        (`Data data_block, `Command command_chunk, data_name)
 
   let line (type dim) (axes : dim axes)
       ({data; style; legend} : dim Data.t with_metadata) with_points error_bars
@@ -773,7 +782,7 @@ end = struct
                 GP_subcommand.linespoints_2d ~data_name style ~legend_opt:legend
               else GP_subcommand.lines_2d ~data_name style ~legend_opt:legend
             in
-            (`Data data_block, `Command command_chunk)
+            (`Data data_block, `Command command_chunk, data_name)
         | Some error_bars ->
             (* assert (not with_points) ; *)
             let data_with_errors =
@@ -782,7 +791,7 @@ end = struct
             let command_chunk =
               GP_subcommand.y_error_lines ~data_name style ~legend_opt:legend
             in
-            (`Data data_with_errors, `Command command_chunk))
+            (`Data data_with_errors, `Command command_chunk, data_name))
     | Dim3_axes _ ->
         let data_name = namegen () in
         let data_block = GP_data._3d ~data_name data in
@@ -791,7 +800,7 @@ end = struct
             GP_subcommand.linespoints_3d ~data_name style ~legend_opt:legend
           else GP_subcommand.lines_3d ~data_name style ~legend_opt:legend
         in
-        (`Data data_block, `Command command_chunk)
+        (`Data data_block, `Command command_chunk, data_name)
 
   let histogram (data : r1 Seq.t) (options : histogram_options) legend_opt =
     let data_name = namegen () in
@@ -799,7 +808,7 @@ end = struct
     let command_chunk =
       GP_subcommand.histogram ~data_name options ~legend_opt
     in
-    (`Data data_block, `Command command_chunk)
+    (`Data data_block, `Command command_chunk, data_name)
 
   let boxes (data : (string * float) Data.t with_metadata) box_width fill =
     let ys = List.of_seq data.data in
@@ -819,7 +828,7 @@ end = struct
     let command_chunk =
       GP_subcommand.boxes ~data_name ~legend_opt:data.legend ~fill
     in
-    (`Data data_block, `Command command_chunk)
+    (`Data data_block, `Command command_chunk, data_name)
 
   let rec spec_list :
       type dim.
@@ -827,70 +836,105 @@ end = struct
       dim spec list ->
       GP_data.t list ->
       GP_subcommand.t list ->
-      GP_data.t list * GP_subcommand.t list =
-    fun (type dim) (axes : dim axes) (specs : dim spec list) data_acc cmd_acc ->
+      string list ->
+      GP_data.t list * GP_subcommand.t list * string list =
+    fun (type dim)
+        (axes : dim axes)
+        (specs : dim spec list)
+        data_acc
+        cmd_acc
+        name_acc ->
      match specs with
-     | [] -> (List.rev data_acc, List.rev cmd_acc)
+     | [] -> (List.rev data_acc, List.rev cmd_acc, List.rev name_acc)
      | Scatter {data; error_bars} :: tl ->
-         let `Data data_block, `Command command_chunk =
+         let `Data data_block, `Command command_chunk, data_name =
            scatter axes data error_bars
          in
-         spec_list axes tl (data_block :: data_acc) (command_chunk :: cmd_acc)
+         spec_list
+           axes
+           tl
+           (data_block :: data_acc)
+           (command_chunk :: cmd_acc)
+           (data_name :: name_acc)
      | Histogram {data; options; legend} :: tl ->
-         let `Data data_block, `Command command_chunk =
+         let `Data data_block, `Command command_chunk, data_name =
            histogram data options legend
          in
-         spec_list axes tl (data_block :: data_acc) (command_chunk :: cmd_acc)
+         spec_list
+           axes
+           tl
+           (data_block :: data_acc)
+           (command_chunk :: cmd_acc)
+           (data_name :: name_acc)
      | Line {data; with_points; error_bars} :: tl ->
-         let `Data data_block, `Command command_chunk =
+         let `Data data_block, `Command command_chunk, data_name =
            line axes data with_points error_bars
          in
-         spec_list axes tl (data_block :: data_acc) (command_chunk :: cmd_acc)
+         spec_list
+           axes
+           tl
+           (data_block :: data_acc)
+           (command_chunk :: cmd_acc)
+           (data_name :: name_acc)
      | Boxes {data; box_width; fill} :: tl ->
-         let `Data data_block, `Command command_chunk =
+         let `Data data_block, `Command command_chunk, data_name =
            boxes data box_width fill
          in
-         spec_list axes tl (data_block :: data_acc) (command_chunk :: cmd_acc)
+         spec_list
+           axes
+           tl
+           (data_block :: data_acc)
+           (command_chunk :: cmd_acc)
+           (data_name :: name_acc)
 
-  let render (Plot {axes; plots; title}) =
+  let render ?save (Plot {axes; plots; title}) =
     let title_cmd =
       match title with None -> set_title "" | Some title -> set_title title
     in
+    let save_cmd =
+      match save with None -> [] | Some savefile -> [sf "save %s" savefile]
+    in
     match axes with
     | Dim2_axes {xaxis; yaxis; xtics; ytics} ->
-        let all_data, cmds = spec_list axes plots [] [] in
+        let all_data, cmds, _all_data_names = spec_list axes plots [] [] [] in
         let all_data = (all_data :> string list) in
         let cmd = (GP_command.plot cmds :> string) in
         concat
-          [
-            set_xlabel xaxis;
-            set_ylabel yaxis;
-            set_xtics xtics;
-            set_ytics ytics;
-            concat all_data;
-            title_cmd;
-            cmd;
-          ]
+          ([
+             set_xlabel xaxis;
+             set_ylabel yaxis;
+             set_xtics xtics;
+             set_ytics ytics;
+             concat all_data;
+             title_cmd;
+             cmd;
+           ]
+          @ save_cmd)
     | Dim3_axes {xaxis; yaxis; zaxis; xtics; ytics; ztics} ->
-        let all_data, cmds = spec_list axes plots [] [] in
+        let all_data, cmds, all_data_names = spec_list axes plots [] [] [] in
         let all_data = (all_data :> string list) in
         let cmd = (GP_command.splot cmds :> string) in
         concat
-          [
-            set_xlabel xaxis;
-            set_ylabel yaxis;
-            set_zlabel zaxis;
-            set_xtics xtics;
-            set_ytics ytics;
-            set_ztics ztics;
-            concat all_data;
-            title_cmd;
-            cmd;
-          ]
+          ([
+             set_xlabel xaxis;
+             set_ylabel yaxis;
+             set_zlabel zaxis;
+             set_xtics xtics;
+             set_ytics ytics;
+             set_ztics ztics;
+             concat all_data;
+             title_cmd;
+             set_fixed_z_range all_data_names;
+             cmd;
+           ]
+          @ save_cmd)
+
+  let save_file i j = sf "ARG0.'save_%d_%d.option'" i j
 
   let multiplot ~title ~matrix =
     let rows = Array.length matrix in
     let cols = Array.length matrix.(0) in
+    let size = rows * cols in
     let plots =
       List.flatten (Array.to_list ((Array.map Array.to_list) matrix))
     in
@@ -903,17 +947,51 @@ end = struct
            title;
        ]
       @ plots
-      @ [sf "unset multiplot"])
+      @ [sf "unset multiplot"]
+      @ [sf "N = %d" size]
+      @ ["array plots[N]"]
+      @ Stdlib.List.init size (fun c ->
+            let i = c mod rows in
+            let j = c / rows in
+            sf "plots[%d] = %s" (i + 1) (save_file i j))
+      @ ["multi = 1"] @ ["c = 1"]
+      (* Macro for plotting *)
+      @ [
+          sf
+            "PLOT = \"if (multi == 1) {min = 1; max = N; rn = %d; cn = %d} \
+             else {min = c; max = c; rn = 1; cn = 1}; set multiplot layout rn, \
+             cn rowsfirst downwards title ''; do for [i=min:max] { load \
+             plots[i]; if (multi == 0) {clear; replot}}; unset multiplot\""
+            rows
+            cols;
+        ]
+      (* Key bindings to navigate the plots *)
+      (* Ctrl+Left/Right: previous/next plot*)
+      @ [
+          "bind 'ctrl-Right' 'if (multi == 1) { multi = 0 } else { c = (c % N) \
+           + 1 };'.PLOT";
+        ]
+      @ [
+          "bind 'ctrl-Left' 'if (multi == 1) { multi = 0 } else { c = ((c + N \
+           - 2) % N) + 1 };'.PLOT";
+        ]
+      (* Ctrl+Down: Show multiplot *)
+      @ ["bind 'ctrl-Down' 'if (multi == 0) { multi = 1 };'.PLOT"]
+      (* Ctrl+Up: Show single plot *)
+      @ ["bind 'ctrl-Up' 'if (multi == 1) { multi = 0 };'.PLOT"])
 
   let render_matrix ~title plots =
     let plot_matrix =
-      Array.map
-        (Array.map (function
+      Array.mapi
+        (fun i ->
+          Array.mapi (fun j -> function
             | None -> "set multiplot next"
-            | Some p -> render p))
+            | Some p -> render ~save:(save_file i j) p))
         plots
     in
     multiplot ~title ~matrix:plot_matrix
+
+  let render = render ?save:None
 end
 
 (* Plot targets *)
@@ -963,28 +1041,31 @@ module GP_run = struct
     | Png_target _ | Pdf_target _ -> false
     | X11_target | Qt_target _ -> true
 
-  let make_script ~target ~(plot : GP_script.t) =
+  let make_script ~matrix_mode ~target ~(plot : GP_script.t) =
     concat
       ([set_target target; (plot :> string)]
-      @ if is_target_interactive target then ["pause -1"] else [])
+      @ (if is_target_interactive target then ["pause mouse close"] else [])
+      @ if matrix_mode then ["do for [i=1:N]{system 'rm '.plots[i]}"] else [])
 
-  let write_script ~filename ~target ~(plot : GP_script.t) =
+  let write_script ~filename ~matrix_mode ~target ~(plot : GP_script.t) =
     match open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o666 filename with
     | exception _ ->
         Format.eprintf "write_script: could not open file %s, exiting" filename ;
         exit 1
     | oc ->
-        let script = make_script ~target ~plot in
+        let script = make_script ~matrix_mode ~target ~plot in
         output_string oc script ;
         close_out oc
 
-  let run_script ?(path = "gnuplot") ?(detach = false) ~target
+  let run_script ?(path = "gnuplot") ?(detach = false) ~matrix_mode ~target
       ~(plot : GP_script.t) () =
     let name, oc = Filename.open_temp_file ~perms:0o666 "gnuplot" ".gp" in
     let full_command =
       concat
         ([set_target target; (plot :> string)]
-        @ if is_target_interactive target then ["pause -1"] else [])
+        @ (if is_target_interactive target then ["pause mouse close"] else [])
+        @ if matrix_mode then ["do for [i=1:N]{system 'rm '.plots[i]}"] else []
+        )
     in
     output_string oc full_command ;
     close_out oc ;
@@ -1001,13 +1082,13 @@ module GP_run = struct
     | pid -> if not detach then ignore @@ Unix.waitpid [] pid else ()
 
   let write_and_run_script ?(path = "gnuplot") ?(detach = false) ~filename
-      ~target ~(plot : GP_script.t) () =
+      ~matrix_mode ~target ~(plot : GP_script.t) () =
     match open_out_gen [Open_wronly; Open_creat; Open_trunc] 0o666 filename with
     | exception _ ->
         Format.eprintf "write_script: could not open file %s, exiting" filename ;
         exit 1
     | oc -> (
-        let script = make_script ~target ~plot in
+        let script = make_script ~matrix_mode ~target ~plot in
         output_string oc script ;
         close_out oc ;
         match Unix.fork () with
@@ -1039,27 +1120,33 @@ let exec_and_save_to filename = Exec_and_save_to filename
 
 let write_plot ~filename ~target ~plot =
   let plot = GP_script.render plot in
-  GP_run.write_script ~filename ~target ~plot
+  GP_run.write_script ~filename ~matrix_mode:false ~target ~plot
 
 let run_plot ?path ?detach ~target ~plot () =
   let plot = GP_script.render plot in
-  GP_run.run_script ?path ?detach ~target ~plot ()
+  GP_run.run_script ?path ?detach ~matrix_mode:false ~target ~plot ()
 
 let write_and_run_plot ?path ~filename ~target ~plot () =
   let plot = GP_script.render plot in
-  GP_run.write_and_run_script ?path ~filename ~target ~plot ()
+  GP_run.write_and_run_script
+    ?path
+    ~filename
+    ~matrix_mode:false
+    ~target
+    ~plot
+    ()
 
 let write_matrix ~filename ~title ~target ~plots =
   let plot = GP_script.render_matrix ~title plots in
-  GP_run.write_script ~filename ~target ~plot
+  GP_run.write_script ~filename ~matrix_mode:true ~target ~plot
 
 let run_matrix ?path ?detach ~title ~target ~plots () =
   let plot = GP_script.render_matrix ~title plots in
-  GP_run.run_script ?path ?detach ~target ~plot ()
+  GP_run.run_script ?path ?detach ~matrix_mode:true ~target ~plot ()
 
 let write_and_run_matrix ?path ~title ~filename ~target ~plots () =
   let plot = GP_script.render_matrix ~title plots in
-  GP_run.write_and_run_script ?path ~filename ~target ~plot ()
+  GP_run.write_and_run_script ?path ~filename ~matrix_mode:true ~target ~plot ()
 
 let run ?path ~target action plot =
   match action with
