@@ -44,13 +44,13 @@ _`Baker`
 _`Baking`/_`endorsing rights`
     A delegate_ is allowed to bake/endorse a block_ if it holds the
     baking/endorsing right for that block_. At the start of a cycle_,
-    baking and endorsing rights are computed for all the block_ heights in the
+    baking and endorsing rights are computed for all the block_ levels in the
     cycle_, based on the proportion of the stake owned by each account.
 
-    For each block_ height and block round_, there is exactly one account that is allowed to bake.
+    For each block_ level and block round_, there is exactly one account that is allowed to bake.
 
     When a block_ is created and propagated on the network, delegates that have
-    `endorsing rights`_ for the matching block_ height can emit an endorsement
+    `endorsing rights`_ for the matching block_ level can emit an endorsement
     operation_.
     Endorsement operations_ are included in the next block_.
 
@@ -72,7 +72,7 @@ _`Contract`
 
 _`Cycle`
     A cycle is a set of consecutive blocks. E.g., cycle 12 started at block_
-    height 49152 and ended at block_ height 53248.
+    level 49152 and ended at block_ level 53248.
 
     Cycles are used as a unit of “time” in the block_ chain. For example, the
     different phases in the amendment voting procedures are defined based on
@@ -92,10 +92,10 @@ _`Delegation`
     the account_.
 
 _`Double signing`
-    When a baker_ signs two different blocks at the same height and same round,
+    When a baker_ signs two different blocks at the same level and same round,
     it is called double baking. Double baking is detrimental to the network and might be
     indicative of an attempt to double spend.
-    The same goes for signing two different endorsements at the same height and the same round.
+    The same goes for signing two different endorsements at the same level and the same round.
     As such, double signing is punished by the
     network: an accuser_ can provide proof of the double signing to be awarded
     part of the double signer's deposit.
@@ -140,7 +140,7 @@ _`Origination`
     An operation_ to create a `smart contract`_.
 
 _`Round`
-    An attempt to reach consensus on a block at a given height.
+    An attempt to reach consensus on a block at a given level.
     A round is represented by an index, starting with 0.
     Each round corresponds to a time span.
     A baker_ with baking_ rights at a given round is only allowed to bake during
