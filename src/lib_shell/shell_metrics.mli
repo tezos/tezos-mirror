@@ -67,7 +67,7 @@ module Block_validator : sig
     validation_worker_metrics : Worker.t;
   }
 
-  val init : string trace -> t
+  val init : string list -> t
 
   val set_operation_per_pass_collector : (unit -> float list) -> unit
 end
@@ -124,7 +124,7 @@ module Chain_validator : sig
     Chain_validator_worker_state.Event.synchronisation_status ->
     unit
 
-  val init : string trace -> Chain_id.t -> t
+  val init : string list -> Chain_id.t -> t
 
   val update_proto_metrics_callback :
     metrics:t -> cycle:float -> consumed_gas:float -> round:float -> unit
@@ -154,5 +154,5 @@ module Peer_validator : sig
     connections : Prometheus.Counter.t;
   }
 
-  val init : string trace -> t
+  val init : string list -> t
 end

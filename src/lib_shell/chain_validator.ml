@@ -575,6 +575,39 @@ let collect_proto ~metrics (chain_store, block) =
           Lwt.return_unit)
         (fun _ -> Lwt.return_unit)
 
+let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
+    unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let request_view = Request.view request in
+  match request with
+  | Validated _ ->
+      (* If an error happens here, it means that the request
+         [Validated] failed. For this request, the payload
+         associated to the request was validated and therefore is
+         safe. The handler for such request does some I/Os, and
+         therefore a failure could be "No space left on device" for
+         example. If there is an error at this level, it certainly
+         requires a manual operation from the maintener of the
+         node. *)
+      let*! () =
+        Worker.log_event w (Request_failure (request_view, st, errs))
+      in
+      Lwt.return_error errs
+  (* We do not crash the worker in the following cases mainly for one
+     reason: Such request comes from a remote peer. The payload for this
+     request may contain unsafe data. The current policy with tzresult is
+     not clear and there might be a non serious error raised as a [tzresult]
+     to say it was a bad data. If if is the case, we do not want to crash
+     the worker.
+
+     With the current state of the code, it is possible that
+     this branch is not reachable. This would be possible to
+     see it if we relax the interface of [tezos-worker] to use
+     [('a, 'b) result] instead of [tzresult] and if each
+     request uses its own error type. *)
+  | Notify_branch _ -> ( match errs with _ -> .)
+  | Notify_head _ -> ( match errs with _ -> .)
+  | Disconnection _ -> ( match errs with _ -> .)
 let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
     request_status =
   match req with
@@ -785,38 +818,7 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
 
     let on_close = on_close
 
-    let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
-        unit tzresult Lwt.t =
-      let request_view = Request.view request in
-      match request with
-      | Validated _ ->
-          (* If an error happens here, it means that the request
-             [Validated] failed. For this request, the payload
-             associated to the request was validated and therefore is
-             safe. The handler for such request does some I/Os, and
-             therefore a failure could be "No space left on device" for
-             example. If there is an error at this level, it certainly
-             requires a manual operation from the maintener of the
-             node. *)
-          let*! () =
-            Worker.log_event w (Request_failure (request_view, st, errs))
-          in
-          Lwt.return_error errs
-      (* We do not crash the worker in the following cases mainly for one
-         reason: Such request comes from a remote peer. The payload for this
-         request may contain unsafe data. The current policy with tzresult is
-         not clear and there might be a non serious error raised as a [tzresult]
-         to say it was a bad data. If if is the case, we do not want to crash
-         the worker.
-
-         With the current state of the code, it is possible that
-         this branch is not reachable. This would be possible to
-         see it if we relax the interface of [tezos-worker] to use
-         [('a, 'b) result] instead of [tzresult] and if each
-         request uses its own error type. *)
-      | Notify_branch _ -> ( match errs with _ -> .)
-      | Notify_head _ -> ( match errs with _ -> .)
-      | Disconnection _ -> ( match errs with _ -> .)
+    let on_error = on_error
 
     let on_completion = on_completion
 
