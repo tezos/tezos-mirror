@@ -465,6 +465,10 @@ let pp_paid_storage_size_diff ppf paid_storage_size_diff =
       "@,Paid storage size diff: %s bytes"
       (Z.to_string paid_storage_size_diff)
 
+let pp_storage_size ppf storage_size =
+  if storage_size <> Z.zero then
+    Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size)
+
 let pp_manager_operation_contents_and_result ppf
     ( Manager_operation
         {source; fee; operation; counter; gas_limit; storage_limit},
@@ -515,11 +519,7 @@ let pp_manager_operation_contents_and_result ppf
               Michelson_v1_printer.print_expr
               expr) ;
         pp_lazy_storage_diff lazy_storage_diff ;
-        if storage_size <> Z.zero then
-          Format.fprintf
-            ppf
-            "@,Storage size: %s bytes"
-            (Z.to_string storage_size) ;
+        pp_storage_size ppf storage_size ;
         pp_paid_storage_size_diff ppf paid_storage_size_diff ;
         pp_consumed_gas ppf consumed_gas ;
         pp_balance_updates_opt ppf balance_updates
@@ -548,8 +548,7 @@ let pp_manager_operation_contents_and_result ppf
           "@,@[<v 2>Originated contracts:@,%a@]"
           (Format.pp_print_list Contract_hash.pp)
           contracts) ;
-    if storage_size <> Z.zero then
-      Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
+    pp_storage_size ppf storage_size ;
     pp_lazy_storage_diff lazy_storage_diff ;
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
@@ -565,7 +564,7 @@ let pp_manager_operation_contents_and_result ppf
         assert false
     | balance_updates -> pp_balance_updates_opt ppf balance_updates) ;
     pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size_of_constant) ;
+    pp_storage_size ppf size_of_constant ;
     Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
   in
   let pp_tx_rollup_result
@@ -665,7 +664,7 @@ let pp_manager_operation_contents_and_result ppf
       (Sc_rollup_originate_result
         {address; consumed_gas; size; balance_updates}) =
     pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size) ;
+    pp_storage_size ppf size ;
     Format.fprintf ppf "@,Address: %a" Sc_rollup.Address.pp address ;
     pp_balance_updates_opt ppf balance_updates
   in
