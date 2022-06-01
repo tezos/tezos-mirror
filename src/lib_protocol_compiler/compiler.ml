@@ -279,8 +279,11 @@ let main {compile_ml; pack_objects; link_shared} =
   Clflags.nopervasives := true ;
   Clflags.no_std_include := true ;
   Clflags.include_dirs := [Filename.dirname functor_file] ;
-  let (_ : Warnings.alert option) = Warnings.parse_options false warnings in
-  let (_ : Warnings.alert option) = Warnings.parse_options true warn_error in
+  let parse_options errflag s =
+    Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
+  in
+  parse_options false warnings ;
+  parse_options true warn_error ;
   load_embedded_cmis tezos_protocol_env ;
   let packed_protocol_object = compile_ml ~for_pack functor_file in
   let register_objects =
