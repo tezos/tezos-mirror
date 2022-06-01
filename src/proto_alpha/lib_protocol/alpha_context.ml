@@ -134,32 +134,6 @@ end
 module Ratio = Ratio_repr
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
-
-module Script = struct
-  include Michelson_v1_primitives
-  include Script_repr
-
-  type consume_deserialization_gas = Always | When_needed
-
-  let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
-    let gas_cost =
-      match consume_deserialization_gas with
-      | Always -> Script_repr.stable_force_decode_cost lexpr
-      | When_needed -> Script_repr.force_decode_cost lexpr
-    in
-    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
-    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
-
-  let force_bytes_in_context ctxt lexpr =
-    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
-    >>? fun ctxt ->
-    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
-
-  let consume_decoding_gas ctxt lexpr =
-    let gas_cost = Script_repr.stable_force_decode_cost lexpr in
-    Raw_context.consume_gas ctxt gas_cost
-end
-
 module Fees = Fees_storage
 
 type public_key = Signature.Public_key.t
@@ -236,6 +210,31 @@ module Gas = struct
 
   (* Necessary to inject costs for Storage_costs into Gas.cost *)
   let cost_of_repr cost = cost
+end
+
+module Script = struct
+  include Michelson_v1_primitives
+  include Script_repr
+
+  type consume_deserialization_gas = Always | When_needed
+
+  let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
+    let gas_cost =
+      match consume_deserialization_gas with
+      | Always -> Script_repr.stable_force_decode_cost lexpr
+      | When_needed -> Script_repr.force_decode_cost lexpr
+    in
+    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
+    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
+
+  let force_bytes_in_context ctxt lexpr =
+    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
+    >>? fun ctxt ->
+    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
+
+  let consume_decoding_gas ctxt lexpr =
+    let gas_cost = Script_repr.stable_force_decode_cost lexpr in
+    Raw_context.consume_gas ctxt gas_cost
 end
 
 module Level = struct
