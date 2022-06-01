@@ -414,12 +414,19 @@ module Make (Rollup : PARAMETERS) = struct
         (fun acc op (Apply_results.Contents_result result) ->
           match result with
           | Apply_results.Manager_operation_result
-              {operation_result = Failed (_, error); _} ->
+              {
+                operation_result =
+                  Failed (_, error) | Backtracked (_, Some error);
+                _;
+              } ->
               let*! () = Event.(emit2 dropping_operation) state op error in
               failure := true ;
               Lwt.return acc
           | Apply_results.Manager_operation_result
-              {operation_result = Applied _ | Backtracked _ | Skipped _; _} ->
+              {
+                operation_result = Applied _ | Backtracked (_, None) | Skipped _;
+                _;
+              } ->
               (* Not known to be failing *)
               Lwt.return (op :: acc)
           | _ ->
