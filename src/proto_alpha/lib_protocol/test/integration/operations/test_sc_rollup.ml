@@ -105,10 +105,11 @@ let test_disable_feature_flag () =
     implementations. *)
 let test_sc_rollups_all_well_defined () =
   let all_contains_all_constructors () =
-    let tickets = ref ["Example_arith"] in
+    let tickets = ref ["Example_arith"; "Wasm_2_0_0"] in
     let burn x = tickets := List.filter (( <> ) x) !tickets in
     let pick = function
       | Sc_rollup.Kind.Example_arith -> burn "Example_arith"
+      | Sc_rollup.Kind.Wasm_2_0_0 -> burn "Wasm_2_0_0"
     in
     List.iter pick Sc_rollup.Kind.all ;
     if !tickets <> [] then

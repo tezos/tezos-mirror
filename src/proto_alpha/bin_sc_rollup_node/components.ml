@@ -43,3 +43,4 @@ end
 let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
   function
   | Example_arith -> (module Arith_pvm)
+  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)

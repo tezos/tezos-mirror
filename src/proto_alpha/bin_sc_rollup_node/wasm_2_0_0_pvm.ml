@@ -23,29 +23,68 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context.Sc_rollup
+open Protocol
+open Alpha_context
 
-module Simple = struct
-  include Internal_event.Simple
+(** This module manifests the proof format used by the Wasm PVM as defined by
+    the Layer 1 implementation for it.
 
-  let section = ["sc_rollup_node"; "interpreter"]
+    It is imperative that this is aligned with the protocol's implementation.
+*)
+module Wasm_2_0_0_proof_format = struct
+  open Store
 
-  let transitioned_pvm =
-    declare_3
-      ~section
-      ~name:"sc_rollup_node_interpreter_transitioned_pvm"
-      ~msg:
-        "Transitioned PVM to {state_hash} at tick {ticks} with {num_messages} \
-         messages"
-      ~level:Notice
-      ("state_hash", State_hash.encoding)
-      ("ticks", Tick.encoding)
-      ("num_messages", Data_encoding.z)
+  type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
+
+  let produce_proof context tree step =
+    let open Lwt_syntax in
+    match IStoreTree.kinded_key tree with
+    | Some k ->
+        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
+        return (Some p)
+    | None -> return None
+
+  let verify_proof proof step =
+    (* The rollup node is not supposed to verify proof. We keep
+       this part in case this changes in the future. *)
+    let open Lwt_syntax in
+    let* result = IStoreProof.verify_tree_proof proof step in
+    match result with
+    | Ok v -> return (Some v)
+    | Error _ ->
+        (* We skip the error analysis here since proof verification is not a
+           job for the rollup node. *)
+        return None
+
+  let kinded_hash_to_state_hash :
+      IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
+    | `Value hash | `Node hash ->
+        Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes hash]
+
+  let proof_before proof =
+    kinded_hash_to_state_hash proof.IStoreProof.Proof.before
+
+  let proof_after proof =
+    kinded_hash_to_state_hash proof.IStoreProof.Proof.after
+
+  let proof_encoding =
+    Tezos_context_helpers.Merkle_proof_encoding.V2.Tree32.tree_proof_encoding
 end
 
-let transitioned_pvm state num_messages =
-  let open Lwt_syntax in
-  (* TODO (#3094): is this code path taken for Wasm_2_0_0_pvm. Do we need to abstract? *)
-  let* hash = Arith_pvm.state_hash state in
-  let* ticks = Arith_pvm.get_tick state in
-  Simple.(emit transitioned_pvm (hash, ticks, num_messages))
+module Impl : Pvm.S = struct
+  include Sc_rollup.Wasm_2_0_0PVM.Make (struct
+    open Store
+    module Tree = IStoreTree
+
+    type tree = IStoreTree.tree
+
+    include Wasm_2_0_0_proof_format
+  end)
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3093
+     Print a more informative status.
+  *)
+  let string_of_status _status = "<wasm PVM status>"
+end
+
+include Impl

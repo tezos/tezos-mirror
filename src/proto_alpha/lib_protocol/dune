@@ -81,6 +81,7 @@
   Sc_rollup_outbox_message_repr
   Sc_rollup_PVM_sem
   Sc_rollup_arith
+  Sc_rollup_wasm
   Sc_rollups
   Skip_list_repr
   Sc_rollup_inbox_repr
@@ -300,6 +301,7 @@
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
@@ -506,6 +508,7 @@
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
@@ -732,6 +735,7 @@
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
@@ -954,6 +958,7 @@
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
