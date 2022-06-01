@@ -18,14 +18,14 @@
   tezos-test-helpers
   tezos-test-helpers-extra)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_store
-   -open Tezos_shell_services
-   -open Tezos_stdlib_unix
-   -open Tezos_validation
-   -open Tezos_protocol_alpha_parameters
-   -open Tezos_protocol_plugin_alpha)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_store
+  -open Tezos_shell_services
+  -open Tezos_stdlib_unix
+  -open Tezos_validation
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_plugin_alpha))
 
 (rule
  (alias runtest)

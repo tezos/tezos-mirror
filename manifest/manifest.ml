@@ -705,6 +705,43 @@ module Opam = struct
     Option.iter (pp_line "description: %a" pp_string) description
 end
 
+module Flags = struct
+  type t = {standard : bool; rest : Dune.s_expr list}
+
+  type maker =
+    ?nopervasives:bool ->
+    ?nostdlib:bool ->
+    ?opaque:bool ->
+    ?warnings:string ->
+    ?warn_error:string ->
+    unit ->
+    t
+
+  let if_true b name = if b then Dune.S name else Dune.E
+
+  let if_some o name = match o with None -> Dune.E | Some x -> H [S name; S x]
+
+  let make ~standard ?(nopervasives = false) ?(nostdlib = false)
+      ?(opaque = false) ?warnings ?warn_error () =
+    {
+      standard;
+      rest =
+        [
+          if_some warnings "-w";
+          if_some warn_error "-warn-error";
+          if_true nostdlib "-nostdlib";
+          if_true nopervasives "-nopervasives";
+          if_true opaque "-opaque";
+        ];
+    }
+
+  let standard = make ~standard:true
+
+  let no_standard = make ~standard:false
+
+  let include_ f = {standard = false; rest = Dune.[S ":include"; S f]}
+end
+
 module Env : sig
   (* See manifest.mli for documentation *)
 
@@ -836,7 +873,7 @@ module Target = struct
     conflicts : t list;
     deps : t list;
     dune : Dune.s_expr;
-    flags_nostandard : bool;
+    flags : Flags.t option;
     foreign_stubs : Dune.foreign_stubs option;
     inline_tests : bool;
     js_compatible : bool;
@@ -847,11 +884,8 @@ module Target = struct
     modes : Dune.mode list option;
     modules : modules;
     modules_without_implementation : string list;
-    nopervasives : bool;
-    nostdlib : bool;
     ocaml : Version.constraints option;
     opam : string option;
-    opaque : bool;
     opens : string list;
     path : string;
     preprocess : preprocessor list;
@@ -863,8 +897,6 @@ module Target = struct
     static_cclibs : string list;
     synopsis : string option;
     description : string option;
-    warnings : string option;
-    warn_error : string option;
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
@@ -989,7 +1021,7 @@ module Target = struct
     ?conflicts:t option list ->
     ?deps:t option list ->
     ?dune:Dune.s_expr ->
-    ?flags_nostandard:bool ->
+    ?flags:Flags.t ->
     ?foreign_stubs:Dune.foreign_stubs ->
     ?inline_tests:inline_tests ->
     ?js_compatible:bool ->
@@ -1000,11 +1032,8 @@ module Target = struct
     ?modules:string list ->
     ?modules_without_implementation:string list ->
     ?npm_deps:Npm.t list ->
-    ?nopervasives:bool ->
-    ?nostdlib:bool ->
     ?ocaml:Version.constraints ->
     ?opam:string ->
-    ?opaque:bool ->
     ?opens:string list ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
@@ -1016,8 +1045,6 @@ module Target = struct
     ?synopsis:string ->
     ?description:string ->
     ?time_measurement_ppx:bool ->
-    ?warnings:string ->
-    ?warn_error:string ->
     ?wrapped:bool ->
     ?cram:bool ->
     ?license:string ->
@@ -1061,15 +1088,14 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
-      ?(dune = Dune.[]) ?(flags_nostandard = false) ?foreign_stubs ?inline_tests
-      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
-      ?modules ?(modules_without_implementation = []) ?(npm_deps = [])
-      ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
+      ?(dune = Dune.[]) ?flags ?foreign_stubs ?inline_tests ?js_compatible
+      ?js_of_ocaml ?documentation ?(linkall = false) ?modes ?modules
+      ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml ?opam
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
       ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
-      ?warnings ?warn_error ?(wrapped = true) ?(cram = false) ?license
-      ?(extra_authors = []) ~path names =
+      ?(wrapped = true) ?(cram = false) ?license ?(extra_authors = []) ~path
+      names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1282,7 +1308,7 @@ module Target = struct
         conflicts;
         deps;
         dune;
-        flags_nostandard;
+        flags;
         foreign_stubs;
         inline_tests;
         js_compatible;
@@ -1293,11 +1319,8 @@ module Target = struct
         modes;
         modules;
         modules_without_implementation;
-        nopervasives;
-        nostdlib;
         ocaml;
         opam;
-        opaque;
         opens;
         path;
         preprocess;
@@ -1310,8 +1333,6 @@ module Target = struct
         synopsis;
         description;
         npm_deps;
-        warnings;
-        warn_error;
         wrapped;
         cram;
         license;
@@ -1578,7 +1599,6 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     let libraries = List.map get_library internal.deps |> Dune.of_list in
     (libraries, List.rev !empty_files_to_create)
   in
-  let cons_if p x xs = if p then x :: xs else xs in
   let is_lib =
     match internal.kind with
     | Public_library _ | Private_library _ -> true
@@ -1593,44 +1613,31 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       Some Dune.[S ":standard"; S "-linkall"]
     else None
   in
-  let flags =
-    internal.opens
-    |> List.map (fun m -> Dune.(H [S "-open"; S m]))
-    |> cons_if internal.nopervasives (Dune.S "-nopervasives")
-    |> cons_if internal.nostdlib (Dune.S "-nostdlib")
-    |> cons_if internal.opaque (Dune.S "-opaque")
+  let open_flags : Dune.s_expr list =
+    internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
   in
-  let flags =
+  let minus_flags : Dune.s_expr =
     if dune_file_has_static_profile && not internal.static then
       (* Disable static compilation for this particular target
          (the static profile is global for the dune file).
          This must be at the end of the flag list. *)
-      flags @ [Dune.(H [S "\\"; S "-ccopt"; S "-static"])]
-    else flags
+      Dune.(H [S "\\"; S "-ccopt"; S "-static"])
+    else Dune.E
   in
   let flags =
-    match internal.warn_error with
-    | None -> flags
-    | Some w -> Dune.[H [S "-warn-error"; S w]] @ flags
-  in
-  let flags =
-    match internal.warnings with
-    | None -> flags
-    | Some w -> Dune.[H [S "-w"; S w]] @ flags
-  in
-  let flags =
-    match flags with
-    | [] -> None
-    | _ :: _ ->
-        Some
-          Dune.
-            [
-              V
-                (of_list
-                   ((if internal.flags_nostandard then []
-                    else [Dune.S ":standard"])
-                   @ flags));
-            ]
+    match (internal.flags, minus_flags, open_flags) with
+    | None, Dune.E, [] -> None
+    | flags, _, _ ->
+        let flags =
+          match flags with None -> Flags.standard () | Some flags -> flags
+        in
+        let flags =
+          match (flags.standard, minus_flags) with
+          | false, _ -> flags.rest
+          | true, E -> Dune.[S ":standard"] :: flags.rest
+          | true, minus_flags -> Dune.[S ":standard"; minus_flags] :: flags.rest
+        in
+        Some Dune.(V [V (of_list flags); V (of_list open_flags)])
   in
 
   let preprocess =

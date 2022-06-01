@@ -25,14 +25,14 @@
   tezos-protocol-demo-counter.environment)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -w +a-4-40..42-44-45-48-70
-   -warn-error +a
-   -nostdlib
-   -nopervasives
-   -open Tezos_protocol_environment_demo_counter.Environment
-   -open Pervasives
-   -open Error_monad))
+  (:standard)
+  -w +a-4-40..42-44-45-48-70
+  -warn-error +a
+  -nostdlib
+  -nopervasives
+  -open Tezos_protocol_environment_demo_counter.Environment
+  -open Pervasives
+  -open Error_monad)
  (modules
   Error
   Proto_params
@@ -52,9 +52,9 @@
   tezos-protocol-environment
   tezos-protocol-environment.sigs
   tezos-protocol-demo-counter.raw)
- (flags (-w +a-4-40..42-44-45-48-70
-         -warn-error +a
-         -nopervasives))
+ (flags -w +a-4-40..42-44-45-48-70
+        -warn-error +a
+        -nopervasives)
  (modules Protocol))
 
 (install
@@ -112,9 +112,9 @@
   tezos-protocol-environment
   tezos-protocol-environment.sigs
   tezos-protocol-demo-counter.raw)
- (flags (-w +a-4-40..42-44-45-48-70
-         -warn-error +a
-         -nopervasives))
+ (flags -w +a-4-40..42-44-45-48-70
+        -warn-error +a
+        -nopervasives)
  (modules Functor))
 
 (rule
@@ -145,9 +145,9 @@
   tezos-protocol-updater
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (flags (:standard
-         -w +a-4-40..42-44-45-48-70
-         -warn-error +a))
+ (flags (:standard)
+        -w +a-4-40..42-44-45-48-70
+        -warn-error +a)
  (modules Registerer))
 
 (rule

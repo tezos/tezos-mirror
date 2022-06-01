@@ -19,18 +19,18 @@
   tezos-protocol-plugin-010-PtGRANAD)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_010_PtGRANAD
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_010_PtGRANAD
-   -open Tezos_client_commands
-   -open Tezos_rpc
-   -open Tezos_client_base_unix
-   -open Tezos_protocol_plugin_010_PtGRANAD))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_010_PtGRANAD
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_010_PtGRANAD
+  -open Tezos_client_commands
+  -open Tezos_rpc
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_plugin_010_PtGRANAD)
  (modules (:standard \ alpha_commands_registration)))
 
 (library
@@ -50,15 +50,15 @@
   tezos-protocol-plugin-010-PtGRANAD)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_010_PtGRANAD
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_010_PtGRANAD
-   -open Tezos_client_commands
-   -open Tezos_client_010_PtGRANAD_commands
-   -open Tezos_rpc
-   -open Tezos_protocol_plugin_010_PtGRANAD))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_010_PtGRANAD
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_010_PtGRANAD
+  -open Tezos_client_commands
+  -open Tezos_client_010_PtGRANAD_commands
+  -open Tezos_rpc
+  -open Tezos_protocol_plugin_010_PtGRANAD)
  (modules alpha_commands_registration))

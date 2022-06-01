@@ -25,14 +25,14 @@
   tezos-protocol-008-PtEdo2Zk.environment)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-   -warn-error +a
-   -nostdlib
-   -nopervasives
-   -open Tezos_protocol_environment_008_PtEdo2Zk.Environment
-   -open Pervasives
-   -open Error_monad))
+  (:standard)
+  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
+  -warn-error +a
+  -nostdlib
+  -nopervasives
+  -open Tezos_protocol_environment_008_PtEdo2Zk.Environment
+  -open Pervasives
+  -open Error_monad)
  (modules
   Misc
   Storage_description
@@ -120,9 +120,9 @@
   tezos-protocol-environment.sigs
   tezos-protocol-008-PtEdo2Zk.raw)
  (flags
-  (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-   -warn-error +a
-   -nopervasives))
+  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
+  -warn-error +a
+  -nopervasives)
  (modules Protocol))
 
 (install
@@ -315,9 +315,9 @@
   tezos-protocol-environment.sigs
   tezos-protocol-008-PtEdo2Zk.raw)
  (flags
-  (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-   -warn-error +a
-   -nopervasives))
+  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
+  -warn-error +a
+  -nopervasives)
  (modules Functor))
 
 (rule
@@ -416,9 +416,9 @@
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-   -warn-error +a))
+  (:standard)
+  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
+  -warn-error +a)
  (modules Registerer))
 
 (rule

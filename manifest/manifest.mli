@@ -451,6 +451,46 @@ module Npm : sig
   val make : string -> Version.constraints -> t
 end
 
+module Flags : sig
+  (** OCaml flags
+
+      This module is used to construct flags to be passed to the OCaml compiler (in the [(flags ...)] stanza)
+  *)
+
+  (** OCaml flags *)
+  type t
+
+  (** Functions that build OCaml flags.
+
+      - [nopervasives]: if [true], add [-nopervasives] to the list of flags.
+
+      - [nostdlib]: if [true], add [-nostdlib] to the list of flags.
+
+      - [opaque]: if [true], add [-opaque] to the list of flags.
+
+      - [warnings]: the argument passed to the -w flag when building.
+
+      - [warn_error]: the argument passed to the -warn-error flag when building.
+   *)
+  type maker =
+    ?nopervasives:bool ->
+    ?nostdlib:bool ->
+    ?opaque:bool ->
+    ?warnings:string ->
+    ?warn_error:string ->
+    unit ->
+    t
+
+  (** Extend standard flags with custom ones. *)
+  val standard : maker
+
+  (** Override standard flags with custom ones. *)
+  val no_standard : maker
+
+  (** [include_ file] will use the flags defined in the file [file]. *)
+  val include_ : string -> t
+end
+
 (** Preprocessors. *)
 type preprocessor
 
@@ -499,8 +539,8 @@ val inline_tests_backend : target -> inline_tests
     - [dune]: added to the [dune] file after this target.
       A typical use is to add [rule] or [install] stanzas.
 
-    - [flags_nostandard]: if true, then omits the :standard flags in a [(flags ...)].
-      Default value is [false].
+    - [flags]: specifies a [(flags ...)] stanza.
+      Those flags are passed to the OCaml compiler when compiling and linking OCaml units.
 
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
@@ -537,12 +577,6 @@ val inline_tests_backend : target -> inline_tests
 
     - [npm]: npm dependencies used when targeting JavaScript.
 
-    - [nopervasives]: if [true], add [-nopervasives] to the list of flags to
-      be passed to the OCaml compiler (in the [(flags ...)] stanza).
-
-    - [nostdlib]: if [true], add [-nostdlib] to the list of flags to
-      be passed to the OCaml compiler (in the [(flags ...)] stanza).
-
     - [ocaml]: constraints for the version of the [ocaml] opam package,
       i.e. on the version of the OCaml compiler.
 
@@ -553,9 +587,6 @@ val inline_tests_backend : target -> inline_tests
       and [name] is the public name of the target.
       For private libraries, private executables and tests, you must specify
       this argument (you can explicitely set it to [""] to generate no [.opam] file).
-
-    - [opaque]: if [true], add [-opaque] to the list of flags to be passed
-      to the OCaml compiler (in the [(flags ...)] stanza).
 
     - [opens]: list of module names to open when compiling.
       They are passed as [-open] flags to the OCaml compiler (in the [(flags ...)] stanza).
@@ -590,10 +621,6 @@ val inline_tests_backend : target -> inline_tests
 
     - [description]: long description for the [.opam] file.
 
-    - [warnings]: the argument passed to the -w flag when building.
-
-    - [warn_error]: the argument passed to the -warn-error flag when building.
-
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -611,7 +638,7 @@ type 'a maker =
   ?conflicts:target list ->
   ?deps:target list ->
   ?dune:Dune.s_expr ->
-  ?flags_nostandard:bool ->
+  ?flags:Flags.t ->
   ?foreign_stubs:Dune.foreign_stubs ->
   ?inline_tests:inline_tests ->
   ?js_compatible:bool ->
@@ -622,11 +649,8 @@ type 'a maker =
   ?modules:string list ->
   ?modules_without_implementation:string list ->
   ?npm_deps:Npm.t list ->
-  ?nopervasives:bool ->
-  ?nostdlib:bool ->
   ?ocaml:Version.constraints ->
   ?opam:string ->
-  ?opaque:bool ->
   ?opens:string list ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
@@ -638,8 +662,6 @@ type 'a maker =
   ?synopsis:string ->
   ?description:string ->
   ?time_measurement_ppx:bool ->
-  ?warnings:string ->
-  ?warn_error:string ->
   ?wrapped:bool ->
   ?cram:bool ->
   ?license:string ->

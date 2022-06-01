@@ -14,9 +14,9 @@
   tezos-protocol-013-PtJakart
   hashcons)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_error_monad
-   -open Tezos_micheline
-   -open Tezos_micheline_rewriting
-   -open Tezos_protocol_013_PtJakart)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_protocol_013_PtJakart))

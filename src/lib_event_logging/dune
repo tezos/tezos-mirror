@@ -13,8 +13,8 @@
   lwt_log.core)
  (js_of_ocaml)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Data_encoding
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Data_encoding
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib))

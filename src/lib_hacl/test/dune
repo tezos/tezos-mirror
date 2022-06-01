@@ -17,11 +17,11 @@
   tezos-test-helpers)
  (js_of_ocaml)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_error_monad.TzLwtreslib
-   -open Data_encoding
-   -open Tezos_hacl))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad.TzLwtreslib
+  -open Data_encoding
+  -open Tezos_hacl)
  (modules (:standard \ test)))
 
 (rule

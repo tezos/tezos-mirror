@@ -17,12 +17,12 @@
   tezos-base-test-helpers
   alcotest-lwt)
  (flags
-  (:standard
-   -open Tezos_sapling
-   -open Tezos_crypto
-   -open Tezos_stdlib
-   -open Data_encoding
-   -open Tezos_base_test_helpers))
+  (:standard)
+  -open Tezos_sapling
+  -open Tezos_crypto
+  -open Tezos_stdlib
+  -open Data_encoding
+  -open Tezos_base_test_helpers)
  (modules (:standard \ test_js)))
 
 (rule

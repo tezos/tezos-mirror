@@ -21,12 +21,12 @@
   tezt-tezos
   tezt-performance-regression)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezt
-   -open Tezt.Base
-   -open Tezt_tezos
-   -open Tezt_performance_regression)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos
+  -open Tezt_performance_regression))
 
 (rule
  (targets sql.ml)

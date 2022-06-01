@@ -17,11 +17,11 @@
   qcheck-alcotest
   tezos-test-helpers)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_crypto
-   -open Tezos_error_monad.TzLwtreslib
-   -open Data_encoding)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_crypto
+  -open Tezos_error_monad.TzLwtreslib
+  -open Data_encoding))
 
 (rule
  (alias runtest)

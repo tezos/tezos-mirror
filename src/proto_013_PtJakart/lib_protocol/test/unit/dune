@@ -18,16 +18,16 @@
   alcotest-lwt
   tezos-stdlib)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_base_test_helpers
-   -open Tezos_micheline
-   -open Tezos_client_013_PtJakart
-   -open Tezos_protocol_013_PtJakart
-   -open Tezos_protocol_environment_013_PtJakart
-   -open Tezos_013_PtJakart_test_helpers
-   -open Tezos_stdlib)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base_test_helpers
+  -open Tezos_micheline
+  -open Tezos_client_013_PtJakart
+  -open Tezos_protocol_013_PtJakart
+  -open Tezos_protocol_environment_013_PtJakart
+  -open Tezos_013_PtJakart_test_helpers
+  -open Tezos_stdlib))
 
 (rule
  (alias runtest)

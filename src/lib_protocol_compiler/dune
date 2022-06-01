@@ -8,9 +8,9 @@
  (libraries
   tezos-base
   tezos-protocol-environment.sigs)
- (flags (:standard
-         -opaque
-         -open Tezos_base.TzPervasives))
+ (flags (:standard)
+        -opaque
+        -open Tezos_base.TzPervasives)
  (modules Registerer))
 
 (rule
@@ -49,10 +49,10 @@
   ocplib-ocamlres
   unix)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base_unix
-   -open Tezos_stdlib_unix))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_unix
+  -open Tezos_stdlib_unix)
  (modules Embedded_cmis Packer Compiler))
 
 (library
@@ -64,9 +64,9 @@
   tezos-protocol-compiler
   compiler-libs.optcomp)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_compiler))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_compiler)
  (modules Native))
 
 (install

@@ -17,12 +17,12 @@
   tezos-protocol-updater
   tezos-shell-context)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_context
-   -open Tezos_stdlib_unix
-   -open Tezos_shell
-   -open Tezos_shell_services
-   -open Tezos_validation
-   -open Tezos_protocol_updater
-   -open Tezos_shell_context)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_context
+  -open Tezos_stdlib_unix
+  -open Tezos_shell
+  -open Tezos_shell_services
+  -open Tezos_validation
+  -open Tezos_protocol_updater
+  -open Tezos_shell_context))

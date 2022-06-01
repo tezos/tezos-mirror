@@ -12,11 +12,11 @@
   qcheck-alcotest
   tezos-polynomial)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_crypto_dal
-   -open Tezos_error_monad
-   -open Data_encoding)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_crypto_dal
+  -open Tezos_error_monad
+  -open Data_encoding))
 
 (rule
  (alias runtest)

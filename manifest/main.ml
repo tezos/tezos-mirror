@@ -1628,8 +1628,7 @@ let tezos_protocol_environment_sigs =
     ~path:"src/lib_protocol_environment/sigs"
     ~ocaml:V.(at_least "4.12")
     ~deps:[tezos_protocol_environment_sigs_stdlib_compat]
-    ~nopervasives:true
-    ~nostdlib:true
+    ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ())
     ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"; "V6"]
     ~dune:
       Dune.
@@ -1778,7 +1777,7 @@ let tezos_protocol_compiler_registerer =
     ~deps:
       [tezos_base |> open_ ~m:"TzPervasives"; tezos_protocol_environment_sigs]
     ~modules:["Registerer"]
-    ~opaque:true
+    ~flags:(Flags.standard ~opaque:true ())
     ~dune:
       Dune.
         [
@@ -3229,10 +3228,13 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
           ~opam:(sf "tezos-protocol-%s" name_dash)
           ~linkall:true
           ~modules:tezos_protocol.modules
-          ~warnings
-          ~warn_error
-          ~nopervasives:true
-          ~nostdlib:true
+          ~flags:
+            (Flags.standard
+               ~nopervasives:true
+               ~nostdlib:true
+               ~warnings
+               ~warn_error
+               ())
           ~deps:[environment |> open_ ~m:"Environment"]
           ~opens:["Pervasives"; "Error_monad"]
       in
@@ -3253,10 +3255,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                   name_underscore
             | Alpha | V _ -> "Tezos/Protocol: economic-protocol definition")
           ~modules:["Protocol"]
-          ~warnings
-          ~warn_error
-          ~nopervasives:true
-          ~flags_nostandard:true
+          ~flags:(Flags.no_standard ~nopervasives:true ~warn_error ~warnings ())
           ~deps:
             [
               tezos_protocol_environment;
@@ -3346,10 +3345,7 @@ include Tezos_raw_protocol_%s.Main
             (* The instrumentation is removed as it can lead to a stack overflow *)
             (* https://gitlab.com/tezos/tezos/-/issues/1927 *)
           ~bisect_ppx:false
-          ~warnings
-          ~warn_error
-          ~nopervasives:true
-          ~flags_nostandard:true
+          ~flags:(Flags.no_standard ~nopervasives:true ~warn_error ~warnings ())
           ~opam_only_deps:[tezos_protocol_compiler_tezos_protocol_packer]
           ~deps:
             [
@@ -3402,8 +3398,7 @@ include Tezos_raw_protocol_%s.Main
                  `tezos-node`")
           ~modules:["Registerer"]
           ~linkall:true
-          ~warnings
-          ~warn_error
+          ~flags:(Flags.standard ~warnings ~warn_error ())
           ~deps:[main; tezos_protocol_updater; tezos_protocol_environment]
           ~dune:
             Dune.

@@ -22,9 +22,9 @@
   bls12-381)
  (js_of_ocaml)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Data_encoding
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib
-   -open Tezos_rpc)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Data_encoding
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_rpc))

@@ -19,11 +19,11 @@
   tezos-lwt-result-stdlib)
  (js_of_ocaml (javascript_files runtime.js))
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_crypto
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_crypto
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib)
  (foreign_stubs
   (language c)
   (flags (:standard -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs))

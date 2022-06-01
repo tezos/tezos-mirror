@@ -14,8 +14,8 @@
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base
-   -open Tezos_p2p_services
-   -open Tezos_version)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_p2p_services
+  -open Tezos_version))

@@ -18,13 +18,13 @@
   tezos-protocol-plugin-alpha)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_stdlib_unix
-   -open Tezos_client_base
-   -open Tezos_client_alpha
-   -open Tezos_client_alpha_commands
-   -open Tezos_protocol_alpha
-   -open Tezos_protocol_environment_alpha
-   -open Tezos_protocol_plugin_alpha)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base
+  -open Tezos_client_alpha
+  -open Tezos_client_alpha_commands
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_environment_alpha
+  -open Tezos_protocol_plugin_alpha))

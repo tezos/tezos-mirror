@@ -25,21 +25,21 @@
   tezos-version
   lwt-exit)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base
-   -open Tezos_base_unix
-   -open Tezos_context
-   -open Tezos_store
-   -open Tezos_shell_context
-   -open Tezos_p2p
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_p2p_services
-   -open Tezos_protocol_updater
-   -open Tezos_requester
-   -open Tezos_workers
-   -open Tezos_validation
-   -open Tezos_version)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_base_unix
+  -open Tezos_context
+  -open Tezos_store
+  -open Tezos_shell_context
+  -open Tezos_p2p
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_p2p_services
+  -open Tezos_protocol_updater
+  -open Tezos_requester
+  -open Tezos_workers
+  -open Tezos_validation
+  -open Tezos_version))
 
 (documentation (package tezos-shell))

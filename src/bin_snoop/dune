@@ -24,7 +24,7 @@
   prbnmcn-stats)
  (link_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_stdlib_unix
-   -open Tezos_benchmark)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_benchmark))

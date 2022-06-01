@@ -13,7 +13,7 @@
   tezos-lwt-result-stdlib)
  (js_of_ocaml)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib))

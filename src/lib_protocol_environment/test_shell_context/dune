@@ -10,10 +10,10 @@
   tezos-base
   tezos-protocol-environment)
  (flags
-  (:standard
-   -open Lib_test
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_environment)))
+  (:standard)
+  -open Lib_test
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_environment))
 
 (rule
  (alias runtest)

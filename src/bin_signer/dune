@@ -22,14 +22,14 @@
   tezos-stdlib
   tezos-signer-backends.unix)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_client_base
-   -open Tezos_client_base_unix
-   -open Tezos_client_commands
-   -open Tezos_signer_services
-   -open Tezos_rpc_http
-   -open Tezos_rpc_http_server
-   -open Tezos_rpc_http_client_unix
-   -open Tezos_stdlib_unix
-   -open Tezos_stdlib)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_client_commands
+  -open Tezos_signer_services
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_server
+  -open Tezos_rpc_http_client_unix
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib))
