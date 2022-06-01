@@ -153,11 +153,11 @@ module Revamped = struct
        accounts."
       operations_batch_size
       (number_of_operations - 5) ;
-    let node = Node.create [Connections 0; Synchronisation_threshold 0] in
-    let* () = Node.config_init node [] in
-    Node.Config_file.(update node (set_prevalidator ~operations_batch_size)) ;
-    let* () = Node.run node [] in
-    let* () = Node.wait_for_ready node in
+    let* node =
+      Node.init
+        ~patch_config:(Node.Config_file.set_prevalidator ~operations_batch_size)
+        [Connections 0; Synchronisation_threshold 0]
+    in
     let* client = Client.init ~endpoint:(Node node) () in
     let bootstrap_accounts = Account.Bootstrap.keys |> Array.length in
     let* additional_bootstrap_accounts =
@@ -1172,11 +1172,12 @@ module Revamped = struct
       1
       "Initialize a node with 'max_refused_operations=%d'."
       max_refused_operations ;
-    let node = Node.create [Connections 0; Synchronisation_threshold 0] in
-    let* () = Node.config_init node [] in
-    Node.Config_file.(update node (set_prevalidator ~max_refused_operations)) ;
-    let* () = Node.run node [] in
-    let* () = Node.wait_for_ready node in
+    let* node =
+      Node.init
+        ~patch_config:
+          (Node.Config_file.set_prevalidator ~max_refused_operations)
+        [Connections 0; Synchronisation_threshold 0]
+    in
     let* client = Client.init ~endpoint:(Node node) () in
     let* () = Client.activate_protocol ~protocol client in
     let* _ = Node.wait_for_level node 1 in
@@ -1325,11 +1326,12 @@ module Revamped = struct
       1
       "Initialize a node with 'max_refused_operations=%d'."
       max_refused_operations ;
-    let node = Node.create [Connections 0; Synchronisation_threshold 0] in
-    let* () = Node.config_init node [] in
-    Node.Config_file.(update node (set_prevalidator ~max_refused_operations)) ;
-    let* () = Node.run node [] in
-    let* () = Node.wait_for_ready node in
+    let* node =
+      Node.init
+        ~patch_config:
+          (Node.Config_file.set_prevalidator ~max_refused_operations)
+        [Connections 0; Synchronisation_threshold 0]
+    in
     let* client = Client.init ~endpoint:(Node node) () in
     let* () = Client.activate_protocol ~protocol client in
     let* _ = Node.wait_for_level node 1 in
@@ -2731,10 +2733,10 @@ let forge_pre_filtered_operation =
 let wait_for_failed_fetch node =
   Node.wait_for node "operation_not_fetched.v0" (fun _ -> Some ())
 
-let set_config_operations_timeout node timeout =
+let set_config_operations_timeout timeout json =
   let chain_validator_config =
     let open JSON in
-    Node.Config_file.read node |-> "shell" |-> "chain_validator"
+    json |-> "shell" |-> "chain_validator"
   in
   let updated_shell_config =
     JSON.annotate
@@ -2747,7 +2749,7 @@ let set_config_operations_timeout node timeout =
             timeout
             (JSON.encode chain_validator_config)))
   in
-  Node.Config_file.update node (JSON.put ("shell", updated_shell_config))
+  JSON.put ("shell", updated_shell_config) json
 
 (** This test checks that failed fetched operations can be refetched successfully
 
@@ -2777,14 +2779,14 @@ let refetch_failed_operation =
   (* initialise both nodes and activate protocol
      node_2 uses specific configuration to force timeout in fetching *)
   let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode] in
-  let node_2 = Node.create [Synchronisation_threshold 0; Private_mode] in
-  let* () = Node.config_init node_2 [] in
-  (* Set a low operations_request_timeout to force timeout at fetching *)
-  set_config_operations_timeout node_2 0.00001 ;
-  (* Run the node with the new config.
-     event_level is set to debug to catch fetching event at this level *)
-  let* () =
-    Node.run ~event_sections_levels:[("prevalidator", `Debug)] node_2 []
+  let* node_2 =
+    Node.init
+    (* Run the node with the new config.
+       event_level is set to debug to catch fetching event at this level *)
+      ~event_sections_levels:[("prevalidator", `Debug)]
+        (* Set a low operations_request_timeout to force timeout at fetching *)
+      ~patch_config:(set_config_operations_timeout 0.00001)
+      [Synchronisation_threshold 0; Private_mode]
   in
   let* () = Node.wait_for_ready node_2 in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()

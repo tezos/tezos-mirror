@@ -40,16 +40,14 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
     ~tags:["protocol"; "migration"; "sandbox"]
   @@ fun () ->
   assert (migration_level >= blocks_per_cycle) ;
-  let node = Node.create [] in
-  let* () = Node.config_init node [] in
-  Node.Config_file.(
-    update
-      node
-      (set_sandbox_network_with_user_activated_upgrades
-         [(migration_level, migrate_to)])) ;
   Log.info "Node starting" ;
-  let* () = Node.run node [] in
-  let* () = Node.wait_for_ready node in
+  let* node =
+    Node.init
+      ~patch_config:
+        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])
+      []
+  in
   Log.info "Node initialized" ;
   let* client = Client.(init ~endpoint:(Node node) ()) in
   let* () = Client.activate_protocol ~protocol:migrate_from client in
@@ -89,18 +87,13 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
 
 (** Boilerplate code to create a user-migratable node. Used in the tests below. **)
 let user_migratable_node_init ~migration_level ~migrate_to =
-  let node = Node.create [] in
-  (* Calling identity_generate is necessary whenever needs to use peer-related
-   * functions, such as kick_peer *)
-  let* () = Node.identity_generate node in
-  let* () = Node.config_init node [] in
-  Node.Config_file.(
-    update
-      node
-      (set_sandbox_network_with_user_activated_upgrades
-         [(migration_level, migrate_to)])) ;
-  let* () = Node.run node [Synchronisation_threshold 0; Private_mode] in
-  let* () = Node.wait_for_ready node in
+  let* node =
+    Node.init
+      ~patch_config:
+        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])
+      [Synchronisation_threshold 0; Private_mode]
+  in
   let* client = Client.(init ~endpoint:(Node node) ()) in
   Lwt.return (client, node)
 

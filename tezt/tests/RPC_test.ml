@@ -880,13 +880,13 @@ let test_mempool protocol ?endpoint client =
   unit
 
 let start_with_acl address acl =
-  let node = Node.create ~rpc_host:address [] in
-  let endpoint = Client.(Node node) in
-  let* () = Node.config_init node [] in
-  Node.Config_file.update node (JSON.update "rpc" (JSON.put ("acl", acl))) ;
-  let* () = Node.identity_generate node in
-  let* () = Node.run node [] in
-  let* () = Node.wait_for_ready node in
+  let* node =
+    Node.init
+      ~rpc_host:address
+      ~patch_config:(JSON.update "rpc" (JSON.put ("acl", acl)))
+      []
+  in
+  let endpoint = Client.Node node in
   Client.init ~endpoint ()
 
 (* Test access to RPC regulated with an ACL. *)

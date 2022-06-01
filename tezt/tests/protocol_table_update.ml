@@ -78,29 +78,25 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
     ~title:"protocol activation"
     ~tags:["protocol"; "table"; "update"]
   @@ fun () ->
-  let node_1 = Node.create [Synchronisation_threshold 0] in
-  let node_2 = Node.create [Synchronisation_threshold 0] in
   let migration_level =
     (* NOTE: Migration to Tenderbake is only supported after the first
        cycle, therefore at [migration_level >= blocks_per_cycle]. *)
     8
   in
   let migration_block = string_of_int migration_level in
-  let* () =
-    Lwt_list.iter_s
-      (fun node ->
-        let* () = Node.config_init node [] in
-        Node.Config_file.(
-          update
-            node
-            (set_sandbox_network_with_user_activated_upgrades
-               [(migration_level, migrate_to)])) ;
-        Lwt.return_unit)
-      [node_1; node_2]
+  let* node_1 =
+    Node.init
+      ~patch_config:
+        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])
+      [Synchronisation_threshold 0]
+  and* node_2 =
+    Node.init
+      ~patch_config:
+        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])
+      [Synchronisation_threshold 0]
   in
-  let nodes = [node_1; node_2] in
-  let* () = Lwt_list.iter_s (fun node -> Node.run node []) nodes in
-  let* () = Lwt_list.iter_s (fun node -> Node.wait_for_ready node) nodes in
   let* client_1 = Client.(init ~endpoint:(Node node_1) ()) in
   let* client_2 = Client.(init ~endpoint:(Node node_2) ()) in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
