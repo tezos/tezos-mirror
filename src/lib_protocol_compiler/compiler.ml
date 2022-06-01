@@ -214,30 +214,31 @@ let main {compile_ml; pack_objects; link_shared} =
         Arg.usage args_spec usage_msg ;
         Stdlib.exit 1
   in
-  let announced_hash, protocol =
+  let stored_hash_opt, protocol =
     match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
     | Ok (hash, proto) -> (hash, proto)
     | Error err ->
         Format.eprintf "Failed to read TEZOS_PROTOCOL: %a" pp_print_trace err ;
         exit 2
   in
-  let real_hash = Protocol.hash protocol in
+  let computed_hash = Protocol.hash protocol in
   if !hash_only then (
-    Format.printf "%a@." Protocol_hash.pp real_hash ;
+    Format.printf "%a@." Protocol_hash.pp computed_hash ;
     exit 0) ;
   let hash =
-    match announced_hash with
-    | None -> real_hash
-    | Some hash
-      when !check_protocol_hash && not (Protocol_hash.equal real_hash hash) ->
+    match stored_hash_opt with
+    | None -> computed_hash
+    | Some stored_hash
+      when !check_protocol_hash
+           && not (Protocol_hash.equal computed_hash stored_hash) ->
         Format.eprintf
           "Inconsistent hash for protocol in TEZOS_PROTOCOL.@\n\
-           Found: %a@\n\
-           Expected: %a@."
+           Computed hash: %a@\n\
+           Stored in TEZOS_PROTOCOL: %a@."
           Protocol_hash.pp
-          hash
+          computed_hash
           Protocol_hash.pp
-          real_hash ;
+          stored_hash ;
         exit 2
     | Some hash -> hash
   in
