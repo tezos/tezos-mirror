@@ -128,7 +128,7 @@ let finalize_block state _ =
       },
       () )
 
-let init context block_header =
+let init _chain_id context block_header =
   let open Block_header in
   let fitness = block_header.fitness in
   Context.Cache.set_cache_layout context [] >>= fun context ->

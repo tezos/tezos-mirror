@@ -1228,7 +1228,7 @@ struct
       let+ r = finalize_block c shell_header in
       wrap_tzresult r
 
-    let init c bh =
+    let init _chain_id c bh =
       let open Lwt_syntax in
       let+ r = init c bh in
       wrap_tzresult r

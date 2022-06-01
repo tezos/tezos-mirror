@@ -295,16 +295,16 @@ let prepare_main_init_params ?bootstrap_contracts commitments constants
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
 
-let initial_context ?(commitments = []) ?bootstrap_contracts constants header
-    initial_accounts =
+let initial_context ?(commitments = []) ?bootstrap_contracts chain_id constants
+    header initial_accounts =
   prepare_main_init_params
     ?bootstrap_contracts
     commitments
     constants
     initial_accounts
   >>= fun ctxt ->
-  Main.init ctxt header >|= Environment.wrap_tzresult >|=? fun {context; _} ->
-  context
+  Main.init chain_id ctxt header >|= Environment.wrap_tzresult
+  >|=? fun {context; _} -> context
 
 let initial_alpha_context ?(commitments = []) constants
     (block_header : Block_header.shell_header) initial_accounts =
@@ -344,7 +344,12 @@ let initial_alpha_context ?(commitments = []) constants
     in
     (({script with storage}, lazy_storage_diff), ctxt)
   in
-  Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ctxt
+  Alpha_context.prepare_first_block
+    ~typecheck
+    ~level
+    ~timestamp
+    Chain_id.zero
+    ctxt
   >|= Environment.wrap_tzresult
 
 let genesis_with_parameters parameters =
@@ -384,7 +389,9 @@ let genesis_with_parameters parameters =
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  Main.init ctxt shell >|= Environment.wrap_tzresult >|=? fun {context; _} ->
+  let chain_id = Chain_id.of_block_hash hash in
+  Main.init chain_id ctxt shell >|= Environment.wrap_tzresult
+  >|=? fun {context; _} ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
@@ -563,6 +570,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   initial_context
     ?commitments
     ?bootstrap_contracts
+    (Chain_id.of_block_hash hash)
     constants
     shell
     initial_accounts

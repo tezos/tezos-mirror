@@ -178,7 +178,7 @@ let get_init_state context : State.t tzresult Lwt.t =
     | Some state ->
         return state )
 
-let init context block_header =
+let init _chain_id context block_header =
   let open Block_header in
   let fitness = block_header.fitness in
   Logging.log Notice "init: fitness = %a%!" Fitness.pp fitness ;

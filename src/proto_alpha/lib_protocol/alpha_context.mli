@@ -3425,6 +3425,7 @@ end
 
 (** Create an [Alpha_context.t] from an untyped context (first block in the chain only). *)
 val prepare_first_block :
+  Chain_id.t ->
   Context.t ->
   typecheck:
     (context ->

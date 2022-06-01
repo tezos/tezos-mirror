@@ -259,7 +259,10 @@ let may_switch_test_chain w active_chains spawn_child block =
                 in
                 let bvp = nv.parameters.block_validator_process in
                 let*! r =
-                  Block_validator_process.init_test_chain bvp forking_block
+                  Block_validator_process.init_test_chain
+                    bvp
+                    (Store.Chain.chain_id chain_store)
+                    forking_block
                 in
                 match r with
                 | Ok genesis_header ->

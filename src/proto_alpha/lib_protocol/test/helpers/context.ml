@@ -502,6 +502,7 @@ let default_raw_context () =
   >>= fun context ->
   let typecheck ctxt script_repr = return ((script_repr, None), ctxt) in
   Init_storage.prepare_first_block
+    Chain_id.zero
     context
     ~level:0l
     ~timestamp:(Time.Protocol.of_seconds 1643125688L)

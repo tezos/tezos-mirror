@@ -58,7 +58,7 @@
   See !3730 for an example.
 *)
 
-let prepare_first_block ctxt ~typecheck ~level ~timestamp =
+let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in

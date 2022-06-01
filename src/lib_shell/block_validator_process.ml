@@ -85,7 +85,8 @@ module type S = sig
   val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
-  val init_test_chain : t -> Store.Block.t -> Block_header.t tzresult Lwt.t
+  val init_test_chain :
+    t -> Chain_id.t -> Store.Block.t -> Block_header.t tzresult Lwt.t
 
   val reconfigure_event_logging :
     t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
@@ -341,11 +342,11 @@ module Internal_validator_process = struct
       ~time:genesis.time
       ~protocol:genesis.protocol
 
-  let init_test_chain validator forking_block =
+  let init_test_chain validator chain_id forking_block =
     let open Lwt_result_syntax in
     let forked_header = Store.Block.header forking_block in
     let* context = Store.Block.context validator.chain_store forking_block in
-    Block_validation.init_test_chain context forked_header
+    Block_validation.init_test_chain chain_id context forked_header
 
   let reconfigure_event_logging _ _ = Lwt_result_syntax.return_unit
 end
@@ -801,11 +802,12 @@ module External_validator_process = struct
     let request = External_validation.Commit_genesis {chain_id} in
     send_request validator request Context_hash.encoding
 
-  let init_test_chain validator forking_block =
+  let init_test_chain validator chain_id forking_block =
     let forked_header = Store.Block.header forking_block in
     let context_hash = forked_header.shell.context in
     let request =
-      External_validation.Fork_test_chain {context_hash; forked_header}
+      External_validation.Fork_test_chain
+        {chain_id; context_hash; forked_header}
     in
     send_request validator request Block_header.encoding
 
@@ -937,9 +939,9 @@ let precheck_block (E {validator_process = (module VP); validator}) chain_store
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id
 
-let init_test_chain (E {validator_process = (module VP); validator})
+let init_test_chain (E {validator_process = (module VP); validator}) chain_id
     forked_block =
-  VP.init_test_chain validator forked_block
+  VP.init_test_chain validator chain_id forked_block
 
 let preapply_block (E {validator_process = (module VP); validator} : t)
     chain_store ~predecessor ~protocol_data ~timestamp operations =

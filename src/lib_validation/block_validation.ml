@@ -154,7 +154,7 @@ let update_testchain_status ctxt ~predecessor_hash timestamp =
         ctxt
         (Running {chain_id; genesis; protocol; expiration})
 
-let init_test_chain ctxt forked_header =
+let init_test_chain chain_id ctxt forked_header =
   let open Lwt_result_syntax in
   let*! tc = Context.get_test_chain ctxt in
   match tc with
@@ -172,7 +172,7 @@ let init_test_chain ctxt forked_header =
       Proto_test.set_log_message_consumer
         (Protocol_logging.make_log_message_consumer ()) ;
       let* {context = test_ctxt; _} =
-        Proto_test.init test_ctxt forked_header.Block_header.shell
+        Proto_test.init chain_id test_ctxt forked_header.Block_header.shell
       in
       let test_ctxt = Shell_context.unwrap_disk_context test_ctxt in
       let*! test_ctxt = Context.add_test_chain test_ctxt Not_running in
@@ -546,8 +546,9 @@ module Make (Proto : Registered_protocol.T) = struct
        in
        return (validation_result, block_data, ops_metadata))
 
-  let may_init_new_protocol new_protocol (block_header : Proto.block_header)
-      block_hash (validation_result : Environment_context.validation_result) =
+  let may_init_new_protocol chain_id new_protocol
+      (block_header : Proto.block_header) block_hash
+      (validation_result : Environment_context.validation_result) =
     let open Lwt_result_syntax in
     if Protocol_hash.equal new_protocol Proto.hash then
       return (validation_result, Proto.environment_version)
@@ -569,7 +570,7 @@ module Make (Proto : Registered_protocol.T) = struct
           NewProto.set_log_message_consumer
             (Protocol_logging.make_log_message_consumer ()) ;
           let* validation_result =
-            NewProto.init validation_result.context block_header.shell
+            NewProto.init chain_id validation_result.context block_header.shell
           in
           return (validation_result, NewProto.environment_version)
 
@@ -668,6 +669,7 @@ module Make (Proto : Registered_protocol.T) = struct
         in
         let* validation_result, new_protocol_env_version =
           may_init_new_protocol
+            chain_id
             new_protocol
             block_header
             block_hash
@@ -747,6 +749,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let*! new_protocol = Context.get_protocol context in
     let* _validation_result, new_protocol_env_version =
       may_init_new_protocol
+        chain_id
         new_protocol
         block_header
         block_hash
@@ -1015,7 +1018,7 @@ module Make (Proto : Registered_protocol.T) = struct
             NewProto.set_log_message_consumer
               (Protocol_logging.make_log_message_consumer ()) ;
             let* validation_result =
-              NewProto.init validation_result.context shell_header
+              NewProto.init chain_id validation_result.context shell_header
             in
             let (Environment_context.Context.Context {cache; _}) =
               validation_result.context

@@ -32,6 +32,7 @@
 
 (* This is the genesis protocol: initialise the state *)
 val prepare_first_block :
+  Chain_id.t ->
   Context.t ->
   typecheck:
     (Raw_context.t ->

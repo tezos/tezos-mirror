@@ -70,6 +70,7 @@ type request =
     }
   | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
+      chain_id : Chain_id.t;
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
@@ -352,15 +353,16 @@ let request_encoding =
       case
         (Tag 3)
         ~title:"fork_test_chain"
-        (obj2
+        (obj3
+           (req "chain_id" Chain_id.encoding)
            (req "context_hash" Context_hash.encoding)
            (req "forked_header" Block_header.encoding))
         (function
-          | Fork_test_chain {context_hash; forked_header} ->
-              Some (context_hash, forked_header)
+          | Fork_test_chain {chain_id; context_hash; forked_header} ->
+              Some (chain_id, context_hash, forked_header)
           | _ -> None)
-        (fun (context_hash, forked_header) ->
-          Fork_test_chain {context_hash; forked_header});
+        (fun (chain_id, context_hash, forked_header) ->
+          Fork_test_chain {chain_id; context_hash; forked_header});
       case
         (Tag 4)
         ~title:"terminate"

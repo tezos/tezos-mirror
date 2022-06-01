@@ -1717,6 +1717,7 @@ protocols.|}
         "Environment_protocol_T";
         "Environment_protocol_T_V0";
         "Environment_protocol_T_V3";
+        "Environment_protocol_T_V6";
         "Environment_protocol_T_test";
         "Dummy_context";
         "Memory_context";

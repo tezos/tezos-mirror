@@ -426,7 +426,8 @@ let run input output =
             block_precheck_result
         in
         loop cache cached_result
-    | External_validation.Fork_test_chain {context_hash; forked_header} ->
+    | External_validation.Fork_test_chain
+        {chain_id; context_hash; forked_header} ->
         let*! () = Events.(emit fork_test_chain_request forked_header) in
         let*! context_opt = Context.checkout context_index context_hash in
         let*! () =
@@ -434,7 +435,7 @@ let run input output =
           | Some ctxt ->
               let*! test_chain_init_result =
                 with_retry_to_load_protocol protocol_root (fun () ->
-                    Block_validation.init_test_chain ctxt forked_header)
+                    Block_validation.init_test_chain chain_id ctxt forked_header)
               in
               External_validation.send
                 output
