@@ -37,7 +37,7 @@ let patch_env_loading () =
       | None -> Tezos_protocol_compiler.Compiler.default_load ~unit_name
 
 let directive_string_fn fn_name =
-  match Hashtbl.find_opt Toploop.directive_table fn_name with
+  match Toploop.get_directive fn_name with
   | Some (Toploop.Directive_string fn) -> fn
   | _ ->
       Printf.printf

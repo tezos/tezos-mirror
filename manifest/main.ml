@@ -1835,7 +1835,7 @@ let tezos_protocol_compiler_lib =
     ~ocaml:
       V.(
         (* Should be in sync with scripts/version.sh *)
-        at_least "4.12.1" && less_than "4.13")
+        at_least "4.14.0" && less_than "4.15")
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
@@ -2951,8 +2951,9 @@ end = struct
     (** AV0 is the Architecture Version corresponding to the first protocols.
         After protocol 010, some changes were made in the architecture
         of [lib_protocol], resulting in Architecture Version 1 (AV1). This
-        new version has been in effect since protocol 011. *)
-    type lib_protocol_architecture_version = AV0 | AV1
+        new version has been in effect since protocol 011.
+        AV2 is in effect since protocol 014  *)
+    type lib_protocol_architecture_version = AV0 | AV1 | AV2
 
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
         ?benchmark_type_inference ~main ~environment ~name () =
@@ -3187,11 +3188,12 @@ end = struct
       in
       let warnings =
         match template_version with
-        | AV0 -> "+a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68"
-        | AV1 -> "+a-4-40..42-44-45-48"
+        | AV0 -> "+a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70"
+        | AV1 -> "+a-4-40..42-44-45-48-51-70"
+        | AV2 -> "+a-4-40..42-44-45-48-70"
       in
       let warn_error =
-        match template_version with AV0 -> "-A" | AV1 -> "+a"
+        match template_version with AV0 -> "-A" | AV1 | AV2 -> "+a"
       in
       let environment =
         public_lib
@@ -3254,10 +3256,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                   name_underscore
             | Alpha | V _ -> "Tezos/Protocol: economic-protocol definition")
           ~modules:["Protocol"]
-          ~warnings:
-            (match template_version with
-            | AV0 -> "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
-            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warnings
           ~warn_error
           ~nopervasives:true
           ~flags_nostandard:true
@@ -3350,10 +3349,7 @@ include Tezos_raw_protocol_%s.Main
             (* The instrumentation is removed as it can lead to a stack overflow *)
             (* https://gitlab.com/tezos/tezos/-/issues/1927 *)
           ~bisect_ppx:false
-          ~warnings:
-            (match template_version with
-            | AV0 -> "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
-            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warnings
           ~warn_error
           ~nopervasives:true
           ~flags_nostandard:true
@@ -3409,10 +3405,7 @@ include Tezos_raw_protocol_%s.Main
                  `tezos-node`")
           ~modules:["Registerer"]
           ~linkall:true
-          ~warnings:
-            (match template_version with
-            | AV0 -> "+a-4-6-7-9-16-29-32-40..42-44-45-48-60-67"
-            | AV1 -> "+a-4-40..42-44-45-48")
+          ~warnings
           ~warn_error:"+a"
           ~deps:[main; tezos_protocol_updater; tezos_protocol_environment]
           ~dune:
@@ -3519,7 +3512,9 @@ include Tezos_raw_protocol_%s.Main
     in
     let {Lib_protocol.main; embedded; environment; raw_protocol} =
       let template_version =
-        if N.(number >= 011) then Lib_protocol.AV1 else AV0
+        if N.(number >= 014) then Lib_protocol.AV2
+        else if N.(number >= 011) then AV1
+        else AV0
       in
       Lib_protocol.make ~template_version ~name
     in

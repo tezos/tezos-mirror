@@ -42,18 +42,18 @@ let bottom_up_fold_cps initial_accumulator node initial_k f =
     match node with
     | String _ | Int _ | Bytes _ -> k accu node
     | Prim (loc, prim, args, annot) ->
-        (traverse_nodes [@ocaml.tailcall]) accu args @@ fun accu args ->
-        f accu (Prim (loc, prim, args, annot)) k
+        (traverse_nodes [@ocaml.tailcall]) accu args (fun accu args ->
+            f accu (Prim (loc, prim, args, annot)) k)
     | Seq (loc, elts) ->
-        (traverse_nodes [@ocaml.tailcall]) accu elts @@ fun accu elts ->
-        f accu (Seq (loc, elts)) k
+        (traverse_nodes [@ocaml.tailcall]) accu elts (fun accu elts ->
+            f accu (Seq (loc, elts)) k)
   and traverse_nodes accu nodes k =
     match nodes with
     | [] -> k accu []
     | node :: nodes ->
-        (traverse_node [@ocaml.tailcall]) accu node @@ fun accu node ->
-        (traverse_nodes [@ocaml.tailcall]) accu nodes @@ fun accu nodes ->
-        k accu (node :: nodes)
+        (traverse_node [@ocaml.tailcall]) accu node (fun accu node ->
+            (traverse_nodes [@ocaml.tailcall]) accu nodes (fun accu nodes ->
+                k accu (node :: nodes)))
   in
   traverse_node initial_accumulator node initial_k
   [@@coq_axiom_with_reason "local mutually recursive definition not handled"]

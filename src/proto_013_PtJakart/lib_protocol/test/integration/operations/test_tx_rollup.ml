@@ -3138,12 +3138,12 @@ module Rejection = struct
     >>=? fun _ -> return_unit
 
   (** Drop the last element of a seq, that is, the last element of a proof *)
-  let rec drop x =
+  let rec drop_last x =
     let open Seq in
     match x with
     | Cons (x, xs) -> (
         let node = xs () in
-        match node with Nil -> Nil | n -> Cons (x, fun () -> drop n))
+        match node with Nil -> Nil | n -> Cons (x, fun () -> drop_last n))
     | Nil -> assert false
 
   let test_valid_proof_truncated () =
@@ -3173,7 +3173,7 @@ module Rejection = struct
     make_proof store l2_parameters deposit >>= fun proof ->
     let proof_truncated =
       let proof_node = proof.state () in
-      let truncated_node = drop proof_node in
+      let truncated_node = drop_last proof_node in
       {proof with state = (fun () -> truncated_node)}
     in
     (* We try to reject with the truncated proof which is already above the
