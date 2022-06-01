@@ -99,26 +99,9 @@ let test_disable_feature_flag () =
   let*! _ = Incremental.add_operation ~expect_apply_failure i op in
   return_unit
 
-(** [test_sc_rollups_all_well_defined] checks that [Sc_rollup.Kind.all]
-    contains all the constructors of [Sc_rollup.Kind.t] and that the
-    [of_name] is consistent with the names declared in the PVM
-    implementations. *)
+(** [test_sc_rollups_all_well_defined] checks that the [kind_of_string] is
+    consistent with the names declared in the PVM implementations. *)
 let test_sc_rollups_all_well_defined () =
-  let all_contains_all_constructors () =
-    let tickets = ref ["Example_arith"; "Wasm_2_0_0"] in
-    let burn x = tickets := List.filter (( <> ) x) !tickets in
-    let pick = function
-      | Sc_rollup.Kind.Example_arith -> burn "Example_arith"
-      | Sc_rollup.Kind.Wasm_2_0_0 -> burn "Wasm_2_0_0"
-    in
-    List.iter pick Sc_rollup.Kind.all ;
-    if !tickets <> [] then
-      failwith
-        "The following smart-contract rollup kinds should occur in \
-         [Sc_rollup.Kind.all]: %s\n"
-        (String.concat ", " !tickets)
-    else return_unit
-  in
   let all_names_are_valid () =
     List.iter_es
       (fun k ->
@@ -128,7 +111,6 @@ let test_sc_rollups_all_well_defined () =
           (err (Printf.sprintf "PVM name `%s' is not a valid kind name" P.name)))
       Sc_rollup.Kind.all
   in
-  let* _ = all_contains_all_constructors () in
   all_names_are_valid ()
 
 (** Initializes the context and originates a SCORU. *)
