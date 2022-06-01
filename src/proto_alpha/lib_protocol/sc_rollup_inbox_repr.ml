@@ -737,7 +737,7 @@ module Proof = struct
          (req "inc" inclusion_proof_encoding)
          (req
             "message_proof"
-            Context.Proof_encoding.V2.Tree32.tree_proof_encoding))
+            Context.Proof_encoding.V1.Tree32.tree_proof_encoding))
 
   (* This function is for pattern matching on proofs based on whether
      they involve multiple levels or if they only concern a single
