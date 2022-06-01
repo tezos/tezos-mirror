@@ -2618,9 +2618,6 @@ module Sc_rollup : sig
       type status = Halted | WaitingForInputMessage | Parsing | Evaluating
 
       val get_status : state -> status Lwt.t
-
-      val produce_proof :
-        context -> input option -> state -> (proof, string) result Lwt.t
     end
   end
 

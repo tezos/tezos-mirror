@@ -262,8 +262,8 @@ module type S = sig
   val verify_proof : proof -> bool Lwt.t
 
   (** [produce_proof ctxt input_given state] should return a [proof] for
-      the PVM step starting from [state], if possible. This may return
-      [None] for a few reasons:
+      the PVM step starting from [state], if possible. This may fail for
+      a few reasons:
         - the [input_given] doesn't match the expectations of [state] ;
         - the [context] for this instance of the PVM doesn't have access
         to enough of the [state] to build the proof. *)
