@@ -3257,25 +3257,6 @@ end = struct
       in
       ()
 
-    let disabled_warnings_to_string l =
-      let int_ranges l =
-        List.sort_uniq compare l
-        |> List.fold_left
-             (fun acc x ->
-               match acc with
-               | [] -> [(x, x)]
-               | (l, u) :: acc when succ u = x -> (l, x) :: acc
-               | _ -> (x, x) :: acc)
-             []
-        |> List.rev
-      in
-      let range_to_flag (x, y) =
-        if x = y then sf "-%d" x
-        else if x + 1 = y then sf "-%d-%d" x y
-        else sf "-%d..%d" x y
-      in
-      List.map range_to_flag (int_ranges l) |> String.concat ""
-
     let make ~name =
       let name_underscore = Name.name_underscore name in
       let name_dash = Name.name_dash name in
@@ -3310,24 +3291,21 @@ end = struct
         in
         Dune.V s_expr
       in
-      let warnings =
+      let disable_warnings =
         let disabled_by_default = [4; 40; 41; 42; 44; 45; 48; 70] in
-        let disabled_warnings =
+        let disabled_extra =
           match number with
           (* [Other] and [Alpha] protocols can be edited and should be
              fixed whenever a warning that we care about triggers. We
              only want to disable a limited set of warnings *)
-          | Other | Alpha -> disabled_by_default
-          (* [V _] protocols can't be edited to accommodate warnings, we need to disable warnings instead. *)
+          | Other | Alpha -> []
+          (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
           | V _ as number ->
-              let disabled_extra =
-                if N.(number >= 014) then []
-                else if N.(number >= 011) then [51]
-                else [6; 7; 9; 16; 29; 32; 51; 60; 67; 68]
-              in
-              disabled_by_default @ disabled_extra
+              if N.(number >= 014) then []
+              else if N.(number >= 011) then [51]
+              else [6; 7; 9; 16; 29; 32; 51; 60; 67; 68]
         in
-        disabled_warnings_to_string disabled_warnings
+        disabled_by_default @ disabled_extra
       in
       let environment =
         public_lib
@@ -3366,7 +3344,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
           ~opam:(sf "tezos-protocol-%s" name_dash)
           ~linkall:true
           ~modules:tezos_protocol.modules
-          ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ~warnings ())
+          ~flags:
+            (Flags.standard
+               ~nopervasives:true
+               ~nostdlib:true
+               ~disable_warnings
+               ())
           ~deps:[environment |> open_ ~m:"Environment"]
           ~opens:["Pervasives"; "Error_monad"]
       in
@@ -3387,7 +3370,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                   name_underscore
             | Alpha | V _ -> "Tezos/Protocol: economic-protocol definition")
           ~modules:["Protocol"]
-          ~flags:(Flags.standard ~nopervasives:true ~warnings ())
+          ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~deps:
             [
               tezos_protocol_environment;
@@ -3463,7 +3446,7 @@ include Tezos_raw_protocol_%s.Main
             (* The instrumentation is removed as it can lead to a stack overflow *)
             (* https://gitlab.com/tezos/tezos/-/issues/1927 *)
           ~bisect_ppx:false
-          ~flags:(Flags.standard ~nopervasives:true ~warnings ())
+          ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~opam_only_deps:[tezos_protocol_compiler_tezos_protocol_packer]
           ~deps:
             [
@@ -3516,7 +3499,7 @@ include Tezos_raw_protocol_%s.Main
                  `tezos-node`")
           ~modules:["Registerer"]
           ~linkall:true
-          ~flags:(Flags.standard ~warnings ())
+          ~flags:(Flags.standard ~disable_warnings ())
           ~deps:[main; tezos_protocol_updater; tezos_protocol_environment]
           ~dune:
             Dune.

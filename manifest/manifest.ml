@@ -723,15 +723,37 @@ module Flags = struct
 
   let if_true b name = if b then Dune.S name else Dune.E
 
-  let if_some o name = match o with None -> Dune.E | Some x -> H [S name; S x]
+  let disable_warnings_to_string ws =
+    let int_ranges l =
+      List.sort_uniq compare l
+      |> List.fold_left
+           (fun acc x ->
+             match acc with
+             | [] -> [(x, x)]
+             | (l, u) :: acc when succ u = x -> (l, x) :: acc
+             | _ -> (x, x) :: acc)
+           []
+      |> List.rev
+    in
+    let range_to_flag (x, y) =
+      if x = y then Printf.sprintf "-%d" x
+      else if x + 1 = y then Printf.sprintf "-%d-%d" x y
+      else Printf.sprintf "-%d..%d" x y
+    in
+    List.map range_to_flag (int_ranges ws) |> String.concat ""
 
-  let standard ?(nopervasives = false) ?(nostdlib = false) ?(opaque = false)
-      ?warnings () =
+  let standard ?disable_warnings ?(nopervasives = false) ?(nostdlib = false)
+      ?(opaque = false) () =
     {
       standard = true;
       rest =
         [
-          if_some warnings "-w";
+          (match disable_warnings with
+          | None | Some Stdlib.List.[] -> E
+          | Some l ->
+              if List.exists (fun x -> x <= 0) l then
+                invalid_arg "Warning number must be positive" ;
+              H [S "-w"; S (disable_warnings_to_string l)]);
           if_true nostdlib "-nostdlib";
           if_true nopervasives "-nopervasives";
           if_true opaque "-opaque";

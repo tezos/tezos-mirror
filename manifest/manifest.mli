@@ -462,19 +462,19 @@ module Flags : sig
 
   (** Extend standard flags with custom ones.
 
+      - [disable_warnings]: disable additional warnings
+
       - [nopervasives]: if [true], add [-nopervasives] to the list of flags.
 
       - [nostdlib]: if [true], add [-nostdlib] to the list of flags.
 
       - [opaque]: if [true], add [-opaque] to the list of flags.
-
-      - [warnings]: the argument passed to the -w flag when building.
    *)
   val standard :
+    ?disable_warnings:int list ->
     ?nopervasives:bool ->
     ?nostdlib:bool ->
     ?opaque:bool ->
-    ?warnings:string ->
     unit ->
     t
 
