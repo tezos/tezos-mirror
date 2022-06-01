@@ -445,6 +445,13 @@ let pp_balance_updates ppf = function
         (Format.pp_print_list pp_one)
         balance_updates
 
+let pp_balance_updates_always ppf balance_updates =
+  Format.fprintf
+    ppf
+    "@,Balance updates:@,  %a"
+    pp_balance_updates
+    balance_updates
+
 let pp_balance_updates_opt ppf balance_updates =
   match balance_updates with
   | [] -> ()
@@ -570,11 +577,7 @@ let pp_manager_operation_contents_and_result ppf
   let pp_tx_rollup_result
       (Tx_rollup_origination_result
         {balance_updates; consumed_gas; originated_tx_rollup}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates_always ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
@@ -585,61 +588,37 @@ let pp_manager_operation_contents_and_result ppf
   let pp_tx_rollup_submit_batch_result
       (Tx_rollup_submit_batch_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates_always ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     pp_paid_storage_size_diff ppf paid_storage_size_diff
   in
   let pp_tx_rollup_commit_result
       (Tx_rollup_commit_result {balance_updates; consumed_gas}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates_always ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_return_bond_result
       (Tx_rollup_return_bond_result {balance_updates; consumed_gas}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates_always ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_finalize_commitment_result
       (Tx_rollup_finalize_commitment_result
         {balance_updates; consumed_gas; level}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates_always ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_remove_commitment_result
       (Tx_rollup_remove_commitment_result
         {balance_updates; consumed_gas; level}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates_always ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_rejection_result
       (Tx_rollup_rejection_result {balance_updates; consumed_gas}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates_always ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_dispatch_tickets_result
