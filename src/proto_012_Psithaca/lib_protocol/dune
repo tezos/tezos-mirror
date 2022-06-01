@@ -26,8 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w +a-4-40..42-44-45-48-51-70
-  -warn-error +a
+  -w -4-40..42-44-45-48-51-70
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_012_Psithaca.Environment
@@ -158,8 +157,8 @@
   tezos-protocol-environment.sigs
   tezos-protocol-012-Psithaca.raw)
  (flags
-  -w +a-4-40..42-44-45-48-51-70
-  -warn-error +a
+  (:standard)
+  -w -4-40..42-44-45-48-51-70
   -nopervasives)
  (modules Protocol))
 
@@ -417,8 +416,8 @@
   tezos-protocol-environment.sigs
   tezos-protocol-012-Psithaca.raw)
  (flags
-  -w +a-4-40..42-44-45-48-51-70
-  -warn-error +a
+  (:standard)
+  -w -4-40..42-44-45-48-51-70
   -nopervasives)
  (modules Functor))
 
@@ -557,8 +556,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w +a-4-40..42-44-45-48-51-70
-  -warn-error +a)
+  -w -4-40..42-44-45-48-51-70)
  (modules Registerer))
 
 (rule

@@ -26,8 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-  -warn-error +a
+  -w -4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_002_PsYLVpVv.Environment
@@ -111,8 +110,8 @@
   tezos-protocol-environment.sigs
   tezos-protocol-002-PsYLVpVv.raw)
  (flags
-  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-  -warn-error +a
+  (:standard)
+  -w -4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
   -nopervasives)
  (modules Protocol))
 
@@ -276,8 +275,8 @@
   tezos-protocol-environment.sigs
   tezos-protocol-002-PsYLVpVv.raw)
  (flags
-  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-  -warn-error +a
+  (:standard)
+  -w -4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
   -nopervasives)
  (modules Functor))
 
@@ -369,8 +368,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-  -warn-error +a)
+  -w -4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70)
  (modules Registerer))
 
 (rule

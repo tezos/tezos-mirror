@@ -460,7 +460,7 @@ module Flags : sig
   (** OCaml flags *)
   type t
 
-  (** Functions that build OCaml flags.
+  (** Extend standard flags with custom ones.
 
       - [nopervasives]: if [true], add [-nopervasives] to the list of flags.
 
@@ -469,23 +469,14 @@ module Flags : sig
       - [opaque]: if [true], add [-opaque] to the list of flags.
 
       - [warnings]: the argument passed to the -w flag when building.
-
-      - [warn_error]: the argument passed to the -warn-error flag when building.
    *)
-  type maker =
+  val standard :
     ?nopervasives:bool ->
     ?nostdlib:bool ->
     ?opaque:bool ->
     ?warnings:string ->
-    ?warn_error:string ->
     unit ->
     t
-
-  (** Extend standard flags with custom ones. *)
-  val standard : maker
-
-  (** Override standard flags with custom ones. *)
-  val no_standard : maker
 
   (** [include_ file] will use the flags defined in the file [file]. *)
   val include_ : string -> t

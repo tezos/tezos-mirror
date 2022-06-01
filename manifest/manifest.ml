@@ -721,36 +721,22 @@ end
 module Flags = struct
   type t = {standard : bool; rest : Dune.s_expr list}
 
-  type maker =
-    ?nopervasives:bool ->
-    ?nostdlib:bool ->
-    ?opaque:bool ->
-    ?warnings:string ->
-    ?warn_error:string ->
-    unit ->
-    t
-
   let if_true b name = if b then Dune.S name else Dune.E
 
   let if_some o name = match o with None -> Dune.E | Some x -> H [S name; S x]
 
-  let make ~standard ?(nopervasives = false) ?(nostdlib = false)
-      ?(opaque = false) ?warnings ?warn_error () =
+  let standard ?(nopervasives = false) ?(nostdlib = false) ?(opaque = false)
+      ?warnings () =
     {
-      standard;
+      standard = true;
       rest =
         [
           if_some warnings "-w";
-          if_some warn_error "-warn-error";
           if_true nostdlib "-nostdlib";
           if_true nopervasives "-nopervasives";
           if_true opaque "-opaque";
         ];
     }
-
-  let standard = make ~standard:true
-
-  let no_standard = make ~standard:false
 
   let include_ f = {standard = false; rest = Dune.[S ":include"; S f]}
 end

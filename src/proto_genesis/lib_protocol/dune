@@ -26,8 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w +a-4-40..42-44-45-48-70
-  -warn-error +a
+  -w -4-40..42-44-45-48-70
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_genesis.Environment
@@ -44,8 +43,8 @@
   tezos-protocol-environment.sigs
   tezos-protocol-genesis.raw)
  (flags
-  -w +a-4-40..42-44-45-48-70
-  -warn-error +a
+  (:standard)
+  -w -4-40..42-44-45-48-70
   -nopervasives)
  (modules Protocol))
 
@@ -78,8 +77,8 @@
   tezos-protocol-environment.sigs
   tezos-protocol-genesis.raw)
  (flags
-  -w +a-4-40..42-44-45-48-70
-  -warn-error +a
+  (:standard)
+  -w -4-40..42-44-45-48-70
   -nopervasives)
  (modules Functor))
 
@@ -106,8 +105,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w +a-4-40..42-44-45-48-70
-  -warn-error +a)
+  -w -4-40..42-44-45-48-70)
  (modules Registerer))
 
 (rule
