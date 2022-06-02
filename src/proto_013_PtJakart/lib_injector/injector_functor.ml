@@ -328,7 +328,7 @@ module Make (Rollup : PARAMETERS) = struct
     let (Manager_list annot_op) =
       Annotated_manager_operation.manager_of_list operations
     in
-    let* oph, op, result =
+    let* oph, _, op, result =
       Injection.inject_manager_operation
         state.cctxt
         ~simulation:true (* Only simulation here *)
