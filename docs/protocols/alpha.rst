@@ -50,6 +50,11 @@ Bug Fixes
   enforcing that failing reveal operations do not take effect (MR
   :gl:`!5182`).
 
+- Consume constant gas `Michelson_v1_gas.Cost_of.manager_operation`
+  during precheck: this fixes some cases of operations passing
+  precheck even though they obviously do not have enough gas to apply
+  the external operation, e.g. when `gas_limit = 0`. (MR :gl:`!5506`)
+
 Minor Changes
 -------------
 

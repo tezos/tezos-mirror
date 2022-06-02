@@ -122,6 +122,7 @@ type error +=
   | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
   | Multiple_revelation
   | Gas_quota_exceeded_init_deserialize
+  | Insufficient_gas_for_manager
   | Inconsistent_sources
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
@@ -725,6 +726,19 @@ let () =
     Data_encoding.empty
     (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
     (fun () -> Gas_quota_exceeded_init_deserialize) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.insufficient_gas_for_manager"
+    ~title:"Not enough gas for initial manager cost"
+    ~description:
+      (Format.asprintf
+         "Gas limit was not high enough to cover the initial cost of manager \
+          operations. At least %a expected."
+         Gas.pp_cost
+         Michelson_v1_gas.Cost_of.manager_operation)
+    Data_encoding.empty
+    (function Insufficient_gas_for_manager -> Some () | _ -> None)
+    (fun () -> Insufficient_gas_for_manager) ;
   register_error_kind
     `Permanent
     ~id:"operation.inconsistent_sources"
@@ -1937,6 +1951,10 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   @@ Gas.consume_limit_in_block ctxt gas_limit
   >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
+  record_trace
+    Insufficient_gas_for_manager
+    (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation)
+  >>?= fun ctxt ->
   Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
   let source_contract = Contract.Implicit source in
   Contract.must_be_allocated ctxt source_contract >>=? fun () ->

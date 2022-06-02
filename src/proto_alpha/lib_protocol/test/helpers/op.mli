@@ -89,7 +89,7 @@ val unsafe_transaction :
   ?force_reveal:bool ->
   ?counter:counter ->
   ?fee:Tez.t ->
-  ?gas_limit:Fixed_point_repr.integral_tag Gas.Arith.t ->
+  ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:counter ->
   ?parameters:
     Michelson_v1_primitives.prim Micheline.canonical Data_encoding.lazy_t ->

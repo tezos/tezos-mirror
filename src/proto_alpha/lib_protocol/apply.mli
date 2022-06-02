@@ -39,6 +39,7 @@ open Apply_results
 type error +=
   | Internal_operation_replay of packed_internal_contents
   | Gas_quota_exceeded_init_deserialize
+  | Insufficient_gas_for_manager
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled

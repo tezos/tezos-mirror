@@ -1228,7 +1228,14 @@ let test_self_delegation_emptying_contract () =
   Incremental.add_operation i op >>=? fun i ->
   Op.revelation ~fee:Tez.zero (I i) pk >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  Op.delegation ~fee:amount (I i) contract (Some delegate_pkh) >>=? fun op ->
+  let gas_limit =
+    (* This is empirically about just enough gas so that the operation
+       does not fail for lack of gas. *)
+    Gas.Arith.integral_of_int_exn
+      (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 400)
+  in
+  Op.delegation ~fee:amount ~gas_limit (I i) contract (Some delegate_pkh)
+  >>=? fun op ->
   (Context.Contract.is_manager_key_revealed (I i) contract >>=? function
    | false -> failwith "contract should exist"
    | true -> return_unit)

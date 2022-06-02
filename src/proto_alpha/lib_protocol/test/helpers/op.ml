@@ -151,6 +151,14 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
   Environment.wrap_tzresult @@ Operation.of_list operations
   >>?= fun operations -> return @@ sign account.sk ctxt operations
 
+let default_low_gas_limit =
+  Gas.Arith.integral_of_int_exn
+    Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation
+
+let default_high_gas_limit =
+  Gas.Arith.integral_of_int_exn
+    (10_000 + Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
+
 let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
   assert (match packed_operations with [] -> false | _ :: _ -> true) ;
@@ -194,7 +202,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
              fee = Tez.zero;
              counter;
              operation = Reveal public_key;
-             gas_limit = Gas.Arith.integral_of_int_exn 10_000;
+             gas_limit = default_high_gas_limit;
              storage_limit = Z.zero;
            }
        in
@@ -288,7 +296,7 @@ let manager_operation ?(force_reveal = true) ?counter ?(fee = Tez.zero)
           fee = Tez.zero;
           counter;
           operation = Reveal public_key;
-          gas_limit = Gas.Arith.integral_of_int_exn 10_000;
+          gas_limit = default_high_gas_limit;
           storage_limit = Z.zero;
         }
     in
@@ -305,9 +313,8 @@ let manager_operation ?(force_reveal = true) ?counter ?(fee = Tez.zero)
     in
     Contents_list (Cons (op_reveal, Single op))
 
-let revelation ?(fee = Tez.zero)
-    ?(gas_limit = Gas.Arith.integral_of_int_exn 10000) ?(storage_limit = Z.zero)
-    ?counter ?(forge_pkh = None) ctxt public_key =
+let revelation ?(fee = Tez.zero) ?(gas_limit = default_high_gas_limit)
+    ?(storage_limit = Z.zero) ?counter ?(forge_pkh = None) ctxt public_key =
   (* If Some pkh is provided to ?forge_pkh we take that hash at face
      value, otherwise we honestly compute the hash from
      [public_key]. This is useful to test forging Reveal operations
@@ -434,14 +441,9 @@ let transaction ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     dst
     amount
 
-let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
-    dst =
+let delegation ?force_reveal ?fee ?(gas_limit = default_low_gas_limit) ?counter
+    ?storage_limit ctxt source dst =
   let top = Delegation dst in
-  let gas_limit =
-    match gas_limit with
-    | None -> Gas.Arith.integral_of_int_exn 1000
-    | Some g -> g
-  in
   manager_operation
     ?force_reveal
     ?fee
@@ -455,14 +457,9 @@ let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt sop
 
-let set_deposits_limit ?force_reveal ?fee ?gas_limit ?storage_limit ?counter
-    ctxt source limit =
+let set_deposits_limit ?force_reveal ?fee ?(gas_limit = default_low_gas_limit)
+    ?storage_limit ?counter ctxt source limit =
   let top = Set_deposits_limit limit in
-  let gas_limit =
-    match gas_limit with
-    | None -> Gas.Arith.integral_of_int_exn 1000
-    | Some g -> g
-  in
   manager_operation
     ?force_reveal
     ?fee

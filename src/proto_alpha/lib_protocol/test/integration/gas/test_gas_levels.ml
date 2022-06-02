@@ -344,7 +344,9 @@ let bake_operations_with_gas ?counter block src list_list_dst =
   return (block, consumed_gas, gas_limit_total)
 
 let basic_gas_sampler () =
-  Alpha_context.Gas.Arith.integral_of_int_exn (100 + Random.int 900)
+  Alpha_context.Gas.Arith.integral_of_int_exn
+    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100
+   + Random.int 900)
 
 let generic_test_block_one_origination contract gas_sampler structure =
   block_with_one_origination contract >>=? fun (block, src, dst) ->
