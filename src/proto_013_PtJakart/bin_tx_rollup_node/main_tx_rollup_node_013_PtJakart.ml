@@ -25,6 +25,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let force_switch =
+  Clic.switch
+    ~long:"force"
+    ~doc:"Overwrites the configuration file when it exists."
+    ()
+
 let data_dir_doc =
   Format.sprintf "The directory path to the transaction rollup node data."
 
@@ -285,7 +291,8 @@ let configuration_init_command =
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
-    (args11
+    (args12
+       force_switch
        data_dir_arg
        operator_arg
        batch_signer_arg
@@ -304,7 +311,8 @@ let configuration_init_command =
          ~desc:"address of the rollup"
          rollup_id_param
     @@ stop)
-    (fun ( data_dir,
+    (fun ( force,
+           data_dir,
            operator,
            batch_signer,
            finalize_commitment_signer,
@@ -337,7 +345,7 @@ let configuration_init_command =
           reconnection_delay
       in
       let*? config = Node_config.check_mode config in
-      let* file = Node_config.save config in
+      let* file = Node_config.save ~force config in
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
       let*! () = cctxt#message "Configuration written in %s" file in

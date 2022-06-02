@@ -467,11 +467,17 @@ let check_mode config =
         ]
   | Custom -> Ok config
 
-let save configuration =
+let save ~force configuration =
   let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct encoding configuration in
   let*! () = Lwt_utils_unix.create_dir configuration.data_dir in
   let file = get_configuration_filename configuration.data_dir in
+  let*! exists = Lwt_unix.file_exists file in
+  let* () =
+    fail_when
+      (exists && not force)
+      (Error.Tx_rollup_configuration_file_already_exists file)
+  in
   let*! v =
     Lwt_utils_unix.with_atomic_open_out file (fun chan ->
         let content = Data_encoding.Json.to_string json in
