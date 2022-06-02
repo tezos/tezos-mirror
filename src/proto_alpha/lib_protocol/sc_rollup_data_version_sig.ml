@@ -24,54 +24,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Sc_rollup_repr
+(** The values are versioned, to let the possibility to modify
+    the values in future iterations of the protocol.
 
-module Hash : sig
-  include S.HASH
-
-  include Storage_description.INDEX with type t := t
-end
-
-(** A commitment represents a claim about the state of the Inbox and PVM at
-    some Inbox level.
-
-    More formally, a commitment is a claim that:
-
-    {ul
-      {li assuming the PVM and Inbox are in a state implied by [predecessor]}
-      {li the PVM consumes [number_of_messages] messages tagged with
-      [inbox_level] from the Inbox}
-      {li the PVM advances to the state [compressed_state] over
-      [number_of_ticks] ticks }
-    }
-
-    Commitments are disjoint. The next correct commitment is a function of the
-    previous machine state and Inbox.
-
-    [number_of_messages] and [inbox_level] can be proven/disproven by Merkle
-    proofs on the Inbox state.
-
-    [compressed_state] and [number_of_ticks] can be proven/disproven by PVM
-    execution, or equivalently, by an interactive proof game between
-    conflicting parties, such that a correct executor always wins the game.
+    We allow the possibility to modify the values by introducing
+    a {!versioned} value that is the only values written in the storage.
+    
+    In future versions, the versioning is supposed to let us reinterpret old
+    stored values within the new protocol implementation. That is, each
+    access to the storage will transform old stored values to the
+    current version.
 *)
-module V1 : sig
-  type t = {
-    compressed_state : State_hash.t;
-    inbox_level : Raw_level_repr.t;
-    predecessor : Hash.t;
-    number_of_messages : Number_of_messages.t;
-    number_of_ticks : Number_of_ticks.t;
-  }
 
-  val pp : Format.formatter -> t -> unit
+module type S = sig
+  type t
 
-  val encoding : t Data_encoding.t
+  type versioned
 
-  val hash : t -> Hash.t
+  val versioned_encoding : versioned Data_encoding.t
+
+  val of_versioned : versioned -> t
+
+  val to_versioned : t -> versioned
 end
-
-(** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
-include Sc_rollup_data_version_sig.S with type t = V1.t
-
-include module type of V1 with type t = V1.t

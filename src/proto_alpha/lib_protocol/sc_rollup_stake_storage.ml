@@ -235,10 +235,10 @@ let increase_commitment_stake_count ctxt rollup node =
   in
   return (size_diff, ctxt)
 
-(* 76 for Commitments entry + 4 for Commitment_stake_count entry
+(* 77 for Commitments entry + 4 for Commitment_stake_count entry
    + 4 for Commitment_added entry
    + 0 for Staker_count_update entry *)
-let commitment_storage_size_in_bytes = 84
+let commitment_storage_size_in_bytes = 85
 
 let refine_stake ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in

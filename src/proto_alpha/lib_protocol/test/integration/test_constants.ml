@@ -118,27 +118,25 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
 *)
 let test_sc_rollup_commitment_storage_size () =
   let open Protocol in
-  Assert.get_some
-    ~loc:__LOC__
-    (Alpha_context.Sc_rollup.Number_of_messages.of_int32 3l)
+  Assert.get_some ~loc:__LOC__ (Sc_rollup_repr.Number_of_messages.of_int32 3l)
   >>=? fun number_of_messages ->
   Assert.get_some
     ~loc:__LOC__
-    (Alpha_context.Sc_rollup.Number_of_ticks.of_int32 1232909l)
+    (Sc_rollup_repr.Number_of_ticks.of_int32 1232909l)
   >>=? fun number_of_ticks ->
   let commitment =
-    Alpha_context.Sc_rollup.Commitment.
+    Sc_rollup_commitment_repr.to_versioned
       {
-        predecessor = Alpha_context.Sc_rollup.Commitment.Hash.zero;
-        inbox_level = Alpha_context.Raw_level.of_int32_exn 21l;
+        predecessor = Sc_rollup_commitment_repr.Hash.zero;
+        inbox_level = Raw_level_repr.of_int32_exn 21l;
         number_of_messages;
         number_of_ticks;
-        compressed_state = Alpha_context.Sc_rollup.State_hash.zero;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
   let commitment_bytes =
     Data_encoding.Binary.to_bytes_exn
-      Alpha_context.Sc_rollup.Commitment.encoding
+      Sc_rollup_commitment_repr.versioned_encoding
       commitment
   in
   let level = Alpha_context.Raw_level.of_int32_exn 5l in

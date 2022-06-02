@@ -1490,6 +1490,50 @@ module Sc_rollup = struct
          end))
          (Make_index (Sc_rollup_repr.Index))
 
+  module Make_versioned (Versioned_value : sig
+    val name : string
+
+    module Index : Storage_description.INDEX
+
+    include Sc_rollup_data_version_sig.S
+  end) =
+  struct
+    include
+      Make_indexed_carbonated_data_storage
+        (Make_subcontext (Registered) (Indexed_context.Raw_context)
+           (struct
+             let name = [Versioned_value.name]
+           end))
+           (Make_index (Versioned_value.Index))
+        (struct
+          type t = Versioned_value.versioned
+
+          let encoding = Versioned_value.versioned_encoding
+        end)
+
+    type value = Versioned_value.t
+
+    let get ctxt key =
+      let open Lwt_result_syntax in
+      let* ctxt, versioned = get ctxt key in
+      return (ctxt, Versioned_value.of_versioned versioned)
+
+    let find ctxt key =
+      let open Lwt_result_syntax in
+      let* ctxt, versioned = find ctxt key in
+      return (ctxt, Option.map Versioned_value.of_versioned versioned)
+
+    let update ctxt key value =
+      update ctxt key (Versioned_value.to_versioned value)
+
+    let init ctxt key value = init ctxt key (Versioned_value.to_versioned value)
+
+    let add ctxt key value = add ctxt key (Versioned_value.to_versioned value)
+
+    let add_or_remove ctxt key value =
+      add_or_remove ctxt key (Option.map Versioned_value.to_versioned value)
+  end
+
   module PVM_kind =
     Indexed_context.Make_map
       (struct
@@ -1580,18 +1624,12 @@ module Sc_rollup = struct
         let encoding = Data_encoding.int32
       end)
 
-  module Commitments =
-    Make_indexed_carbonated_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["commitments"]
-         end))
-         (Make_index (Sc_rollup_commitment_repr.Hash))
-      (struct
-        type t = Sc_rollup_commitment_repr.t
+  module Commitments = Make_versioned (struct
+    include Sc_rollup_commitment_repr
+    module Index = Hash
 
-        let encoding = Sc_rollup_commitment_repr.encoding
-      end)
+    let name = "commitments"
+  end)
 
   module Commitment_stake_count =
     Make_indexed_carbonated_data_storage

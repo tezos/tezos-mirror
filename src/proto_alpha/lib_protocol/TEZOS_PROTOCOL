@@ -53,6 +53,7 @@
         "Sc_rollup_wasm",
         "Sc_rollups",
         "Skip_list_repr",
+        "Sc_rollup_data_version_sig",
         "Sc_rollup_inbox_repr",
         "Sc_rollup_commitment_repr",
         "Sc_rollup_proof_repr",
