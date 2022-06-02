@@ -290,7 +290,7 @@ let get_block_metadata state (header : L2block.header) =
   let finalized =
     match finalized_level with
     | None -> false
-    | Some l -> Tx_rollup_level.(header.level >= l)
+    | Some l -> Tx_rollup_level.(header.level <= l)
   in
   L2block.{commitment_included; finalized}
 
