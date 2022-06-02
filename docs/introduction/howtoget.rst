@@ -77,19 +77,19 @@ Ubuntu Launchpad PPA with Tezos packages
 If you're using Ubuntu, you can install packages with Tezos binaries from a Launchpad PPA.
 Currently it supports Focal and Bionic versions.
 
-In order to add the stable release PPA repository to your machine, run:
+In order to add the stable release PPA repository to your machine, do:
 
 .. literalinclude:: install-bin-ubuntu.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup stable repository]
+   :end-before: [end]
 
-Alternatively, to add the release candidates PPA instead, run:
+Alternatively, to add the release candidates PPA instead, do:
 
-.. literalinclude:: install-bin-rc-ubuntu.sh
+.. literalinclude:: install-bin-ubuntu.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup rc repository]
+   :end-before: [end]
 
 Then, to install the binaries, run the following commands:
 
@@ -111,19 +111,19 @@ Fedora Copr repository with Tezos packages
 If you're using Fedora, you can install packages with Tezos binaries from a Copr repository.
 Currently it supports Fedora 34.
 
-In order to add the stable Copr repository to your machine, run:
+In order to add the stable Copr repository to your machine, do:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup stable repository]
+   :end-before: [end]
 
-Alternatively, to add the release candidates Copr repository instead, run:
+Alternatively, to add the release candidates Copr repository instead, do:
 
-.. literalinclude:: install-bin-rc-fedora.sh
+.. literalinclude:: install-bin-fedora.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup rc repository]
+   :end-before: [end]
 
 Then, to install the binaries, run the following commands:
 
@@ -389,7 +389,14 @@ If you plan to contribute to the Tezos codebase, the way to go is to set up a
 complete development environment, by cloning the repository and compiling the
 sources using the provided makefile.
 
-**TL;DR**: From a fresh Debian Buster x86_64, you typically want to do:
+**TL;DR**: From a fresh Debian Buster x86_64, you typically want to select a source branch, e.g.:
+
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [select branch]
+  :end-before: [end]
+
+and then do:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
