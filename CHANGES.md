@@ -38,3 +38,9 @@ v0.7:
 * Remove Ezresto (and other Ez libraries)
 * Packaging, build, tests and CI improvements
 * Add the `middleware` feature (contributed by Swann Moreau)
+
+v0.8:
+
+* Improve ocaml version coverage in CI
+* Add helpers for pretty-printing Paths
+* Add service-lookup feature to resolve parametric URI from concrete URI
