@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This modules handles the storage of random nonce seeds.
+
+    This module is responsible for maintaining the table
+   {!Storage.Seed.For_cycle}. *)
+
 type seed_computation_status =
   | Nonce_revelation_stage
   | Vdf_revelation_stage of {
@@ -32,7 +37,8 @@ type seed_computation_status =
   | Computation_finished
 
 type error +=
-  | Unknown of {
+  | (* `Permanent *)
+      Unknown of {
       oldest : Cycle_repr.t;
       cycle : Cycle_repr.t;
       latest : Cycle_repr.t;
@@ -40,8 +46,6 @@ type error +=
   | Already_accepted
   | Unverified_vdf
   | Too_early_revelation
-
-(* `Permanent *)
 
 (** Generates the first [preserved_cycles+2] seeds for which
     there are no nonces. *)
@@ -64,6 +68,13 @@ val check_vdf : Raw_context.t -> Seed_repr.vdf_solution -> unit tzresult Lwt.t
 val update_seed :
   Raw_context.t -> Seed_repr.vdf_solution -> Raw_context.t tzresult Lwt.t
 
+(** Returns the seed associated with the given cycle. Returns a generic storage
+   error when the seed is not available. *)
+val raw_for_cycle :
+  Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
+
+(** Returns the seed associated with the given cycle. Returns the {!Unknown}
+   error when the seed is not available. *)
 val for_cycle : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
 (** Computes RANDAO output for cycle #(current_cycle + preserved + 1) *)
@@ -82,3 +93,8 @@ val cycle_end :
   finished for the current cycle. *)
 val get_seed_computation_status :
   Raw_context.t -> seed_computation_status tzresult Lwt.t
+
+(** Removes the seed associated with the given cycle from the storage. It
+   assumes the seed exists. If it does not it returns a generic storage error. *)
+val remove_for_cycle :
+  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t

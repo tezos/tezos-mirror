@@ -203,7 +203,7 @@ let compute_snapshot_index ctxt cycle ~max_snapshot_index =
 
 let select_distribution_for_cycle ctxt cycle =
   Stake_storage.max_snapshot_index ctxt >>=? fun max_snapshot_index ->
-  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+  Seed_storage.raw_for_cycle ctxt cycle >>=? fun seed ->
   compute_snapshot_index_for_seed ~max_snapshot_index seed
   >>=? fun selected_index ->
   get_stakes_for_selected_index ctxt selected_index
@@ -237,5 +237,4 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
   | None -> return ctxt
   | Some outdated_cycle ->
       Delegate_sampler_state.remove_existing ctxt outdated_cycle
-      >>=? fun ctxt ->
-      Storage.Seed.For_cycle.remove_existing ctxt outdated_cycle
+      >>=? fun ctxt -> Seed_storage.remove_for_cycle ctxt outdated_cycle
