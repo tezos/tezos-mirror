@@ -69,12 +69,27 @@ let rpc_arg =
     | Sc_rollup_bond_id id -> Sc_rollup_repr.Address.to_b58check id
   in
   let destruct id =
-    match Tx_rollup_repr.of_b58check_opt id with
-    | Some id -> Result.ok (Tx_rollup_bond_id id)
-    | None -> (
-        match Sc_rollup_repr.Address.of_b58check_opt id with
-        | Some id -> Result.ok (Sc_rollup_bond_id id)
-        | None -> Result.error "Cannot parse rollup id")
+    (* String.starts_with from the stdlib 4.14, with [unsafe_get] replaced by
+       [get], comparators replaced by theirs versions in [Compare.*]. *)
+    let starts_with ~prefix s =
+      let open String in
+      let len_s = length s and len_pre = length prefix in
+      let rec aux i =
+        if Compare.Int.(i = len_pre) then true
+        else if Compare.Char.(get s i <> get prefix i) then false
+        else aux (i + 1)
+      in
+      Compare.Int.(len_s >= len_pre) && aux 0
+    in
+    if starts_with ~prefix:Tx_rollup_repr.Hash.rollup_hash id then
+      match Tx_rollup_repr.of_b58check_opt id with
+      | Some id -> Result.ok (Tx_rollup_bond_id id)
+      | None -> Result.error "Cannot parse transaction rollup id"
+    else if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
+      match Sc_rollup_repr.Address.of_b58check_opt id with
+      | Some id -> Result.ok (Sc_rollup_bond_id id)
+      | None -> Result.error "Cannot parse smart contract rollup id"
+    else Result.error "Cannot parse rollup id"
   in
   RPC_arg.make
     ~descr:"A bond identifier."
