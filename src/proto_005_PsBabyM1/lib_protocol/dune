@@ -114,7 +114,7 @@
   tezos-protocol-005-PsBabyM1.raw)
  (flags
   (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-   -warn-error -A
+   -warn-error +a
    -nopervasives))
  (modules Protocol))
 
@@ -295,7 +295,7 @@
   tezos-protocol-005-PsBabyM1.raw)
  (flags
   (-w +a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70
-   -warn-error -A
+   -warn-error +a
    -nopervasives))
  (modules Functor))
 

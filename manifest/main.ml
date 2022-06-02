@@ -2948,13 +2948,6 @@ end = struct
       raw_protocol : target;
     }
 
-    (** AV0 is the Architecture Version corresponding to the first protocols.
-        After protocol 010, some changes were made in the architecture
-        of [lib_protocol], resulting in Architecture Version 1 (AV1). This
-        new version has been in effect since protocol 011.
-        AV2 is in effect since protocol 014  *)
-    type lib_protocol_architecture_version = AV0 | AV1 | AV2
-
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
         ?benchmark_type_inference ~main ~environment ~name () =
       let name_dash = Name.name_dash name in
@@ -3152,7 +3145,7 @@ end = struct
       in
       ()
 
-    let make ~template_version ~name =
+    let make ~name =
       let name_underscore = Name.name_underscore name in
       let name_dash = Name.name_dash name in
       let number = Name.number name in
@@ -3187,14 +3180,18 @@ end = struct
         Dune.V s_expr
       in
       let warnings =
-        match template_version with
-        | AV0 -> "+a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70"
-        | AV1 -> "+a-4-40..42-44-45-48-51-70"
-        | AV2 -> "+a-4-40..42-44-45-48-70"
+        match number with
+        (* [Other] and [Alpha] protocols can be edited and should be
+           fixed whenever a warning that we care about triggers. We
+           only want to disable a limited set of warnings *)
+        | Other | Alpha -> "+a-4-40..42-44-45-48-70"
+        (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
+        | V _ as number ->
+            if N.(number >= 014) then "+a-4-40..42-44-45-48-70"
+            else if N.(number >= 011) then "+a-4-40..42-44-45-48-51-70"
+            else "+a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70"
       in
-      let warn_error =
-        match template_version with AV0 -> "-A" | AV1 | AV2 -> "+a"
-      in
+      let warn_error = "+a" in
       let environment =
         public_lib
           (sf "tezos-protocol-%s.environment" name_dash)
@@ -3233,7 +3230,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
           ~linkall:true
           ~modules:tezos_protocol.modules
           ~warnings
-          ~warn_error:"+a"
+          ~warn_error
           ~nopervasives:true
           ~nostdlib:true
           ~deps:[environment |> open_ ~m:"Environment"]
@@ -3406,7 +3403,7 @@ include Tezos_raw_protocol_%s.Main
           ~modules:["Registerer"]
           ~linkall:true
           ~warnings
-          ~warn_error:"+a"
+          ~warn_error
           ~deps:[main; tezos_protocol_updater; tezos_protocol_environment]
           ~dune:
             Dune.
@@ -3437,7 +3434,7 @@ include Tezos_raw_protocol_%s.Main
   let genesis =
     let name = Name.other "genesis" in
     let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make ~template_version:AV0 ~name
+      Lib_protocol.make ~name
     in
     let client =
       public_lib
@@ -3463,14 +3460,14 @@ include Tezos_raw_protocol_%s.Main
   let demo_noops =
     let name = Name.other "demo-noops" in
     let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make ~template_version:AV1 ~name
+      Lib_protocol.make ~name
     in
     register @@ make ~name ~status:Not_mainnet ~main ~embedded ()
 
   let _demo_counter =
     let name = Name.other "demo-counter" in
     let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make ~template_version:AV1 ~name
+      Lib_protocol.make ~name
     in
     let client =
       public_lib
@@ -3511,12 +3508,7 @@ include Tezos_raw_protocol_%s.Main
       match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
     in
     let {Lib_protocol.main; embedded; environment; raw_protocol} =
-      let template_version =
-        if N.(number >= 014) then Lib_protocol.AV2
-        else if N.(number >= 011) then AV1
-        else AV0
-      in
-      Lib_protocol.make ~template_version ~name
+      Lib_protocol.make ~name
     in
     let parameters =
       some_if (N.(number >= 011) && not_overridden) @@ fun () ->
