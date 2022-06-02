@@ -1037,7 +1037,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       "@[<v 2>Simulation result:@,%a@]"
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
-    >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
+    >>= fun () -> return (oph, op, result.contents)
   else
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
@@ -1122,7 +1122,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
             tenderbake_finality_confirmations
             Block_hash.pp
             op.shell.branch)
-    >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
+    >>= fun () -> return (oph, op, result.contents)
 
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?successor_level ?branch ?src_sk
@@ -1142,6 +1142,7 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?verbose_signing
     ?fee_parameter
     (contents : kind contents_list)
+  >|=? fun (oph, op, result) -> (oph, op.protocol_data.contents, result)
 
 let prepare_manager_operation ~fee ~gas_limit ~storage_limit operation =
   Annotated_manager_operation.Manager_info
@@ -1341,6 +1342,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
+    * packed_operation
     * kind Kind.manager contents_list
     * kind Kind.manager contents_result_list)
     tzresult
@@ -1433,10 +1435,10 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
         ~src_sk
         contents
       >>=? fun (oph, op, result) ->
-      match pack_contents_list op result with
+      match pack_contents_list op.protocol_data.contents result with
       | Cons_and_result (_, _, rest) ->
-          let op, result = unpack_contents_list rest in
-          return (oph, op, result)
+          let second_op, second_result = unpack_contents_list rest in
+          return (oph, Operation.pack op, second_op, second_result)
       | _ -> assert false)
   | Some _ when has_reveal operations ->
       failwith "The manager key was previously revealed."
@@ -1473,3 +1475,5 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
         ?branch
         ~src_sk
         contents
+      >>=? fun (oph, op, result) ->
+      return (oph, Operation.pack op, op.protocol_data.contents, result)
