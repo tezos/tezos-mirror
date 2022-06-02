@@ -40,36 +40,36 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ0.00025
         [CONTRACT_HASH] ... -ꜩ9001
         [CONTRACT_HASH] ... +ꜩ9001
-    Internal operations:
-      Internal Transaction:
-        Amount: ꜩ0
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        Entrypoint: transfer
-        Parameter: (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600
-                         (Pair 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c 360))
-        This transaction was successfully applied
-        Updated storage:
-          { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
-        Updated big_maps:
-          Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 361
-          Set map(0)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 360
-        Storage size: 2331 bytes
-        Paid storage size diff: 68 bytes
-        Consumed gas: 2367.978
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.017
-          storage fees ........................... +ꜩ0.017
-      Internal Transaction:
-        Amount: ꜩ9.001
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        This transaction was successfully applied
-        Consumed gas: 1000
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ9.001
-          [CONTRACT_HASH] ... +ꜩ9.001
-          [CONTRACT_HASH] ... -ꜩ0.06425
-          storage fees ........................... +ꜩ0.06425
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          Entrypoint: transfer
+          Parameter: (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600
+                           (Pair 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c 360))
+          This transaction was successfully applied
+          Updated storage:
+            { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+          Updated big_maps:
+            Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 361
+            Set map(0)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 360
+          Storage size: 2331 bytes
+          Paid storage size diff: 68 bytes
+          Consumed gas: 2367.978
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ0.017
+            storage fees ........................... +ꜩ0.017
+        Internal Transaction:
+          Amount: ꜩ9.001
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          This transaction was successfully applied
+          Consumed gas: 1000
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ9.001
+            [CONTRACT_HASH] ... +ꜩ9.001
+            [CONTRACT_HASH] ... -ꜩ0.06425
+            storage fees ........................... +ꜩ0.06425
 
 Injected block at minimal timestamp

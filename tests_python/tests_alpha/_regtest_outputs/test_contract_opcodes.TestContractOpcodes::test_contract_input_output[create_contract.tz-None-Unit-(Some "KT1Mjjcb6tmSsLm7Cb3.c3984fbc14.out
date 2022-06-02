@@ -4,12 +4,12 @@ storage
   (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")
 emitted operations
   Internal Origination:
-    From: KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi
-    Credit: ꜩ0.05
-    Script:
-      { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
-      Initial storage: Unit
-      No delegate for this contract
+  From: KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi
+  Credit: ꜩ0.05
+  Script:
+    { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+    Initial storage: Unit
+    No delegate for this contract
   big_map diff
     
   trace
