@@ -106,11 +106,10 @@ let pp_internal_operation_result ppf (Apply_results.Internal_contents op)
 let pp_internal_operation ppf op =
   pp_internal_operation_result ppf op (fun (_ : Format.formatter) () -> ()) ()
 
-let pp_manager_operation_content (type kind) source pp_result ppf
-    ((operation, result) : kind manager_operation * _) =
+let pp_manager_operation_content (type kind) source ppf
+    (operation : kind manager_operation) =
   (* For now, try to keep formatting in sync with [pp_internal_operation_result]. *)
-  Format.fprintf ppf "@[<v 0>@[<v 2>" ;
-  (match operation with
+  match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
       Format.fprintf
         ppf
@@ -346,8 +345,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         Sc_rollup.Address.pp
         sc_rollup
         Contract.pp
-        source) ;
-  Format.fprintf ppf "%a@]@]" pp_result result
+        source
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -826,9 +824,11 @@ let pp_manager_operation_contents_and_result ppf
   pp_balance_updates ppf balance_updates ;
   Format.fprintf
     ppf
-    "@,%a"
-    (pp_manager_operation_content (Contract.Implicit source) pp_result)
-    (operation, operation_result) ;
+    "@[<v 0>@[<v 2>@,%a@,%a@]@]"
+    (pp_manager_operation_content (Contract.Implicit source))
+    operation
+    pp_result
+    operation_result ;
   (match internal_operation_results with
   | [] -> ()
   | _ :: _ ->
