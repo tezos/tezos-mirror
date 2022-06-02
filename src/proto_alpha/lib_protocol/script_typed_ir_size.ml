@@ -359,16 +359,20 @@ and kinstr_size :
     | ICons_some (_, _) -> ret_succ_adding accu base
     | ICons_none (_, ty, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
-    | IIf_none _ -> ret_succ_adding accu base
-    | IOpt_map _ -> ret_succ_adding accu base
+    | IIf_none {loc = _; branch_if_none = _; branch_if_some = _; k = _} ->
+        ret_succ_adding accu (base +! (word_size *? 2))
+    | IOpt_map {loc = _; body = _; k = _} ->
+        ret_succ_adding accu (base +! word_size)
     | ICons_left (_, ty, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | ICons_right (_, ty, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
-    | IIf_left _ -> ret_succ_adding accu base
+    | IIf_left {loc = _; branch_if_left = _; branch_if_right = _; k = _} ->
+        ret_succ_adding accu (base +! (word_size *? 2))
     | ICons_list (_, _) -> ret_succ_adding accu base
     | INil (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
-    | IIf_cons _ -> ret_succ_adding accu base
+    | IIf_cons {loc = _; branch_if_nil = _; branch_if_cons = _; k = _} ->
+        ret_succ_adding accu (base +! (word_size *? 2))
     | IList_map (_, _, _) -> ret_succ_adding accu base
     | IList_iter (_, ty, _, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
@@ -442,7 +446,8 @@ and kinstr_size :
     | IAnd_int_nat (_, _) -> ret_succ_adding accu base
     | IXor_nat (_, _) -> ret_succ_adding accu base
     | INot_int (_, _) -> ret_succ_adding accu base
-    | IIf _ -> ret_succ_adding accu base
+    | IIf {loc = _; branch_if_true = _; branch_if_false = _; k = _} ->
+        ret_succ_adding accu (base +! (word_size *? 2))
     | ILoop (_, _, _) -> ret_succ_adding accu (base +! word_size)
     | ILoop_left (_, _, _) -> ret_succ_adding accu (base +! word_size)
     | IDip (_, _, _) -> ret_succ_adding accu (base +! word_size)
