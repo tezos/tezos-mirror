@@ -440,12 +440,18 @@ module MakeHashingScheme (Tree : TREE) :
   type message = tree
 
   let add_external_message inbox payload messages =
-    let open Lwt_syntax in
+    let open Lwt_tzresult_syntax in
     let message_index = inbox.message_counter in
     let message_counter = Z.succ message_index in
     let key = key_of_message message_index in
     let nb_available_messages = Int64.succ inbox.nb_available_messages in
-    let* messages =
+    let*? payload =
+      Sc_rollup_inbox_message_repr.(to_bytes @@ External payload)
+    in
+    (* TODO: 3151
+       Consider making tagging type safe by restricting what to add to the tree.
+    *)
+    let*! messages =
       Tree.(add messages [key; "payload"] (Bytes.of_string payload))
     in
     let nb_messages_in_commitment_period =
@@ -459,7 +465,7 @@ module MakeHashingScheme (Tree : TREE) :
         nb_messages_in_commitment_period;
       }
     in
-    Lwt.return (messages, inbox)
+    return (messages, inbox)
 
   let get_message messages message_index =
     let key = key_of_message message_index in
@@ -620,7 +626,7 @@ module MakeHashingScheme (Tree : TREE) :
       let* messages, inbox =
         List.fold_left_es
           (fun (messages, inbox) payload ->
-            add_external_message inbox payload messages >>= return)
+            add_external_message inbox payload messages)
           (messages, inbox)
           payloads
       in
