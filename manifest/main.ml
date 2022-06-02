@@ -2668,7 +2668,6 @@ let tezt ~opam ~path ?(deps = []) ?dep_globs l =
     ~deps:((tezt_lib |> open_ |> open_ ~m:"Base") :: deps)
     ?dep_globs
     l
-  [@@warning "-unused-value-declaration"]
 
 let tezt_performance_regression =
   public_lib
@@ -3211,23 +3210,28 @@ end = struct
       in
       let _regresssion =
         if N.(number >= 014) then
-          Some
-            (test
-               "main"
-               ~path:(path // "lib_protocol/test/regression")
-               ~opam:(sf "tezos-protocol-%s-tests" name_dash)
-               ~deps:
-                 [
-                   tezt_lib;
-                   tezos_base |> open_ ~m:"TzPervasives";
-                   main |> open_;
-                   client |> if_some |> open_;
-                   plugin |> if_some |> open_;
-                   test_helpers |> if_some |> open_;
-                   tezos_micheline |> open_;
-                 ]
-               ~dep_globs:["contracts/*"; "tezt/_regressions/*"])
-        else None
+          (* About [~dep_globs]: this is only needed so that dune re-runs the tests
+             if those files are modified. Dune will also copy those files in [_build],
+             but the test uses absolute paths to find those files
+             (thanks to [DUNE_SOURCEROOT] and [Filename.dirname __FILE__]),
+             so those copies are not actually used. This is needed so that the test
+             can be run either with [dune build @runtezt],
+             with [dune exec src/proto_alpha/lib_protocol/test/regression/main.exe],
+             or with [dune exec tezt/tests/main.exe -- -f test_logging.ml]. *)
+          tezt
+            ["test_logging"]
+            ~path:(path // "lib_protocol/test/regression")
+            ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+            ~deps:
+              [
+                tezos_base |> open_ ~m:"TzPervasives";
+                main |> open_;
+                client |> if_some |> open_;
+                plugin |> if_some |> open_;
+                test_helpers |> if_some |> open_;
+                tezos_micheline |> open_;
+              ]
+            ~dep_globs:["contracts/*.tz"; "expected/test_logging.ml/*.out"]
       in
       ()
 

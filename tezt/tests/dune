@@ -11,7 +11,8 @@
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
-  tezos-protocol-alpha)
+  tezos-protocol-alpha
+  src_proto_alpha_lib_protocol_test_regression_tezt_lib)
  (flags
   (:standard)
   -open Tezt
