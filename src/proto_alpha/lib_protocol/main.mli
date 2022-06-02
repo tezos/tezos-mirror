@@ -116,37 +116,23 @@ type operation = Alpha_context.packed_operation = {
   protocol_data : operation_data;
 }
 
-(** [check_manager_signature validation_state op raw_operation]
-    The function starts by retrieving the public key hash [pkh] of the manager
-    operation. In case the operation is batched, the function also checks that
-    the sources are all the same.
-    Once the [pkh] is retrieved, the function looks for its associated public
-    key. For that, the manager operation is inspected to check if it contains
-    a public key revelation. If not, the public key is searched in the context.
+(** Call {!Alpha_context.Operation.check_signature}.
 
-    @return [Error Invalid_signature] if the signature check fails
-    @return [Error Unrevealed_manager_key] if the manager has not yet been
-    revealed
-    @return [Error Missing_manager_contract] if the key is not found in the
-    context
-    @return [Error Inconsistent_sources] if the operations in a batch are not
-    from the same manager *)
-val check_manager_signature :
+    @return [Error Alpha_context.Operation.Invalid_signature] if the
+    signature check fails. *)
+val check_signature :
   validation_state ->
-  'b Alpha_context.Kind.manager Alpha_context.contents_list ->
+  Signature.public_key ->
   'a Alpha_context.operation ->
-  unit tzresult Lwt.t
+  unit tzresult
 
-(** [precheck_manager validation_state op] returns [()] if the manager operation
-    [op] is solveable, returns an error otherwise. An operation is solveable if
-    it is well-formed and can pay the fees to be included in a block with either
-    a success or a failure status.
-    This function uses [Apply.precheck_manager_contents_list] but discard the
-    context and balance update *)
+(** Call {Apply.precheck_manager_contents_list} and discard the
+    context and balance updates, so that only the contract's public key
+    is returned. *)
 val precheck_manager :
   validation_state ->
   'a Alpha_context.Kind.manager Alpha_context.contents_list ->
-  unit tzresult Lwt.t
+  Signature.public_key tzresult Lwt.t
 
 include
   Updater.PROTOCOL

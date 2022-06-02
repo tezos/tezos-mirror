@@ -2529,19 +2529,23 @@ let rec rec_precheck_manager_contents_list :
       in
       return (ctxt, PrecheckedCons ({contents; balance_updates}, results_rest))
 
-(** Returns an updated context, and a list of prechecked contents containing
-    balance updates for fees related to each manager operation in
-    [contents_list]. *)
+(** Return an updated context, a list of prechecked contents
+    containing balance updates for fees related to each manager
+    operation in [contents_list], and the contract's public key. *)
 let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+  (* Retrieve the [public_key] first: the contract may be deleted by the
+     fee transfer in [rec_precheck_manager_contents_list]. *)
+  let* public_key = find_manager_public_key ctxt contents_list in
   let* () = check_counters_consistency contents_list in
-  rec_precheck_manager_contents_list ctxt contents_list ~only_batch:mempool_mode
-
-let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
-    raw_operation =
-  find_manager_public_key ctxt op >>=? fun public_key ->
-  Lwt.return (Operation.check_signature public_key chain_id raw_operation)
+  let* ctxt, prechecked_contents_list =
+    rec_precheck_manager_contents_list
+      ctxt
+      contents_list
+      ~only_batch:mempool_mode
+  in
+  return (ctxt, prechecked_contents_list, public_key)
 
 let rec apply_manager_contents_list_rec :
     type kind.
@@ -2902,10 +2906,7 @@ let apply_manager_contents_list ctxt mode ~payload_producer chain_id
 let handle_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
     contents_list operation =
   let open Lwt_result_syntax in
-  (* Use the initial context, the contract may be deleted by the
-     fee transfer in [precheck_manager_contents] *)
-  let* public_key = find_manager_public_key ctxt contents_list in
-  let* ctxt, prechecked_contents_list =
+  let* ctxt, prechecked_contents_list, public_key =
     precheck_manager_contents_list ctxt contents_list ~mempool_mode
   in
   let*? () = Operation.check_signature public_key chain_id operation in

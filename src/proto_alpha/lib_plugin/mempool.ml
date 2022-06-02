@@ -980,7 +980,7 @@ let precheck_manager :
      ~gas_limit
      source ->
   let precheck_manager_and_check_signature ~on_success =
-    ( Main.precheck_manager validation_state contents >>=? fun () ->
+    ( Main.precheck_manager validation_state contents >>=? fun public_key ->
       let (raw_operation : t Kind.manager operation) =
         Alpha_context.{shell; protocol_data}
       in
@@ -989,7 +989,8 @@ let precheck_manager :
         return_unit
       else
         (* Signature probably never checked. *)
-        Main.check_manager_signature validation_state contents raw_operation )
+        Lwt.return
+          (Main.check_signature validation_state public_key raw_operation) )
     >|= function
     | Ok () -> on_success
     | Error err -> (

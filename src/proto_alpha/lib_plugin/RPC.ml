@@ -822,7 +822,7 @@ module Scripts = struct
     match protocol_data.contents with
     | Single (Manager_operation _) as op ->
         Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-        >>=? fun (ctxt, prechecked_contents_list) ->
+        >>=? fun (ctxt, prechecked_contents_list, _pk) ->
         (* removed signature check here *)
         Apply.apply_manager_contents_list
           ctxt
@@ -833,7 +833,7 @@ module Scripts = struct
         >|= fun (_ctxt, result) -> ok @@ ret result
     | Cons (Manager_operation _, _) as op ->
         Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-        >>=? fun (ctxt, prechecked_contents_list) ->
+        >>=? fun (ctxt, prechecked_contents_list, _pk) ->
         (* removed signature check here *)
         Apply.apply_manager_contents_list
           ctxt

@@ -164,10 +164,16 @@ val apply_contents_list :
   'kind contents_list ->
   (context * 'kind contents_result_list) tzresult Lwt.t
 
-(** [precheck_manager_contents_list validation_state contents_list]
-   Returns an updated context, and a list of prechecked contents
-   containing balance updates for fees related to each manager
-   operation in [contents_list]
+(** Check whether the manager operation represented by the given
+    [contents_list] is solvable, return an error otherwise. An
+    operation is solvable if it is well-formed and can pay the fees to
+    be included in a block, regardless of whether the application will
+    then succeed or fail.
+
+    If successful, return an updated context, a list of prechecked
+    contents containing balance updates for fees related to each
+    individual operation in [contents_list], and the contract's public
+    key.
 
    If [mempool_mode], the function checks whether the total gas limit
    of this batch of operation is below the [gas_limit] of a block and
@@ -178,7 +184,8 @@ val precheck_manager_contents_list :
   context ->
   'kind Kind.manager contents_list ->
   mempool_mode:bool ->
-  (context * 'kind Kind.manager prechecked_contents_list) tzresult Lwt.t
+  (context * 'kind Kind.manager prechecked_contents_list * public_key) tzresult
+  Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)
@@ -192,25 +199,3 @@ val are_endorsements_required :
 (** Check if a block's endorsing power is at least the minim required. *)
 val check_minimum_endorsements :
   endorsing_power:int -> minimum:int -> unit tzresult
-
-(** [check_manager_signature validation_state op raw_operation]
-    The function starts by retrieving the public key hash [pkh] of the manager
-    operation. In case the operation is batched, the function also checks that
-    the sources are all the same.
-    Once the [pkh] is retrieved, the function looks for its associated public
-    key. For that, the manager operation is inspected to check if it contains
-    a public key revelation. If not, the public key is searched in the context.
-
-    @return [Error Invalid_signature] if the signature check fails
-    @return [Error Unrevealed_manager_key] if the manager has not yet been
-    revealed
-    @return [Error Missing_manager_contract] if the key is not found in the
-    context
-    @return [Error Inconsistent_sources] if the operations in a batch are not
-    from the same manager *)
-val check_manager_signature :
-  context ->
-  Chain_id.t ->
-  'a Kind.manager contents_list ->
-  'b operation ->
-  (unit, error trace) result Lwt.t

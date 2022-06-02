@@ -803,18 +803,18 @@ let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
   Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, _, _) -> return (Apply.value_of_key ctxt)
 
-let check_manager_signature {chain_id; ctxt; _} op raw_op =
-  Apply.check_manager_signature ctxt chain_id op raw_op
+let check_signature {chain_id; _} public_key raw_op =
+  Alpha_context.Operation.check_signature public_key chain_id raw_op
 
 let precheck_manager {ctxt; _} op =
   (* We do not account for the gas limit of the batch in the block
      since this function does not return a context, but we check that
      this limit is within bounds (and fail otherwise with a
      permanenent error). *)
-  Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-  >|=? fun (_ :
-             Alpha_context.t
-             * 'kind Alpha_context.Kind.manager
-               Apply_results.prechecked_contents_list) -> ()
+  let open Lwt_result_syntax in
+  let* _ctxt, _prechecked_contents_list, public_key =
+    Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
+  in
+  return public_key
 
 (* Vanity nonce: TBD *)
