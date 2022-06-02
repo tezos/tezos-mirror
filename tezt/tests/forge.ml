@@ -38,10 +38,7 @@ let forge =
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   let* (`OpHash _str) =
-    Operation.inject_transfer
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      client
+    Operation.Manager.(inject [make @@ transfer ()] client)
   in
   let* () = Client.bake_for_and_wait client in
   let* _ = RPC.get_operations client in

@@ -550,16 +550,12 @@ let wrong_branch_operation_dismissal =
   Log.info "Activated protocol." ;
   Log.info "Baking a first proposal." ;
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
-  (* Retrieve head's hash *)
-  let* head_hash = RPC.get_block_hash client in
+  (* We inject an operation where the branch is the head (instead of
+     head~2). Such operation should not be included. *)
+  let* branch = RPC.get_block_hash client in
   Log.info "Injecting a transfer branched on the current head." ;
   let* (`OpHash oph) =
-    Operation.inject_transfer
-      ~branch:head_hash
-      ~amount:1
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      client
+    Operation.Manager.(inject ~branch [make @@ transfer ()] client)
   in
   let* current_mempool = Mempool.get_mempool client in
   Check.(
