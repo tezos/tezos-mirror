@@ -46,6 +46,7 @@ type balance =
   | Frozen_bonds of Contract_repr.t * Bond_id_repr.t
   | Tx_rollup_rejection_punishments
   | Tx_rollup_rejection_rewards
+  | Sc_rollup_refutation_punishments
 
 let balance_encoding =
   let open Data_encoding in
@@ -231,6 +232,15 @@ let balance_encoding =
            (function
              | Tx_rollup_rejection_punishments -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Tx_rollup_rejection_punishments);
+         case
+           (Tag 24)
+           ~title:"Sc_rollup_refutation_punishments"
+           (obj2
+              (req "kind" (constant "burned"))
+              (req "category" (constant "sc_rollup_refutation_punishments")))
+           (function
+             | Sc_rollup_refutation_punishments -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Sc_rollup_refutation_punishments);
        ]
 
 let is_not_zero c = not (Compare.Int.equal c 0)
@@ -275,6 +285,7 @@ let compare_balance ba bb =
         | Frozen_bonds _ -> 18
         | Tx_rollup_rejection_punishments -> 19
         | Tx_rollup_rejection_rewards -> 20
+        | Sc_rollup_refutation_punishments -> 21
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)

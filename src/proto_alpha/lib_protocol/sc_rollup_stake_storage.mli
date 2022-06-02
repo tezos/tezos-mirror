@@ -41,7 +41,7 @@ val remove_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** This is a wrapper around [deposit_stake] and [refine_stake] that
     deposits a stake and then refines it to the specified commitment,
@@ -73,7 +73,11 @@ val publish_commitment :
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
   Sc_rollup_commitment_repr.t ->
-  (Sc_rollup_commitment_repr.Hash.t * Raw_level_repr.t * Raw_context.t) tzresult
+  (Sc_rollup_commitment_repr.Hash.t
+  * Raw_level_repr.t
+  * Raw_context.t
+  * Receipt_repr.balance_updates)
+  tzresult
   Lwt.t
 
 (** [cement_commitment context rollup commitment] cements the given
@@ -123,8 +127,8 @@ val find_staker :
 
 module Internal_for_tests : sig
   (** [deposit_stake context rollup staker] stakes [staker] at the last
-      cemented commitment, freezing [sc_rollup_deposit] from [staker]'s account
-      balance.
+      cemented commitment, freezing [sc_rollup_stake_amount] from [staker]'s
+      account balance.
 
       Warning: must be called only if [rollup] exists and [staker] is not to be
       found in {!Store.Stakers.}
@@ -143,7 +147,7 @@ module Internal_for_tests : sig
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->
-    Raw_context.t tzresult Lwt.t
+    (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
   (** [withdraw_stake context rollup staker] removes [staker] and returns
       any deposit previously frozen by [deposit_stake].
@@ -167,7 +171,7 @@ module Internal_for_tests : sig
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->
-    Raw_context.t tzresult Lwt.t
+    (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
   (** [refine_stake context rollup staker commitment] moves the stake of
       [staker] to [commitment]. Because we do not assume any form of coordination

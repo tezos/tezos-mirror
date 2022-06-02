@@ -91,7 +91,7 @@ module Protocol_constants_overrides = struct
     sc_rollup_origination_size : int option;
     sc_rollup_challenge_window_in_blocks : int option;
     sc_rollup_max_available_messages : int option;
-    sc_rollup_stake_amount_in_mutez : int option;
+    sc_rollup_stake_amount : Tez.t option;
     sc_rollup_commitment_period_in_blocks : int option;
     sc_rollup_commitment_storage_size_in_bytes : int option;
     sc_rollup_max_lookahead_in_blocks : int32 option;
@@ -166,7 +166,7 @@ module Protocol_constants_overrides = struct
                         c.sc_rollup_origination_size,
                         c.sc_rollup_challenge_window_in_blocks,
                         c.sc_rollup_max_available_messages,
-                        c.sc_rollup_stake_amount_in_mutez,
+                        c.sc_rollup_stake_amount,
                         c.sc_rollup_commitment_period_in_blocks,
                         c.sc_rollup_commitment_storage_size_in_bytes,
                         c.sc_rollup_max_lookahead_in_blocks,
@@ -231,7 +231,7 @@ module Protocol_constants_overrides = struct
                            sc_rollup_origination_size,
                            sc_rollup_challenge_window_in_blocks,
                            sc_rollup_max_available_messages,
-                           sc_rollup_stake_amount_in_mutez,
+                           sc_rollup_stake_amount,
                            sc_rollup_commitment_period_in_blocks,
                            sc_rollup_commitment_storage_size_in_bytes,
                            sc_rollup_max_lookahead_in_blocks,
@@ -294,7 +294,7 @@ module Protocol_constants_overrides = struct
           sc_rollup_origination_size;
           sc_rollup_challenge_window_in_blocks;
           sc_rollup_max_available_messages;
-          sc_rollup_stake_amount_in_mutez;
+          sc_rollup_stake_amount;
           sc_rollup_commitment_period_in_blocks;
           sc_rollup_commitment_storage_size_in_bytes;
           sc_rollup_max_lookahead_in_blocks;
@@ -385,7 +385,7 @@ module Protocol_constants_overrides = struct
                               (opt "sc_rollup_origination_size" int31)
                               (opt "sc_rollup_challenge_window_in_blocks" int31)
                               (opt "sc_rollup_max_available_messages" int31)
-                              (opt "sc_rollup_stake_amount_in_mutez" int31)
+                              (opt "sc_rollup_stake_amount" Tez.encoding)
                               (opt
                                  "sc_rollup_commitment_period_in_blocks"
                                  int31)
@@ -490,8 +490,7 @@ module Protocol_constants_overrides = struct
           Some parametric.sc_rollup_challenge_window_in_blocks;
         sc_rollup_max_available_messages =
           Some parametric.sc_rollup_max_available_messages;
-        sc_rollup_stake_amount_in_mutez =
-          Some parametric.sc_rollup_stake_amount_in_mutez;
+        sc_rollup_stake_amount = Some parametric.sc_rollup_stake_amount;
         sc_rollup_commitment_period_in_blocks =
           Some parametric.sc_rollup_commitment_period_in_blocks;
         sc_rollup_commitment_storage_size_in_bytes =
@@ -567,7 +566,7 @@ module Protocol_constants_overrides = struct
       sc_rollup_origination_size = None;
       sc_rollup_challenge_window_in_blocks = None;
       sc_rollup_max_available_messages = None;
-      sc_rollup_stake_amount_in_mutez = None;
+      sc_rollup_stake_amount = None;
       sc_rollup_commitment_period_in_blocks = None;
       sc_rollup_commitment_storage_size_in_bytes = None;
       sc_rollup_max_lookahead_in_blocks = None;
@@ -1062,10 +1061,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.sc_rollup_max_available_messages
              o.sc_rollup_max_available_messages;
-         sc_rollup_stake_amount_in_mutez =
+         sc_rollup_stake_amount =
            Option.value
-             ~default:c.sc_rollup_stake_amount_in_mutez
-             o.sc_rollup_stake_amount_in_mutez;
+             ~default:c.sc_rollup_stake_amount
+             o.sc_rollup_stake_amount;
          sc_rollup_commitment_period_in_blocks =
            Option.value
              ~default:c.sc_rollup_commitment_period_in_blocks

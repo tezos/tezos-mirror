@@ -110,7 +110,9 @@ val apply_outcome :
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t * Sc_rollup_repr.Staker.t ->
   Sc_rollup_game_repr.outcome ->
-  (Sc_rollup_game_repr.status * Raw_context.t) tzresult Lwt.t
+  (Sc_rollup_game_repr.status * Raw_context.t * Receipt_repr.balance_updates)
+  tzresult
+  Lwt.t
 
 (**/**)
 

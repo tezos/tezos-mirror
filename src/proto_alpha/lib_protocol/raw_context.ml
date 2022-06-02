@@ -991,7 +991,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             sc_rollup_max_available_messages = 1_000_000;
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
                The following constants need to be refined. *)
-            sc_rollup_stake_amount_in_mutez = 32_000_000;
+            sc_rollup_stake_amount = Tez_repr.of_mutez_exn 32_000_000L;
             sc_rollup_commitment_period_in_blocks = 30;
             (* 76 for Commitments entry + 4 for Commitment_stake_count entry
                + 4 for Commitment_added entry

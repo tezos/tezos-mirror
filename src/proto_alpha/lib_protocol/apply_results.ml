@@ -237,16 +237,19 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
       staked_hash : Sc_rollup.Commitment.Hash.t;
       published_at_level : Raw_level.t;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_publish successful_manager_operation_result
   | Sc_rollup_refute_result : {
       consumed_gas : Gas.Arith.fp;
       status : Sc_rollup.Game.status;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_refute successful_manager_operation_result
   | Sc_rollup_timeout_result : {
       consumed_gas : Gas.Arith.fp;
       status : Sc_rollup.Game.status;
+      balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_timeout successful_manager_operation_result
   | Sc_rollup_atomic_batch_result : {
@@ -987,68 +990,83 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_publish_case
       ~encoding:
-        (obj4
+        (obj5
            (req "consumed_gas" Gas.Arith.n_integral_encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "staked_hash" Sc_rollup.Commitment.Hash.encoding)
-           (req "published_at_level" Raw_level.encoding))
+           (req "published_at_level" Raw_level.encoding)
+           (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_publish_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
         | Sc_rollup_publish_result
-            {consumed_gas; staked_hash; published_at_level} ->
+            {consumed_gas; staked_hash; published_at_level; balance_updates} ->
             ( Gas.Arith.ceil consumed_gas,
               consumed_gas,
               staked_hash,
-              published_at_level ))
+              published_at_level,
+              balance_updates ))
       ~kind:Kind.Sc_rollup_publish_manager_kind
       ~inj:
-        (fun (consumed_gas, consumed_milligas, staked_hash, published_at_level) ->
+        (fun ( consumed_gas,
+               consumed_milligas,
+               staked_hash,
+               published_at_level,
+               balance_updates ) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Sc_rollup_publish_result
-          {consumed_gas = consumed_milligas; staked_hash; published_at_level})
+          {
+            consumed_gas = consumed_milligas;
+            staked_hash;
+            published_at_level;
+            balance_updates;
+          })
 
   let sc_rollup_refute_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_refute_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj4
             (req "consumed_gas" Gas.Arith.n_integral_encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "status" Sc_rollup.Game.status_encoding))
+            (req "status" Sc_rollup.Game.status_encoding)
+            (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_refute_result _ as op) -> Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_refute_result {consumed_gas; status} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas, status))
+        | Sc_rollup_refute_result {consumed_gas; status; balance_updates} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas, status, balance_updates))
       ~kind:Kind.Sc_rollup_refute_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas, status) ->
+      ~inj:(fun (consumed_gas, consumed_milligas, status, balance_updates) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_refute_result {consumed_gas = consumed_milligas; status})
+        Sc_rollup_refute_result
+          {consumed_gas = consumed_milligas; status; balance_updates})
 
   let sc_rollup_timeout_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_timeout_case
       ~encoding:
-        (obj3
+        (obj4
            (req "consumed_gas" Gas.Arith.n_integral_encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "status" Sc_rollup.Game.status_encoding))
+           (req "status" Sc_rollup.Game.status_encoding)
+           (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_timeout_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_timeout_result {consumed_gas; status} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas, status))
+        | Sc_rollup_timeout_result {consumed_gas; status; balance_updates} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas, status, balance_updates))
       ~kind:Kind.Sc_rollup_timeout_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas, status) ->
+      ~inj:(fun (consumed_gas, consumed_milligas, status, balance_updates) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_timeout_result {consumed_gas = consumed_milligas; status})
+        Sc_rollup_timeout_result
+          {consumed_gas = consumed_milligas; status; balance_updates})
 
   let sc_rollup_atomic_batch_case =
     make

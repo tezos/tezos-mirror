@@ -131,7 +131,7 @@ type t = {
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;
   sc_rollup_max_available_messages : int;
-  sc_rollup_stake_amount_in_mutez : int;
+  sc_rollup_stake_amount : Tez_repr.t;
   (* The period with which commitments are made. *)
   sc_rollup_commitment_period_in_blocks : int;
   (* The storage size requirement (in bytes) of a commitment *)

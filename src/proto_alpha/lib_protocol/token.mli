@@ -74,6 +74,7 @@ type infinite_sink =
   | `Double_signing_punishments
   | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
   | `Tx_rollup_rejection_punishments
+  | `Sc_rollup_refutation_punishments
   | `Burned ]
 
 (** [sink] is the type of token receivers. Token receivers that are not

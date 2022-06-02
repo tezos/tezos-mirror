@@ -40,6 +40,7 @@ open Lwt_syntax
 exception TickNotFound of Sc_rollup_tick_repr.t
 
 open Lib_test.Qcheck_helpers
+module Sc_rollup_repr = Protocol.Sc_rollup_repr
 
 (**
 

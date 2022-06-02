@@ -52,6 +52,9 @@ module Address : sig
   val encoded_size : int
 
   val of_b58data : Base58.data -> t option
+
+  (** [prefix] is the prefix of smart contract rollup addresses. *)
+  val prefix : string
 end
 
 module Internal_for_tests : sig

@@ -47,17 +47,40 @@ let modify_staker_count ctxt rollup f =
   assert (Compare.Int.(size_diff = 0)) ;
   return ctxt
 
+let get_contract_and_stake ctxt staker =
+  let staker_contract = Contract_repr.Implicit staker in
+  let stake = Constants_storage.sc_rollup_stake_amount ctxt in
+  (staker_contract, stake)
+
 (** Warning: must be called only if [rollup] exists and [staker] is not to be
     found in {!Store.Stakers.} *)
 let deposit_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
-     We should lock stake here, and fail if there aren't enough funds.
-  *)
+  let staker_contract, stake = get_contract_and_stake ctxt staker in
+  let* ctxt, staker_balance = Token.balance ctxt (`Contract staker_contract) in
+  let* () =
+    fail_when
+      Tez_repr.(staker_balance < stake)
+      (Sc_rollup_staker_funds_too_low
+         {
+           staker;
+           sc_rollup = rollup;
+           staker_balance;
+           min_expected_balance = stake;
+         })
+  in
+  let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+  let* ctxt, balance_updates =
+    Token.transfer
+      ctxt
+      (`Contract staker_contract)
+      (`Frozen_bonds (staker_contract, bond_id))
+      stake
+  in
   let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
   let* ctxt = modify_staker_count ctxt rollup Int32.succ in
-  return ctxt
+  return (ctxt, balance_updates)
 
 let withdraw_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
@@ -71,13 +94,20 @@ let withdraw_stake ctxt rollup staker =
           Commitment_hash.(staked_on_commitment = lcc)
           Sc_rollup_not_staked_on_lcc
       in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2449
-         We should refund stake here.
-      *)
+      let staker_contract, stake = get_contract_and_stake ctxt staker in
+      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+      let* ctxt, balance_updates =
+        Token.transfer
+          ctxt
+          (`Frozen_bonds (staker_contract, bond_id))
+          (`Contract staker_contract)
+          stake
+      in
       let* ctxt, _size_freed =
         Store.Stakers.remove_existing (ctxt, rollup) staker
       in
-      modify_staker_count ctxt rollup Int32.pred
+      let+ ctxt = modify_staker_count ctxt rollup Int32.pred in
+      (ctxt, balance_updates)
 
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
@@ -267,8 +297,13 @@ let refine_stake ctxt rollup staker commitment =
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Stakers.mem (ctxt, rollup) staker in
-  let* ctxt = if res then return ctxt else deposit_stake ctxt rollup staker in
-  refine_stake ctxt rollup staker commitment
+  let* ctxt, balance_updates =
+    if res then return (ctxt, []) else deposit_stake ctxt rollup staker
+  in
+  let+ commitment_hash, ctxt, level =
+    refine_stake ctxt rollup staker commitment
+  in
+  (commitment_hash, ctxt, level, balance_updates)
 
 (** Try to consume n messages. *)
 let consume_n_messages ctxt rollup n =
@@ -348,6 +383,15 @@ let remove_staker ctxt rollup staker =
       let* () =
         fail_when Commitment_hash.(staked_on = lcc) Sc_rollup_remove_lcc
       in
+      let staker_contract, stake = get_contract_and_stake ctxt staker in
+      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+      let* ctxt, balance_updates =
+        Token.transfer
+          ctxt
+          (`Frozen_bonds (staker_contract, bond_id))
+          `Sc_rollup_refutation_punishments
+          stake
+      in
       let* ctxt, _size_diff =
         Store.Stakers.remove_existing (ctxt, rollup) staker
       in
@@ -361,7 +405,8 @@ let remove_staker ctxt rollup staker =
           let* ctxt = decrease_commitment_stake_count ctxt rollup node in
           (go [@ocaml.tailcall]) pred ctxt
       in
-      go staked_on ctxt
+      let+ ctxt = go staked_on ctxt in
+      (ctxt, balance_updates)
 
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake

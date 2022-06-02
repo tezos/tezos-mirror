@@ -423,6 +423,8 @@ let pp_balance_updates ppf = function
               | Tx_rollup_rejection_rewards -> "tx rollup rejection rewards"
               | Tx_rollup_rejection_punishments ->
                   "tx rollup rejection punishments"
+              | Sc_rollup_refutation_punishments ->
+                  "sc rollup refutation punishments"
             in
             let balance =
               match origin with
@@ -707,8 +709,8 @@ let pp_manager_operation_contents_and_result ppf
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
   let pp_sc_rollup_publish_result
-      (Sc_rollup_publish_result {consumed_gas; staked_hash; published_at_level})
-      =
+      (Sc_rollup_publish_result
+        {consumed_gas; staked_hash; published_at_level; balance_updates}) =
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     Format.fprintf
       ppf
@@ -719,25 +721,28 @@ let pp_manager_operation_contents_and_result ppf
       ppf
       "@,Commitment published at level: %a"
       Raw_level.pp
-      published_at_level
+      published_at_level ;
+    pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_refute_result
-      (Sc_rollup_refute_result {consumed_gas; status}) =
+      (Sc_rollup_refute_result {consumed_gas; status; balance_updates}) =
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     Format.fprintf
       ppf
       "@,Refutation game status: %a"
       Sc_rollup.Game.pp_status
-      status
+      status ;
+    pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_timeout_result
-      (Sc_rollup_timeout_result {consumed_gas; status}) =
+      (Sc_rollup_timeout_result {consumed_gas; status; balance_updates}) =
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     Format.fprintf
       ppf
       "@,Refutation game status: %a"
       Sc_rollup.Game.pp_status
-      status
+      status ;
+    pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_atomic_batch_result
       (Sc_rollup_atomic_batch_result

@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Tx_rollup_bond_id of Tx_rollup_repr.t
+type t =
+  | Tx_rollup_bond_id of Tx_rollup_repr.t
+  | Sc_rollup_bond_id of Sc_rollup_repr.t
 
 include Compare.Make (struct
   type nonrec t = t
@@ -32,6 +34,10 @@ include Compare.Make (struct
     match (id1, id2) with
     | Tx_rollup_bond_id id1, Tx_rollup_bond_id id2 ->
         Tx_rollup_repr.compare id1 id2
+    | Sc_rollup_bond_id id1, Sc_rollup_bond_id id2 ->
+        Sc_rollup_repr.Address.compare id1 id2
+    | Tx_rollup_bond_id _, Sc_rollup_bond_id _ -> -1
+    | Sc_rollup_bond_id _, Tx_rollup_bond_id _ -> 1
 end)
 
 let encoding =
@@ -43,18 +49,47 @@ let encoding =
            (Tag 0)
            ~title:"Tx_rollup_bond_id"
            (obj1 (req "tx_rollup" Tx_rollup_repr.encoding))
-           (function Tx_rollup_bond_id id -> Some id)
+           (function Tx_rollup_bond_id id -> Some id | _ -> None)
            (fun id -> Tx_rollup_bond_id id);
+         case
+           (Tag 1)
+           ~title:"Sc_rollup_bond_id"
+           (obj1 (req "sc_rollup" Sc_rollup_repr.encoding))
+           (function Sc_rollup_bond_id id -> Some id | _ -> None)
+           (fun id -> Sc_rollup_bond_id id);
        ]
 
-let pp ppf (Tx_rollup_bond_id id) = Tx_rollup_repr.pp ppf id
+let pp ppf = function
+  | Tx_rollup_bond_id id -> Tx_rollup_repr.pp ppf id
+  | Sc_rollup_bond_id id -> Sc_rollup_repr.pp ppf id
 
 let rpc_arg =
-  let construct (Tx_rollup_bond_id id) = Tx_rollup_repr.to_b58check id in
+  let construct = function
+    | Tx_rollup_bond_id id -> Tx_rollup_repr.to_b58check id
+    | Sc_rollup_bond_id id -> Sc_rollup_repr.Address.to_b58check id
+  in
   let destruct id =
-    Result.map_error
-      (fun _ -> "Cannot parse tx rollup id")
-      (Tx_rollup_repr.of_b58check id >>? fun id -> ok (Tx_rollup_bond_id id))
+    (* String.starts_with from the stdlib 4.14, with [unsafe_get] replaced by
+       [get], comparators replaced by theirs versions in [Compare.*]. *)
+    let starts_with ~prefix s =
+      let open String in
+      let len_s = length s and len_pre = length prefix in
+      let rec aux i =
+        if Compare.Int.(i = len_pre) then true
+        else if Compare.Char.(get s i <> get prefix i) then false
+        else aux (i + 1)
+      in
+      Compare.Int.(len_s >= len_pre) && aux 0
+    in
+    if starts_with ~prefix:Tx_rollup_repr.Hash.rollup_hash id then
+      match Tx_rollup_repr.of_b58check_opt id with
+      | Some id -> Result.ok (Tx_rollup_bond_id id)
+      | None -> Result.error "Cannot parse transaction rollup id"
+    else if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
+      match Sc_rollup_repr.Address.of_b58check_opt id with
+      | Some id -> Result.ok (Sc_rollup_bond_id id)
+      | None -> Result.error "Cannot parse smart contract rollup id"
+    else Result.error "Cannot parse rollup id"
   in
   RPC_arg.make
     ~descr:"A bond identifier."
