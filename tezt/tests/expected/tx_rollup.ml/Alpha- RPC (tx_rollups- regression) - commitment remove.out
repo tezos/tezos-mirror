@@ -51,8 +51,6 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000474
     Tx rollup transaction:[TX_ROLLUP_HASH], 4 bytes, From: [PUBLIC_KEY_HASH]
       This tx rollup submit operation was successfully applied
-      Balance updates:
-        
       Consumed gas: 2108.268
 
 
@@ -149,8 +147,6 @@ This sequence of operations was run:
     Tx rollup finalize commitment:[TX_ROLLUP_HASH] 
       From: [PUBLIC_KEY_HASH]
       This tx rollup finalize operation was successfully applied
-      Balance updates:
-        
       Consumed gas: 2501.420@finalized level:
         0
 
@@ -207,8 +203,6 @@ This sequence of operations was run:
     Tx rollup remove commitment:[TX_ROLLUP_HASH] 
       From: [PUBLIC_KEY_HASH]
       This tx rollup remove operation was successfully applied
-      Balance updates:
-        
       Consumed gas: 3171.024@finalized level:
         0
 

@@ -51,7 +51,5 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.00047
     Tx rollup transaction:[TX_ROLLUP_HASH], 0 bytes, From: [PUBLIC_KEY_HASH]
       This tx rollup submit operation was successfully applied
-      Balance updates:
-        
       Consumed gas: 2104.259
 

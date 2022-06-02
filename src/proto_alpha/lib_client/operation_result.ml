@@ -349,117 +349,92 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         source) ;
   Format.fprintf ppf "%a@]@]" pp_result result
 
-let pp_balance_updates ppf = function
-  | [] -> ()
-  | balance_updates ->
-      let open Receipt in
-      (* For dry runs, the baker's key is zero
-         (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU). Instead of printing this
-         key hash, we want to make the result more informative. *)
-      let pp_baker ppf baker =
-        if Signature.Public_key_hash.equal baker Signature.Public_key_hash.zero
-        then Format.fprintf ppf "the baker who will include this operation"
-        else Signature.Public_key_hash.pp ppf baker
-      in
-      let balance_updates =
-        List.map
-          (fun (balance, update, origin) ->
-            let balance =
-              match balance with
-              | Contract c -> Format.asprintf "%a" Contract.pp c
-              | Block_fees -> "payload fees(the block proposer)"
-              | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
-              | Nonce_revelation_rewards -> "nonce revelation rewards"
-              | Double_signing_evidence_rewards ->
-                  "double signing evidence rewards"
-              | Endorsing_rewards -> "endorsing rewards"
-              | Baking_rewards -> "baking rewards"
-              | Baking_bonuses -> "baking bonuses"
-              | Storage_fees -> "storage fees"
-              | Double_signing_punishments -> "double signing punishments"
-              | Lost_endorsing_rewards (pkh, p, r) ->
-                  let reason =
-                    match (p, r) with
-                    | false, false -> ""
-                    | false, true -> ",revelation"
-                    | true, false -> ",participation"
-                    | true, true -> ",participation,revelation"
-                  in
-                  Format.asprintf
-                    "lost endorsing rewards(%a%s)"
-                    pp_baker
-                    pkh
-                    reason
-              | Liquidity_baking_subsidies -> "liquidity baking subsidies"
-              | Burned -> "burned"
-              | Commitments bpkh ->
-                  Format.asprintf
-                    "commitment(%a)"
-                    Blinded_public_key_hash.pp
-                    bpkh
-              | Bootstrap -> "bootstrap"
-              | Invoice -> "invoices"
-              | Initial_commitments -> "initial commitments"
-              | Minted -> "minted"
-              | Frozen_bonds (contract, bond_id) ->
-                  Format.asprintf
-                    "Frozen_bonds(%a,%a)"
-                    Contract.pp
-                    contract
-                    Bond_id.pp
-                    bond_id
-              | Tx_rollup_rejection_rewards -> "tx rollup rejection rewards"
-              | Tx_rollup_rejection_punishments ->
-                  "tx rollup rejection punishments"
-              | Sc_rollup_refutation_punishments ->
-                  "sc rollup refutation punishments"
-            in
-            let balance =
-              match origin with
-              | Block_application -> balance
-              | Protocol_migration -> Format.asprintf "migration %s" balance
-              | Subsidy -> Format.asprintf "subsidy %s" balance
-              | Simulation -> Format.asprintf "simulation %s" balance
-            in
-            (balance, update))
-          balance_updates
-      in
-      let column_size =
-        List.fold_left
-          (fun acc (balance, _) -> Compare.Int.max acc (String.length balance))
-          0
-          balance_updates
-      in
-      let pp_update ppf = function
-        | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
-        | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
-      in
-      let pp_one ppf (balance, update) =
-        let to_fill = column_size + 3 - String.length balance in
-        let filler = String.make to_fill '.' in
-        Format.fprintf ppf "%s %s %a" balance filler pp_update update
-      in
-      Format.fprintf
-        ppf
-        "@[<v 0>%a@]"
-        (Format.pp_print_list pp_one)
-        balance_updates
-
-let pp_balance_updates_always ppf balance_updates =
-  Format.fprintf
-    ppf
-    "@,Balance updates:@,  %a"
-    pp_balance_updates
-    balance_updates
-
-let pp_balance_updates_opt ppf balance_updates =
+let pp_balance_updates ppf balance_updates =
+  let open Receipt in
+  (* For dry runs, the baker's key is zero
+     (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU). Instead of printing this
+     key hash, we want to make the result more informative. *)
+  let pp_baker ppf baker =
+    if Signature.Public_key_hash.equal baker Signature.Public_key_hash.zero then
+      Format.fprintf ppf "the baker who will include this operation"
+    else Signature.Public_key_hash.pp ppf baker
+  in
+  let balance_updates =
+    List.map
+      (fun (balance, update, origin) ->
+        let balance =
+          match balance with
+          | Contract c -> Format.asprintf "%a" Contract.pp c
+          | Block_fees -> "payload fees(the block proposer)"
+          | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
+          | Nonce_revelation_rewards -> "nonce revelation rewards"
+          | Double_signing_evidence_rewards -> "double signing evidence rewards"
+          | Endorsing_rewards -> "endorsing rewards"
+          | Baking_rewards -> "baking rewards"
+          | Baking_bonuses -> "baking bonuses"
+          | Storage_fees -> "storage fees"
+          | Double_signing_punishments -> "double signing punishments"
+          | Lost_endorsing_rewards (pkh, p, r) ->
+              let reason =
+                match (p, r) with
+                | false, false -> ""
+                | false, true -> ",revelation"
+                | true, false -> ",participation"
+                | true, true -> ",participation,revelation"
+              in
+              Format.asprintf "lost endorsing rewards(%a%s)" pp_baker pkh reason
+          | Liquidity_baking_subsidies -> "liquidity baking subsidies"
+          | Burned -> "burned"
+          | Commitments bpkh ->
+              Format.asprintf "commitment(%a)" Blinded_public_key_hash.pp bpkh
+          | Bootstrap -> "bootstrap"
+          | Invoice -> "invoices"
+          | Initial_commitments -> "initial commitments"
+          | Minted -> "minted"
+          | Frozen_bonds (contract, bond_id) ->
+              Format.asprintf
+                "Frozen_bonds(%a,%a)"
+                Contract.pp
+                contract
+                Bond_id.pp
+                bond_id
+          | Tx_rollup_rejection_rewards -> "tx rollup rejection rewards"
+          | Tx_rollup_rejection_punishments -> "tx rollup rejection punishments"
+          | Sc_rollup_refutation_punishments ->
+              "sc rollup refutation punishments"
+        in
+        let balance =
+          match origin with
+          | Block_application -> balance
+          | Protocol_migration -> Format.asprintf "migration %s" balance
+          | Subsidy -> Format.asprintf "subsidy %s" balance
+          | Simulation -> Format.asprintf "simulation %s" balance
+        in
+        (balance, update))
+      balance_updates
+  in
+  let column_size =
+    List.fold_left
+      (fun acc (balance, _) -> Compare.Int.max acc (String.length balance))
+      0
+      balance_updates
+  in
+  let pp_update ppf = function
+    | Credited amount -> Format.fprintf ppf "+%s%a" tez_sym Tez.pp amount
+    | Debited amount -> Format.fprintf ppf "-%s%a" tez_sym Tez.pp amount
+  in
+  let pp_one ppf (balance, update) =
+    let to_fill = column_size + 3 - String.length balance in
+    let filler = String.make to_fill '.' in
+    Format.fprintf ppf "%s %s %a" balance filler pp_update update
+  in
   match balance_updates with
   | [] -> ()
   | balance_updates ->
       Format.fprintf
         ppf
-        "@,Balance updates:@,  %a"
-        pp_balance_updates
+        "@,@[<v 2>Balance updates:@,%a@]"
+        (Format.pp_print_list pp_one)
         balance_updates
 
 let pp_consumed_gas ppf consumed_gas =
@@ -529,11 +504,11 @@ let pp_manager_operation_contents_and_result ppf
         pp_storage_size ppf storage_size ;
         pp_paid_storage_size_diff ppf paid_storage_size_diff ;
         pp_consumed_gas ppf consumed_gas ;
-        pp_balance_updates_opt ppf balance_updates
+        pp_balance_updates ppf balance_updates
     | Transaction_to_tx_rollup_result
         {balance_updates; consumed_gas; ticket_hash; paid_storage_size_diff} ->
         pp_consumed_gas ppf consumed_gas ;
-        pp_balance_updates_opt ppf balance_updates ;
+        pp_balance_updates ppf balance_updates ;
         Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
         pp_paid_storage_size_diff ppf paid_storage_size_diff
   in
@@ -559,7 +534,7 @@ let pp_manager_operation_contents_and_result ppf
     pp_lazy_storage_diff lazy_storage_diff ;
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_register_global_constant_result
       (Register_global_constant_result
@@ -569,7 +544,7 @@ let pp_manager_operation_contents_and_result ppf
         (* Not possible - register global constant operation always returns
            balance updates. *)
         assert false
-    | balance_updates -> pp_balance_updates_opt ppf balance_updates) ;
+    | balance_updates -> pp_balance_updates ppf balance_updates) ;
     pp_consumed_gas ppf consumed_gas ;
     pp_storage_size ppf size_of_constant ;
     Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
@@ -577,7 +552,7 @@ let pp_manager_operation_contents_and_result ppf
   let pp_tx_rollup_result
       (Tx_rollup_origination_result
         {balance_updates; consumed_gas; originated_tx_rollup}) =
-    pp_balance_updates_always ppf balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
@@ -588,37 +563,37 @@ let pp_manager_operation_contents_and_result ppf
   let pp_tx_rollup_submit_batch_result
       (Tx_rollup_submit_batch_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
-    pp_balance_updates_always ppf balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     pp_paid_storage_size_diff ppf paid_storage_size_diff
   in
   let pp_tx_rollup_commit_result
       (Tx_rollup_commit_result {balance_updates; consumed_gas}) =
-    pp_balance_updates_always ppf balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_return_bond_result
       (Tx_rollup_return_bond_result {balance_updates; consumed_gas}) =
-    pp_balance_updates_always ppf balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_finalize_commitment_result
       (Tx_rollup_finalize_commitment_result
         {balance_updates; consumed_gas; level}) =
-    pp_balance_updates_always ppf balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_remove_commitment_result
       (Tx_rollup_remove_commitment_result
         {balance_updates; consumed_gas; level}) =
-    pp_balance_updates_always ppf balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_rejection_result
       (Tx_rollup_rejection_result {balance_updates; consumed_gas}) =
-    pp_balance_updates_always ppf balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_dispatch_tickets_result
@@ -626,14 +601,14 @@ let pp_manager_operation_contents_and_result ppf
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_dal_publish_slot_header_result
       (Dal_publish_slot_header_result {consumed_gas}) =
@@ -645,7 +620,7 @@ let pp_manager_operation_contents_and_result ppf
     pp_consumed_gas ppf consumed_gas ;
     pp_storage_size ppf size ;
     Format.fprintf ppf "@,Address: %a" Sc_rollup.Address.pp address ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_add_messages_result
       (Sc_rollup_add_messages_result {consumed_gas; inbox_after}) =
@@ -673,7 +648,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Commitment published at level: %a"
       Raw_level.pp
       published_at_level ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_refute_result
       (Sc_rollup_refute_result {consumed_gas; status; balance_updates}) =
@@ -683,7 +658,7 @@ let pp_manager_operation_contents_and_result ppf
       "@,Refutation game status: %a"
       Sc_rollup.Game.pp_status
       status ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_timeout_result
       (Sc_rollup_timeout_result {consumed_gas; status; balance_updates}) =
@@ -693,22 +668,18 @@ let pp_manager_operation_contents_and_result ppf
       "@,Refutation game status: %a"
       Sc_rollup.Game.pp_status
       status ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_execute_outbox_message_result
       (Sc_rollup_execute_outbox_message_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates_opt ppf balance_updates
+    pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_return_bond_result
       (Sc_rollup_return_bond_result {balance_updates; consumed_gas}) =
-    Format.fprintf
-      ppf
-      "@,Balance updates:@,  %a"
-      pp_balance_updates
-      balance_updates ;
+    pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
@@ -1033,7 +1004,7 @@ let pp_manager_operation_contents_and_result ppf
     Gas.Arith.pp_integral
     gas_limit
     (Z.to_string storage_limit) ;
-  pp_balance_updates_opt ppf balance_updates ;
+  pp_balance_updates ppf balance_updates ;
   Format.fprintf
     ppf
     "@,%a"
