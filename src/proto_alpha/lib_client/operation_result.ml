@@ -845,12 +845,11 @@ let pp_manager_operation_contents_and_result ppf
         internal_operation_results) ;
   Format.fprintf ppf "@]@]"
 
-let rec pp_contents_and_result_list :
-    type kind. Format.formatter -> kind contents_and_result_list -> unit =
+let pp_contents_and_result :
+    type kind. Format.formatter -> kind contents * kind contents_result -> unit
+    =
  fun ppf -> function
-  | Single_and_result
-      (Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus)
-    ->
+  | Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus ->
       Format.fprintf
         ppf
         "@[<v 2>Seed nonce revelation:@,\
@@ -864,8 +863,7 @@ let rec pp_contents_and_result_list :
         (Nonce.hash nonce)
         pp_balance_updates
         bus
-  | Single_and_result
-      (Double_baking_evidence {bh1; bh2}, Double_baking_evidence_result bus) ->
+  | Double_baking_evidence {bh1; bh2}, Double_baking_evidence_result bus ->
       Format.fprintf
         ppf
         "@[<v 2>Double baking evidence:@,\
@@ -879,10 +877,9 @@ let rec pp_contents_and_result_list :
         (Block_header.hash bh2)
         pp_balance_updates
         bus
-  | Single_and_result
-      ( Preendorsement {level; _},
-        Preendorsement_result {balance_updates; delegate; preendorsement_power}
-      ) ->
+  | ( Preendorsement {level; _},
+      Preendorsement_result {balance_updates; delegate; preendorsement_power} )
+    ->
       Format.fprintf
         ppf
         "@[<v 2>Preendorsement:@,\
@@ -897,9 +894,8 @@ let rec pp_contents_and_result_list :
         Signature.Public_key_hash.pp
         delegate
         preendorsement_power
-  | Single_and_result
-      ( Endorsement {level; _},
-        Endorsement_result {balance_updates; delegate; endorsement_power} ) ->
+  | ( Endorsement {level; _},
+      Endorsement_result {balance_updates; delegate; endorsement_power} ) ->
       Format.fprintf
         ppf
         "@[<v 2>Endorsement:@,\
@@ -914,16 +910,14 @@ let rec pp_contents_and_result_list :
         Signature.Public_key_hash.pp
         delegate
         endorsement_power
-  | Single_and_result
-      (Dal_slot_availability _, Dal_slot_availability_result {delegate}) ->
+  | Dal_slot_availability _, Dal_slot_availability_result {delegate} ->
       Format.fprintf
         ppf
         "@[<v 2>Slot availability:@,Delegate: %a@]"
         Signature.Public_key_hash.pp
         delegate
-  | Single_and_result
-      ( Double_endorsement_evidence {op1; op2},
-        Double_endorsement_evidence_result bus ) ->
+  | ( Double_endorsement_evidence {op1; op2},
+      Double_endorsement_evidence_result bus ) ->
       Format.fprintf
         ppf
         "@[<v 2>Double endorsement evidence:@,\
@@ -937,9 +931,8 @@ let rec pp_contents_and_result_list :
         (Operation.hash op2)
         pp_balance_updates
         bus
-  | Single_and_result
-      ( Double_preendorsement_evidence {op1; op2},
-        Double_preendorsement_evidence_result bus ) ->
+  | ( Double_preendorsement_evidence {op1; op2},
+      Double_preendorsement_evidence_result bus ) ->
       Format.fprintf
         ppf
         "@[<v 2>Double preendorsement evidence:@,\
@@ -953,7 +946,7 @@ let rec pp_contents_and_result_list :
         (Operation.hash op2)
         pp_balance_updates
         bus
-  | Single_and_result (Activate_account {id; _}, Activate_account_result bus) ->
+  | Activate_account {id; _}, Activate_account_result bus ->
       Format.fprintf
         ppf
         "@[<v 2>Genesis account activation:@,\
@@ -964,8 +957,7 @@ let rec pp_contents_and_result_list :
         id
         pp_balance_updates
         bus
-  | Single_and_result (Proposals {source; period; proposals}, Proposals_result)
-    ->
+  | Proposals {source; period; proposals}, Proposals_result ->
       Format.fprintf
         ppf
         "@[<v 2>Proposals:@,From: %a@,Period: %ld@,Protocols:@,  @[<v 0>%a@]@]"
@@ -974,8 +966,7 @@ let rec pp_contents_and_result_list :
         period
         (Format.pp_print_list Protocol_hash.pp)
         proposals
-  | Single_and_result (Ballot {source; period; proposal; ballot}, Ballot_result)
-    ->
+  | Ballot {source; period; proposal; ballot}, Ballot_result ->
       Format.fprintf
         ppf
         "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
@@ -986,12 +977,16 @@ let rec pp_contents_and_result_list :
         proposal
         Data_encoding.Json.pp
         (Data_encoding.Json.construct Vote.ballot_encoding ballot)
-  | Single_and_result (Failing_noop _arbitrary, _) ->
+  | Failing_noop _arbitrary, _ ->
       (* the Failing_noop operation always fails and can't have result *)
       .
-  | Single_and_result
-      ((Manager_operation _ as op), (Manager_operation_result _ as res)) ->
+  | (Manager_operation _ as op), (Manager_operation_result _ as res) ->
       pp_manager_operation_contents_and_result ppf (op, res)
+
+let rec pp_contents_and_result_list :
+    type kind. Format.formatter -> kind contents_and_result_list -> unit =
+ fun ppf -> function
+  | Single_and_result (op, res) -> pp_contents_and_result ppf (op, res)
   | Cons_and_result
       ((Manager_operation _ as op), (Manager_operation_result _ as res), rest)
     ->
