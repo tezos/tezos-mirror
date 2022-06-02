@@ -383,51 +383,58 @@ let run_command =
          rollup_id
          cctxt ->
       let*! () = Event.(emit preamble_warning) () in
+      let config_from_args =
+        let rpc_addr =
+          Option.value rpc_addr ~default:Node_config.default_rpc_addr
+        in
+        let reconnection_delay =
+          Option.value
+            reconnection_delay
+            ~default:Node_config.default_reconnection_delay
+        in
+        config_from_args
+          data_dir
+          rollup_id
+          mode
+          operator
+          batch_signer
+          finalize_commitment_signer
+          remove_commitment_signer
+          rejection_signer
+          dispatch_withdrawals_signer
+          origination_level
+          rpc_addr
+          allow_deposit
+          reconnection_delay
+      in
       let* config =
         match data_dir with
-        | None ->
-            let rpc_addr =
-              Option.value rpc_addr ~default:Node_config.default_rpc_addr
-            in
-            let reconnection_delay =
-              Option.value
-                reconnection_delay
-                ~default:Node_config.default_reconnection_delay
-            in
-            return
-              (config_from_args
-                 data_dir
-                 rollup_id
-                 mode
-                 operator
-                 batch_signer
-                 finalize_commitment_signer
-                 remove_commitment_signer
-                 rejection_signer
-                 dispatch_withdrawals_signer
-                 origination_level
-                 rpc_addr
-                 allow_deposit
-                 reconnection_delay)
-        | Some data_dir ->
-            let* config = Node_config.load ~data_dir in
-            let*? config =
-              patch_config_from_args
-                config
-                rollup_id
-                mode
-                operator
-                batch_signer
-                finalize_commitment_signer
-                remove_commitment_signer
-                rejection_signer
-                dispatch_withdrawals_signer
-                origination_level
-                rpc_addr
-                allow_deposit
-                reconnection_delay
-            in
-            return config
+        | None -> return config_from_args
+        | Some data_dir -> (
+            let*! disk_config = Node_config.load ~data_dir in
+            match disk_config with
+            | Error (Error.Tx_rollup_configuration_file_does_not_exists _ :: _)
+              ->
+                return config_from_args
+            | Error _ as err -> Lwt.return err
+            | Ok config ->
+                let*? config =
+                  patch_config_from_args
+                    config
+                    rollup_id
+                    mode
+                    operator
+                    batch_signer
+                    finalize_commitment_signer
+                    remove_commitment_signer
+                    rejection_signer
+                    dispatch_withdrawals_signer
+                    origination_level
+                    rpc_addr
+                    allow_deposit
+                    reconnection_delay
+                in
+                return config)
       in
       let*? config = Node_config.check_mode config in
       Daemon.run config cctxt)
