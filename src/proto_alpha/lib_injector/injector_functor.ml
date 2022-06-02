@@ -328,7 +328,7 @@ module Make (Rollup : PARAMETERS) = struct
     let (Manager_list annot_op) =
       Annotated_manager_operation.manager_of_list operations
     in
-    let* oph, _, op, result =
+    let* _, op, _, result =
       Injection.inject_manager_operation
         state.cctxt
         ~simulation:true (* Only simulation here *)
@@ -346,23 +346,14 @@ module Make (Rollup : PARAMETERS) = struct
         ~fee_parameter
         annot_op
     in
-    return (oph, Contents_list op, Apply_results.Contents_result_list result)
+    return (op, Apply_results.Contents_result_list result)
 
-  let inject_on_node state packed_contents =
+  let inject_on_node state {shell; protocol_data = Operation_data {contents; _}}
+      =
     let open Lwt_result_syntax in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2815 *)
-    (* Branch to head - 2 for tenderbake *)
-    let* branch =
-      Tezos_shell_services.Shell_services.Blocks.hash
-        state.cctxt
-        ~chain:state.cctxt#chain
-        ~block:(`Head 2)
-        ()
-    in
+    let unsigned_op = (shell, Contents_list contents) in
     let unsigned_op_bytes =
-      Data_encoding.Binary.to_bytes_exn
-        Operation.unsigned_encoding
-        ({branch}, packed_contents)
+      Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
     in
     let* signature =
       Client_keys.sign
@@ -371,9 +362,8 @@ module Make (Rollup : PARAMETERS) = struct
         state.signer.sk
         unsigned_op_bytes
     in
-    let (Contents_list contents) = packed_contents in
     let op : _ Operation.t =
-      {shell = {branch}; protocol_data = {contents; signature = Some signature}}
+      {shell; protocol_data = {contents; signature = Some signature}}
     in
     let op_bytes =
       Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
@@ -397,7 +387,7 @@ module Make (Rollup : PARAMETERS) = struct
   let rec inject_operations ~must_succeed state
       (operations : L1_operation.t list) =
     let open Lwt_result_syntax in
-    let* _oph, packed_contents, result =
+    let* packed_op, result =
       simulate_operations ~must_succeed state operations
     in
     let results = Apply_results.to_list result in
@@ -443,7 +433,7 @@ module Make (Rollup : PARAMETERS) = struct
       inject_operations ~must_succeed state operations
     else
       (* Inject on node for real *)
-      let+ oph = inject_on_node state packed_contents in
+      let+ oph = inject_on_node state packed_op in
       (oph, operations)
 
   (** Returns the (upper bound on) the size of an L1 batch of operations composed
