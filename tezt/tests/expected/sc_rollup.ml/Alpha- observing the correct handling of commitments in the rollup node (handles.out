@@ -108,7 +108,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000457
       payload fees(the block proposer) ....... +ꜩ0.000457
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
-      This operation sending a message to a smart contract rollup was successfully applied
+      This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.301
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]

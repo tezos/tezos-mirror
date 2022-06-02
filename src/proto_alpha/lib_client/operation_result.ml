@@ -549,7 +549,7 @@ let pp_manager_operation_contents_and_result ppf
     pp_storage_size ppf size_of_constant ;
     Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
   in
-  let pp_tx_rollup_result
+  let pp_tx_rollup_origination_result
       (Tx_rollup_origination_result
         {balance_updates; consumed_gas; originated_tx_rollup}) =
     pp_balance_updates ppf balance_updates ;
@@ -682,276 +682,95 @@ let pp_manager_operation_contents_and_result ppf
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
+  let manager_operation_name (type kind)
+      (result : kind successful_manager_operation_result) =
+    match result with
+    | Reveal_result _ -> "revelation"
+    | Transaction_result _ -> "transaction"
+    | Origination_result _ -> "origination"
+    | Delegation_result _ -> "delegation"
+    | Register_global_constant_result _ -> "global constant registration"
+    | Set_deposits_limit_result _ -> "deposits limit modification"
+    | Tx_rollup_origination_result _ -> "transaction rollup origination"
+    | Tx_rollup_submit_batch_result _ -> "transaction rollup batch submission"
+    | Tx_rollup_commit_result _ -> "transaction rollup commitment"
+    | Tx_rollup_return_bond_result _ -> "transaction rollup bond retrieval"
+    | Tx_rollup_finalize_commitment_result _ ->
+        "transaction rollup commitment finalization"
+    | Tx_rollup_remove_commitment_result _ ->
+        "transaction rollup commitment removal"
+    | Tx_rollup_rejection_result _ -> "transaction rollup commitment rejection"
+    | Tx_rollup_dispatch_tickets_result _ ->
+        "transaction rollup tickets dispatch"
+    | Transfer_ticket_result _ -> "tickets transfer"
+    | Sc_rollup_originate_result _ -> "smart contract rollup origination"
+    | Sc_rollup_add_messages_result _ ->
+        "smart contract rollup messages submission"
+    | Sc_rollup_cement_result _ -> "smart contract rollup commitment cementing"
+    | Sc_rollup_publish_result _ ->
+        "smart contract rollup commitment publishing"
+    | Sc_rollup_refute_result _ -> "smart contract rollup refutation start"
+    | Sc_rollup_timeout_result _ -> "smart contract rollup refutation timeout"
+    | Sc_rollup_execute_outbox_message_result _ ->
+        "smart contract output message execution"
+    | Sc_rollup_return_bond_result _ -> "smart contract bond retrieval"
+    | Dal_publish_slot_header_result _ -> "slot header publishing"
+  in
+
+  let pp_manager_operation_result (type kind) ppf
+      (result : kind successful_manager_operation_result) =
+    match result with
+    | Reveal_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
+    | Delegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
+    | Set_deposits_limit_result {consumed_gas} ->
+        pp_consumed_gas ppf consumed_gas
+    | Transaction_result tx -> pp_transaction_result tx
+    | Origination_result op_res -> pp_origination_result op_res
+    | Register_global_constant_result _ as op ->
+        pp_register_global_constant_result op
+    | Tx_rollup_origination_result _ as op -> pp_tx_rollup_origination_result op
+    | Tx_rollup_submit_batch_result _ as op ->
+        pp_tx_rollup_submit_batch_result op
+    | Tx_rollup_commit_result _ as op -> pp_tx_rollup_commit_result op
+    | Tx_rollup_return_bond_result _ as op -> pp_tx_rollup_return_bond_result op
+    | Tx_rollup_finalize_commitment_result _ as op ->
+        pp_tx_rollup_finalize_commitment_result op
+    | Tx_rollup_remove_commitment_result _ as op ->
+        pp_tx_rollup_remove_commitment_result op
+    | Tx_rollup_rejection_result _ as op -> pp_tx_rollup_rejection_result op
+    | Tx_rollup_dispatch_tickets_result _ as op ->
+        pp_tx_rollup_dispatch_tickets_result op
+    | Transfer_ticket_result _ as op -> pp_transfer_ticket_result op
+    | Sc_rollup_originate_result _ as op -> pp_sc_rollup_originate_result op
+    | Sc_rollup_add_messages_result _ as op ->
+        pp_sc_rollup_add_messages_result op
+    | Sc_rollup_cement_result _ as op -> pp_sc_rollup_cement_result op
+    | Sc_rollup_publish_result _ as op -> pp_sc_rollup_publish_result op
+    | Sc_rollup_refute_result _ as op -> pp_sc_rollup_refute_result op
+    | Sc_rollup_timeout_result _ as op -> pp_sc_rollup_timeout_result op
+    | Sc_rollup_execute_outbox_message_result _ as op ->
+        pp_sc_rollup_execute_outbox_message_result op
+    | Sc_rollup_return_bond_result _ as op -> pp_sc_rollup_return_bond_result op
+    | Dal_publish_slot_header_result _ as op ->
+        pp_dal_publish_slot_header_result op
+  in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
-    | Skipped _ -> Format.fprintf ppf "This operation was skipped"
+    | Skipped _ -> Format.fprintf ppf "This operation was skipped."
     | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
-    | Applied (Reveal_result {consumed_gas}) ->
-        Format.fprintf ppf "This revelation was successfully applied" ;
-        pp_consumed_gas ppf consumed_gas
-    | Backtracked (Reveal_result _, _) ->
+    | Applied op_res ->
         Format.fprintf
           ppf
-          "@[<v 0>This revelation was BACKTRACKED, its expected effects were \
-           NOT applied.@]"
-    | Applied (Delegation_result {consumed_gas}) ->
-        Format.fprintf ppf "This delegation was successfully applied" ;
-        pp_consumed_gas ppf consumed_gas
-    | Backtracked (Delegation_result _, _) ->
+          "This %s was successfully applied"
+          (manager_operation_name op_res) ;
+        pp_manager_operation_result ppf op_res
+    | Backtracked (op_res, _errs) ->
         Format.fprintf
           ppf
-          "@[<v 0>This delegation was BACKTRACKED, its expected effects were \
-           NOT applied.@]"
-    | Applied (Set_deposits_limit_result {consumed_gas}) ->
-        Format.fprintf ppf "The deposits limit was successfully set" ;
-        pp_consumed_gas ppf consumed_gas
-    | Backtracked (Set_deposits_limit_result _, _) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This deposits limit modification was BACKTRACKED, its \
-           expected effects were NOT applied.@]"
-    | Applied (Transaction_result tx) ->
-        Format.fprintf ppf "This transaction was successfully applied" ;
-        pp_transaction_result tx
-    | Backtracked (Transaction_result tx, _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This transaction was BACKTRACKED, its expected effects (as \
-           follow) were NOT applied.@]" ;
-        pp_transaction_result tx
-    | Applied (Origination_result op_res) ->
-        Format.fprintf ppf "This origination was successfully applied" ;
-        pp_origination_result op_res
-    | Backtracked (Origination_result op_res, _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This origination was BACKTRACKED, its expected effects (as \
-           follow) were NOT applied.@]" ;
-        pp_origination_result op_res
-    | Applied (Register_global_constant_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This global constant registration was successfully applied" ;
-        pp_register_global_constant_result op
-    | Backtracked ((Register_global_constant_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This registration of a global constant was BACKTRACKED, its \
-           expected effects (as follow) were NOT applied.@]" ;
-        pp_register_global_constant_result op
-    | Applied (Tx_rollup_origination_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup origination operation was successfully applied" ;
-        pp_tx_rollup_result op
-    | Backtracked ((Tx_rollup_origination_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This rollup operation was BACKTRACKED, its expected effects \
-           (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_result op
-    | Applied (Tx_rollup_submit_batch_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup submit operation was successfully applied" ;
-        pp_tx_rollup_submit_batch_result op
-    | Backtracked ((Tx_rollup_submit_batch_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This rollup submit operation was BACKTRACKED, its expected \
-           effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_submit_batch_result op
-    | Applied (Tx_rollup_commit_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup commit operation was successfully applied" ;
-        pp_tx_rollup_commit_result op
-    | Backtracked ((Tx_rollup_commit_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This tx rollup commit operation was BACKTRACKED, its \
-           expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_commit_result op
-    | Applied (Tx_rollup_return_bond_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup return commitment bond operation was successfully \
-           applied" ;
-        pp_tx_rollup_return_bond_result op
-    | Backtracked ((Tx_rollup_return_bond_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This tx rollup return commitment bond operation was \
-           BACKTRACKED, its expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_return_bond_result op
-    | Applied (Tx_rollup_finalize_commitment_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup finalize operation was successfully applied" ;
-        pp_tx_rollup_finalize_commitment_result op
-    | Backtracked ((Tx_rollup_finalize_commitment_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This tx rollup finalize operation was BACKTRACKED, its \
-           expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_finalize_commitment_result op
-    | Applied (Tx_rollup_remove_commitment_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup remove operation was successfully applied" ;
-        pp_tx_rollup_remove_commitment_result op
-    | Backtracked ((Tx_rollup_remove_commitment_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This tx rollup remove operation was BACKTRACKED, its \
-           expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_remove_commitment_result op
-    | Applied (Tx_rollup_rejection_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup rejection operation was successfully applied" ;
-        pp_tx_rollup_rejection_result op
-    | Backtracked ((Tx_rollup_rejection_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This tx rollup rejection operation was BACKTRACKED, its \
-           expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_rejection_result op
-    | Applied (Tx_rollup_dispatch_tickets_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This tx rollup reveal_withdrawals operation was successfully applied" ;
-        pp_tx_rollup_dispatch_tickets_result op
-    | Backtracked ((Tx_rollup_dispatch_tickets_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This tx rollup reveal_withdrawals rollup operation was \
-           BACKTRACKED, its expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_dispatch_tickets_result op
-    | Applied (Transfer_ticket_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This transfer ticket operation was successfully applied" ;
-        pp_transfer_ticket_result op
-    | Backtracked ((Transfer_ticket_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This transfer ticket operation was BACKTRACKED, its expected \
-           effects (as follow) were NOT applied.@]" ;
-        pp_transfer_ticket_result op
-    | Applied (Dal_publish_slot_header_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This operation publishing a slot header was successfully applied" ;
-        pp_dal_publish_slot_header_result op
-    | Backtracked ((Dal_publish_slot_header_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This operation publishing a slot header was BACKTRACKED, its \
-           expected effects (as follow) were NOT applied.@]" ;
-        pp_dal_publish_slot_header_result op
-    | Applied (Sc_rollup_originate_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This smart contract rollup origination was successfully applied" ;
-        pp_sc_rollup_originate_result op
-    | Backtracked ((Sc_rollup_originate_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This rollup origination was BACKTRACKED, its expected \
-           effects (as follow) were NOT applied.@]" ;
-        pp_sc_rollup_originate_result op
-    | Applied (Sc_rollup_add_messages_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This operation sending a message to a smart contract rollup was \
-           successfully applied" ;
-        pp_sc_rollup_add_messages_result op
-    | Backtracked ((Sc_rollup_add_messages_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This operation sending a message to a smart contract rollup \
-           was BACKTRACKED, its expected effects (as follow) were NOT \
-           applied.@]" ;
-        pp_sc_rollup_add_messages_result op
-    | Applied (Sc_rollup_cement_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This operation cementing a commitment on a smart contract rollup \
-           was successfully applied" ;
-        pp_sc_rollup_cement_result op
-    | Backtracked ((Sc_rollup_cement_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This operation cementing a commitment on a smart contract \
-           rollup was BACKTRACKED, its expected effects (as follow) were NOT \
-           applied.@]" ;
-        pp_sc_rollup_cement_result op
-    | Applied (Sc_rollup_publish_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This operation publishing a commitment on a smart contract rollup \
-           was successfully applied" ;
-        pp_sc_rollup_publish_result op
-    | Backtracked ((Sc_rollup_publish_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This operation publishing a commitment on a smart contract \
-           rollup was BACKTRACKED, its expected effects (as follow) were NOT \
-           applied.@]" ;
-        pp_sc_rollup_publish_result op
-    | Applied (Sc_rollup_refute_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This operation playing a refutation game step on a smart contract \
-           rollup was successfully applied" ;
-        pp_sc_rollup_refute_result op
-    | Backtracked ((Sc_rollup_refute_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This operation playing a refutation game step on a smart \
-           contract rollup was BACKTRACKED, its expected effects (as follow) \
-           were NOT applied.@]" ;
-        pp_sc_rollup_refute_result op
-    | Applied (Sc_rollup_timeout_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This operation to end a refutation game on a smart contract rollup \
-           by timeout was successfully applied" ;
-        pp_sc_rollup_timeout_result op
-    | Backtracked ((Sc_rollup_timeout_result _ as op), _errs) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This operation to end a refutation game on a smart contract \
-           rollup by timeout was BACKTRACKED, its expected effects (as follow) \
-           were NOT applied.@]" ;
-        pp_sc_rollup_timeout_result op
-    | Applied (Sc_rollup_execute_outbox_message_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This operation executing a smart contract rollup outbox message was \
-           successfully applied." ;
-        pp_sc_rollup_execute_outbox_message_result op
-    | Backtracked ((Sc_rollup_execute_outbox_message_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This operation operation executing a smart contract rollup \
-           outbox message was BACKTRACKED, its expected effects (as follow) \
-           were NOT applied.@]" ;
-        pp_sc_rollup_execute_outbox_message_result op
-    | Applied (Sc_rollup_return_bond_result _ as op) ->
-        Format.fprintf
-          ppf
-          "This sc rollup return commitment bond operation was successfully \
-           applied" ;
-        pp_sc_rollup_return_bond_result op
-    | Backtracked ((Sc_rollup_return_bond_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This sc rollup return commitment bond operation was \
-           BACKTRACKED, its expected effects (as follow) were NOT applied.@]" ;
-        pp_sc_rollup_return_bond_result op
+          "This %s was BACKTRACKED, its expected effects were NOT applied."
+          (manager_operation_name op_res) ;
+        pp_manager_operation_result ppf op_res
   in
   let pp_internal_result (type kind) ppf
       (result : kind internal_manager_operation_result) =
@@ -1024,7 +843,7 @@ let pp_manager_operation_contents_and_result ppf
                pp_internal_result
                res))
         internal_operation_results) ;
-  Format.fprintf ppf "@]"
+  Format.fprintf ppf "@]@]"
 
 let rec pp_contents_and_result_list :
     type kind. Format.formatter -> kind contents_and_result_list -> unit =
@@ -1172,13 +991,13 @@ let rec pp_contents_and_result_list :
       .
   | Single_and_result
       ((Manager_operation _ as op), (Manager_operation_result _ as res)) ->
-      Format.fprintf ppf "%a" pp_manager_operation_contents_and_result (op, res)
+      pp_manager_operation_contents_and_result ppf (op, res)
   | Cons_and_result
       ((Manager_operation _ as op), (Manager_operation_result _ as res), rest)
     ->
       Format.fprintf
         ppf
-        "%a@\n%a"
+        "%a@,%a"
         pp_manager_operation_contents_and_result
         (op, res)
         pp_contents_and_result_list
@@ -1186,7 +1005,9 @@ let rec pp_contents_and_result_list :
 
 let pp_operation_result ppf
     ((op, res) : 'kind contents_list * 'kind contents_result_list) =
-  Format.fprintf ppf "@[<v 0>" ;
   let contents_and_result_list = Apply_results.pack_contents_list op res in
-  pp_contents_and_result_list ppf contents_and_result_list ;
-  Format.fprintf ppf "@]@."
+  Format.fprintf
+    ppf
+    "@[<v 0>%a@]@."
+    pp_contents_and_result_list
+    contents_and_result_list

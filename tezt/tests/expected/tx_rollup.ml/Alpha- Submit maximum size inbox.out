@@ -20,7 +20,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000379
     Tx rollup origination:
       From: [PUBLIC_KEY_HASH]
-      This tx rollup origination operation was successfully applied
+      This transaction rollup origination was successfully applied
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         storage fees ........................... +ꜩ1
@@ -50,7 +50,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005721
       payload fees(the block proposer) ....... +ꜩ0.005721
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -75,7 +75,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005721
       payload fees(the block proposer) ....... +ꜩ0.005721
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -100,7 +100,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005721
       payload fees(the block proposer) ....... +ꜩ0.005721
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -125,7 +125,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005721
       payload fees(the block proposer) ....... +ꜩ0.005721
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -150,7 +150,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005721
       payload fees(the block proposer) ....... +ꜩ0.005721
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -190,7 +190,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -230,7 +230,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -270,7 +270,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -310,7 +310,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -350,7 +350,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -390,7 +390,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -430,7 +430,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -470,7 +470,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -510,7 +510,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -550,7 +550,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -590,7 +590,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -630,7 +630,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -670,7 +670,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -710,7 +710,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -750,7 +750,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -790,7 +790,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -830,7 +830,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -870,7 +870,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -910,7 +910,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -950,7 +950,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -990,7 +990,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1030,7 +1030,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1070,7 +1070,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1110,7 +1110,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1150,7 +1150,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1190,7 +1190,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1230,7 +1230,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1270,7 +1270,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1310,7 +1310,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1350,7 +1350,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1390,7 +1390,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1430,7 +1430,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1470,7 +1470,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1510,7 +1510,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1550,7 +1550,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1590,7 +1590,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1630,7 +1630,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1670,7 +1670,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1710,7 +1710,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1750,7 +1750,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1790,7 +1790,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1830,7 +1830,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1870,7 +1870,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1910,7 +1910,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1950,7 +1950,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -1990,7 +1990,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2030,7 +2030,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2070,7 +2070,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2110,7 +2110,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2150,7 +2150,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2190,7 +2190,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2230,7 +2230,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2270,7 +2270,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2310,7 +2310,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2350,7 +2350,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2390,7 +2390,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2430,7 +2430,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2470,7 +2470,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2510,7 +2510,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2550,7 +2550,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2590,7 +2590,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2630,7 +2630,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2670,7 +2670,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2710,7 +2710,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2750,7 +2750,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2790,7 +2790,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2830,7 +2830,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2870,7 +2870,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2910,7 +2910,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2950,7 +2950,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -2990,7 +2990,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3030,7 +3030,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3070,7 +3070,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3110,7 +3110,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3150,7 +3150,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3190,7 +3190,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3230,7 +3230,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3270,7 +3270,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3310,7 +3310,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3350,7 +3350,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3390,7 +3390,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3430,7 +3430,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3470,7 +3470,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3510,7 +3510,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3550,7 +3550,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3590,7 +3590,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3630,7 +3630,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3670,7 +3670,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3710,7 +3710,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3750,7 +3750,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3790,7 +3790,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3830,7 +3830,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3870,7 +3870,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3910,7 +3910,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
@@ -3950,7 +3950,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.005625
       payload fees(the block proposer) ....... +ꜩ0.005625
     Tx rollup transaction:[TX_ROLLUP_HASH], 5000 bytes, From: [PUBLIC_KEY_HASH]
-      This tx rollup submit operation was successfully applied
+      This transaction rollup batch submission was successfully applied
       Consumed gas: 4615.509
 
 
