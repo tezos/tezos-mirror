@@ -458,11 +458,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
           ~hash_string
           script ;
         let filename =
-          Printf.sprintf
-            "%s%s%s.addresses"
-            output_dir
-            Filename.dir_sep
-            hash_string
+          Filename.concat output_dir (hash_string ^ ".addresses")
         in
         File_helpers.print_to_file
           filename
@@ -470,9 +466,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
           (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
           contracts ;
         if Config.collect_storage then
-          let dirname =
-            Printf.sprintf "%s/%s.storages" output_dir hash_string
-          in
+          let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
           File_helpers.print_expr_dir ~dirname ~ext:".storage" storages
         else ())
       contract_map ;
@@ -480,7 +474,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     let () =
       if not (ExprMap.is_empty lambda_map) then (
         print_endline "Writing lambda files..." ;
-        let dirname = Printf.sprintf "%s/lambdas" output_dir in
+        let dirname = Filename.concat output_dir "lambdas" in
         File_helpers.print_expr_dir ~dirname ~ext:".tz" lambda_map ;
         File_helpers.print_expr_dir ~dirname ~ext:".ty" lambda_ty_map ;
         File_helpers.print_legacy_dir
