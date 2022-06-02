@@ -2710,7 +2710,7 @@ module rec Sc_rollup : sig
 
       val history_at_genesis : bound:int64 -> history
 
-      val add_messages :
+      val add_external_messages :
         history ->
         t ->
         Raw_level.t ->
@@ -2718,7 +2718,7 @@ module rec Sc_rollup : sig
         messages ->
         (messages * history * t) tzresult Lwt.t
 
-      val add_messages_no_history :
+      val add_external_messages_no_history :
         t ->
         Raw_level.t ->
         string list ->
@@ -2767,7 +2767,7 @@ module rec Sc_rollup : sig
     module MakeHashingScheme (Tree : TREE) :
       MerkelizedOperations with type tree = Tree.tree
 
-    val add_messages :
+    val add_external_messages :
       context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
 
     val inbox : context -> rollup -> (t * context) tzresult Lwt.t

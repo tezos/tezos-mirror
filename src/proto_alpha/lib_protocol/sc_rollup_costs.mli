@@ -41,9 +41,9 @@ end
 val is_valid_parameters_ty_cost :
   ty_size:'a Saturation_repr.t -> Saturation_repr.may_saturate Saturation_repr.t
 
-(** [cost_add_messages ~num_messages ~total_messages_length level] 
+(** [cost_add_external_messages ~num_messages ~total_messages_length level]
     returns the cost of adding [num_messages] with total messages size
-    [total_messages_size] to a sc-rollup inbox at level [level]. This 
+    [total_messages_size] to a sc-rollup inbox at level [level]. This
     function is used internally in the [Sc_rollup_storage] module. *)
-val cost_add_messages :
+val cost_add_external_messages :
   num_messages:int -> total_messages_size:int -> int32 -> Gas_limit_repr.cost

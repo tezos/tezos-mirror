@@ -30,7 +30,7 @@ val inbox :
   Sc_rollup_repr.t ->
   (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
 
-(** [add_messages context rollup msg] adds [msg] to [rollup]'s inbox.
+(** [add_external_messages context rollup msg] adds [msg] to [rollup]'s inbox.
 
     This function returns the updated context as well as the size diff.
 
@@ -41,7 +41,7 @@ val inbox :
       the number of messages pushed during commitment period is too high}
     }
 *)
-val add_messages :
+val add_external_messages :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   string list ->

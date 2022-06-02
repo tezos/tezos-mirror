@@ -194,7 +194,7 @@ type t = {
   nb_messages_in_commitment_period : int64;
   starting_level_of_current_commitment_period : Raw_level_repr.t;
   message_counter : Z.t;
-  (* Lazy to avoid hashing O(n^2) time in [add_messages] *)
+  (* Lazy to avoid hashing O(n^2) time in [add_external_messages] *)
   current_messages_hash : unit -> Hash.t;
   old_levels_messages : history_proof;
 }
@@ -377,7 +377,7 @@ module type MerkelizedOperations = sig
 
   val history_at_genesis : bound:int64 -> history
 
-  val add_messages :
+  val add_external_messages :
     history ->
     t ->
     Raw_level_repr.t ->
@@ -385,7 +385,7 @@ module type MerkelizedOperations = sig
     messages ->
     (messages * history * t) tzresult Lwt.t
 
-  val add_messages_no_history :
+  val add_external_messages_no_history :
     t ->
     Raw_level_repr.t ->
     string list ->
@@ -439,7 +439,7 @@ module MakeHashingScheme (Tree : TREE) :
 
   type message = tree
 
-  let add_message inbox payload messages =
+  let add_external_message inbox payload messages =
     let open Lwt_syntax in
     let message_index = inbox.message_counter in
     let message_counter = Z.succ message_index in
@@ -611,7 +611,7 @@ module MakeHashingScheme (Tree : TREE) :
     if Tree.is_empty messages then no_messages_hash
     else Hash.of_context_hash @@ Tree.hash messages
 
-  let add_messages_aux history inbox level payloads messages =
+  let add_external_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
     if Raw_level_repr.(level < inbox.level) then
       fail (Invalid_level_add_messages level)
@@ -620,24 +620,29 @@ module MakeHashingScheme (Tree : TREE) :
       let* messages, inbox =
         List.fold_left_es
           (fun (messages, inbox) payload ->
-            add_message inbox payload messages >>= return)
+            add_external_message inbox payload messages >>= return)
           (messages, inbox)
           payloads
       in
       let current_messages_hash () = hash_messages messages in
       return (messages, history, {inbox with current_messages_hash})
 
-  let add_messages history inbox level payloads messages =
+  let add_external_messages history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
     let* messages, With_history history, inbox =
-      add_messages_aux (With_history history) inbox level payloads messages
+      add_external_messages_aux
+        (With_history history)
+        inbox
+        level
+        payloads
+        messages
     in
     return (messages, history, inbox)
 
-  let add_messages_no_history inbox level payloads messages =
+  let add_external_messages_no_history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
     let* messages, No_history, inbox =
-      add_messages_aux No_history inbox level payloads messages
+      add_external_messages_aux No_history inbox level payloads messages
     in
     return (messages, inbox)
 
