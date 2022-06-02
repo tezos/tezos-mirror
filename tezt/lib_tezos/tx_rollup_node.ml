@@ -88,6 +88,8 @@ let spawn_init_config node =
   spawn_command
     node
     (([
+        "--base-dir";
+        Client.base_dir node.persistent_state.client;
         "init";
         string_of_mode node.persistent_state.mode;
         "config";
