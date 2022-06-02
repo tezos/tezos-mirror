@@ -90,22 +90,7 @@ let output_dirs_and_files : String_set.t String_map.t ref = ref String_map.empty
 
 let register ~__FILE__ ~title ~tags ?file f =
   let tags = "regression" :: tags in
-  let output_dir =
-    let project_root =
-      match Sys.getenv_opt "DUNE_SOURCEROOT" with
-      | Some x -> x
-      | None -> (
-          match Sys.getenv_opt "PWD" with
-          | Some x -> x
-          | None ->
-              (* For some reason, under [dune runtest], [PWD] and
-                 [getcwd] have different values. [getcwd] is in
-                 [_build/default], and [PWD] is where [dune runtest] was
-                 executed, which is closer to what we want. *)
-              Sys.getcwd ())
-    in
-    project_root // Filename.dirname __FILE__ // "expected"
-  in
+  let output_dir = project_root // Filename.dirname __FILE__ // "expected" in
   let relative_output_file =
     let file =
       match file with
