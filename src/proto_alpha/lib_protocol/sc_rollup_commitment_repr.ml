@@ -55,10 +55,6 @@ module Hash = struct
   include Path_encoding.Make_hex (H)
 end
 
-module Hash_index = struct
-  include Hash
-end
-
 type t = {
   compressed_state : State_hash.t;
   inbox_level : Raw_level_repr.t;

@@ -522,14 +522,19 @@ module Sc_rollup_inbox = struct
         let* tree = add tree [key; "payload"] payload in
         build_current_messages_tree (Z.succ counter) tree rest
 
-  let predict_current_messages_hash = function
-    | [] -> return @@ Tezos_crypto.Context_hash.hash_bytes []
-    | current_messages ->
-        let open Lwt.Syntax in
-        let+ tree =
-          build_current_messages_tree Z.zero (empty ()) current_messages
-        in
-        hash tree
+  let predict_current_messages_hash =
+    Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.(
+      function
+      | [] -> return @@ Inbox.Hash.hash_bytes []
+      | current_messages ->
+          let open Lwt.Syntax in
+          let* tree =
+            build_current_messages_tree Z.zero (empty ()) current_messages
+          in
+          let context_hash = hash tree in
+          Inbox.Hash.hash_bytes
+            [Tezos_crypto.Context_hash.to_bytes context_hash]
+          |> return)
 end
 
 let fetch_messages_from_block sc_rollup_address client =
@@ -568,7 +573,7 @@ let test_rollup_inbox_current_messages_hash =
           |> List.map (Printf.sprintf "\"%s\"")
           |> String.concat ", " |> Printf.sprintf "text:[%s]"
         in
-        let open Tezos_crypto.Context_hash in
+        let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
         (* no messages have been sent *)
         let* pristine_hash, _ =
           get_inbox_from_tezos_node sc_rollup_address client
@@ -576,7 +581,7 @@ let test_rollup_inbox_current_messages_hash =
         let* expected = Sc_rollup_inbox.predict_current_messages_hash [] in
         let () =
           Check.(
-            (to_b58check expected = pristine_hash)
+            (Inbox.Hash.to_b58check expected = pristine_hash)
               string
               ~error_msg:"expected pristine hash %L, got %R")
         in
@@ -604,7 +609,7 @@ let test_rollup_inbox_current_messages_hash =
         in
         let () =
           Check.(
-            (to_b58check expected = fst_batch_hash)
+            (Inbox.Hash.to_b58check expected = fst_batch_hash)
               string
               ~error_msg:"expected first batch hash %L, got %R")
         in
@@ -632,7 +637,7 @@ let test_rollup_inbox_current_messages_hash =
         in
         let () =
           Check.(
-            (Tezos_crypto.Context_hash.to_b58check expected = snd_batch_hash)
+            (Inbox.Hash.to_b58check expected = snd_batch_hash)
               string
               ~error_msg:"expected second batch hash %L, got %R")
         in
