@@ -2455,36 +2455,6 @@ let check_counters_consistency contents_list =
   in
   check_counters_rec None contents_list
 
-(** Returns an updated context, and a list of prechecked contents containing
-    balance updates for fees related to each manager operation in
-    [contents_list]. *)
-let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
-  let open Lwt_result_syntax in
-  let rec rec_precheck_manager_contents_list :
-      type kind.
-      context ->
-      kind Kind.manager contents_list ->
-      (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
-   fun ctxt contents_list ->
-    match contents_list with
-    | Single contents ->
-        let* ctxt, balance_updates =
-          precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        in
-        return (ctxt, PrecheckedSingle {contents; balance_updates})
-    | Cons (contents, rest) ->
-        let* ctxt, balance_updates =
-          precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        in
-        let* ctxt, results_rest =
-          rec_precheck_manager_contents_list ctxt rest
-        in
-        return (ctxt, PrecheckedCons ({contents; balance_updates}, results_rest))
-  in
-  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  let* () = check_counters_consistency contents_list in
-  rec_precheck_manager_contents_list ctxt contents_list
-
 let find_manager_public_key ctxt (op : _ Kind.manager contents_list) =
   (* Currently, the [op] batch contains only one signature, so all
      operations in the batch are required to originate from the same
@@ -2535,6 +2505,38 @@ let find_manager_public_key ctxt (op : _ Kind.manager contents_list) =
   match revealed_key with
   | None -> Contract.get_manager_key ctxt source
   | Some pk -> return pk
+
+let rec rec_precheck_manager_contents_list :
+    type kind.
+    context ->
+    kind Kind.manager contents_list ->
+    only_batch:bool ->
+    (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
+ fun ctxt contents_list ~only_batch ->
+  let open Lwt_result_syntax in
+  match contents_list with
+  | Single contents ->
+      let* ctxt, balance_updates =
+        precheck_manager_contents ctxt contents ~only_batch
+      in
+      return (ctxt, PrecheckedSingle {contents; balance_updates})
+  | Cons (contents, rest) ->
+      let* ctxt, balance_updates =
+        precheck_manager_contents ctxt contents ~only_batch
+      in
+      let* ctxt, results_rest =
+        rec_precheck_manager_contents_list ctxt rest ~only_batch
+      in
+      return (ctxt, PrecheckedCons ({contents; balance_updates}, results_rest))
+
+(** Returns an updated context, and a list of prechecked contents containing
+    balance updates for fees related to each manager operation in
+    [contents_list]. *)
+let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
+  let open Lwt_result_syntax in
+  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+  let* () = check_counters_consistency contents_list in
+  rec_precheck_manager_contents_list ctxt contents_list ~only_batch:mempool_mode
 
 let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
     raw_operation =
