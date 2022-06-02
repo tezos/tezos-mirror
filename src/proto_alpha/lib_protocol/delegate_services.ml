@@ -186,11 +186,12 @@ module S = struct
   let list_delegate =
     RPC_service.get_service
       ~description:
-        "Lists all registered delegates. The arguments `active`, `inactive`, \
-         `with_minimal_stake`, and `without_minimal_stake` allow to enumerate \
-         only the delegates that are active, inactive, have at least a minimal \
-         stake to participate in consensus and in governance, or do not have \
-         such a minimal stake, respectively."
+        "Lists all registered delegates by default. The arguments `active`, \
+         `inactive`, `with_minimal_stake`, and `without_minimal_stake` allow \
+         to enumerate only the delegates that are active, inactive, have at \
+         least a minimal stake to participate in consensus and in governance, \
+         or do not have such a minimal stake, respectively. Note, setting \
+         these arguments to false has no effect."
       ~query:list_query
       ~output:(list Signature.Public_key_hash.encoding)
       raw_path
