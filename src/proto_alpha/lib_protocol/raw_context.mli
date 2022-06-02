@@ -370,3 +370,37 @@ module Sc_rollup_in_memory_inbox : sig
 
   val set_current_messages : t -> Sc_rollup_repr.t -> Context.tree -> t tzresult
 end
+
+module Dal : sig
+  (** [record_available_shards ctxt slots shards] records that the
+     list of shards [shards] were declared available. The function
+     assumes that a shard belongs to the interval [0; number_of_shards
+     - 1]. Otherwise, for each shard outside this interval, it is a
+     no-op. *)
+  val record_available_shards : t -> Dal_endorsement_repr.t -> int list -> t
+
+  (** [current_slot_fees ctxt slot fees] computes the current fees
+     associated to the slot [slot]. *)
+  val current_slot_fees : t -> Dal_slot_repr.t -> Tez_repr.t option
+
+  (** [update_slot_fees ctxt slot fees] returns a new context where
+     the new candidate [(slot,fees)] have been taken into
+     account. Returns [(ctxt,updated)] where [updated=true] if the
+     candidate if better (fee-wise) than the current
+     candidate. [update=false] otherwise. *)
+  val update_slot_fees : t -> Dal_slot_repr.t -> Tez_repr.t -> t * bool
+
+  (** [candidates ctxt] returns the current list of slot for which
+     there is at least one candidate. *)
+  val candidates : t -> Dal_slot_repr.t list
+
+  (** [is_slot_available ctxt slot_index] returns [true] if the
+     [slot_index] is declared available by the protocol. [false]
+     otherwise. If the [index] is out of the interval
+     [0;number_of_slots - 1], returns [false]. *)
+  val is_slot_available : t -> Dal_slot_repr.index -> bool
+
+  (** [shards ctxt ~endorser] returns the shard assignment for the
+     [endorser] for the current level. *)
+  val shards : t -> endorser:Signature.Public_key_hash.t -> int list
+end

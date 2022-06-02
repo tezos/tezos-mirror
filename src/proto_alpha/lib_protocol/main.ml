@@ -583,6 +583,7 @@ let finalize_block
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
+              dal_slot_availability = None;
             } )
   | Partial_application {fitness; block_producer; _} ->
       (* For partial application we do not completely check the block validity.
@@ -622,6 +623,7 @@ let finalize_block
             balance_updates = migration_balance_updates;
             liquidity_baking_toggle_ema;
             implicit_operations_results;
+            dal_slot_availability = None;
           } )
   | Application
       {
@@ -690,6 +692,9 @@ let relative_position_within_block op1 op2 =
   | Single (Endorsement _), Single (Endorsement _) -> 0
   | Single (Endorsement _), _ -> -1
   | _, Single (Endorsement _) -> 1
+  | Single (Dal_slot_availability _), Single (Dal_slot_availability _) -> 0
+  | Single (Dal_slot_availability _), _ -> -1
+  | _, Single (Dal_slot_availability _) -> 1
   | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
   | _, Single (Seed_nonce_revelation _) -> 1
   | Single (Seed_nonce_revelation _), _ -> -1

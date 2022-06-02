@@ -23,31 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Z.t
+let find ctxt level = Storage.Dal.Slot_headers.find ctxt level
 
-type error += Invalid_position of int
+let finalize_current_slots ctxt =
+  let current_level = Raw_context.current_level ctxt in
+  let slots = Raw_context.Dal.candidates ctxt in
+  Storage.Dal.Slot_headers.add ctxt current_level.level slots
 
-let encoding = Data_encoding.z
+let compute_available_slots ctxt slots =
+  let fold_available_slots available_slots slot =
+    if Raw_context.Dal.is_slot_available ctxt slot.Dal_slot_repr.index then
+      Dal_endorsement_repr.commit available_slots slot.Dal_slot_repr.index
+    else available_slots
+  in
+  List.fold_left fold_available_slots Dal_endorsement_repr.empty slots
 
-let empty = Z.zero
+let finalize_pending_slots ctxt =
+  let current_level = Raw_context.current_level ctxt in
+  let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
+  match Raw_level_repr.(sub current_level.level dal.endorsement_lag) with
+  | None -> return (ctxt, Dal_endorsement_repr.empty)
+  | Some level_endorsed -> (
+      Storage.Dal.Slot_headers.find ctxt level_endorsed >>=? function
+      | None -> return (ctxt, Dal_endorsement_repr.empty)
+      | Some slots ->
+          let available_slots = compute_available_slots ctxt slots in
+          (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3112
 
-let mem field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.testbit field pos
-
-let add field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.logor field Z.(shift_left one pos)
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"bitfield_invalid_position"
-    ~title:"Invalid bitfield’s position"
-    ~description:"Bitfields does not accept negative positions"
-    (obj1 (req "position" int31))
-    (function Invalid_position i -> Some i | _ -> None)
-    (fun i -> Invalid_position i)
-
-let occupied_size_in_bits = Z.numbits
+             At this point, available slots can be integrated into
+             SCORU inboxes *)
+          Storage.Dal.Slot_headers.remove ctxt level_endorsed >>= fun ctxt ->
+          return (ctxt, available_slots))

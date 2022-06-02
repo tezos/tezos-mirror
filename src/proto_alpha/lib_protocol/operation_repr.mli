@@ -68,6 +68,8 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type 'a double_consensus_operation_evidence =
@@ -119,6 +121,8 @@ module Kind : sig
 
   type transfer_ticket = Transfer_ticket_kind
 
+  type dal_publish_slot_header = Dal_publish_slot_header_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -152,6 +156,7 @@ module Kind : sig
     | Tx_rollup_dispatch_tickets_manager_kind
         : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
+    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -186,6 +191,7 @@ val pp_consensus_content : Format.formatter -> consensus_content -> unit
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
+  | Dal_slot_availability of Chain_id.t
 
 val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -235,6 +241,12 @@ and _ contents =
   (* Endorsement: About consensus, endorsement of a block held by a
      validator. *)
   | Endorsement : consensus_content -> Kind.endorsement contents
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
+
+     Temporary operation to avoid modifying endorsement encoding. *)
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      -> Kind.dal_slot_availability contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their
      nonces after a given number of cycles to keep their block rewards
@@ -426,6 +438,10 @@ and _ manager_operation =
           (** The entrypoint of the smart contract address that should receive the tickets. *)
     }
       -> Kind.transfer_ticket manager_operation
+  | Dal_publish_slot_header : {
+      slot : Dal_slot_repr.t;
+    }
+      -> Kind.dal_publish_slot_header manager_operation
   (* [Sc_rollup_originate] allows an implicit account to originate a new
      smart contract rollup (initialized with a given boot
      sector). *)
@@ -561,6 +577,8 @@ module Encoding : sig
 
   val endorsement_case : Kind.endorsement case
 
+  val dal_slot_availability_case : Kind.dal_slot_availability case
+
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 
   val double_preendorsement_evidence_case :
@@ -612,6 +630,9 @@ module Encoding : sig
     Kind.tx_rollup_dispatch_tickets Kind.manager case
 
   val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
+
+  val dal_publish_slot_header_case :
+    Kind.dal_publish_slot_header Kind.manager case
 
   val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
 
@@ -671,6 +692,8 @@ module Encoding : sig
     val tx_rollup_dispatch_tickets_case : Kind.tx_rollup_dispatch_tickets case
 
     val transfer_ticket_case : Kind.transfer_ticket case
+
+    val dal_publish_slot_header_case : Kind.dal_publish_slot_header case
 
     val sc_rollup_originate_case : Kind.sc_rollup_originate case
 

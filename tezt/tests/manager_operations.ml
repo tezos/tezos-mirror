@@ -874,7 +874,7 @@ module Deserialisation = struct
     in
     Operation.forge_and_inject_operation
       ?protocol
-      ~batch:[op]
+      ~batch:(`Manager [op])
       ~signer:source
       client
 
@@ -1011,7 +1011,7 @@ module Gas_limits = struct
       @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
-        ~batch
+        ~batch:(`Manager batch)
         ~signer:Constant.bootstrap2
         nodes.main.client
     in
@@ -1036,7 +1036,7 @@ module Gas_limits = struct
       (* Gas limit per op is too high *)
       Operation.forge_and_inject_operation
         ~protocol
-        ~batch
+        ~batch:(`Manager batch)
         ~signer:Constant.bootstrap2
         nodes.main.client
     in
@@ -1065,7 +1065,7 @@ module Gas_limits = struct
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
-        ~batch
+        ~batch:(`Manager batch)
         ~signer:Constant.bootstrap2
         nodes.main.client
     in
@@ -1086,7 +1086,10 @@ module Reveal = struct
     let s2 = {key with Account.public_key = pk2} in
     let* op1 = Operation.mk_reveal ~source:s1 ~counter:(cpt + 1) ~fee client in
     let* op2 = Operation.mk_reveal ~source:s2 ~counter:(cpt + 2) ~fee client in
-    Operation.forge_and_inject_operation ~batch:[op1; op2] ~signer:key client
+    Operation.forge_and_inject_operation
+      ~batch:(`Manager [op1; op2])
+      ~signer:key
+      client
 
   let simple_reveal_bad_pk =
     Protocol.register_test
@@ -1129,7 +1132,7 @@ module Reveal = struct
       Memchecks.with_absent_checks ~__LOC__ nodes @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
-        ~batch:[op]
+        ~batch:(`Manager [op])
         ~signer:key
         ~patch_unsigned
         nodes.main.client
@@ -1720,7 +1723,7 @@ module Simple_transfers = struct
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
-        ~batch:[op1; op2; op3]
+        ~batch:(`Manager [op1; op2; op3])
         ~signer:Constant.bootstrap2
         nodes.main.client
     in
@@ -1761,7 +1764,7 @@ module Simple_transfers = struct
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
-        ~batch:[op1; op2; op3]
+        ~batch:(`Manager [op1; op2; op3])
         ~signer:Constant.bootstrap2
         nodes.main.client
     in

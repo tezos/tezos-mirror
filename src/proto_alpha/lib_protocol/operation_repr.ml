@@ -39,6 +39,8 @@ module Kind = struct
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type 'a double_consensus_operation_evidence =
@@ -90,6 +92,8 @@ module Kind = struct
 
   type transfer_ticket = Transfer_ticket_kind
 
+  type dal_publish_slot_header = Dal_publish_slot_header_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -123,6 +127,7 @@ module Kind = struct
     | Tx_rollup_dispatch_tickets_manager_kind
         : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
+    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -184,12 +189,15 @@ let pp_consensus_content ppf content =
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
+  | Dal_slot_availability of Chain_id.t
 
 let bytes_of_consensus_watermark = function
   | Preendorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
   | Endorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id)
+  | Dal_slot_availability chain_id ->
+      Bytes.cat (Bytes.of_string "\x14") (Chain_id.to_bytes chain_id)
 
 let to_watermark w = Signature.Custom (bytes_of_consensus_watermark w)
 
@@ -204,6 +212,10 @@ let of_watermark = function
         | '\x13' ->
             Option.map
               (fun chain_id -> Preendorsement chain_id)
+              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
+        | '\x14' ->
+            Option.map
+              (fun chain_id -> Dal_slot_availability chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -238,6 +250,9 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
@@ -362,6 +377,10 @@ and _ manager_operation =
       entrypoint : Entrypoint_repr.t;
     }
       -> Kind.transfer_ticket manager_operation
+  | Dal_publish_slot_header : {
+      slot : Dal_slot_repr.t;
+    }
+      -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup_repr.Kind.t;
       boot_sector : string;
@@ -425,6 +444,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Tx_rollup_rejection _ -> Kind.Tx_rollup_rejection_manager_kind
   | Tx_rollup_dispatch_tickets _ -> Kind.Tx_rollup_dispatch_tickets_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
+  | Dal_publish_slot_header _ -> Kind.Dal_publish_slot_header_manager_kind
   | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
   | Sc_rollup_add_messages _ -> Kind.Sc_rollup_add_messages_manager_kind
   | Sc_rollup_cement _ -> Kind.Sc_rollup_cement_manager_kind
@@ -520,6 +540,10 @@ let sc_rollup_operation_refute_tag = sc_rollup_operation_tag_offset + 4
 let sc_rollup_operation_timeout_tag = sc_rollup_operation_tag_offset + 5
 
 let sc_rollup_operation_atomic_batch_tag = sc_rollup_operation_tag_offset + 6
+
+let dal_offset = 230
+
+let dal_publish_slot_header_tag = dal_offset + 0
 
 module Encoding = struct
   open Data_encoding
@@ -940,6 +964,19 @@ module Encoding = struct
               Sc_rollup_originate {kind; boot_sector; parameters_ty});
         }
 
+    let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =
+      MCase
+        {
+          tag = dal_publish_slot_header_tag;
+          name = "dal_publish_slot_header";
+          encoding = obj1 (req "slot" Dal_slot_repr.encoding);
+          select =
+            (function
+            | Manager (Dal_publish_slot_header _ as op) -> Some op | _ -> None);
+          proj = (function Dal_publish_slot_header {slot} -> slot);
+          inj = (fun slot -> Dal_publish_slot_header {slot});
+        }
+
     let[@coq_axiom_with_reason "gadt"] sc_rollup_add_messages_case =
       MCase
         {
@@ -1193,6 +1230,29 @@ module Encoding = struct
                   @@ union [make endorsement_case]))
                (varopt "signature" Signature.encoding)))
 
+  let dal_slot_availability_encoding =
+    obj2
+      (req "endorser" Signature.Public_key_hash.encoding)
+      (req "endorsement" Dal_endorsement_repr.encoding)
+
+  let dal_slot_availability_case =
+    Case
+      {
+        tag = 22;
+        name = "dal_slot_availability";
+        encoding = dal_slot_availability_encoding;
+        select =
+          (function
+          | Contents (Dal_slot_availability _ as op) -> Some op | _ -> None);
+        proj =
+          (fun [@coq_match_with_default] (Dal_slot_availability
+                                           (endorser, endorsement)) ->
+            (endorser, endorsement));
+        inj =
+          (fun (endorser, endorsement) ->
+            Dal_slot_availability (endorser, endorsement));
+      }
+
   let[@coq_axiom_with_reason "gadt"] seed_nonce_revelation_case =
     Case
       {
@@ -1434,6 +1494,11 @@ module Encoding = struct
       transfer_ticket_tag
       Manager_operations.transfer_ticket_case
 
+  let dal_publish_slot_header_case =
+    make_manager_case
+      dal_publish_slot_header_tag
+      Manager_operations.dal_publish_slot_header_case
+
   let sc_rollup_originate_case =
     make_manager_case
       sc_rollup_operation_origination_tag
@@ -1483,6 +1548,7 @@ module Encoding = struct
          [
            make endorsement_case;
            make preendorsement_case;
+           make dal_slot_availability_case;
            make seed_nonce_revelation_case;
            make double_endorsement_evidence_case;
            make double_preendorsement_evidence_case;
@@ -1506,6 +1572,7 @@ module Encoding = struct
            make tx_rollup_rejection_case;
            make tx_rollup_dispatch_tickets_case;
            make transfer_ticket_case;
+           make dal_publish_slot_header_case;
            make sc_rollup_originate_case;
            make sc_rollup_add_messages_case;
            make sc_rollup_cement_case;
@@ -1572,6 +1639,7 @@ let acceptable_passes (op : packed_operation) =
   | Single (Failing_noop _) -> []
   | Single (Preendorsement _) -> [0]
   | Single (Endorsement _) -> [0]
+  | Single (Dal_slot_availability _) -> [0]
   | Single (Proposals _) -> [1]
   | Single (Ballot _) -> [1]
   | Single (Seed_nonce_revelation _) -> [2]
@@ -1650,6 +1718,11 @@ let check_signature (type kind) key chain_id
             ~watermark:(to_watermark (Endorsement chain_id))
             (Contents_list contents)
             signature
+      | Single (Dal_slot_availability _) as contents ->
+          check
+            ~watermark:(to_watermark (Dal_slot_availability chain_id))
+            (Contents_list contents)
+            signature
       | Single
           ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
           | Double_endorsement_evidence _ | Double_preendorsement_evidence _
@@ -1717,6 +1790,8 @@ let equal_manager_operation_kind :
   | Tx_rollup_dispatch_tickets _, _ -> None
   | Transfer_ticket _, Transfer_ticket _ -> Some Eq
   | Transfer_ticket _, _ -> None
+  | Dal_publish_slot_header _, Dal_publish_slot_header _ -> Some Eq
+  | Dal_publish_slot_header _, _ -> None
   | Sc_rollup_originate _, Sc_rollup_originate _ -> Some Eq
   | Sc_rollup_originate _, _ -> None
   | Sc_rollup_add_messages _, Sc_rollup_add_messages _ -> Some Eq
@@ -1740,6 +1815,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preendorsement _, _ -> None
   | Endorsement _, Endorsement _ -> Some Eq
   | Endorsement _, _ -> None
+  | Dal_slot_availability _, Dal_slot_availability _ -> Some Eq
+  | Dal_slot_availability _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq

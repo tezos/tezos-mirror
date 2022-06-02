@@ -99,6 +99,10 @@ and 'kind contents_result =
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
+  | Dal_slot_availability_result : {
+      delegate : Signature.Public_key_hash.t;
+    }
+      -> Kind.dal_slot_availability contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -256,6 +260,10 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.transfer_ticket successful_manager_operation_result
+  | Dal_publish_slot_header_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.dal_publish_slot_header successful_manager_operation_result
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;
@@ -372,6 +380,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
+  dal_slot_availability : Dal.Endorsement.t option;
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding

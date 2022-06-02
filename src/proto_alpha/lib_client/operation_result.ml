@@ -269,6 +269,8 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         source
   | Transfer_ticket _ ->
       Format.fprintf ppf "Transfer tickets:@,From: %a" Contract.pp source
+  | Dal_publish_slot_header {slot} ->
+      Format.fprintf ppf "@[<v 2>Publish slot %a@]" Dal.Slot.pp slot
   | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
       let parameters_ty =
@@ -680,6 +682,10 @@ let pp_manager_operation_contents_and_result ppf
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
+  let pp_dal_publish_slot_header_result
+      (Dal_publish_slot_header_result {consumed_gas}) =
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+  in
   let pp_sc_rollup_originate_result
       (Sc_rollup_originate_result
         {address; consumed_gas; size; balance_updates}) =
@@ -902,6 +908,17 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This transfer ticket operation was BACKTRACKED, its expected \
            effects (as follow) were NOT applied.@]" ;
         pp_transfer_ticket_result op
+    | Applied (Dal_publish_slot_header_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This operation publishing a slot header was successfully applied" ;
+        pp_dal_publish_slot_header_result op
+    | Backtracked ((Dal_publish_slot_header_result _ as op), _errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This operation publishing a slot header was BACKTRACKED, its \
+           expected effects (as follow) were NOT applied.@]" ;
+        pp_dal_publish_slot_header_result op
     | Applied (Sc_rollup_originate_result _ as op) ->
         Format.fprintf
           ppf
@@ -1099,6 +1116,13 @@ let rec pp_contents_and_result_list :
         Signature.Public_key_hash.pp
         delegate
         endorsement_power
+  | Single_and_result
+      (Dal_slot_availability _, Dal_slot_availability_result {delegate}) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Slot availability:@,Delegate: %a@]"
+        Signature.Public_key_hash.pp
+        delegate
   | Single_and_result
       ( Double_endorsement_evidence {op1; op2},
         Double_endorsement_evidence_result bus ) ->

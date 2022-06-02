@@ -43,3 +43,7 @@ val mem : t -> int -> bool tzresult
 
     This functions returns [Invalid_input i] if [i] is negative. *)
 val add : t -> int -> t tzresult
+
+(** [occupied_size_in_bits bitset] returns the current number of bits
+   occupied by the [bitset]. *)
+val occupied_size_in_bits : t -> int

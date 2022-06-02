@@ -213,6 +213,10 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.transfer_ticket successful_manager_operation_result
+  | Dal_publish_slot_header_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.dal_publish_slot_header successful_manager_operation_result
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;
@@ -891,6 +895,26 @@ module Manager_result = struct
             paid_storage_size_diff;
           })
 
+  let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =
+    make
+      ~op_case:
+        Operation.Encoding.Manager_operations.dal_publish_slot_header_case
+      ~encoding:
+        (obj2
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Dal_publish_slot_header_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~proj:(function
+        | Dal_publish_slot_header_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~kind:Kind.Dal_publish_slot_header_manager_kind
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Dal_publish_slot_header_result {consumed_gas = consumed_milligas})
+
   let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_originate_case
@@ -1446,6 +1470,10 @@ type 'kind contents_result =
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
+  | Dal_slot_availability_result : {
+      delegate : Signature.Public_key_hash.t;
+    }
+      -> Kind.dal_slot_availability contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -1534,6 +1562,10 @@ let equal_manager_kind :
   | Kind.Transfer_ticket_manager_kind, Kind.Transfer_ticket_manager_kind ->
       Some Eq
   | Kind.Transfer_ticket_manager_kind, _ -> None
+  | ( Kind.Dal_publish_slot_header_manager_kind,
+      Kind.Dal_publish_slot_header_manager_kind ) ->
+      Some Eq
+  | Kind.Dal_publish_slot_header_manager_kind, _ -> None
   | Kind.Sc_rollup_originate_manager_kind, Kind.Sc_rollup_originate_manager_kind
     ->
       Some Eq
@@ -1633,6 +1665,24 @@ module Encoding = struct
         inj =
           (fun (balance_updates, delegate, endorsement_power) ->
             Endorsement_result {balance_updates; delegate; endorsement_power});
+      }
+
+  let[@coq_axiom_with_reason "gadt"] dal_slot_availability_case =
+    Case
+      {
+        op_case = Operation.Encoding.dal_slot_availability_case;
+        encoding = obj1 (req "delegate" Signature.Public_key_hash.encoding);
+        select =
+          (function
+          | Contents_result (Dal_slot_availability_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Dal_slot_availability _ as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        proj = (function Dal_slot_availability_result {delegate} -> delegate);
+        inj = (fun delegate -> Dal_slot_availability_result {delegate});
       }
 
   let[@coq_axiom_with_reason "gadt"] seed_nonce_revelation_case =
@@ -1820,6 +1870,7 @@ module Encoding = struct
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preendorsement_result _) -> None
           | Contents_result (Endorsement_result _) -> None
+          | Contents_result (Dal_slot_availability_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Double_endorsement_evidence_result _) -> None
@@ -2011,6 +2062,18 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
+  let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =
+    make_manager_case
+      Operation.Encoding.dal_publish_slot_header_case
+      Manager_result.dal_publish_slot_header_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Dal_publish_slot_header _; _} as
+              op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
+
   let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =
     make_manager_case
       Operation.Encoding.sc_rollup_originate_case
@@ -2111,6 +2174,7 @@ let contents_result_encoding =
          make seed_nonce_revelation_case;
          make endorsement_case;
          make preendorsement_case;
+         make dal_slot_availability_case;
          make double_preendorsement_evidence_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
@@ -2132,6 +2196,7 @@ let contents_result_encoding =
          make tx_rollup_rejection_case;
          make tx_rollup_dispatch_tickets_case;
          make transfer_ticket_case;
+         make dal_publish_slot_header_case;
          make sc_rollup_originate_case;
          make sc_rollup_add_messages_case;
          make sc_rollup_cement_case;
@@ -2305,6 +2370,8 @@ let kind_equal :
   | Endorsement _, _ -> None
   | Preendorsement _, Preendorsement_result _ -> Some Eq
   | Preendorsement _, _ -> None
+  | Dal_slot_availability _, Dal_slot_availability_result _ -> Some Eq
+  | Dal_slot_availability _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Double_preendorsement_evidence _, Double_preendorsement_evidence_result _ ->
@@ -2719,6 +2786,23 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Transfer_ticket _; _}, _ -> None
+  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Dal_publish_slot_header_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Dal_publish_slot_header_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Dal_publish_slot_header _; _}, _ -> None
   | ( Manager_operation {operation = Sc_rollup_originate _; _},
       Manager_operation_result
         {operation_result = Applied (Sc_rollup_originate_result _); _} ) ->
@@ -3011,6 +3095,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
+  dal_slot_availability : Dal.Endorsement.t option;
 }
 
 let block_metadata_encoding =
@@ -3028,6 +3113,7 @@ let block_metadata_encoding =
               balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
+              dal_slot_availability;
             } ->
          ( ( proposer,
              baker,
@@ -3039,7 +3125,7 @@ let block_metadata_encoding =
              balance_updates,
              liquidity_baking_toggle_ema,
              implicit_operations_results ),
-           consumed_gas ))
+           (consumed_gas, dal_slot_availability) ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -3050,7 +3136,7 @@ let block_metadata_encoding =
                 balance_updates,
                 liquidity_baking_toggle_ema,
                 implicit_operations_results ),
-              _consumed_millgas ) ->
+              (_consumed_millgas, dal_slot_availability) ) ->
          {
            proposer;
            baker;
@@ -3062,6 +3148,7 @@ let block_metadata_encoding =
            balance_updates;
            liquidity_baking_toggle_ema;
            implicit_operations_results;
+           dal_slot_availability;
          })
        (merge_objs
           (obj10
@@ -3079,7 +3166,14 @@ let block_metadata_encoding =
              (req
                 "implicit_operations_results"
                 (list successful_manager_operation_result_encoding)))
-          (obj1 (req "consumed_milligas" Gas.Arith.n_fp_encoding)))
+          (obj2
+             (req "consumed_milligas" Gas.Arith.n_fp_encoding)
+             (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3119
+
+                This varopt is here while the DAL is behind a feature
+                flag. This should be replaced by a required field once
+                the feature flag will be activated. *)
+             (varopt "dal_slot_availability" Dal.Endorsement.encoding)))
 
 type precheck_result = {
   consumed_gas : Gas.Arith.fp;

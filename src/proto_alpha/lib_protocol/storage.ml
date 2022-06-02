@@ -1719,3 +1719,34 @@ module Sc_rollup = struct
       end)
       (Bitset_and_level)
 end
+
+module Dal = struct
+  module Raw_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["dal"]
+      end)
+
+  module Level_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["level"]
+         end))
+         (Make_index (Raw_level_repr.Index))
+
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3113
+
+     This is only for prototyping. Probably something smarter would be
+     to index each header directly. *)
+  module Slot_headers =
+    Level_context.Make_map
+      (struct
+        let name = ["slots"]
+      end)
+      (struct
+        type t = Dal_slot_repr.t list
+
+        let encoding = Data_encoding.(list Dal_slot_repr.encoding)
+      end)
+end

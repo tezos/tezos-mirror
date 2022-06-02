@@ -721,6 +721,16 @@ module Constants : sig
 
   (** Constants parameterized by context *)
   module Parametric : sig
+    type dal = {
+      feature_enable : bool;
+      number_of_slots : int;
+      number_of_shards : int;
+      endorsement_lag : int;
+      availability_threshold : int;
+    }
+
+    val dal_encoding : dal Data_encoding.t
+
     type t = {
       preserved_cycles : int;
       blocks_per_cycle : int32;
@@ -773,6 +783,7 @@ module Constants : sig
       tx_rollup_max_withdrawals_per_batch : int;
       tx_rollup_rejection_max_proof_size : int;
       tx_rollup_sunset_level : int32;
+      dal : dal;
       sc_rollup_enable : bool;
       sc_rollup_origination_size : int;
       sc_rollup_challenge_window_in_blocks : int;
@@ -2736,6 +2747,45 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
+module Dal : sig
+  module Endorsement : sig
+    type t
+
+    val encoding : t Data_encoding.t
+
+    val empty : t
+
+    val occupied_size_in_bits : t -> int
+
+    val expected_size_in_bits : max_index:int -> int
+
+    val shards : context -> endorser:Signature.Public_key_hash.t -> int list
+
+    val record_available_shards : context -> t -> int list -> context
+  end
+
+  module Slot : sig
+    type header
+
+    type t = private {level : Raw_level.t; index : int; header : header}
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+
+    val current_slot_fees : context -> t -> Tez.t option
+
+    val update_slot_fees : context -> t -> Tez.t -> context * bool
+
+    val find : context -> Raw_level.t -> t list option tzresult Lwt.t
+
+    val finalize_current_slots : context -> context Lwt.t
+
+    val finalize_pending_slots :
+      context -> (context * Endorsement.t) tzresult Lwt.t
+  end
+end
+
 module Block_payload : sig
   val hash :
     predecessor:Block_hash.t ->
@@ -2859,6 +2909,8 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
   type 'a double_consensus_operation_evidence =
@@ -2910,6 +2962,8 @@ module Kind : sig
 
   type transfer_ticket = Transfer_ticket_kind
 
+  type dal_publish_slot_header = Dal_publish_slot_header_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -2943,6 +2997,7 @@ module Kind : sig
     | Tx_rollup_dispatch_tickets_manager_kind
         : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
+    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -2998,6 +3053,9 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal.Endorsement.t
+      -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
       nonce : Nonce.t;
@@ -3122,6 +3180,10 @@ and _ manager_operation =
       entrypoint : Entrypoint.t;
     }
       -> Kind.transfer_ticket manager_operation
+  | Dal_publish_slot_header : {
+      slot : Dal.Slot.t;
+    }
+      -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
@@ -3198,6 +3260,7 @@ module Operation : sig
   type consensus_watermark =
     | Endorsement of Chain_id.t
     | Preendorsement of Chain_id.t
+    | Dal_slot_availability of Chain_id.t
 
   val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -3261,6 +3324,8 @@ module Operation : sig
 
     val endorsement_case : Kind.endorsement case
 
+    val dal_slot_availability_case : Kind.dal_slot_availability case
+
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 
     val double_preendorsement_evidence_case :
@@ -3309,6 +3374,9 @@ module Operation : sig
       Kind.tx_rollup_dispatch_tickets Kind.manager case
 
     val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
+
+    val dal_publish_slot_header_case :
+      Kind.dal_publish_slot_header Kind.manager case
 
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
@@ -3374,6 +3442,8 @@ module Operation : sig
       val tx_rollup_dispatch_tickets_case : Kind.tx_rollup_dispatch_tickets case
 
       val transfer_ticket_case : Kind.transfer_ticket case
+
+      val dal_publish_slot_header_case : Kind.dal_publish_slot_header case
 
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
 

@@ -23,31 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Z.t
+(** This modules handles all the validation/application/finalisation
+   of any operation related to the DAL. *)
 
-type error += Invalid_position of int
+open Alpha_context
 
-let encoding = Data_encoding.z
+(** [validate_data_availability ctxt endorsement] ensures the
+   [endorsement] is valid and cannot prevent an operation containing
+   [endorsement] to be refused on top of [ctxt]. If an [Error _] is
+   returned, the [endorsement] is not valid. *)
+val validate_data_availability : t -> Dal.Endorsement.t -> unit tzresult
 
-let empty = Z.zero
+(** [apply_data_availability ctxt endorsement ~endorser] applies
+   [endorsement] into the [ctxt] assuming [endorser] issued those
+   endorsements. *)
+val apply_data_availability :
+  t ->
+  Dal.Endorsement.t ->
+  endorser:Signature.Public_key_hash.t ->
+  t tzresult Lwt.t
 
-let mem field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.testbit field pos
+(** [validate_publish_slot_header ctxt slot] ensures that [slot] is
+   valid and cannot prevent an operation containing [slot] to be
+   refused on top of [ctxt]. If an [Error _] is returned, the [slot]
+   is not valid. *)
+val validate_publish_slot_header : t -> Dal.Slot.t -> unit tzresult
 
-let add field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.logor field Z.(shift_left one pos)
+(** [apply_publish_slot_header ctxt slot fees] applies the publication
+   of [slot] on top of [ctxt] assuming the operation that issued
+   contains [fees] tez. *)
+val apply_publish_slot_header : t -> Dal.Slot.t -> Tez.t -> t tzresult
 
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"bitfield_invalid_position"
-    ~title:"Invalid bitfield’s position"
-    ~description:"Bitfields does not accept negative positions"
-    (obj1 (req "position" int31))
-    (function Invalid_position i -> Some i | _ -> None)
-    (fun i -> Invalid_position i)
+(** [dal_finalisation ctxt] should be executed at block finalisation
+   time. A set of slots available at level [ctxt.current_level - lag]
+   is returned encapsulated into the endorsement data-structure.
 
-let occupied_size_in_bits = Z.numbits
+   [lag] is a parametric constant specific to the data-availability
+   layer.  *)
+val dal_finalisation : t -> (t * Dal.Endorsement.t option) tzresult Lwt.t

@@ -31,6 +31,12 @@
     smart constructors below *)
 type manager_operation_content
 
+type consensus_op_kind =
+  | Dal_slot_availability of {
+      endorser : string; (* public_key hash *)
+      endorsement : bool Array.t; (* Bit vector *)
+    }
+
 (** Michelson scripts and data in different representations.
 
     Used when originating or calling contracts.
@@ -149,6 +155,26 @@ val mk_origination :
   Client.t ->
   manager_operation_content Lwt.t
 
+(** [mk_publish_slot_header] allows to construct a manager operation publishing a
+    slot header.
+
+    - Default [counter] is the successor of the counter of [source].
+    - Default [init_balance] is [0] tez.
+    - Default [fee] is [1_000_000] mutez.
+    - Default [gas_limit] is [100_000] gas.
+    - Default [storage_limit] is [10_000]. *)
+val mk_publish_slot_header :
+  source:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  index:int ->
+  level:int ->
+  header:int ->
+  Client.t ->
+  manager_operation_content Lwt.t
+
 (** {2 Helper functions to build manager operations} *)
 
 (** Returns the current counter of the given implicit account *)
@@ -182,9 +208,11 @@ val sign_manager_op_hex : signer:Account.key -> Hex.t -> Hex.t
 val forge_operation :
   ?protocol:Protocol.t ->
   branch:string ->
-  batch:manager_operation_content list ->
+  batch:
+    [< `Consensus of consensus_op_kind
+    | `Manager of manager_operation_content list ] ->
   Client.t ->
-  Hex.t Lwt.t
+  [> `Hex of string] Lwt.t
 
 (** Inject a forged operation with its signature.
 
@@ -238,7 +266,9 @@ val forge_and_inject_operation :
   ?async:bool ->
   ?force:bool ->
   ?wait_for_injection:Node.t ->
-  batch:manager_operation_content list ->
+  batch:
+    [ `Manager of manager_operation_content list
+    | `Consensus of consensus_op_kind ] ->
   signer:Account.key ->
   Client.t ->
   [`OpHash of string] Lwt.t
@@ -248,7 +278,9 @@ val runnable_forge_and_inject_operation :
   ?branch:string ->
   ?async:bool ->
   ?force:bool ->
-  batch:manager_operation_content list ->
+  batch:
+    [ `Manager of manager_operation_content list
+    | `Consensus of consensus_op_kind ] ->
   signer:Account.key ->
   Client.t ->
   JSON.t Runnable.process Lwt.t
@@ -417,3 +449,32 @@ val inject_transfer_ticket :
   entrypoint:string ->
   Client.t ->
   [`OpHash of string] Lwt.t
+
+val inject_publish_slot_header :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  source:Account.key ->
+  ?signer:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  index:int ->
+  level:int ->
+  header:int ->
+  Client.t ->
+  [`OpHash of string] Lwt.t
+
+val inject_slot_availability :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  signer:Account.key ->
+  endorsement:bool array ->
+  Client.t ->
+  [> `OpHash of string] Lwt.t

@@ -863,7 +863,7 @@ module Revamped = struct
     in
     let* branch = Operation.get_injection_branch client in
     let* (`Hex op_str_hex as op_hex) =
-      Operation.forge_operation ~protocol ~branch ~batch:[op2] client
+      Operation.forge_operation ~protocol ~branch ~batch:(`Manager [op2]) client
     in
     let (`Hex signature) =
       Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_hex
@@ -949,7 +949,7 @@ module Revamped = struct
       Operation.forge_and_inject_operation
         ~protocol
         ~force:true
-        ~batch:[op]
+        ~batch:(`Manager [op])
         ~signer:dest (* signer should be source to be correctly signed *)
         client
     in
@@ -1954,7 +1954,7 @@ module Revamped = struct
     let* process =
       let* runnable =
         Operation.runnable_forge_and_inject_operation
-          ~batch:[op]
+          ~batch:(`Manager [op])
           ~signer:Constant.bootstrap1
           client
       in
@@ -1985,7 +1985,10 @@ module Revamped = struct
               client
           in
           let* (`Hex raw_unsigned_op as unsigned_op) =
-            Operation.forge_operation ~branch ~batch:[transfer] client
+            Operation.forge_operation
+              ~branch
+              ~batch:(`Manager [transfer])
+              client
           in
           let (`Hex signature_op) =
             Operation.sign_manager_op_hex ~signer:account unsigned_op

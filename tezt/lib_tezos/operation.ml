@@ -54,6 +54,7 @@ type manager_op_kind =
       destination : string;
       entrypoint : string;
     }
+  | Dal_publish_slot_header of {level : int; index : int; header : int}
 
 (* This is the manager operations' content type *)
 type manager_operation_content = {
@@ -65,6 +66,12 @@ type manager_operation_content = {
   gas_limit : int;
   storage_limit : int;
 }
+
+type consensus_op_kind =
+  | Dal_slot_availability of {
+      endorser : string; (* public_key hash *)
+      endorsement : bool Array.t; (* Bit vector *)
+    }
 
 let micheline_to_json convert client = function
   | `Json json -> return json
@@ -142,10 +149,31 @@ let mk_transfer_ticket ~source ?counter ?(fee = 1_000_000)
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
 
+let mk_publish_slot_header ~source ?counter ?(fee = 1_000_000)
+    ?(gas_limit = 1_000_000) ?(storage_limit = 0) ~index ~level ~header client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Dal_publish_slot_header {index; level; header}
+
 let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
     ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Origination {code; storage = init_storage; balance = init_balance}
+
+let consensus_op_to_json_string = function
+  | Dal_slot_availability {endorser; endorsement} ->
+      let string_of_bool_vector endorsement =
+        let aux (acc, n) b =
+          let bit = if b then 1 else 0 in
+          (acc lor (bit lsl n), n + 1)
+        in
+        Array.fold_left aux (0, 0) endorsement |> fst |> string_of_int
+      in
+      `O
+        [
+          ("kind", Ezjsonm.string "dal_slot_availability");
+          ("endorser", Ezjsonm.string endorser);
+          ("endorsement", Ezjsonm.string (string_of_bool_vector endorsement));
+        ]
 
 (* encodes the given manager operation as a JSON string *)
 let manager_op_content_to_json_string
@@ -155,7 +183,7 @@ let manager_op_content_to_json_string
       ?(public_key = `Null) ?(delegate = `Null) ?(balance = `Null)
       ?(script = `Null) ?(ticket_contents = `Null) ?(ticket_ty = `Null)
       ?(ticket_ticketer = `Null) ?(ticket_amount = `Null) ?(entrypoint = `Null)
-      kind =
+      ?(slot = `Null) kind =
     let filter = List.filter (fun (_k, v) -> v <> `Null) in
     return
     @@ `O
@@ -185,6 +213,7 @@ let manager_op_content_to_json_string
               ("ticket_ticketer", ticket_ticketer);
               ("ticket_amount", ticket_amount);
               ("entrypoint", entrypoint);
+              ("slot", slot);
             ])
   in
   match op_kind with
@@ -222,18 +251,31 @@ let manager_op_content_to_json_string
         ~ticket_ticketer:(Ezjsonm.string ticketer)
         ~entrypoint:(Ezjsonm.string entrypoint)
         "transfer_ticket"
+  | Dal_publish_slot_header {index; level; header} ->
+      let index = `Float (float_of_int index) in
+      let level = `Float (float_of_int level) in
+      let header = `Float (float_of_int header) in
+      let slot = `O [("index", index); ("level", level); ("header", header)] in
+      mk_jsonm ~slot "dal_publish_slot_header"
 
 (* construct a JSON operations with contents and branch *)
-let manager_op_to_json_string ~branch operations_json =
+let op_to_json_string ~branch operations_json =
   `O [("branch", Ezjsonm.string branch); ("contents", operations_json)]
 
 (* Forging, signing and injection operations *)
 
+let forge_manager_batch ~batch client =
+  Lwt_list.map_p (fun op -> manager_op_content_to_json_string op client) batch
+
+let forge_consensus_op ~op = consensus_op_to_json_string op
+
 let forge_operation ?protocol ~branch ~batch client =
   let* json_batch =
-    Lwt_list.map_p (fun op -> manager_op_content_to_json_string op client) batch
+    match batch with
+    | `Manager batch -> forge_manager_batch ~batch client
+    | `Consensus op -> [forge_consensus_op ~op] |> Lwt.return
   in
-  let op_json = manager_op_to_json_string ~branch (`A json_batch) in
+  let op_json = op_to_json_string ~branch (`A json_batch) in
   let* hex =
     match protocol with
     | None -> RPC.post_forge_operations ~data:op_json client >|= JSON.as_string
@@ -321,7 +363,7 @@ let inject_origination ?protocol ?async ?force ?wait_for_injection ?branch
     ?async
     ?force
     ?wait_for_injection
-    ~batch:[op]
+    ~batch:(`Manager [op])
     ?branch
     ~signer
     client
@@ -344,7 +386,7 @@ let inject_public_key_revelation ?protocol ?async ?force ?wait_for_injection
     ?force
     ?wait_for_injection
     ?branch
-    ~batch:[op]
+    ~batch:(`Manager [op])
     ~signer
     client
 
@@ -367,7 +409,7 @@ let inject_delegation ?protocol ?async ?force ?wait_for_injection ?branch
     ?force
     ?wait_for_injection
     ?branch
-    ~batch:[op]
+    ~batch:(`Manager [op])
     ~signer
     client
 
@@ -391,7 +433,7 @@ let inject_transfer ?protocol ?async ?force ?wait_for_injection ?branch ~source
     ?force
     ?wait_for_injection
     ?branch
-    ~batch:[op]
+    ~batch:(`Manager [op])
     ~signer
     client
 
@@ -419,7 +461,48 @@ let inject_transfer_ticket ?protocol ?async ?force ?wait_for_injection ?branch
     ?force
     ?wait_for_injection
     ?branch
-    ~batch:[op]
+    ~batch:(`Manager [op])
+    ~signer
+    client
+
+let inject_publish_slot_header ?protocol ?async ?force ?wait_for_injection
+    ?branch ~source ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit
+    ~index ~level ~header client =
+  let* op =
+    mk_publish_slot_header
+      ~source
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      ~index
+      ~level
+      ~header
+      client
+  in
+  forge_and_inject_operation
+    ?protocol
+    ?async
+    ?force
+    ?wait_for_injection
+    ?branch
+    ~batch:(`Manager [op])
+    ~signer
+    client
+
+let inject_slot_availability ?protocol ?async ?force ?wait_for_injection ?branch
+    ~signer ~endorsement client =
+  let op =
+    Dal_slot_availability
+      {endorser = signer.Account.public_key_hash; endorsement}
+  in
+  forge_and_inject_operation
+    ?protocol
+    ?async
+    ?force
+    ?wait_for_injection
+    ?branch
+    ~batch:(`Consensus op)
     ~signer
     client
 
@@ -445,7 +528,7 @@ let inject_contract_call ?protocol ?async ?force ?wait_for_injection ?branch
     ?force
     ?wait_for_injection
     ?branch
-    ~batch:[op]
+    ~batch:(`Manager [op])
     ~signer
     client
 

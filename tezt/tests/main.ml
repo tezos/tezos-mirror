@@ -71,6 +71,7 @@ let () =
   Cache_cache.register [Ithaca; Jakarta; Alpha] ;
   Baking.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Prevalidator.register ~protocols:[Ithaca; Jakarta; Alpha] ;
+  Dal.register ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)

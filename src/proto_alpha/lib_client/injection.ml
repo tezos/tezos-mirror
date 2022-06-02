@@ -330,6 +330,8 @@ let estimated_gas_single (type kind)
     | Applied (Tx_rollup_dispatch_tickets_result {consumed_gas; _}) ->
         Ok consumed_gas
     | Applied (Transfer_ticket_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Dal_publish_slot_header_result {consumed_gas; _}) ->
+        Ok consumed_gas
     | Applied (Sc_rollup_originate_result {consumed_gas; _}) -> Ok consumed_gas
     | Applied (Sc_rollup_add_messages_result {consumed_gas; _}) ->
         Ok consumed_gas
@@ -392,6 +394,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         Ok paid_storage_size_diff
     | Applied (Transfer_ticket_result {paid_storage_size_diff; _}) ->
         Ok paid_storage_size_diff
+    | Applied (Dal_publish_slot_header_result _) -> Ok Z.zero
     | Applied (Sc_rollup_originate_result {size; _}) -> Ok size
     | Applied (Sc_rollup_add_messages_result _) -> Ok Z.zero
     (* The following Sc_rollup operations have zero storage cost because we
@@ -463,6 +466,7 @@ let originated_contracts_single (type kind)
     | Applied (Tx_rollup_rejection_result _) -> Ok []
     | Applied (Tx_rollup_dispatch_tickets_result _) -> Ok []
     | Applied (Transfer_ticket_result _) -> Ok []
+    | Applied (Dal_publish_slot_header_result _) -> Ok []
     | Applied (Sc_rollup_originate_result _) -> Ok []
     | Applied (Sc_rollup_add_messages_result _) -> Ok []
     | Applied (Sc_rollup_cement_result _) -> Ok []

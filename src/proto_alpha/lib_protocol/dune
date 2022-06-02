@@ -98,6 +98,8 @@
   Tx_rollup_commitment_repr
   Tx_rollup_errors_repr
   Tx_rollup_state_repr
+  Dal_slot_repr
+  Dal_endorsement_repr
   Bond_id_repr
   Vote_repr
   Liquidity_baking_repr
@@ -163,6 +165,7 @@
   Sc_rollup_stake_storage
   Sc_rollup_refutation_storage
   Sc_rollup_storage
+  Dal_slot_storage
   Alpha_context
   Script_string
   Script_int
@@ -211,6 +214,7 @@
   Sc_rollup_PVM_sem
   Sc_rollup_arith
   Sc_rollups
+  Dal_apply
   Baking
   Amendment
   Apply
@@ -311,6 +315,8 @@
   tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
   tx_rollup_errors_repr.ml
   tx_rollup_state_repr.ml tx_rollup_state_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
+  dal_endorsement_repr.ml dal_endorsement_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -376,6 +382,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli
@@ -424,6 +431,7 @@
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
+  dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
   apply.ml apply.mli
@@ -510,6 +518,8 @@
   tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
   tx_rollup_errors_repr.ml
   tx_rollup_state_repr.ml tx_rollup_state_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
+  dal_endorsement_repr.ml dal_endorsement_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -575,6 +585,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli
@@ -623,6 +634,7 @@
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
+  dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
   apply.ml apply.mli
@@ -729,6 +741,8 @@
   tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
   tx_rollup_errors_repr.ml
   tx_rollup_state_repr.ml tx_rollup_state_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
+  dal_endorsement_repr.ml dal_endorsement_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -794,6 +808,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli
@@ -842,6 +857,7 @@
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
+  dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
   apply.ml apply.mli
@@ -944,6 +960,8 @@
   tx_rollup_commitment_repr.ml tx_rollup_commitment_repr.mli
   tx_rollup_errors_repr.ml
   tx_rollup_state_repr.ml tx_rollup_state_repr.mli
+  dal_slot_repr.ml dal_slot_repr.mli
+  dal_endorsement_repr.ml dal_endorsement_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -1009,6 +1027,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_int.ml script_int.mli
@@ -1057,6 +1076,7 @@
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
+  dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
   apply.ml apply.mli

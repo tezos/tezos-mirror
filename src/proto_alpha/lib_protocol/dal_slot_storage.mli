@@ -23,31 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Z.t
+(** Storage management of slots for the data-availability layer.
 
-type error += Invalid_position of int
+    {1 Overview}
 
-let encoding = Data_encoding.z
+    This module is an interface for the slot storage for the layer 1.
 
-let empty = Z.zero
+    Depending on the current level of the context and the [lag] (a
+   constant given by the context), the status of the slot may differ:
 
-let mem field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.testbit field pos
+    - For every level in the interval [current_level; current_level +
+   lag -1] the slot is [Pending]. This means a slot header was
+   proposed but was not declared available yet.
 
-let add field pos =
-  error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
-  ok @@ Z.logor field Z.(shift_left one pos)
+    - For every level above [current_level + lag], the slot may be
+   [confirmed]. For any slot confirmed by the protocol (i.e. indices
+   returned by [finalize_pending_slots]), subscribers of the DAL
+   should take into account the corresponding slots.
 
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"bitfield_invalid_position"
-    ~title:"Invalid bitfield’s position"
-    ~description:"Bitfields does not accept negative positions"
-    (obj1 (req "position" int31))
-    (function Invalid_position i -> Some i | _ -> None)
-    (fun i -> Invalid_position i)
+    - For every level below [current_level - lag], there should not be
+   any slot in the storage.  *)
 
-let occupied_size_in_bits = Z.numbits
+(** [find ctxt level] returns [Some slots] where [slots] are pending
+   slots at level [level].  [None] is returned if no [slot] was
+   registered at this level. The function fails if the reading into
+   the context fails. *)
+val find :
+  Raw_context.t ->
+  Raw_level_repr.t ->
+  Dal_slot_repr.t list option tzresult Lwt.t
+
+(** [finalize_current_slots ctxt] finalizes the current slots posted
+   on this block and marks them as pending into the context.  *)
+val finalize_current_slots : Raw_context.t -> Raw_context.t Lwt.t
+
+(** [finalize_pending_slots ctxt] finalizes pending slots which are
+   old enough (i.e. registered at level [current_level - lag]). All
+   slots marked as available are returned. All the pending slots at
+   [current_level - lag] level are removed from the context. *)
+val finalize_pending_slots :
+  Raw_context.t -> (Raw_context.t * Dal_endorsement_repr.t) tzresult Lwt.t

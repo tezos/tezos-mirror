@@ -211,7 +211,7 @@ let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
       ~async:true
       ~force:true
       ~protocol
-      ~batch
+      ~batch:(`Manager batch)
       ~signer
       client
   in
@@ -222,7 +222,7 @@ let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
       ~async:true
       ~force:true
       ~protocol
-      ~batch
+      ~batch:(`Manager batch)
       ~signer
       client
   in
@@ -237,7 +237,7 @@ let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
           ~async:true
           ~force:true
           ~protocol
-          ~batch
+          ~batch:(`Manager batch)
           ~signer
           client
       in
