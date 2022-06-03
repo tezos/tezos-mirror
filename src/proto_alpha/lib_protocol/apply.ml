@@ -99,7 +99,6 @@ type error +=
   | Tx_rollup_invalid_transaction_ticket_amount
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
-  | Inconsistent_counters
   | Wrong_voting_period of {expected : int32; provided : int32}
   | Internal_operation_replay of Apply_internal_results.packed_internal_contents
   | Invalid_denunciation of denunciation_kind
@@ -121,12 +120,8 @@ type error +=
     }
   | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
   | Multiple_revelation
-  | Gas_quota_exceeded_init_deserialize
-  | Insufficient_gas_for_manager
-  | Inconsistent_sources
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
-  | Incorrect_reveal_position
   | Invalid_transfer_to_sc_rollup_from_implicit_account
 
 let () =
@@ -538,21 +533,6 @@ let () =
     (fun () -> Sc_rollup_feature_disabled) ;
 
   register_error_kind
-    `Permanent
-    ~id:"operation.inconsistent_counters"
-    ~title:"Inconsistent counters in operation"
-    ~description:
-      "Inconsistent counters in operation. Counters of an operation must be \
-       successive."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Inconsistent counters in operation. Counters of an operation must be \
-         successive.")
-    Data_encoding.empty
-    (function Inconsistent_counters -> Some () | _ -> None)
-    (fun () -> Inconsistent_counters) ;
-  register_error_kind
     `Temporary
     ~id:"operation.wrong_voting_period"
     ~title:"Wrong voting period"
@@ -717,43 +697,6 @@ let () =
     (fun () -> Multiple_revelation) ;
   register_error_kind
     `Permanent
-    ~id:"gas_exhausted.init_deserialize"
-    ~title:"Not enough gas for initial deserialization of script expressions"
-    ~description:
-      "Gas limit was not high enough to deserialize the transaction parameters \
-       or origination script code or initial storage, making the operation \
-       impossible to parse within the provided gas bounds."
-    Data_encoding.empty
-    (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
-    (fun () -> Gas_quota_exceeded_init_deserialize) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.insufficient_gas_for_manager"
-    ~title:"Not enough gas for initial manager cost"
-    ~description:
-      (Format.asprintf
-         "Gas limit was not high enough to cover the initial cost of manager \
-          operations. At least %a expected."
-         Gas.pp_cost
-         Michelson_v1_gas.Cost_of.manager_operation)
-    Data_encoding.empty
-    (function Insufficient_gas_for_manager -> Some () | _ -> None)
-    (fun () -> Insufficient_gas_for_manager) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.inconsistent_sources"
-    ~title:"Inconsistent sources in operation pack"
-    ~description:
-      "The operation pack includes operations from different sources."
-    ~pp:(fun ppf () ->
-      Format.pp_print_string
-        ppf
-        "The operation pack includes operations from different sources.")
-    Data_encoding.empty
-    (function Inconsistent_sources -> Some () | _ -> None)
-    (fun () -> Inconsistent_sources) ;
-  register_error_kind
-    `Permanent
     ~id:"operation.failing_noop"
     ~title:"Failing_noop operations are not executed by the protocol"
     ~description:
@@ -781,19 +724,6 @@ let () =
     Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
     (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
     (fun delegate -> Zero_frozen_deposits delegate) ;
-  register_error_kind
-    `Permanent
-    ~id:"operations.incorrect_reveal_position"
-    ~title:"Incorrect reveal position"
-    ~description:"Incorrect reveal position in batch"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Incorrect reveal operation position in batch: only allowed in first \
-         position")
-    Data_encoding.empty
-    (function Incorrect_reveal_position -> Some () | _ -> None)
-    (fun () -> Incorrect_reveal_position) ;
   register_error_kind
     `Permanent
     ~id:"operations.invalid_transfer_to_sc_rollup_from_implicit_account"
@@ -1969,178 +1899,6 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   in
   apply ctxt [] ops
 
-let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
-    remaining_block_gas (op : kind Kind.manager contents) ~(only_batch : bool) :
-    (Tez.t * bool * Gas.Arith.fp) tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let[@coq_match_with_default] (Manager_operation
-                                 {
-                                   source;
-                                   fee;
-                                   operation;
-                                   gas_limit;
-                                   storage_limit;
-                                   _;
-                                 }) =
-    op
-  in
-  let*? remaining_block_gas =
-    (if only_batch then
-     (* {!Gas.check_limit_and_consume_from_block_gas}
-        will only raise a "temporary" error, however
-        when the precheck is called on a batch in isolation (like e.g. in the
-        mempool) it must "refuse" operations whose total gas_limit (the sum of
-        the gas_limits of each operation) is already above the block limit. We
-        add the "permanent" error Gas.Gas_limit_too_high on top of the trace to
-        this effect. *)
-     record_trace Gas.Gas_limit_too_high
-    else fun errs -> errs)
-    @@ Gas.check_limit_and_consume_from_block_gas
-         ~hard_gas_limit_per_operation:
-           (Constants.hard_gas_limit_per_operation ctxt)
-         ~remaining_block_gas
-         ~gas_limit
-  in
-  let*? remaining_gas =
-    record_trace
-      Insufficient_gas_for_manager
-      (Gas.consume_from
-         (Gas.Arith.fp gas_limit)
-         Michelson_v1_gas.Cost_of.manager_operation)
-  in
-  let*? () = Fees.check_storage_limit ctxt ~storage_limit in
-  let*? () =
-    error_unless
-      still_allocated
-      (Contract_storage.Empty_implicit_contract source)
-  in
-  let consume_decoding_gas ctxt lexpr =
-    record_trace Gas_quota_exceeded_init_deserialize
-    @@ (* Fail early if the operation does not have enough gas to
-          cover the deserialization cost. We always consider the full
-          deserialization cost, independently from the internal state
-          of the lazy_expr. Otherwise we might risk getting different
-          results if the operation has already been deserialized
-          before (e.g. when retrieved in JSON format). Note that the
-          lazy_expr is not actually decoded here; its deserialization
-          cost is estimated from the size of its bytes. *)
-    Script.consume_decoding_gas ctxt lexpr
-  in
-  let*? () =
-    let open Result_syntax in
-    match operation with
-    | Reveal pk -> Contract.check_public_key pk source
-    | Transaction {parameters; _} ->
-        let* _remaining_gas = consume_decoding_gas remaining_gas parameters in
-        return_unit
-    | Origination {script; _} ->
-        let* remaining_gas = consume_decoding_gas remaining_gas script.code in
-        let* _remaining_gas =
-          consume_decoding_gas remaining_gas script.storage
-        in
-        return_unit
-    | Register_global_constant {value} ->
-        let* _remaining_gas = consume_decoding_gas remaining_gas value in
-        return_unit
-    | Delegation _ | Set_deposits_limit _ -> return_unit
-    | Tx_rollup_origination -> assert_tx_rollup_feature_enabled ctxt
-    | Tx_rollup_submit_batch {content; _} ->
-        let* () = assert_tx_rollup_feature_enabled ctxt in
-        let size_limit = Constants.tx_rollup_hard_size_limit_per_message ctxt in
-        let _message, message_size = Tx_rollup_message.make_batch content in
-        let* cost = Tx_rollup_gas.hash_cost message_size in
-        let* _remaining_gas = Gas.consume_from remaining_gas cost in
-        error_unless
-          Compare.Int.(message_size <= size_limit)
-          Tx_rollup_errors.Message_size_exceeds_limit
-    | Tx_rollup_commit _ | Tx_rollup_return_bond _
-    | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
-        assert_tx_rollup_feature_enabled ctxt
-    | Transfer_ticket {contents; ty; _} ->
-        let* () = assert_tx_rollup_feature_enabled ctxt in
-        let* remaining_gas = consume_decoding_gas remaining_gas contents in
-        let* _remaining_gas = consume_decoding_gas remaining_gas ty in
-        return_unit
-    | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
-        let* () = assert_tx_rollup_feature_enabled ctxt in
-        let Constants.Parametric.
-              {max_messages_per_inbox; max_withdrawals_per_batch; _} =
-          Constants.tx_rollup ctxt
-        in
-        let* () =
-          Tx_rollup_errors.check_path_depth
-            `Commitment
-            (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-            ~count_limit:max_messages_per_inbox
-        in
-        let* () =
-          error_when
-            Compare.List_length_with.(tickets_info = 0)
-            Tx_rollup_errors.No_withdrawals_to_dispatch
-        in
-        let* () =
-          error_when
-            Compare.List_length_with.(tickets_info > max_withdrawals_per_batch)
-            Tx_rollup_errors.Too_many_withdrawals
-        in
-        let* _remaining_gas =
-          record_trace
-            Gas_quota_exceeded_init_deserialize
-            (List.fold_left_e
-               (fun remaining_gas Tx_rollup_reveal.{contents; ty; _} ->
-                 let* remaining_gas =
-                   Script.consume_decoding_gas remaining_gas contents
-                 in
-                 Script.consume_decoding_gas remaining_gas ty)
-               remaining_gas
-               tickets_info)
-        in
-        return_unit
-    | Tx_rollup_rejection
-        {message_path; message_result_path; previous_message_result_path; _} ->
-        let* () = assert_tx_rollup_feature_enabled ctxt in
-        let Constants.Parametric.{max_messages_per_inbox; _} =
-          Constants.tx_rollup ctxt
-        in
-        let* () =
-          Tx_rollup_errors.check_path_depth
-            `Inbox
-            (Tx_rollup_inbox.Merkle.path_depth message_path)
-            ~count_limit:max_messages_per_inbox
-        in
-        let* () =
-          Tx_rollup_errors.check_path_depth
-            `Commitment
-            (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-            ~count_limit:max_messages_per_inbox
-        in
-        Tx_rollup_errors.check_path_depth
-          `Commitment
-          (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
-          ~count_limit:max_messages_per_inbox
-    | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
-    | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
-    | Sc_rollup_execute_outbox_message _ ->
-        assert_sc_rollup_feature_enabled ctxt
-    | Sc_rollup_recover_bond _ ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
-           should we successfully precheck Sc_rollup_recover_bond and any
-           (simple) Sc rollup operation, or should we add some some checks to make
-           the operations Branch_delayed if they cannot be successfully
-           prechecked. *)
-        assert_sc_rollup_feature_enabled ctxt
-    | Dal_publish_slot_header {slot} ->
-        Dal_apply.validate_publish_slot_header ctxt slot
-  in
-  let+ new_balance, still_allocated =
-    Contract.simulate_spending
-      ctxt
-      ~balance:remaining_balance
-      ~amount:fee
-      source
-  in
-  (new_balance, still_allocated, remaining_block_gas)
-
 let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
   match trr with
   | Transaction_to_contract_result payload ->
@@ -2453,170 +2211,6 @@ let rec mark_skipped :
             },
           mark_skipped ~payload_producer level rest )
 
-(** Check a few simple properties of the given batch or standalone
-    manager operation represented by [contents_list]. Then return its
-    [source] (aka [public_key_hash]) and [public_key].
-
-    Invariants checked:
-
-    - All sources in a batch must be equal.
-
-    - The counters in a batch must be successive.
-
-    - Reveal operations are only authorized as the very first
-      operation of a batch.
-
-    - The source's contract must be allocated.
-
-    - The counter of the first operation must be the source's next
-      expected counter.
-
-    - The source's public key must have been revealed (either before
-      the considered batch, or during its first operation).
-
-    Note that currently, a batch contains only one signature, so all
-    operations in a batch are required to originate from the same
-    manager. This may change in the future, in order to allow several
-    managers to group-sign a sequence of operations. *)
-let check_batch_sanity_and_find_public_key ctxt
-    (contents_list : _ Kind.manager contents_list) =
-  let open Result_syntax in
-  let check_source_and_counter ~expected_source ~source ~previous_counter
-      ~counter =
-    let* () =
-      error_unless
-        (Signature.Public_key_hash.equal expected_source source)
-        Inconsistent_sources
-    in
-    error_unless
-      Compare.Z.(Z.succ previous_counter = counter)
-      Inconsistent_counters
-  in
-  let rec check_batch_tail_sanity :
-      type kind.
-      public_key_hash ->
-      counter ->
-      kind Kind.manager contents_list ->
-      unit tzresult =
-   fun expected_source previous_counter -> function
-    | Single (Manager_operation {operation = Reveal _key; _}) ->
-        error Incorrect_reveal_position
-    | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
-        error Incorrect_reveal_position
-    | Single (Manager_operation {source; counter; _}) ->
-        check_source_and_counter
-          ~expected_source
-          ~source
-          ~previous_counter
-          ~counter
-    | Cons (Manager_operation {source; counter; _}, rest) ->
-        let* () =
-          check_source_and_counter
-            ~expected_source
-            ~source
-            ~previous_counter
-            ~counter
-        in
-        check_batch_tail_sanity source counter rest
-  in
-  let check_batch :
-      type kind.
-      kind Kind.manager contents_list ->
-      (public_key_hash * public_key option * counter) tzresult =
-   fun op ->
-    match op with
-    | Single (Manager_operation {source; counter; operation = Reveal key; _}) ->
-        ok (source, Some key, counter)
-    | Single (Manager_operation {source; counter; _}) ->
-        ok (source, None, counter)
-    | Cons (Manager_operation {source; counter; operation = Reveal key; _}, rest)
-      ->
-        let* () = check_batch_tail_sanity source counter rest in
-        return (source, Some key, counter)
-    | Cons (Manager_operation {source; counter; _}, rest) ->
-        let* () = check_batch_tail_sanity source counter rest in
-        return (source, None, counter)
-  in
-  let open Lwt_result_syntax in
-  let*? source, revealed_key, first_counter = check_batch contents_list in
-  let* () = Contract.must_be_allocated ctxt (Contract.Implicit source) in
-  let* () = Contract.check_counter_increment ctxt source first_counter in
-  let* pk =
-    match revealed_key with
-    | None -> Contract.get_manager_key ctxt source
-    | Some pk -> return pk
-  in
-  return (source, pk)
-
-let rec precheck_checks_rec :
-    type kind.
-    context ->
-    Tez.t ->
-    still_allocated:bool ->
-    Gas.Arith.fp ->
-    kind Kind.manager contents_list ->
-    only_batch:bool ->
-    unit tzresult Lwt.t =
- fun ctxt
-     remaining_balance
-     ~still_allocated
-     remaining_block_gas
-     contents_list
-     ~only_batch ->
-  let open Lwt_result_syntax in
-  match contents_list with
-  | Single contents ->
-      let* _ =
-        precheck_checks_contents
-          ctxt
-          remaining_balance
-          ~still_allocated
-          remaining_block_gas
-          contents
-          ~only_batch
-      in
-      return_unit
-  | Cons (contents, rest) ->
-      let* remaining_balance, still_allocated, remaining_block_gas =
-        precheck_checks_contents
-          ctxt
-          remaining_balance
-          ~still_allocated
-          remaining_block_gas
-          contents
-          ~only_batch
-      in
-      precheck_checks_rec
-        ctxt
-        remaining_balance
-        ~still_allocated
-        remaining_block_gas
-        rest
-        ~only_batch
-
-(** Check the solvability of an operation batch.
-    This function is effect-free. *)
-let precheck_checks ctxt contents_list ~mempool_mode =
-  let open Lwt_result_syntax in
-  let* source, public_key =
-    check_batch_sanity_and_find_public_key ctxt contents_list
-  in
-  let* ctxt, initial_balance =
-    Token.balance ctxt (`Contract (Contract.Implicit source))
-  in
-  let* () =
-    precheck_checks_rec
-      ctxt
-      initial_balance
-      (* The contract's allocation has been checked in
-         {!check_batch_sanity_and_find_public_key}. *)
-      ~still_allocated:true
-      (Gas.block_level ctxt)
-      contents_list
-      ~only_batch:mempool_mode
-  in
-  return public_key
-
 (** Return balance updates for fees and an updated context that accounts for:
     - fees spending
     - counter incrementation
@@ -2648,14 +2242,6 @@ let rec precheck_effects :
       let* ctxt, prechecked_contents = contents_effects contents in
       let+ ctxt, result_rest = precheck_effects ctxt rest in
       (ctxt, PrecheckedCons (prechecked_contents, result_rest))
-
-(** Check the solvability of the given standalone manager operation or
-    batch of manager operations, except that the signature is not
-    checked here. Return the contract's public key. This function is
-    effect-free. *)
-let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
-  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  precheck_checks ctxt contents_list ~mempool_mode
 
 let rec apply_manager_contents_list_rec :
     type kind.

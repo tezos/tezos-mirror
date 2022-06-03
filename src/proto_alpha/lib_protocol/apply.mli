@@ -39,14 +39,9 @@ open Apply_internal_results
 
 type error +=
   | Internal_operation_replay of packed_internal_contents
-  | Gas_quota_exceeded_init_deserialize
-  | Insufficient_gas_for_manager
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
-  | Inconsistent_counters
-  | Incorrect_reveal_position
-  | Inconsistent_sources
 
 val begin_partial_construction :
   context ->
@@ -192,16 +187,6 @@ val apply_manager_operation :
   mempool_mode:bool ->
   'a Kind.manager contents_list ->
   (context * 'a Kind.manager contents_result_list) tzresult Lwt.t
-
-(** Check the solvability of the given standalone manager operation or
-    batch of manager operations, except that the signature is not
-    checked here. Return the contract's public key. This function is
-    effect-free. *)
-val precheck_manager_contents_list :
-  context ->
-  'kind Kind.manager contents_list ->
-  mempool_mode:bool ->
-  public_key tzresult Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)
