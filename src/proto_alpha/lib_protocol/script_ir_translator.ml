@@ -4929,6 +4929,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract) tzresult Lwt.t =
  fun ~stack_depth ctxt loc arg destination ~entrypoint ->
+  Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
   match destination with
   | Contract contract -> (
       match contract with
