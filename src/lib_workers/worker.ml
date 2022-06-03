@@ -567,21 +567,23 @@ struct
     {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
   let close (type kind) handlers (w : kind t) errs =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3264
+              close should be called only once in a worker lifetime *)
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
     let open Lwt_syntax in
-    let t0 =
-      match w.status with
-      | Running t0 -> t0
-      | Launching _ | Closing _ | Closed _ -> assert false
-    in
-    w.status <- Closing (t0, Time.System.now ()) ;
-    close w ;
-    let* () = Error_monad.cancel_with_exceptions w.canceler in
-    w.status <- Closed (t0, Time.System.now (), errs) ;
-    let* () = Handlers.on_close w in
-    Nametbl.remove w.table.instances w.name ;
-    w.state <- None ;
-    return_unit
+    match w.status with
+    (* Launching is not accessible from here, as the only occurrence
+       in form [launch] and happens before the call to [worker_loop] *)
+    | Closed _ | Closing _ | Launching _ -> Lwt.return_unit
+    | Running t0 ->
+        w.status <- Closing (t0, Time.System.now ()) ;
+        close w ;
+        let* () = Error_monad.cancel_with_exceptions w.canceler in
+        w.status <- Closed (t0, Time.System.now (), errs) ;
+        let* () = Handlers.on_close w in
+        Nametbl.remove w.table.instances w.name ;
+        w.state <- None ;
+        return_unit
 
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
