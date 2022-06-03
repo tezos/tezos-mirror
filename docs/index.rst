@@ -60,7 +60,8 @@ The Community
 - A few community-run websites collect useful Tezos links:
 
     - https://www.tezos.help
-    - https://tezos.rocks
+    - https://tezoscommons.org/
+    - https://tqtezos.com/
 
 - More resources can be found in the :doc:`introduction/support` page.
 

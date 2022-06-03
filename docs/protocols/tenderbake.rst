@@ -4,7 +4,7 @@ Tenderbake
 ==========
 
 This page contains a summary of the changes brought by the Tenderbake merge request (:gl:`!3738`).
-Please refer to :doc:`the documentation<../alpha/consensus>` and to this `blog post <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_ for an overview of the Tenderbake consensus algorithm and its motivation.
+Please refer to :doc:`the documentation<../alpha/consensus>` and to this `blog post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_ for an overview of the Tenderbake consensus algorithm and its motivation.
 
 Protocol
 --------

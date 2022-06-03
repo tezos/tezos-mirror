@@ -16,7 +16,7 @@ tokens in a decentralised
 environment. It was designed and implemented by the Electric Coin
 Company as the last iteration over a series of previous protocols and
 academic works starting with the `Zerocoin seminal
-paper <http://zerocoin.org/media/pdf/ZerocoinOakland.pdf>`_.
+paper <https://zerocoin.org/media/pdf/ZerocoinOakland.pdf>`_.
 
 The reference implementation of Sapling,
 `librustzcash <https://github.com/zcash/librustzcash>`_, was

@@ -65,7 +65,7 @@ The current protocol status can be found at election pages such as: tzstats.com_
 
 An interesting blog post on the history of the initial Tezos economic protocols
 is: `A quick history of past upgrades
-<https://blog.nomadic-labs.com/amendments-at-work-in-tezos.html#a-quick-history-of-past-upgrades>`_.
+<https://research-development.nomadic-labs.com/amendments-at-work-in-tezos.html#a-quick-history-of-past-upgrades>`_.
 
 .. _tzstats.com: https://tzstats.com/election/head
 .. _tzkt.io: https://tzkt.io/governance/current/exploration

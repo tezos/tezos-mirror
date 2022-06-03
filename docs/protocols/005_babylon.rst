@@ -38,9 +38,9 @@ In particular:
   than 0.
 
 Detailed information can be found in the blog
-`announcement <https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html>`_
+`announcement <https://research-development.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html>`_
 and
-`analysis. <https://blog.nomadic-labs.com/analysis-of-emmy.html>`_
+`analysis. <https://research-development.nomadic-labs.com/analysis-of-emmy.html>`_
 
 Merge requests
 `(MR58)
@@ -57,7 +57,7 @@ Protocol 005 contains several improvements to the Michelson smart
 contract language.
 More details are provided later in the changelog and in the
 `Michelson update blog post.
-<https://blog.nomadic-labs.com/michelson-updates-in-005.html>`_
+<https://research-development.nomadic-labs.com/michelson-updates-in-005.html>`_
 
 A summary of the main changes:
 

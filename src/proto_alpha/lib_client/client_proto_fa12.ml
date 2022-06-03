@@ -95,7 +95,7 @@ let () =
       "An FA1.2 command has referenced a smart contract whose script does not \
        implement at least one FA1.2 entrypoint, or with an incompatible type. \
        See TZIP-7 \
-       (https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md) \
+       (https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md) \
        for documentation on FA1.2."
     ~pp:(fun ppf (name, ty) ->
       Format.fprintf
@@ -203,7 +203,7 @@ let () =
       "An FA1.2 non-zero allowance change failed because the current allowance \
        is non-zero. For more explanation on why such allowance change is \
        unsafe, please look at TZIP-7 \
-       (https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md#approve)."
+       (https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md#approve)."
     ~pp:(fun ppf previous ->
       Format.fprintf
         ppf
@@ -329,14 +329,14 @@ let t_contract ~loc (a, is_a) : type_eq_combinator =
    equivalence checking functions, and returns a Micheline node for
    the `view a b` type, and a function checking another node is
    syntactically equivalent. The view type is defined by
-   [TZIP4](https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md).
+   [TZIP4](https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-4/tzip-4.md).
    *)
 let t_view ~loc a b : type_eq_combinator = t_pair ~loc [a; t_contract ~loc b]
 
 (** * Actions *)
 
 (** Corresponds to
-   [TZIP7](https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md)
+   [TZIP7](https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md)
    entrypoints. *)
 
 (** A callback from a view can be on a specific entrypoint of the

@@ -50,7 +50,7 @@ the filters of the previous protocol. Notice that prevalidator filters are not
 mandatory, their absence does not break the Tezos blockchain protocol.
 
 The interface of the prevalidator plugin is described at the `mempool plugin API
-<https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-plugin-alpha/Tezos_protocol_plugin_alpha/Plugin/Mempool/index.html>`__
+<https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-plugin-alpha/Tezos_protocol_plugin_alpha/Mempool/index.html>`__
 
 The different kinds of prevalidator filters are described below.
 

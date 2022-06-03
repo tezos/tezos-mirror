@@ -256,7 +256,7 @@ module Scripts = struct
       RPC_service.post_service
         ~description:
           "Simulate a call to a view following the TZIP-4 standard. See \
-           https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints."
+           https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints."
         ~input:run_tzip4_view_encoding
         ~output:(obj1 (req "data" Script.expr_encoding))
         ~query:RPC_query.empty
