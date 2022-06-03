@@ -29,6 +29,8 @@
 type error +=
   | (* `Temporary *)
       Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
+  | (* `Temporary *)
+      Counter_in_the_past of Contract_repr.t * Z.t * Z.t
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.t * Z.t * Z.t
   | (* `Temporary *)
@@ -39,6 +41,9 @@ type error +=
   | (* `Permanent *) Failure of string
   | (* `Branch *)
       Empty_implicit_contract of Signature.Public_key_hash.t
+  | (* `Branch *)
+      Empty_implicit_delegated_contract of
+      Signature.Public_key_hash.t
 
 (** [allocated ctxt contract] returns [true] if and only if the
    contract is stored in [Storage.Contract.Balance]. *)
