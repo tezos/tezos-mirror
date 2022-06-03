@@ -2724,7 +2724,7 @@ module Sc_rollup : sig
     (t * Z.t * context) tzresult Lwt.t
 
   val parameters_type :
-    context -> t -> (Script.lazy_expr * context) tzresult Lwt.t
+    context -> t -> (Script.lazy_expr option * context) tzresult Lwt.t
 
   val kind : context -> t -> Kind.t option tzresult Lwt.t
 
