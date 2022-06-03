@@ -34,7 +34,7 @@ typedef struct hid_device_info hid_device_info_t;
     };                                                                  \
                                                                         \
     static value alloc_##SNAME (CNAME *a) {                             \
-        value custom = alloc_custom(&hidapi_##SNAME##_ops, sizeof(CNAME *), 0, 1); \
+        value custom = caml_alloc_custom(&hidapi_##SNAME##_ops, sizeof(CNAME *), 0, 1); \
         MNAME(custom) = a;                                              \
         return custom;                                                  \
     }
