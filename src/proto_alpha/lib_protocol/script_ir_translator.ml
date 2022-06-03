@@ -5011,6 +5011,7 @@ let parse_contract_for_script :
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract option) tzresult Lwt.t =
  fun ctxt loc arg contract ~entrypoint ->
+  Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
   match contract with
   | Contract contract -> (
       match contract with
@@ -5028,11 +5029,10 @@ let parse_contract_for_script :
                     (ctxt, Some contract)
                 | Error Inconsistent_types_fast -> (ctxt, None) )
           else
-            Lwt.return
-              ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-              >|? fun ctxt ->
-                (* An implicit account on any other entrypoint is not a valid contract. *)
-                (ctxt, None) )
+            return
+              ( (* An implicit account on any other entrypoint is not a valid contract. *)
+                ctxt,
+                None )
       | Originated _ -> (
           (* Originated account *)
           trace (Invalid_contract (loc, contract))
