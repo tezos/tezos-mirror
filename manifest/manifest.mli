@@ -619,14 +619,9 @@ type with_test = Always | Never | Only_on_64_arch
     - [release]: unused for now. The intent is to define whether this should be released.
       Default is [true] for public executables and [false] for other targets.
 
-    - [static]: whether to generate a [(env (static (flags (:standard -ccopt -static ...))))]
-      stanza to provide a static compilation profile.
-      Default is [true] for public executables and [false] for other targets,
-      unless you specify [static_cclibs], in which case default is [true].
-
-    - [static_cclibs]: list of static libraries to link with for targets
-      in this [dune] file when building static executables.
-      Added using [-cclib] to the stanza that is generated when [static] is [true].
+    - [static]: whether to incluce [ %{workspace_root}/static-link-flags.sexp ] to the link
+      flags to provide a static compilation profile.
+      Default is [true] for public executables and [false] for other targets.
 
     - [synopsis]: short description for the [.opam] file.
 
@@ -670,7 +665,6 @@ type 'a maker =
   ?opam_only_deps:target list ->
   ?release:bool ->
   ?static:bool ->
-  ?static_cclibs:string list ->
   ?synopsis:string ->
   ?description:string ->
   ?time_measurement_ppx:bool ->

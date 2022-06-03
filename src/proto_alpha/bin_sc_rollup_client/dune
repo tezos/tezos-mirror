@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (static (flags (:standard -ccopt -static))))
-
 (executable
  (name main_sc_rollup_client_alpha)
  (public_name tezos-sc-rollup-client-alpha)
@@ -20,6 +18,8 @@
   tezos-protocol-alpha
   tezos-sc-rollup-alpha
   uri)
+ (link_flags (:standard)
+             (:include %{workspace_root}/static-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (static (flags (:standard -ccopt -static))))
-
 (executable
  (name codec)
  (public_name tezos-codec)
@@ -48,7 +46,9 @@
   (select void_for_linking-tezos-client-alpha from
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty)))
- (link_flags (:standard -linkall))
+ (link_flags
+  (:standard -linkall)
+  (:include %{workspace_root}/static-link-flags.sexp))
  (flags
   (:standard)
   -open Data_encoding
