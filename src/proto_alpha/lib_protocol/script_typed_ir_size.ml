@@ -576,61 +576,9 @@ and kinstr_size :
   in
   kinstr_traverse t accu {apply}
 
-let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
-    =
- fun t ->
-  let ret_zero x = (Nodes.zero, x) in
-  let apply :
-      type a s r f. nodes_and_size -> (a, s, r, f) kinstr -> nodes_and_size =
-   fun accu t ->
-    let stack_prefix_preservation_witness_size n = ret_zero (!!24 *? n) in
-    let dup_n_gadt_witness_size n = ret_zero (!!16 *? n) in
-    let comb n = ret_zero (!!16 *? n) in
-    let self_size =
-      match t with
-      (* Op n *)
-      | IDig (_, n, _, _) -> stack_prefix_preservation_witness_size n
-      | IDug (_, n, _, _) -> stack_prefix_preservation_witness_size n
-      | IDipn (_, n, _, _, _) -> stack_prefix_preservation_witness_size n
-      | IDropn (_, n, _, _) -> stack_prefix_preservation_witness_size n
-      | IComb (_, n, _, _) -> comb n
-      | IUncomb (_, n, _, _) -> comb n
-      | IComb_get (_, n, _, _) -> comb (n / 2)
-      | IComb_set (_, n, _, _) -> comb (n / 2)
-      | IDup_n (_, n, _, _) -> dup_n_gadt_witness_size n
-      | ICompare (_, ty, _) -> ty_size ty
-      (* Other extra *)
-      | ILambda (_, lambda, _) -> lambda_extra_size lambda
-      | _ -> zero
-    in
-    ret_succ (accu ++ self_size)
-  in
-  kinstr_traverse t zero {apply}
+let lambda_size lam = lambda_size ~count_lambda_nodes:true zero lam
 
-and lambda_extra_size : type i o. (i, o) lambda -> nodes_and_size =
- fun (Lam ({kinstr; _}, _)) -> kinstr_extra_size kinstr
-
-let lambda_size lam =
-  (*
-
-      The following formula has been obtained through a regression
-      over the corpus of mainnet contracts in Granada.
-
-  *)
-  let lambda_nodes, lambda_size =
-    lambda_size ~count_lambda_nodes:true zero lam
-  in
-  let lambda_extra_size_nodes, lambda_extra_size = lambda_extra_size lam in
-  let size = (lambda_size *? 157 /? 100) +! (lambda_extra_size *? 18 /? 100) in
-  (Nodes.add lambda_nodes lambda_extra_size_nodes, size)
-
-let kinstr_size kinstr =
-  let kinstr_extra_size_nodes, kinstr_extra_size = kinstr_extra_size kinstr in
-  let kinstr_nodes, kinstr_size =
-    kinstr_size ~count_lambda_nodes:true zero kinstr
-  in
-  let size = (kinstr_size *? 157 /? 100) +! (kinstr_extra_size *? 18 /? 100) in
-  (Nodes.add kinstr_nodes kinstr_extra_size_nodes, size)
+let kinstr_size kinstr = kinstr_size ~count_lambda_nodes:true zero kinstr
 
 let value_size ty x = value_size ~count_lambda_nodes:true zero ty x
 
