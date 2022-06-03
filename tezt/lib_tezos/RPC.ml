@@ -127,6 +127,10 @@ let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
     ~data:(`O [("bootstrapped", `Bool bootstrapped)])
     ignore
 
+let get_chain_is_bootstrapped ?(chain = "main") () =
+  make GET ["chains"; chain; "is_bootstrapped"] @@ fun json ->
+  JSON.(json |-> "sync_state" |> as_string)
+
 type block_descriptor = {block_hash : string; level : int}
 
 let parse_block_descriptor json =

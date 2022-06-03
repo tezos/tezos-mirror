@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let is_bootstrapped ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "is_bootstrapped"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
 let raw_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     client =
   let path =
