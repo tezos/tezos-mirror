@@ -36,9 +36,6 @@ open Protocol
 open Alpha_context
 open Sc_rollup
 open Lwt_syntax
-
-exception TickNotFound of Tick.t
-
 open Lib_test.Qcheck_helpers
 module Sc_rollup_repr = Protocol.Sc_rollup_repr
 
@@ -73,10 +70,6 @@ let dummy_proof_encoding : dummy_proof Data_encoding.t =
 let proof_start_state proof = proof.start
 
 let proof_stop_state proof = proof.stop
-
-let check pred =
-  let open Result_syntax in
-  if pred then return () else error ()
 
 let number_of_messages_exn n =
   match Number_of_messages.of_int32 n with

@@ -243,17 +243,7 @@ module Dune = struct
              S "inline_tests";
              [S "flags"; S "-verbose"];
              S "modes"
-             :: of_list
-                  (List.map
-                     (function
-                       | JS ->
-                           (* We don't run inline_tests in JS by default because of the issue #1947.
-                              In short, we don't want [dune runtest] to depend on node.
-                              Remove this code after we switch to dune.3.0
-                              and address https://gitlab.com/tezos/tezos/-/issues/1947 *)
-                           E
-                       | mode -> S (string_of_mode mode))
-                     modes);
+             :: of_list (List.map (fun mode -> S (string_of_mode mode)) modes);
            ]
           else E);
           (match preprocess with
@@ -1955,9 +1945,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let depends =
     {
       Opam.package = "dune";
-      (* We artificially constrain the version of dune to split the tooling
-         upgrade. This is temporary. *)
-      version = Version.(and_list [at_least "2.9"; less_than "3.0"]);
+      version = Version.at_least "3.0";
       with_test = false;
       optional = false;
     }
@@ -2077,7 +2065,7 @@ let generate_opam_files_for_release packages_dir release =
 
 (* Bumping the dune lang version can result in different dune stanza
    semantic and could require changes to the generation logic. *)
-let dune_lang_version = "2.9"
+let dune_lang_version = "3.0"
 
 let generate_dune_project_files () =
   let t = Hashtbl.create 17 in
@@ -2095,8 +2083,19 @@ let generate_dune_project_files () =
   Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
-  ( Target.iter_internal_by_opam @@ fun package _internals ->
-    Format.fprintf fmt "(package (name %s))@." package ) ;
+  ( Target.iter_internal_by_opam @@ fun package internals ->
+    let has_public_target =
+      List.exists
+        (fun (i : Target.internal) ->
+          match i.kind with
+          | Public_library _ | Public_executable _ -> true
+          | Private_library _ -> false
+          | Private_executable _ -> false
+          | Test_executable _ -> false)
+        internals
+    in
+    let allow_empty = if not has_public_target then "(allow_empty)" else "" in
+    Format.fprintf fmt "(package (name %s)%s)@." package allow_empty ) ;
   Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 

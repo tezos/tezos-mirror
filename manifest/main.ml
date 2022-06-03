@@ -206,8 +206,6 @@ let ocplib_ocamlres =
 
 let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
-let parsexp = external_lib ~js_compatible:true "parsexp" V.True
-
 let ppx_inline_test =
   inline_tests_backend (external_lib "ppx_inline_test" V.True)
 
@@ -1218,20 +1216,7 @@ let _tezos_tooling =
            it is added to tezos/opam-repository. *)
         ocamlformat;
         ometrics;
-        (* Keep a fake dependency on ppx_blob so that we don't need to
-           do the opam-repository dance just for this.  It will be
-           removed later when bumping opam-repository is mandatory *)
-        external_lib "ppx_blob" V.True;
       ]
-
-let _tezos_tooling_js_inline_tests =
-  test
-    "run_js_inline_tests"
-    ~runtest:false
-    ~path:"src/tooling"
-    ~opam:"tezos-tooling"
-    ~modules:["run_js_inline_tests"]
-    ~deps:[parsexp; unix]
 
 let _tezos_tooling_opam_file_format =
   private_lib
@@ -4899,6 +4884,10 @@ let () =
     Env.empty
     |> Env.add p_static ~key:"ocamlopt_flags" Dune.[S ":standard"; S "-O3"]
     |> Env.add p_release ~key:"ocamlopt_flags" Dune.[S ":standard"; S "-O3"]
+    |> Env.add
+         Env.Any
+         ~key:"js_of_ocaml"
+         Dune.[S "runtest_alias"; S "runtest_js"]
   in
   let dune =
     Dune.

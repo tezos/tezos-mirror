@@ -194,7 +194,6 @@ test-flextesa:
 .PHONY: test-js
 test-js:
 	@ALCOTEST_VERBOSE=yes dune build @runtest_js
-	@dune exec ./src/tooling/run_js_inline_tests.exe
 
 .PHONY: build-tezt
 build-tezt:

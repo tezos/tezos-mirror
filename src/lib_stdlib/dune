@@ -11,6 +11,6 @@
   zarith_stubs_js
   lwt
   ringo)
- (inline_tests (flags -verbose) (modes native))
+ (inline_tests (flags -verbose) (modes native js))
  (preprocess (pps ppx_inline_test))
  (js_of_ocaml))

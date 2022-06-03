@@ -8,13 +8,6 @@
  (modules))
 
 (executable
- (name run_js_inline_tests)
- (libraries
-  parsexp
-  unix)
- (modules run_js_inline_tests))
-
-(executable
  (name node_wrapper)
  (libraries
   unix)

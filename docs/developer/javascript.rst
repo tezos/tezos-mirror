@@ -46,29 +46,12 @@ using another methods, make sure to call ``npm install`` to intall
 theses dependencies.
 
 
-Limitation with inline_tests
-----------------------------
-
-``Inline_tests`` (e.g. ``ppx_inline_test``) are compatible with
-``js_of_ocaml``, but we currently can't configure the alias under which
-they run.
-
-Because we don't want to force a ``nodejs`` dependency on everybody, we
-can't have JavaScript test run under the ``runtest`` alias by default.
-
-To workaround this limitation, running
-``dune exec ./src/tooling/run_js_inline_tests.exe`` will temporarily
-patch dune files and run ``dune runtest`` for you.
-
 Running tests
 -------------
 
 One can run JavaScript tests with ``make test-js`` in the project root
 or directly using dune with ``dune builld @SOME-PATH/runtest_js``.
 
-In addition, to run inline_tests, execute
-``dune exec ./src/tooling/run_js_inline_tests.exe`` or
-``dune exec ./src/tooling/run_js_inline_tests.exe SOME_PATH``.
 
 Adding tests
 ------------
@@ -97,20 +80,18 @@ alcotest tests in JavaScript:
 Inline tests
 ~~~~~~~~~~~~
 
-Inline tests (e.g. ``ppx_inline_test``) are compatible with jsoo but do
-not run by default (see limitation above).
+Inline tests (e.g. ``ppx_inline_test``) are compatible with jsoo.
 
 In order to run inline_tests in javascript:
 
-- make sure to have both ``(js_of_ocaml)`` and ``(inline_tests)`` in your library stanza.
-- run ``dune exec ./src/tooling/run_js_inline_tests.exe``
+- make sure to have ``(inline_tests (modes js))`` in your library stanza.
 
 ::
 
     (library
       (name mylib)
       (js_of_ocaml)
-      (inline_tests)
+      (inline_tests (modes native js))
     )
 
 JavaScript test failures
