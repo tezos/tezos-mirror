@@ -2484,7 +2484,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       traced
         ( parse_address ctxt expr >>?= fun (address, ctxt) ->
           let loc = location expr in
-          parse_contract
+          parse_contract_data
             ~stack_depth:(stack_depth + 1)
             ctxt
             loc
@@ -4901,6 +4901,24 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
              I_XOR;
            ]
 
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract_data :
+    type arg argc.
+    stack_depth:int ->
+    context ->
+    Script.location ->
+    (arg, argc) ty ->
+    Destination.t ->
+    entrypoint:Entrypoint.t ->
+    (context * arg typed_contract) tzresult Lwt.t =
+ fun ~stack_depth ctxt loc arg destination ~entrypoint ->
+  (parse_contract [@ocaml.tailcall])
+    ~stack_depth
+    ctxt
+    loc
+    arg
+    destination
+    ~entrypoint
+
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract :
     type arg argc.
     stack_depth:int ->
@@ -6077,8 +6095,8 @@ let unparse_code ctxt mode code =
   Global_constants_storage.expand ctxt (strip_locations code)
   >>=? fun (ctxt, code) -> unparse_code ~stack_depth:0 ctxt mode (root code)
 
-let parse_contract context loc arg_ty contract ~entrypoint =
-  parse_contract ~stack_depth:0 context loc arg_ty contract ~entrypoint
+let parse_contract_data context loc arg_ty contract ~entrypoint =
+  parse_contract_data ~stack_depth:0 context loc arg_ty contract ~entrypoint
 
 let parse_toplevel ctxt ~legacy toplevel =
   Global_constants_storage.expand ctxt toplevel >>=? fun (ctxt, toplevel) ->
