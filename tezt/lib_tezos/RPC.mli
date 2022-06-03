@@ -45,7 +45,7 @@ include module type of RPC_legacy
 
     - Then the name contains all constant parts of the endpoint path,
       separated by underscores.
-      E.g. [chain_levels_caboose] for [GET /chain/[chain]/levels/caboose].
+      E.g. [chain_levels_caboose] for [GET /chains/[chain]/levels/caboose].
       The dynamic part [[chain]] is dropped (it becomes an argument of the function).
 
     - When a word is plural, it becomes singular if the RPC selects one element.
@@ -53,9 +53,9 @@ include module type of RPC_legacy
       because it returns all elements of the list, but [GET /network/connections/<peer_id>]
       becomes [get_network_connection] because it returns only one connection.
       This allows to differentiate the two RPCs.
-      Another example is [GET /chain/[chain]/blocks/[block]/metadata] which becomes
+      Another example is [GET /chains/[chain]/blocks/[block]/metadata] which becomes
       [get_chain_block_metadata] since it selects one block.
-      Another example is [GET /chain/[chain]/levels/checkpoint] which becomes
+      Another example is [GET /chains/[chain]/levels/checkpoint] which becomes
       [get_chain_level_checkpoint], which illustrates that the selector (here [checkpoint])
       does not need to be dynamic for this rule to apply.
 
@@ -85,20 +85,20 @@ val post_private_injection_operations :
   unit ->
   [`OpHash of string] list t
 
-(** RPC: [GET /chain/[chain]/blocks/[block]]
+(** RPC: [GET /chains/[chain]/blocks/[block]]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block : ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chain/[chain]/blocks/[block]/metadata]
+(** RPC: [GET /chains/[chain]/blocks/[block]/metadata]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_metadata :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chain/[chain]/blocks/[block]/header]
+(** RPC: [GET /chains/[chain]/blocks/[block]/header]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
@@ -107,17 +107,17 @@ val get_chain_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
 (** A level and its hash *)
 type block_descriptor = {block_hash : string; level : int}
 
-(** RPC: [GET /chain/[chain]/levels/checkpoint]
+(** RPC: [GET /chains/[chain]/levels/checkpoint]
 
     [chain] defaults to ["main"]. *)
 val get_chain_level_checkpoint : ?chain:string -> unit -> block_descriptor t
 
-(** RPC: [GET /chain/[chain]/levels/savepoint]
+(** RPC: [GET /chains/[chain]/levels/savepoint]
 
     [chain] defaults to ["main"]. *)
 val get_chain_level_savepoint : ?chain:string -> unit -> block_descriptor t
 
-(** RPC: [GET /chain/[chain]/levels/caboose]
+(** RPC: [GET /chains/[chain]/levels/caboose]
 
     [chain] defaults to ["main"]. *)
 val get_chain_level_caboose : ?chain:string -> unit -> block_descriptor t
