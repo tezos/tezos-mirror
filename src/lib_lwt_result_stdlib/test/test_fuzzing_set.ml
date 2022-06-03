@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Test_fuzzing_tests
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 module IntSet : Support.Lib.Set.S with type elt = int = struct
   include Support.Lib.Set.Make (Int)

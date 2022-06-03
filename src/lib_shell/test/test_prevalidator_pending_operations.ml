@@ -30,7 +30,7 @@
     Subject:      Unit tests the Prevalidator pending operations APIs
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 module Pending_ops = Prevalidator_pending_operations
 module CompareListQ = Compare.List (Q)
 

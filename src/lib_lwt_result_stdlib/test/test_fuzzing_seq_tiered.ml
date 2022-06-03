@@ -222,7 +222,7 @@ let iter_p =
 
 let wrap (name, (module Tier : TIER)) =
   let module M = TestIter (Tier) in
-  (name, Lib_test.Qcheck_helpers.qcheck_wrap M.tests)
+  (name, Lib_test.Qcheck2_helpers.qcheck_wrap M.tests)
 
 let () =
   let name = "Test_fuzzing_seq_tiered" in
@@ -237,8 +237,8 @@ let () =
   let tests =
     tests
     @ [
-        ("iter_p", Lib_test.Qcheck_helpers.qcheck_wrap [iter_p]);
-        ("iter_ep", Lib_test.Qcheck_helpers.qcheck_wrap [iter_ep]);
+        ("iter_p", Lib_test.Qcheck2_helpers.qcheck_wrap [iter_p]);
+        ("iter_ep", Lib_test.Qcheck2_helpers.qcheck_wrap [iter_ep]);
       ]
   in
   Alcotest.run name tests

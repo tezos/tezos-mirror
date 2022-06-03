@@ -306,10 +306,10 @@ end
 let () =
   let tests =
     [
-      ("iter*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests);
-      ("filter*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilter.tests);
-      ("filter_map*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilterMap.tests);
-      ("map*", Lib_test.Qcheck_helpers.qcheck_wrap TestMap.tests);
+      ("iter*", Lib_test.Qcheck2_helpers.qcheck_wrap TestIter.tests);
+      ("filter*", Lib_test.Qcheck2_helpers.qcheck_wrap TestFilter.tests);
+      ("filter_map*", Lib_test.Qcheck2_helpers.qcheck_wrap TestFilterMap.tests);
+      ("map*", Lib_test.Qcheck2_helpers.qcheck_wrap TestMap.tests);
     ]
   in
   Alcotest.run "Option" tests

@@ -137,7 +137,7 @@ module SizedSet_test = struct
 
   let test =
     [empty; singleton]
-    @ Lib_test.Qcheck_helpers.qcheck_wrap
+    @ Lib_test.Qcheck2_helpers.qcheck_wrap
         [
           equal;
           inequal;
@@ -281,7 +281,7 @@ module SizedMap_test = struct
 
   let test =
     [empty; singleton]
-    @ Lib_test.Qcheck_helpers.qcheck_wrap
+    @ Lib_test.Qcheck2_helpers.qcheck_wrap
         [
           equal;
           inequal;
