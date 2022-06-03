@@ -686,7 +686,7 @@ let definition mode x_opt def =
         let rec unquote def =
           match def.it with
           | Textual m -> m
-          | Encoded (_, bs) -> Decode.decode "" bs
+          | Encoded (_, bytes) -> Decode.decode ~name:"" ~bytes
           | Quoted (_, s) -> unquote (Parse.string_to_module s)
         in
         module_with_var_opt x_opt (unquote def)
@@ -694,7 +694,7 @@ let definition mode x_opt def =
         let rec unquote def =
           match def.it with
           | Textual m -> Encode.encode m
-          | Encoded (_, bs) -> Encode.encode (Decode.decode "" bs)
+          | Encoded (_, bytes) -> Encode.encode (Decode.decode ~name:"" ~bytes)
           | Quoted (_, s) -> unquote (Parse.string_to_module s)
         in
         binary_module_with_var_opt x_opt (unquote def)

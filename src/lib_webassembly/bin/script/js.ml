@@ -660,7 +660,7 @@ let of_command mods cmd =
       let rec unquote def =
         match def.it with
         | Textual m -> m
-        | Encoded (_, bs) -> Decode.decode "binary" bs
+        | Encoded (_, bytes) -> Decode.decode ~name:"binary" ~bytes
         | Quoted (_, s) -> unquote (Parse.string_to_module s)
       in
       bind mods x_opt (unquote def) ;

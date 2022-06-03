@@ -4,7 +4,7 @@ open Binary_exn
 
 type stream = {name : string; bytes : string; pos : int ref}
 
-let stream name bs = {name; bytes = bs; pos = ref 0}
+let make_stream ~name ~bytes = {name; bytes; pos = ref 0}
 
 let len s = String.length s.bytes
 
@@ -1512,17 +1512,15 @@ type field =
   | SingleField : 'a field_type * 'a option -> field
 
 (** Module parsing steps *)
-type module_kont' =
+type module_kont =
   | MKStart  (** Initial state of a module parsing *)
-  | MKSkipCustom : ('a field_type * section_tag) option -> module_kont'
+  | MKSkipCustom : ('a field_type * section_tag) option -> module_kont
       (** Custom section which are skipped, with the next section to parse. *)
-  | MKFieldStart : 'a field_type * section_tag -> module_kont'
+  | MKFieldStart : 'a field_type * section_tag -> module_kont
       (** Starting point of a section, handles parsing generic section header. *)
-  | MKField : 'a field_type * size * 'a vec_kont -> module_kont'
+  | MKField : 'a field_type * size * 'a vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
-  | MKElaborateFunc :
-      var list * func list * func vec_kont * bool
-      -> module_kont'
+  | MKElaborateFunc : var list * func list * func vec_kont * bool -> module_kont
       (** Elaboration of functions from the code section with their declared type in
       the func section, and accumulating invariants conditions associated to
       functions. *)
@@ -1555,9 +1553,10 @@ type module_kont' =
       continuation, the starting position of the current function, the size of
       the section. *)
 
-type module_kont = {
+type decode_kont = {
   building_state : field list;  (** Accumulated parsed sections. *)
-  kont : module_kont';
+  module_kont : module_kont;
+  stream : stream;
 }
 
 let rec find_vec : type t. t field_type -> _ -> t list * int =
@@ -1604,12 +1603,13 @@ let rec find_single : type t. t field_type -> _ -> t option =
       | DataField, DataField -> v
       | _ -> find_single ty rest)
 
-let module_step s state =
-  let next kont = {state with kont} in
-  let next_with_field field kont =
-    {building_state = field :: state.building_state; kont}
+let module_step state =
+  let next module_kont = {state with module_kont} in
+  let next_with_field field module_kont =
+    {state with building_state = field :: state.building_state; module_kont}
   in
-  match state.kont with
+  let s = state.stream in
+  match state.module_kont with
   | MKStart ->
       (* Module header *)
       let header = u32 s in
@@ -1869,8 +1869,9 @@ let module_step s state =
         (len s)
         "data count section required" ;
       {
+        state with
         building_state = [];
-        kont =
+        module_kont =
           MKStop
             {
               types;
@@ -1893,14 +1894,14 @@ let module_step s state =
       assert false
   | MKStop _ (* Stop cannot reduce. *) -> assert false
 
-let module_ s =
+let module_ stream =
   let rec loop = function
-    | {kont = MKStop m; _} -> m
-    | k -> loop (module_step s k)
+    | {module_kont = MKStop m; _} -> m
+    | k -> loop (module_step k)
   in
-  loop {building_state = []; kont = MKStart}
+  loop {building_state = []; module_kont = MKStart; stream}
 
-let decode name bs = at module_ (stream name bs)
+let decode ~name ~bytes = at module_ (make_stream ~name ~bytes)
 
 let all_custom tag s =
   let header = u32 s in
@@ -1916,4 +1917,4 @@ let all_custom tag s =
   in
   collect ()
 
-let decode_custom tag name bs = all_custom tag (stream name bs)
+let decode_custom tag ~name ~bytes = all_custom tag (make_stream ~name ~bytes)
