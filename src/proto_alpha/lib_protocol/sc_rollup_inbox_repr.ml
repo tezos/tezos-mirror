@@ -113,6 +113,9 @@ module Hash = struct
 
   let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
 
+  let of_context_hash context_hash =
+    hash_bytes [Context_hash.to_bytes context_hash]
+
   include Path_encoding.Make_hex (H)
 end
 
@@ -606,9 +609,7 @@ module MakeHashingScheme (Tree : TREE) :
 
   let hash_messages messages =
     if Tree.is_empty messages then no_messages_hash
-    else
-      let context_hash = Tree.hash messages in
-      Hash.hash_bytes [Context_hash.to_bytes context_hash]
+    else Hash.of_context_hash @@ Tree.hash messages
 
   let add_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
@@ -787,8 +788,8 @@ module Proof = struct
 
   let check_hash hash kinded_hash =
     match kinded_hash with
-    | `Node h -> Context_hash.equal h hash
-    | `Value h -> Context_hash.equal h hash
+    | `Node h -> Hash.(equal (of_context_hash h) hash)
+    | `Value h -> Hash.(equal (of_context_hash h) hash)
 
   let drop_error result reason =
     Lwt.map (Result.map_error (fun _ -> reason)) result
