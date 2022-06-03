@@ -21,6 +21,7 @@ The script downloads it to compute sha256 and sha512 checksums for you."
 version="${1:-}"
 url="${2:-}"
 opam_dir="${3:-opam-repository}"
+opam_repository_fork="git@github.com:rdavison/opam-repository"
 
 if [ -z "$version" ] ; then
     echo "$usage"
@@ -73,3 +74,5 @@ git checkout -b "$branch"
 git add packages
 git commit -am "Octez $version packages"
 log "A branch named $branch has been created in $opam_dir."
+git remote add staging "$opam_repository_fork"
+git push -u staging "$branch"
