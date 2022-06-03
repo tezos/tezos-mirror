@@ -90,6 +90,8 @@ segment variable `Segment <#segment>`__
 proof   variable `Inode_tree <#inode-tree>`__
 ======= ======== ============================
 
+.. _v1-tree32-inode-tree:
+
 Inode_tree
 ~~~~~~~~~~
 
@@ -322,6 +324,8 @@ Name    Size           Contents
 length  1 byte         < 256
 content (length) bytes 5bit integers with termination
 ======= ============== ==============================
+
+.. _v1-tree32-optional-hash:
 
 Optional_hash
 ~~~~~~~~~~~~~
