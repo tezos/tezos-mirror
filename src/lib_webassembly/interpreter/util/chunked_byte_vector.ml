@@ -70,6 +70,8 @@ module type S = sig
 
   val of_bytes : bytes -> t effect
 
+  val to_string_unstable : t -> string effect
+
   val grow : t -> int64 -> unit
 
   val length : t -> int64
@@ -144,6 +146,27 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     let vector = Bytes.length bytes |> Int64.of_int |> create in
     let+ () = store_bytes vector 0L bytes in
     vector
+
+  (* This function makes a lot of conversion from Int64 to native int but it
+     should be called only when converting a parsed data segment into a string
+     (when writing a parsed module into its binary or text representation).
+
+     @raise Invalid_argument "Chunked_byte.vector.to_string" if the size of the
+     vector is greater than [Sys.max_string_length]. *)
+  let to_string_unstable vector =
+    let open Effect in
+    let len = length vector in
+    if len > Int64.of_int (Sys.max_string_length) then
+      invalid_arg "Chunked_byte_vector.to_string"
+    else
+      let buff = Bytes.create (Int64.to_int len) in
+      let+ () =
+        List.init (Int64.to_int len) (fun i ->
+          let+ b = load_byte vector (Int64.of_int i) in
+          Bytes.set buff i (Char.chr b))
+        |> join
+      in
+      Bytes.to_string buff
 end
 
 include Make (Effect.Identity)

@@ -44,6 +44,18 @@ module type S = sig
       turning your [bytes] into a [string] would be potentially expensive. *)
   val of_bytes : bytes -> t effect
 
+  (** [to_string_unstable vector] creates a string from the given chunked byte vector
+      [vector]. Reads the first [length vector] bytes.
+
+      This function should be called only when converting a parsed data segment
+      into a string (when writing a parsed module into its binary or text
+      representation).
+
+      @raise [Invalid_argument "Chunked_byte.vector.to_string"] if the size of the
+      vector is greater than [Sys.max_string_length].
+  *)
+  val to_string_unstable : t -> string effect
+
   (** [grow vector length_delta] increases the byte vector length by
       [length_delta]. *)
   val grow : t -> int64 -> unit
@@ -60,6 +72,7 @@ module type S = sig
   (** [store_bytes vector offset bytes] set the bytes from [offset] to the given
       [bytes]. *)
   val store_bytes : t -> int64 -> bytes -> unit effect
+
 end
 
 include S with type 'a effect = 'a
