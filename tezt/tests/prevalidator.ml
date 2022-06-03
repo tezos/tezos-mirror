@@ -2228,8 +2228,9 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
     Operation.sign_manager_op_bytes ~signer (Hex.to_bytes (`Hex op_str_hex))
   in
   let* _run =
-    let* chain_id = RPC.get_chain_id client in
+    let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
     let op_runnable =
+      (* Please don't do that. Build [JSON.u] values and use [JSON.encode_u]. *)
       Format.asprintf
         {|{ "operation":
             {"branch": "%s",
@@ -2240,7 +2241,7 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
         ops_json
         Tezos_crypto.Signature.pp
         signature
-        (JSON.encode chain_id)
+        (JSON.encode_u (`String chain_id))
     in
     RPC.post_run_operation ~data:(Ezjsonm.from_string op_runnable) client
   in

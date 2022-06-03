@@ -105,6 +105,9 @@ let get_network_version = make GET ["network"; "version"] Fun.id
 
 let get_network_versions = make GET ["network"; "versions"] Fun.id
 
+let get_chain_chain_id ?(chain = "main") () =
+  make GET ["chains"; chain; "chain_id"] JSON.as_string
+
 let get_chain_block ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block] Fun.id
 

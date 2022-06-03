@@ -145,6 +145,11 @@ val post_private_injection_operations :
   unit ->
   [`OpHash of string] list t
 
+(** RPC: [GET /chains/[chain]/chain_id]
+
+    Returns the chain ID. *)
+val get_chain_chain_id : ?chain:string -> unit -> string t
+
 (** RPC: [GET /chains/[chain]/blocks/[block]]
 
     [chain] defaults to ["main"].

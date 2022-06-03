@@ -34,14 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chain/[chain]/chain_id *)
-val get_chain_id :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/blocks/[block]/hash *)
 val get_block_hash :
   ?endpoint:Client.endpoint ->

@@ -600,7 +600,7 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
          counter
          contract_id
          value
-         (JSON.as_string chain_id)
+         chain_id
          (match blocks_before_activation with
          | None -> ""
          | Some b -> Printf.sprintf {|, "blocks_before_activation" : %d |} b)
@@ -618,7 +618,7 @@ let check_simulation_takes_cache_into_account ~protocol =
     ~protocol
   @@ fun () ->
   let* _, client = init1 ~protocol in
-  let* chain_id = RPC.get_chain_id client in
+  let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
   let* contract_id = originate_very_small_contract client in
   let* () = Client.bake_for client in
 
@@ -677,7 +677,7 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
   in
   setup_migration_time ~migration_level:8 @@ fun node client ->
   let* contract_id = originate_very_small_contract client in
-  let* chain_id = RPC.get_chain_id client in
+  let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
   let simulate ~blocks_before_activation counter =
     let arg = {|{ "prim" : "Unit" }|} in
     gas_from_simulation
@@ -859,7 +859,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
 
   let simulate counter =
     let arg = {|{ "prim" : "Unit" }|} in
-    let* chain_id = RPC.get_chain_id client in
+    let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
     gas_from_simulation client chain_id contract_id counter arg
   in
   let* predicted_gas_in_simulation = simulate 4 in
