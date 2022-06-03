@@ -1012,6 +1012,39 @@ let pp_manager_operation_contents_and_result ppf
            expected effects (as follow) were NOT applied.@]" ;
         pp_sc_rollup_atomic_batch_result op
   in
+  let pp_internal_result (type kind) ppf
+      (result : kind internal_manager_operation_result) =
+    Format.fprintf ppf "@," ;
+    match result with
+    | Skipped _ -> Format.fprintf ppf "This operation was skipped"
+    | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
+    | Applied (IDelegation_result {consumed_gas}) ->
+        Format.fprintf ppf "This delegation was successfully applied" ;
+        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    | Backtracked (IDelegation_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This delegation was BACKTRACKED, its expected effects were \
+           NOT applied.@]"
+    | Applied (ITransaction_result tx) ->
+        Format.fprintf ppf "This transaction was successfully applied" ;
+        pp_transaction_result tx
+    | Backtracked (ITransaction_result tx, _errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This transaction was BACKTRACKED, its expected effects (as \
+           follow) were NOT applied.@]" ;
+        pp_transaction_result tx
+    | Applied (IOrigination_result op_res) ->
+        Format.fprintf ppf "This origination was successfully applied" ;
+        pp_origination_result op_res
+    | Backtracked (IOrigination_result op_res, _errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This origination was BACKTRACKED, its expected effects (as \
+           follow) were NOT applied.@]" ;
+        pp_origination_result op_res
+  in
 
   Format.fprintf
     ppf
@@ -1047,7 +1080,7 @@ let pp_manager_operation_contents_and_result ppf
              pp_internal_operation_result
                ppf
                (Internal_contents op)
-               pp_result
+               pp_internal_result
                res))
         internal_operation_results) ;
   Format.fprintf ppf "@]"

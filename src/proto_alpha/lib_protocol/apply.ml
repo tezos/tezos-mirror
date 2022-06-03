@@ -1016,7 +1016,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
   >>=? fun (ctxt, state, paid_storage_size_diff) ->
   Tx_rollup_state.update ctxt dst_rollup state >>=? fun ctxt ->
   let result =
-    Transaction_result
+    ITransaction_result
       (Transaction_to_tx_rollup_result
          {
            balance_updates;
@@ -1120,7 +1120,7 @@ let apply_internal_manager_operation_content :
     chain_id:Chain_id.t ->
     kind Script_typed_ir.manager_operation ->
     (context
-    * kind successful_manager_operation_result
+    * kind successful_internal_manager_operation_result
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
@@ -1151,7 +1151,8 @@ let apply_internal_manager_operation_content :
         ~before_operation
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
-        (Transaction_result res : kind successful_manager_operation_result),
+        (ITransaction_result res
+          : kind successful_internal_manager_operation_result),
         ops )
   | Transaction_to_contract
       {
@@ -1175,7 +1176,7 @@ let apply_internal_manager_operation_content :
         ~mode
         ~internal:true
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
-      >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
+      >|=? fun (ctxt, res, ops) -> (ctxt, ITransaction_result res, ops)
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       apply_transaction_to_tx_rollup
@@ -1208,11 +1209,11 @@ let apply_internal_manager_operation_content :
         ~credit
         ~before_operation
       >|=? fun (ctxt, origination_result, ops) ->
-      (ctxt, Origination_result origination_result, ops)
+      (ctxt, IOrigination_result origination_result, ops)
   | Delegation delegate ->
       apply_delegation ~ctxt ~source ~delegate ~before_operation
       >|=? fun (ctxt, consumed_gas, ops) ->
-      (ctxt, Delegation_result {consumed_gas}, ops)
+      (ctxt, IDelegation_result {consumed_gas}, ops)
 
 let apply_external_manager_operation_content :
     type kind.
@@ -2209,99 +2210,31 @@ let burn_manager_storage_fees :
 let burn_internal_storage_fees :
     type kind.
     context ->
-    kind successful_manager_operation_result ->
+    kind successful_internal_manager_operation_result ->
     storage_limit:Z.t ->
     payer:public_key_hash ->
-    (context * Z.t * kind successful_manager_operation_result) tzresult Lwt.t =
+    (context * Z.t * kind successful_internal_manager_operation_result) tzresult
+    Lwt.t =
  fun ctxt smopr ~storage_limit ~payer ->
   let payer = `Contract (Contract.Implicit payer) in
   match smopr with
-  | Transaction_result transaction_result ->
+  | ITransaction_result transaction_result ->
       burn_transaction_storage_fees
         ctxt
         transaction_result
         ~storage_limit
         ~payer
       >|=? fun (ctxt, storage_limit, transaction_result) ->
-      (ctxt, storage_limit, Transaction_result transaction_result)
-  | Origination_result origination_result ->
+      (ctxt, storage_limit, ITransaction_result transaction_result)
+  | IOrigination_result origination_result ->
       burn_origination_storage_fees
         ctxt
         origination_result
         ~storage_limit
         ~payer
       >|=? fun (ctxt, storage_limit, origination_result) ->
-      (ctxt, storage_limit, Origination_result origination_result)
-  | Reveal_result _ | Delegation_result _ -> return (ctxt, storage_limit, smopr)
-  | Register_global_constant_result ({balance_updates; _} as payload) ->
-      let consumed = payload.size_of_constant in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Register_global_constant_result {payload with balance_updates} )
-  | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
-  | Tx_rollup_origination_result ({balance_updates; _} as payload) ->
-      Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
-      >>=? fun (ctxt, storage_limit, origination_bus) ->
-      let balance_updates = origination_bus @ balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Tx_rollup_origination_result {payload with balance_updates} )
-  | Tx_rollup_return_bond_result _ | Tx_rollup_remove_commitment_result _
-  | Tx_rollup_rejection_result _ | Tx_rollup_finalize_commitment_result _
-  | Tx_rollup_commit_result _ ->
-      return (ctxt, storage_limit, smopr)
-  | Transfer_ticket_result
-      ({balance_updates; paid_storage_size_diff; _} as payload) ->
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = balance_updates @ storage_bus in
-      return
-        ( ctxt,
-          storage_limit,
-          Transfer_ticket_result {payload with balance_updates} )
-  | Tx_rollup_submit_batch_result
-      ({balance_updates; paid_storage_size_diff; _} as payload) ->
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Tx_rollup_submit_batch_result {payload with balance_updates} )
-  | Tx_rollup_dispatch_tickets_result
-      ({balance_updates; paid_storage_size_diff; _} as payload) ->
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Tx_rollup_dispatch_tickets_result {payload with balance_updates} )
-  | Dal_publish_slot_header_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_originate_result ({size; _} as payload) ->
-      Fees.burn_sc_rollup_origination_fees ctxt ~storage_limit ~payer size
-      >>=? fun (ctxt, storage_limit, balance_updates) ->
-      let result = Sc_rollup_originate_result {payload with balance_updates} in
-      return (ctxt, storage_limit, result)
-  | Sc_rollup_add_messages_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_cement_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_publish_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_refute_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_timeout_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_atomic_batch_result
-      ({balance_updates; paid_storage_size_diff; _} as payload) ->
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer paid_storage_size_diff
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Sc_rollup_atomic_batch_result {payload with balance_updates} )
+      (ctxt, storage_limit, IOrigination_result origination_result)
+  | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
@@ -2624,12 +2557,18 @@ let mark_backtracked results =
   and mark_internal_operation_results
       (Internal_manager_operation_result (kind, result)) =
     Internal_manager_operation_result
-      (kind, mark_manager_operation_result result)
+      (kind, mark_internal_manager_operation_result result)
   and mark_manager_operation_result :
       type kind. kind manager_operation_result -> kind manager_operation_result
       = function
     | (Failed _ | Skipped _ | Backtracked _) as result -> result
     | Applied (Reveal_result _) as result -> result
+    | Applied result -> Backtracked (result, None)
+  and mark_internal_manager_operation_result :
+      type kind.
+      kind internal_manager_operation_result ->
+      kind internal_manager_operation_result = function
+    | (Failed _ | Skipped _ | Backtracked _) as result -> result
     | Applied result -> Backtracked (result, None)
   in
   mark_contents_list results
