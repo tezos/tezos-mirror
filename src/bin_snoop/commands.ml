@@ -292,6 +292,7 @@ module Infer_cmd = struct
       report = NoReport;
       save_solution = None;
       dot_file = None;
+      display = Display.default_options;
     }
 
   let set_print_problem print_problem options = {options with print_problem}
@@ -320,6 +321,13 @@ module Infer_cmd = struct
 
   let set_dot_file dot_file options = {options with dot_file}
 
+  let set_full_plot_verbosity full_plot_verbosity options =
+    {
+      options with
+      display =
+        {options.display with reduced_plot_verbosity = not full_plot_verbosity};
+    }
+
   let list_solvers () =
     Printf.eprintf "ridge --ridge-alpha=<float>\n" ;
     Printf.eprintf "lasso --lasso-alpha=<float> --lasso-positive\n" ;
@@ -335,7 +343,8 @@ module Infer_cmd = struct
         report,
         override_files,
         save_solution,
-        dot_file ) model_name workload_data solver () =
+        dot_file,
+        full_plot_verbosity ) model_name workload_data solver () =
     let options =
       default_infer_parameters_options
       |> set_print_problem print_problem
@@ -347,6 +356,7 @@ module Infer_cmd = struct
       |> set_override_files override_files
       |> set_save_solution save_solution
       |> set_dot_file dot_file
+      |> set_full_plot_verbosity full_plot_verbosity
     in
     commandline_outcome_ref :=
       Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
@@ -452,11 +462,17 @@ module Infer_cmd = struct
         ~long:"dot-file"
         ~placeholder:"filename"
         override_file_param
+
+    let full_plot_verbosity_arg =
+      Clic.switch
+        ~doc:"Produces all (possibly redundant) plots"
+        ~long:"full-plot-verbosity"
+        ()
   end
 
   let options =
     let open Options in
-    Clic.args10
+    Clic.args11
       print_problem
       dump_csv_arg
       plot_arg
@@ -467,6 +483,7 @@ module Infer_cmd = struct
       override_arg
       save_solution_arg
       dot_file_arg
+      full_plot_verbosity_arg
 
   let model_param =
     Clic.param

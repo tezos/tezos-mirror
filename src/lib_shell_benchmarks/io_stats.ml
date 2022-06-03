@@ -109,45 +109,40 @@ let context_statistics base_dir context_hash =
   let* () = Tezos_context.Context.close index in
   Lwt.return (tree_statistics tree)
 
-let matrix_of_int_list (l : int list) =
-  let arr = Array.map float_of_int (Array.of_list l) in
-  Pyplot.Matrix.init ~lines:(Array.length arr) ~cols:1 ~f:(fun l _ -> arr.(l))
+let array_of_int_list (l : int list) = Array.map float_of_int (Array.of_list l)
 
-let plot_histograms save_to {degrees; depths; sizes; _} =
-  let open Pyplot.Plot in
-  init () ;
-  let degrees = matrix_of_int_list degrees in
-  let depths = matrix_of_int_list depths in
-  let sizes = matrix_of_int_list sizes in
-  run
-    ~nrows:1
-    ~ncols:3
-    (let* () =
-       subplot_2d
-         ~row:0
-         ~col:0
-         Axis.(
-           let* () = set_title "Tree degree distribution" in
-           histogram_1d
-             ~h:degrees
-             ~opts:{bins = Some (Bins_num 50); range = None})
-     in
-     let* () =
-       subplot_2d
-         ~row:0
-         ~col:1
-         Axis.(
-           let* () = set_title "Key depth distribution" in
-           histogram_1d
-             ~h:depths
-             ~opts:{bins = Some (Bins_num 50); range = None})
-     in
-     let* () =
-       subplot_2d
-         ~row:0
-         ~col:2
-         Axis.(
-           let* () = set_title "Data size distribution" in
-           histogram_1d ~h:sizes ~opts:{bins = None; range = None})
-     in
-     savefig ~filename:save_to ~dpi:300 ~quality:95)
+let plot_histograms pdf_file {degrees; depths; sizes; _} =
+  let open Plot in
+  let degree =
+    let points =
+      degrees |> List.to_seq |> Seq.map float_of_int |> Seq.map r1
+      |> Data.of_seq
+    in
+    plot2
+      ~title:"Tree degree distribution"
+      ~xaxis:"degree"
+      ~yaxis:"freq"
+      [Histogram.hist ~bins:50 ~points ()]
+  in
+  let depth =
+    let points =
+      depths |> List.to_seq |> Seq.map float_of_int |> Seq.map r1 |> Data.of_seq
+    in
+    plot2
+      ~title:"Key depth distribution"
+      ~xaxis:"depth"
+      ~yaxis:"freq"
+      [Histogram.hist ~bins:50 ~points ()]
+  in
+  let size =
+    let points =
+      sizes |> List.to_seq |> Seq.map float_of_int |> Seq.map r1 |> Data.of_seq
+    in
+    plot2
+      ~title:"Data size distribution"
+      ~xaxis:"size"
+      ~yaxis:"freq"
+      [Histogram.hist ~bins:50 ~points ()]
+  in
+  let plots = [|[|Some degree; Some depth; Some size|]|] in
+  run_matrix ~target:(pdf ~cm_size:(30.0, 20.0) ~pdf_file ()) exec plots

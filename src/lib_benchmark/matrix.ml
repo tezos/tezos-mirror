@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,7 +32,8 @@ type gen = (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Genarray.t
 
 let create ~(lines : int) ~(cols : int) =
   let mat = BA2.create Bigarray.Float64 Bigarray.C_layout lines cols in
-  BA2.fill mat 0.0 ; mat
+  BA2.fill mat 0.0 ;
+  mat
 
 let init ~(lines : int) ~(cols : int) ~f =
   let mat = BA2.create Bigarray.Float64 Bigarray.C_layout lines cols in
@@ -63,7 +64,7 @@ let map (mat : t) (f : float -> float) =
   res
 
 let column (mat : t) (i : int) =
-  let (lines, cols) = shape mat in
+  let lines, cols = shape mat in
   if i >= cols then
     let msg =
       Printf.sprintf
@@ -81,7 +82,7 @@ let column (mat : t) (i : int) =
     col
 
 let is_column (m : t) : bool =
-  let (_, cols) = shape m in
+  let _, cols = shape m in
   cols = 1
 
 let all_equal (l : int list) : int option =
@@ -92,14 +93,12 @@ let all_equal (l : int list) : int option =
 
 let concat_columns_horiz (columns : t list) : t =
   let cols = List.length columns in
-  if cols = 0 then
-    Stdlib.failwith "concat_columns_horiz: empty list of columns" ;
+  if cols = 0 then Stdlib.failwith "concat_columns_horiz: empty list of columns" ;
   if not (List.for_all is_column columns) then
     Stdlib.failwith "concat_columns_horiz: invalid argument" ;
   let row_dims = List.map dim1 columns in
   match all_equal row_dims with
-  | None ->
-      Stdlib.failwith "concat_columns_horiz: invalid argument"
+  | None -> Stdlib.failwith "concat_columns_horiz: invalid argument"
   | Some rows ->
       let columns = Array.of_list columns in
       init ~lines:rows ~cols ~f:(fun l c -> get columns.(c) l 0)
@@ -110,9 +109,7 @@ let of_genarray (a : gen) : t = Bigarray.array2_of_genarray a
 
 let bigarray_copy (a : gen) =
   let dims = Bigarray.Genarray.dims a in
-  let copy =
-    Bigarray.Genarray.create Bigarray.Float64 Bigarray.C_layout dims
-  in
+  let copy = Bigarray.Genarray.create Bigarray.Float64 Bigarray.C_layout dims in
   Bigarray.Genarray.blit a copy ;
   copy
 

@@ -43,7 +43,64 @@
    of the constant base "functions".
 *)
 
-open Pyplot
+open Plot
+
+type options = {
+  save_directory : string;
+  point_size : float;
+  qt_target_pixel_size : (int * int) option;
+  pdf_target_cm_size : (float * float) option;
+  reduced_plot_verbosity : bool;
+}
+
+let options_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           save_directory;
+           point_size;
+           qt_target_pixel_size;
+           pdf_target_cm_size;
+           reduced_plot_verbosity;
+         } ->
+      ( save_directory,
+        point_size,
+        qt_target_pixel_size,
+        pdf_target_cm_size,
+        reduced_plot_verbosity ))
+    (fun ( save_directory,
+           point_size,
+           qt_target_pixel_size,
+           pdf_target_cm_size,
+           reduced_plot_verbosity ) ->
+      {
+        save_directory;
+        point_size;
+        qt_target_pixel_size;
+        pdf_target_cm_size;
+        reduced_plot_verbosity;
+      })
+    (obj5
+       (req "save_directory" string)
+       (req "point_size" float)
+       (opt "qt_target_pixel_size" (tup2 int31 int31))
+       (opt "pdf_target_cm_size" (tup2 float float))
+       (dft "reduced_plot_verbosity" bool true))
+
+let default_options =
+  {
+    save_directory = Filename.get_temp_dir_name ();
+    point_size = 0.5;
+    qt_target_pixel_size = None;
+    pdf_target_cm_size = None;
+    reduced_plot_verbosity = true;
+  }
+
+let point_size opts = opts.point_size
+
+let qt_pixel_size opts = opts.qt_target_pixel_size
+
+let pdf_cm_size opts = opts.pdf_target_cm_size
 
 (* A [raw_row] is consists in a list of named values called a workload
    (corresponding to time measurement of events) together with the
@@ -51,77 +108,96 @@ open Pyplot
    of the workload, there are [n+1] columns. *)
 type raw_row = {workload : (string * float) list; qty : float}
 
-let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list =
- fun workload_data ->
-  List.map
-    (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
-    workload_data
+(* Gnuplot interprets by default underscores as subscript symbols *)
+let underscore_to_dash = String.map (fun c -> if c = '_' then '-' else c)
 
-let style i =
+let style opts i =
+  let open Style in
   match i with
-  | 0 -> Plot.(Blue, Dot)
-  | 1 -> Plot.(Red, Square)
-  | 2 -> Plot.(Green, Triangle)
+  | 0 ->
+      default |> set_color Color.blue
+      |> set_point ~ptyp:Pointtype.disk ~psize:(point_size opts)
+  | 1 ->
+      default |> set_color Color.red
+      |> set_point ~ptyp:Pointtype.box ~psize:(point_size opts)
+  | 2 ->
+      default |> set_color Color.green
+      |> set_point ~ptyp:Pointtype.delta_solid ~psize:(point_size opts)
   | _ -> Stdlib.failwith "Display.style: style overflow"
 
-let scatterplot_2d title (name, input) outputs =
-  let data =
-    List.mapi
-      (fun i output -> (Plot.Dim2Scatter {xs = input; ys = output}, style i))
-      outputs
-  in
-  let plot : Plot.dim2 Plot.scatter =
-    let open Plot in
-    Scatter {data; axes = Dim2Axes {xaxis = name; yaxis = "timing"}; title}
-  in
-  `Dim2 (Plot.scatter plot)
-
-let scatterplot_3d title (name_x, input_x) (name_y, input_y) outputs =
-  let data =
+let scatterplot_2d opts title (xaxis, input) outputs =
+  let plots =
     List.mapi
       (fun i output ->
-        let sty = style i in
-        (Plot.Dim3Scatter {xs = input_x; ys = input_y; zs = output}, sty))
+        let style = style opts i in
+        let points = Data.of_array @@ Array.map2 Plot.r2 input output in
+        Scatter.points_2d ~points ~style ())
       outputs
   in
-  let plot : Plot.dim3 Plot.scatter =
-    Scatter
-      {
-        data;
-        axes = Dim3Axes {xaxis = name_x; yaxis = name_y; zaxis = "timing"};
-        title;
-      }
+  let xaxis = underscore_to_dash xaxis in
+  plot2 ~xaxis ~yaxis:"timing" ~title plots
+
+let rec map3 f l1 l2 l3 () =
+  let open Seq in
+  match (l1 (), l2 (), l3 ()) with
+  | Nil, _, _ | _, Nil, _ | _, _, Nil -> Nil
+  | Cons (x1, l1'), Cons (x2, l2'), Cons (x3, l3') ->
+      Cons (f x1 x2 x3, map3 f l1' l2' l3')
+
+let scatterplot_3d opts title (xaxis, input_x) (yaxis, input_y) outputs =
+  let plots =
+    List.mapi
+      (fun i output ->
+        let style = style opts i in
+        let xs = Array.to_seq input_x in
+        let ys = Array.to_seq input_y in
+        let zs = Array.to_seq output in
+        let points = map3 Plot.r3 xs ys zs |> Data.of_seq in
+        Scatter.points_3d ~points ~style ())
+      outputs
   in
-  `Dim3 (Plot.scatter plot)
+  let xaxis = underscore_to_dash xaxis in
+  let yaxis = underscore_to_dash yaxis in
+  plot3 ~xaxis ~yaxis ~zaxis:"timing" ~title plots
 
 (* Scatter plot/s/ of the input vectors specified by [input_columns]
    against the [outputs]. This will superpose [List.length outputs]
    scatter plots on the same page. *)
-let plot_scatter title input_columns outputs =
+let plot_scatter opts title input_columns outputs =
+  let open Result_syntax in
   match input_columns with
   | [] ->
-      let msg =
-        Format.asprintf "Display.plot_scatter (%s): empty scatter data" title
-      in
-      Error msg
+      Format.kasprintf
+        Result.error
+        "Display.plot_scatter (%s): empty scatter data"
+        title
   | [column] ->
-      let plot = scatterplot_2d title column outputs in
-      Ok [plot]
+      let plot = scatterplot_2d opts title column outputs in
+      return [plot]
   | [column1; column2] ->
-      let plot = scatterplot_3d title column1 column2 outputs in
-      Ok [plot]
+      let plot = scatterplot_3d opts title column1 column2 outputs in
+      return [plot]
   | _ ->
-      let subsets = Benchmark_helpers.enumerate_subsets 2 input_columns in
-      let plots =
-        List.map
-          (function
-            | [((dim1, _) as col1); ((dim2, _) as col2)] ->
-                let title = Format.asprintf "%s\n(%s, %s)" title dim1 dim2 in
-                scatterplot_3d title col1 col2 outputs
-            | _ -> assert false)
-          subsets
-      in
-      Ok plots
+      if opts.reduced_plot_verbosity then return []
+      else
+        let subsets = Benchmark_helpers.enumerate_subsets 2 input_columns in
+        let plots =
+          List.map
+            (function
+              | [((dim1, _) as col1); ((dim2, _) as col2)] ->
+                  let dim1 = underscore_to_dash dim1 in
+                  let dim2 = underscore_to_dash dim2 in
+                  let title = Format.asprintf "%s (%s, %s)" title dim1 dim2 in
+                  scatterplot_3d opts title col1 col2 outputs
+              | cols ->
+                  let len = List.length cols in
+                  Format.kasprintf
+                    Stdlib.failwith
+                    "plot_scatter: bug found (got %d columns, expected 2)"
+                    len)
+            subsets
+        in
+        return plots
 
 (* Extract size vs timing information from the [workload_data], e.g.
    if   workload_data = (Add_int_int 10 20, 2879) :: (Add_int_int 3 2, 768) :: []
@@ -129,6 +205,12 @@ let plot_scatter title input_columns outputs =
      [ ("Add_int_int1", [| 10 ; 20 |]) ; ("Add_int_int2", [| 3 ; 2 |]) ]
    together with timings:
      [| 2879 ; 768 |] *)
+
+let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list =
+ fun workload_data ->
+  List.map
+    (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
+    workload_data
 
 let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
   let samples = convert_workload_data workload_data in
@@ -139,25 +221,21 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
   let variables = List.sort_uniq Stdlib.compare variables in
   match variables with
   | [] | _ :: _ :: _ ->
-      let msg =
-        Format.asprintf
-          "Display.empirical_data: variables not named consistenly@."
-      in
-      Error msg
+      Format.kasprintf
+        Result.error
+        "Display.empirical_data: variables not named consistenly@."
   | [vars] ->
       let rows = List.length samples in
       let input_dims = List.length vars in
-      let columns =
-        Array.init input_dims (fun _ -> Matrix.create ~lines:rows ~cols:1)
-      in
-      let timings = Matrix.create ~lines:rows ~cols:1 in
+      let columns = Array.init input_dims (fun _ -> Array.make rows 0.0) in
+      let timings = Array.make rows 0.0 in
       List.iteri
         (fun i {workload; qty} ->
           assert (Compare.List_length_with.(workload = input_dims)) ;
           List.iteri
-            (fun input_dim (_, size) -> Matrix.set columns.(input_dim) i 0 size)
+            (fun input_dim (_, size) -> columns.(input_dim).(i) <- size)
             workload ;
-          Matrix.set timings i 0 qty)
+          timings.(i) <- qty)
         samples ;
       let columns = Array.to_list columns in
       let named_columns =
@@ -197,26 +275,15 @@ let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
       in
       (columns, output)
 
-let rec plot_stacked :
-    int ->
-    int ->
-    [> `Dim2 of (unit, Pyplot.Plot.dim2) Pyplot.Plot.Axis.t
-    | `Dim3 of (unit, Pyplot.Plot.dim3) Pyplot.Plot.Axis.t ]
-    list ->
-    unit Plot.t =
- fun row col plots ->
-  match plots with
-  | [] -> Plot.return ()
-  | `Dim2 ax :: tl ->
-      let open Plot in
-      let* () = subplot_2d ~row ~col ax in
-      plot_stacked (row + 1) col tl
-  | `Dim3 ax :: tl ->
-      let open Plot in
-      let* () = subplot_3d ~row ~col ax in
-      plot_stacked (row + 1) col tl
+let column_to_array (m : Matrix.t) =
+  let rows = Matrix.dim1 m in
+  let cols = Matrix.dim2 m in
+  assert (cols = 1) ;
+  Array.init rows (fun i -> Matrix.get m i 0)
 
-let validator (problem : Inference.problem) (solution : Inference.solution) =
+let validator opts (problem : Inference.problem) (solution : Inference.solution)
+    =
+  let open Result_syntax in
   match problem with
   | Inference.Degenerate _ -> Error "Display.validator: degenerate plot"
   | Inference.Non_degenerate {input; _} ->
@@ -225,23 +292,28 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
       let columns, timings = prune_problem problem in
       let columns =
         List.map
-          (fun (c, m) -> (Format.asprintf "%a" Free_variable.pp c, m))
+          (fun (c, m) ->
+            (Format.asprintf "%a" Free_variable.pp c, column_to_array m))
           columns
       in
-      Result.bind
-        (plot_scatter "Validation (chosen basis)" columns [timings; predicted])
-        (fun plots ->
-          let nrows = List.length plots in
-          let plot ~col = plot_stacked 0 col plots in
-          Result.ok (nrows, plot))
+      let timings = column_to_array timings in
+      let predicted = column_to_array predicted in
+      let* plots =
+        plot_scatter
+          opts
+          "Validation (chosen basis)"
+          columns
+          [timings; predicted]
+      in
+      return plots
 
-let empirical (workload_data : (Sparse_vec.String.t * float) list) :
-    (int * (col:int -> unit Plot.t), string) result =
+let empirical opts (workload_data : (Sparse_vec.String.t * float) list) =
   let open Result_syntax in
-  let* columns, timings = empirical_data workload_data in
-  let* plots = plot_scatter "Empirical" columns [timings] in
-  let nrows = List.length plots in
-  Ok (nrows, fun ~col -> plot_stacked 0 col plots)
+  if opts.reduced_plot_verbosity then return []
+  else
+    let* columns, timings = empirical_data workload_data in
+    let* plots = plot_scatter opts "Empirical" columns [timings] in
+    return plots
 
 let eval_mset (mset : Free_variable.Sparse_vec.t)
     (eval : Free_variable.t -> float) =
@@ -253,9 +325,9 @@ let eval_mset (mset : Free_variable.Sparse_vec.t)
 let eval_affine (aff : Costlang.affine) (eval : Free_variable.t -> float) =
   eval_mset aff.linear_comb eval +. aff.const
 
-let validator_empirical workload_data (problem : Inference.problem)
-    (solution : Inference.solution) :
-    (int * (col:int -> unit Plot.t), string) result =
+let validator_empirical opts workload_data (problem : Inference.problem)
+    (solution : Inference.solution) =
+  let open Result_syntax in
   let {Inference.mapping; _} = solution in
   let valuation name =
     WithExceptions.Option.get ~loc:__LOC__
@@ -263,7 +335,7 @@ let validator_empirical workload_data (problem : Inference.problem)
   in
   let predicted =
     match problem with
-    | Inference.Degenerate {predicted; _} -> predicted
+    | Inference.Degenerate {predicted; _} -> column_to_array predicted
     | Inference.Non_degenerate {lines; _} ->
         let predicted_list =
           List.map
@@ -272,104 +344,69 @@ let validator_empirical workload_data (problem : Inference.problem)
               eval_affine affine valuation)
             lines
         in
-        let array = Array.of_list predicted_list in
-        Matrix.init ~lines:(Array.length array) ~cols:1 ~f:(fun l _ ->
-            array.(l))
+        Array.of_list predicted_list
   in
-  Result.bind (empirical_data workload_data) @@ fun (columns, timings) ->
-  Result.bind (plot_scatter "Validation (raw)" columns [timings; predicted])
-  @@ fun plots ->
-  let nrows = List.length plots in
-  let plot ~col = plot_stacked 0 col plots in
-  Result.ok (nrows, plot)
+  let* columns, timings = empirical_data workload_data in
+  let* plots =
+    plot_scatter opts "Validation (raw)" columns [timings; predicted]
+  in
+  return plots
 
-type plot_target =
-  | Save of {file : string option}
-  | Show
-  | ShowAndSave of {file : string option}
+type plot_target = Save | Show
 
-let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
-  Pyinit.pyinit () ;
+let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
-  let filename kind =
-    Format.asprintf "%s_%s_%s.pdf" Bench.name model_name kind
+  let filename ?index kind =
+    let dir = options.save_directory in
+    let kind =
+      match index with None -> kind | Some i -> Format.asprintf "%s-%d" kind i
+    in
+    Filename.Infix.(
+      dir // Format.asprintf "%s_%s_%s.pdf" Bench.name model_name kind)
   in
-  let main_plot_opt =
-    let workload_data =
-      List.map
-        (fun {Measure.workload; qty} ->
-          (Bench.workload_to_vector workload, qty))
-        measurement.workload_data
-    in
-    let current_col = ref 0 in
-    let max_rows = ref 0 in
-    let with_col f =
-      let col = !current_col in
-      incr current_col ;
-      f col
-    in
-    let empirical =
-      Result.fold
-        (empirical workload_data)
-        ~ok:(fun (rows, plot) ->
-          max_rows := max !max_rows rows ;
-          with_col (fun col -> plot ~col))
-        ~error:(fun _err -> Plot.return ())
-    in
-    let validator =
-      Result.fold
-        (validator problem solution)
-        ~ok:(fun (rows, plot) ->
-          max_rows := max !max_rows rows ;
-          with_col (fun col -> plot ~col))
-        ~error:(fun _err -> Plot.return ())
-    in
-    let validator_emp =
-      Result.fold
-        (validator_empirical workload_data problem solution)
-        ~ok:(fun (rows, plot) ->
-          max_rows := max !max_rows rows ;
-          with_col (fun col -> plot ~col))
-        ~error:(fun _err -> Plot.return ())
-    in
-    if !current_col = 0 then (* Nothing to plot. *)
-      None
-    else
-      let plot =
-        let open Plot in
-        let* () = empirical in
-        let* () = validator in
-        validator_emp
-      in
-      Some (!max_rows, !current_col, plot)
+  let workload_data =
+    List.map
+      (fun {Measure.workload; qty} -> (Bench.workload_to_vector workload, qty))
+      measurement.workload_data
   in
-  match main_plot_opt with
-  | None -> false
-  | Some (nrows, ncols, plot) ->
-      Plot.run
-        ~nrows
-        ~ncols
-        (let open Plot in
-        let* () = plot in
-        let* () = suptitle ~title:Bench.name ~fontsize:None in
+  let try_plot kind plot_result =
+    match plot_result with
+    | Ok [] -> []
+    | Ok plots -> (
         match plot_target with
-        | Save {file} -> (
-            match file with
-            | None ->
-                savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95
-            | Some filename -> savefig ~filename ~dpi:3000 ~quality:95)
+        | Save ->
+            List.mapi
+              (fun i plot ->
+                let pdf_file = filename ~index:i kind in
+                let target = pdf ?cm_size:(pdf_cm_size options) ~pdf_file () in
+                Plot.run ~target exec_detach plot ;
+                pdf_file)
+              plots
         | Show ->
-            Plot.(
-              let* () = show () in
-              return ())
-        | ShowAndSave {file} -> (
-            match file with
-            | None ->
-                Plot.(
-                  let* () = show () in
-                  savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95)
-            | Some filename ->
-                Plot.(
-                  let* () = show () in
-                  savefig ~filename ~dpi:3000 ~quality:95))) ;
-      true
+            let target =
+              match Plot.get_targets () with
+              | None ->
+                  Format.eprintf
+                    "Failed performing plot: could not get list of terminal \
+                     types, defaulting to x11@." ;
+                  x11
+              | Some available_targets ->
+                  if List.mem ~equal:String.equal "qt" available_targets then
+                    qt ?pixel_size:(qt_pixel_size options) ()
+                  else (
+                    Format.eprintf
+                      "\"qt\" gnuplot terminal not available, defaulting to \
+                       x11@." ;
+                    x11)
+            in
+            let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
+            Plot.run_matrix ~target exec_detach plots ;
+            [])
+    | Error msg ->
+        Format.eprintf "Failed performing plot: %s@." msg ;
+        []
+  in
+  (try_plot "emp" @@ empirical options workload_data)
+  @ (try_plot "validation" @@ validator options problem solution)
+  @ try_plot "emp-validation"
+  @@ validator_empirical options workload_data problem solution
