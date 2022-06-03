@@ -43,5 +43,6 @@ let () =
       ("failing_noop operation", Test_failing_noop.tests);
       ("tx rollup", Test_tx_rollup.tests);
       ("sc rollup", Test_sc_rollup.tests);
+      ("precheck manager", Test_manager_operation_precheck.tests);
     ]
   |> Lwt_main.run
