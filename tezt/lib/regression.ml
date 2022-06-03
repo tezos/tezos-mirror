@@ -88,7 +88,7 @@ let log_regression_diff diff =
    In the map, output files can be in subdirectories (i.e. they can contain '/'). *)
 let output_dirs_and_files : String_set.t String_map.t ref = ref String_map.empty
 
-let register ~__FILE__ ~title ~tags f =
+let register ~__FILE__ ~title ~tags ?file f =
   let tags = "regression" :: tags in
   let output_dir =
     let project_root =
@@ -107,22 +107,25 @@ let register ~__FILE__ ~title ~tags f =
     project_root // Filename.dirname __FILE__ // "expected"
   in
   let relative_output_file =
-    let sanitized_title =
-      (* We exclude ':' because of Windows. *)
-      let sanitize_char = function
-        | ( 'a' .. 'z'
-          | 'A' .. 'Z'
-          | '0' .. '9'
-          | '_' | '-' | '.' | ' ' | '(' | ')' ) as x ->
-            x
-        | _ -> '-'
-      in
-      let full = String.map sanitize_char title in
-      let max_length = 80 in
-      if String.length full > max_length then String.sub full 0 max_length
-      else full
+    let file =
+      match file with
+      | Some file -> file
+      | None ->
+          (* Sanitize title. We exclude ':' because of Windows. *)
+          let sanitize_char = function
+            | ( 'a' .. 'z'
+              | 'A' .. 'Z'
+              | '0' .. '9'
+              | '_' | '-' | '.' | ' ' | '(' | ')' ) as x ->
+                x
+            | _ -> '-'
+          in
+          let full = String.map sanitize_char title in
+          let max_length = 80 in
+          if String.length full > max_length then String.sub full 0 max_length
+          else full
     in
-    Filename.basename __FILE__ // (sanitized_title ^ ".out")
+    Filename.basename __FILE__ // (file ^ ".out")
   in
   let old_relative_output_files =
     String_map.find_opt output_dir !output_dirs_and_files

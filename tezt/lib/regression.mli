@@ -36,16 +36,18 @@
     to the [tags] list provided by the argument.
 
     Output which is captured (with {!capture}) is recorded in a file named
-    [<ROOT>/<DIR>/expected/<BASE>/<TITLE>.out] where:
+    [<ROOT>/<DIR>/expected/<BASE>/<FILE>.out] where:
     - [<ROOT>] is the root directory of the project, read from environment variable
       [DUNE_SOURCEROOT] if available, else [PWD] if available, else using [Sys.getcwd];
     - [<DIR>] is [Filename.dirname __FILE__];
     - [<BASE>] is [Filename.basename __FILE__];
-    - [<TITLE>] is a sanitized and possibly truncated version of [~title]. *)
+    - [<FILE>] is [~file], which defaults to a sanitized and possibly truncated
+      version of [~title]. *)
 val register :
   __FILE__:string ->
   title:string ->
   tags:string list ->
+  ?file:string ->
   (unit -> unit Lwt.t) ->
   unit
 
