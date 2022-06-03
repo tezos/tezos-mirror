@@ -446,7 +446,7 @@ and _ manager_operation =
      smart contract rollup (initialized with a given boot
      sector). *)
   | Sc_rollup_originate : {
-      kind : Sc_rollup_repr.Kind.t;
+      kind : Sc_rollups.Kind.t;
       boot_sector : string;
       parameters_ty : Script_repr.lazy_expr;
     }

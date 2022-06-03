@@ -72,7 +72,7 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /state_hash
-"scs12WfbwHy5EsA4KEwvcQuWdwZdCMAkWM51kDGRPnyTSGmWmnrgBN"
+"scs11s5nfonT2qW9aBhmo3pv3oUiG9X35qDNkSUxQNFANSZUrrAvX8"
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with 31 --burn-cap 9999999
 Node is bootstrapped.
@@ -147,4 +147,4 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /state_hash
-"scs138kLbfRQFHHsUfyeWrCEgtMRfojXTjNReKda8SWJrW4J7kQehp"
+"scs12mzqZwgkUZNNSQZk6HQ1sN8VubcgPHMHNj1ARrpYnc2oLpo5SC"

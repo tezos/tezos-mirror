@@ -124,48 +124,6 @@
 
 open Sc_rollup_repr
 
-(** Currently, [Proof] is a dummy type with the structure we need, set
-    up to allow testing. *)
-module Proof : sig
-  (** There are three cases for a refutation game proof:
-
-      [Computation_step]: a simple step in the PVM that doesn't involve
-      any interaction with the inbox.
-
-      [Input_step]: a step in which the PVM 'reads' from the inbox. This
-      will include a proof that the machine is in a blocked state and a
-      proof that the next message to be read is correct. The inbox proof
-      part of this will refer to the [inbox_snapshot] stored in the game
-      type (see {!Sc_rollup_game_repr.t}).
-
-      [Blocked_step]: similar to an input step, this is a step where the
-      machine is in a blocked state. However, it includes a proof that
-      there are no further messages in the inbox at the current level.
-      This means the machine is genuinely blocked and the [stop] state
-      of this [Proof] will be [None]. *)
-  type t =
-    | Computation_step of {
-        valid : bool;
-        start : State_hash.t;
-        stop : State_hash.t;
-      }
-    | Input_step of {valid : bool; start : State_hash.t; stop : State_hash.t}
-    | Blocked_step of {valid : bool; start : State_hash.t}
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  (** The state hash of the machine before the step. *)
-  val start : t -> State_hash.t
-
-  (** The state hash of the machine after the step. *)
-  val stop : t -> State_hash.t option
-
-  (** Check the validity of a proof *)
-  val valid : t -> bool
-end
-
 (** The two stakers index the game in the storage as a pair of public
     key hashes which is in lexical order. We use [Alice] and [Bob] to
     represent the first and second player in the pair respectively. *)
@@ -187,6 +145,10 @@ type player = Alice | Bob
       will show that the next message available in [inbox_snapshot] is
       at [level], so shouldn't be included in this commitment.
 
+    - [pvm_name] identifies the PVM used in this rollup. It is useful to
+      have here so we can check that the proof provided in a refutation
+      is of the correct kind.
+
     - [dissection], a list of states with tick counts. The current
       player will specify, in the next move, a tick count that
       indicates the last of these states that she agrees with.
@@ -201,6 +163,7 @@ type t = {
   turn : player;
   inbox_snapshot : Sc_rollup_inbox_repr.t;
   level : Raw_level_repr.t;
+  pvm_name : string;
   dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
 }
 
@@ -266,6 +229,7 @@ end
     increment from that state to its successor. *)
 val initial :
   Sc_rollup_inbox_repr.t ->
+  pvm_name:string ->
   parent:Sc_rollup_commitment_repr.t ->
   child:Sc_rollup_commitment_repr.t ->
   refuter:Staker.t ->
@@ -276,7 +240,7 @@ val initial :
     intermediate ticks remaining to put in it) or a proof. *)
 type step =
   | Dissection of (State_hash.t option * Sc_rollup_tick_repr.t) list
-  | Proof of Proof.t
+  | Proof of Sc_rollup_proof_repr.t
 
 (** A [refutation] is a move in the game. [choice] is the final tick
     in the current dissection at which the two players agree. *)
@@ -289,7 +253,7 @@ val refutation_encoding : refutation Data_encoding.t
 (** A game ends for one of three reasons: the conflict has been
     resolved via a proof, a player has been timed out, or a player has
     forfeited because of attempting to make an invalid move. *)
-type reason = Conflict_resolved | Invalid_move | Timeout
+type reason = Conflict_resolved | Invalid_move of string | Timeout
 
 val pp_reason : Format.formatter -> reason -> unit
 
@@ -331,23 +295,16 @@ val find_choice :
     * Sc_rollup_tick_repr.t
     * Sc_rollup_repr.State_hash.t option
     * Sc_rollup_tick_repr.t,
-    unit trace )
+    string )
   result
-
-(** Applies the move [refutation] to the game. Checks the move is
-    valid and returns an [Invalid_move] outcome if not.
-
-    In the case of the game continuing, this swaps the current
-    player and updates the [dissection]. In the case of a [Proof]
-    being provided this returns an [outcome]. *)
-val play : t -> refutation -> (outcome, t) Either.t
+  Lwt.t
 
 (** We check firstly that [dissection] is the correct length. It must be
     32 values long, unless the distance between [start_tick] and
     [stop_tick] is too small to make this possible, in which case it
     should be as long as possible. (If the distance is one we fail
     immediately as there is no possible legal dissection).
-    
+
     Then we check that [dissection] starts at the correct tick and state,
     and that it ends at the correct tick and with a different state to
     the current dissection.
@@ -361,4 +318,12 @@ val check_dissection :
   Sc_rollup_repr.State_hash.t option ->
   Sc_rollup_tick_repr.t ->
   (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
-  (unit, unit trace) result
+  (unit, string) result Lwt.t
+
+(** Applies the move [refutation] to the game. Checks the move is
+    valid and returns an [Invalid_move] outcome if not.
+
+    In the case of the game continuing, this swaps the current
+    player and updates the [dissection]. In the case of a [Proof]
+    being provided this returns an [outcome]. *)
+val play : t -> refutation -> (outcome, t) Either.t Lwt.t

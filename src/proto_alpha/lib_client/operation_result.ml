@@ -272,7 +272,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
   | Dal_publish_slot_header {slot} ->
       Format.fprintf ppf "@[<v 2>Publish slot %a@]" Dal.Slot.pp slot
   | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
-      let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
+      let (module R : Sc_rollup.PVM.S) = Sc_rollup.Kind.pvm_of kind in
       let parameters_ty =
         WithExceptions.Option.to_exn
           ~none:(Failure "ill-serialized parameters type")

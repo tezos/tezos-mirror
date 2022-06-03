@@ -56,12 +56,15 @@ module Sc_rollup_repr = Sc_rollup_repr
 module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
+  include Sc_rollup_PVM_sem
+  module ArithPVM = Sc_rollup_arith
 
   module Inbox = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
   end
 
+  module Proof = Sc_rollup_proof_repr
   module Game = Sc_rollup_game_repr
 
   module Commitment = struct
@@ -72,6 +75,7 @@ module Sc_rollup = struct
   module Stake_storage = Sc_rollup_stake_storage
   module Refutation_storage = Sc_rollup_refutation_storage
   include Sc_rollup_storage
+  include Sc_rollups
 end
 
 module Dal = struct

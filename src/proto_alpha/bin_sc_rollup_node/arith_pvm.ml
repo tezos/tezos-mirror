@@ -36,17 +36,35 @@ module Arith_proof_format = struct
 
   type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
 
-  let verify_proof = IStoreProof.verify_tree_proof
+  let verify_proof proof step =
+    (* The rollup node is not supposed to verify proof. We keep
+       this part in case this changes in the future. *)
+    let open Lwt_syntax in
+    let* result = IStoreProof.verify_tree_proof proof step in
+    match result with
+    | Ok v -> return (Some v)
+    | Error _ ->
+        (* We skip the error analysis here since proof verification is not a
+           job for the rollup node. *)
+        return None
+
+  let produce_proof context tree step =
+    let open Lwt_syntax in
+    match IStoreTree.kinded_key tree with
+    | Some k ->
+        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
+        return (Some p)
+    | None -> return None
 
   let kinded_hash_to_state_hash :
       IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
     | `Value hash | `Node hash ->
         Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes hash]
 
-  let proof_start_state proof =
+  let proof_before proof =
     kinded_hash_to_state_hash proof.IStoreProof.Proof.before
 
-  let proof_stop_state proof =
+  let proof_after proof =
     kinded_hash_to_state_hash proof.IStoreProof.Proof.after
 
   let proof_encoding =
@@ -54,7 +72,7 @@ module Arith_proof_format = struct
 end
 
 module Impl : Pvm.S = struct
-  include Sc_rollup_arith.Make (struct
+  include Sc_rollup.ArithPVM.Make (struct
     open Store
     module Tree = IStoreTree
 

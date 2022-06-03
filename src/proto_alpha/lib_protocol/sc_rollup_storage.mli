@@ -33,7 +33,7 @@
    Also returns the number of allocated bytes.  *)
 val originate :
   Raw_context.t ->
-  kind:Sc_rollup_repr.Kind.t ->
+  kind:Sc_rollups.Kind.t ->
   boot_sector:string ->
   parameters_ty:Script_repr.lazy_expr ->
   (Sc_rollup_repr.Address.t * Z.t * Raw_context.t) tzresult Lwt.t
@@ -42,9 +42,7 @@ val originate :
     existing rollup of some [kind]. Returns [None] if [address] is
     not the address of an existing rollup. *)
 val kind :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  Sc_rollup_repr.Kind.t option tzresult Lwt.t
+  Raw_context.t -> Sc_rollup_repr.t -> Sc_rollups.Kind.t option tzresult Lwt.t
 
 val list : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 

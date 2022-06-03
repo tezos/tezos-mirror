@@ -69,10 +69,14 @@
   Script_repr
   Cache_memory_helpers
   Sc_rollup_repr
+  Sc_rollup_tick_repr
+  Sc_rollup_PVM_sem
+  Sc_rollup_arith
+  Sc_rollups
   Skip_list_repr
   Sc_rollup_inbox_repr
-  Sc_rollup_tick_repr
   Sc_rollup_commitment_repr
+  Sc_rollup_proof_repr
   Sc_rollup_game_repr
   Seed_repr
   Sampler
@@ -211,9 +215,6 @@
   Script_interpreter
   Sc_rollup_management_protocol
   Sc_rollup_operations
-  Sc_rollup_PVM_sem
-  Sc_rollup_arith
-  Sc_rollups
   Dal_apply
   Baking
   Amendment
@@ -285,10 +286,14 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -428,9 +433,6 @@
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
-  sc_rollup_PVM_sem.ml
-  sc_rollup_arith.ml sc_rollup_arith.mli
-  sc_rollups.ml sc_rollups.mli
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
@@ -488,10 +490,14 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -631,9 +637,6 @@
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
-  sc_rollup_PVM_sem.ml
-  sc_rollup_arith.ml sc_rollup_arith.mli
-  sc_rollups.ml sc_rollups.mli
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
@@ -711,10 +714,14 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -854,9 +861,6 @@
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
-  sc_rollup_PVM_sem.ml
-  sc_rollup_arith.ml sc_rollup_arith.mli
-  sc_rollups.ml sc_rollups.mli
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
@@ -930,10 +934,14 @@
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_PVM_sem.ml
+  sc_rollup_arith.ml sc_rollup_arith.mli
+  sc_rollups.ml sc_rollups.mli
   skip_list_repr.ml skip_list_repr.mli
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
-  sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
+  sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -1073,9 +1081,6 @@
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
-  sc_rollup_PVM_sem.ml
-  sc_rollup_arith.ml sc_rollup_arith.mli
-  sc_rollups.ml sc_rollups.mli
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli

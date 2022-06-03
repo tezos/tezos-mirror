@@ -252,6 +252,8 @@ module type MerkelizedOperations = sig
      The size of this proof is O(log_basis (L' - L)). *)
   type inclusion_proof
 
+  val inclusion_proof_encoding : inclusion_proof Data_encoding.t
+
   val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
 
   (** [number_of_proof_steps proof] returns the length of [proof]. *)
@@ -305,3 +307,66 @@ module MakeHashingScheme (Tree : TREE) :
   MerkelizedOperations with type tree = Tree.tree
 
 include MerkelizedOperations with type tree = Context.tree
+
+type inbox = t
+
+(** The [Proof] module wraps the more specific proof types provided
+    earlier in this file into the inbox proof as it is required by a
+    refutation. *)
+module Proof : sig
+  (** An inbox proof has three parameters:
+
+      - the [starting_point], of type [Raw_level_repr.t * Z.t], specifying
+      a location in the inbox ;
+
+      - the [message], of type [Sc_rollup_PVM_sem.input option] ;
+
+      - and a reference [inbox].
+
+      A valid inbox proof implies the following semantics: beginning at
+      [starting_point] and reading forward through [inbox], the first
+      message you reach will be [message].
+
+      Usually this is very simple because there will actually be a
+      message at the location specified by [starting_point]. But in some
+      cases [starting_point] is past the last message within a level,
+      and then the inbox proof must prove that and also provide another
+      proof starting at the beginning of the next level. This can in
+      theory happen across multiple levels if they are empty, which is
+      why we need a list [skips] of sub-inboxes.
+
+      TODO #2997: an issue to fix the problem of unbounded inbox proofs
+      if the list below can be arbitrarily long (if there are many
+      consecutive empty levels). *)
+  type t = {
+    skips : (inbox * inclusion_proof) list;
+    level : inbox;
+    inc : inclusion_proof;
+    message_proof : Context.Proof.tree Context.Proof.t;
+  }
+
+  val pp : Format.formatter -> t -> unit
+
+  val encoding : t Data_encoding.t
+
+  (** See the docstring for [Proof.t] for details of proof semantics.
+
+      [valid starting_point inbox proof] will return the third parameter
+      of the proof, [message], iff the proof is valid. *)
+  val valid :
+    Raw_level_repr.t * Z.t ->
+    inbox ->
+    t ->
+    (Sc_rollup_PVM_sem.input option, string) result Lwt.t
+
+  (** TODO #2997 Currently a placeholder, needs implementation.
+
+      [produce_proof inbox (level, counter)] creates an inbox proof
+      proving the first message after the index [counter] at location
+      [level]. This will fail if the inbox given doesn't have sufficient
+      data (it needs to be run on an inbox with the full history). *)
+  val produce_proof :
+    inbox ->
+    Raw_level_repr.t * Z.t ->
+    (t * Sc_rollup_PVM_sem.input option, string) result Lwt.t
+end

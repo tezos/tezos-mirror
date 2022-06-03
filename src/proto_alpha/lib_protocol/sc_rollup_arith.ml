@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-open Sc_rollup
+open Sc_rollup_repr
+module PS = Sc_rollup_PVM_sem
 
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
@@ -35,23 +35,19 @@ module type P = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val proof_start_state : proof -> State_hash.t
+  val proof_before : proof -> State_hash.t
 
-  val proof_stop_state : proof -> State_hash.t
+  val proof_after : proof -> State_hash.t
 
   val verify_proof :
-    proof ->
-    (tree -> (tree * 'a) Lwt.t) ->
-    ( tree * 'a,
-      [ `Proof_mismatch of string
-      | `Stream_too_long of string
-      | `Stream_too_short of string ] )
-    result
-    Lwt.t
+    proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+  val produce_proof :
+    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
 end
 
 module type S = sig
-  include Sc_rollup_PVM_sem.S
+  include PS.S
 
   val name : string
 
@@ -61,7 +57,7 @@ module type S = sig
 
   val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
-  val get_tick : state -> Sc_rollup.Tick.t Lwt.t
+  val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
   type status = Halted | WaitingForInputMessage | Parsing | Evaluating
 
@@ -90,23 +86,40 @@ module type S = sig
 end
 
 module Make (Context : P) :
-  S
-    with type context = Context.Tree.t
-     and type state = Context.tree
-     and type proof = Context.proof = struct
+  S with type context = Context.Tree.t and type state = Context.tree = struct
   module Tree = Context.Tree
 
   type context = Context.Tree.t
 
   type hash = State_hash.t
 
-  type proof = Context.proof
+  type proof = {
+    tree_proof : Context.proof;
+    given : PS.input option;
+    requested : PS.input_request;
+  }
 
-  let proof_encoding = Context.proof_encoding
+  let proof_encoding =
+    let open Data_encoding in
+    conv
+      (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
+      (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
+      (obj3
+         (req "tree_proof" Context.proof_encoding)
+         (req "given" (option PS.input_encoding))
+         (req "requested" PS.input_request_encoding))
 
-  let proof_start_state = Context.proof_start_state
+  let proof_start_state p = Context.proof_before p.tree_proof
 
-  let proof_stop_state = Context.proof_stop_state
+  let proof_stop_state p =
+    match (p.given, p.requested) with
+    | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
+    | None, _ -> None
+    | _ -> Some (Context.proof_after p.tree_proof)
+
+  let proof_input_given p = p.given
+
+  let proof_input_requested p = p.requested
 
   let name = "arith"
 
@@ -141,7 +154,7 @@ module Make (Context : P) :
 
      Here is the data model of this state represented in the tree:
 
-     - tick : Tick.t
+     - tick : Sc_rollup_tick_repr.t
        The current tick counter of the machine.
      - status : status
        The current status of the machine.
@@ -421,7 +434,7 @@ module Make (Context : P) :
     end
 
     module CurrentTick = MakeVar (struct
-      include Tick
+      include Sc_rollup_tick_repr
 
       let name = "tick"
     end)
@@ -512,27 +525,29 @@ module Make (Context : P) :
     end)
 
     module CurrentLevel = MakeVar (struct
-      type t = Raw_level.t
+      type t = Raw_level_repr.t
 
-      let initial = Raw_level.root
+      let initial = Raw_level_repr.root
 
-      let encoding = Raw_level.encoding
+      let encoding = Raw_level_repr.encoding
 
       let name = "current_level"
 
-      let pp = Raw_level.pp
+      let pp = Raw_level_repr.pp
     end)
 
     module MessageCounter = MakeVar (struct
-      type t = Z.t
+      type t = Z.t option
 
-      let initial = Z.(pred zero)
+      let initial = None
 
-      let encoding = Data_encoding.n
+      let encoding = Data_encoding.option Data_encoding.n
 
       let name = "message_counter"
 
-      let pp = Z.pp_print
+      let pp fmt = function
+        | None -> Format.fprintf fmt "None"
+        | Some c -> Format.fprintf fmt "Some %a" Z.pp_print c
     end)
 
     module NextMessage = MakeVar (struct
@@ -705,19 +720,22 @@ module Make (Context : P) :
     let* s, _ = run m state in
     return s
 
-  let get_tick = result_of ~default:Tick.initial CurrentTick.get
+  let get_tick = result_of ~default:Sc_rollup_tick_repr.initial CurrentTick.get
 
   let is_input_state_monadic =
     let open Monad.Syntax in
     let* status = Status.get in
     match status with
-    | WaitingForInputMessage ->
+    | WaitingForInputMessage -> (
         let* level = CurrentLevel.get in
         let* counter = MessageCounter.get in
-        return (Some (level, counter))
-    | _ -> return None
+        match counter with
+        | Some n -> return (PS.First_after (level, n))
+        | None -> return PS.Initial)
+    | _ -> return PS.No_input_required
 
-  let is_input_state = result_of ~default:None @@ is_input_state_monadic
+  let is_input_state =
+    result_of ~default:PS.No_input_required @@ is_input_state_monadic
 
   let get_status = result_of ~default:WaitingForInputMessage @@ Status.get
 
@@ -734,28 +752,15 @@ module Make (Context : P) :
   let get_is_stuck = result_of ~default:None @@ is_stuck
 
   let set_input_monadic input =
-    let open Sc_rollup_PVM_sem in
+    let open PS in
     let {inbox_level; message_counter; payload} = input in
     let open Monad.Syntax in
     let* boot_sector = Boot_sector.get in
     let msg = boot_sector ^ payload in
-    let* last_level = CurrentLevel.get in
-    let* last_counter = MessageCounter.get in
-    let update =
-      let* () = CurrentLevel.set inbox_level in
-      let* () = MessageCounter.set message_counter in
-      let* () = NextMessage.set (Some msg) in
-      return ()
-    in
-    let does_not_follow =
-      internal_error "The input message does not follow the previous one."
-    in
-    if Raw_level.(equal last_level inbox_level) then
-      if Z.(equal message_counter (succ last_counter)) then update
-      else does_not_follow
-    else if Raw_level.(last_level < inbox_level) then
-      if Z.(equal message_counter Z.zero) then update else does_not_follow
-    else does_not_follow
+    let* () = CurrentLevel.set inbox_level in
+    let* () = MessageCounter.set (Some message_counter) in
+    let* () = NextMessage.set (Some msg) in
+    return ()
 
   let set_input input = state_of @@ set_input_monadic input
 
@@ -948,23 +953,43 @@ module Make (Context : P) :
   let ticked m =
     let open Monad.Syntax in
     let* tick = CurrentTick.get in
-    let* () = CurrentTick.set (Tick.next tick) in
+    let* () = CurrentTick.set (Sc_rollup_tick_repr.next tick) in
     m
 
   let eval state = state_of (ticked eval_step) state
 
-  let verify_proof ~input proof =
+  let step_transition input_given state =
     let open Lwt_syntax in
-    let transition state =
-      let* state =
-        match input with
-        | None -> eval state
-        | Some input -> state_of (ticked (set_input_monadic input)) state
-      in
-      return (state, ())
+    let* request = is_input_state state in
+    let* state =
+      match request with
+      | PS.No_input_required -> eval state
+      | _ -> (
+          match input_given with
+          | Some input -> set_input input state
+          | None -> return state)
     in
-    let* x = Context.verify_proof proof transition in
-    match x with Ok _ -> return_true | Error _ -> return_false
+    return (state, request)
+
+  let verify_proof proof =
+    let open Lwt_syntax in
+    let* result =
+      Context.verify_proof proof.tree_proof (step_transition proof.given)
+    in
+    match result with
+    | None -> return false
+    | Some (_, request) ->
+        return (PS.input_request_equal request proof.requested)
+
+  let produce_proof context input_given state =
+    let open Lwt_syntax in
+    let* result =
+      Context.produce_proof context state (step_transition input_given)
+    in
+    match result with
+    | Some (tree_proof, requested) ->
+        return (Result.ok {tree_proof; given = input_given; requested})
+    | None -> return (Result.error "Context.produce_proof returned None")
 end
 
 module ProtocolImplementation = Make (struct
@@ -984,17 +1009,20 @@ module ProtocolImplementation = Make (struct
 
   type proof = Context.Proof.tree Context.Proof.t
 
-  let verify_proof = Context.verify_tree_proof
+  let verify_proof p f =
+    Lwt.map Result.to_option (Context.verify_tree_proof p f)
+
+  let produce_proof _context _state _f =
+    (* Can't produce proof without full context*)
+    Lwt.return None
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
         State_hash.hash_bytes [Context_hash.to_bytes hash]
 
-  let proof_start_state proof =
-    kinded_hash_to_state_hash proof.Context.Proof.before
+  let proof_before proof = kinded_hash_to_state_hash proof.Context.Proof.before
 
-  let proof_stop_state proof =
-    kinded_hash_to_state_hash proof.Context.Proof.after
+  let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
-  let proof_encoding = Context.Proof_encoding.V2.Tree32.tree_proof_encoding
+  let proof_encoding = Context.Proof_encoding.V1.Tree32.tree_proof_encoding
 end)

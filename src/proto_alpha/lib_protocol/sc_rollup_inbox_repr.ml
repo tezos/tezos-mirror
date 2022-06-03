@@ -113,6 +113,9 @@ module Hash = struct
 
   let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
 
+  let of_context_hash context_hash =
+    hash_bytes [Context_hash.to_bytes context_hash]
+
   include Path_encoding.Make_hex (H)
 end
 
@@ -395,6 +398,8 @@ module type MerkelizedOperations = sig
 
   type inclusion_proof
 
+  val inclusion_proof_encoding : inclusion_proof Data_encoding.t
+
   val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
 
   val number_of_proof_steps : inclusion_proof -> int
@@ -604,9 +609,7 @@ module MakeHashingScheme (Tree : TREE) :
 
   let hash_messages messages =
     if Tree.is_empty messages then no_messages_hash
-    else
-      let context_hash = Tree.hash messages in
-      Hash.hash_bytes [Context_hash.to_bytes context_hash]
+    else Hash.of_context_hash @@ Tree.hash messages
 
   let add_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
@@ -647,6 +650,10 @@ module MakeHashingScheme (Tree : TREE) :
      because there is no obviously encoding of sequences in these data
      structures with the same guarantee about the size of proofs. *)
   type inclusion_proof = history_proof list
+
+  let inclusion_proof_encoding =
+    let open Data_encoding in
+    list history_proof_encoding
 
   let pp_inclusion_proof fmt proof =
     Format.pp_print_list pp_history_proof fmt proof
@@ -702,3 +709,129 @@ include (
     type key = string list
   end) :
     MerkelizedOperations with type tree = Context.tree)
+
+type inbox = t
+
+module Proof = struct
+  type t = {
+    skips : (inbox * inclusion_proof) list;
+    (* The [skips] value in this record makes it potentially unbounded
+       in size. There is an issue #2997 to deal with this problem. *)
+    level : inbox;
+    inc : inclusion_proof;
+    message_proof : Context.Proof.tree Context.Proof.t;
+  }
+
+  let pp fmt proof =
+    Format.fprintf fmt "Inbox proof with %d skips" (List.length proof.skips)
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {skips; level; inc; message_proof} ->
+        (skips, level, inc, message_proof))
+      (fun (skips, level, inc, message_proof) ->
+        {skips; level; inc; message_proof})
+      (obj4
+         (req "skips" (list (tup2 encoding inclusion_proof_encoding)))
+         (req "level" encoding)
+         (req "inc" inclusion_proof_encoding)
+         (req
+            "message_proof"
+            Context.Proof_encoding.V1.Tree32.tree_proof_encoding))
+
+  (* This function is for pattern matching on proofs based on whether
+     they involve multiple levels or if they only concern a single
+     level.
+
+     [split_proof proof] is [None] in the case that [proof] is a
+     'simple' inbox proof that only involves one level. In this case
+     [skips] is empty and we just check the single [level], [inc]
+     pair, and the [message_proof].
+
+     [split_proof proof] is [Some (level, inc, remaining_proof)] if
+     there are [skips]. In this case, we must check the [level] and
+     [inc] given, and then continue (recursively) on to the
+     [remaining_proof]. *)
+  let split_proof proof =
+    match proof.skips with
+    | [] -> None
+    | (level, inc) :: rest -> Some (level, inc, {proof with skips = rest})
+
+  (* A proof might include several sub-inboxes as evidence of different
+     levels being empty in the actual inbox snapshot. This returns the
+     _lowest_ such sub-inbox for a given proof.
+
+     It's used with the function above in the recursive case of [valid].
+     When [split_proof proof] gives [Some (level, inc, remaining_proof)]
+     we have to check that [inc] is an inclusion proof between [level]
+     and [bottom_level remaining_proof]. *)
+  let bottom_level proof =
+    match proof.skips with [] -> proof.level | (level, _) :: _ -> level
+
+  (* The [message_proof] part of an inbox proof is a
+     [Context.tree_proof].
+
+     To validate this, we need a function of type
+
+       [tree -> (tree, result) Lwt.t].
+
+     For a given [n], [message_payload n] is such a function: it takes a
+     [Context.tree] representing the messages in a single level of the
+     inbox and extracts the message payload at index [n], so [result] in
+     this case is [string]. (It also returns the tree just to satisfy
+     the function [Context.verify_tree_proof]). *)
+  let message_payload n tree =
+    let open Lwt_syntax in
+    let* r = get_message_payload tree n in
+    return (tree, r)
+
+  let check_hash hash kinded_hash =
+    match kinded_hash with
+    | `Node h -> Hash.(equal (of_context_hash h) hash)
+    | `Value h -> Hash.(equal (of_context_hash h) hash)
+
+  let drop_error result reason =
+    Lwt.map (Result.map_error (fun _ -> reason)) result
+
+  let rec valid (l, n) inbox proof =
+    assert (Z.(geq n zero)) ;
+    let open Lwt_result_syntax in
+    match split_proof proof with
+    | None ->
+        if
+          verify_inclusion_proof proof.inc proof.level inbox
+          && Raw_level_repr.equal (inbox_level proof.level) l
+          && check_hash
+               (proof.level.current_messages_hash ())
+               proof.message_proof.before
+        then
+          let* (_ : Context.tree), payload =
+            drop_error
+              (Context.verify_tree_proof
+                 proof.message_proof
+                 (message_payload n))
+              "message_proof invalid"
+          in
+          match payload with
+          | None ->
+              if equal proof.level inbox then return None
+              else fail "payload is None, inbox proof.level not top"
+          | Some msg ->
+              return
+              @@ Some
+                   Sc_rollup_PVM_sem.
+                     {inbox_level = l; message_counter = n; payload = msg}
+        else fail "Inbox proof parameters don't match (message level)"
+    | Some (level, inc, remaining_proof) ->
+        if
+          verify_inclusion_proof inc level (bottom_level remaining_proof)
+          && Raw_level_repr.equal (inbox_level level) l
+          && Z.equal level.message_counter n
+        then valid (Raw_level_repr.succ l, Z.zero) inbox remaining_proof
+        else fail "Inbox proof parameters don't match (lower level)"
+
+  (* TODO #2997 This needs to be implemented when the inbox structure is
+     improved. *)
+  let produce_proof _ _ = assert false
+end
