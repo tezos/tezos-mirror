@@ -964,6 +964,11 @@ module Voting = struct
       Compare.Int32.(expected = period_index)
       (Wrong_voting_period_index {expected; provided = period_index})
 
+  let check_proposals_source_is_registered ctxt source =
+    let open Lwt_tzresult_syntax in
+    let*! is_registered = Delegate.registered ctxt source in
+    fail_unless is_registered (Proposals_from_unregistered_delegate source)
+
   (** Check that the list of proposals is not empty and does not contain
     duplicates. *)
   let check_proposal_list_sanity proposals =
@@ -1034,11 +1039,19 @@ module Voting = struct
     let*! has_ballot = Vote.has_recorded_ballot ctxt source in
     fail_when has_ballot Already_submitted_a_ballot
 
+  let check_ballot_source_is_registered ctxt source =
+    let open Lwt_tzresult_syntax in
+    let*! is_registered = Delegate.registered ctxt source in
+    fail_unless is_registered (Ballot_from_unregistered_delegate source)
+
   (** Check that a Proposals operation can be safely applied.
 
     @return [Error Wrong_voting_period_index] if the operation's
     period and the [context]'s current period do not have the same
     index.
+
+    @return [Error Proposals_from_unregistered_delegate] if the
+    source is not a registered delegate.
 
     @return [Error Empty_proposals] if the list of proposals is empty.
 
@@ -1099,6 +1112,7 @@ module Voting = struct
              vs.voting_state
              oph)
       else
+        let* () = check_proposals_source_is_registered vi.ctxt source in
         let*? () = check_proposal_list_sanity proposals in
         let*? () = check_period_kind_for_proposals current_period in
         let* () = check_in_listings vi.ctxt source in
@@ -1130,6 +1144,9 @@ module Voting = struct
     return {vs with voting_state}
 
   (** Check that a Ballot operation can be safely applied.
+
+    @return [Error Ballot_from_unregistered_delegate] if the
+    source is not a registered delegate.
 
     @return [Error Conflicting_ballot] if the source has already
     submitted a ballot in the current block/mempool.
@@ -1163,6 +1180,7 @@ module Voting = struct
     let (Single (Ballot {source; period; proposal; ballot = _})) =
       operation.protocol_data.contents
     in
+    let* () = check_ballot_source_is_registered vi.ctxt source in
     let*? () = check_ballot_conflicts vs.voting_state source in
     let* current_period = Voting_period.get_current vi.ctxt in
     let*? () = check_period_index ~expected:current_period.index period in

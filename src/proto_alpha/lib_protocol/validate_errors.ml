@@ -411,6 +411,7 @@ module Voting = struct
     | Conflicting_dictator_proposals of Operation_hash.t
     | Testnet_dictator_multiple_proposals
     | Testnet_dictator_conflicting_operation
+    | Proposals_from_unregistered_delegate of Signature.Public_key_hash.t
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
         current : Protocol_hash.t;
@@ -418,6 +419,7 @@ module Voting = struct
       }
     | Already_submitted_a_ballot
     | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
+    | Ballot_from_unregistered_delegate of Signature.Public_key_hash.t
 
   let () =
     (* Shared voting errors *)
@@ -666,6 +668,21 @@ module Voting = struct
       Data_encoding.empty
       (function Testnet_dictator_conflicting_operation -> Some () | _ -> None)
       (fun () -> Testnet_dictator_conflicting_operation) ;
+    register_error_kind
+      `Permanent
+      ~id:"operation.proposals_from_unregistered_delegate"
+      ~title:"Proposals from an unregistered delegate"
+      ~description:"Cannot submit proposals with an unregistered delegate."
+      ~pp:(fun ppf c ->
+        Format.fprintf
+          ppf
+          "Cannot submit proposals with public key hash %a (unregistered \
+           delegate)."
+          Signature.Public_key_hash.pp
+          c)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function Proposals_from_unregistered_delegate c -> Some c | _ -> None)
+      (fun c -> Proposals_from_unregistered_delegate c) ;
 
     (* Ballot errors *)
     register_error_kind
@@ -723,7 +740,21 @@ module Voting = struct
         | Conflicting_ballot {conflicting_operation} ->
             Some conflicting_operation
         | _ -> None)
-      (fun conflicting_operation -> Conflicting_ballot {conflicting_operation})
+      (fun conflicting_operation -> Conflicting_ballot {conflicting_operation}) ;
+    register_error_kind
+      `Permanent
+      ~id:"operation.ballot_from_unregistered_delegate"
+      ~title:"Ballot from an unregistered delegate"
+      ~description:"Cannot cast a ballot for an unregistered delegate."
+      ~pp:(fun ppf c ->
+        Format.fprintf
+          ppf
+          "Cannot cast a ballot for public key hash %a (unregistered delegate)."
+          Signature.Public_key_hash.pp
+          c)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function Ballot_from_unregistered_delegate c -> Some c | _ -> None)
+      (fun c -> Ballot_from_unregistered_delegate c)
 end
 
 module Anonymous = struct
