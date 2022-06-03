@@ -821,9 +821,12 @@ module Scripts = struct
     let payload_producer = Signature.Public_key_hash.zero in
     match protocol_data.contents with
     | Single (Manager_operation _) as op ->
-        Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-        >>=? fun _pk ->
-        (* removed signature check here *)
+        Validate_operation.TMP_for_plugin.precheck_manager_no_validation_state
+          ctxt
+          chain_id
+          op
+          Skip_signature_check
+        >>=? fun () ->
         Apply.apply_manager_operation
           ctxt
           Optimized
@@ -833,9 +836,12 @@ module Scripts = struct
           op
         >|=? fun (_ctxt, result) -> ret result
     | Cons (Manager_operation _, _) as op ->
-        Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-        >>=? fun _pk ->
-        (* removed signature check here *)
+        Validate_operation.TMP_for_plugin.precheck_manager_no_validation_state
+          ctxt
+          chain_id
+          op
+          Skip_signature_check
+        >>=? fun () ->
         Apply.apply_manager_operation
           ctxt
           Optimized

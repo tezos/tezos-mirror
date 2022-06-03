@@ -177,4 +177,17 @@ module TMP_for_plugin : sig
     'a Alpha_context.Kind.manager Alpha_context.contents_list ->
     'a Alpha_context.Kind.manager should_check_signature ->
     unit tzresult Lwt.t
+
+  (** Same as {!precheck_manager}, except that this function does not
+      require [validate_operation_info] and [validate_operation_state]
+      arguments. Instead, they are constructed internally from the given
+      context and chain_id.
+
+      This function is called in [lib_plugin/RPC.ml]. *)
+  val precheck_manager_no_validation_state :
+    Alpha_context.t ->
+    Chain_id.t ->
+    'a Alpha_context.Kind.manager Alpha_context.contents_list ->
+    'a Alpha_context.Kind.manager should_check_signature ->
+    unit tzresult Lwt.t
 end

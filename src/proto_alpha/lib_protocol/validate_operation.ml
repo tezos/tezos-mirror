@@ -693,4 +693,9 @@ module TMP_for_plugin = struct
       | Skip_signature_check -> ok ()
     in
     return_unit
+
+  let precheck_manager_no_validation_state ctxt chain_id contents_list
+      should_check_signature =
+    let vi, vs = init_info_and_state ctxt Mempool chain_id in
+    precheck_manager vi vs contents_list should_check_signature
 end
