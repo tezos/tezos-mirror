@@ -479,7 +479,8 @@ let init_zcash () =
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
 
-let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
+let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
+    ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   let open Lwt_result_syntax in
   let* () = Node_data_version.ensure_data_dir config.data_dir in
@@ -495,7 +496,10 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
       ~configuration:config.internal_events
       ()
   in
-  let* () = Node_config_validation.check config in
+  let*! () =
+    Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
+  in
+  let* () = Node_config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   let*! () =
@@ -567,10 +571,14 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
   let main_promise =
+    let cli_warnings = ref [] in
     let* config =
       Node_shared_arg.read_and_patch_config_file
         ~ignore_bootstrap_peers:
           (match sandbox with Some _ -> true | None -> false)
+        ~emit:(fun event () ->
+          cli_warnings := event :: !cli_warnings ;
+          Lwt.return_unit)
         args
     in
     let* () =
@@ -613,6 +621,8 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           ?target
           ~singleprocess
           ~force_history_mode_switch
+          ~cli_warnings:!cli_warnings
+          ~ignore_testchain_warning:args.enable_testchain
           config)
       (function exn -> fail_with_exn exn)
   in

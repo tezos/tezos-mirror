@@ -107,6 +107,7 @@ val read_data_dir : t -> string tzresult Lwt.t
 *)
 val patch_config :
   ?may_override_network:bool ->
+  ?emit:(unit Internal_event.Simple.t -> unit -> unit Lwt.t) ->
   ?ignore_bootstrap_peers:bool ->
   ?cfg:Node_config_file.t ->
   t ->
@@ -122,6 +123,7 @@ val patch_config :
 *)
 val read_and_patch_config_file :
   ?may_override_network:bool ->
+  ?emit:(unit Internal_event.Simple.t -> unit -> unit Lwt.t) ->
   ?ignore_bootstrap_peers:bool ->
   t ->
   Node_config_file.t tzresult Lwt.t

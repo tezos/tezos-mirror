@@ -62,6 +62,9 @@ Node
   behaviour, use the ``metadata`` query string with the value
   ``always``.
 
+- Deprecated the CLI argument `--enable-testchain` and the corresponding
+  configuration-file option `p2p.enable_testchain`.
+
 Client
 ------
 
