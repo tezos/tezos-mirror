@@ -66,12 +66,12 @@ include module type of RPC_legacy
 
 (** RPC: [GET /network/connections]
 
-    Result is a list of [(address, port)] pairs. *)
+    Returns the list of [(address, port)] pairs. *)
 val get_network_connections : (string * int) list t
 
 (** RPC: [GET /network/connections/<peer_id>]
 
-    Result is the address and port of the given peer ID if connected.
+    Returns the address and port of the given peer ID if connected.
     This RPC returns 404 Not Found if the peer ID is not connected. *)
 val get_network_connection : string -> (string * int) t
 
@@ -137,7 +137,7 @@ val get_network_versions : JSON.t t
 
 (** RPC: [POST /private/injection/operations]
 
-    Result is the hashes of the operations that were injected. *)
+    Returns the hashes of the operations that were injected. *)
 val post_private_injection_operations :
   ?force:bool ->
   ?async:bool ->
