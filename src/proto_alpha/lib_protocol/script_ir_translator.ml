@@ -5010,7 +5010,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
       Tx_rollup_state.assert_exist ctxt tx_rollup >|=? fun ctxt ->
       if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
         (* /!\ This pattern matching needs to remain in sync with
-           [parse_contract] and [parse_tx_rollup_deposit_parameters]. *)
+           [parse_tx_rollup_deposit_parameters]. *)
         match arg with
         | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _) ->
             let address = {destination; entrypoint} in
@@ -5037,82 +5037,17 @@ let parse_contract_for_script :
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract option) tzresult Lwt.t =
  fun ctxt loc arg destination ~entrypoint ->
-  Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
-  match destination with
-  | Contract contract -> (
-      match contract with
-      | Implicit _ ->
-          if Entrypoint.is_default entrypoint then
-            (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-            Lwt.return
-              ( Gas_monad.run ctxt @@ ty_eq ~error_details:Fast arg unit_t
-              >|? fun (eq, ctxt) ->
-                match eq with
-                | Ok Eq ->
-                    let address = {destination; entrypoint} in
-                    let contract = Typed_contract {arg_ty = arg; address} in
-                    (ctxt, Some contract)
-                | Error Inconsistent_types_fast -> (ctxt, None) )
-          else
-            return
-              ( (* An implicit account on any other entrypoint is not a valid contract. *)
-                ctxt,
-                None )
-      | Originated _ ->
-          (* Originated account *)
-          trace
-            (Invalid_contract (loc, contract))
-            ( Contract.get_script_code ctxt contract >>=? fun (ctxt, code) ->
-              match code with
-              | None -> return (ctxt, None)
-              | Some code ->
-                  Lwt.return
-                    ( Script.force_decode_in_context
-                        ~consume_deserialization_gas:When_needed
-                        ctxt
-                        code
-                    >>? fun (code, ctxt) ->
-                      (* can only fail because of gas *)
-                      parse_toplevel ctxt ~legacy:true code
-                      >>? fun ({arg_type; _}, ctxt) ->
-                      parse_parameter_ty_and_entrypoints
-                        ctxt
-                        ~stack_depth:0
-                        ~legacy:true
-                        arg_type
-                      >>? fun ( Ex_parameter_ty_and_entrypoints
-                                  {arg_type = targ; entrypoints},
-                                ctxt ) ->
-                      (* we don't check targ size here because it's a legacy contract code *)
-                      Gas_monad.run ctxt
-                      @@ find_entrypoint_for_type
-                           ~error_details:Fast
-                           ~full:targ
-                           ~expected:arg
-                           entrypoints
-                           entrypoint
-                      >|? fun (entrypoint_arg, ctxt) ->
-                      match entrypoint_arg with
-                      | Ok (entrypoint, arg_ty) ->
-                          let address = {destination; entrypoint} in
-                          let contract = Typed_contract {arg_ty; address} in
-                          (ctxt, Some contract)
-                      | Error Inconsistent_types_fast -> (ctxt, None) ) ))
-  | Tx_rollup tx_rollup -> (
-      (* /!\ This pattern matching needs to remain in sync with
-         [parse_contract_for_script] and
-         [parse_tx_rollup_deposit_parameters]. *)
-      match arg with
-      | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _)
-        when Entrypoint.(
-               entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint) -> (
-          Tx_rollup_state.find ctxt tx_rollup >|=? function
-          | ctxt, Some _ ->
-              let address = {destination; entrypoint} in
-              (ctxt, Some (Typed_contract {arg_ty = arg; address}))
-          | ctxt, None -> (ctxt, None))
-      | _ -> return (ctxt, None))
-  | Sc_rollup _ -> return (ctxt, None)
+  parse_contract
+    ~stack_depth:0
+    ctxt
+    ~error_details:Fast
+    loc
+    arg
+    destination
+    ~entrypoint
+  >|=? fun (ctxt, res) ->
+  ( ctxt,
+    match res with Ok res -> Some res | Error Inconsistent_types_fast -> None )
 
 let view_size view =
   let open Script_typed_ir_size in
