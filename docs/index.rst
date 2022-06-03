@@ -87,7 +87,7 @@ Test Networks
 
 There are several test networks for the Tezos blockchain with a
 faucet to obtain free tez (see :ref:`faucet`).
-It is the reference network for developers wanting to test their
+These networks are intended for developers wanting to test their
 software before going to beta and for users who want to familiarize
 themselves with Tezos before using their real tez.
 
