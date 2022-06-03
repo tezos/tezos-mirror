@@ -27,21 +27,21 @@
   lwt-exit)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_013_PtJakart
-   -open Tezos_protocol_plugin_013_PtJakart
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_013_PtJakart
-   -open Tezos_client_commands
-   -open Tezos_stdlib
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_context
-   -open Tezos_context
-   -open Tezos_rpc
-   -open Tezos_rpc_http))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_013_PtJakart
+  -open Tezos_protocol_plugin_013_PtJakart
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_013_PtJakart
+  -open Tezos_client_commands
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_context
+  -open Tezos_context
+  -open Tezos_rpc
+  -open Tezos_rpc_http)
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
 (library
@@ -61,17 +61,17 @@
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_013_PtJakart
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_013_PtJakart
-   -open Tezos_client_commands
-   -open Tezos_baking_013_PtJakart
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_013_PtJakart
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_013_PtJakart
+  -open Tezos_client_commands
+  -open Tezos_baking_013_PtJakart
+  -open Tezos_rpc)
  (modules Baking_commands))
 
 (library
@@ -91,14 +91,14 @@
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_013_PtJakart
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_013_PtJakart
-   -open Tezos_client_commands
-   -open Tezos_baking_013_PtJakart
-   -open Tezos_baking_013_PtJakart_commands
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_013_PtJakart
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_013_PtJakart
+  -open Tezos_client_commands
+  -open Tezos_baking_013_PtJakart
+  -open Tezos_baking_013_PtJakart_commands
+  -open Tezos_rpc)
  (modules Baking_commands_registration))

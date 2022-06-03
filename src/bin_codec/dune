@@ -50,14 +50,14 @@
    (-> void_for_linking-tezos-client-alpha.empty)))
  (link_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Data_encoding
-   -open Tezos_base.TzPervasives
-   -open Tezos_client_base_unix
-   -open Tezos_client_base
-   -open Tezos_clic
-   -open Tezos_stdlib_unix
-   -open Tezos_event_logging)))
+  (:standard)
+  -open Data_encoding
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_base_unix
+  -open Tezos_client_base
+  -open Tezos_clic
+  -open Tezos_stdlib_unix
+  -open Tezos_event_logging))
 
 (rule
  (action

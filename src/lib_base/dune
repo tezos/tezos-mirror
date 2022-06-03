@@ -23,16 +23,16 @@
   ipaddr)
  (js_of_ocaml (javascript_files ptime.js))
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_crypto
-   -open Data_encoding
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib
-   -open Tezos_rpc
-   -open Tezos_clic
-   -open Tezos_micheline
-   -open Tezos_event_logging)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_crypto
+  -open Data_encoding
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_rpc
+  -open Tezos_clic
+  -open Tezos_micheline
+  -open Tezos_event_logging))
 
 (ocamllex point_parser)
 

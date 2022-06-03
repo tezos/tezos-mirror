@@ -11,11 +11,11 @@
   tezos-baking-alpha.tenderbrute)
  (link_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_base
-   -open Tezos_client_base
-   -open Tezos_client_alpha
-   -open Tezos_protocol_alpha
-   -open Tenderbrute_alpha)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base
+  -open Tezos_client_base
+  -open Tezos_client_alpha
+  -open Tezos_protocol_alpha
+  -open Tenderbrute_alpha))

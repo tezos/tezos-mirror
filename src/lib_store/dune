@@ -23,12 +23,12 @@
   tar-unix
   prometheus)
  (flags
-  (:standard
-   -open Tezos_shell_services
-   -open Tezos_base
-   -open Tezos_base.TzPervasives
-   -open Tezos_context
-   -open Tezos_validation
-   -open Tezos_protocol_updater
-   -open Tezos_stdlib_unix
-   -open Tezos_stdlib)))
+  (:standard)
+  -open Tezos_shell_services
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_context
+  -open Tezos_validation
+  -open Tezos_protocol_updater
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib))

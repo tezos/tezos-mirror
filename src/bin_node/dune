@@ -107,22 +107,22 @@
    (-> void_for_linking-tezos-protocol-plugin-alpha-registerer.empty)))
  (link_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_rpc_http
-   -open Tezos_rpc_http_server
-   -open Tezos_p2p
-   -open Tezos_shell
-   -open Tezos_store
-   -open Tezos_context
-   -open Tezos_validator
-   -open Tezos_validation
-   -open Tezos_shell_context
-   -open Tezos_workers
-   -open Tezos_protocol_updater)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_server
+  -open Tezos_p2p
+  -open Tezos_shell
+  -open Tezos_store
+  -open Tezos_context
+  -open Tezos_validator
+  -open Tezos_validation
+  -open Tezos_shell_context
+  -open Tezos_workers
+  -open Tezos_protocol_updater))
 
 (rule
  (action

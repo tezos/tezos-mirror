@@ -15,10 +15,10 @@
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_rpc
-   -open Tezos_shell_services))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_rpc
+  -open Tezos_shell_services)
  (modules :standard bip39_english))
 
 (rule

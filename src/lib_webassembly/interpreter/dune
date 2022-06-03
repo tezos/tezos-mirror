@@ -14,6 +14,6 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-webassembly-interpreter)
- (flags (:standard
-         -open Tezos_webassembly_interpreter))
+ (flags (:standard)
+        -open Tezos_webassembly_interpreter)
  (modules main))

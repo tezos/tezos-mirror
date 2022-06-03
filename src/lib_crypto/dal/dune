@@ -11,8 +11,8 @@
   data-encoding
   tezos-polynomial)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_error_monad
-   -open Data_encoding
-   -open Tezos_polynomial)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Data_encoding
+  -open Tezos_polynomial))

@@ -12,15 +12,15 @@
   tezos-base-test-helpers
   alcotest-lwt)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_stdlib_unix
-   -open Tezos_base
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.Worker_types
-   -open Tezos_workers
-   -open Lib_test
-   -open Tezos_base_test_helpers)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.Worker_types
+  -open Tezos_workers
+  -open Lib_test
+  -open Tezos_base_test_helpers))
 
 (rule
  (alias runtest)

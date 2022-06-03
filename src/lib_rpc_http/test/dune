@@ -14,12 +14,12 @@
   qcheck-alcotest
   alcotest-lwt)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_stdlib
-   -open Lib_test
-   -open Tezos_base_test_helpers
-   -open Tezos_rpc_http_server)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib
+  -open Lib_test
+  -open Tezos_base_test_helpers
+  -open Tezos_rpc_http_server))
 
 (rule
  (alias runtest)

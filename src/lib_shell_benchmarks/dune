@@ -16,10 +16,10 @@
   tezos-micheline)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_base
-   -open Tezos_base.TzPervasives
-   -open Tezos_error_monad
-   -open Tezos_benchmark
-   -open Tezos_crypto)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_benchmark
+  -open Tezos_crypto))

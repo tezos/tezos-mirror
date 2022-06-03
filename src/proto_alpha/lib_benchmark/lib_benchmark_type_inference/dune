@@ -14,9 +14,9 @@
   tezos-protocol-alpha
   hashcons)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_error_monad
-   -open Tezos_micheline
-   -open Tezos_micheline_rewriting
-   -open Tezos_protocol_alpha)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_protocol_alpha))

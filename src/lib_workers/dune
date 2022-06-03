@@ -10,9 +10,9 @@
   tezos-stdlib-unix
   ringo)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base
-   -open Tezos_stdlib_unix)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_stdlib_unix))
 
 (documentation (package tezos-workers))

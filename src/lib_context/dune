@@ -22,8 +22,8 @@
   tezos-context.encoding
   tezos-context.memory)
  (flags
-  (:standard
-   -open Tezos_shell_services
-   -open Tezos_base.TzPervasives
-   -open Tezos_stdlib_unix
-   -open Tezos_stdlib)))
+  (:standard)
+  -open Tezos_shell_services
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib))
