@@ -125,11 +125,11 @@ val wait_for_full :
       look like. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** Write the configuration file for a rollup node.
-    Returns the name of the configuration file. *)
-val init_config : t -> string Lwt.t
+(** Write the configuration file for a rollup node, overwriting when [force] is
+    [true].  Returns the name of the configuration file. *)
+val init_config : ?force:bool -> t -> string Lwt.t
 
-val spawn_init_config : t -> Process.t
+val spawn_init_config : ?force:bool -> t -> Process.t
 
 (** [run node] launches the given transaction rollup node. *)
 val run : t -> unit Lwt.t

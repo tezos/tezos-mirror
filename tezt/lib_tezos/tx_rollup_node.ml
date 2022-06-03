@@ -84,7 +84,7 @@ let string_of_mode = function
   | Operator -> "operator"
   | Custom -> "custom"
 
-let spawn_init_config node =
+let spawn_init_config ?(force = false) node =
   spawn_command
     node
     (([
@@ -100,6 +100,7 @@ let spawn_init_config node =
         "--rpc-addr";
         rpc_addr node;
       ]
+     @ (if force then ["--force"] else [])
      @ if node.persistent_state.allow_deposit then ["--allow-deposit"] else [])
     |> add_option "--origination-level"
        @@ Option.map string_of_int node.persistent_state.origination_level
@@ -116,8 +117,8 @@ let spawn_init_config node =
          node.persistent_state.dispatch_withdrawals_signer
     |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
 
-let init_config node =
-  let process = spawn_init_config node in
+let init_config ?force node =
+  let process = spawn_init_config ?force node in
   let* output = Process.check_and_read_stdout process in
   match output =~* rex "Configuration written in ([^\n]*)" with
   | None -> failwith "Configuration initialization failed"
@@ -375,7 +376,7 @@ let change_signers ?operator ?batch_signer ?finalize_commitment_signer
         };
     }
   in
-  let* _ = init_config tmp_tx_node in
+  let* _ = init_config ~force:true tmp_tx_node in
   unit
 
 module Inbox = struct
