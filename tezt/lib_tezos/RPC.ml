@@ -114,6 +114,9 @@ let get_chain_block ?(chain = "main") ?(block = "head") () =
 let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
 
+let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string
+
 let get_chain_block_header ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
 

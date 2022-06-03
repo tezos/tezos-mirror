@@ -1326,9 +1326,10 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
     "Verify that the replacement accuser has registered at least one block" ;
   let* accuser_first_block_hash = to_protocol_accuser_received_block in
   let* proposal_first_block_hash =
-    RPC.get_block_hash
-      ~block:(string_of_int expected_level_of_next_proposal)
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_hash
+         ~block:(string_of_int expected_level_of_next_proposal)
+         ()
   in
   Check.((accuser_first_block_hash = proposal_first_block_hash) string)
     ~error_msg:"Expected the accuser to find %R, found %L" ;

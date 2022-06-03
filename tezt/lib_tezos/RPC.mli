@@ -163,6 +163,11 @@ val get_chain_block : ?chain:string -> ?block:string -> unit -> JSON.t t
 val get_chain_block_metadata :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/[chain]/blocks/[block]/hash]
+
+    Returns the hash. *)
+val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
+
 (** RPC: [GET /chains/[chain]/blocks/[block]/header]
 
     [chain] defaults to ["main"].

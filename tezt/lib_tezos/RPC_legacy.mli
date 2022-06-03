@@ -34,15 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chain/[chain]/blocks/[block]/hash *)
-val get_block_hash :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  string Lwt.t
-
 (** Call RPC /chain/[chain] *)
 val force_bootstrapped :
   ?endpoint:Client.endpoint ->

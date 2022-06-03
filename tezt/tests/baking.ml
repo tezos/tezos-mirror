@@ -552,7 +552,7 @@ let wrong_branch_operation_dismissal =
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
   (* We inject an operation where the branch is the head (instead of
      head~2). Such operation should not be included. *)
-  let* branch = RPC.get_block_hash client in
+  let* branch = RPC.Client.call client @@ RPC.get_chain_block_hash () in
   Log.info "Injecting a transfer branched on the current head." ;
   let* (`OpHash oph) =
     Operation.Manager.(inject ~branch [make @@ transfer ()] client)
