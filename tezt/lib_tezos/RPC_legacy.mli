@@ -34,15 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chain/[chain] *)
-val force_bootstrapped :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?bootstrapped:bool ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/is_bootstrapped *)
 val is_bootstrapped :
   ?endpoint:Client.endpoint ->

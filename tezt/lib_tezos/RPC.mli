@@ -174,6 +174,12 @@ val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
     [block] defaults to ["head"]. *)
 val get_chain_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [PATCH /chains/[chain]] to set ["bootstrapped"]
+
+    Example: to force the chain to be considered bootstrapped,
+    use [patch_chain_bootstrapped true]. *)
+val patch_chain_bootstrapped : ?chain:string -> bool -> unit t
+
 (** A level and its hash *)
 type block_descriptor = {block_hash : string; level : int}
 

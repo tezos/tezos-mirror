@@ -120,6 +120,13 @@ let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
 let get_chain_block_header ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
 
+let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
+  make
+    PATCH
+    ["chains"; chain]
+    ~data:(`O [("bootstrapped", `Bool bootstrapped)])
+    ignore
+
 type block_descriptor = {block_hash : string; level : int}
 
 let parse_block_descriptor json =

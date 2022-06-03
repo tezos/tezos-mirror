@@ -24,12 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let force_bootstrapped ?endpoint ?hooks ?(chain = "main") ?(bootstrapped = true)
-    client =
-  let path = ["chains"; chain] in
-  let data = `O [("bootstrapped", `Bool bootstrapped)] in
-  Client.rpc ?endpoint ?hooks ~data PATCH path client
-
 let is_bootstrapped ?endpoint ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "is_bootstrapped"] in
   Client.rpc ?endpoint ?hooks GET path client
