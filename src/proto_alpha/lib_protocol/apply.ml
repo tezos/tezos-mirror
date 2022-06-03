@@ -1976,10 +1976,10 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
                                  {
                                    source;
                                    fee;
-                                   counter;
                                    operation;
                                    gas_limit;
                                    storage_limit;
+                                   _;
                                  }) =
     op
   in
@@ -2004,7 +2004,6 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   let*? () = Fees.check_storage_limit ctxt ~storage_limit in
   let source_contract = Contract.Implicit source in
   let* () = Contract.must_be_allocated ctxt source_contract in
-  let* () = Contract.check_counter_increment ctxt source counter in
   let consume_decoding_gas ctxt lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
     @@ (* Fail early if the operation does not have enough gas to
@@ -2428,80 +2427,94 @@ let rec mark_skipped :
             },
           mark_skipped ~payload_producer level rest )
 
-(** Check that counters are consistent, i.e. that they are successive within a
-    batch. Fail with a {b permanent} error otherwise.
-    TODO: https://gitlab.com/tezos/tezos/-/issues/2301
-    Remove when format of operation is changed to save space.
- *)
-let check_counters_consistency contents_list =
-  let check_counter ~previous_counter counter =
-    match previous_counter with
-    | None -> return_unit
-    | Some previous_counter ->
-        let expected = Z.succ previous_counter in
-        if Compare.Z.(expected = counter) then return_unit
-        else fail Inconsistent_counters
+(** Check a few simple properties of the given batch or standalone
+    manager operation represented by [contents_list]. Then return its
+    [public_key].
+
+    Invariants checked:
+
+    - All sources in a batch must be equal.
+
+    - The counters in a batch must be successive.
+
+    - Reveal operations are only authorized as the very first
+      operation of a batch.
+
+    - The source's contract must be allocated.
+
+    - The counter of the first operation must be the source's next
+      expected counter.
+
+    - The source's public key must have been revealed (either before
+      the considered batch, or during its first operation).
+
+    Note that currently, a batch contains only one signature, so all
+    operations in a batch are required to originate from the same
+    manager. This may change in the future, in order to allow several
+    managers to group-sign a sequence of operations. *)
+let check_batch_sanity_and_find_public_key ctxt
+    (contents_list : _ Kind.manager contents_list) =
+  let open Result_syntax in
+  let check_source_and_counter ~expected_source ~source ~previous_counter
+      ~counter =
+    let* () =
+      error_unless
+        (Signature.Public_key_hash.equal expected_source source)
+        Inconsistent_sources
+    in
+    error_unless
+      Compare.Z.(Z.succ previous_counter = counter)
+      Inconsistent_counters
   in
-  let rec check_counters_rec :
-      type kind.
-      counter option -> kind Kind.manager contents_list -> unit tzresult Lwt.t =
-   fun previous_counter contents_list ->
-    match[@coq_match_with_default] contents_list with
-    | Single (Manager_operation {counter; _}) ->
-        check_counter ~previous_counter counter
-    | Cons (Manager_operation {counter; _}, rest) ->
-        check_counter ~previous_counter counter >>=? fun () ->
-        check_counters_rec (Some counter) rest
-  in
-  check_counters_rec None contents_list
-
-let find_manager_public_key ctxt (op : _ Kind.manager contents_list) =
-  (* Currently, the [op] batch contains only one signature, so all
-     operations in the batch are required to originate from the same
-     manager. This may change in the future, in order to allow several
-     managers to group-sign a sequence of operations. *)
-  (* Invariants checked:
-
-     - Reveal operations are only authorized in the first position element of a batch.
-
-     - All sources in a batch must be equal. *)
-  (* Performs a sanity check and return the operation's (single)
-     source and a potential public key if the batch contains a reveal
-     operation in the head position. *)
   let rec check_batch_tail_sanity :
       type kind.
-      public_key_hash -> kind Kind.manager contents_list -> unit tzresult =
-   fun expected_source -> function
+      public_key_hash ->
+      counter ->
+      kind Kind.manager contents_list ->
+      unit tzresult =
+   fun expected_source previous_counter -> function
     | Single (Manager_operation {operation = Reveal _key; _}) ->
         error Incorrect_reveal_position
     | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
         error Incorrect_reveal_position
-    | Single (Manager_operation {source; _}) ->
-        error_unless
-          (Signature.Public_key_hash.equal expected_source source)
-          Inconsistent_sources
-    | Cons (Manager_operation {source; _}, rest) ->
-        error_unless
-          (Signature.Public_key_hash.equal expected_source source)
-          Inconsistent_sources
-        >>? fun () -> check_batch_tail_sanity source rest
+    | Single (Manager_operation {source; counter; _}) ->
+        check_source_and_counter
+          ~expected_source
+          ~source
+          ~previous_counter
+          ~counter
+    | Cons (Manager_operation {source; counter; _}, rest) ->
+        let* () =
+          check_source_and_counter
+            ~expected_source
+            ~source
+            ~previous_counter
+            ~counter
+        in
+        check_batch_tail_sanity source counter rest
   in
   let check_batch :
       type kind.
       kind Kind.manager contents_list ->
-      (public_key_hash * public_key option) tzresult =
+      (public_key_hash * public_key option * counter) tzresult =
    fun op ->
     match op with
-    | Single (Manager_operation {source; operation = Reveal key; _}) ->
-        ok (source, Some key)
-    | Single (Manager_operation {source; _}) -> ok (source, None)
-    | Cons (Manager_operation {source; operation = Reveal key; _}, rest) ->
-        check_batch_tail_sanity source rest >>? fun () -> ok (source, Some key)
-    | Cons (Manager_operation {source; _}, rest) ->
-        check_batch_tail_sanity source rest >>? fun () -> ok (source, None)
+    | Single (Manager_operation {source; counter; operation = Reveal key; _}) ->
+        ok (source, Some key, counter)
+    | Single (Manager_operation {source; counter; _}) ->
+        ok (source, None, counter)
+    | Cons (Manager_operation {source; counter; operation = Reveal key; _}, rest)
+      ->
+        let* () = check_batch_tail_sanity source counter rest in
+        return (source, Some key, counter)
+    | Cons (Manager_operation {source; counter; _}, rest) ->
+        let* () = check_batch_tail_sanity source counter rest in
+        return (source, None, counter)
   in
-  check_batch op >>?= fun (source, revealed_key) ->
-  Contract.must_be_allocated ctxt (Contract.Implicit source) >>=? fun () ->
+  let open Lwt_result_syntax in
+  let*? source, revealed_key, first_counter = check_batch contents_list in
+  let* () = Contract.must_be_allocated ctxt (Contract.Implicit source) in
+  let* () = Contract.check_counter_increment ctxt source first_counter in
   match revealed_key with
   | None -> Contract.get_manager_key ctxt source
   | Some pk -> return pk
@@ -2537,8 +2550,7 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
   (* Retrieve the [public_key] first: the contract may be deleted by the
      fee transfer in [rec_precheck_manager_contents_list]. *)
-  let* public_key = find_manager_public_key ctxt contents_list in
-  let* () = check_counters_consistency contents_list in
+  let* public_key = check_batch_sanity_and_find_public_key ctxt contents_list in
   let* ctxt, prechecked_contents_list =
     rec_precheck_manager_contents_list
       ctxt
