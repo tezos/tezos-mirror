@@ -3031,6 +3031,10 @@ module Sc_rollup : sig
       (Z.t * context) tzresult Lwt.t
   end
 
+  module Errors : sig
+    type error += Sc_rollup_does_not_exist of t
+  end
+
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
   end

@@ -83,6 +83,8 @@ module Sc_rollup = struct
     include Sc_rollup_storage.Outbox
     module Message = Sc_rollup_outbox_message_repr
   end
+
+  module Errors = Sc_rollup_errors
 end
 
 module Dal = struct
