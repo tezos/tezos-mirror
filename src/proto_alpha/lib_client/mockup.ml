@@ -60,7 +60,6 @@ module Protocol_constants_overrides = struct
     max_available_messages : int option;
     stake_amount : Tez.t option;
     commitment_period_in_blocks : int option;
-    commitment_storage_size_in_bytes : int option;
     max_lookahead_in_blocks : int32 option;
     max_active_outbox_levels : int32 option;
     max_outbox_messages_per_level : int option;
@@ -192,7 +191,6 @@ module Protocol_constants_overrides = struct
           c.max_available_messages,
           c.stake_amount,
           c.commitment_period_in_blocks,
-          c.commitment_storage_size_in_bytes,
           c.max_lookahead_in_blocks,
           c.max_active_outbox_levels,
           c.max_outbox_messages_per_level ))
@@ -202,7 +200,6 @@ module Protocol_constants_overrides = struct
              sc_rollup_max_available_messages,
              sc_rollup_stake_amount,
              sc_rollup_commitment_period_in_blocks,
-             sc_rollup_commitment_storage_size_in_bytes,
              sc_rollup_max_lookahead_in_blocks,
              sc_rollup_max_active_outbox_levels,
              sc_rollup_max_outbox_messages_per_level ) ->
@@ -213,21 +210,18 @@ module Protocol_constants_overrides = struct
           max_available_messages = sc_rollup_max_available_messages;
           stake_amount = sc_rollup_stake_amount;
           commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
-          commitment_storage_size_in_bytes =
-            sc_rollup_commitment_storage_size_in_bytes;
           max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
           max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
           max_outbox_messages_per_level =
             sc_rollup_max_outbox_messages_per_level;
         })
-      (obj10
+      (obj9
          (opt "sc_rollup_enable" bool)
          (opt "sc_rollup_origination_size" int31)
          (opt "sc_rollup_challenge_window_in_blocks" int31)
          (opt "sc_rollup_max_available_messages" int31)
          (opt "sc_rollup_stake_amount" Tez.encoding)
          (opt "sc_rollup_commitment_period_in_blocks" int31)
-         (opt "sc_rollup_commitment_storage_size_in_bytes" int31)
          (opt "sc_rollup_max_lookahead_in_blocks" int32)
          (opt "sc_rollup_max_active_outbox_levels" int32)
          (opt "sc_rollup_max_outbox_messages_per_level" int31))
@@ -488,8 +482,6 @@ module Protocol_constants_overrides = struct
             stake_amount = Some parametric.sc_rollup.stake_amount;
             commitment_period_in_blocks =
               Some parametric.sc_rollup.commitment_period_in_blocks;
-            commitment_storage_size_in_bytes =
-              Some parametric.sc_rollup.commitment_storage_size_in_bytes;
             max_lookahead_in_blocks =
               Some parametric.sc_rollup.max_lookahead_in_blocks;
             max_active_outbox_levels =
@@ -577,7 +569,6 @@ module Protocol_constants_overrides = struct
           max_available_messages = None;
           stake_amount = None;
           commitment_period_in_blocks = None;
-          commitment_storage_size_in_bytes = None;
           max_lookahead_in_blocks = None;
           max_active_outbox_levels = None;
           max_outbox_messages_per_level = None;
@@ -1040,10 +1031,6 @@ module Protocol_constants_overrides = struct
                Option.value
                  ~default:c.sc_rollup.commitment_period_in_blocks
                  o.sc_rollup.commitment_period_in_blocks;
-             commitment_storage_size_in_bytes =
-               Option.value
-                 ~default:c.sc_rollup.commitment_storage_size_in_bytes
-                 o.sc_rollup.commitment_storage_size_in_bytes;
              max_lookahead_in_blocks =
                Option.value
                  ~default:c.sc_rollup.max_lookahead_in_blocks

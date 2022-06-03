@@ -235,6 +235,11 @@ let increase_commitment_stake_count ctxt rollup node =
   in
   return (size_diff, ctxt)
 
+(* 76 for Commitments entry + 4 for Commitment_stake_count entry
+   + 4 for Commitment_added entry
+   + 0 for Staker_count_update entry *)
+let commitment_storage_size_in_bytes = 84
+
 let refine_stake ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
@@ -271,10 +276,8 @@ let refine_stake ctxt rollup staker commitment =
         commitment_size_diff + commitment_added_size_diff
         + stake_count_size_diff + staker_count_diff
       in
-      let expected_size_diff =
-        Constants_storage.sc_rollup_commitment_storage_size_in_bytes ctxt
-      in
-      (* First submission adds [sc_rollup_commitment_storage_size_in_bytes] to storage.
+      let expected_size_diff = commitment_storage_size_in_bytes in
+      (* First submission adds [commitment_storage_size_in_bytes] to storage.
          Later submission adds 0 due to content-addressing. *)
       assert (Compare.Int.(size_diff = 0 || size_diff = expected_size_diff)) ;
       return (new_hash, commitment_added_level, ctxt)
