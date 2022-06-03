@@ -24,24 +24,52 @@
 (*****************************************************************************)
 open Lwt_result_syntax
 
+let group =
+  {Clic.name = "generic"; Clic.title = "Protocol agnostic teztale command"}
+
 let select_commands ctxt Client_config.{protocol; chain; block; _} =
-  match protocol with
-  | Some protocol ->
-      return
-        (Tezos_client_commands.Client_commands.commands_for_version
-           protocol
-           None)
-  | None -> (
-      let*! protocol = Shell_services.Blocks.protocols ctxt ~chain ~block () in
-      match protocol with
-      | Ok {next_protocol; _} ->
-          return
-            (Tezos_client_commands.Client_commands.commands_for_version
-               next_protocol
-               None)
-      | Error err ->
-          let () = Format.eprintf "%a@." Error_monad.pp_print_trace err in
-          return [])
+  let* proto_commands =
+    match protocol with
+    | Some protocol ->
+        return
+          (Tezos_client_commands.Client_commands.commands_for_version
+             protocol
+             None)
+    | None -> (
+        let*! protocol =
+          Shell_services.Blocks.protocols ctxt ~chain ~block ()
+        in
+        match protocol with
+        | Ok {next_protocol; _} ->
+            return
+              (Tezos_client_commands.Client_commands.commands_for_version
+                 next_protocol
+                 None)
+        | Error err ->
+            let () = Format.eprintf "%a@." Error_monad.pp_print_trace err in
+            return [])
+  in
+  return
+    ([
+       Clic.command
+         ~group
+         ~desc:"convert a file hierarchy into a db"
+         Clic.no_options
+         (Clic.prefixes ["convert"; "from"]
+         @@ Clic.param
+              ~name:"archive_path"
+              ~desc:"folder where files are"
+              (Clic.parameter (fun _ p -> return p))
+         @@ Clic.prefix "to"
+         @@ Clic.param
+              ~name:"db_path"
+              ~desc:"database file to create"
+              (Clic.parameter (fun _ p -> return p))
+         @@ Clic.stop)
+         (fun () prefix db_file _cctxt ->
+           Teztale_archiver.Converter.main "Pirbo_sniffer" prefix db_file);
+     ]
+    @ proto_commands)
 
 let () =
   let () = Teztale_archiver.PtGRANAD_machine.register_json_commands () in
