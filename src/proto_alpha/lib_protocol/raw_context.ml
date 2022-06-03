@@ -298,6 +298,10 @@ let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
 let[@inline] constants ctxt = ctxt.back.constants
 
+let[@inline] tx_rollup ctxt = ctxt.back.constants.tx_rollup
+
+let[@inline] sc_rollup ctxt = ctxt.back.constants.sc_rollup
+
 let[@inline] recover ctxt = ctxt.back.context
 
 let[@inline] fees ctxt = ctxt.back.fees
@@ -958,55 +962,57 @@ let prepare_first_block ~level ~timestamp ctxt =
             cache_script_size = c.cache_script_size;
             cache_stake_distribution_cycles = c.cache_stake_distribution_cycles;
             cache_sampler_state_cycles = c.cache_sampler_state_cycles;
-            tx_rollup_enable = c.tx_rollup_enable;
-            tx_rollup_origination_size = c.tx_rollup_origination_size;
-            tx_rollup_hard_size_limit_per_inbox =
-              c.tx_rollup_hard_size_limit_per_inbox;
-            tx_rollup_hard_size_limit_per_message =
-              c.tx_rollup_hard_size_limit_per_message;
-            tx_rollup_max_withdrawals_per_batch =
-              c.tx_rollup_max_withdrawals_per_batch;
-            tx_rollup_max_ticket_payload_size =
-              c.tx_rollup_max_ticket_payload_size;
-            tx_rollup_commitment_bond = c.tx_rollup_commitment_bond;
-            tx_rollup_finality_period = c.tx_rollup_finality_period;
-            tx_rollup_withdraw_period = c.tx_rollup_withdraw_period;
-            tx_rollup_max_inboxes_count = c.tx_rollup_max_inboxes_count;
-            tx_rollup_max_messages_per_inbox =
-              c.tx_rollup_max_messages_per_inbox;
-            tx_rollup_max_commitments_count = c.tx_rollup_max_commitments_count;
-            tx_rollup_cost_per_byte_ema_factor =
-              c.tx_rollup_cost_per_byte_ema_factor;
-            tx_rollup_rejection_max_proof_size =
-              c.tx_rollup_rejection_max_proof_size;
-            tx_rollup_sunset_level = c.tx_rollup_sunset_level;
+            tx_rollup =
+              {
+                enable = c.tx_rollup_enable;
+                origination_size = c.tx_rollup_origination_size;
+                hard_size_limit_per_inbox =
+                  c.tx_rollup_hard_size_limit_per_inbox;
+                hard_size_limit_per_message =
+                  c.tx_rollup_hard_size_limit_per_message;
+                max_withdrawals_per_batch =
+                  c.tx_rollup_max_withdrawals_per_batch;
+                max_ticket_payload_size = c.tx_rollup_max_ticket_payload_size;
+                commitment_bond = c.tx_rollup_commitment_bond;
+                finality_period = c.tx_rollup_finality_period;
+                withdraw_period = c.tx_rollup_withdraw_period;
+                max_inboxes_count = c.tx_rollup_max_inboxes_count;
+                max_messages_per_inbox = c.tx_rollup_max_messages_per_inbox;
+                max_commitments_count = c.tx_rollup_max_commitments_count;
+                cost_per_byte_ema_factor = c.tx_rollup_cost_per_byte_ema_factor;
+                rejection_max_proof_size = c.tx_rollup_rejection_max_proof_size;
+                sunset_level = c.tx_rollup_sunset_level;
+              };
             dal;
-            sc_rollup_enable = false;
-            sc_rollup_origination_size = c.sc_rollup_origination_size;
-            sc_rollup_challenge_window_in_blocks = 20_160;
-            (* The following value is chosen to limit the maximal
-               length of an inbox refutation proof. *)
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
-               The follow constants need to be refined. *)
-            sc_rollup_max_available_messages = 1_000_000;
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-               The following constants need to be refined. *)
-            sc_rollup_stake_amount = Tez_repr.of_mutez_exn 32_000_000L;
-            sc_rollup_commitment_period_in_blocks = 30;
-            (* 76 for Commitments entry + 4 for Commitment_stake_count entry
-               + 4 for Commitment_added entry
-               + 0 for Staker_count_update entry *)
-            sc_rollup_commitment_storage_size_in_bytes = 84;
-            sc_rollup_max_lookahead_in_blocks = 30_000l;
-            (* Number of active levels kept for executing outbox messages.
-               WARNING: Changing this value impacts the storage charge for
-               applying messages from the outbox. It also requires migration for
-               remapping existing active outbox levels to new indices. *)
-            sc_rollup_max_active_outbox_levels = 20_160l;
-            (* Maximum number of outbox messages per level.
-               WARNING: changing this value impacts the storage cost charged
-               for applying messages from the outbox. *)
-            sc_rollup_max_outbox_messages_per_level = 100;
+            sc_rollup =
+              {
+                enable = false;
+                origination_size = c.sc_rollup_origination_size;
+                challenge_window_in_blocks = 20_160;
+                (* The following value is chosen to limit the maximal
+                   length of an inbox refutation proof. *)
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
+                   The follow constants need to be refined. *)
+                max_available_messages = 1_000_000;
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+                   The following constants need to be refined. *)
+                stake_amount = Tez_repr.of_mutez_exn 32_000_000L;
+                commitment_period_in_blocks = 30;
+                (* 76 for Commitments entry + 4 for Commitment_stake_count entry
+                   + 4 for Commitment_added entry
+                   + 0 for Staker_count_update entry *)
+                commitment_storage_size_in_bytes = 84;
+                max_lookahead_in_blocks = 30_000l;
+                (* Number of active levels kept for executing outbox messages.
+                   WARNING: Changing this value impacts the storage charge for
+                   applying messages from the outbox. It also requires migration for
+                   remapping existing active outbox levels to new indices. *)
+                max_active_outbox_levels = 20_160l;
+                (* Maximum number of outbox messages per level.
+                   WARNING: changing this value impacts the storage cost charged
+                   for applying messages from the outbox. *)
+                max_outbox_messages_per_level = 100;
+              };
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)

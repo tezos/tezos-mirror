@@ -71,13 +71,13 @@ let sc_rollup_commitment_period =
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2977
      Use effective on-chain protocol parameter. *)
   Int32.of_int
-    Default_parameters.constants_mainnet.sc_rollup_commitment_period_in_blocks
+    Default_parameters.constants_mainnet.sc_rollup.commitment_period_in_blocks
 
 let sc_rollup_challenge_window =
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2977
      Use effective on-chain protocol parameter. *)
   Int32.of_int
-    Default_parameters.constants_mainnet.sc_rollup_challenge_window_in_blocks
+    Default_parameters.constants_mainnet.sc_rollup.challenge_window_in_blocks
 
 let last_commitment_level (module Last_commitment_level : Mutable_level_store)
     store =

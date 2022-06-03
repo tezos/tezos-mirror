@@ -317,7 +317,7 @@ let process_messages_and_inboxes (state : State.t)
     Protocol.Tx_rollup_l2_apply.
       {
         tx_rollup_max_withdrawals_per_batch =
-          state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
+          state.constants.parametric.tx_rollup.max_withdrawals_per_batch;
       }
   in
   let context = predecessor_context in
@@ -326,7 +326,7 @@ let process_messages_and_inboxes (state : State.t)
       context
       parameters
       ~rejection_max_proof_size:
-        state.constants.parametric.tx_rollup_rejection_max_proof_size
+        state.constants.parametric.tx_rollup.rejection_max_proof_size
       messages
   in
   let* context =
