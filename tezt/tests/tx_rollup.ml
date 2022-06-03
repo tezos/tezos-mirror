@@ -432,7 +432,7 @@ module Regressions = struct
       (* Batch with all possible characters. *)
       let batch = Rollup.make_batch (String.init 256 Char.chr) in
       let* () = submit_batch ~batch state in
-      let* block = RPC.Client.call client @@ RPC.get_block () in
+      let* block = RPC.Client.call client @@ RPC.get_chain_block () in
       let op = JSON.(block |-> "operations" |=> 3 |=> 0 |-> "contents" |=> 0) in
       Check.(
         ((JSON.(op |-> "kind" |> as_string) = "tx_rollup_submit_batch")
@@ -1085,7 +1085,7 @@ let test_rollup_last_commitment_is_rejected =
   in
   let* () = Client.bake_for_and_wait client in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let* _ = RPC.Client.call client @@ RPC.get_block () in
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   unit
 
 let test_rollup_reject_position_one =
@@ -1106,7 +1106,7 @@ let test_rollup_reject_position_one =
       ~batches:[(batch, Constant.bootstrap2.public_key_hash)]
       state
   in
-  let* _ = RPC.Client.call client @@ RPC.get_block () in
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   let inbox_content = `Content [batch; batch] in
   let* () =
     submit_commitment
@@ -1168,7 +1168,7 @@ let test_rollup_reject_position_one =
   in
   let* () = Client.bake_for_and_wait client in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let* _ = RPC.Client.call client @@ RPC.get_block () in
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   unit
 
 let test_rollup_wrong_rejection =

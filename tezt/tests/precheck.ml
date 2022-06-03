@@ -406,7 +406,7 @@ let propagate_precheckable_bad_block_signature =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
     |> Process.check_error ~msg:(rex "Invalid payload hash")
   in
-  let* _ = RPC.Client.call client @@ RPC.get_block () in
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   Log.info
     "Bake a valid block and check the cluster receives it (ensuring the \
      cluster is still connected)." ;

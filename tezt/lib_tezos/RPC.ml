@@ -26,7 +26,7 @@
 include RPC_core
 include RPC_legacy
 
-let get_connections =
+let get_network_connections =
   make GET ["network"; "connections"] @@ fun json ->
   let decode_connection json =
     let id_point = JSON.(json |-> "id_point") in
@@ -35,12 +35,13 @@ let get_connections =
   in
   List.map decode_connection (JSON.as_list json)
 
-let get_connection peer_id =
+let get_network_connection peer_id =
   make GET ["network"; "connections"; peer_id] @@ fun json ->
   let id_point = JSON.(json |-> "id_point") in
   (JSON.(id_point |-> "addr" |> as_string), JSON.(id_point |-> "port" |> as_int))
 
-let private_injection_operations ?(force = false) ?(async = false) ~ops () =
+let post_private_injection_operations ?(force = false) ?(async = false) ~ops ()
+    =
   let query_string =
     [("async", string_of_bool async); ("force", string_of_bool force)]
   in
@@ -49,13 +50,13 @@ let private_injection_operations ?(force = false) ?(async = false) ~ops () =
   @@ fun json ->
   JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
 
-let get_block ?(chain = "main") ?(block = "head") () =
+let get_chain_block ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block] Fun.id
 
-let get_block_metadata ?(chain = "main") ?(block = "head") () =
+let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
 
-let get_block_header ?(chain = "main") ?(block = "head") () =
+let get_chain_block_header ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
 
 type block_descriptor = {block_hash : string; level : int}
@@ -67,11 +68,11 @@ let parse_block_descriptor json =
       level = json |-> "level" |> as_int;
     }
 
-let get_checkpoint ?(chain = "main") () =
+let get_chain_level_checkpoint ?(chain = "main") () =
   make GET ["chains"; chain; "levels"; "checkpoint"] parse_block_descriptor
 
-let get_savepoint ?(chain = "main") () =
+let get_chain_level_savepoint ?(chain = "main") () =
   make GET ["chains"; chain; "levels"; "savepoint"] parse_block_descriptor
 
-let get_caboose ?(chain = "main") () =
+let get_chain_level_caboose ?(chain = "main") () =
   make GET ["chains"; chain; "levels"; "caboose"] parse_block_descriptor

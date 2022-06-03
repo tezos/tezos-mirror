@@ -92,7 +92,7 @@ let test_feature_flag =
       Mempool.classified_typ
       ~error_msg:"Expected mempool: %R. Got: %L. (Order does not matter)") ;
   let* () = Client.bake_for_and_wait client in
-  let* block_metadata = RPC.(call node @@ get_block_metadata ()) in
+  let* block_metadata = RPC.(call node @@ get_chain_block_metadata ()) in
   let slot_availability =
     JSON.(block_metadata |-> "dal_slot_availability" |> is_null)
   in
