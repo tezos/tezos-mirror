@@ -105,6 +105,22 @@ let get_network_version = make GET ["network"; "version"] Fun.id
 
 let get_network_versions = make GET ["network"; "versions"] Fun.id
 
+let post_injection_operation ?(async = false) data =
+  make
+    POST
+    ["injection"; "operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
+
+let post_private_injection_operation ?(async = false) data =
+  make
+    POST
+    ["private"; "injection"; "operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
+
 let get_chain_chain_id ?(chain = "main") () =
   make GET ["chains"; chain; "chain_id"] JSON.as_string
 

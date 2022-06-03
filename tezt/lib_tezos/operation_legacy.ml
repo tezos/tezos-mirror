@@ -250,14 +250,15 @@ let inject_operation ?(async = false) ?(force = false) ?wait_for_injection
   let (`Hex signature) = signature in
   let signed_op = unsigned_op ^ signature in
   let inject =
-    if force then RPC.private_inject_operation else RPC.inject_operation
+    if force then RPC.post_private_injection_operation
+    else RPC.post_injection_operation
   in
   let waiter =
     match wait_for_injection with
     | None -> Lwt.return_unit
     | Some node -> Node.wait_for_request ~request:`Inject node
   in
-  let*! oph_json = inject ~async ~data:(`String signed_op) client in
+  let* oph_json = RPC.Client.call client @@ inject ~async (`String signed_op) in
   let* () = waiter in
   return (`OpHash (JSON.as_string oph_json))
 

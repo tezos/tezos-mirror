@@ -145,6 +145,12 @@ val post_private_injection_operations :
   unit ->
   [`OpHash of string] list t
 
+(** RPC: [POST /injection/operation] *)
+val post_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+
+(** RPC: [POST /private/injection/operation] *)
+val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+
 (** RPC: [GET /chains/[chain]/chain_id]
 
     Returns the chain ID. *)

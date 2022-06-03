@@ -34,24 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /injection/operation *)
-val inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Runnable.process
-
-(** Call RPC /private/injection/operation *)
-val private_inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Runnable.process
-
 (** Call RPC /injection/block *)
 val inject_block :
   ?endpoint:Client.endpoint ->
