@@ -729,7 +729,7 @@ module Interpreter_tests = struct
     Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
-      ~expect_failure:(fun _ -> return_unit)
+      ~expect_apply_failure:(fun _ -> return_unit)
       incr
       operation
     >>=? fun _incr ->
@@ -764,7 +764,7 @@ module Interpreter_tests = struct
     Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
-      ~expect_failure:(fun _ -> return_unit)
+      ~expect_apply_failure:(fun _ -> return_unit)
       incr
       operation
     >>=? fun _incr -> return_unit

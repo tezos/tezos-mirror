@@ -248,6 +248,8 @@ module Contract = struct
 
   let is_manager_key_revealed = Contract_manager_storage.is_manager_key_revealed
 
+  let check_public_key = Contract_manager_storage.check_public_key
+
   let reveal_manager_key = Contract_manager_storage.reveal_manager_key
 
   let get_manager_key = Contract_manager_storage.get_manager_key

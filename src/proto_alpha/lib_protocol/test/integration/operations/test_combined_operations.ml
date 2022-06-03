@@ -154,7 +154,7 @@ let test_multiple_origination_and_delegation () =
       Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
     new_contracts
 
-let expect_failure = function
+let expect_apply_failure = function
   | Environment.Ecoproto_error err :: _ ->
       Assert.test_error_encodings err ;
       let error_info =
@@ -178,7 +178,7 @@ let test_failing_operation_in_the_middle () =
   Incremental.begin_construction blk >>=? fun inc ->
   Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
   Context.Contract.balance (I inc) c2 >>=? fun c2_old_balance ->
-  Incremental.add_operation ~expect_failure inc operation >>=? fun inc ->
+  Incremental.add_operation ~expect_apply_failure inc operation >>=? fun inc ->
   let tickets = Incremental.rev_tickets inc in
   let open Apply_results in
   let tickets =
@@ -223,7 +223,7 @@ let test_failing_operation_in_the_middle_with_fees () =
   Incremental.begin_construction blk >>=? fun inc ->
   Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
   Context.Contract.balance (I inc) c2 >>=? fun c2_old_balance ->
-  Incremental.add_operation ~expect_failure inc operation >>=? fun inc ->
+  Incremental.add_operation ~expect_apply_failure inc operation >>=? fun inc ->
   let tickets = Incremental.rev_tickets inc in
   let open Apply_results in
   let tickets =
@@ -286,7 +286,7 @@ let test_wrong_signature_in_the_middle () =
   let operations = [op1; op2; op3] in
   Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
   >>=? fun operation ->
-  let expect_apply_failure = function
+  let expect_failure = function
     | Environment.Ecoproto_error err :: _ ->
         Assert.test_error_encodings err ;
         let error_info =
@@ -300,7 +300,7 @@ let test_wrong_signature_in_the_middle () =
           "Packed operation has invalid source in the middle : operation \
            expected to fail."
   in
-  Incremental.add_operation ~expect_apply_failure inc operation >>=? fun _inc ->
+  Incremental.add_operation ~expect_failure inc operation >>=? fun _inc ->
   return_unit
 
 let expect_inconsistent_counters list =
@@ -370,17 +370,11 @@ let test_inconsistent_counters () =
   Incremental.add_operation inc op >>=? fun _ ->
   (* Gap in counter in the following op *)
   Op.batch_operations ~source:c1 (I inc) [op1; op2; op4] >>=? fun op ->
-  Incremental.add_operation
-    ~expect_apply_failure:expect_inconsistent_counters
-    inc
-    op
+  Incremental.add_operation ~expect_failure:expect_inconsistent_counters inc op
   >>=? fun _ ->
   (* Same counter used twice in the following op *)
   Op.batch_operations ~source:c1 (I inc) [op1; op2; op2'] >>=? fun op ->
-  Incremental.add_operation
-    ~expect_apply_failure:expect_inconsistent_counters
-    inc
-    op
+  Incremental.add_operation ~expect_failure:expect_inconsistent_counters inc op
   >>=? fun _ -> return_unit
 
 let tests =

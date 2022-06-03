@@ -1537,8 +1537,14 @@ module Contract : sig
   val is_manager_key_revealed :
     context -> public_key_hash -> bool tzresult Lwt.t
 
+  val check_public_key : public_key -> public_key_hash -> unit tzresult
+
   val reveal_manager_key :
-    context -> public_key_hash -> public_key -> context tzresult Lwt.t
+    ?check_consistency:bool ->
+    context ->
+    public_key_hash ->
+    public_key ->
+    context tzresult Lwt.t
 
   val get_script_code :
     context -> t -> (context * Script.lazy_expr option) tzresult Lwt.t

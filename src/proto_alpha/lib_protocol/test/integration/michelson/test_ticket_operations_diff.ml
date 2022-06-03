@@ -199,7 +199,7 @@ let originate block ~script ~storage ~src ~baker ~forges_tickets =
   in
   let* incr =
     Incremental.add_operation
-      ?expect_failure:
+      ?expect_apply_failure:
         (if forges_tickets then Some (fun _ -> return ()) else None)
       incr
       operation

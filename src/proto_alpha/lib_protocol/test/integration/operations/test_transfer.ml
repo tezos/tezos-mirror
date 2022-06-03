@@ -78,13 +78,13 @@ let two_over_n_of_balance incr contract n =
 
 (********************)
 
-let single_transfer ?fee ?expect_failure amount =
+let single_transfer ?fee ?expect_apply_failure amount =
   Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   transfer_and_check_balances
     ~loc:__LOC__
     ?fee
-    ?expect_failure
+    ?expect_apply_failure
     b
     contract_1
     contract_2
@@ -101,7 +101,7 @@ let test_block_with_a_single_transfer_with_fee () =
 
 (** Single transfer without fee. *)
 let test_transfer_zero_tez () =
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error err :: _ ->
         Assert.test_error_encodings err ;
         let error_info =
@@ -111,7 +111,7 @@ let test_transfer_zero_tez () =
         else failwith "unexpected error"
     | _ -> failwith "Empty transaction should fail"
   in
-  single_transfer ~expect_failure Tez.zero
+  single_transfer ~expect_apply_failure Tez.zero
 
 (** Transfer zero tez from an implicit contract. *)
 let test_transfer_zero_implicit () =
@@ -183,15 +183,33 @@ let test_missing_transaction () =
 let test_transfer_zero_implicit_with_bal_src_as_fee () =
   Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
+  let src_pkh = account.Account.pkh in
   Incremental.begin_construction b >>=? fun i ->
-  let src = Contract.Implicit account.Account.pkh in
+  let src = Contract.Implicit src_pkh in
   Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) src >>=? fun bal_src ->
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
   Op.transaction (I i) ~fee:bal_src src dest Tez.zero >>=? fun op ->
-  Incremental.add_operation i op >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Empty transaction"
+  (* Transferring zero tez should result in an application failure as
+     the implicit contract has been depleted. *)
+  let expect_apply_failure = function
+    | [
+        Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
+      ]
+      when pkh = src_pkh ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_apply_failure i op >>=? fun inc ->
+  Context.Contract.balance (I inc) src >>=? fun balance ->
+  (* We assert that the failing operation was included and that the
+     fees were taken, effectively depleting the contract. *)
+  Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
+  (* Empty contracts should be unrevealed *)
+  Context.Contract.is_manager_key_revealed (I inc) src >>=? fun revelead ->
+  when_ revelead (fun () ->
+      Stdlib.failwith "Empty account still exists and is revealed.")
 
 (** Transfer zero tez to an originated contract, with fee equals balance of src. *)
 let test_transfer_zero_to_originated_with_bal_src_as_fee () =
@@ -205,6 +223,8 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
   >>=? fun (op, new_contract) ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) src >>=? fun bal_src ->
+  Op.revelation (I i) ~fee:Tez.zero account.pk >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
   Op.transaction (I i) ~fee:bal_src src new_contract Tez.zero >>=? fun op ->
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
   Incremental.add_operation i op >>=? fun i ->
@@ -220,6 +240,8 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) src >>=? fun bal_src ->
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
+  Op.revelation (I i) ~fee:Tez.zero account.pk >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
   Op.transaction (I i) ~fee:bal_src src dest Tez.one >>=? fun op ->
   Incremental.add_operation i op >>= fun res ->
   Assert.proto_error_with_info ~loc:__LOC__ res "Balance too low"
@@ -383,7 +405,7 @@ let test_balance_too_low fee () =
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
   Op.transaction ~fee (I i) contract_1 contract_2 max_tez >>=? fun op ->
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error err :: _ ->
         Assert.test_error_encodings err ;
         let error_info =
@@ -395,11 +417,12 @@ let test_balance_too_low fee () =
   in
   (* the fee is higher than the balance then raise an error "Balance_too_low" *)
   if fee > balance1 then
-    Incremental.add_operation ~expect_failure i op >>= fun _res -> return_unit
+    Incremental.add_operation ~expect_apply_failure i op >>= fun _res ->
+    return_unit
     (* the fee is smaller than the balance, then the transfer is accepted
        but it is not processed, and fees are taken *)
   else
-    Incremental.add_operation ~expect_failure i op >>=? fun i ->
+    Incremental.add_operation ~expect_apply_failure i op >>=? fun i ->
     (* contract_1 loses the fees *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee
     >>=? fun () ->
@@ -428,7 +451,7 @@ let test_balance_too_low_two_transfers fee () =
   Context.Contract.balance (I i) contract_3 >>=? fun balance3 ->
   Op.transaction ~fee (I i) contract_1 contract_3 two_third_of_balance
   >>=? fun operation ->
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error err :: _ ->
         Assert.test_error_encodings err ;
         let error_info =
@@ -438,7 +461,7 @@ let test_balance_too_low_two_transfers fee () =
         else failwith "unexpected error"
     | _ -> failwith "balance too low should fail"
   in
-  Incremental.add_operation ~expect_failure i operation >>=? fun i ->
+  Incremental.add_operation ~expect_apply_failure i operation >>=? fun i ->
   (* contract_1 loses the fees *)
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee
   >>=? fun () ->
@@ -597,14 +620,14 @@ let transfer_to_itself_with_no_such_entrypoint () =
   Context.init1 () >>=? fun (b, addr) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.transaction (B b) addr addr Tez.one ~entrypoint >>=? fun transaction ->
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error (Script_tc_errors.No_such_entrypoint _ as e)
       :: _ ->
         Assert.test_error_encodings e ;
         return ()
     | _ -> failwith "no such entrypoint should fail"
   in
-  Incremental.add_operation ~expect_failure i transaction >>= fun _res ->
+  Incremental.add_operation ~expect_apply_failure i transaction >>= fun _res ->
   return ()
 
 let tests =

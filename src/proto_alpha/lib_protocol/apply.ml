@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -125,6 +126,7 @@ type error +=
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
   | Forbidden_zero_ticket_quantity
+  | Incorrect_reveal_position
 
 let () =
   register_error_kind
@@ -773,7 +775,20 @@ let () =
       "It is not allowed to use a zero amount ticket in this operation."
     Data_encoding.empty
     (function Forbidden_zero_ticket_quantity -> Some () | _ -> None)
-    (fun () -> Forbidden_zero_ticket_quantity)
+    (fun () -> Forbidden_zero_ticket_quantity) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.incorrect_reveal_position"
+    ~title:"Incorrect reveal position"
+    ~description:"Incorrect reveal position in batch"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Incorrect reveal operation position in batch: only allowed in first \
+         position")
+    Data_encoding.empty
+    (function Incorrect_reveal_position -> Some () | _ -> None)
+    (fun () -> Incorrect_reveal_position)
 
 open Apply_results
 
@@ -1237,9 +1252,27 @@ let apply_external_manager_operation_content :
     ~gas_consumed_in_precheck
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
-  | Reveal _ ->
+  | Reveal pk ->
+      (* TODO #2603
+
+         Even if [precheck_manager_contents] has already asserted that
+         the implicit contract is allocated, we must re-do this check in
+         case the manager has been emptied while collecting fees. This
+         should be solved by forking out [validate_operation] from
+         [apply_operation]. *)
+      Contract.must_be_allocated ctxt source_contract >>=? fun () ->
+      (* TODO tezos/tezos#3070
+
+         We have already asserted the consistency of the supplied public
+         key during precheck, so we avoid re-checking that precondition
+         with [?check_consistency=false]. This optional parameter is
+         temporary, to avoid breaking compatibility with external legacy
+         usage of [Contract.reveal_manager_key]. However, the pattern of
+         using [Contract.check_public_key] and this usage of
+         [Contract.reveal_manager_key] should become the standard. *)
+      Contract.reveal_manager_key ~check_consistency:false ctxt source pk
+      >>=? fun ctxt ->
       return
-        (* No-op: action already performed by `precheck_manager_contents`. *)
         ( ctxt,
           (Reveal_result
              {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
@@ -1905,7 +1938,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
      risk getting different results if the operation has already been
      deserialized before (e.g. when retrieve in JSON format). *)
   (match operation with
-  | Reveal pk -> Contract.reveal_manager_key ctxt source pk
+  | Reveal pk -> Contract.check_public_key pk source >>?= fun () -> return ctxt
   | Transaction {parameters; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
@@ -2319,17 +2352,6 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   | Error errors ->
       Lwt.return (Failure, Failed (manager_kind operation, errors), [])
 
-let skipped_operation_result :
-    type kind. kind manager_operation -> kind manager_operation_result =
-  function
-  | operation -> (
-      match operation with
-      | Reveal _ ->
-          Applied
-            (Reveal_result {consumed_gas = Gas.Arith.zero}
-              : kind successful_manager_operation_result)
-      | _ -> Skipped (manager_kind operation))
-
 let rec mark_skipped :
     type kind.
     payload_producer:Signature.Public_key_hash.t ->
@@ -2347,7 +2369,7 @@ let rec mark_skipped :
         (Manager_operation_result
            {
              balance_updates;
-             operation_result = skipped_operation_result operation;
+             operation_result = Skipped (manager_kind operation);
              internal_operation_results = [];
            })
   | PrecheckedCons
@@ -2360,7 +2382,7 @@ let rec mark_skipped :
         ( Manager_operation_result
             {
               balance_updates;
-              operation_result = skipped_operation_result operation;
+              operation_result = Skipped (manager_kind operation);
               internal_operation_results = [];
             },
           mark_skipped ~payload_producer level rest )
@@ -2419,42 +2441,55 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   rec_precheck_manager_contents_list ctxt contents_list
 
 let find_manager_public_key ctxt (op : _ Kind.manager contents_list) =
-  (* Currently, the [op] only contains one signature, so
-     all operations are required to be from the same manager. This may
-     change in the future, allowing several managers to group-sign a
-     sequence of transactions. *)
-  let check_same_manager (source, source_key) manager =
-    match manager with
-    | None -> ok (source, source_key)
-    | Some (manager, manager_key) ->
-        if Signature.Public_key_hash.equal source manager then
-          (* Consistency will be checked by
-             [reveal_manager_key] in [precheck_manager_contents]. *)
-          ok (source, Option.either manager_key source_key)
-        else error Inconsistent_sources
+  (* Currently, the [op] batch contains only one signature, so all
+     operations in the batch are required to originate from the same
+     manager. This may change in the future, in order to allow several
+     managers to group-sign a sequence of operations. *)
+  (* Invariants checked:
+
+     - Reveal operations are only authorized in the first position element of a batch.
+
+     - All sources in a batch must be equal. *)
+  (* Performs a sanity check and return the operation's (single)
+     source and a potential public key if the batch contains a reveal
+     operation in the head position. *)
+  let rec check_batch_tail_sanity :
+      type kind.
+      public_key_hash -> kind Kind.manager contents_list -> unit tzresult =
+   fun expected_source -> function
+    | Single (Manager_operation {operation = Reveal _key; _}) ->
+        error Incorrect_reveal_position
+    | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
+        error Incorrect_reveal_position
+    | Single (Manager_operation {source; _}) ->
+        error_unless
+          (Signature.Public_key_hash.equal expected_source source)
+          Inconsistent_sources
+    | Cons (Manager_operation {source; _}, rest) ->
+        error_unless
+          (Signature.Public_key_hash.equal expected_source source)
+          Inconsistent_sources
+        >>? fun () -> check_batch_tail_sanity source rest
   in
-  let rec find_source :
+  let check_batch :
       type kind.
       kind Kind.manager contents_list ->
-      (Signature.public_key_hash * Signature.public_key option) option ->
-      (Signature.public_key_hash * Signature.public_key option) tzresult =
-   fun contents_list manager ->
-    let source (type kind) = function[@coq_match_with_default]
-      | (Manager_operation {source; operation = Reveal key; _} :
-          kind Kind.manager contents) ->
-          (source, Some key)
-      | Manager_operation {source; _} -> (source, None)
-    in
-    match contents_list with
-    | Single op -> check_same_manager (source op) manager
-    | Cons (op, rest) ->
-        check_same_manager (source op) manager >>? fun manager ->
-        find_source rest (Some manager)
+      (public_key_hash * public_key option) tzresult =
+   fun op ->
+    match op with
+    | Single (Manager_operation {source; operation = Reveal key; _}) ->
+        ok (source, Some key)
+    | Single (Manager_operation {source; _}) -> ok (source, None)
+    | Cons (Manager_operation {source; operation = Reveal key; _}, rest) ->
+        check_batch_tail_sanity source rest >>? fun () -> ok (source, Some key)
+    | Cons (Manager_operation {source; _}, rest) ->
+        check_batch_tail_sanity source rest >>? fun () -> ok (source, None)
   in
-  find_source op None >>?= fun (source, source_key) ->
-  match source_key with
-  | Some key -> return key
+  check_batch op >>?= fun (source, revealed_key) ->
+  Contract.must_be_allocated ctxt (Contract.Implicit source) >>=? fun () ->
+  match revealed_key with
   | None -> Contract.get_manager_key ctxt source
+  | Some pk -> return pk
 
 let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
     raw_operation =
@@ -2525,54 +2560,50 @@ let rec apply_manager_contents_list_rec :
           (ctxt_result, Cons_result (result, results)))
 
 let mark_backtracked results =
-  let rec mark_contents_list :
+  let mark_results :
+      type kind.
+      kind Kind.manager contents_result -> kind Kind.manager contents_result =
+   fun results ->
+    let mark_manager_operation_result :
+        type kind.
+        kind manager_operation_result -> kind manager_operation_result =
+      function
+      | (Failed _ | Skipped _ | Backtracked _) as result -> result
+      | Applied result -> Backtracked (result, None)
+    in
+    let mark_internal_manager_operation_result :
+        type kind.
+        kind internal_manager_operation_result ->
+        kind internal_manager_operation_result = function
+      | (Failed _ | Skipped _ | Backtracked _) as result -> result
+      | Applied result -> Backtracked (result, None)
+    in
+    let mark_internal_operation_results
+        (Internal_manager_operation_result (kind, result)) =
+      Internal_manager_operation_result
+        (kind, mark_internal_manager_operation_result result)
+    in
+    match results with
+    | Manager_operation_result op ->
+        Manager_operation_result
+          {
+            balance_updates = op.balance_updates;
+            operation_result = mark_manager_operation_result op.operation_result;
+            internal_operation_results =
+              List.map
+                mark_internal_operation_results
+                op.internal_operation_results;
+          }
+  in
+  let rec traverse_apply_results :
       type kind.
       kind Kind.manager contents_result_list ->
       kind Kind.manager contents_result_list = function
-    | Single_result (Manager_operation_result op) ->
-        Single_result
-          (Manager_operation_result
-             {
-               balance_updates = op.balance_updates;
-               operation_result =
-                 mark_manager_operation_result op.operation_result;
-               internal_operation_results =
-                 List.map
-                   mark_internal_operation_results
-                   op.internal_operation_results;
-             })
-    | Cons_result (Manager_operation_result op, rest) ->
-        Cons_result
-          ( Manager_operation_result
-              {
-                balance_updates = op.balance_updates;
-                operation_result =
-                  mark_manager_operation_result op.operation_result;
-                internal_operation_results =
-                  List.map
-                    mark_internal_operation_results
-                    op.internal_operation_results;
-              },
-            mark_contents_list rest )
-  and mark_internal_operation_results
-      (Internal_manager_operation_result (kind, result)) =
-    Internal_manager_operation_result
-      (kind, mark_internal_manager_operation_result result)
-  and mark_manager_operation_result :
-      type kind. kind manager_operation_result -> kind manager_operation_result
-      = function
-    | (Failed _ | Skipped _ | Backtracked _) as result -> result
-    | Applied (Reveal_result _) as result -> result
-    | Applied result -> Backtracked (result, None)
-  and mark_internal_manager_operation_result :
-      type kind.
-      kind internal_manager_operation_result ->
-      kind internal_manager_operation_result = function
-    | (Failed _ | Skipped _ | Backtracked _) as result -> result
-    | Applied result -> Backtracked (result, None)
+    | Single_result res -> Single_result (mark_results res)
+    | Cons_result (res, rest) ->
+        Cons_result (mark_results res, traverse_apply_results rest)
   in
-  mark_contents_list results
-  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
+  traverse_apply_results results
 
 type apply_mode =
   | Application of {

@@ -27,6 +27,8 @@
     contracts. *)
 
 type error +=
+  | (* `Temporary *)
+      Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.t * Z.t * Z.t
   | (* `Temporary *)
@@ -35,6 +37,8 @@ type error +=
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *) Failure of string
+  | (* `Branch *)
+      Empty_implicit_contract of Signature.Public_key_hash.t
 
 (** [allocated ctxt contract] returns [true] if and only if the
    contract is stored in [Storage.Contract.Balance]. *)
@@ -137,7 +141,7 @@ val spend_only_call_from_token :
 (** [raw_originate ctxt ~prepaid_bootstrap_storage contract ~script]
     originates the [contract] parameter. The [storage] space allocated by this
     origination is considered to be free of charge or to have been already paid
-    for by the user, if and only if [prepaid_bootstrap_storage] is [true]. In 
+    for by the user, if and only if [prepaid_bootstrap_storage] is [true]. In
     particular, the amount of space allocated by this origination will be part
     of the consumed space to pay for returned by the next call to
     [Fees_storage.record_paid_storage_space ctxt contract], if and only if

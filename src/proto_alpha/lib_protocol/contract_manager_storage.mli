@@ -46,7 +46,24 @@ val init :
 val is_manager_key_revealed :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
+(** [check_publick_key pk pkh] asserts that the provided [pk] is
+   consistent with the expected public key hash [pkh], otherwise
+   fails with an [Inconsistent_hash] error. *)
+val check_public_key :
+  Signature.Public_key.t -> Signature.Public_key_hash.t -> unit tzresult
+
+(** [reveal_manager_key ?check_consistency ctxt manager pk] reveals
+   the public key [pk] for a given unrevealed [manager]. If the
+   optional [?check_consistency] flag is set (and it is set by
+   default), it will re-check the same consistency checks than
+   [check_public_key] above, otherwise it will assume [manager] is
+   indeed the hash of [pk]. It is expected to fail with
+   [Previously_revealed_key contract] if [manager] was already
+   revealed, and with [Inconsistent_hash] if the (unrevealed) [manager]
+   doesn't match the expected hash of the implicit contract associated
+   to [pk]. *)
 val reveal_manager_key :
+  ?check_consistency:bool ->
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Signature.Public_key.t ->

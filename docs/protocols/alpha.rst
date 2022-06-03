@@ -20,6 +20,9 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!4933`, :gl:`!4812`)
 Breaking Changes
 ----------------
 
+- Reveal operations can only occur at the head of a manager operation
+  batch (MR :gl:`!5182`).
+
 RPC Changes
 -----------
 
@@ -37,6 +40,10 @@ RPC Changes
 
 Bug Fixes
 ---------
+
+- Restore *all-or-nothing* semantics of manager operation batches by
+  enforcing that failing reveal operations do not take effect (MR
+  :gl:`!5182`).
 
 Minor Changes
 -------------

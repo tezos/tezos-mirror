@@ -1079,7 +1079,8 @@ end
 
 module Reveal = struct
   (* This auxiliary function forges and injects a batched operation
-     made of two revelations pk1 and pk2. The tx is signed by the given key. *)
+     made of two revelations pk1 and pk2. The transaction is signed by
+     the given key. *)
   let mk_reveal_twice {client; _} key pk1 pk2 =
     let* cpt = Operation.get_counter client ~source:key in
     let s1 = {key with Account.public_key = pk1} in
@@ -1139,22 +1140,42 @@ module Reveal = struct
     in
     unit
 
-  let revealed_twice_in_batch =
+  let revealed_twice_in_batch ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Correct public key revealed twice in a batch"
       ~tags:["reveal"; "revelation"; "batch"]
+      ~supports
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
     Log.section "Make the revelation" ;
     let* _ =
-      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      decide_error nodes @@ fun () ->
       mk_reveal_twice nodes.main key key.public_key key.public_key
     in
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
 
+  (* After the work in !5182, which enforces that reveal operations
+      can only be placed at the head of the batch, this test should
+      fail with a permanent, Apply.Incorrect_reveal_position error (see
+      #2774). For Ithaca and Jakarta, we leave the original behaviour
+      which resulted in an Branch Refused error. *)
+  let revealed_twice_in_batch protocols =
+    revealed_twice_in_batch
+      ~supports:(Protocol.Until_protocol 13)
+      (Memchecks.with_branch_refused_checks ~__LOC__)
+      protocols ;
+    revealed_twice_in_batch
+      ~supports:(Protocol.From_protocol 14)
+      (Memchecks.with_refused_checks ~__LOC__)
+      protocols
+
+  (* After the work in !5182, which enforces that reveal operations
+     can only be placed at the head of the batch, this test should
+     fail with a permanent, Apply.Incorrect_reveal_position error (see
+     #2774). *)
   let revealed_twice_in_batch_bad_first_key =
     Protocol.register_test
       ~__FILE__
@@ -1175,17 +1196,18 @@ module Reveal = struct
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
 
-  let revealed_twice_in_batch_bad_second_key =
+  let revealed_twice_in_batch_bad_second_key ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Two reveals in a batch. Second key is wrong"
       ~tags:["reveal"; "revelation"]
+      ~supports
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
     Log.section "Make the revelation" ;
     let* _ =
-      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      decide_error nodes @@ fun () ->
       mk_reveal_twice
         nodes.main
         key
@@ -1194,6 +1216,21 @@ module Reveal = struct
     in
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  (* After the work in !5182, which enforces that reveal operations
+     can only be placed at the head of the batch, this test should
+     fail with a permanent, Apply.Incorrect_reveal_position error (see
+     #2774). For Ithaca and Jakarta, we leave the original behaviour
+     which resulted in an Branch Refused error. *)
+  let revealed_twice_in_batch_bad_second_key protocols =
+    revealed_twice_in_batch_bad_second_key
+      ~supports:(Protocol.Until_protocol 13)
+      (Memchecks.with_branch_refused_checks ~__LOC__)
+      protocols ;
+    revealed_twice_in_batch_bad_second_key
+      ~supports:(Protocol.From_protocol 14)
+      (Memchecks.with_refused_checks ~__LOC__)
+      protocols
 
   let register ~protocols =
     simple_reveal_bad_pk protocols ;
