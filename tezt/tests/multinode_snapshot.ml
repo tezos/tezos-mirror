@@ -47,7 +47,7 @@ let retained_cycles = 8
 let node_arguments = Node.[Synchronisation_threshold 0]
 
 let get_head_max_op_ttl node =
-  let* head = RPC.call node @@ RPC.get_block_metadata () in
+  let* head = RPC.call node @@ RPC.get_chain_block_metadata () in
   return JSON.(head |-> "max_operations_ttl" |> as_int)
 
 (*
@@ -165,12 +165,18 @@ let test_storage_snapshot =
   (* expected ones after a snapshot import. *)
   let node_consistency_after_import node ~expected_level ~expected_checkpoint
       ~expected_savepoint ~expected_caboose =
-    let* block_head = RPC.call node @@ RPC.get_block () in
+    let* block_head = RPC.call node @@ RPC.get_chain_block () in
     let level = JSON.(block_head |-> "header" |-> "level" |> as_int) in
 
-    let* {level = checkpoint; _} = RPC.call node @@ RPC.get_checkpoint () in
-    let* {level = savepoint; _} = RPC.call node @@ RPC.get_savepoint () in
-    let* {level = caboose; _} = RPC.call node @@ RPC.get_caboose () in
+    let* {level = checkpoint; _} =
+      RPC.call node @@ RPC.get_chain_level_checkpoint ()
+    in
+    let* {level = savepoint; _} =
+      RPC.call node @@ RPC.get_chain_level_savepoint ()
+    in
+    let* {level = caboose; _} =
+      RPC.call node @@ RPC.get_chain_level_caboose ()
+    in
     Check.((level = expected_level) int)
       ~error_msg:"expected level = %R, got %L" ;
     Check.((checkpoint = expected_checkpoint) int)
@@ -180,7 +186,7 @@ let test_storage_snapshot =
     Check.((caboose = expected_caboose) int)
       ~error_msg:"expected caboose = %R, got %L" ;
     (* Check that the metadata of genesis is available *)
-    let* (_ : JSON.t) = RPC.call node @@ RPC.get_block ~block:"0" () in
+    let* (_ : JSON.t) = RPC.call node @@ RPC.get_chain_block ~block:"0" () in
     unit
   in
 
@@ -196,13 +202,15 @@ let test_storage_snapshot =
   (* - blocks from the savepoint (included) have metadata. *)
   let full_node_blocks_availability node ~savepoint ~head_level =
     (* The metadata of genesis is available *)
-    let* (_ : JSON.t) = RPC.call node @@ RPC.get_block ~block:"0" () in
+    let* (_ : JSON.t) = RPC.call node @@ RPC.get_chain_block ~block:"0" () in
     let* () =
       iter_block_range_s 1 (savepoint - 1) @@ fun block ->
-      let* (_ : JSON.t) = RPC.call node @@ RPC.get_block_header ~block () in
+      let* (_ : JSON.t) =
+        RPC.call node @@ RPC.get_chain_block_header ~block ()
+      in
       (* Expect failure *)
       let* {body; code} =
-        RPC.call_json node @@ RPC.get_block_metadata ~block ()
+        RPC.call_json node @@ RPC.get_chain_block_metadata ~block ()
       in
       (* In the client, attempting to retrieve missing metadata outputs:
 
@@ -219,7 +227,9 @@ let test_storage_snapshot =
       unit
     in
     iter_block_range_s savepoint head_level @@ fun block ->
-    let* (_ : JSON.t) = RPC.call node @@ RPC.get_block_metadata ~block () in
+    let* (_ : JSON.t) =
+      RPC.call node @@ RPC.get_chain_block_metadata ~block ()
+    in
     unit
   in
 
@@ -232,11 +242,11 @@ let test_storage_snapshot =
   (*  - blocks after the savepoint (included) have metadata. *)
   let rolling_node_blocks_availability node ~savepoint ~caboose ~head_level =
     (* the metadata of genesis is available *)
-    let* (_ : JSON.t) = RPC.call node @@ RPC.get_block ~block:"0" () in
+    let* (_ : JSON.t) = RPC.call node @@ RPC.get_chain_block ~block:"0" () in
     let* () =
       if caboose <> 0 then (
         iter_block_range_s 1 (caboose - 1) @@ fun block ->
-        let* {code; _} = RPC.call_raw node @@ RPC.get_block ~block () in
+        let* {code; _} = RPC.call_raw node @@ RPC.get_chain_block ~block () in
         (* In the client, attempting to retrieve an unknown block outputs:
 
              Did not find service
@@ -250,7 +260,7 @@ let test_storage_snapshot =
       else unit
     in
     iter_block_range_s (savepoint + 1) head_level @@ fun block ->
-    let* (_ : JSON.t) = RPC.call node @@ RPC.get_block_header ~block () in
+    let* (_ : JSON.t) = RPC.call node @@ RPC.get_chain_block_header ~block () in
     unit
   in
 

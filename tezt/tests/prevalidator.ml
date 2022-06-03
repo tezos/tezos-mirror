@@ -2012,7 +2012,7 @@ module Revamped = struct
       RPC.(
         Client.spawn
           client
-          (private_injection_operations
+          (post_private_injection_operations
              ~ops:[List.nth ops 0; List.nth ops 1]
              ()))
     in
@@ -2031,7 +2031,7 @@ module Revamped = struct
       RPC.(
         call
           node
-          (private_injection_operations
+          (post_private_injection_operations
              ~ops:[List.nth ops 2; List.nth ops 3]
              ()))
     in
@@ -2047,7 +2047,7 @@ module Revamped = struct
       RPC.(
         call
           node
-          (private_injection_operations
+          (post_private_injection_operations
              ~force:true
              ~ops:[List.nth ops 0; List.nth ops 4]
              ()))

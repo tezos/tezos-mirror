@@ -171,7 +171,7 @@ let rec wait_pred ~pred ~arg =
 (* [get_nb_connections ~client] returns the number of active connections of the
    node  to [client]. *)
 let get_nb_connections node =
-  let* ports = RPC.call node RPC.get_connections in
+  let* ports = RPC.call node RPC.get_network_connections in
   return @@ List.length ports
 
 (* [wait_connections ~client n] waits until the node related to [client] has at

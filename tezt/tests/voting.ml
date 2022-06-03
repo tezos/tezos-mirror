@@ -211,7 +211,7 @@ let check_protocols ?level client expected_protocols =
   let open Lwt.Infix in
   let* {protocol; next_protocol} =
     RPC.Client.call client
-    @@ RPC.get_block_metadata ?block:(Option.map string_of_int level) ()
+    @@ RPC.get_chain_block_metadata ?block:(Option.map string_of_int level) ()
     >|= parse_block_metadata
   in
   Check.(

@@ -51,7 +51,9 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
   in
   let* non_migration_block =
     RPC.Client.call client
-    @@ RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) ()
+    @@ RPC.get_chain_block_metadata
+         ~block:(string_of_int (migration_level - 1))
+         ()
   in
   let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
   Log.info "checking consistency of block at level %d" (migration_level - 1) ;
@@ -69,7 +71,7 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
   Log.info "checking consistency of block at level %d" migration_level ;
   let* migration_block =
     RPC.Client.call client
-    @@ RPC.get_block_metadata ~block:(string_of_int migration_level) ()
+    @@ RPC.get_chain_block_metadata ~block:(string_of_int migration_level) ()
   in
   let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Check.(
@@ -88,7 +90,9 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
     (migration_level - 1) ;
   let* non_migration_block =
     RPC.Client.call client
-    @@ RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) ()
+    @@ RPC.get_chain_block_metadata
+         ~block:(string_of_int (migration_level - 1))
+         ()
   in
   let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
   Check.(

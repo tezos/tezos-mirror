@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let is_connected node ~peer_id =
-  let* response = RPC.get_connection peer_id |> RPC.call_raw node in
+  let* response = RPC.get_network_connection peer_id |> RPC.call_raw node in
   match response.code with
   | 200 -> return true
   | 404 -> return false
@@ -264,7 +264,8 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
     match hmode1 with
     | Full _ ->
         let* {level = savepoint; _} =
-          RPC.Client.call ~endpoint:endpoint_1 client @@ RPC.get_checkpoint ()
+          RPC.Client.call ~endpoint:endpoint_1 client
+          @@ RPC.get_chain_level_checkpoint ()
         in
         if savepoint <= bakes_before_kill then
           Test.fail
@@ -274,7 +275,8 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
         return ()
     | Rolling _ ->
         let* {level = caboose; _} =
-          RPC.Client.call ~endpoint:endpoint_1 client @@ RPC.get_caboose ()
+          RPC.Client.call ~endpoint:endpoint_1 client
+          @@ RPC.get_chain_level_caboose ()
         in
         if caboose <= bakes_before_kill then
           Test.fail
