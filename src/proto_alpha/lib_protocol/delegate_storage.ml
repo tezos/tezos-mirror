@@ -31,7 +31,6 @@ type error +=
   | (* `Temporary *) Current_delegate
   | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
-  | (* `Temporary *) Not_registered of Signature.Public_key_hash.t
 
 let () =
   register_error_kind
@@ -100,26 +99,7 @@ let () =
         k)
     Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
     (function Unregistered_delegate k -> Some k | _ -> None)
-    (fun k -> Unregistered_delegate k) ;
-  register_error_kind
-    `Temporary
-    ~id:"delegate.not_registered"
-    ~title:"Not a registered delegate"
-    ~description:
-      "The provided public key hash is not the address of a registered \
-       delegate."
-    ~pp:(fun ppf pkh ->
-      Format.fprintf
-        ppf
-        "The provided public key hash (%a) is not the address of a registered \
-         delegate. If you own this account and want to register it as a \
-         delegate, use a delegation operation to delegate the account to \
-         itself."
-        Signature.Public_key_hash.pp
-        pkh)
-    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
-    (function Not_registered pkh -> Some pkh | _ -> None)
-    (fun pkh -> Not_registered pkh)
+    (fun k -> Unregistered_delegate k)
 
 let set_inactive ctxt delegate =
   Delegate_activation_storage.set_inactive ctxt delegate >>= fun ctxt ->
@@ -211,13 +191,6 @@ let set c contract delegate =
         if self_delegation then
           Storage.Delegates.add c delegate >>= fun c -> set_active c delegate
         else return c
-
-(* The fact that this succeeds iff [registered ctxt pkh] returns true is an
-   invariant of the [set] function. *)
-let check_delegate ctxt pkh =
-  Storage.Delegates.mem ctxt pkh >>= function
-  | true -> return_unit
-  | false -> fail (Not_registered pkh)
 
 let fold = Storage.Delegates.fold
 

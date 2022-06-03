@@ -40,7 +40,6 @@ type error +=
   | (* `Temporary *) Current_delegate
   | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
-  | (* `Temporary *) Not_registered of Signature.Public_key_hash.t
 
 val set_active :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
@@ -64,10 +63,6 @@ val set :
   Contract_repr.t ->
   Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
-
-(** Check that a given implicit account is a registered delegate. *)
-val check_delegate :
-  Raw_context.t -> Signature.Public_key_hash.t -> unit tzresult Lwt.t
 
 (** Iterate on all registered delegates. *)
 val fold :
