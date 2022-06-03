@@ -23,9 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Octez RPCs. *)
+
+(** [RPC_core] contains functions to declare and call RPCs.
+    It does not contain any RPC definition: those are in this module. *)
 include module type of RPC_core
 
+(** [RPC_legacy] contains RPCs implemented using a deprecated approach
+    that does not allow to use cohttp. If you need to call functions
+    from [RPC_legacy], it is recommended to port them to this module
+    in order to be able to use cohttp, which is more efficient than using
+    the client. *)
 include module type of RPC_legacy
+
+(** {2 Naming Conventions} *)
+
+(** Functions in this module are named after the RPC they implement.
+
+    - The name starts with the HTTP verb, in lowercase, followed by an underscore.
+      E.g. [get_] for GET, [patch_] for PATCH, [delete_] for DELETE, etc.
+
+    - Then the name contains all constant parts of the endpoint path,
+      separated by underscores.
+      E.g. [chain_levels_caboose] for [GET /chain/[chain]/levels/caboose].
+      The dynamic part [[chain]] is dropped (it becomes an argument of the function).
+
+    - When a word is plural, it becomes singular if the RPC selects one element.
+      For instance, [GET /network/connections] becomes [get_network_connections]
+      because it returns all elements of the list, but [GET /network/connections/<peer_id>]
+      becomes [get_network_connection] because it returns only one connection.
+      This allows to differentiate the two RPCs.
+      Another example is [GET /chain/[chain]/blocks/[block]/metadata] which becomes
+      [get_chain_block_metadata] since it selects one block.
+
+    - Submodules are not used. Do not group all [/network] RPCs in a [Network]
+      submodule for instance. *)
+
+(** {2 RPC Definitions} *)
 
 (** RPC: [GET /network/connections]
 
