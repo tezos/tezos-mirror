@@ -795,3 +795,27 @@ val sc_rollup_atomic_batch :
     tztrace )
   result
   Lwt.t
+
+val sc_rollup_return_bond :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
+  source:Signature.public_key_hash ->
+  src_pk:Signature.public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  sc_rollup:Sc_rollup.t ->
+  unit ->
+  (Operation_hash.t
+  * Kind.sc_rollup_return_bond Kind.manager contents
+  * Kind.sc_rollup_return_bond Kind.manager Apply_results.contents_result)
+  tzresult
+  Lwt.t

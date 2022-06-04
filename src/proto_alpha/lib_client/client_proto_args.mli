@@ -239,5 +239,13 @@ module Tx_rollup : sig
     (Tx_rollup_inbox.Merkle.root -> 'a, full) Clic.params
 end
 
+module Sc_rollup_params : sig
+  val sc_rollup_address_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Alpha_context.Sc_rollup.t -> 'a, full) Clic.params
+end
+
 val fee_parameter_args :
   (Injection.fee_parameter, Protocol_client_context.full) Clic.arg

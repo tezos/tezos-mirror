@@ -882,6 +882,30 @@ module Tx_rollup = struct
       next
 end
 
+module Sc_rollup_params = struct
+  let sc_rollup_address_parameter =
+    Clic.parameter (fun _ s ->
+        match Alpha_context.Sc_rollup.Address.of_b58check_opt s with
+        | Some c -> return c
+        | None ->
+            failwith
+              "Parameter '%s' is an invalid smart contract rollup address \
+               encoded in a base58 string."
+              s)
+
+  let sc_rollup_address_param ?(name = "smart contract rollup address") ~usage
+      next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Smart contract rollup address encoded in a base58 \
+            string.@]@]"
+           usage)
+      sc_rollup_address_parameter
+      next
+end
+
 let fee_parameter_args =
   let open Clic in
   let force_low_fee_arg =
