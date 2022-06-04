@@ -44,3 +44,157 @@ docker:promote_to_latest:
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     - ./scripts/ci/docker_promote_to_latest.sh
+
+#
+# Templates for building deb & rpm packages.
+#
+
+.build_deb_packages:
+  stage: publish_release
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-package:branch-staging-docker-ubuntu@sha256:fcaefc1954a2df5e5a74fa55802738e7a928f4d9d1f06c817bc4e3494b24926c
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  variables:
+    TEZOS_PACKAGING_VERSION: "build-from-binaries"
+    TEZOS_PACKAGING_REPO: "https://gitlab.com/nomadic-labs/tezos-packaging"
+    ROLE_ARN: "arn:aws:iam::623103086665:role/octez-packaging-bucket-writer"
+    OCTEZ_DEB_BUCKET: "octez-deb-pkgs"
+    AWS_BUCKET_REGION: "eu-west-1"
+    PACKAGE_FORMAT: "deb"
+  script:
+    - ./scripts/ci/create_linux_package.sh
+    - ./scripts/ci/upload_linux_package.sh
+
+.build_rpm_packages:
+  stage: publish_release
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-package:branch-staging-docker-fedora@sha256:d1cd1905a60b96741feecb6e50aa191a992af38d416dd515e0625f994ad0dd38
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  variables:
+    TEZOS_PACKAGING_VERSION: "build-from-binaries"
+    TEZOS_PACKAGING_REPO: "https://gitlab.com/nomadic-labs/tezos-packaging"
+    ROLE_ARN: "arn:aws:iam::623103086665:role/octez-packaging-bucket-writer"
+    OCTEZ_RPM_BUCKET: "octez-rpm-pkgs"
+    AWS_BUCKET_REGION: "eu-west-1"
+    PACKAGE_FORMAT: "rpm"
+  script:
+    - ./scripts/ci/create_linux_package.sh
+    - ./scripts/ci/upload_linux_package.sh
+
+build:rpm-packages-unstable-amd64-test:
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  extends:
+    - .rules_template__not_on_latest_release
+    - .build_rpm_packages
+  variables:
+    ARCH: "amd64"
+    CODENAME: "unstable"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+
+build:deb-packages-unstable-amd64-test:
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  extends:
+    - .rules_template__not_on_latest_release
+    - .build_deb_packages
+  variables:
+    ARCH: "amd64"
+    CODENAME: "unstable"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+
+#
+# RPM packages
+#
+
+build:rpm-packages-unstable-amd64:
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  extends:
+    - .rules_template__master
+    - .build_rpm_packages
+  variables:
+    ARCH: "amd64"
+    CODENAME: "unstable"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+
+build:rpm-packages-stable-amd64:
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  extends:
+    - .rules_template__release_tag
+    - .build_rpm_packages
+  variables:
+    ARCH: "amd64"
+    CODENAME: "stable"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+
+build:rpm-packages-unstable-arm64:
+  needs:
+    - "build:static-arm64-linux-binaries"
+  extends:
+    - .rules_template__master
+    - .build_rpm_packages
+  variables:
+    ARCH: "aarch64"
+    CODENAME: "unstable"
+    TEZOS_BINARIES: "tezos-binaries/arm64"
+
+build:rpm-packages-stable-arm64:
+  needs:
+    - "build:static-arm64-linux-binaries"
+  extends:
+    - .rules_template__release_tag
+    - .build_rpm_packages
+  variables:
+    ARCH: "aarch64"
+    CODENAME: "stable"
+    TEZOS_BINARIES: "tezos-binaries/arm64"
+
+#
+# Deb packages
+#
+
+build:deb-packages-unstable-amd64:
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  extends:
+    - .rules_template__master
+    - .build_deb_packages
+  variables:
+    ARCH: "amd64"
+    CODENAME: "unstable"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+
+build:deb-packages-stable-amd64:
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  extends:
+    - .rules_template__release_tag
+    - .build_deb_packages
+  variables:
+    ARCH: "amd64"
+    CODENAME: "stable"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+
+build:deb-packages-unstable-arm64:
+  needs:
+    - "build:static-arm64-linux-binaries"
+  extends:
+    - .rules_template__master
+    - .build_deb_packages
+  variables:
+    ARCH: "aarch64"
+    CODENAME: "unstable"
+    TEZOS_BINARIES: "tezos-binaries/arm64"
+
+build:deb-packages-stable-arm64:
+  needs:
+    - "build:static-arm64-linux-binaries"
+  extends:
+    - .rules_template__release_tag
+    - .build_deb_packages
+  variables:
+    ARCH: "aarch64"
+    CODENAME: "stable"
+    TEZOS_BINARIES: "tezos-binaries/arm64"
