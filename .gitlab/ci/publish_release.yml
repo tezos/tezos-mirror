@@ -44,3 +44,96 @@ docker:promote_to_latest:
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     - ./scripts/ci/docker_promote_to_latest.sh
+
+#
+# Templates for building deb & rpm packages.
+#
+# The AWS resources used for the packaging are managed on https://gitlab.com/nomadic-labs/iac/terraform/octez-packaging
+#
+# Specifically we use 2 S3 buckets to host the deb and rpm packages and one IAM role which has the ability to
+# push changes. The jobs use the OpenID protocol to connect to AWS, receive temporary credentials and assume
+# the IAM role.
+#
+# Details can be found on the following links:
+# - https://docs.gitlab.com/ee/ci/cloud_services/index.html#configure-a-conditional-role-with-oidc-claims
+# - https://docs.gitlab.com/ee/ci/cloud_services/aws/index.html
+
+.build_deb_packages:
+  stage: publish_release
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-package:latest-ubuntu@sha256:76c894f509b84e106c9d056882c63cb497a2778f7c7dbbd1c73abe2568ee446e
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  variables:
+    TEZOS_PACKAGING_VERSION: "872ac62526c49bd59b8621ee06c066141e940dbd"
+    TEZOS_PACKAGING_REPO: "https://github.com/serokell/tezos-packaging"
+    TEZOS_LICENSE_VERSION: "master"
+    ROLE_ARN: "arn:aws:iam::623103086665:role/octez-packaging-bucket-writer"
+    OCTEZ_DEB_BUCKET: "octez-deb-pkgs"
+    AWS_BUCKET_REGION: "eu-west-1"
+    PACKAGE_FORMAT: "deb"
+    ARCH: "amd64"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+  script:
+    - ./scripts/ci/create_linux_package.sh
+    - ./scripts/ci/upload_linux_package.sh
+
+.build_rpm_packages:
+  stage: publish_release
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-package:latest-fedora@sha256:35bfacc001e4c5247679e2f79c36ab1c83bd893a1e909c5c1afd1beff44c6895
+  needs:
+    - "build:static-x86_64-linux-binaries"
+  variables:
+    TEZOS_PACKAGING_VERSION: "872ac62526c49bd59b8621ee06c066141e940dbd"
+    TEZOS_PACKAGING_REPO: "https://github.com/serokell/tezos-packaging"
+    TEZOS_LICENSE_VERSION: "master"
+    ROLE_ARN: "arn:aws:iam::623103086665:role/octez-packaging-bucket-writer"
+    OCTEZ_RPM_BUCKET: "octez-rpm-pkgs"
+    AWS_BUCKET_REGION: "eu-west-1"
+    PACKAGE_FORMAT: "rpm"
+    ARCH: "amd64"
+    TEZOS_BINARIES: "tezos-binaries/x86_64"
+  script:
+    - ./scripts/ci/create_linux_package.sh
+    - ./scripts/ci/upload_linux_package.sh
+
+#
+# RPM packages
+#
+
+rpm-packages-unstable-amd64:
+  extends:
+    - .rules_template__master
+    - .build_rpm_packages
+  variables:
+    CODENAME: "unstable"
+    TEZOS_VERSION: v0.0+$CI_COMMIT_SHORT_SHA
+
+rpm-packages-stable-amd64:
+  extends:
+    - .rules_template__release_tag
+    - .build_rpm_packages
+  variables:
+    CODENAME: "stable"
+  before_script:
+    - export TEZOS_VERSION=$(git tag --points-at HEAD | grep -oE '^v[0-9]{1,3}\.[0-9]{1,3}$' ||:)
+
+#
+# Deb packages
+#
+
+deb-packages-unstable-amd64:
+  extends:
+    - .rules_template__master
+    - .build_deb_packages
+  variables:
+    CODENAME: "unstable"
+    TEZOS_VERSION: v0.0+$CI_COMMIT_SHORT_SHA
+
+deb-packages-stable-amd64:
+  extends:
+    - .rules_template__release_tag
+    - .build_deb_packages
+  variables:
+    CODENAME: "stable"
+  before_script:
+    - export TEZOS_VERSION=$(git tag --points-at HEAD | grep -oE '^v[0-9]{1,3}\.[0-9]{1,3}$' ||:)
