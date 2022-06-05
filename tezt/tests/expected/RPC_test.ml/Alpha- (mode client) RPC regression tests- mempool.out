@@ -6085,13 +6085,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           },
                           {
-                            "title": "Sc_rollup_atomic_batch",
+                            "title": "Sc_rollup_execute_outbox_message",
                             "type": "object",
                             "properties": {
                               "kind": {
                                 "type": "string",
                                 "enum": [
-                                  "sc_rollup_atomic_batch"
+                                  "sc_rollup_execute_outbox_message"
                                 ]
                               },
                               "source": {
@@ -6128,12 +6128,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "inclusion proof": {
                                 "$ref": "#/definitions/unistring"
                               },
-                              "atomic_transaction_batch": {
+                              "message": {
                                 "$ref": "#/definitions/unistring"
                               }
                             },
                             "required": [
-                              "atomic_transaction_batch",
+                              "message",
                               "inclusion proof",
                               "message_index",
                               "outbox_level",
@@ -10441,7 +10441,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "size": "Uint30"
                                 },
                                 {
-                                  "name": "atomic_transaction_batch",
+                                  "name": "message",
                                   "layout": {
                                     "kind": "String"
                                   },
@@ -10451,7 +10451,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 }
                               ],
-                              "name": "Sc_rollup_atomic_batch"
+                              "name": "Sc_rollup_execute_outbox_message"
                             },
                             {
                               "tag": 207,
@@ -21557,13 +21557,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           },
                           {
-                            "title": "Sc_rollup_atomic_batch",
+                            "title": "Sc_rollup_execute_outbox_message",
                             "type": "object",
                             "properties": {
                               "kind": {
                                 "type": "string",
                                 "enum": [
-                                  "sc_rollup_atomic_batch"
+                                  "sc_rollup_execute_outbox_message"
                                 ]
                               },
                               "source": {
@@ -21600,12 +21600,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "inclusion proof": {
                                 "$ref": "#/definitions/unistring"
                               },
-                              "atomic_transaction_batch": {
+                              "message": {
                                 "$ref": "#/definitions/unistring"
                               }
                             },
                             "required": [
-                              "atomic_transaction_batch",
+                              "message",
                               "inclusion proof",
                               "message_index",
                               "outbox_level",
