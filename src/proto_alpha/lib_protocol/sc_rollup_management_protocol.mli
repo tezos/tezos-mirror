@@ -45,7 +45,7 @@ type error += (* Permanent *) Sc_rollup_invalid_destination
 (** A type representing a Layer 2 to Layer 1 transaction. *)
 type transaction = private
   | Transaction : {
-      destination : Destination.t;
+      destination : Contract_hash.t;
       entrypoint : Entrypoint.t;
       parameters_ty : ('a, _) Script_typed_ir.ty;
       parameters : 'a;
@@ -88,7 +88,7 @@ module Internal_for_tests : sig
     context ->
     ('a, _) Script_typed_ir.ty ->
     parameters:'a ->
-    destination:Destination.t ->
+    destination:Contract_hash.t ->
     entrypoint:Entrypoint.t ->
     (transaction * context) tzresult Lwt.t
 

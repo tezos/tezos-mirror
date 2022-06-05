@@ -42,7 +42,7 @@ let () =
 
 type transaction =
   | Transaction : {
-      destination : Destination.t;
+      destination : Contract_hash.t;
       entrypoint : Entrypoint.t;
       parameters_ty : ('a, _) Script_typed_ir.ty;
       parameters : 'a;
@@ -71,19 +71,10 @@ let transactions_batch_of_internal ctxt transactions =
   let or_internal_transaction ctxt
       {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint} =
     (* Lookup the contract-hash. *)
-    let*? contract_hash =
-      match destination with
-      | Destination.Contract (Contract.Implicit _)
-      | Destination.Sc_rollup _ | Destination.Tx_rollup _ ->
-          (* Only smart-contract destinations are currently supported. *)
-          error Sc_rollup_invalid_destination
-      | Destination.Contract (Contract.Originated contract_hash) ->
-          ok contract_hash
-    in
     (* Load the type and entrypoints of the script. *)
     let* ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
            ctxt ) =
-      let* ctxt, _cache_key, cached = Script_cache.find ctxt contract_hash in
+      let* ctxt, _cache_key, cached = Script_cache.find ctxt destination in
       match cached with
       | Some (_script, ex_script) -> return (ex_script, ctxt)
       | None -> fail Sc_rollup_invalid_destination

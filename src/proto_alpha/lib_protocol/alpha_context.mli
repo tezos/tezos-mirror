@@ -2464,7 +2464,7 @@ module Vote : sig
 end
 
 (** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
-module rec Sc_rollup : sig
+module Sc_rollup : sig
   (** See {!Sc_rollup_tick_repr}. *)
   module Tick : sig
     type t
@@ -2918,7 +2918,7 @@ module rec Sc_rollup : sig
     module Message : sig
       type transaction = {
         unparsed_parameters : Script.expr;
-        destination : Destination.t;
+        destination : Contract_hash.t;
         entrypoint : Entrypoint.t;
       }
 
@@ -2945,7 +2945,7 @@ module rec Sc_rollup : sig
 end
 
 (** This simply re-exports {!Destination_repr}. *)
-and Destination : sig
+module Destination : sig
   type t =
     | Contract of Contract.t
     | Tx_rollup of Tx_rollup.t

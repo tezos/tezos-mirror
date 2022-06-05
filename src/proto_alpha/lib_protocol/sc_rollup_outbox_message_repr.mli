@@ -38,7 +38,7 @@
 (** A transaction from L2 to L1. *)
 type transaction = {
   unparsed_parameters : Script_repr.expr;  (** The payload. *)
-  destination : Destination_repr.t;  (** The recipient contract or rollup. *)
+  destination : Contract_hash.t;  (** The recipient contract. *)
   entrypoint : Entrypoint_repr.t;  (** Entrypoint of the destination. *)
 }
 

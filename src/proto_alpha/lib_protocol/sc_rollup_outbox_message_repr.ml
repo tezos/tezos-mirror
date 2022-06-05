@@ -56,7 +56,7 @@ let () =
 
 type transaction = {
   unparsed_parameters : Script_repr.expr;  (** The payload. *)
-  destination : Destination_repr.t;  (** The recipient contract or rollup. *)
+  destination : Contract_hash.t;  (** The recipient contract. *)
   entrypoint : Entrypoint_repr.t;  (** Entrypoint of the destination. *)
 }
 
@@ -75,7 +75,7 @@ let transaction_encoding =
       {unparsed_parameters; destination; entrypoint})
   @@ obj3
        (req "parameters" Script_repr.expr_encoding)
-       (req "destination" Destination_repr.encoding)
+       (req "destination" Contract_repr.originated_encoding)
        (req "entrypoint" Entrypoint_repr.simple_encoding)
 
 let encoding =
