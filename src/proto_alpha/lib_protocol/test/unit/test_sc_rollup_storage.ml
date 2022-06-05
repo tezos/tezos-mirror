@@ -521,6 +521,111 @@ let test_withdraw_and_cement () =
   in
   assert_true ctxt
 
+let test_refine_commitment_different_stakers () =
+  let* ctxt, rollup, staker1, staker2 =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let level = valid_inbox_level ctxt in
+  let commitment1 =
+    Commitment_repr.
+      {
+        predecessor = Commitment_repr.Hash.zero;
+        inbox_level = level 1l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* c1, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker1
+         commitment1
+  in
+  let commitment2 =
+    Commitment_repr.
+      {
+        predecessor = c1;
+        inbox_level = level 2l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker2
+         commitment2
+  in
+  assert_true ctxt
+
+let test_refine_stake_twice_different_stakers () =
+  let* ctxt, rollup, staker1, staker2 =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let level = valid_inbox_level ctxt in
+  let commitment =
+    Commitment_repr.
+      {
+        predecessor = Commitment_repr.Hash.zero;
+        inbox_level = level 1l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _c, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker1
+         commitment
+  in
+  let* ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker2
+         commitment
+  in
+  assert_true ctxt
+
+let test_refine_stake_twice_same_staker () =
+  let* ctxt, rollup, staker = originate_rollup_and_deposit_with_one_staker () in
+  let commitment =
+    Commitment_repr.
+      {
+        predecessor = Commitment_repr.Hash.zero;
+        inbox_level = valid_inbox_level ctxt 1l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _c1, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment
+  in
+  assert_fails_with
+    ~loc:__LOC__
+    (Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+       ctxt
+       rollup
+       staker
+       commitment)
+    Sc_rollup_errors.Sc_rollup_staker_backtracked
+
 let test_deposit_then_publish () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
@@ -2460,6 +2565,18 @@ let tests =
       "withdraw stake of another staker before cementing"
       `Quick
       test_withdraw_and_cement;
+    Tztest.tztest
+      "refine a commitment published by another staker is allowed"
+      `Quick
+      test_refine_stake_twice_different_stakers;
+    Tztest.tztest
+      "Different stakers staking on same commitment is allowed"
+      `Quick
+      test_refine_commitment_different_stakers;
+    Tztest.tztest
+      "staking twice on same commitment from same staker is not allowed"
+      `Quick
+      test_refine_stake_twice_same_staker;
     Tztest.tztest "stake then publish" `Quick test_deposit_then_publish;
     Tztest.tztest "publish with no rollup" `Quick test_publish_missing_rollup;
     Tztest.tztest
