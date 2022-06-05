@@ -106,7 +106,8 @@ module Kind = struct
 
   type sc_rollup_timeout = Sc_rollup_timeout_kind
 
-  type sc_rollup_atomic_batch = Sc_rollup_atomic_batch_kind
+  type sc_rollup_execute_outbox_message =
+    | Sc_rollup_execute_outbox_message_kind
 
   type sc_rollup_return_bond = Sc_rollup_return_bond_kind
 
@@ -136,7 +137,8 @@ module Kind = struct
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
     | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
-    | Sc_rollup_atomic_batch_manager_kind : sc_rollup_atomic_batch manager
+    | Sc_rollup_execute_outbox_message_manager_kind
+        : sc_rollup_execute_outbox_message manager
     | Sc_rollup_return_bond_manager_kind : sc_rollup_return_bond manager
 end
 
@@ -417,15 +419,15 @@ and _ manager_operation =
       stakers : Sc_rollup_game_repr.Index.t;
     }
       -> Kind.sc_rollup_timeout manager_operation
-  | Sc_rollup_atomic_batch : {
+  | Sc_rollup_execute_outbox_message : {
       rollup : Sc_rollup_repr.t;
       cemented_commitment : Sc_rollup_commitment_repr.Hash.t;
       outbox_level : Raw_level_repr.t;
       message_index : int;
       inclusion_proof : string;
-      atomic_transaction_batch : string;
+      message : string;
     }
-      -> Kind.sc_rollup_atomic_batch manager_operation
+      -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_return_bond : {
       sc_rollup : Sc_rollup_repr.t;
     }
@@ -459,7 +461,8 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_publish _ -> Kind.Sc_rollup_publish_manager_kind
   | Sc_rollup_refute _ -> Kind.Sc_rollup_refute_manager_kind
   | Sc_rollup_timeout _ -> Kind.Sc_rollup_timeout_manager_kind
-  | Sc_rollup_atomic_batch _ -> Kind.Sc_rollup_atomic_batch_manager_kind
+  | Sc_rollup_execute_outbox_message _ ->
+      Kind.Sc_rollup_execute_outbox_message_manager_kind
   | Sc_rollup_return_bond _ -> Kind.Sc_rollup_return_bond_manager_kind
 
 type packed_manager_operation =
@@ -1088,11 +1091,11 @@ module Encoding = struct
           inj = (fun (rollup, stakers) -> Sc_rollup_timeout {rollup; stakers});
         }
 
-    let[@coq_axiom_with_reason "gadt"] sc_rollup_atomic_batch_case =
+    let[@coq_axiom_with_reason "gadt"] sc_rollup_execute_outbox_message_case =
       MCase
         {
           tag = sc_rollup_operation_atomic_batch_tag;
-          name = "sc_rollup_atomic_batch";
+          name = "sc_rollup_execute_outbox_message";
           encoding =
             obj6
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1102,42 +1105,43 @@ module Encoding = struct
               (req "outbox_level" Raw_level_repr.encoding)
               (req "message_index" Data_encoding.int31)
               (req "inclusion proof" Data_encoding.string)
-              (req "atomic_transaction_batch" Data_encoding.string);
+              (req "message" Data_encoding.string);
           select =
             (function
-            | Manager (Sc_rollup_atomic_batch _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_execute_outbox_message _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
-            | Sc_rollup_atomic_batch
+            | Sc_rollup_execute_outbox_message
                 {
                   rollup;
                   cemented_commitment;
                   outbox_level;
                   message_index;
                   inclusion_proof;
-                  atomic_transaction_batch;
+                  message;
                 } ->
                 ( rollup,
                   cemented_commitment,
                   outbox_level,
                   message_index,
                   inclusion_proof,
-                  atomic_transaction_batch ));
+                  message ));
           inj =
             (fun ( rollup,
                    cemented_commitment,
                    outbox_level,
                    message_index,
                    inclusion_proof,
-                   atomic_transaction_batch ) ->
-              Sc_rollup_atomic_batch
+                   message ) ->
+              Sc_rollup_execute_outbox_message
                 {
                   rollup;
                   cemented_commitment;
                   outbox_level;
                   message_index;
                   inclusion_proof;
-                  atomic_transaction_batch;
+                  message;
                 });
         }
 
@@ -1551,10 +1555,10 @@ module Encoding = struct
       sc_rollup_operation_timeout_tag
       Manager_operations.sc_rollup_timeout_case
 
-  let sc_rollup_atomic_batch_case =
+  let sc_rollup_execute_outbox_message_case =
     make_manager_case
       sc_rollup_operation_atomic_batch_tag
-      Manager_operations.sc_rollup_atomic_batch_case
+      Manager_operations.sc_rollup_execute_outbox_message_case
 
   let sc_rollup_return_bond_case =
     make_manager_case
@@ -1606,7 +1610,7 @@ module Encoding = struct
            make sc_rollup_publish_case;
            make sc_rollup_refute_case;
            make sc_rollup_timeout_case;
-           make sc_rollup_atomic_batch_case;
+           make sc_rollup_execute_outbox_message_case;
            make sc_rollup_return_bond_case;
          ]
 
@@ -1832,8 +1836,9 @@ let equal_manager_operation_kind :
   | Sc_rollup_refute _, _ -> None
   | Sc_rollup_timeout _, Sc_rollup_timeout _ -> Some Eq
   | Sc_rollup_timeout _, _ -> None
-  | Sc_rollup_atomic_batch _, Sc_rollup_atomic_batch _ -> Some Eq
-  | Sc_rollup_atomic_batch _, _ -> None
+  | Sc_rollup_execute_outbox_message _, Sc_rollup_execute_outbox_message _ ->
+      Some Eq
+  | Sc_rollup_execute_outbox_message _, _ -> None
   | Sc_rollup_return_bond _, Sc_rollup_return_bond _ -> Some Eq
   | Sc_rollup_return_bond _, _ -> None
 

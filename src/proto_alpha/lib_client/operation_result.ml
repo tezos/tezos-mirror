@@ -332,14 +332,14 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         bob
         Sc_rollup.Address.pp
         rollup
-  | Sc_rollup_atomic_batch
+  | Sc_rollup_execute_outbox_message
       {
         rollup;
         cemented_commitment;
         outbox_level;
         message_index;
         inclusion_proof;
-        atomic_transaction_batch;
+        message;
       } ->
       (* TODO #3125
          Improve pretty-printing of this content and sc operations above.
@@ -347,9 +347,9 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       *)
       Format.fprintf
         ppf
-        "Execute the atomic transaction batch from the smart contract rollup \
-         at address %a, with cemented commit %a, outbox level %a, message  \
-         index %d, inclusion proof %s for the atomic batch of transactions %s"
+        "Execute the outbox message of the smart contract rollup at address \
+         %a, with cemented commit %a, outbox level %a, message  index %d,  \
+         inclusion proof %s and message %s"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Commitment.Hash.pp
@@ -358,7 +358,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         outbox_level
         message_index
         inclusion_proof
-        atomic_transaction_batch
+        message
   | Sc_rollup_return_bond {sc_rollup} ->
       Format.fprintf
         ppf
@@ -752,8 +752,8 @@ let pp_manager_operation_contents_and_result ppf
       status ;
     pp_balance_updates_opt ppf balance_updates
   in
-  let pp_sc_rollup_atomic_batch_result
-      (Sc_rollup_atomic_batch_result
+  let pp_sc_rollup_execute_outbox_message_result
+      (Sc_rollup_execute_outbox_message_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     if paid_storage_size_diff <> Z.zero then
       Format.fprintf
@@ -1017,23 +1017,25 @@ let pp_manager_operation_contents_and_result ppf
            rollup by timeout was BACKTRACKED, its expected effects (as follow) \
            were NOT applied.@]" ;
         pp_sc_rollup_timeout_result op
-    | Applied (Sc_rollup_atomic_batch_result _ as op) ->
+    | Applied (Sc_rollup_execute_outbox_message_result _ as op) ->
         Format.fprintf
           ppf
-          "This sc rollup atomic batch operation was successfully applied." ;
-        pp_sc_rollup_atomic_batch_result op
+          "This operation executing a smart contract rollup outbox message was \
+           successfully applied." ;
+        pp_sc_rollup_execute_outbox_message_result op
+    | Backtracked ((Sc_rollup_execute_outbox_message_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This operation operation executing a smart contract rollup \
+           outbox message was BACKTRACKED, its expected effects (as follow) \
+           were NOT applied.@]" ;
+        pp_sc_rollup_execute_outbox_message_result op
     | Applied (Sc_rollup_return_bond_result _ as op) ->
         Format.fprintf
           ppf
           "This sc rollup return commitment bond operation was successfully \
            applied" ;
         pp_sc_rollup_return_bond_result op
-    | Backtracked ((Sc_rollup_atomic_batch_result _ as op), _err) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>This sc rollup atomic batch operation was BACKTRACKED, its \
-           expected effects (as follow) were NOT applied.@]" ;
-        pp_sc_rollup_atomic_batch_result op
     | Backtracked ((Sc_rollup_return_bond_result _ as op), _err) ->
         Format.fprintf
           ppf

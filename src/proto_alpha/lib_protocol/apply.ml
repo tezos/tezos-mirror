@@ -1835,23 +1835,23 @@ let apply_external_manager_operation_content :
         Sc_rollup_timeout_result {status; consumed_gas; balance_updates}
       in
       return (ctxt, result, [])
-  | Sc_rollup_atomic_batch
+  | Sc_rollup_execute_outbox_message
       {
         rollup;
         cemented_commitment;
         outbox_level;
         message_index;
         inclusion_proof;
-        atomic_transaction_batch;
+        message;
       } ->
-      Sc_rollup_operations.atomic_batch
+      Sc_rollup_operations.execute_outbox_message
         ctxt
         rollup
         cemented_commitment
         ~outbox_level
         ~message_index
         ~inclusion_proof
-        ~atomic_transaction_batch
+        ~message
       >>=? fun _ctxt ->
       failwith "Sc_rolup_atomic_batch operation is not yet supported."
   | Sc_rollup_return_bond {sc_rollup} ->
@@ -2060,7 +2060,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       >>?= fun () -> return ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
   | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
-  | Sc_rollup_atomic_batch _ ->
+  | Sc_rollup_execute_outbox_message _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Sc_rollup_return_bond _ ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
@@ -2241,7 +2241,7 @@ let burn_manager_storage_fees :
   | Sc_rollup_publish_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_refute_result _ -> return (ctxt, storage_limit, smopr)
   | Sc_rollup_timeout_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_atomic_batch_result
+  | Sc_rollup_execute_outbox_message_result
       ({paid_storage_size_diff; balance_updates; _} as payload) ->
       let consumed = paid_storage_size_diff in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
@@ -2249,7 +2249,8 @@ let burn_manager_storage_fees :
       let balance_updates = storage_bus @ balance_updates in
       ( ctxt,
         storage_limit,
-        Sc_rollup_atomic_batch_result {payload with balance_updates} )
+        Sc_rollup_execute_outbox_message_result {payload with balance_updates}
+      )
   | Sc_rollup_return_bond_result _ -> return (ctxt, storage_limit, smopr)
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the

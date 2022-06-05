@@ -766,7 +766,7 @@ val sc_rollup_publish :
   tzresult
   Lwt.t
 
-val sc_rollup_atomic_batch :
+val sc_rollup_execute_outbox_message :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
@@ -784,14 +784,15 @@ val sc_rollup_atomic_batch :
   outbox_level:Raw_level.t ->
   message_index:int ->
   inclusion_proof:string ->
-  atomic_transaction_batch:string ->
+  message:string ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   ( Operation_hash.t
-    * Kind.sc_rollup_atomic_batch Kind.manager contents
-    * Kind.sc_rollup_atomic_batch Kind.manager Apply_results.contents_result,
+    * Kind.sc_rollup_execute_outbox_message Kind.manager contents
+    * Kind.sc_rollup_execute_outbox_message Kind.manager
+      Apply_results.contents_result,
     tztrace )
   result
   Lwt.t

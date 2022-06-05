@@ -2841,7 +2841,7 @@ let commands_rw () =
            outbox_level
            message_index
            inclusion_proof
-           atomic_transaction_batch
+           message
            cctxt ->
         (match source with
         | Originated _ ->
@@ -2851,7 +2851,7 @@ let commands_rw () =
         | Implicit source -> return source)
         >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-        sc_rollup_atomic_batch
+        sc_rollup_execute_outbox_message
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
@@ -2868,7 +2868,7 @@ let commands_rw () =
           ~outbox_level
           ~message_index
           ~inclusion_proof
-          ~atomic_transaction_batch
+          ~message
           ~src_pk
           ~src_sk
           ~fee_parameter

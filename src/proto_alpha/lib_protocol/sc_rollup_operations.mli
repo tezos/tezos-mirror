@@ -41,12 +41,12 @@ val originate :
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
 
-val atomic_batch :
+val execute_outbox_message :
   context ->
   Sc_rollup.t ->
   Sc_rollup.Commitment.Hash.t ->
   outbox_level:Raw_level.t ->
   message_index:int ->
   inclusion_proof:string ->
-  atomic_transaction_batch:string ->
+  message:string ->
   context tzresult Lwt.t

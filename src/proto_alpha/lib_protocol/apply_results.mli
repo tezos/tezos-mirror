@@ -318,12 +318,13 @@ and _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_timeout successful_manager_operation_result
-  | Sc_rollup_atomic_batch_result : {
+  | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
-      -> Kind.sc_rollup_atomic_batch successful_manager_operation_result
+      -> Kind.sc_rollup_execute_outbox_message
+         successful_manager_operation_result
   | Sc_rollup_return_bond_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
