@@ -133,6 +133,14 @@ included in a block. To be able to replace the first operation, the fee and the
 by a factor (currently fixed to 5%). In case of successful replacement, the old
 operation is re-classified as ``Outdated``.
 
+Concretely, a user can replace a successfully prechecked manager operation in the
+mempool, with the help of ``tezos-client``, using two methods :
+
+- manually provide a higher fee to bump the "fee/gas limit" ratio by at least 5% for the new
+  operation,
+- via option ``--replace``: In this case, ``tezos-client`` will automatically
+  compute the minimal amount of fee for the second operation to be able to
+  replace the one in the mempool.
 
 Operations prioritization and ordering
 ......................................
