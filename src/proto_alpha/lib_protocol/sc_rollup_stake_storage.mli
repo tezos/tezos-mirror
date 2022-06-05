@@ -181,9 +181,9 @@ module Internal_for_tests : sig
       between validators, we do not distinguish between {i adding new}
       commitments and {i staking on existing commitments}.  The storage of
       commitments is content-addressable to minimize storage duplication.
-  
+
       Subsequent calls to [refine_stake] and [cement_commitment] must use
-      a [context] with greater level, or behavior is undefined.
+      a [context] with greater level, or this function call will fail.
 
       The first time a commitment hash is staked on, it is assigned a deadline,
       which is counted in Tezos blocks (levels). Further stakes on the block does
