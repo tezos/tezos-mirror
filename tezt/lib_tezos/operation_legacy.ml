@@ -45,7 +45,6 @@ type manager_op_kind =
     }
   | Reveal of string (* public key *)
   | Origination of {code : micheline; storage : micheline; balance : int}
-  | Delegation of (* public key hash *) string
   | Transfer_ticket of {
       contents : micheline;
       ty : micheline;
@@ -131,11 +130,6 @@ let mk_reveal ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Reveal source.Account.public_key
 
-let mk_delegation ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
-    ?(storage_limit = 0) ~delegate client =
-  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
-  @@ Delegation delegate
-
 let mk_transfer_ticket ~source ?counter ?(fee = 1_000_000)
     ?(gas_limit = 1_000_000) ?(storage_limit = 0) ~contents ~ty ~ticketer
     ~amount ~destination ~entrypoint client =
@@ -152,10 +146,9 @@ let manager_op_content_to_json_string
     {op_kind; fee; gas_limit; storage_limit; source; counter} client =
   let jz_string_of_int n = Ezjsonm.string @@ string_of_int n in
   let mk_jsonm ?(amount = `Null) ?(destination = `Null) ?(parameter = `Null)
-      ?(public_key = `Null) ?(delegate = `Null) ?(balance = `Null)
-      ?(script = `Null) ?(ticket_contents = `Null) ?(ticket_ty = `Null)
-      ?(ticket_ticketer = `Null) ?(ticket_amount = `Null) ?(entrypoint = `Null)
-      ?(slot = `Null) kind =
+      ?(public_key = `Null) ?(balance = `Null) ?(script = `Null)
+      ?(ticket_contents = `Null) ?(ticket_ty = `Null) ?(ticket_ticketer = `Null)
+      ?(ticket_amount = `Null) ?(entrypoint = `Null) ?(slot = `Null) kind =
     let filter = List.filter (fun (_k, v) -> v <> `Null) in
     return
     @@ `O
@@ -174,8 +167,6 @@ let manager_op_content_to_json_string
               ("parameters", parameter);
               (* Pk reveal *)
               ("public_key", public_key);
-              (* Delegation *)
-              ("delegate", delegate);
               (* Smart Contract origination *)
               ("balance", balance);
               ("script", script);
@@ -205,8 +196,6 @@ let manager_op_content_to_json_string
         ~parameter
         "transaction"
   | Reveal pk -> mk_jsonm ~public_key:(Ezjsonm.string pk) "reveal"
-  | Delegation delegate ->
-      mk_jsonm ~delegate:Ezjsonm.(string delegate) "delegation"
   | Origination {code; storage; balance} ->
       let* code = script_to_json client code in
       let* storage = data_to_json client storage in
@@ -341,29 +330,6 @@ let inject_public_key_revelation ?protocol ?async ?force ?wait_for_injection
   in
   let* op =
     mk_reveal ~source:fake_source ?counter ?fee ?gas_limit ?storage_limit client
-  in
-  forge_and_inject_operation
-    ?protocol
-    ?async
-    ?force
-    ?wait_for_injection
-    ?branch
-    ~batch:(`Manager [op])
-    ~signer
-    client
-
-let inject_delegation ?protocol ?async ?force ?wait_for_injection ?branch
-    ~source ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~delegate
-    client =
-  let* op =
-    mk_delegation
-      ~source
-      ?counter
-      ?fee
-      ?gas_limit
-      ?storage_limit
-      ~delegate
-      client
   in
   forge_and_inject_operation
     ?protocol
