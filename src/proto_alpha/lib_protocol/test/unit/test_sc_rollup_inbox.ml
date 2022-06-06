@@ -98,14 +98,40 @@ let test_consume_messages (payloads, nb_consumed_messages) =
            "Message consumption fails only when trying to consume more than \
             the number of available messages.")
 
-let check_payload message payload =
-  Environment.Context.Tree.find message ["payload"] >>= function
-  | None -> fail (err "No payload in message")
-  | Some payload' ->
-      let payload' = Bytes.to_string payload' in
+(* A message is tagged with a prefix. It consists of 5 bytes:
+   - Byte 0 is the tag (1 for external and 0 for internal).
+   - Bytes 1-4 is the length of the message encoded as:
+      [ prefix[1] * 256^3 + prefix[2] * 256^2 prefix[3] * 256^1 prefix[4]]
+*)
+let encode_external_message message =
+  let length = String.length message in
+  let pow m n = Z.to_int @@ Z.(of_int m ** n) in
+  let prefix =
+    [
+      (* This is the tag of external messages. *)
+      1;
+      (* The length of the message encoded in base 256. *)
+      length / pow 256 3 mod 256;
+      length / pow 256 2 mod 256;
+      length / 256 mod 256;
+      length mod 256;
+    ]
+    |> List.map Char.chr |> List.to_seq |> String.of_seq
+  in
+  Bytes.of_string (Printf.sprintf "%s%s" prefix message)
+
+let check_payload messages external_message =
+  Environment.Context.Tree.find messages ["payload"] >>= function
+  | None -> fail (err "No payload in messages")
+  | Some payload ->
+      let expected_payload = encode_external_message external_message in
       fail_unless
-        (payload = payload')
-        (err (Printf.sprintf "Expected payload %s, got %s" payload payload'))
+        (expected_payload = payload)
+        (err
+           (Printf.sprintf
+              "Expected payload %s, got %s"
+              (Bytes.to_string expected_payload)
+              (Bytes.to_string payload)))
 
 let test_get_message payloads =
   setup_inbox_with_messages [payloads]
@@ -121,12 +147,13 @@ let test_get_message_payload payloads =
   setup_inbox_with_messages [payloads]
   @@ fun messages _history _inbox _inboxes ->
   List.iteri_es
-    (fun i payload ->
+    (fun i message ->
+      let expected_payload = encode_external_message message in
       get_message_payload messages (Z.of_int i) >>= function
-      | Some payload' ->
+      | Some payload ->
           fail_unless
-            (String.equal payload' payload)
-            (err (Printf.sprintf "Expected %s, got %s" payload payload'))
+            (String.equal payload (Bytes.to_string expected_payload))
+            (err (Printf.sprintf "Expected %s, got %s" message payload))
       | None ->
           fail
             (err (Printf.sprintf "No message payload number %d in messages" i)))

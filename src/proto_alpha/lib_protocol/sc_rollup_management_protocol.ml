@@ -25,13 +25,27 @@
 
 open Alpha_context
 
+type error += (* Permanent *) Sc_rollup_invalid_destination
+
+let () =
+  let open Data_encoding in
+  let msg = "Invalid destination" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_management_protocol.sc_rollup_invalid_destination"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Sc_rollup_invalid_destination -> Some () | _ -> None)
+    (fun () -> Sc_rollup_invalid_destination)
+
 type transaction =
   | Transaction : {
       destination : Destination.t;
       entrypoint : Entrypoint.t;
       parameters_ty : ('a, _) Script_typed_ir.ty;
       parameters : 'a;
-      unparsed_parameters_ty : Script.expr;
       unparsed_parameters : Script.expr;
     }
       -> transaction
@@ -55,26 +69,37 @@ let make_internal_inbox_message ctxt ty ~payload ~sender ~source =
 let transactions_batch_of_internal ctxt transactions =
   let open Lwt_tzresult_syntax in
   let or_internal_transaction ctxt
-      {
-        Sc_rollup.Outbox.Message.unparsed_parameters_ty;
-        unparsed_parameters;
-        destination;
-        entrypoint;
-      } =
-    let*? Ex_ty parameters_ty, ctxt =
-      Script_ir_translator.parse_ty
-        ~legacy:false
-        ~allow_lazy_storage:false
-        ~allow_contract:false
-        ~allow_ticket:true
-        ~allow_operation:false
-        ctxt
-        (Micheline.root unparsed_parameters_ty)
+      {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint} =
+    (* Lookup the contract-hash. *)
+    let*? contract_hash =
+      match destination with
+      | Destination.Contract (Contract.Implicit _)
+      | Destination.Sc_rollup _ | Destination.Tx_rollup _ ->
+          (* Only smart-contract destinations are currently supported. *)
+          error Sc_rollup_invalid_destination
+      | Destination.Contract (Contract.Originated contract_hash) ->
+          ok contract_hash
     in
-    (* TODO: #2964
-       We should rule out big-maps.
-       [allow_forged] controls both tickets and big-maps. Here we only want to
-       allow tickets. *)
+    (* Load the type and entrypoints of the script. *)
+    let* ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
+           ctxt ) =
+      let* ctxt, _cache_key, cached = Script_cache.find ctxt contract_hash in
+      match cached with
+      | Some (_script, ex_script) -> return (ex_script, ctxt)
+      | None -> fail Sc_rollup_invalid_destination
+    in
+    (* Find the entrypoint type for the given entrypoint. *)
+    let*? res, ctxt =
+      Gas_monad.run
+        ctxt
+        (Script_ir_translator.find_entrypoint
+           ~error_details:(Informative ())
+           arg_type
+           entrypoints
+           entrypoint)
+    in
+    let*? (Ex_ty_cstr {ty = parameters_ty; _}) = res in
+    (* Parse the parameters according to the entrypoint type. *)
     let* parameters, ctxt =
       Script_ir_translator.parse_data
         ctxt
@@ -90,7 +115,6 @@ let transactions_batch_of_internal ctxt transactions =
             entrypoint;
             parameters_ty;
             parameters;
-            unparsed_parameters_ty;
             unparsed_parameters;
           },
         ctxt )
@@ -123,22 +147,7 @@ module Internal_for_tests = struct
     let* unparsed_parameters, ctxt =
       Script_ir_translator.unparse_data ctxt Optimized parameters_ty parameters
     in
-    let*? unparsed_parameters_ty, ctxt =
-      Script_ir_translator.unparse_ty
-        ctxt
-        ~loc:Micheline.dummy_location
-        parameters_ty
-    in
-    let*? ctxt =
-      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-    in
     let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-    let*? ctxt =
-      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters_ty)
-    in
-    let unparsed_parameters_ty =
-      Micheline.strip_locations unparsed_parameters_ty
-    in
     return
       ( Transaction
           {
@@ -146,7 +155,6 @@ module Internal_for_tests = struct
             entrypoint;
             parameters_ty;
             parameters;
-            unparsed_parameters_ty;
             unparsed_parameters;
           },
         ctxt )
@@ -162,16 +170,10 @@ module Internal_for_tests = struct
             entrypoint;
             parameters_ty = _;
             parameters = _;
-            unparsed_parameters_ty;
             unparsed_parameters;
           }) =
       return
-        {
-          Sc_rollup.Outbox.Message.unparsed_parameters;
-          unparsed_parameters_ty;
-          destination;
-          entrypoint;
-        }
+        {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint}
     in
     let* transactions = List.map_e to_internal_transaction transactions in
     let output_message_internal =

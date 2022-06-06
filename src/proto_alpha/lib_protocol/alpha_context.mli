@@ -2917,7 +2917,6 @@ module rec Sc_rollup : sig
     (** See {!Sc_rollup_outbox_message_repr}. *)
     module Message : sig
       type transaction = {
-        unparsed_parameters_ty : Script.expr;
         unparsed_parameters : Script.expr;
         destination : Destination.t;
         entrypoint : Entrypoint.t;

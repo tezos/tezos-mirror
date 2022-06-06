@@ -37,7 +37,6 @@
 
 (** A transaction from L2 to L1. *)
 type transaction = {
-  unparsed_parameters_ty : Script_repr.expr;  (** The type of the parameters. *)
   unparsed_parameters : Script_repr.expr;  (** The payload. *)
   destination : Destination_repr.t;  (** The recipient contract or rollup. *)
   entrypoint : Entrypoint_repr.t;  (** Entrypoint of the destination. *)

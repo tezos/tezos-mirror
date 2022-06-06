@@ -55,7 +55,6 @@ let () =
     (fun () -> Error_decode_outbox_message)
 
 type transaction = {
-  unparsed_parameters_ty : Script_repr.expr;  (** The type of the parameters. *)
   unparsed_parameters : Script_repr.expr;  (** The payload. *)
   destination : Destination_repr.t;  (** The recipient contract or rollup. *)
   entrypoint : Entrypoint_repr.t;  (** Entrypoint of the destination. *)
@@ -70,12 +69,11 @@ let transaction_encoding =
      The exact limit is yet to be decided. Could be added as a constant.
   *)
   conv
-    (fun {unparsed_parameters_ty; unparsed_parameters; destination; entrypoint} ->
-      (unparsed_parameters_ty, unparsed_parameters, destination, entrypoint))
-    (fun (unparsed_parameters_ty, unparsed_parameters, destination, entrypoint) ->
-      {unparsed_parameters_ty; unparsed_parameters; destination; entrypoint})
-  @@ obj4
-       (req "parameters_ty" Script_repr.expr_encoding)
+    (fun {unparsed_parameters; destination; entrypoint} ->
+      (unparsed_parameters, destination, entrypoint))
+    (fun (unparsed_parameters, destination, entrypoint) ->
+      {unparsed_parameters; destination; entrypoint})
+  @@ obj3
        (req "parameters" Script_repr.expr_encoding)
        (req "destination" Destination_repr.encoding)
        (req "entrypoint" Entrypoint_repr.simple_encoding)

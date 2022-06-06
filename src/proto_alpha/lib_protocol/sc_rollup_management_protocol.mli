@@ -40,6 +40,8 @@
 
 open Alpha_context
 
+type error += (* Permanent *) Sc_rollup_invalid_destination
+
 (** A type representing a Layer 2 to Layer 1 transaction. *)
 type transaction = private
   | Transaction : {
@@ -47,7 +49,6 @@ type transaction = private
       entrypoint : Entrypoint.t;
       parameters_ty : ('a, _) Script_typed_ir.ty;
       parameters : 'a;
-      unparsed_parameters_ty : Script.expr;
       unparsed_parameters : Script.expr;
     }
       -> transaction
