@@ -3096,6 +3096,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "oneOf": [
                                   {
                                     "title": "Example_arith smart contract rollup kind"
+                                  },
+                                  {
+                                    "title": "Wasm 2.0.0 smart contract rollup kind"
                                   }
                                 ]
                               },
@@ -3431,6 +3434,813 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                             "oneOf": [
                                               {
                                                 "title": "Arithmetic PVM with proof",
+                                                "type": "object",
+                                                "properties": {
+                                                  "tree_proof": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "version": {
+                                                        "type": "integer",
+                                                        "minimum": -32768,
+                                                        "maximum": 32767
+                                                      },
+                                                      "before": {
+                                                        "oneOf": [
+                                                          {
+                                                            "title": "Value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "value": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "node": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          }
+                                                        ]
+                                                      },
+                                                      "after": {
+                                                        "oneOf": [
+                                                          {
+                                                            "title": "Value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "value": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "node": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          }
+                                                        ]
+                                                      },
+                                                      "state": {
+                                                        "oneOf": [
+                                                          {
+                                                            "title": "Value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "value": {
+                                                                "type": "string",
+                                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Blinded_value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "blinded_value": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "blinded_value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "node": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                  "type": "array",
+                                                                  "items": [
+                                                                    {
+                                                                      "type": "string",
+                                                                      "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                    },
+                                                                    {
+                                                                      "$ref": "#/definitions/tree_encoding"
+                                                                    }
+                                                                  ],
+                                                                  "additionalItems": false
+                                                                }
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Blinded_node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "blinded_node": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "blinded_node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Inode",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "inode": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "length": {
+                                                                    "$ref": "#/definitions/int64"
+                                                                  },
+                                                                  "proofs": {
+                                                                    "oneOf": [
+                                                                      {
+                                                                        "title": "sparse_proof",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "sparse_proof": {
+                                                                            "type": "array",
+                                                                            "items": {
+                                                                              "type": "array",
+                                                                              "items": [
+                                                                                {
+                                                                                  "type": "integer",
+                                                                                  "minimum": 0,
+                                                                                  "maximum": 255
+                                                                                },
+                                                                                {
+                                                                                  "oneOf": [
+                                                                                    {
+                                                                                      "title": "Blinded_inode",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "blinded_inode": {
+                                                                                          "$ref": "#/definitions/Context_hash"
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "blinded_inode"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "Inode_values",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "inode_values": {
+                                                                                          "type": "array",
+                                                                                          "items": {
+                                                                                            "type": "array",
+                                                                                            "items": [
+                                                                                              {
+                                                                                                "type": "string",
+                                                                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                              },
+                                                                                              {
+                                                                                                "$ref": "#/definitions/tree_encoding"
+                                                                                              }
+                                                                                            ],
+                                                                                            "additionalItems": false
+                                                                                          }
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "inode_values"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "Inode_tree",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "inode_tree": {
+                                                                                          "type": "object",
+                                                                                          "properties": {
+                                                                                            "length": {
+                                                                                              "$ref": "#/definitions/int64"
+                                                                                            },
+                                                                                            "proofs": {
+                                                                                              "oneOf": [
+                                                                                                {
+                                                                                                  "title": "sparse_proof",
+                                                                                                  "type": "object",
+                                                                                                  "properties": {
+                                                                                                    "sparse_proof": {
+                                                                                                      "type": "array",
+                                                                                                      "items": {
+                                                                                                        "type": "array",
+                                                                                                        "items": [
+                                                                                                          {
+                                                                                                            "type": "integer",
+                                                                                                            "minimum": 0,
+                                                                                                            "maximum": 255
+                                                                                                          },
+                                                                                                          {
+                                                                                                            "$ref": "#/definitions/inode_tree"
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "additionalItems": false
+                                                                                                      }
+                                                                                                    }
+                                                                                                  },
+                                                                                                  "required": [
+                                                                                                    "sparse_proof"
+                                                                                                  ],
+                                                                                                  "additionalProperties": false
+                                                                                                },
+                                                                                                {
+                                                                                                  "title": "dense_proof",
+                                                                                                  "type": "object",
+                                                                                                  "properties": {
+                                                                                                    "dense_proof": {
+                                                                                                      "type": "array",
+                                                                                                      "items": {
+                                                                                                        "$ref": "#/definitions/inode_tree"
+                                                                                                      }
+                                                                                                    }
+                                                                                                  },
+                                                                                                  "required": [
+                                                                                                    "dense_proof"
+                                                                                                  ],
+                                                                                                  "additionalProperties": false
+                                                                                                }
+                                                                                              ]
+                                                                                            }
+                                                                                          },
+                                                                                          "required": [
+                                                                                            "proofs",
+                                                                                            "length"
+                                                                                          ],
+                                                                                          "additionalProperties": false
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "inode_tree"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "Inode_extender",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "inode_extender": {
+                                                                                          "type": "object",
+                                                                                          "properties": {
+                                                                                            "length": {
+                                                                                              "$ref": "#/definitions/int64"
+                                                                                            },
+                                                                                            "segment": {
+                                                                                              "type": "string",
+                                                                                              "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                            },
+                                                                                            "proof": {
+                                                                                              "$ref": "#/definitions/inode_tree"
+                                                                                            }
+                                                                                          },
+                                                                                          "required": [
+                                                                                            "proof",
+                                                                                            "segment",
+                                                                                            "length"
+                                                                                          ],
+                                                                                          "additionalProperties": false
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "inode_extender"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "None",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "none": {
+                                                                                          "type": "null"
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "none"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    }
+                                                                                  ]
+                                                                                }
+                                                                              ],
+                                                                              "additionalItems": false
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "sparse_proof"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "dense_proof",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "dense_proof": {
+                                                                            "type": "array",
+                                                                            "items": {
+                                                                              "oneOf": [
+                                                                                {
+                                                                                  "title": "Blinded_inode",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "blinded_inode": {
+                                                                                      "$ref": "#/definitions/Context_hash"
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "blinded_inode"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "Inode_values",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "inode_values": {
+                                                                                      "type": "array",
+                                                                                      "items": {
+                                                                                        "type": "array",
+                                                                                        "items": [
+                                                                                          {
+                                                                                            "type": "string",
+                                                                                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                          },
+                                                                                          {
+                                                                                            "$ref": "#/definitions/tree_encoding"
+                                                                                          }
+                                                                                        ],
+                                                                                        "additionalItems": false
+                                                                                      }
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "inode_values"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "Inode_tree",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "inode_tree": {
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "length": {
+                                                                                          "$ref": "#/definitions/int64"
+                                                                                        },
+                                                                                        "proofs": {
+                                                                                          "oneOf": [
+                                                                                            {
+                                                                                              "title": "sparse_proof",
+                                                                                              "type": "object",
+                                                                                              "properties": {
+                                                                                                "sparse_proof": {
+                                                                                                  "type": "array",
+                                                                                                  "items": {
+                                                                                                    "type": "array",
+                                                                                                    "items": [
+                                                                                                      {
+                                                                                                        "type": "integer",
+                                                                                                        "minimum": 0,
+                                                                                                        "maximum": 255
+                                                                                                      },
+                                                                                                      {
+                                                                                                        "$ref": "#/definitions/inode_tree"
+                                                                                                      }
+                                                                                                    ],
+                                                                                                    "additionalItems": false
+                                                                                                  }
+                                                                                                }
+                                                                                              },
+                                                                                              "required": [
+                                                                                                "sparse_proof"
+                                                                                              ],
+                                                                                              "additionalProperties": false
+                                                                                            },
+                                                                                            {
+                                                                                              "title": "dense_proof",
+                                                                                              "type": "object",
+                                                                                              "properties": {
+                                                                                                "dense_proof": {
+                                                                                                  "type": "array",
+                                                                                                  "items": {
+                                                                                                    "$ref": "#/definitions/inode_tree"
+                                                                                                  }
+                                                                                                }
+                                                                                              },
+                                                                                              "required": [
+                                                                                                "dense_proof"
+                                                                                              ],
+                                                                                              "additionalProperties": false
+                                                                                            }
+                                                                                          ]
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "proofs",
+                                                                                        "length"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "inode_tree"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "Inode_extender",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "inode_extender": {
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "length": {
+                                                                                          "$ref": "#/definitions/int64"
+                                                                                        },
+                                                                                        "segment": {
+                                                                                          "type": "string",
+                                                                                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                        },
+                                                                                        "proof": {
+                                                                                          "$ref": "#/definitions/inode_tree"
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "proof",
+                                                                                        "segment",
+                                                                                        "length"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "inode_extender"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "None",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "none": {
+                                                                                      "type": "null"
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "none"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                }
+                                                                              ]
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "dense_proof"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "proofs",
+                                                                  "length"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "inode"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Extender",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "extender": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "length": {
+                                                                    "$ref": "#/definitions/int64"
+                                                                  },
+                                                                  "segment": {
+                                                                    "type": "string",
+                                                                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                  },
+                                                                  "proof": {
+                                                                    "oneOf": [
+                                                                      {
+                                                                        "title": "Blinded_inode",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "blinded_inode": {
+                                                                            "$ref": "#/definitions/Context_hash"
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "blinded_inode"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Inode_values",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "inode_values": {
+                                                                            "type": "array",
+                                                                            "items": {
+                                                                              "type": "array",
+                                                                              "items": [
+                                                                                {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                },
+                                                                                {
+                                                                                  "$ref": "#/definitions/tree_encoding"
+                                                                                }
+                                                                              ],
+                                                                              "additionalItems": false
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "inode_values"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Inode_tree",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "inode_tree": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "length": {
+                                                                                "$ref": "#/definitions/int64"
+                                                                              },
+                                                                              "proofs": {
+                                                                                "oneOf": [
+                                                                                  {
+                                                                                    "title": "sparse_proof",
+                                                                                    "type": "object",
+                                                                                    "properties": {
+                                                                                      "sparse_proof": {
+                                                                                        "type": "array",
+                                                                                        "items": {
+                                                                                          "type": "array",
+                                                                                          "items": [
+                                                                                            {
+                                                                                              "type": "integer",
+                                                                                              "minimum": 0,
+                                                                                              "maximum": 255
+                                                                                            },
+                                                                                            {
+                                                                                              "$ref": "#/definitions/inode_tree"
+                                                                                            }
+                                                                                          ],
+                                                                                          "additionalItems": false
+                                                                                        }
+                                                                                      }
+                                                                                    },
+                                                                                    "required": [
+                                                                                      "sparse_proof"
+                                                                                    ],
+                                                                                    "additionalProperties": false
+                                                                                  },
+                                                                                  {
+                                                                                    "title": "dense_proof",
+                                                                                    "type": "object",
+                                                                                    "properties": {
+                                                                                      "dense_proof": {
+                                                                                        "type": "array",
+                                                                                        "items": {
+                                                                                          "$ref": "#/definitions/inode_tree"
+                                                                                        }
+                                                                                      }
+                                                                                    },
+                                                                                    "required": [
+                                                                                      "dense_proof"
+                                                                                    ],
+                                                                                    "additionalProperties": false
+                                                                                  }
+                                                                                ]
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "proofs",
+                                                                              "length"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "inode_tree"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Inode_extender",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "inode_extender": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "length": {
+                                                                                "$ref": "#/definitions/int64"
+                                                                              },
+                                                                              "segment": {
+                                                                                "type": "string",
+                                                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                              },
+                                                                              "proof": {
+                                                                                "$ref": "#/definitions/inode_tree"
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "proof",
+                                                                              "segment",
+                                                                              "length"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "inode_extender"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "None",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "none": {
+                                                                            "type": "null"
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "none"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "proof",
+                                                                  "segment",
+                                                                  "length"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "extender"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "None",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "none": {
+                                                                "type": "null"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "none"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          }
+                                                        ]
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "state",
+                                                      "after",
+                                                      "before",
+                                                      "version"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "given": {
+                                                    "oneOf": [
+                                                      {
+                                                        "title": "Some",
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "inbox_level": {
+                                                            "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647
+                                                          },
+                                                          "message_counter": {
+                                                            "$ref": "#/definitions/positive_bignum"
+                                                          },
+                                                          "payload": {
+                                                            "$ref": "#/definitions/unistring"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "payload",
+                                                          "message_counter",
+                                                          "inbox_level"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "title": "None",
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  },
+                                                  "requested": {
+                                                    "oneOf": [
+                                                      {
+                                                        "title": "No_input_required",
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "no_input_required": {}
+                                                        },
+                                                        "required": [
+                                                          "no_input_required"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "title": "Initial",
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "initial": {}
+                                                        },
+                                                        "required": [
+                                                          "initial"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "title": "First_after",
+                                                        "type": "array",
+                                                        "items": [
+                                                          {
+                                                            "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647
+                                                          },
+                                                          {
+                                                            "$ref": "#/definitions/positive_bignum"
+                                                          }
+                                                        ],
+                                                        "additionalItems": false
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "requested",
+                                                  "given",
+                                                  "tree_proof"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "Wasm 2.0.0 PVM with proof",
                                                 "type": "object",
                                                 "properties": {
                                                   "tree_proof": {
@@ -7335,7 +8145,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_1777",
+                                    "name": "X_2590",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -8000,7 +8810,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_1775",
+                                    "name": "X_2588",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -8363,7 +9173,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "message",
                                   "layout": {
-                                    "name": "X_1648",
+                                    "name": "X_2461",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -8432,7 +9242,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "previous_message_result",
                                   "layout": {
-                                    "name": "X_1649",
+                                    "name": "X_2462",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -8462,7 +9272,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "proof",
                                   "layout": {
-                                    "name": "X_1774",
+                                    "name": "X_2587",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -8618,7 +9428,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "name": "tickets_info",
                                   "layout": {
                                     "layout": {
-                                      "name": "X_1644",
+                                      "name": "X_2457",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -8859,7 +9669,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "kind",
                                   "layout": {
-                                    "name": "X_1643",
+                                    "name": "X_2456",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -8997,7 +9807,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "name": "message",
                                   "layout": {
                                     "layout": {
-                                      "name": "X_1642",
+                                      "name": "X_2455",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -9201,7 +10011,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_1641",
+                                    "name": "X_2454",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -10374,7 +11184,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1777"
+                          "title": "X_2590"
                         },
                         "encoding": {
                           "fields": [
@@ -10717,7 +11527,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1775"
+                          "title": "X_2588"
                         },
                         "encoding": {
                           "fields": [
@@ -10754,7 +11564,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "predecessor",
                               "layout": {
-                                "name": "X_1776",
+                                "name": "X_2589",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -10778,7 +11588,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1776"
+                          "title": "X_2589"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -10848,7 +11658,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1774"
+                          "title": "X_2587"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -10904,7 +11714,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1650",
+                                    "name": "X_2463",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -10963,7 +11773,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1650",
+                                    "name": "X_2463",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11022,7 +11832,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1650",
+                                    "name": "X_2463",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11081,7 +11891,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1650",
+                                    "name": "X_2463",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11097,7 +11907,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1773"
+                          "title": "X_2586"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -11133,7 +11943,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1772",
+                                    "name": "X_2585",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11173,7 +11983,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1772",
+                                    "name": "X_2585",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11213,7 +12023,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1772",
+                                    "name": "X_2585",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11253,7 +12063,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1772",
+                                    "name": "X_2585",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11293,7 +12103,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11333,7 +12143,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11373,7 +12183,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11413,7 +12223,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11453,7 +12263,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11493,7 +12303,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11533,7 +12343,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11573,7 +12383,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1768",
+                                    "name": "X_2581",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11613,7 +12423,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1760",
+                                    "name": "X_2573",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11653,7 +12463,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1760",
+                                    "name": "X_2573",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11693,7 +12503,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1760",
+                                    "name": "X_2573",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11733,7 +12543,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1760",
+                                    "name": "X_2573",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -11791,7 +12601,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_1655",
+                                      "name": "X_2468",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq",
@@ -11826,7 +12636,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_1655",
+                                      "name": "X_2468",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq",
@@ -11866,7 +12676,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_1655",
+                                      "name": "X_2468",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -12003,7 +12813,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1755",
+                                    "name": "X_2568",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -12052,7 +12862,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1755",
+                                    "name": "X_2568",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -12101,7 +12911,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1755",
+                                    "name": "X_2568",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -12150,7 +12960,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_1755",
+                                    "name": "X_2568",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -12176,7 +12986,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1772"
+                          "title": "X_2585"
                         },
                         "encoding": {
                           "fields": []
@@ -12184,7 +12994,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1768"
+                          "title": "X_2581"
                         },
                         "encoding": {
                           "fields": [
@@ -12203,7 +13013,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1760"
+                          "title": "X_2573"
                         },
                         "encoding": {
                           "fields": [
@@ -12232,7 +13042,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1756"
+                          "title": "X_2569"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -12304,7 +13114,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1755"
+                          "title": "X_2568"
                         },
                         "encoding": {
                           "fields": [
@@ -12327,7 +13137,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1650"
+                          "title": "X_2463"
                         },
                         "encoding": {
                           "fields": [
@@ -12339,7 +13149,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "layout": {
                                 "layout": {
-                                  "name": "X_1773",
+                                  "name": "X_2586",
                                   "kind": "Ref"
                                 },
                                 "kind": "Seq"
@@ -12354,13 +13164,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1655"
+                          "title": "X_2468"
                         },
                         "encoding": {
                           "fields": [
                             {
                               "layout": {
-                                "name": "X_1755",
+                                "name": "X_2568",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -12370,7 +13180,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "layout": {
-                                "name": "X_1756",
+                                "name": "X_2569",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -12384,7 +13194,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1649"
+                          "title": "X_2462"
                         },
                         "encoding": {
                           "fields": [
@@ -12415,7 +13225,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1648"
+                          "title": "X_2461"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -12474,7 +13284,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "deposit",
                                   "layout": {
-                                    "name": "X_1646",
+                                    "name": "X_2459",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -12490,7 +13300,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1646"
+                          "title": "X_2459"
                         },
                         "encoding": {
                           "fields": [
@@ -12531,7 +13341,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "amount",
                               "layout": {
-                                "name": "X_1647",
+                                "name": "X_2460",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -12544,7 +13354,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1647"
+                          "title": "X_2460"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -12673,7 +13483,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1644"
+                          "title": "X_2457"
                         },
                         "encoding": {
                           "fields": [
@@ -12722,7 +13532,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "amount",
                               "layout": {
-                                "name": "X_1647",
+                                "name": "X_2460",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -12747,7 +13557,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1643"
+                          "title": "X_2456"
                         },
                         "encoding": {
                           "tag_size": "Uint16",
@@ -12783,13 +13593,41 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Example_arith smart contract rollup kind"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "Wasm 2.0.0 smart contract rollup kind"
                             }
                           ]
                         }
                       },
                       {
                         "description": {
-                          "title": "X_1642"
+                          "title": "X_2455"
                         },
                         "encoding": {
                           "fields": [
@@ -12812,7 +13650,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1641"
+                          "title": "X_2454"
                         },
                         "encoding": {
                           "fields": [
@@ -12897,7 +13735,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "step",
                               "layout": {
-                                "name": "X_1640",
+                                "name": "X_2453",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -12910,7 +13748,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1640"
+                          "title": "X_2453"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -12941,7 +13779,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_1638",
+                                      "name": "X_2451",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -12972,7 +13810,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "pvm_step",
                                   "layout": {
-                                    "name": "X_817",
+                                    "name": "X_1630",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -12983,7 +13821,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "inbox",
                                   "layout": {
-                                    "name": "X_1637",
+                                    "name": "X_2450",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -12999,13 +13837,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1638"
+                          "title": "X_2451"
                         },
                         "encoding": {
                           "fields": [
                             {
                               "layout": {
-                                "name": "X_1639",
+                                "name": "X_2452",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -13028,7 +13866,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1639"
+                          "title": "X_2452"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -13098,7 +13936,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1637"
+                          "title": "X_2450"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -13158,7 +13996,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "name": "skips",
                                   "layout": {
                                     "layout": {
-                                      "name": "X_818",
+                                      "name": "X_1631",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -13171,7 +14009,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "level",
                                   "layout": {
-                                    "name": "X_819",
+                                    "name": "X_1632",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -13188,7 +14026,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "name": "inc",
                                   "layout": {
                                     "layout": {
-                                      "name": "X_825",
+                                      "name": "X_1638",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -13217,7 +14055,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1636"
+                          "title": "X_2449"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -13434,7 +14272,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1632"
+                          "title": "X_2445"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -13498,7 +14336,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "name": "dense_proof",
                                   "layout": {
                                     "layout": {
-                                      "name": "X_1631",
+                                      "name": "X_2444",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq",
@@ -13520,7 +14358,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1631"
+                          "title": "X_2444"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -13675,7 +14513,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_828"
+                          "title": "X_1641"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -13747,7 +14585,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_825"
+                          "title": "X_1638"
                         },
                         "encoding": {
                           "fields": [
@@ -13798,13 +14636,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_818"
+                          "title": "X_1631"
                         },
                         "encoding": {
                           "fields": [
                             {
                               "layout": {
-                                "name": "X_819",
+                                "name": "X_1632",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -13814,7 +14652,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "layout": {
-                                "name": "X_821",
+                                "name": "X_1634",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -13827,7 +14665,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_821"
+                          "title": "X_1634"
                         },
                         "encoding": {
                           "fields": [
@@ -13839,7 +14677,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "layout": {
                                 "layout": {
-                                  "name": "X_825",
+                                  "name": "X_1638",
                                   "kind": "Ref"
                                 },
                                 "kind": "Seq"
@@ -13854,7 +14692,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_819"
+                          "title": "X_1632"
                         },
                         "encoding": {
                           "fields": [
@@ -13947,7 +14785,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "old_levels_messages",
                               "layout": {
-                                "name": "X_825",
+                                "name": "X_1638",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -13960,7 +14798,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_817"
+                          "title": "X_1630"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -13997,7 +14835,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "given",
                                   "layout": {
-                                    "name": "X_815",
+                                    "name": "X_1628",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -14008,7 +14846,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "requested",
                                   "layout": {
-                                    "name": "X_816",
+                                    "name": "X_1629",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -14018,13 +14856,64 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Arithmetic PVM with proof"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "tree_proof",
+                                  "layout": {
+                                    "name": "X_4",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "given",
+                                  "layout": {
+                                    "name": "X_1628",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "requested",
+                                  "layout": {
+                                    "name": "X_1629",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Wasm 2.0.0 PVM with proof"
                             }
                           ]
                         }
                       },
                       {
                         "description": {
-                          "title": "X_816"
+                          "title": "X_1629"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -14112,7 +15001,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_815"
+                          "title": "X_1628"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -14228,7 +15117,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "before",
                               "layout": {
-                                "name": "X_828",
+                                "name": "X_1641",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -14240,7 +15129,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "after",
                               "layout": {
-                                "name": "X_828",
+                                "name": "X_1641",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -14252,7 +15141,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "state",
                               "layout": {
-                                "name": "X_1636",
+                                "name": "X_2449",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -14284,7 +15173,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "proofs",
                               "layout": {
-                                "name": "X_1632",
+                                "name": "X_2445",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -14314,7 +15203,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "layout": {
-                                "name": "X_1631",
+                                "name": "X_2444",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -14346,7 +15235,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "segment",
                               "layout": {
-                                "name": "X_1755",
+                                "name": "X_2568",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -14357,7 +15246,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "proof",
                               "layout": {
-                                "name": "X_1631",
+                                "name": "X_2444",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -14376,7 +15265,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "fields": [
                             {
                               "layout": {
-                                "name": "X_1755",
+                                "name": "X_2568",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -14386,7 +15275,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "layout": {
-                                "name": "X_1636",
+                                "name": "X_2449",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -17544,6 +18433,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "oneOf": [
                                   {
                                     "title": "Example_arith smart contract rollup kind"
+                                  },
+                                  {
+                                    "title": "Wasm 2.0.0 smart contract rollup kind"
                                   }
                                 ]
                               },
@@ -17879,6 +18771,813 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                             "oneOf": [
                                               {
                                                 "title": "Arithmetic PVM with proof",
+                                                "type": "object",
+                                                "properties": {
+                                                  "tree_proof": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "version": {
+                                                        "type": "integer",
+                                                        "minimum": -32768,
+                                                        "maximum": 32767
+                                                      },
+                                                      "before": {
+                                                        "oneOf": [
+                                                          {
+                                                            "title": "Value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "value": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "node": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          }
+                                                        ]
+                                                      },
+                                                      "after": {
+                                                        "oneOf": [
+                                                          {
+                                                            "title": "Value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "value": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "node": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          }
+                                                        ]
+                                                      },
+                                                      "state": {
+                                                        "oneOf": [
+                                                          {
+                                                            "title": "Value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "value": {
+                                                                "type": "string",
+                                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Blinded_value",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "blinded_value": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "blinded_value"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "node": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                  "type": "array",
+                                                                  "items": [
+                                                                    {
+                                                                      "type": "string",
+                                                                      "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                    },
+                                                                    {
+                                                                      "$ref": "#/definitions/tree_encoding"
+                                                                    }
+                                                                  ],
+                                                                  "additionalItems": false
+                                                                }
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Blinded_node",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "blinded_node": {
+                                                                "$ref": "#/definitions/Context_hash"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "blinded_node"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Inode",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "inode": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "length": {
+                                                                    "$ref": "#/definitions/int64"
+                                                                  },
+                                                                  "proofs": {
+                                                                    "oneOf": [
+                                                                      {
+                                                                        "title": "sparse_proof",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "sparse_proof": {
+                                                                            "type": "array",
+                                                                            "items": {
+                                                                              "type": "array",
+                                                                              "items": [
+                                                                                {
+                                                                                  "type": "integer",
+                                                                                  "minimum": 0,
+                                                                                  "maximum": 255
+                                                                                },
+                                                                                {
+                                                                                  "oneOf": [
+                                                                                    {
+                                                                                      "title": "Blinded_inode",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "blinded_inode": {
+                                                                                          "$ref": "#/definitions/Context_hash"
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "blinded_inode"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "Inode_values",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "inode_values": {
+                                                                                          "type": "array",
+                                                                                          "items": {
+                                                                                            "type": "array",
+                                                                                            "items": [
+                                                                                              {
+                                                                                                "type": "string",
+                                                                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                              },
+                                                                                              {
+                                                                                                "$ref": "#/definitions/tree_encoding"
+                                                                                              }
+                                                                                            ],
+                                                                                            "additionalItems": false
+                                                                                          }
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "inode_values"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "Inode_tree",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "inode_tree": {
+                                                                                          "type": "object",
+                                                                                          "properties": {
+                                                                                            "length": {
+                                                                                              "$ref": "#/definitions/int64"
+                                                                                            },
+                                                                                            "proofs": {
+                                                                                              "oneOf": [
+                                                                                                {
+                                                                                                  "title": "sparse_proof",
+                                                                                                  "type": "object",
+                                                                                                  "properties": {
+                                                                                                    "sparse_proof": {
+                                                                                                      "type": "array",
+                                                                                                      "items": {
+                                                                                                        "type": "array",
+                                                                                                        "items": [
+                                                                                                          {
+                                                                                                            "type": "integer",
+                                                                                                            "minimum": 0,
+                                                                                                            "maximum": 255
+                                                                                                          },
+                                                                                                          {
+                                                                                                            "$ref": "#/definitions/inode_tree"
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "additionalItems": false
+                                                                                                      }
+                                                                                                    }
+                                                                                                  },
+                                                                                                  "required": [
+                                                                                                    "sparse_proof"
+                                                                                                  ],
+                                                                                                  "additionalProperties": false
+                                                                                                },
+                                                                                                {
+                                                                                                  "title": "dense_proof",
+                                                                                                  "type": "object",
+                                                                                                  "properties": {
+                                                                                                    "dense_proof": {
+                                                                                                      "type": "array",
+                                                                                                      "items": {
+                                                                                                        "$ref": "#/definitions/inode_tree"
+                                                                                                      }
+                                                                                                    }
+                                                                                                  },
+                                                                                                  "required": [
+                                                                                                    "dense_proof"
+                                                                                                  ],
+                                                                                                  "additionalProperties": false
+                                                                                                }
+                                                                                              ]
+                                                                                            }
+                                                                                          },
+                                                                                          "required": [
+                                                                                            "proofs",
+                                                                                            "length"
+                                                                                          ],
+                                                                                          "additionalProperties": false
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "inode_tree"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "Inode_extender",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "inode_extender": {
+                                                                                          "type": "object",
+                                                                                          "properties": {
+                                                                                            "length": {
+                                                                                              "$ref": "#/definitions/int64"
+                                                                                            },
+                                                                                            "segment": {
+                                                                                              "type": "string",
+                                                                                              "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                            },
+                                                                                            "proof": {
+                                                                                              "$ref": "#/definitions/inode_tree"
+                                                                                            }
+                                                                                          },
+                                                                                          "required": [
+                                                                                            "proof",
+                                                                                            "segment",
+                                                                                            "length"
+                                                                                          ],
+                                                                                          "additionalProperties": false
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "inode_extender"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    },
+                                                                                    {
+                                                                                      "title": "None",
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "none": {
+                                                                                          "type": "null"
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "none"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    }
+                                                                                  ]
+                                                                                }
+                                                                              ],
+                                                                              "additionalItems": false
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "sparse_proof"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "dense_proof",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "dense_proof": {
+                                                                            "type": "array",
+                                                                            "items": {
+                                                                              "oneOf": [
+                                                                                {
+                                                                                  "title": "Blinded_inode",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "blinded_inode": {
+                                                                                      "$ref": "#/definitions/Context_hash"
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "blinded_inode"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "Inode_values",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "inode_values": {
+                                                                                      "type": "array",
+                                                                                      "items": {
+                                                                                        "type": "array",
+                                                                                        "items": [
+                                                                                          {
+                                                                                            "type": "string",
+                                                                                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                          },
+                                                                                          {
+                                                                                            "$ref": "#/definitions/tree_encoding"
+                                                                                          }
+                                                                                        ],
+                                                                                        "additionalItems": false
+                                                                                      }
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "inode_values"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "Inode_tree",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "inode_tree": {
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "length": {
+                                                                                          "$ref": "#/definitions/int64"
+                                                                                        },
+                                                                                        "proofs": {
+                                                                                          "oneOf": [
+                                                                                            {
+                                                                                              "title": "sparse_proof",
+                                                                                              "type": "object",
+                                                                                              "properties": {
+                                                                                                "sparse_proof": {
+                                                                                                  "type": "array",
+                                                                                                  "items": {
+                                                                                                    "type": "array",
+                                                                                                    "items": [
+                                                                                                      {
+                                                                                                        "type": "integer",
+                                                                                                        "minimum": 0,
+                                                                                                        "maximum": 255
+                                                                                                      },
+                                                                                                      {
+                                                                                                        "$ref": "#/definitions/inode_tree"
+                                                                                                      }
+                                                                                                    ],
+                                                                                                    "additionalItems": false
+                                                                                                  }
+                                                                                                }
+                                                                                              },
+                                                                                              "required": [
+                                                                                                "sparse_proof"
+                                                                                              ],
+                                                                                              "additionalProperties": false
+                                                                                            },
+                                                                                            {
+                                                                                              "title": "dense_proof",
+                                                                                              "type": "object",
+                                                                                              "properties": {
+                                                                                                "dense_proof": {
+                                                                                                  "type": "array",
+                                                                                                  "items": {
+                                                                                                    "$ref": "#/definitions/inode_tree"
+                                                                                                  }
+                                                                                                }
+                                                                                              },
+                                                                                              "required": [
+                                                                                                "dense_proof"
+                                                                                              ],
+                                                                                              "additionalProperties": false
+                                                                                            }
+                                                                                          ]
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "proofs",
+                                                                                        "length"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "inode_tree"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "Inode_extender",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "inode_extender": {
+                                                                                      "type": "object",
+                                                                                      "properties": {
+                                                                                        "length": {
+                                                                                          "$ref": "#/definitions/int64"
+                                                                                        },
+                                                                                        "segment": {
+                                                                                          "type": "string",
+                                                                                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                        },
+                                                                                        "proof": {
+                                                                                          "$ref": "#/definitions/inode_tree"
+                                                                                        }
+                                                                                      },
+                                                                                      "required": [
+                                                                                        "proof",
+                                                                                        "segment",
+                                                                                        "length"
+                                                                                      ],
+                                                                                      "additionalProperties": false
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "inode_extender"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "None",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "none": {
+                                                                                      "type": "null"
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "none"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                }
+                                                                              ]
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "dense_proof"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "proofs",
+                                                                  "length"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "inode"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "Extender",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "extender": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "length": {
+                                                                    "$ref": "#/definitions/int64"
+                                                                  },
+                                                                  "segment": {
+                                                                    "type": "string",
+                                                                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                  },
+                                                                  "proof": {
+                                                                    "oneOf": [
+                                                                      {
+                                                                        "title": "Blinded_inode",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "blinded_inode": {
+                                                                            "$ref": "#/definitions/Context_hash"
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "blinded_inode"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Inode_values",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "inode_values": {
+                                                                            "type": "array",
+                                                                            "items": {
+                                                                              "type": "array",
+                                                                              "items": [
+                                                                                {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                },
+                                                                                {
+                                                                                  "$ref": "#/definitions/tree_encoding"
+                                                                                }
+                                                                              ],
+                                                                              "additionalItems": false
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "inode_values"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Inode_tree",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "inode_tree": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "length": {
+                                                                                "$ref": "#/definitions/int64"
+                                                                              },
+                                                                              "proofs": {
+                                                                                "oneOf": [
+                                                                                  {
+                                                                                    "title": "sparse_proof",
+                                                                                    "type": "object",
+                                                                                    "properties": {
+                                                                                      "sparse_proof": {
+                                                                                        "type": "array",
+                                                                                        "items": {
+                                                                                          "type": "array",
+                                                                                          "items": [
+                                                                                            {
+                                                                                              "type": "integer",
+                                                                                              "minimum": 0,
+                                                                                              "maximum": 255
+                                                                                            },
+                                                                                            {
+                                                                                              "$ref": "#/definitions/inode_tree"
+                                                                                            }
+                                                                                          ],
+                                                                                          "additionalItems": false
+                                                                                        }
+                                                                                      }
+                                                                                    },
+                                                                                    "required": [
+                                                                                      "sparse_proof"
+                                                                                    ],
+                                                                                    "additionalProperties": false
+                                                                                  },
+                                                                                  {
+                                                                                    "title": "dense_proof",
+                                                                                    "type": "object",
+                                                                                    "properties": {
+                                                                                      "dense_proof": {
+                                                                                        "type": "array",
+                                                                                        "items": {
+                                                                                          "$ref": "#/definitions/inode_tree"
+                                                                                        }
+                                                                                      }
+                                                                                    },
+                                                                                    "required": [
+                                                                                      "dense_proof"
+                                                                                    ],
+                                                                                    "additionalProperties": false
+                                                                                  }
+                                                                                ]
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "proofs",
+                                                                              "length"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "inode_tree"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Inode_extender",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "inode_extender": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "length": {
+                                                                                "$ref": "#/definitions/int64"
+                                                                              },
+                                                                              "segment": {
+                                                                                "type": "string",
+                                                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                              },
+                                                                              "proof": {
+                                                                                "$ref": "#/definitions/inode_tree"
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "proof",
+                                                                              "segment",
+                                                                              "length"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "inode_extender"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "None",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "none": {
+                                                                            "type": "null"
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "none"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "proof",
+                                                                  "segment",
+                                                                  "length"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "extender"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          },
+                                                          {
+                                                            "title": "None",
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "none": {
+                                                                "type": "null"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "none"
+                                                            ],
+                                                            "additionalProperties": false
+                                                          }
+                                                        ]
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "state",
+                                                      "after",
+                                                      "before",
+                                                      "version"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "given": {
+                                                    "oneOf": [
+                                                      {
+                                                        "title": "Some",
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "inbox_level": {
+                                                            "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647
+                                                          },
+                                                          "message_counter": {
+                                                            "$ref": "#/definitions/positive_bignum"
+                                                          },
+                                                          "payload": {
+                                                            "$ref": "#/definitions/unistring"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "payload",
+                                                          "message_counter",
+                                                          "inbox_level"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "title": "None",
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  },
+                                                  "requested": {
+                                                    "oneOf": [
+                                                      {
+                                                        "title": "No_input_required",
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "no_input_required": {}
+                                                        },
+                                                        "required": [
+                                                          "no_input_required"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "title": "Initial",
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "initial": {}
+                                                        },
+                                                        "required": [
+                                                          "initial"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "title": "First_after",
+                                                        "type": "array",
+                                                        "items": [
+                                                          {
+                                                            "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647
+                                                          },
+                                                          {
+                                                            "$ref": "#/definitions/positive_bignum"
+                                                          }
+                                                        ],
+                                                        "additionalItems": false
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": [
+                                                  "requested",
+                                                  "given",
+                                                  "tree_proof"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "Wasm 2.0.0 PVM with proof",
                                                 "type": "object",
                                                 "properties": {
                                                   "tree_proof": {
