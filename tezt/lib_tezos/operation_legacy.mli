@@ -23,9 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [manager_operation_content] is an abstract type for
-    manager operations. Values of this type can be constructed using the
-    smart constructors below *)
+(** [manager_operation_content] is an abstract type for manager
+   operations. Values of this type can be constructed using the smart
+   constructors below.
+
+    Unless mentioned otherwise, the default values for generic
+   parameters of a manager operations are the following ones:
+
+    - Default [counter] is the successor of the counter of [source].
+
+    - Default [amount] is [1] tez.
+
+    - Default [fee] is [1000] mutez.
+
+    - Default [gas_limit] is [1040] gas. Use a greater limit
+   (e.g. ~1500) if the destination is not allocated, and ~1900 if the
+   source will additionnaly be emptied.
+
+    - Default [storage_limit] is [257].  *)
 type manager_operation_content
 
 (** Michelson scripts and data in different representations.
@@ -48,28 +63,6 @@ type micheline =
   | `File of string  (** file with ext .tz or .json for Ezjsonm *) ]
 
 (** {2 Smart constructors} *)
-
-(** [mk_transfer] allows to construct a manager operation representing a simple
-    transfer between implicit accounts [source] and [dest].
-
-    - Default [counter] is the successor of the counter of [source].
-    - Default [amount] is [1] tez.
-    - Default [fee] is [1000] mutez.
-    - Default [gas_limit] is [1040] gas. Use a greater limit (e.g. ~1500) if the
-      destination is not allocated, and ~1900 if the source will additionnaly be
-      emptied.
-    - Default [storage_limit] is [257].
-*)
-val mk_transfer :
-  source:Account.key ->
-  ?counter:int ->
-  ?fee:int ->
-  ?gas_limit:int ->
-  ?storage_limit:int ->
-  dest:Account.key ->
-  ?amount:int ->
-  Client.t ->
-  manager_operation_content Lwt.t
 
 (** [mk_reveal] allows to construct a manager operation representing a
     public key revelation of an implicit account [source].
@@ -186,14 +179,6 @@ val inject_operation :
   Client.t ->
   [`OpHash of string] Lwt.t
 
-val runnable_inject_operation :
-  ?async:bool ->
-  ?force:bool ->
-  unsigned_op:Hex.t ->
-  signature:Hex.t ->
-  Client.t ->
-  JSON.t Runnable.process
-
 (** [forge_and_inject_operation] allows to forge, sign and inject to a
     node, via the provided [client], the list [batch] of managed operations.
     The forged operation is signed by the given [signer] account.
@@ -222,16 +207,6 @@ val forge_and_inject_operation :
   signer:Account.key ->
   Client.t ->
   [`OpHash of string] Lwt.t
-
-val runnable_forge_and_inject_operation :
-  ?protocol:Protocol.t ->
-  ?branch:string ->
-  ?async:bool ->
-  ?force:bool ->
-  batch:[`Manager of manager_operation_content list] ->
-  signer:Account.key ->
-  Client.t ->
-  JSON.t Runnable.process Lwt.t
 
 (** {2 High-level injection functions} *)
 
@@ -288,7 +263,7 @@ val inject_public_key_revelation :
     [signer] can be different from the [source] to be able to inject missigned
     operations.
 
-    See {!mk_transfer} and {!forge_and_inject_operation} for the list of
+    See {!type:manager_operation_content} and {!forge_and_inject_operation} for the list of
     parameters and their default values. *)
 val inject_transfer :
   ?protocol:Protocol.t ->
