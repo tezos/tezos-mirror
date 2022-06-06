@@ -444,6 +444,6 @@ module V2_0_0 = struct
 
     let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
-    let proof_encoding = Context.Proof_encoding.V2.Tree32.tree_proof_encoding
+    let proof_encoding = Context.Proof_encoding.V1.Tree32.tree_proof_encoding
   end)
 end
