@@ -120,6 +120,20 @@ val inject :
   Client.t ->
   [`OpHash of string] Lwt.t
 
+(** [inject_operations] is similar as [inject] for a list of
+   operations. This function calls the RPC
+   {!val:RPC.post_private_injection_operations} which is faster than
+   calling the RPC used by {!val:inject} several times. Note that this
+   function should be used mainly when the time for injecting
+   operations matters. *)
+val inject_operations :
+  ?request:[`Inject | `Notify] ->
+  ?force:bool ->
+  ?error:rex ->
+  t list ->
+  Client.t ->
+  [`OpHash of string] list Lwt.t
+
 module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
