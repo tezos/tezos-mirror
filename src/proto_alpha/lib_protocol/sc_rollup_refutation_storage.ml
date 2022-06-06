@@ -136,14 +136,22 @@ let get_conflict_point ctxt rollup staker1 staker2 =
   in
   traverse_in_parallel ctxt commit1 commit2
 
-(** [get_or_init_game ctxt rollup refuter defender] returns the current
-    game between the two stakers [refuter] and [defender] if it exists.
+let get_game ctxt rollup stakers =
+  let open Lwt_tzresult_syntax in
+  let stakers = Sc_rollup_game_repr.Index.normalize stakers in
+  let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
+  match game with
+  | Some g -> return (g, ctxt)
+  | None -> fail Sc_rollup_no_game
 
-    If it does not already exist, it creates one with [refuter] as the
-    first player to move. The initial state of the game will be obtained
-    from the commitment pair belonging to [defender] at the conflict
-    point. See [Sc_rollup_game_repr.initial] for documentation on how a
-    pair of commitments is turned into an initial game state.
+(** [init_game ctxt rollup refuter defender] initialises the game or
+    if it already exists fails with `Sc_rollup_game_already_started`.
+
+    The game is created with `refuter` as the first player to move. The
+    initial state of the game will be obtained from the commitment pair
+    belonging to [defender] at the conflict point. See
+    [Sc_rollup_game_repr.initial] for documentation on how a pair of
+    commitments is turned into an initial game state.
 
     This also deals with the other bits of data in the storage around
     the game. It checks neither staker is already in a game (and also
@@ -168,12 +176,12 @@ let get_conflict_point ctxt rollup staker1 staker2 =
       {li [Sc_rollup_staker_in_game] if one of the [refuter] or [defender]
          is already playing a game}
     } *)
-let get_or_init_game ctxt rollup ~refuter ~defender =
+let init_game ctxt rollup ~refuter ~defender =
   let open Lwt_tzresult_syntax in
   let stakers = Sc_rollup_game_repr.Index.normalize (refuter, defender) in
   let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
   match game with
-  | Some g -> return (g, ctxt)
+  | Some _ -> fail Sc_rollup_game_already_started
   | None ->
       let* ctxt, opp_1 = Store.Opponent.find (ctxt, rollup) refuter in
       let* ctxt, opp_2 = Store.Opponent.find (ctxt, rollup) defender in
@@ -208,11 +216,13 @@ let get_or_init_game ctxt rollup ~refuter ~defender =
       let* ctxt, _ = Store.Opponent.init (ctxt, rollup) defender refuter in
       return (game, ctxt)
 
-let update_game ctxt rollup ~player ~opponent refutation =
+let game_move ctxt rollup ~player ~opponent refutation ~is_opening_move =
   let open Lwt_tzresult_syntax in
   let alice, bob = Sc_rollup_game_repr.Index.normalize (player, opponent) in
   let* game, ctxt =
-    get_or_init_game ctxt rollup ~refuter:player ~defender:opponent
+    if is_opening_move then
+      init_game ctxt rollup ~refuter:player ~defender:opponent
+    else get_game ctxt rollup (alice, bob)
   in
   let* () =
     fail_unless

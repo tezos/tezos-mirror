@@ -472,6 +472,7 @@ and _ manager_operation =
       rollup : Sc_rollup_repr.t;
       opponent : Sc_rollup_repr.Staker.t;
       refutation : Sc_rollup_game_repr.refutation;
+      is_opening_move : bool;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {
