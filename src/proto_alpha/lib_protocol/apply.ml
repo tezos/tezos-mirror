@@ -1785,7 +1785,7 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [])
   | Sc_rollup_add_messages {rollup; messages} ->
-      Sc_rollup.Inbox.add_messages ctxt rollup messages
+      Sc_rollup.Inbox.add_external_messages ctxt rollup messages
       >>=? fun (inbox_after, _size, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in

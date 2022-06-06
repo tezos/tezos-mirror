@@ -68,8 +68,17 @@
   Level_repr
   Script_repr
   Cache_memory_helpers
+  Seed_repr
+  Sampler
+  Voting_period_repr
+  Ticket_hash_repr
+  Contract_repr
+  Indexable
+  Entrypoint_repr
   Sc_rollup_repr
   Sc_rollup_tick_repr
+  Sc_rollup_inbox_message_repr
+  Sc_rollup_outbox_message_repr
   Sc_rollup_PVM_sem
   Sc_rollup_arith
   Sc_rollups
@@ -78,13 +87,6 @@
   Sc_rollup_commitment_repr
   Sc_rollup_proof_repr
   Sc_rollup_game_repr
-  Seed_repr
-  Sampler
-  Voting_period_repr
-  Ticket_hash_repr
-  Contract_repr
-  Indexable
-  Entrypoint_repr
   Tx_rollup_level_repr
   Tx_rollup_l2_proof
   Tx_rollup_l2_address
@@ -285,8 +287,17 @@
   level_repr.ml level_repr.mli
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  ticket_hash_repr.ml ticket_hash_repr.mli
+  contract_repr.ml contract_repr.mli
+  indexable.ml indexable.mli
+  entrypoint_repr.ml entrypoint_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
@@ -295,13 +306,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  seed_repr.ml seed_repr.mli
-  sampler.ml sampler.mli
-  voting_period_repr.ml voting_period_repr.mli
-  ticket_hash_repr.ml ticket_hash_repr.mli
-  contract_repr.ml contract_repr.mli
-  indexable.ml indexable.mli
-  entrypoint_repr.ml entrypoint_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
@@ -489,8 +493,17 @@
   level_repr.ml level_repr.mli
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  ticket_hash_repr.ml ticket_hash_repr.mli
+  contract_repr.ml contract_repr.mli
+  indexable.ml indexable.mli
+  entrypoint_repr.ml entrypoint_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
@@ -499,13 +512,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  seed_repr.ml seed_repr.mli
-  sampler.ml sampler.mli
-  voting_period_repr.ml voting_period_repr.mli
-  ticket_hash_repr.ml ticket_hash_repr.mli
-  contract_repr.ml contract_repr.mli
-  indexable.ml indexable.mli
-  entrypoint_repr.ml entrypoint_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
@@ -713,8 +719,17 @@
   level_repr.ml level_repr.mli
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  ticket_hash_repr.ml ticket_hash_repr.mli
+  contract_repr.ml contract_repr.mli
+  indexable.ml indexable.mli
+  entrypoint_repr.ml entrypoint_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
@@ -723,13 +738,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  seed_repr.ml seed_repr.mli
-  sampler.ml sampler.mli
-  voting_period_repr.ml voting_period_repr.mli
-  ticket_hash_repr.ml ticket_hash_repr.mli
-  contract_repr.ml contract_repr.mli
-  indexable.ml indexable.mli
-  entrypoint_repr.ml entrypoint_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
@@ -933,8 +941,17 @@
   level_repr.ml level_repr.mli
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
+  seed_repr.ml seed_repr.mli
+  sampler.ml sampler.mli
+  voting_period_repr.ml voting_period_repr.mli
+  ticket_hash_repr.ml ticket_hash_repr.mli
+  contract_repr.ml contract_repr.mli
+  indexable.ml indexable.mli
+  entrypoint_repr.ml entrypoint_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
+  sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sem.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollups.ml sc_rollups.mli
@@ -943,13 +960,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  seed_repr.ml seed_repr.mli
-  sampler.ml sampler.mli
-  voting_period_repr.ml voting_period_repr.mli
-  ticket_hash_repr.ml ticket_hash_repr.mli
-  contract_repr.ml contract_repr.mli
-  indexable.ml indexable.mli
-  entrypoint_repr.ml entrypoint_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli

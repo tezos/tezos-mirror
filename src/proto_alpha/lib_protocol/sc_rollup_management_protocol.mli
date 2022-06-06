@@ -23,38 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The Rollup Management Protocol defines the communication protocol for
-    exchanging messages between Layer 1 and Layer 2 for a SCORU.
+(** This module provides a typed API for the Rollup Management Protocol that
+    defines the communication protocol for exchanging messages between Layer 1
+    and Layer 2 for smart-contract rollups.
 
-    This module exposes a type {!inbox_message}. Inbox messages produced by the
-    Layer 1 protocol are encoded using the {!bytes_of_inbox} function, before
-    added to a SCORU's inbox.
-
-    An {!inbox_message} consists of:
-     - [payload] the parameters passed to the SCORU.
-     - [sender] the Layer 1 contract caller.
-     - [source] the public key hash used for originating the transaction.
+    The API exposes functions for constructing inbox messages. These are
+    messages produced by the Layer 1 protocol and added to a smart-contract
+    rollups inbox.
 
     The Layer 2 node is responsible for decoding and interpreting the messages.
 
-    Another type {!outbox_message} representing messages from Layer 2 to Layer 1
+    A type {!outbox_message} representing messages from Layer 2 to Layer 1
     is also provided. An {!outbox_message} consists of a set of transactions
     to L1 accounts.
   *)
 
 open Alpha_context
 
-(** A type representing messages from Layer 1 to Layer 2. *)
-type inbox_message
+type error += (* Permanent *) Sc_rollup_invalid_destination
 
 (** A type representing a Layer 2 to Layer 1 transaction. *)
 type transaction = private
   | Transaction : {
-      destination : Destination.t;
+      destination : Contract_hash.t;
       entrypoint : Entrypoint.t;
       parameters_ty : ('a, _) Script_typed_ir.ty;
       parameters : 'a;
-      unparsed_parameters_ty : Script.expr;
       unparsed_parameters : Script.expr;
     }
       -> transaction
@@ -66,26 +60,22 @@ type atomic_transaction_batch = private {transactions : transaction list}
 type outbox_message = private
   | Atomic_transaction_batch of atomic_transaction_batch
 
-(** [make_inbox_message ctxt ty ~payload ~sender ~source] constructs a SCORU
-    [inbox message] (an L1 to L2 message) with the given [payload], [sender],
-    and [source]. *)
-val make_inbox_message :
+(** [make_internal_inbox_message ctxt ty ~payload ~sender ~source] constructs a
+    smart-contract rollup's [inbox message] (an L1 to L2 message) with the given
+    [payload], [sender], and [source]. *)
+val make_internal_inbox_message :
   context ->
   ('a, _) Script_typed_ir.ty ->
   payload:'a ->
   sender:Contract.t ->
   source:public_key_hash ->
-  (inbox_message * context) tzresult Lwt.t
-
-(** [bytes_of_inbox_message msg] encodes the inbox message [msg] in binary
-    format. *)
-val bytes_of_inbox_message : inbox_message -> bytes tzresult
+  (Sc_rollup.Inbox.Message.t * context) tzresult Lwt.t
 
 (** [outbox_message_of_bytes ctxt bs] decodes an outbox message value from the
     given bytes [bs]. The function involves parsing Micheline expressions to
     typed values. *)
 val outbox_message_of_bytes :
-  context -> bytes -> (outbox_message * context) tzresult Lwt.t
+  context -> string -> (outbox_message * context) tzresult Lwt.t
 
 (** Function for constructing and encoding {!inbox_message} and
     {!outbox_message} values. Since Layer 1 only ever consumes {!outbox_message}
@@ -98,7 +88,7 @@ module Internal_for_tests : sig
     context ->
     ('a, _) Script_typed_ir.ty ->
     parameters:'a ->
-    destination:Destination.t ->
+    destination:Contract_hash.t ->
     entrypoint:Entrypoint.t ->
     (transaction * context) tzresult Lwt.t
 
@@ -108,9 +98,9 @@ module Internal_for_tests : sig
 
   (** [bytes_of_output_message msg] encodes the outbox message [msg] in binary
       format. *)
-  val bytes_of_outbox_message : outbox_message -> bytes tzresult
+  val bytes_of_outbox_message : outbox_message -> string tzresult
 
   (** [inbox_message_of_bytes bs] decodes an inbox message from the given bytes
       [bs]. *)
-  val inbox_message_of_bytes : bytes -> inbox_message tzresult
+  val inbox_message_of_bytes : string -> Sc_rollup.Inbox.Message.t tzresult
 end

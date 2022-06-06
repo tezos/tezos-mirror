@@ -62,6 +62,7 @@ module Sc_rollup = struct
   module Inbox = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
+    module Message = Sc_rollup_inbox_message_repr
   end
 
   module Proof = Sc_rollup_proof_repr
@@ -76,6 +77,11 @@ module Sc_rollup = struct
   module Refutation_storage = Sc_rollup_refutation_storage
   include Sc_rollup_storage
   include Sc_rollups
+
+  module Outbox = struct
+    include Sc_rollup_storage.Outbox
+    module Message = Sc_rollup_outbox_message_repr
+  end
 end
 
 module Dal = struct

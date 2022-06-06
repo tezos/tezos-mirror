@@ -191,8 +191,8 @@ module type MerkelizedOperations = sig
       positive. *)
   val history_at_genesis : bound:int64 -> history
 
-  (** [add_messages history inbox level payloads messages] inserts a list of
-     [payloads] as new messages in the [messages] of the current
+  (** [add_external_messages history inbox level payloads messages] inserts a
+     list of [payloads] as new messages in the [messages] of the current
      [level] of the [inbox]. This function returns the new sequence
      of messages as well as updated [inbox] and [history].
 
@@ -210,7 +210,7 @@ module type MerkelizedOperations = sig
      if the inbox is full.
 
   *)
-  val add_messages :
+  val add_external_messages :
     history ->
     t ->
     Raw_level_repr.t ->
@@ -218,10 +218,10 @@ module type MerkelizedOperations = sig
     messages ->
     (messages * history * t) tzresult Lwt.t
 
-  (** [add_messages_no_history inbox level payloads messages] behaves
-      a [add_messages] except that it does not remember the inbox
+  (** [add_external_messages_no_history inbox level payloads messages] behaves
+      a [add_external_messages] except that it does not remember the inbox
       history. *)
-  val add_messages_no_history :
+  val add_external_messages_no_history :
     t ->
     Raw_level_repr.t ->
     string list ->

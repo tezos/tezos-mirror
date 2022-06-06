@@ -28,8 +28,8 @@ open Protocol
 (** A benchmark for estimating the gas cost of
     {!Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages}. This
     value is used to consume the gas cost internally in
-    [Sc_rollup_storage.add_messages], when computing the number of messages
-    and their totla size in bytes to be added to an inbox.
+    [Sc_rollup_storage.add_external_messages], when computing the number of
+    messages and their total size in bytes to be added to an inbox.
 *)
 
 module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
@@ -122,18 +122,20 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
       (Model.For_codegen cost_update_num_and_size_ofmessages_model)
 end
 
-(** A benchmark for estimating the gas cost of {!Sc_rollup.Inbox.add_messages}.
+(** A benchmark for estimating the gas cost of
+    {!Sc_rollup.Inbox.add_external_messages}.
+
     We assume that the cost (in gas) [cost(n, l)] of adding a message of size
     [n] bytes, at level [l] since the origination of the rollup, satisfies the
     equation [cost(n) = c_0 + c_1 * n + c_2 * log(l)], where [c_0], [c_1] and
     [c_2] are the values to be benchmarked. We also assume that the cost of
     adding messages [m_0, ..., m_k] to a rollup inbox is
-    [\sum_{i=0}^{k} cost(|m_i|, l)]. Thus, it suffices to estimate the cost of 
+    [\sum_{i=0}^{k} cost(|m_i|, l)]. Thus, it suffices to estimate the cost of
     adding a single message to the inbox.
 *)
 
-module Sc_rollup_add_messages_benchmark = struct
-  let name = "Sc_rollup_inbox_add_message"
+module Sc_rollup_add_external_messages_benchmark = struct
+  let name = "Sc_rollup_inbox_add_external_message"
 
   let info = "Estimating the costs of adding a single message to a rollup inbox"
 
@@ -226,7 +228,10 @@ module Sc_rollup_add_messages_benchmark = struct
       let open Lwt_result_syntax in
       let+ inbox, _, ctxt =
         Lwt.map Environment.wrap_tzresult
-        @@ Sc_rollup_inbox_storage.add_messages ctxt rollup ["CAFEBABE"]
+        @@ Sc_rollup_inbox_storage.add_external_messages
+             ctxt
+             rollup
+             ["CAFEBABE"]
       in
       let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
       (inbox, ctxt)
@@ -262,7 +267,7 @@ module Sc_rollup_add_messages_benchmark = struct
     let workload = {message_length; level = last_level_int} in
     let closure () =
       ignore
-        (Sc_rollup_inbox_repr.add_messages_no_history
+        (Sc_rollup_inbox_repr.add_external_messages_no_history
            inbox
            last_level
            [message]
@@ -277,7 +282,9 @@ module Sc_rollup_add_messages_benchmark = struct
     Registration.register_for_codegen name (Model.For_codegen add_message_model)
 end
 
-let () = Registration_helpers.register (module Sc_rollup_add_messages_benchmark)
+let () =
+  Registration_helpers.register
+    (module Sc_rollup_add_external_messages_benchmark)
 
 let () =
   Registration_helpers.register

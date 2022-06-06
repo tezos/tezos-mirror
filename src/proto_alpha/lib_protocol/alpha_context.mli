@@ -2664,6 +2664,23 @@ module Sc_rollup : sig
   module Inbox : sig
     type t
 
+    (** See {!Sc_rollup_inbox_message_repr}. *)
+    module Message : sig
+      type t =
+        | Internal of {
+            payload : Script.expr;
+            sender : Contract.t;
+            source : Signature.public_key_hash;
+          }
+        | External of string
+
+      val to_bytes : t -> string tzresult
+
+      module Internal_for_tests : sig
+        val of_bytes : string -> t tzresult
+      end
+    end
+
     val pp : Format.formatter -> t -> unit
 
     val encoding : t Data_encoding.t
@@ -2693,7 +2710,7 @@ module Sc_rollup : sig
 
       val history_at_genesis : bound:int64 -> history
 
-      val add_messages :
+      val add_external_messages :
         history ->
         t ->
         Raw_level.t ->
@@ -2701,7 +2718,7 @@ module Sc_rollup : sig
         messages ->
         (messages * history * t) tzresult Lwt.t
 
-      val add_messages_no_history :
+      val add_external_messages_no_history :
         t ->
         Raw_level.t ->
         string list ->
@@ -2750,7 +2767,7 @@ module Sc_rollup : sig
     module MakeHashingScheme (Tree : TREE) :
       MerkelizedOperations with type tree = Tree.tree
 
-    val add_messages :
+    val add_external_messages :
       context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
 
     val inbox : context -> rollup -> (t * context) tzresult Lwt.t
@@ -2897,6 +2914,23 @@ module Sc_rollup : sig
   val get_boot_sector : context -> t -> string tzresult Lwt.t
 
   module Outbox : sig
+    (** See {!Sc_rollup_outbox_message_repr}. *)
+    module Message : sig
+      type transaction = {
+        unparsed_parameters : Script.expr;
+        destination : Contract_hash.t;
+        entrypoint : Entrypoint.t;
+      }
+
+      type t = Atomic_transaction_batch of {transactions : transaction list}
+
+      val of_bytes : string -> t tzresult
+
+      module Internal_for_tests : sig
+        val to_bytes : t -> string tzresult
+      end
+    end
+
     val record_applied_message :
       context ->
       t ->

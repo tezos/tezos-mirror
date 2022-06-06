@@ -59,7 +59,7 @@ let assert_inbox_nb_messages_in_commitment_period inbox extra_messages =
     Compare.Int64.(nb_messages_in_commitment_period > limit)
     Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
-let add_messages ctxt rollup messages =
+let add_external_messages ctxt rollup messages =
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_tzresult_syntax in
   let open Raw_context in
@@ -116,10 +116,13 @@ let add_messages ctxt rollup messages =
   let*? current_messages, ctxt =
     Sc_rollup_in_memory_inbox.current_messages ctxt rollup
   in
-  let gas_cost_add_messages =
-    Sc_rollup_costs.cost_add_messages ~num_messages ~total_messages_size levels
+  let gas_cost_add_external_messages =
+    Sc_rollup_costs.cost_add_external_messages
+      ~num_messages
+      ~total_messages_size
+      levels
   in
-  let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_messages in
+  let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_external_messages in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
@@ -127,7 +130,7 @@ let add_messages ctxt rollup messages =
   *)
   let* current_messages, inbox =
     Sc_rollup_inbox_repr.(
-      add_messages_no_history inbox level messages current_messages)
+      add_external_messages_no_history inbox level messages current_messages)
   in
   let*? ctxt =
     Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages

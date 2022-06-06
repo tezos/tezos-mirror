@@ -23,27 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module contains constants and utility functions for gas metering
-    functions used when handling SC rollups operations in context. *)
+(** This module defines a data type {!t} that represents messages from Layer 2
+    to Layer 1.
 
-module Constants : sig
-  val cost_add_message_base : Gas_limit_repr.cost
+    They are part of the [Rollup Management Protocol] that defines the
+    communication protocol for exchanging messages between Layer 1 and Layer 2
+    for smart-contract rollups.
 
-  val cost_add_message_per_byte : Gas_limit_repr.cost
+    An outbox-message consists of a sequence of transactions to L1
+    smart-contract accounts. All transactions contained in a message are
+    intended to be executed as a batch.
+  *)
 
-  val cost_add_inbox_per_level : Gas_limit_repr.cost
+(** A transaction from L2 to L1. *)
+type transaction = {
+  unparsed_parameters : Script_repr.expr;  (** The payload. *)
+  destination : Contract_hash.t;  (** The recipient contract. *)
+  entrypoint : Entrypoint_repr.t;  (** Entrypoint of the destination. *)
+}
 
-  val cost_update_num_and_size_of_messages : Gas_limit_repr.cost
+(** A type representing messages from Layer 2 to Layer 1. *)
+type t = Atomic_transaction_batch of {transactions : transaction list}
+
+(** [of_bytes ctxt bs] decodes an outbox message value from the
+    given bytes [bs]. The function involves parsing Micheline expressions to
+    typed values. *)
+val of_bytes : string -> t tzresult
+
+module Internal_for_tests : sig
+  (** [to_bytes msg] returns the bytes of the given outbox
+        message [msg]. *)
+  val to_bytes : t -> string tzresult
 end
-
-(** [is_valid_parameters_ty_cost ty] returns the cost of checking whether a type
-    is a valid sc rollup parameter. *)
-val is_valid_parameters_ty_cost :
-  ty_size:'a Saturation_repr.t -> Saturation_repr.may_saturate Saturation_repr.t
-
-(** [cost_add_external_messages ~num_messages ~total_messages_length level]
-    returns the cost of adding [num_messages] with total messages size
-    [total_messages_size] to a sc-rollup inbox at level [level]. This
-    function is used internally in the [Sc_rollup_storage] module. *)
-val cost_add_external_messages :
-  num_messages:int -> total_messages_size:int -> int32 -> Gas_limit_repr.cost

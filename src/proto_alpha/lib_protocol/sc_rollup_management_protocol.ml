@@ -25,94 +25,27 @@
 
 open Alpha_context
 
-type error +=
-  | (* `Permanent *) Error_encode_inbox_message
-  | (* `Permanent *) Error_decode_inbox_message
-  | (* `Permanent *) Error_encode_outbox_message
-  | (* `Permanent *) Error_decode_outbox_message
+type error += (* Permanent *) Sc_rollup_invalid_destination
 
 let () =
   let open Data_encoding in
-  let msg =
-    "Failed to encode a rollup management protocol inbox message value"
-  in
+  let msg = "Invalid destination" in
   register_error_kind
     `Permanent
-    ~id:"rollup_management_protocol.error_encoding_inbox_message"
+    ~id:"sc_rollup_management_protocol.sc_rollup_invalid_destination"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
     unit
-    (function Error_encode_inbox_message -> Some () | _ -> None)
-    (fun () -> Error_encode_inbox_message) ;
-  let msg =
-    "Failed to decode a rollup management protocol inbox message value"
-  in
-  register_error_kind
-    `Permanent
-    ~id:"rollup_management_protocol.error_decoding_inbox_message"
-    ~title:msg
-    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
-    ~description:msg
-    unit
-    (function Error_decode_inbox_message -> Some () | _ -> None)
-    (fun () -> Error_decode_inbox_message) ;
-  let msg =
-    "Failed to encode a rollup management protocol outbox message value"
-  in
-  register_error_kind
-    `Permanent
-    ~id:"rollup_management_protocol.error_encoding_outbox_message"
-    ~title:msg
-    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
-    ~description:msg
-    unit
-    (function Error_encode_outbox_message -> Some () | _ -> None)
-    (fun () -> Error_encode_outbox_message) ;
-  let msg =
-    "Failed to decode a rollup management protocol outbox message value"
-  in
-  register_error_kind
-    `Permanent
-    ~id:"rollup_management_protocol.error_decoding_outbox_message"
-    ~title:msg
-    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
-    ~description:msg
-    unit
-    (function Error_decode_outbox_message -> Some () | _ -> None)
-    (fun () -> Error_decode_outbox_message)
-
-type sc_message = {
-  payload : Script_repr.expr;
-      (** A Micheline value containing the parameters passed to the rollup. *)
-  sender : Alpha_context.Contract.t;  (** The L1 caller contract. *)
-  source : Signature.public_key_hash;
-      (** The implicit account that originated the transaction. *)
-}
-
-type inbox_message = Sc_message of sc_message
-
-type transaction_internal = {
-  unparsed_parameters_ty : Script_repr.expr;  (** The type of the parameters. *)
-  unparsed_parameters : Script_repr.expr;  (** The payload. *)
-  destination : Destination.t;  (** The recipient contract or rollup. *)
-  entrypoint : Entrypoint.t;  (** Entrypoint of the destination. *)
-}
-
-type atomic_message_batch_internal = {
-  transactions_internal : transaction_internal list;
-}
-
-type outbox_message_internal =
-  | Atomic_transaction_batch_internal of atomic_message_batch_internal
+    (function Sc_rollup_invalid_destination -> Some () | _ -> None)
+    (fun () -> Sc_rollup_invalid_destination)
 
 type transaction =
   | Transaction : {
-      destination : Destination.t;
+      destination : Contract_hash.t;
       entrypoint : Entrypoint.t;
       parameters_ty : ('a, _) Script_typed_ir.ty;
       parameters : 'a;
-      unparsed_parameters_ty : Script.expr;
       unparsed_parameters : Script.expr;
     }
       -> transaction
@@ -121,7 +54,7 @@ type atomic_transaction_batch = {transactions : transaction list}
 
 type outbox_message = Atomic_transaction_batch of atomic_transaction_batch
 
-let make_inbox_message ctxt ty ~payload ~sender ~source =
+let make_internal_inbox_message ctxt ty ~payload ~sender ~source =
   let open Lwt_tzresult_syntax in
   let+ payload, ctxt =
     Script_ir_translator.unparse_data
@@ -131,80 +64,33 @@ let make_inbox_message ctxt ty ~payload ~sender ~source =
       payload
   in
   let payload = Micheline.strip_locations payload in
-  (Sc_message {payload; sender; source}, ctxt)
+  (Sc_rollup.Inbox.Message.Internal {payload; sender; source}, ctxt)
 
-let sc_message_encoding =
-  let open Data_encoding in
-  conv
-    (fun {payload; sender; source} -> (payload, sender, source))
-    (fun (payload, sender, source) -> {payload; sender; source})
-  @@ obj3
-       (req "payload" Script_repr.expr_encoding)
-       (req "sender" Contract.encoding)
-       (req "source" Signature.Public_key_hash.encoding)
-
-let transaction_internal_encoding =
-  let open Data_encoding in
-  conv
-    (fun {unparsed_parameters_ty; unparsed_parameters; destination; entrypoint} ->
-      (unparsed_parameters_ty, unparsed_parameters, destination, entrypoint))
-    (fun (unparsed_parameters_ty, unparsed_parameters, destination, entrypoint) ->
-      {unparsed_parameters_ty; unparsed_parameters; destination; entrypoint})
-  @@ obj4
-       (req "parameters_ty" Script_repr.expr_encoding)
-       (req "parameters" Script_repr.expr_encoding)
-       (req "destination" Destination.encoding)
-       (req "entrypoint" Entrypoint.simple_encoding)
-
-let atomic_message_batch_encoding =
-  let open Data_encoding in
-  obj1
-    (req
-       "transactions"
-       (conv
-          (fun {transactions_internal} -> transactions_internal)
-          (fun transactions_internal -> {transactions_internal})
-          (list transaction_internal_encoding)))
-
-let internal_outbox_message_encoding =
-  let open Data_encoding in
-  conv
-    (fun (Atomic_transaction_batch_internal m) -> m)
-    (fun m -> Atomic_transaction_batch_internal m)
-    atomic_message_batch_encoding
-
-let inbox_message_encoding =
-  let open Data_encoding in
-  conv (fun (Sc_message m) -> m) (fun m -> Sc_message m) sc_message_encoding
-
-(** TODO: #2951
-    Carbonate [to_bytes] step.
-    Gas for encoding the value in binary format should be accounted for.
-  *)
-let bytes_of_inbox_message msg =
-  let open Tzresult_syntax in
-  match Data_encoding.Binary.to_bytes_opt inbox_message_encoding msg with
-  | None -> fail Error_encode_inbox_message
-  | Some bs -> return bs
-
-let transactions_batch_of_internal ctxt {transactions_internal} =
+let transactions_batch_of_internal ctxt transactions =
   let open Lwt_tzresult_syntax in
   let or_internal_transaction ctxt
-      {unparsed_parameters_ty; unparsed_parameters; destination; entrypoint} =
-    let*? Ex_ty parameters_ty, ctxt =
-      Script_ir_translator.parse_ty
-        ~legacy:false
-        ~allow_lazy_storage:false
-        ~allow_contract:false
-        ~allow_ticket:true
-        ~allow_operation:false
-        ctxt
-        (Micheline.root unparsed_parameters_ty)
+      {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint} =
+    (* Lookup the contract-hash. *)
+    (* Load the type and entrypoints of the script. *)
+    let* ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
+           ctxt ) =
+      let* ctxt, _cache_key, cached = Script_cache.find ctxt destination in
+      match cached with
+      | Some (_script, ex_script) -> return (ex_script, ctxt)
+      | None -> fail Sc_rollup_invalid_destination
     in
-    (* TODO: #2964
-       We should rule out big-maps.
-       [allow_forged] controls both tickets and big-maps. Here we only want to
-       allow tickets. *)
+    (* Find the entrypoint type for the given entrypoint. *)
+    let*? res, ctxt =
+      Gas_monad.run
+        ctxt
+        (Script_ir_translator.find_entrypoint
+           ~error_details:(Informative ())
+           arg_type
+           entrypoints
+           entrypoint)
+    in
+    let*? (Ex_ty_cstr {ty = parameters_ty; _}) = res in
+    (* Parse the parameters according to the entrypoint type. *)
     let* parameters, ctxt =
       Script_ir_translator.parse_data
         ctxt
@@ -220,7 +106,6 @@ let transactions_batch_of_internal ctxt {transactions_internal} =
             entrypoint;
             parameters_ty;
             parameters;
-            unparsed_parameters_ty;
             unparsed_parameters;
           },
         ctxt )
@@ -231,7 +116,7 @@ let transactions_batch_of_internal ctxt {transactions_internal} =
         let+ t, ctxt = or_internal_transaction ctxt msg in
         (ctxt, t))
       ctxt
-      transactions_internal
+      transactions
   in
   ({transactions}, ctxt)
 
@@ -241,14 +126,10 @@ let transactions_batch_of_internal ctxt {transactions_internal} =
   *)
 let outbox_message_of_bytes ctxt bytes =
   let open Lwt_tzresult_syntax in
-  let*? (Atomic_transaction_batch_internal msg) =
-    match
-      Data_encoding.Binary.of_bytes_opt internal_outbox_message_encoding bytes
-    with
-    | Some x -> ok x
-    | None -> error Error_decode_inbox_message
+  let*? (Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}) =
+    Sc_rollup.Outbox.Message.of_bytes bytes
   in
-  let+ ts, ctxt = transactions_batch_of_internal ctxt msg in
+  let+ ts, ctxt = transactions_batch_of_internal ctxt transactions in
   (Atomic_transaction_batch ts, ctxt)
 
 module Internal_for_tests = struct
@@ -257,22 +138,7 @@ module Internal_for_tests = struct
     let* unparsed_parameters, ctxt =
       Script_ir_translator.unparse_data ctxt Optimized parameters_ty parameters
     in
-    let*? unparsed_parameters_ty, ctxt =
-      Script_ir_translator.unparse_ty
-        ctxt
-        ~loc:Micheline.dummy_location
-        parameters_ty
-    in
-    let*? ctxt =
-      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-    in
     let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-    let*? ctxt =
-      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters_ty)
-    in
-    let unparsed_parameters_ty =
-      Micheline.strip_locations unparsed_parameters_ty
-    in
     return
       ( Transaction
           {
@@ -280,7 +146,6 @@ module Internal_for_tests = struct
             entrypoint;
             parameters_ty;
             parameters;
-            unparsed_parameters_ty;
             unparsed_parameters;
           },
         ctxt )
@@ -296,26 +161,17 @@ module Internal_for_tests = struct
             entrypoint;
             parameters_ty = _;
             parameters = _;
-            unparsed_parameters_ty;
             unparsed_parameters;
           }) =
-      {unparsed_parameters; unparsed_parameters_ty; destination; entrypoint}
+      return
+        {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint}
     in
+    let* transactions = List.map_e to_internal_transaction transactions in
     let output_message_internal =
-      Atomic_transaction_batch_internal
-        {transactions_internal = List.map to_internal_transaction transactions}
+      Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}
     in
-    match
-      Data_encoding.Binary.to_bytes_opt
-        internal_outbox_message_encoding
-        output_message_internal
-    with
-    | Some x -> return x
-    | None -> fail Error_encode_inbox_message
+    Sc_rollup.Outbox.Message.Internal_for_tests.to_bytes output_message_internal
 
-  let inbox_message_of_bytes bytes =
-    let open Tzresult_syntax in
-    match Data_encoding.Binary.of_bytes_opt inbox_message_encoding bytes with
-    | None -> fail Error_decode_inbox_message
-    | Some deposit -> return deposit
+  let inbox_message_of_bytes =
+    Sc_rollup.Inbox.Message.Internal_for_tests.of_bytes
 end

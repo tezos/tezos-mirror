@@ -23,27 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module contains constants and utility functions for gas metering
-    functions used when handling SC rollups operations in context. *)
+(** This module exposes a type {!t} that represents inbox messages. Inbox
+    messages are produced by the Layer 1 protocol and are encoded using the
+    {!to_bytes} function, before being added to a smart-contract rollup's inbox.
 
-module Constants : sig
-  val cost_add_message_base : Gas_limit_repr.cost
+    They are part of the [Rollup Management Protocol] that defines the
+    communication protocol for exchanging messages between Layer 1 and Layer 2
+    for a smart-contract rollup.
 
-  val cost_add_message_per_byte : Gas_limit_repr.cost
+    There are two types of inbox messages: external and internal.
 
-  val cost_add_inbox_per_level : Gas_limit_repr.cost
+     Internal messages originate from Layer 1 smart-contract and consist of:
+     - [payload] the parameters passed to the smart-contract rollup.
+     - [sender] the Layer 1 contract caller.
+     - [source] the public key hash used for originating the transaction.
 
-  val cost_update_num_and_size_of_messages : Gas_limit_repr.cost
+    External messages originate from the [Sc_rollup_add_messages]
+    manager-operation and consists of strings. The Layer 2 node is responsible
+    for decoding and interpreting these messages.
+  *)
+
+(** A type representing messages from Layer 1 to Layer 2. Internal ones are
+    originated from Layer 1 smart-contracts and external ones are messages from
+    an external manager operation. *)
+type t =
+  | Internal of {
+      payload : Script_repr.expr;
+          (** A Micheline value containing the parameters passed to the rollup. *)
+      sender : Contract_repr.t;  (** The L1 caller contract. *)
+      source : Signature.public_key_hash;
+          (** The implicit account that originated the transaction. *)
+    }
+  | External of string
+
+(** [bytes_of_inbox_message msg] encodes the inbox message [msg] in binary
+    format. *)
+val to_bytes : t -> string tzresult
+
+module Internal_for_tests : sig
+  (** [of_bytes bs] decodes [bs] as an [inbox_message]. *)
+  val of_bytes : string -> t tzresult
 end
-
-(** [is_valid_parameters_ty_cost ty] returns the cost of checking whether a type
-    is a valid sc rollup parameter. *)
-val is_valid_parameters_ty_cost :
-  ty_size:'a Saturation_repr.t -> Saturation_repr.may_saturate Saturation_repr.t
-
-(** [cost_add_external_messages ~num_messages ~total_messages_length level]
-    returns the cost of adding [num_messages] with total messages size
-    [total_messages_size] to a sc-rollup inbox at level [level]. This
-    function is used internally in the [Sc_rollup_storage] module. *)
-val cost_add_external_messages :
-  num_messages:int -> total_messages_size:int -> int32 -> Gas_limit_repr.cost
