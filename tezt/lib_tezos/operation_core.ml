@@ -84,7 +84,7 @@ module Tezos_operation = Tezos_base.TzPervasives.Operation
 
 let to_raw_operation t client : Tezos_operation.t Lwt.t =
   let open Tezos_base.TzPervasives in
-  let branch = Block_hash.of_string_exn t.branch in
+  let branch = Block_hash.of_b58check_exn t.branch in
   let* raw = hex t client in
   return Tezos_operation.{shell = {branch}; proto = Hex.to_bytes_exn raw}
 
