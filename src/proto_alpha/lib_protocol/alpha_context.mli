@@ -2883,12 +2883,13 @@ module Sc_rollup : sig
   module Refutation_storage : sig
     type conflict_point = Commitment.Hash.t * Commitment.Hash.t
 
-    val update_game :
+    val game_move :
       context ->
       t ->
       player:Staker.t ->
       opponent:Staker.t ->
       Game.refutation ->
+      is_opening_move:bool ->
       (Game.outcome option * context) tzresult Lwt.t
 
     val timeout :
@@ -3430,6 +3431,7 @@ and _ manager_operation =
       rollup : Sc_rollup.t;
       opponent : Sc_rollup.Staker.t;
       refutation : Sc_rollup.Game.refutation;
+      is_opening_move : bool;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {

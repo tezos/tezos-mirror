@@ -41,6 +41,7 @@ type error +=
       Sc_rollup_commitment_repr.Hash.t
   | (* `Temporary *) Sc_rollup_bad_inbox_level
   | (* `Temporary *) Sc_rollup_max_number_of_available_messages_reached
+  | (* `Temporary *) Sc_rollup_game_already_started
   | (* `Temporary *) Sc_rollup_wrong_turn
   | (* `Temporary *) Sc_rollup_no_game
   | (* `Temporary *) Sc_rollup_staker_in_game
@@ -85,11 +86,25 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_timeout_level_not_reached -> Some () | _ -> None)
     (fun () -> Sc_rollup_timeout_level_not_reached) ;
+  let description =
+    "Refutation game already started, must play with is_opening_move = false."
+  in
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_game_already_started"
+    ~title:"Refutation game already started"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.unit
+    (function Sc_rollup_game_already_started -> Some () | _ -> None)
+    (fun () -> Sc_rollup_game_already_started) ;
+  let description = "Refutation game does not exist" in
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_no_game"
     ~title:"Refutation game does not exist"
-    ~description:"Refutation game does not exist"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
     (function Sc_rollup_no_game -> Some () | _ -> None)
     (fun () -> Sc_rollup_no_game) ;
