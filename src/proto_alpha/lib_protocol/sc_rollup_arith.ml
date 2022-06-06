@@ -991,6 +991,8 @@ module Make (Context : P) :
         return (Result.ok {tree_proof; given = input_given; requested})
     | None -> return (Result.error "Context.produce_proof returned None")
 
+  (* TEMPORARY: The following definitions will be extended in a future commit. *)
+
   type output_proof = {
     output_proof_state : hash;
     output_proof_output : PS.output;

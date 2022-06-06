@@ -135,14 +135,25 @@ let input_request_equal a b =
       Raw_level_repr.equal l m && Z.equal n o
   | First_after _, _ -> false
 
-type output = {message_counter : Z.t; payload : string}
+type output = {message_counter : Z.t; payload : Sc_rollup_outbox_message_repr.t}
 
 let output_encoding =
   let open Data_encoding in
   conv
     (fun {message_counter; payload} -> (message_counter, payload))
     (fun (message_counter, payload) -> {message_counter; payload})
-    (obj2 (req "message_counter" n) (req "payload" string))
+    (obj2
+       (req "message_counter" n)
+       (req "payload" Sc_rollup_outbox_message_repr.encoding))
+
+let pp_output fmt {message_counter; payload} =
+  Format.fprintf
+    fmt
+    "@[%a@;%a@;@]"
+    Z.pp_print
+    message_counter
+    Sc_rollup_outbox_message_repr.pp
+    payload
 
 module type S = sig
   (**

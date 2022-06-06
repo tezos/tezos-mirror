@@ -430,6 +430,26 @@ module V2_0_0 = struct
       | Some (tree_proof, requested) ->
           return (Result.ok {tree_proof; given = input_given; requested})
       | None -> return (Result.error "Context.produce_proof returned None")
+
+    type output_proof = {
+      output_proof_state : hash;
+      output_proof_output : PS.output;
+    }
+
+    (* FIXME: #3176
+       The WASM PVM must provide an implementation for these
+       proofs. These are likely to be similar to the proofs about the
+       PVM execution steps. *)
+    let output_of_output_proof s = s.output_proof_output
+
+    let state_of_output_proof s = s.output_proof_state
+
+    let verify_output_proof _proof = Lwt.return true
+
+    let produce_output_proof _context state output_proof_output =
+      let open Lwt_result_syntax in
+      let*! output_proof_state = state_hash state in
+      return {output_proof_state; output_proof_output}
   end
 
   module ProtocolImplementation = Make (struct
