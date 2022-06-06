@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,24 +24,64 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = sig
-  module PVM : Pvm.S
+module V2_0_0 : sig
+  (** This module provides Proof-Generating Virtual Machine (PVM) running
+    WebAssembly (version 2.0.0). *)
 
-  module Interpreter : Interpreter.S
+  module type S = sig
+    include Sc_rollup_PVM_sem.S
 
-  module Commitment : Commitment.S with module PVM = PVM
+    (** [name] is "wasm_2_0_0".
 
-  module RPC_server : RPC_server.S with module PVM = PVM
+      WebAssembly is an "evergreen" specification. We aim to track
+      the latest major version, 2.0 at the time of writing. We
+      use the minor version number to track changes to our fork.
+   *)
+    val name : string
+
+    (** [parse_boot_sector s] builds a boot sector from its human
+      writable description. *)
+    val parse_boot_sector : string -> string option
+
+    (** [pp_boot_sector fmt s] prints a human readable representation of
+     a boot sector. *)
+    val pp_boot_sector : Format.formatter -> string -> unit
+
+    (* Required by L2 node: *)
+
+    (** [get_tick state] gets the total tick counter for the given PVM state. *)
+    val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
+
+    (** PVM status *)
+    type status = Computing | WaitingForInputMessage
+
+    (** [get_status state] gives you the current execution status for the PVM. *)
+    val get_status : state -> status Lwt.t
+  end
+
+  module ProtocolImplementation : S with type context = Context.t
+
+  module type P = sig
+    module Tree :
+      Context.TREE with type key = string list and type value = bytes
+
+    type tree = Tree.tree
+
+    type proof
+
+    val proof_encoding : proof Data_encoding.t
+
+    val proof_before : proof -> Sc_rollup_repr.State_hash.t
+
+    val proof_after : proof -> Sc_rollup_repr.State_hash.t
+
+    val verify_proof :
+      proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+    val produce_proof :
+      Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
+  end
+
+  module Make (Context : P) :
+    S with type context = Context.Tree.t and type state = Context.tree
 end
-
-module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module RPC_server = RPC_server.Make (PVM)
-end
-
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)

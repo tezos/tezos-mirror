@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -41,14 +42,13 @@ end
 
 module Kind = struct
   (*
-
       Each time we add a data constructor to [t], we also need:
       - to extend [Sc_rollups.all] with this new constructor ;
       - to update [Sc_rollups.of_name] and [encoding] ;
       - to update [Sc_rollups.wrapped_proof] and [wrapped_proof_encoding].
 
   *)
-  type t = Example_arith
+  type t = Example_arith | Wasm_2_0_0
 
   let example_arith_case =
     Data_encoding.(
@@ -56,21 +56,43 @@ module Kind = struct
         ~title:"Example_arith smart contract rollup kind"
         (Tag 0)
         unit
-        (function Example_arith -> Some ())
+        (function Example_arith -> Some () | _ -> None)
         (fun () -> Example_arith))
 
-  let encoding = Data_encoding.union ~tag_size:`Uint16 [example_arith_case]
+  let wasm_2_0_0_case =
+    Data_encoding.(
+      case
+        ~title:"Wasm 2.0.0 smart contract rollup kind"
+        (Tag 1)
+        unit
+        (function Wasm_2_0_0 -> Some () | _ -> None)
+        (fun () -> Wasm_2_0_0))
 
-  let equal x y = match (x, y) with Example_arith, Example_arith -> true
+  let encoding =
+    Data_encoding.union ~tag_size:`Uint16 [example_arith_case; wasm_2_0_0_case]
 
-  let all = [Example_arith]
+  let equal x y =
+    match (x, y) with
+    | Example_arith, Example_arith -> true
+    | Wasm_2_0_0, Wasm_2_0_0 -> true
+    | _ -> false
 
-  let of_name = function "arith" -> Some Example_arith | _ -> None
+  let all = [Example_arith; Wasm_2_0_0]
+
+  let of_name = function
+    | "arith" -> Some Example_arith
+    | "wasm_2_0_0" -> Some Wasm_2_0_0
+    | _ -> None
 
   let example_arith_pvm =
     (module Sc_rollup_arith.ProtocolImplementation : PVM.S)
 
-  let pvm_of = function Example_arith -> example_arith_pvm
+  let wasm_2_0_0_pvm =
+    (module Sc_rollup_wasm.V2_0_0.ProtocolImplementation : PVM.S)
+
+  let pvm_of = function
+    | Example_arith -> example_arith_pvm
+    | Wasm_2_0_0 -> wasm_2_0_0_pvm
 
   let of_pvm (module M : PVM.S) =
     match of_name M.name with
@@ -108,11 +130,19 @@ type wrapped_proof =
   | Arith_pvm_with_proof of
       (module PVM_with_proof
          with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+  | Wasm_2_0_0_pvm_with_proof of
+      (module PVM_with_proof
+         with type proof = Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof)
 
 let wrapped_proof_module p =
   match p with
   | Unencodable p -> p
   | Arith_pvm_with_proof p ->
+      let (module P) = p in
+      (module struct
+        include P
+      end : PVM_with_proof)
+  | Wasm_2_0_0_pvm_with_proof p ->
       let (module P) = p in
       (module struct
         include P
@@ -143,6 +173,26 @@ let wrapped_proof_encoding =
             let proof = proof
           end in
           Arith_pvm_with_proof (module P));
+      case
+        ~title:"Wasm 2.0.0 PVM with proof"
+        (Tag 1)
+        Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof_encoding
+        (function
+          | Wasm_2_0_0_pvm_with_proof pvm ->
+              let (module P : PVM_with_proof
+                    with type proof =
+                      Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof) =
+                pvm
+              in
+              Some P.proof
+          | _ -> None)
+        (fun proof ->
+          let module P = struct
+            include Sc_rollup_wasm.V2_0_0.ProtocolImplementation
+
+            let proof = proof
+          end in
+          Wasm_2_0_0_pvm_with_proof (module P));
     ]
 
 let wrap_proof pvm_with_proof =
@@ -163,4 +213,19 @@ let wrap_proof pvm_with_proof =
            (fun bytes ->
              Data_encoding.Binary.of_bytes_opt
                Sc_rollup_arith.ProtocolImplementation.proof_encoding
+               bytes))
+  | Some Kind.Wasm_2_0_0 ->
+      Option.map
+        (fun wasm_proof ->
+          let module P_wasm2_0_0 = struct
+            include Sc_rollup_wasm.V2_0_0.ProtocolImplementation
+
+            let proof = wasm_proof
+          end in
+          Wasm_2_0_0_pvm_with_proof (module P_wasm2_0_0))
+        (Option.bind
+           (Data_encoding.Binary.to_bytes_opt P.proof_encoding P.proof)
+           (fun bytes ->
+             Data_encoding.Binary.of_bytes_opt
+               Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof_encoding
                bytes))

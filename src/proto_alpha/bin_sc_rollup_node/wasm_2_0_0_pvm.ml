@@ -26,15 +26,23 @@
 open Protocol
 open Alpha_context
 
-(** This module manifests the proof format used by the Arith PVM as defined by
+(** This module manifests the proof format used by the Wasm PVM as defined by
     the Layer 1 implementation for it.
 
     It is imperative that this is aligned with the protocol's implementation.
 *)
-module Arith_proof_format = struct
+module Wasm_2_0_0_proof_format = struct
   open Store
 
   type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
+
+  let produce_proof context tree step =
+    let open Lwt_syntax in
+    match IStoreTree.kinded_key tree with
+    | Some k ->
+        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
+        return (Some p)
+    | None -> return None
 
   let verify_proof proof step =
     (* The rollup node is not supposed to verify proof. We keep
@@ -48,14 +56,6 @@ module Arith_proof_format = struct
            job for the rollup node. *)
         return None
 
-  let produce_proof context tree step =
-    let open Lwt_syntax in
-    match IStoreTree.kinded_key tree with
-    | Some k ->
-        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
-        return (Some p)
-    | None -> return None
-
   let kinded_hash_to_state_hash :
       IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
     | `Value hash | `Node hash ->
@@ -68,25 +68,23 @@ module Arith_proof_format = struct
     kinded_hash_to_state_hash proof.IStoreProof.Proof.after
 
   let proof_encoding =
-    Tezos_context_helpers.Merkle_proof_encoding.V1.Tree32.tree_proof_encoding
+    Tezos_context_helpers.Merkle_proof_encoding.V2.Tree32.tree_proof_encoding
 end
 
 module Impl : Pvm.S = struct
-  include Sc_rollup.ArithPVM.Make (struct
+  include Sc_rollup.Wasm_2_0_0PVM.Make (struct
     open Store
     module Tree = IStoreTree
 
     type tree = IStoreTree.tree
 
-    include Arith_proof_format
+    include Wasm_2_0_0_proof_format
   end)
 
-  let string_of_status status =
-    match status with
-    | Halted -> "Halted"
-    | WaitingForInputMessage -> "WaitingForInputMessage"
-    | Parsing -> "Parsing"
-    | Evaluating -> "Evaluating"
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3093
+     Print a more informative status.
+  *)
+  let string_of_status _status = "<wasm PVM status>"
 end
 
 include Impl

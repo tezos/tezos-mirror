@@ -2566,7 +2566,7 @@ module Sc_rollup : sig
   end
 
   module Kind : sig
-    type t = Example_arith
+    type t = Example_arith | Wasm_2_0_0
 
     val encoding : t Data_encoding.t
 
@@ -2618,6 +2618,45 @@ module Sc_rollup : sig
       type status = Halted | WaitingForInputMessage | Parsing | Evaluating
 
       val get_status : state -> status Lwt.t
+    end
+  end
+
+  module Wasm_2_0_0PVM : sig
+    module type P = sig
+      module Tree :
+        Context.TREE with type key = string list and type value = bytes
+
+      type tree = Tree.tree
+
+      type proof
+
+      val proof_encoding : proof Data_encoding.t
+
+      val proof_before : proof -> State_hash.t
+
+      val proof_after : proof -> State_hash.t
+
+      val verify_proof :
+        proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+      val produce_proof :
+        Tree.t ->
+        tree ->
+        (tree -> (tree * 'a) Lwt.t) ->
+        (proof * 'a) option Lwt.t
+    end
+
+    module Make (C : P) : sig
+      include PVM.S with type context = C.Tree.t and type state = C.tree
+
+      val get_tick : state -> Tick.t Lwt.t
+
+      type status = Computing | WaitingForInputMessage
+
+      val get_status : state -> status Lwt.t
+
+      val produce_proof :
+        context -> input option -> state -> (proof, string) result Lwt.t
     end
   end
 
@@ -2788,6 +2827,9 @@ module Sc_rollup : sig
     | Arith_pvm_with_proof of
         (module PVM_with_proof
            with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+    | Wasm_2_0_0_pvm_with_proof of
+        (module PVM_with_proof
+           with type proof = Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof)
 
   module Proof : sig
     type t = {pvm_step : wrapped_proof; inbox : Inbox.Proof.t option}

@@ -50,6 +50,7 @@
         "Sc_rollup_outbox_message_repr",
         "Sc_rollup_PVM_sem",
         "Sc_rollup_arith",
+        "Sc_rollup_wasm",
         "Sc_rollups",
         "Skip_list_repr",
         "Sc_rollup_inbox_repr",

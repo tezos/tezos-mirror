@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -50,7 +51,7 @@ module Kind : sig
 
      This list must only be appended for backward compatibility.
   *)
-  type t = Example_arith
+  type t = Example_arith | Wasm_2_0_0
 
   val encoding : t Data_encoding.t
 
@@ -98,6 +99,9 @@ type wrapped_proof =
   | Arith_pvm_with_proof of
       (module PVM_with_proof
          with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+  | Wasm_2_0_0_pvm_with_proof of
+      (module PVM_with_proof
+         with type proof = Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof)
 
 (** Unwrap a [wrapped_proof] into a first-class module. *)
 val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)

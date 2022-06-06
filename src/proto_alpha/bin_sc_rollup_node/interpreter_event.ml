@@ -45,6 +45,7 @@ end
 
 let transitioned_pvm state num_messages =
   let open Lwt_syntax in
+  (* TODO (#3094): is this code path taken for Wasm_2_0_0_pvm. Do we need to abstract? *)
   let* hash = Arith_pvm.state_hash state in
   let* ticks = Arith_pvm.get_tick state in
   Simple.(emit transitioned_pvm (hash, ticks, num_messages))
