@@ -197,7 +197,7 @@ module Manager = struct
 
   let json_of_int n = float_of_int n |> Ezjsonm.float
 
-  let get_next_counter ~source client =
+  let get_next_counter ?(source = Constant.bootstrap1) client =
     let*! json =
       RPC.Contracts.get_counter
         ~contract_id:source.Account.public_key_hash
@@ -280,6 +280,13 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:0 in
         {source; counter; fee; gas_limit; storage_limit; payload}
+
+  let make_batch ?source ?fee ?gas_limit ?storage_limit ~counter payloads =
+    List.mapi
+      (fun i payload ->
+        let counter = counter + i in
+        make ?source ?fee ?gas_limit ?storage_limit ~counter payload)
+      payloads
 
   let inject ?request ?force ?branch ?signer ?error managers client =
     let* op = operation ?branch ?signer managers client in
