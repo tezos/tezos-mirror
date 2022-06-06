@@ -2530,6 +2530,8 @@ module Sc_rollup : sig
 
   val input_request_equal : input_request -> input_request -> bool
 
+  type output = {message_counter : Z.t; payload : string}
+
   module PVM : sig
     type boot_sector = string
 
@@ -2572,6 +2574,17 @@ module Sc_rollup : sig
 
       val produce_proof :
         context -> input option -> state -> (proof, string) result Lwt.t
+
+      type output_proof
+
+      val output_of_output_proof : output_proof -> output
+
+      val state_of_output_proof : output_proof -> State_hash.t
+
+      val verify_output_proof : output_proof -> bool Lwt.t
+
+      val produce_output_proof :
+        context -> state -> output -> (output_proof, string) result Lwt.t
     end
 
     type t = (module S)
