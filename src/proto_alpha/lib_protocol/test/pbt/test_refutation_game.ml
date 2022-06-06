@@ -259,6 +259,20 @@ end) : TestPVM with type state = int = struct
 
   let produce_proof _ _ _ =
     return (Result.error "Dummy PVM can't produce proof")
+
+  type output_proof = unit
+
+  let state_of_output_proof _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  let output_of_output_proof _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  let verify_output_proof _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  let produce_output_proof _ _ _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
 end
 
 (** This is a random PVM. Its state is a pair of a string and a
@@ -329,6 +343,20 @@ end) : TestPVM with type state = string * int list = struct
 
   let produce_proof _ _ _ =
     return (Result.error "Dummy PVM can't produce proof")
+
+  type output_proof = unit
+
+  let state_of_output_proof _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  let output_of_output_proof _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  let verify_output_proof _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  let produce_output_proof _ _ _ =
+    Stdlib.failwith "Dummy PVM can't handle output proof"
 end
 
 module ContextPVM = ArithPVM.Make (struct
