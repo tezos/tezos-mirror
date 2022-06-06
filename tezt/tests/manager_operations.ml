@@ -970,23 +970,11 @@ module Gas_limits = struct
       them.  *)
   let mk_batch ?(source = Constant.bootstrap2) ?(dest = Constant.bootstrap3) ~nb
       ~gas_limit client =
-    let rec loop n counter acc =
-      if n <= 0 then Lwt.return (List.rev acc)
-      else
-        let counter = counter + 1 in
-        let* op =
-          Operation.mk_transfer
-            ~source
-            ~fee:1_000_000
-            ~gas_limit
-            ~dest
-            ~counter
-            client
-        in
-        loop (n - 1) counter (op :: acc)
-    in
-    let* counter = Operation.get_counter client ~source:Constant.bootstrap1 in
-    loop nb counter []
+    let open Operation.Manager in
+    let fee = 1_000_000 in
+    let* counter = get_next_counter client ~source:Constant.bootstrap1 in
+    let transfers = List.map (fun _ -> transfer ~dest ()) (range 1 nb) in
+    make_batch ~source ~gas_limit ~fee ~counter transfers |> return
 
   let block_below_ops_below =
     Protocol.register_test
@@ -1008,12 +996,7 @@ module Gas_limits = struct
         ~__LOC__
         nodes
         ~expected_statuses:["applied"; "applied"]
-      @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch:(`Manager batch)
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      @@ fun () -> Operation.Manager.inject batch nodes.main.client
     in
     unit
 
@@ -1034,11 +1017,7 @@ module Gas_limits = struct
     let* _oph =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       (* Gas limit per op is too high *)
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch:(`Manager batch)
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true batch nodes.main.client
     in
     unit
 
@@ -1063,11 +1042,7 @@ module Gas_limits = struct
     in
     let* _oph =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch:(`Manager batch)
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true batch nodes.main.client
     in
     unit
 
@@ -1735,34 +1710,17 @@ module Simple_transfers = struct
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
-    let* op1 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 1)
-        nodes.main.client
+    let make_transfer ~counter =
+      Operation.Manager.(
+        make ~source:Constant.bootstrap2 ~counter
+        @@ transfer ~dest:Constant.bootstrap3 ())
     in
-    let* op2 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2)
-        nodes.main.client
-    in
-    let* op3 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2)
-        nodes.main.client
-    in
+    let op1 = make_transfer ~counter:(counter + 1) in
+    let op2 = make_transfer ~counter:(counter + 2) in
+    let op3 = op2 in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch:(`Manager [op1; op2; op3])
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true [op1; op2; op3] nodes.main.client
     in
     unit
 
@@ -1776,34 +1734,17 @@ module Simple_transfers = struct
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
-    let* op1 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 1)
-        nodes.main.client
+    let make_transfer ~counter =
+      Operation.Manager.(
+        make ~source:Constant.bootstrap2 ~counter
+        @@ transfer ~dest:Constant.bootstrap3 ())
     in
-    let* op2 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2)
-        nodes.main.client
-    in
-    let* op3 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 4)
-        nodes.main.client
-    in
+    let op1 = make_transfer ~counter:(counter + 1) in
+    let op2 = make_transfer ~counter:(counter + 2) in
+    let op3 = make_transfer ~counter:(counter + 4) in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch:(`Manager [op1; op2; op3])
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true [op1; op2; op3] nodes.main.client
     in
     unit
 

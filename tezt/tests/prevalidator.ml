@@ -825,28 +825,17 @@ module Revamped = struct
       ~tags:["mempool"; "manager_restriction"; "inject"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* node, client =
+    let* _node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
         `Client
         ()
     in
-    let*! counter =
-      RPC.Contracts.get_counter
-        ~contract_id:Constant.bootstrap1.public_key_hash
-        client
-    in
-    let counter = JSON.as_int counter in
 
     log_step 2 "Inject a transfer with a correct counter." ;
     let* (`OpHash oph1) =
-      Operation.inject_transfer
-        ~wait_for_injection:node
-        ~source:Constant.bootstrap1
-        ~dest:Constant.bootstrap2
-        ~counter:(counter + 1)
-        client
+      Operation.Manager.(inject [make @@ transfer ()] client)
     in
     log_step
       3
@@ -854,30 +843,22 @@ module Revamped = struct
        destination (~force: %b)."
       false ;
 
-    let* op2 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap1
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 1)
-        client
-    in
-    let* branch = Operation.get_injection_branch client in
-    let* (`Hex op_str_hex as op_hex) =
-      Operation.forge_operation ~protocol ~branch ~batch:(`Manager [op2]) client
-    in
-    let (`Hex signature) =
-      Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_hex
-    in
-    let signed_op = op_str_hex ^ signature in
-    let*? p = RPC.inject_operation ~data:(`String signed_op) client in
-
-    log_step 4 "Check that injection failed as expected." ;
-    let injection_error_rex =
+    let error =
       rex
         ~opts:[`Dotall]
         "Fatal error:\n  Command failed: Error while applying operation.*:"
     in
-    let* () = Process.check_error ~msg:injection_error_rex p in
+    let* _ = RPC.get_mempool_pending_operations client in
+    (* By putting the wrong signature, we also ensure that the
+       signature is checked only after the 1M restriction check. *)
+    let* _oph2 =
+      Operation.Manager.(
+        inject
+          ~error
+          ~signer:Constant.bootstrap2
+          [make @@ transfer ~dest:Constant.bootstrap3 ()]
+          client)
+    in
 
     log_step
       5
@@ -897,31 +878,17 @@ module Revamped = struct
       ~tags:["mempool"; "wrong"; "signature"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
-    let* node, client =
+    let* _node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0]
         ~protocol
         `Client
         ()
     in
-    let source = Constant.bootstrap1 in
-    let dest = Constant.bootstrap2 in
-    let*! counter =
-      RPC.Contracts.get_counter
-        ~contract_id:Constant.bootstrap1.public_key_hash
-        client
-    in
-    let counter = JSON.as_int counter + 1 in
 
     log_step 2 "Inject a transfer with a correct counter." ;
     let* (`OpHash oph1) =
-      Operation.inject_transfer
-        ~wait_for_injection:node
-        ~source
-        ~fee:1000
-        ~dest
-        ~counter
-        client
+      Operation.Manager.(inject [make ~fee:1_000 @@ transfer ()] client)
     in
 
     log_step
@@ -930,28 +897,21 @@ module Revamped = struct
        previous operation to avoid replacing it and be rejected with the 1M \
        restriction." ;
     let* (`OpHash oph2) =
-      Operation.inject_transfer
-        ~wait_for_injection:node
-        ~force:true
-        ~source
-        ~fee:999
-        ~dest
-        ~counter
-        client
+      Operation.Manager.(
+        inject ~force:true [make ~fee:999 @@ transfer ()] client)
     in
 
     log_step
       4
       "Inject a transfer with a correct counter, but with less fees and \
        ill-signed." ;
-    let* op = Operation.mk_transfer ~source ~counter ~dest ~fee:998 client in
     let* (`OpHash oph3) =
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~force:true
-        ~batch:(`Manager [op])
-        ~signer:dest (* signer should be source to be correctly signed *)
-        client
+      Operation.Manager.(
+        inject
+          ~force:true
+          ~signer:Constant.bootstrap2
+          [make ~fee:998 @@ transfer ()]
+          client)
     in
 
     log_step
@@ -1944,24 +1904,12 @@ module Revamped = struct
         client
     in
     let balance = JSON.as_string json_balance |> int_of_string in
-    let* op =
-      Operation.mk_transfer
-        ~fee:balance
-        ~source:Constant.bootstrap1
-        ~dest:Constant.bootstrap2
-        client
+    let error = rex "proto.012-Psithaca.balance_is_empty" in
+    let* _op =
+      Operation.Manager.(
+        inject ~error [make ~fee:balance @@ transfer ()] client)
     in
-    let* process =
-      let* runnable =
-        Operation.runnable_forge_and_inject_operation
-          ~batch:(`Manager [op])
-          ~signer:Constant.bootstrap1
-          client
-      in
-      let*? process = runnable in
-      return process
-    in
-    Process.check_error ~msg:(rex "proto.012-Psithaca.balance_is_empty") process
+    unit
 
   let inject_operations =
     Protocol.register_test
@@ -1970,30 +1918,17 @@ module Revamped = struct
       ~tags:["mempool"; "injection"; "operations"; "rpc"]
     @@ fun protocol ->
     log_step 1 "Init a node and client with a fresh account" ;
-    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    let* _node, client = Client.init_with_protocol ~protocol `Client () in
     let* new_account = Client.gen_and_show_keys ~alias:"new" client in
 
     log_step 2 "Forge and sign five operations" ;
-    let* branch = Operation.get_injection_branch client in
     let* ops =
       Lwt_list.map_s
         (fun (account : Account.key) ->
-          let* transfer =
-            Operation.mk_transfer
-              ~source:account
-              ~dest:Constant.bootstrap5
-              client
-          in
-          let* (`Hex raw_unsigned_op as unsigned_op) =
-            Operation.forge_operation
-              ~branch
-              ~batch:(`Manager [transfer])
-              client
-          in
-          let (`Hex signature_op) =
-            Operation.sign_manager_op_hex ~signer:account unsigned_op
-          in
-          return (`Hex (raw_unsigned_op ^ signature_op)))
+          Operation.Manager.(
+            operation
+              [make ~source:account @@ transfer ~dest:Constant.bootstrap5 ()]
+              client))
         [
           new_account;
           Constant.bootstrap1;
@@ -2008,15 +1943,18 @@ module Revamped = struct
       "Try to inject two operations. Check that the injection failed (return \
        an error) because one operation was invalid. And check that the valid \
        operation is in the mempool" ;
-    let*? process =
-      RPC.(
-        Client.spawn
-          client
-          (post_private_injection_operations
-             ~ops:[List.nth ops 0; List.nth ops 1]
-             ()))
+    let* _ophs =
+      Operation.(
+        inject_operations
+          ~error:
+            (rex
+               ~opts:[`Dotall]
+               ".*While injecting several operations, one or several \
+                injections failed. Errors are the one below in the \
+                trace.*Empty implicit contract.*")
+          [List.nth ops 0; List.nth ops 1])
+        client
     in
-    let* () = Process.check_error process in
     let* mempool = Mempool.get_mempool client in
     Check.(
       (List.length mempool.applied = 1)
@@ -2028,12 +1966,7 @@ module Revamped = struct
       "Inject two valid operations and check that they are in the applied \
        mempool" ;
     let* injected_ops =
-      RPC.(
-        call
-          node
-          (post_private_injection_operations
-             ~ops:[List.nth ops 2; List.nth ops 3]
-             ()))
+      Operation.(inject_operations [List.nth ops 2; List.nth ops 3] client)
     in
     let injected_ops = List.map (fun (`OpHash op) -> op) injected_ops in
     let* () = check_mempool ~applied:(injected_ops @ mempool.applied) client in
@@ -2044,13 +1977,8 @@ module Revamped = struct
        the first one is `branch_refused` and the second is in the applied \
        mempool" ;
     let* injected_ops2 =
-      RPC.(
-        call
-          node
-          (post_private_injection_operations
-             ~force:true
-             ~ops:[List.nth ops 0; List.nth ops 4]
-             ()))
+      Operation.(
+        inject_operations ~force:true [List.nth ops 0; List.nth ops 4] client)
     in
     let injected_ops2 = List.map (fun (`OpHash op) -> op) injected_ops2 in
     let* () =
