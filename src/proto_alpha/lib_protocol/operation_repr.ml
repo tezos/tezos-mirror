@@ -1052,7 +1052,8 @@ module Encoding = struct
             | Manager (Sc_rollup_refute _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Sc_rollup_refute {rollup; opponent; refutation; is_opening_move} ->
+            | Sc_rollup_refute {rollup; opponent; refutation; is_opening_move}
+              ->
                 (rollup, opponent, refutation, is_opening_move));
           inj =
             (fun (rollup, opponent, refutation, is_opening_move) ->

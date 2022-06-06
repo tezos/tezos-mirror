@@ -140,9 +140,7 @@ let get_game ctxt rollup stakers =
   let open Lwt_tzresult_syntax in
   let stakers = Sc_rollup_game_repr.Index.normalize stakers in
   let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
-  match game with
-  | Some g -> return (g, ctxt)
-  | None -> fail Sc_rollup_no_game
+  match game with Some g -> return (g, ctxt) | None -> fail Sc_rollup_no_game
 
 (** [init_game ctxt rollup refuter defender] initialises the game or
     if it already exists fails with `Sc_rollup_game_already_started`.
