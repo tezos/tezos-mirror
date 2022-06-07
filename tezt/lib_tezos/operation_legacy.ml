@@ -66,12 +66,6 @@ type manager_operation_content = {
   storage_limit : int;
 }
 
-type consensus_op_kind =
-  | Dal_slot_availability of {
-      endorser : string; (* public_key hash *)
-      endorsement : bool Array.t; (* Bit vector *)
-    }
-
 let micheline_to_json convert client = function
   | `Json json -> return json
   | `Michelson data -> convert data client
@@ -152,22 +146,6 @@ let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
     ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Origination {code; storage = init_storage; balance = init_balance}
-
-let consensus_op_to_json_string = function
-  | Dal_slot_availability {endorser; endorsement} ->
-      let string_of_bool_vector endorsement =
-        let aux (acc, n) b =
-          let bit = if b then 1 else 0 in
-          (acc lor (bit lsl n), n + 1)
-        in
-        Array.fold_left aux (0, 0) endorsement |> fst |> string_of_int
-      in
-      `O
-        [
-          ("kind", Ezjsonm.string "dal_slot_availability");
-          ("endorser", Ezjsonm.string endorser);
-          ("endorsement", Ezjsonm.string (string_of_bool_vector endorsement));
-        ]
 
 (* encodes the given manager operation as a JSON string *)
 let manager_op_content_to_json_string
@@ -255,13 +233,9 @@ let op_to_json_string ~branch operations_json =
 let forge_manager_batch ~batch client =
   Lwt_list.map_p (fun op -> manager_op_content_to_json_string op client) batch
 
-let forge_consensus_op ~op = consensus_op_to_json_string op
-
 let forge_operation ?protocol ~branch ~batch client =
   let* json_batch =
-    match batch with
-    | `Manager batch -> forge_manager_batch ~batch client
-    | `Consensus op -> [forge_consensus_op ~op] |> Lwt.return
+    match batch with `Manager batch -> forge_manager_batch ~batch client
   in
   let op_json = op_to_json_string ~branch (`A json_batch) in
   let* hex =
@@ -450,22 +424,6 @@ let inject_transfer_ticket ?protocol ?async ?force ?wait_for_injection ?branch
     ?wait_for_injection
     ?branch
     ~batch:(`Manager [op])
-    ~signer
-    client
-
-let inject_slot_availability ?protocol ?async ?force ?wait_for_injection ?branch
-    ~signer ~endorsement client =
-  let op =
-    Dal_slot_availability
-      {endorser = signer.Account.public_key_hash; endorsement}
-  in
-  forge_and_inject_operation
-    ?protocol
-    ?async
-    ?force
-    ?wait_for_injection
-    ?branch
-    ~batch:(`Consensus op)
     ~signer
     client
 

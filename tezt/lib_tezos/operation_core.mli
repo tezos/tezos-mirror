@@ -65,7 +65,7 @@ type operation := t
    operation which is necessary for signing an operation. This type
    aims to be extended when other kinds of operations are added into
    this module. *)
-type kind = Manager
+type kind = Consensus of {chain_id : string} | Manager
 
 (** [make ~branch ~signer ~kind json client] builds the representation
    of an unsigned operation. *)
@@ -119,6 +119,42 @@ val inject :
   t ->
   Client.t ->
   [`OpHash of string] Lwt.t
+
+module Consensus : sig
+  (** A representation of a consensus operation. *)
+  type t
+
+  (** [slot_availability ~endorsement] crafts a data-availability
+     consensus to endorse slot headers. For each slot, the value of
+     the booleans indicates whether the data is available. *)
+  val slot_availability : endorsement:bool array -> t
+
+  (** [operation] constructs an operation from a consensus
+     operation. the [client] is used to fetch the branch and the
+     [chain_id]. *)
+  val operation :
+    ?branch:string ->
+    ?chain_id:string ->
+    signer:Account.key ->
+    t ->
+    Client.t ->
+    operation Lwt.t
+
+  (** A wrapper for {!val:inject} with consensus operations. The client
+     is used to get all the data that was not provided if it can be
+     recovered via RPCs. Mainly those are the [branch] and the
+     [chain_id]. *)
+  val inject :
+    ?request:[`Inject | `Notify] ->
+    ?force:bool ->
+    ?branch:string ->
+    ?chain_id:string ->
+    ?error:rex ->
+    signer:Account.key ->
+    t ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
+end
 
 module Manager : sig
   (** Payload of a manager operation. This excludes generic parameters

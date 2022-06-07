@@ -28,12 +28,6 @@
     smart constructors below *)
 type manager_operation_content
 
-type consensus_op_kind =
-  | Dal_slot_availability of {
-      endorser : string; (* public_key hash *)
-      endorsement : bool Array.t; (* Bit vector *)
-    }
-
 (** Michelson scripts and data in different representations.
 
     Used when originating or calling contracts.
@@ -185,9 +179,7 @@ val sign_manager_op_hex : signer:Account.key -> Hex.t -> Hex.t
 val forge_operation :
   ?protocol:Protocol.t ->
   branch:string ->
-  batch:
-    [< `Consensus of consensus_op_kind
-    | `Manager of manager_operation_content list ] ->
+  batch:[`Manager of manager_operation_content list] ->
   Client.t ->
   [> `Hex of string] Lwt.t
 
@@ -243,9 +235,7 @@ val forge_and_inject_operation :
   ?async:bool ->
   ?force:bool ->
   ?wait_for_injection:Node.t ->
-  batch:
-    [ `Manager of manager_operation_content list
-    | `Consensus of consensus_op_kind ] ->
+  batch:[`Manager of manager_operation_content list] ->
   signer:Account.key ->
   Client.t ->
   [`OpHash of string] Lwt.t
@@ -255,9 +245,7 @@ val runnable_forge_and_inject_operation :
   ?branch:string ->
   ?async:bool ->
   ?force:bool ->
-  batch:
-    [ `Manager of manager_operation_content list
-    | `Consensus of consensus_op_kind ] ->
+  batch:[`Manager of manager_operation_content list] ->
   signer:Account.key ->
   Client.t ->
   JSON.t Runnable.process Lwt.t
@@ -426,14 +414,3 @@ val inject_transfer_ticket :
   entrypoint:string ->
   Client.t ->
   [`OpHash of string] Lwt.t
-
-val inject_slot_availability :
-  ?protocol:Protocol.t ->
-  ?async:bool ->
-  ?force:bool ->
-  ?wait_for_injection:Node.t ->
-  ?branch:string ->
-  signer:Account.key ->
-  endorsement:bool array ->
-  Client.t ->
-  [> `OpHash of string] Lwt.t

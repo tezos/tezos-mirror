@@ -56,17 +56,11 @@ let test_feature_flag =
       bool
       ~error_msg:"Feature flag for the DAL should be disabled") ;
   let* (`OpHash oph1) =
-    Operation.(
-      forge_and_inject_operation
+    Operation.Consensus.(
+      inject
         ~force:true
-        ~batch:
-          (`Consensus
-            (Dal_slot_availability
-               {
-                 endorser = Constant.bootstrap1.public_key_hash;
-                 endorsement = Array.make number_of_slots false;
-               }))
         ~signer:Constant.bootstrap1
+        (slot_availability ~endorsement:(Array.make number_of_slots false))
         client)
   in
   let* (`OpHash oph2) =
