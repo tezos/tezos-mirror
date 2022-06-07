@@ -27,5 +27,3 @@ module Plugin = struct
   module Proto = Registerer.Registered
   include Plugin
 end
-
-let () = Prevalidator_filters.register (module Plugin)
