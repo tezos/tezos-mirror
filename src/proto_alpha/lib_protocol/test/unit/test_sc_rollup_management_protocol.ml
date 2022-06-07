@@ -42,12 +42,14 @@ let check_encode_decode_inbox_message message =
   let*? bytes =
     Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.to_bytes message
   in
+  let bytes = (bytes :> string) in
   let*? message' =
     Environment.wrap_tzresult @@ Internal_for_tests.inbox_message_of_bytes bytes
   in
   let*? bytes' =
     Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.to_bytes message'
   in
+  let bytes' = (bytes' :> string) in
   Assert.equal_string ~loc:__LOC__ bytes bytes'
 
 let check_encode_decode_outbox_message ctxt message =
@@ -123,6 +125,7 @@ let test_encode_decode_external_inbox_message () =
       Environment.wrap_tzresult
       @@ Sc_rollup.Inbox.Message.to_bytes inbox_message
     in
+    let real_encoding = (real_encoding :> string) in
     (* The prefix consists of 5 bytes:
        - Byte 0 is the tag (0 for internal, 1 for external).
        - Bytes 1-4 is the length of the message encoded as:

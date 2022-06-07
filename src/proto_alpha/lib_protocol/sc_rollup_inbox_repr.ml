@@ -452,7 +452,7 @@ module MakeHashingScheme (Tree : TREE) :
        Consider making tagging type safe by restricting what to add to the tree.
     *)
     let*! messages =
-      Tree.(add messages [key; "payload"] (Bytes.of_string payload))
+      Tree.(add messages [key; "payload"] (Bytes.of_string (payload :> string)))
     in
     let nb_messages_in_commitment_period =
       Int64.succ inbox.nb_messages_in_commitment_period

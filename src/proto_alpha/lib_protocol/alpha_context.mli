@@ -2713,7 +2713,9 @@ module Sc_rollup : sig
           }
         | External of string
 
-      val to_bytes : t -> string tzresult
+      type serialized = private string
+
+      val to_bytes : t -> serialized tzresult
 
       module Internal_for_tests : sig
         val of_bytes : string -> t tzresult
