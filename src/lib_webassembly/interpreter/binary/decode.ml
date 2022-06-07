@@ -114,15 +114,9 @@ let len32 s =
     error s pos "length out of bounds"
 
 let bool s = (vu1 s = 1)
-let string s = let n = len32 s in get_string n s
 let rec list f n s = if n = 0 then [] else let x = f s in x :: list f (n - 1) s
 let opt f b s = if b then Some (f s) else None
 let vec f s = let n = len32 s in list f n s
-
-let name s =
-  let pos = pos s in
-  try Utf8.decode (string s) with Utf8.Utf8 ->
-    error s pos "malformed UTF-8 encoding"
 
 let sized f s =
   let size = len32 s in
@@ -871,6 +865,43 @@ let size s =
 
 let check_size { size; start } s =
   require (pos s = start + size) s start "section size mismatch"
+
+type name_step =
+  | NKStart
+  (** UTF8 name starting point. *)
+  | NKParse of pos * (int, int) vec_map_kont
+  (** UTF8 char parsing. *)
+  | NKStop of int list
+  (** UTF8 name final step.*)
+
+let name_step s = function
+  | NKStart ->
+    let pos = pos s in
+    let len = len32 s in
+    NKParse (pos, Collect (len, []))
+
+  | NKParse (pos, Collect (i, l)) when i <= 0 ->
+    NKParse (pos, Rev (l, [], 0))
+  | NKParse (pos, Collect (n, l)) ->
+    let d, offset =
+      try Utf8.decode_step get s
+      with Utf8.Utf8 ->
+        error s pos "malformed UTF-8 encoding"
+    in
+    NKParse (pos, Collect (n - offset, d :: l))
+
+  | NKParse (pos, Rev ([], l, _)) ->
+    NKStop l
+  | NKParse (pos, Rev (c :: l, l', n)) ->
+    NKParse (pos, Rev (l, c :: l', n + 1))
+
+  | NKStop l -> assert false (* final step, cannot reduce. *)
+
+let name s =
+  let rec step = function
+      NKStop n -> n
+    | k -> step (name_step s k) in
+  step NKStart
 
 (* Sections *)
 
