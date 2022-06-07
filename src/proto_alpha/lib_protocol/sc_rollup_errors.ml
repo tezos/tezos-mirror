@@ -44,7 +44,11 @@ type error +=
   | (* `Temporary *) Sc_rollup_game_already_started
   | (* `Temporary *) Sc_rollup_wrong_turn
   | (* `Temporary *) Sc_rollup_no_game
-  | (* `Temporary *) Sc_rollup_staker_in_game
+  | (* `Temporary *)
+      Sc_rollup_staker_in_game of
+      [ `Refuter of Signature.public_key_hash
+      | `Defender of Signature.public_key_hash
+      | `Both of Signature.public_key_hash * Signature.public_key_hash ]
   | (* `Temporary *) Sc_rollup_timeout_level_not_reached
   | (* `Temporary *)
       Sc_rollup_max_number_of_messages_reached_for_commitment_period
@@ -74,10 +78,66 @@ let () =
     `Temporary
     ~id:"Sc_rollup_staker_in_game"
     ~title:"Staker is already playing a game"
-    ~description:"Attempt to start a game where one staker is already busy"
-    Data_encoding.unit
-    (function Sc_rollup_staker_in_game -> Some () | _ -> None)
-    (fun () -> Sc_rollup_staker_in_game) ;
+    ~description:"Attempted to start a game where one staker is already busy"
+    ~pp:(fun ppf staker ->
+      let busy ppf = function
+        | `Refuter sc ->
+            Format.fprintf
+              ppf
+              "the refuter (%a) is"
+              Signature.Public_key_hash.pp
+              sc
+        | `Defender sc ->
+            Format.fprintf
+              ppf
+              "the defender (%a) is"
+              Signature.Public_key_hash.pp
+              sc
+        | `Both (refuter, defender) ->
+            Format.fprintf
+              ppf
+              "both the refuter (%a) and the defender (%a) are"
+              Signature.Public_key_hash.pp
+              refuter
+              Signature.Public_key_hash.pp
+              defender
+      in
+      Format.fprintf
+        ppf
+        "Attempted to start a game where %a already busy."
+        busy
+        staker)
+    Data_encoding.(
+      obj1
+        (req
+           "staker_in_game"
+           (union
+              [
+                case
+                  (Tag 0)
+                  ~title:"Refuter"
+                  Signature.Public_key_hash.encoding
+                  (function `Refuter sc -> Some sc | _ -> None)
+                  (fun sc -> `Refuter sc);
+                case
+                  (Tag 1)
+                  ~title:"Defender"
+                  Signature.Public_key_hash.encoding
+                  (function `Defender sc -> Some sc | _ -> None)
+                  (fun sc -> `Defender sc);
+                case
+                  (Tag 2)
+                  ~title:"Both"
+                  (obj2
+                     (req "refuter" Signature.Public_key_hash.encoding)
+                     (req "defender" Signature.Public_key_hash.encoding))
+                  (function
+                    | `Both (refuter, defender) -> Some (refuter, defender)
+                    | _ -> None)
+                  (fun (refuter, defender) -> `Both (refuter, defender));
+              ])))
+    (function Sc_rollup_staker_in_game x -> Some x | _ -> None)
+    (fun x -> Sc_rollup_staker_in_game x) ;
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_timeout_level_not_reached"

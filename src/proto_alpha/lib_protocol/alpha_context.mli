@@ -2923,7 +2923,12 @@ module Sc_rollup : sig
   end
 
   module Refutation_storage : sig
-    type conflict_point = Commitment.Hash.t * Commitment.Hash.t
+    type point = {
+      commitment : Sc_rollup_commitment_repr.t;
+      hash : Sc_rollup_commitment_repr.Hash.t;
+    }
+
+    type conflict_point = point * point
 
     val game_move :
       context ->

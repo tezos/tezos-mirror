@@ -1518,7 +1518,7 @@ let test_finds_conflict_point_at_lcc () =
          staker1
          staker2
   in
-  assert_commitment_hash_equal ~loc:__LOC__ ctxt left c1
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt left.hash c1
 
 let test_finds_conflict_point_beneath_lcc () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1587,8 +1587,8 @@ let test_finds_conflict_point_beneath_lcc () =
          staker1
          staker2
   in
-  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left c2 in
-  assert_commitment_hash_equal ~loc:__LOC__ ctxt right c3
+  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left.hash c2 in
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt right.hash c3
 
 let test_conflict_point_is_first_point_of_disagreement () =
   let* ctxt, rollup, staker1, staker2 =
@@ -1675,8 +1675,8 @@ let test_conflict_point_is_first_point_of_disagreement () =
          staker1
          staker2
   in
-  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left c2 in
-  assert_commitment_hash_equal ~loc:__LOC__ ctxt right c3
+  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left.hash c2 in
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt right.hash c3
 
 let test_conflict_point_computation_fits_in_gas_limit () =
   (* Worst case of conflict point computation: two branches of maximum
@@ -1769,8 +1769,10 @@ let test_conflict_point_computation_fits_in_gas_limit () =
          staker1
          staker2
   in
-  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left branch_1.(0) in
-  assert_commitment_hash_equal ~loc:__LOC__ ctxt right branch_2.(0)
+  let* () =
+    assert_commitment_hash_equal ~loc:__LOC__ ctxt left.hash branch_1.(0)
+  in
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt right.hash branch_2.(0)
 
 let test_no_conflict_point_one_staker_at_lcc_preboot () =
   let* ctxt, rollup, staker1, staker2 =
@@ -2210,8 +2212,8 @@ let test_concurrent_refinement_point_of_conflict () =
          staker1
          staker2
   in
-  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c1' in
-  assert_commitment_hash_equal ~loc:__LOC__ ctxt c2 c2'
+  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt c1.hash c1'.hash in
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt c2.hash c2'.hash
 
 let test_concurrent_refinement_cement () =
   let* before_ctxt, rollup, staker1, staker2 =
