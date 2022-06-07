@@ -333,8 +333,24 @@ module Admin = struct
           (Node.net_port peer);
       ]
 
+  let spawn_untrust_address ?endpoint ~peer client =
+    spawn_command
+      ?endpoint
+      client
+      [
+        "untrust";
+        "address";
+        Printf.sprintf
+          "%s:%d"
+          (address ?from:endpoint (Node peer))
+          (Node.net_port peer);
+      ]
+
   let trust_address ?endpoint ~peer client =
     spawn_trust_address ?endpoint ~peer client |> Process.check
+
+  let untrust_address ?endpoint ~peer client =
+    spawn_untrust_address ?endpoint ~peer client |> Process.check
 
   let spawn_connect_address ?endpoint ~peer client =
     spawn_command
