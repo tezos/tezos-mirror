@@ -40,11 +40,12 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
     $(foreach p, $(active_protocol_versions), \
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
 		             echo tezos-endorser-$(p); fi)) \
+    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
+    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
+    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
+    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 
-UNRELEASED_TEZOS_BIN=$(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
-   $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
-   $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
-   $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
+UNRELEASED_TEZOS_BIN=
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
