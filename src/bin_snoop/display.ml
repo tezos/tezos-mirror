@@ -405,6 +405,16 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
         (Bench.workload_to_vector workload, Maths.vector_to_array measures))
       measurement.workload_data
   in
+  let get_targets =
+    let res = ref None in
+    fun () ->
+      match !res with
+      | Some res -> res
+      | None ->
+          let targets = Plot.get_targets () in
+          res := Some targets ;
+          targets
+  in
   let try_plot plot_target kind plot_result =
     match plot_result with
     | Ok [] -> []
@@ -420,7 +430,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
               plots
         | Show ->
             let target =
-              match Plot.get_targets () with
+              match get_targets () with
               | None ->
                   Format.eprintf
                     "Failed performing plot: could not get list of terminal \
