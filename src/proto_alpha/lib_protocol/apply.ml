@@ -1189,6 +1189,15 @@ let apply_internal_manager_operation_content :
         ~payer
         ~dst_rollup:destination
         ~since:ctxt_before_op
+  | Transaction_to_sc_rollup
+      {
+        destination = _;
+        entrypoint = _;
+        parameters_ty = _;
+        parameters = _;
+        unparsed_parameters = _;
+      } ->
+      failwith "TODO"
   | Origination
       {
         delegate;

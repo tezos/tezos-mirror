@@ -102,6 +102,15 @@ let contents_of_internal_operation (type kind)
             entrypoint = Tx_rollup.deposit_entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
+    | Transaction_to_sc_rollup {destination; entrypoint; unparsed_parameters; _}
+      ->
+        Transaction
+          {
+            destination = Sc_rollup destination;
+            amount = Tez.zero;
+            entrypoint;
+            parameters = Script.lazy_expr unparsed_parameters;
+          }
     | Origination {delegate; code; unparsed_storage; credit; _} ->
         let script =
           {

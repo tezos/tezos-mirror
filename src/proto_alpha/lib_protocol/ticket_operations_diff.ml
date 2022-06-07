@@ -203,6 +203,15 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
               tickets = [ex_ticket];
             },
           ctxt )
+  | Transaction_to_sc_rollup
+      {
+        destination = _;
+        entrypoint = _;
+        parameters_ty = _;
+        parameters = _;
+        unparsed_parameters = _;
+      } ->
+      failwith "TODO"
   | Origination
       {
         delegate = _;
