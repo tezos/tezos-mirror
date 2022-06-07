@@ -62,7 +62,7 @@ let assert_inbox_nb_messages_in_commitment_period inbox extra_messages =
     Compare.Int64.(nb_messages_in_commitment_period > limit)
     Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
-let add_external_messages ctxt rollup messages =
+let add_messages ctxt rollup messages =
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_tzresult_syntax in
   let open Raw_context in
@@ -70,12 +70,6 @@ let add_external_messages ctxt rollup messages =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
   in
   let* inbox, ctxt = inbox ctxt rollup in
-  let*? messages =
-    List.map_e
-      (fun message ->
-        Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
-      messages
-  in
   let* num_messages, total_messages_size, ctxt =
     List.fold_left_es
       (fun (num_messages, total_messages_size, ctxt) message ->
@@ -146,6 +140,16 @@ let add_external_messages ctxt rollup messages =
   in
   let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
   return (inbox, Z.of_int size, ctxt)
+
+let add_external_messages ctxt rollup external_messages =
+  let open Lwt_result_syntax in
+  let*? messages =
+    List.map_e
+      (fun message ->
+        Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
+      external_messages
+  in
+  add_messages ctxt rollup messages
 
 module Internal_for_tests = struct
   let update_num_and_size_of_messages = update_num_and_size_of_messages
