@@ -55,6 +55,7 @@
 
     {3 Cemented and Disputable commitments}
     Commitments accepted as true by the protocol are referred to as Cemented.
+    A commitment that is not cemented is said to be disputable.
 
     {3 Stakers}
     The Stakers table maps Stakers (implicit accounts) to commitments hashes.
