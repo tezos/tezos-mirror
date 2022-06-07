@@ -54,5 +54,8 @@ module Internal_for_tests : sig
       message] returns the length and total messages size
       [messages]. *)
   val update_num_and_size_of_messages :
-    num_messages:int -> total_messages_size:int -> string -> int * int
+    num_messages:int ->
+    total_messages_size:int ->
+    Sc_rollup_inbox_message_repr.serialized ->
+    int * int
 end

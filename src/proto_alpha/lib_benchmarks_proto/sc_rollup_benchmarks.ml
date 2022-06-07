@@ -99,8 +99,13 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
         ~range:{min = 0; max = conf.max_new_message_size}
         rng_state
     in
-    let new_message =
+    let new_external_message =
       Base_samplers.uniform_string ~nbytes:new_message_size rng_state
+    in
+    let new_message =
+      WithExceptions.Result.get_ok ~loc:__LOC__
+      @@ Sc_rollup_inbox_message_repr.(
+           to_bytes @@ External new_external_message)
     in
     let workload = () in
     let closure () =

@@ -28,7 +28,10 @@ open Sc_rollup_errors
 module Store = Storage.Sc_rollup
 
 let update_num_and_size_of_messages ~num_messages ~total_messages_size message =
-  (num_messages + 1, total_messages_size + String.length message)
+  ( num_messages + 1,
+    total_messages_size
+    + String.length
+        (message : Sc_rollup_inbox_message_repr.serialized :> string) )
 
 let inbox ctxt rollup =
   let open Lwt_tzresult_syntax in
@@ -67,6 +70,12 @@ let add_external_messages ctxt rollup messages =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
   in
   let* inbox, ctxt = inbox ctxt rollup in
+  let*? messages =
+    List.map_e
+      (fun message ->
+        Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
+      messages
+  in
   let* num_messages, total_messages_size, ctxt =
     List.fold_left_es
       (fun (num_messages, total_messages_size, ctxt) message ->
@@ -128,12 +137,6 @@ let add_external_messages ctxt rollup messages =
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
   *)
-  let*? messages =
-    List.map_e
-      (fun message ->
-        Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
-      messages
-  in
   let* current_messages, inbox =
     Sc_rollup_inbox_repr.(
       add_messages_no_history inbox level messages current_messages)
