@@ -57,6 +57,12 @@ build_arm64:
   tags:
     - arm64
 
+build_get_contracts:
+  extends:
+    - .build_template
+  script:
+    - dune build @devtools/get_contracts/check
+
 # similar to the build template above, this template
 # compiles all binaries using the static profile.
 .build_static_binaries_template:

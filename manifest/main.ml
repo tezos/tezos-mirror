@@ -2690,6 +2690,8 @@ module Protocol : sig
 
   val name_dash : t -> string
 
+  val name_underscore : t -> string
+
   val main : t -> target
 
   val embedded : t -> target
@@ -2863,6 +2865,8 @@ end = struct
   let status p = p.status
 
   let name_dash p = Name.name_dash p.name
+
+  let name_underscore p = Name.name_underscore p.name
 
   let main p = p.main
 
@@ -4480,6 +4484,64 @@ let _git_gas_diff =
     ~static:false
     ~release:false
     ~bisect_ppx:false
+
+let get_contracts_lib =
+  private_lib
+    "get_contracts"
+    ~path:"devtools/get_contracts"
+    ~synopsis:"Generic tool to extract smart contracts from node's context."
+    ~opam:""
+    ~deps:[tezos_client_base_unix; tezos_store]
+    ~modules:["get_contracts"; "sigs"; "storage_helpers"]
+    ~opens:["Tezos_micheline"; "Tezos_base__TzPervasives"; "Tezos_stdlib_unix"]
+    ~static:false
+    ~release:false
+    ~bisect_ppx:false
+
+let _get_contracts =
+  let mk_path = function
+    | [] -> "."
+    | p :: ps -> List.fold_left Filename.concat p ps
+  in
+  let path = mk_path ["devtools"; "get_contracts"] in
+  Protocol.all_optionally
+    [
+      (fun proto ->
+        let proto_version = Protocol.name_underscore proto in
+        let name = "get_contracts_" ^ proto_version in
+        let main_module = mk_path [".."; path; name ^ ".ml"] in
+        match (Protocol.status proto, Protocol.client proto) with
+        | Active, Some client ->
+            let main = Protocol.main proto in
+            if not @@ Sys.file_exists main_module then
+              ignore @@ Sys.command
+              @@ Format.sprintf
+                   "cp %s %s"
+                   (mk_path [".."; path; "get_contracts_alpha.ml"])
+                   main_module ;
+            Some
+              (private_exe
+                 name
+                 ~path
+                 ~synopsis:"A script to extract smart contracts from a node."
+                 ~opam:""
+                 ~deps:[main; client; get_contracts_lib]
+                 ~modules:[name]
+                 ~opens:
+                   [
+                     "Tezos_base__TzPervasives";
+                     "Tezos_raw_protocol_" ^ proto_version;
+                     "Tezos_protocol_environment_" ^ proto_version;
+                     "Tezos_client_" ^ proto_version;
+                   ]
+                 ~static:false
+                 ~release:false
+                 ~bisect_ppx:false)
+        | _ ->
+            if Sys.file_exists main_module then
+              ignore @@ Sys.command @@ Format.sprintf "rm %s" main_module ;
+            None);
+    ]
 
 let _s_packer =
   private_exe
