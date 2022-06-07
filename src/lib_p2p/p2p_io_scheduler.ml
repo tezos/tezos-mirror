@@ -212,8 +212,7 @@ module Scheduler (IO : IO) = struct
       match msg with
       | Error (Canceled :: _) -> worker_loop st
       | Error (P2p_errors.Connection_closed :: _ as err)
-      | Error (Exn Lwt_pipe.Closed :: _ as err)
-      | Error (Exn (Unix.Unix_error ((EBADF | ETIMEDOUT), _, _)) :: _ as err) ->
+      | Error (Exn Lwt_pipe.Closed :: _ as err) ->
           let* () = Events.(emit connection_closed) ("pop", conn.id, IO.name) in
           let* () = cancel conn err in
           worker_loop st
@@ -229,7 +228,6 @@ module Scheduler (IO : IO) = struct
              match r with
              | Ok () | Error (Canceled :: _) -> return_ok_unit
              | Error (P2p_errors.Connection_closed :: _ as err)
-             | Error (Exn (Unix.Unix_error (EBADF, _, _)) :: _ as err)
              | Error (Exn Lwt_pipe.Closed :: _ as err) ->
                  let* () =
                    Events.(emit connection_closed) ("push", conn.id, IO.name)
@@ -360,19 +358,22 @@ module ReadIO = struct
      Invariant: Given a connection, there is not concurrent call to
      pop. *)
   let pop {fd; maxlen; read_buffer} =
-    let open Lwt_result_syntax in
-    Lwt.catch
-      (fun () ->
-        let*! data =
+    Error_monad.catch_es (fun () ->
+        let open Lwt_result_syntax in
+        let*! data_result =
           Circular_buffer.write ~maxlen ~fill_using:(P2p_fd.read fd) read_buffer
         in
-        if Circular_buffer.length data = 0 then
-          tzfail P2p_errors.Connection_closed
-        else return data)
-      (function
-        | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
+        match data_result with
+        | Ok data ->
+            if Circular_buffer.length data = 0 then
+              tzfail P2p_errors.Connection_closed
+            else return data
+        | Error
+            ( `Connection_lost _ | `Connection_closed_by_peer
+            | `Connection_locally_closed ) ->
             tzfail P2p_errors.Connection_closed
-        | exn -> fail_with_exn exn)
+        | Error (`Unexpected_error_when_closing _ | `Unexpected_error _) ->
+            tzfail P2p_errors.Connection_error)
 
   type out_param = Circular_buffer.data tzresult Lwt_pipe.Maybe_bounded.t
 
@@ -417,16 +418,15 @@ module WriteIO = struct
   (* [push] bytes in the network. *)
   let push fd buf =
     let open Lwt_result_syntax in
-    Lwt.catch
-      (fun () ->
-        let*! () = P2p_fd.write fd buf in
-        return_unit)
-      (function
-        | Unix.Unix_error (Unix.ECONNRESET, _, _)
-        | Unix.Unix_error (Unix.EPIPE, _, _)
-        | Lwt.Canceled | End_of_file ->
-            tzfail P2p_errors.Connection_closed
-        | exn -> fail_with_exn exn)
+    let*! r = P2p_fd.write fd buf in
+    match r with
+    | Ok () -> return_unit
+    | Error
+        ( `Connection_closed_by_peer | `Connection_lost _
+        | `Connection_locally_closed | `Unexpected_error_when_closing _
+        | `Unexpected_error Lwt.Canceled ) ->
+        tzfail P2p_errors.Connection_closed
+    | Error (`Unexpected_error ex) -> fail_with_exn ex
 
   (* [close] does nothing, it will still be possible to push values to
      the network. *)
@@ -547,8 +547,9 @@ let register st fd =
   if st.closed then (
     Error_monad.dont_wait
       (fun () -> P2p_fd.close fd)
-      (fun trace ->
-        Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
+      (function
+        | `Unexpected_error ex ->
+            Format.eprintf "Uncaught error: %s\n%!" (Printexc.to_string ex))
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     raise Closed)
@@ -589,9 +590,14 @@ let register st fd =
         Lwt_pipe.Maybe_bounded.close write_queue ;
         Lwt_pipe.Maybe_bounded.close read_queue ;
         let* r = P2p_fd.close fd in
-        Result.iter_error
-          (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
-          r ;
+        let* () =
+          match r with
+          | Ok () -> Lwt.return_unit
+          | Error (`Unexpected_error ex) ->
+              (* Do not prevent the closing if an exception is raised *)
+              let* () = Events.(emit close_error) (id, error_of_exn ex) in
+              Lwt.return_unit
+        in
         return_unit) ;
     let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
     let conn =

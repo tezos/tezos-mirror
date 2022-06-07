@@ -220,22 +220,30 @@ module Low_level = struct
   let client ch sched addr port =
     let open Lwt_result_syntax in
     let msg = Bytes.create (Bytes.length simple_msg) in
-    let*! fd = raw_connect sched addr port in
-    let* () =
-      P2p_buffer_reader.(
-        read_full (P2p_io_scheduler.to_readable fd) @@ mk_buffer_safe msg)
-    in
-    let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
-    let* () = sync ch in
-    P2p_io_scheduler.close fd
+    let*! r = raw_connect sched addr port in
+    match r with
+    | Error (`Connection_refused | `Unexpected_error _) ->
+        Lwt.fail Alcotest.Test_error
+    | Ok fd ->
+        let* () =
+          P2p_buffer_reader.(
+            read_full (P2p_io_scheduler.to_readable fd) @@ mk_buffer_safe msg)
+        in
+        let* () = tzassert (Bytes.compare simple_msg msg = 0) __POS__ in
+        let* () = sync ch in
+        P2p_io_scheduler.close fd
 
   let server ch sched socket =
     let open Lwt_result_syntax in
-    let*! fd, _point = raw_accept sched socket in
-    let* () = P2p_io_scheduler.write fd simple_msg in
-    let* () = sync ch in
-    let* _ = P2p_io_scheduler.close fd in
-    return_unit
+    let*! r = raw_accept sched socket in
+    match r with
+    | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
+        Lwt.fail ex
+    | Ok (fd, _point) ->
+        let* () = P2p_io_scheduler.write fd simple_msg in
+        let* () = sync ch in
+        let* () = P2p_io_scheduler.close fd in
+        return_unit
 
   let run _dir = run_nodes client server
 end

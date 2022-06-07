@@ -47,9 +47,9 @@ module type S = sig
   (* Write the output of [fill_using] in [data]. *)
   val write :
     maxlen:int ->
-    fill_using:(Bytes.t -> int -> int -> int Lwt.t) ->
+    fill_using:(bytes -> int -> int -> (int, 'err) result Lwt.t) ->
     t ->
-    data Lwt.t
+    (data, 'err) result Lwt.t
 
   (* Read the value of [data]. The read may be partial if the [data]
      is not fully read. We return the [data] part which was not
@@ -68,10 +68,13 @@ module Reference : S = struct
 
   let create ?maxlength:_ ?fresh_buf_size:_ () = ()
 
-  let write ~maxlen ~fill_using () =
+  let write ~maxlen
+      ~(fill_using : data -> int -> int -> (int, 'err) result Lwt.t) () =
     let bytes = Bytes.create maxlen in
     let* written_bytes = fill_using bytes 0 maxlen in
-    Lwt.return (Bytes.sub bytes 0 written_bytes)
+    match written_bytes with
+    | Error e -> Lwt.return_error e
+    | Ok written_bytes -> Lwt.return_ok (Bytes.sub bytes 0 written_bytes)
 
   let read data ?(len = Bytes.length data) () ~into ~offset =
     let data_length = Bytes.length data in
@@ -193,7 +196,7 @@ let () =
   let fill_using write_len fresh_bytes bytes offset maxlen =
     let len = min write_len maxlen in
     Bytes.blit fresh_bytes 0 bytes offset len ;
-    Lwt.return len
+    Lwt.return_ok len
   in
   let write_data write_len maxlen bytes_to_write (E state) =
     let (module M) = state.implementation in
@@ -203,8 +206,11 @@ let () =
         ~fill_using:(fill_using write_len bytes_to_write)
         state.internal_state
     in
-    Queue.add data state.data_to_be_read ;
-    Lwt.return_unit
+    match data with
+    | Error _ -> failwith "read_invalid: fill_using_error"
+    | Ok data ->
+        Queue.add data state.data_to_be_read ;
+        Lwt.return_unit
   in
   let read_data ~without_invalid_argument read_len (E state) =
     let (module M) = state.implementation in

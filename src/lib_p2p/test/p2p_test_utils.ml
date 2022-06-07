@@ -197,15 +197,19 @@ let run_nodes client server =
 
 let raw_accept sched main_socket =
   let open Lwt_syntax in
-  let* fd, sockaddr = P2p_fd.accept main_socket in
-  let fd = P2p_io_scheduler.register sched fd in
-  let point =
-    match sockaddr with
-    | Lwt_unix.ADDR_UNIX _ -> assert false
-    | Lwt_unix.ADDR_INET (addr, port) ->
-        (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
-  in
-  Lwt.return (fd, point)
+  let* r = P2p_fd.accept main_socket in
+  match r with
+  | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
+      Lwt.fail ex
+  | Ok (fd, sockaddr) ->
+      let fd = P2p_io_scheduler.register sched fd in
+      let point =
+        match sockaddr with
+        | Lwt_unix.ADDR_UNIX _ -> assert false
+        | Lwt_unix.ADDR_INET (addr, port) ->
+            (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
+      in
+      Lwt.return_ok (fd, point)
 
 (** [accept ?id ?proof_of_work_target sched main_socket] connect
    and performs [P2p_socket.authenticate] with the given
@@ -213,41 +217,49 @@ let raw_accept sched main_socket =
 let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
     main_socket =
   let open Lwt_syntax in
-  let* fd, point = raw_accept sched main_socket in
+  let* r = raw_accept sched main_socket in
   let* id1 = id in
-  P2p_socket.authenticate
-    ~canceler
-    ~proof_of_work_target
-    ~incoming:true
-    fd
-    point
-    id1
-    version
-    conn_meta_config
+  match r with
+  | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
+      Lwt.fail ex
+  | Ok (fd, point) ->
+      P2p_socket.authenticate
+        ~canceler
+        ~proof_of_work_target
+        ~incoming:true
+        fd
+        point
+        id1
+        version
+        conn_meta_config
 
 let raw_connect sched addr port =
-  let open Lwt_syntax in
-  let* fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
+  let open Lwt_result_syntax in
+  let*! fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   let* () = P2p_fd.connect fd uaddr in
   let fd = P2p_io_scheduler.register sched fd in
-  Lwt.return fd
+  Lwt.return_ok fd
 
 (** [connect ?proof_of_work_target sched addr port] connect
    and performs [P2p_socket.authenticate] with the given
    [proof_of_work_target]. *)
 let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
-  let open Lwt_syntax in
-  let* fd = raw_connect sched addr port in
-  P2p_socket.authenticate
-    ~canceler
-    ~proof_of_work_target
-    ~incoming:false
-    fd
-    (addr, port)
-    id
-    version
-    conn_meta_config
+  let open Lwt_result_syntax in
+  let*! r = raw_connect sched addr port in
+  match r with
+  | Error (`Connection_refused | `Unexpected_error _) ->
+      Lwt.fail Alcotest.Test_error
+  | Ok fd ->
+      P2p_socket.authenticate
+        ~canceler
+        ~proof_of_work_target
+        ~incoming:false
+        fd
+        (addr, port)
+        id
+        version
+        conn_meta_config
 
 let sync ch =
   let open Lwt_result_syntax in
