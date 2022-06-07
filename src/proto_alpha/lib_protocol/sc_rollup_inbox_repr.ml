@@ -615,7 +615,7 @@ module MakeHashingScheme (Tree : TREE) :
     if Tree.is_empty messages then no_messages_hash
     else Hash.of_context_hash @@ Tree.hash messages
 
-  let add_external_messages_aux history inbox level payloads messages =
+  let add_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
     if Raw_level_repr.(level < inbox.level) then
       fail (Invalid_level_add_messages level)
@@ -623,11 +623,7 @@ module MakeHashingScheme (Tree : TREE) :
       let history, inbox = archive_if_needed history inbox level in
       let* messages, inbox =
         List.fold_left_es
-          (fun (messages, inbox) payload ->
-            let*? payload =
-              Sc_rollup_inbox_message_repr.(to_bytes @@ External payload)
-            in
-            add_message inbox payload messages)
+          (fun (messages, inbox) payload -> add_message inbox payload messages)
           (messages, inbox)
           payloads
       in
@@ -636,20 +632,27 @@ module MakeHashingScheme (Tree : TREE) :
 
   let add_external_messages history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
-    let* messages, With_history history, inbox =
-      add_external_messages_aux
-        (With_history history)
-        inbox
-        level
+    let*? payloads =
+      List.map_e
+        (fun payload ->
+          Sc_rollup_inbox_message_repr.(to_bytes @@ External payload))
         payloads
-        messages
+    in
+    let* messages, With_history history, inbox =
+      add_messages_aux (With_history history) inbox level payloads messages
     in
     return (messages, history, inbox)
 
   let add_external_messages_no_history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
+    let*? payloads =
+      List.map_e
+        (fun payload ->
+          Sc_rollup_inbox_message_repr.(to_bytes @@ External payload))
+        payloads
+    in
     let* messages, No_history, inbox =
-      add_external_messages_aux No_history inbox level payloads messages
+      add_messages_aux No_history inbox level payloads messages
     in
     return (messages, inbox)
 
