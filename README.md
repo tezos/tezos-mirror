@@ -24,6 +24,13 @@ let w = Json.destruct encoding j
 let () = assert (v = w)
 ```
 
+Tutorial
+--------
+
+A full tutorial is available in markdown form in `src/tutorial.md` and the
+generated html is hosted on
+<https://nomadic-labs.gitlab.io/data-encoding/data-encoding/Data_encoding/tutorial.html>.
+
 Build and Install
 -----------------
 
