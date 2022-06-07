@@ -126,6 +126,30 @@ val find_staker :
 (** The storage size requirement (in bytes) of a commitment *)
 val commitment_storage_size_in_bytes : int
 
+(** [withdraw_stake context rollup staker] removes [staker] and returns
+      any deposit previously frozen by [deposit_stake].
+
+      May fail with:
+      {ul
+        {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+        {li [Sc_rollup_not_staked_on_lcc] if [staker] is not staked on the last
+            cemented commitment}
+      }
+
+      Note that it is not possible to be staked on a Cemented commitment other
+      than the Last, because of Cementation Rule #4. See [cement_commitment]
+      for details.
+
+      By design, the operation wrapping this might {i not} be authenticated,
+      as it may be necessary for nodes on the honest branch to refund stakers on
+      the LCC. They must do so by using [withdraw_stake] as they are implicitly
+      staked on the LCC and can not dispute it. *)
+val withdraw_stake :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_repr.Staker.t ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig
@@ -147,30 +171,6 @@ module Internal_for_tests : sig
 
       This function does not authenticate the staker. *)
   val deposit_stake :
-    Raw_context.t ->
-    Sc_rollup_repr.t ->
-    Sc_rollup_repr.Staker.t ->
-    (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
-
-  (** [withdraw_stake context rollup staker] removes [staker] and returns
-      any deposit previously frozen by [deposit_stake].
-
-      May fail with:
-      {ul
-        {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-        {li [Sc_rollup_not_staked_on_lcc] if [staker] is not staked on the last
-            cemented commitment}
-      }
-
-      Note that it is not possible to be staked on a Cemented commitment other
-      than the Last, because of Cementation Rule #4. See [cement_commitment]
-      for details.
-
-      By design, the operation wrapping this should {i not} be authenticated,
-      as it may be necessary for nodes on the honest branch to refund stakers on
-      the LCC. They must do so by using [withdraw_stake] as they are implicitly
-      staked on the LCC and can not dispute it. *)
-  val withdraw_stake :
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->

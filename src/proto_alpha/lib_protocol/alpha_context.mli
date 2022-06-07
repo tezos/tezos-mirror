@@ -2920,6 +2920,12 @@ module Sc_rollup : sig
 
     val cement_commitment :
       context -> t -> Commitment.Hash.t -> context tzresult Lwt.t
+
+    val withdraw_stake :
+      context ->
+      t ->
+      Staker.t ->
+      (context * Receipt.balance_updates) tzresult Lwt.t
   end
 
   module Refutation_storage : sig
@@ -3247,6 +3253,8 @@ module Kind : sig
 
   type sc_rollup_atomic_batch = Sc_rollup_atomic_batch_kind
 
+  type sc_rollup_return_bond = Sc_rollup_return_bond_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -3274,6 +3282,7 @@ module Kind : sig
     | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
     | Sc_rollup_atomic_batch_manager_kind : sc_rollup_atomic_batch manager
+    | Sc_rollup_return_bond_manager_kind : sc_rollup_return_bond manager
 end
 
 type 'a consensus_operation_type =
@@ -3495,6 +3504,10 @@ and _ manager_operation =
       atomic_transaction_batch : string;
     }
       -> Kind.sc_rollup_atomic_batch manager_operation
+  | Sc_rollup_return_bond : {
+      sc_rollup : Sc_rollup.t;
+    }
+      -> Kind.sc_rollup_return_bond manager_operation
 
 and counter = Z.t
 
@@ -3669,6 +3682,9 @@ module Operation : sig
     val sc_rollup_atomic_batch_case :
       Kind.sc_rollup_atomic_batch Kind.manager case
 
+    val sc_rollup_return_bond_case :
+      Kind.sc_rollup_return_bond Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -3728,6 +3744,8 @@ module Operation : sig
       val sc_rollup_timeout_case : Kind.sc_rollup_timeout case
 
       val sc_rollup_atomic_batch_case : Kind.sc_rollup_atomic_batch case
+
+      val sc_rollup_return_bond_case : Kind.sc_rollup_return_bond case
     end
   end
 

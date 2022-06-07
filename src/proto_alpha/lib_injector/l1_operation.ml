@@ -98,6 +98,7 @@ module Manager_operation = struct
     | Sc_rollup_refute _ -> sc_rollup_refute_case
     | Sc_rollup_timeout _ -> sc_rollup_timeout_case
     | Sc_rollup_atomic_batch _ -> sc_rollup_atomic_batch_case
+    | Sc_rollup_return_bond _ -> sc_rollup_return_bond_case
 
   let pp_kind ppf op =
     let open Operation.Encoding.Manager_operations in

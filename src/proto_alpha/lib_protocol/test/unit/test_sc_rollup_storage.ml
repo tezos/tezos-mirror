@@ -293,11 +293,7 @@ let withdraw_stake_and_check_balances ctxt rollup staker =
     staker
     (fun ctxt rollup staker_contract stake ->
       let* ctxt', _ =
-        lift
-        @@ Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-             ctxt
-             rollup
-             staker
+        lift @@ Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker
       in
       let* () =
         assert_balance_increased ctxt ctxt' (`Contract staker_contract) stake
@@ -320,7 +316,7 @@ let test_deposit_then_withdraw () =
 
 let test_withdrawal_from_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
-      Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
+      Sc_rollup_stake_storage.withdraw_stake
         ctxt
         rollup
         Sc_rollup_repr.Staker.zero)
@@ -334,10 +330,7 @@ let test_withdraw_when_not_staked () =
   in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-       ctxt
-       rollup
-       staker)
+    (Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker)
     Sc_rollup_errors.Sc_rollup_not_staked
 
 let test_withdrawing_twice () =
@@ -351,10 +344,7 @@ let test_withdrawing_twice () =
   let* ctxt = withdraw_stake_and_check_balances ctxt rollup staker in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-       ctxt
-       rollup
-       staker)
+    (Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker)
     Sc_rollup_errors.Sc_rollup_not_staked
 
 let number_of_messages_exn n =
@@ -1083,10 +1073,7 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
   in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-       ctxt
-       rollup
-       staker)
+    (Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker)
     Sc_rollup_errors.Sc_rollup_not_staked_on_lcc
 
 let test_initial_level_of_rollup () =
@@ -1329,10 +1316,7 @@ let test_removed_staker_can_not_withdraw () =
   in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_stake_storage.Internal_for_tests.withdraw_stake
-       ctxt
-       rollup
-       staker2)
+    (Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker2)
     Sc_rollup_errors.Sc_rollup_not_staked
 
 let test_no_cement_on_conflict () =

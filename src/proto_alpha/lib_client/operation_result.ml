@@ -358,8 +358,15 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         outbox_level
         message_index
         inclusion_proof
-        atomic_transaction_batch) ;
-
+        atomic_transaction_batch
+  | Sc_rollup_return_bond {sc_rollup} ->
+      Format.fprintf
+        ppf
+        "Sc rollup return commitment bond:%a @,From: %a"
+        Sc_rollup.Address.pp
+        sc_rollup
+        Contract.pp
+        source) ;
   Format.fprintf ppf "%a@]@]" pp_result result
 
 let pp_balance_updates ppf = function
@@ -756,6 +763,15 @@ let pp_manager_operation_contents_and_result ppf
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     pp_balance_updates_opt ppf balance_updates
   in
+  let pp_sc_rollup_return_bond_result
+      (Sc_rollup_return_bond_result {balance_updates; consumed_gas}) =
+    Format.fprintf
+      ppf
+      "@,Balance updates:@,  %a"
+      pp_balance_updates
+      balance_updates ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+  in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
@@ -1006,12 +1022,24 @@ let pp_manager_operation_contents_and_result ppf
           ppf
           "This sc rollup atomic batch operation was successfully applied." ;
         pp_sc_rollup_atomic_batch_result op
+    | Applied (Sc_rollup_return_bond_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This sc rollup return commitment bond operation was successfully \
+           applied" ;
+        pp_sc_rollup_return_bond_result op
     | Backtracked ((Sc_rollup_atomic_batch_result _ as op), _err) ->
         Format.fprintf
           ppf
           "@[<v 0>This sc rollup atomic batch operation was BACKTRACKED, its \
            expected effects (as follow) were NOT applied.@]" ;
         pp_sc_rollup_atomic_batch_result op
+    | Backtracked ((Sc_rollup_return_bond_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This sc rollup return commitment bond operation was \
+           BACKTRACKED, its expected effects (as follow) were NOT applied.@]" ;
+        pp_sc_rollup_return_bond_result op
   in
   let pp_internal_result (type kind) ppf
       (result : kind internal_manager_operation_result) =

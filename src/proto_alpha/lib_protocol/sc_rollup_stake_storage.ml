@@ -414,7 +414,5 @@ let remove_staker ctxt rollup staker =
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake
 
-  let withdraw_stake = withdraw_stake
-
   let refine_stake = refine_stake
 end
