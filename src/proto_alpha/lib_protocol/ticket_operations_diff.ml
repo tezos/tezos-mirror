@@ -174,56 +174,44 @@ let cast_transaction_parameter (type a ac b bc) ctxt location
   >>?= fun (res, ctxt) ->
   res >>?= fun Script_ir_translator.Eq -> return ((parameters : a), ctxt)
 
-let tickets_of_transaction ctxt ~(destination : Contract.t) ~entrypoint
-    ~location ~parameters_ty ~parameters =
-  match destination with
-  | Implicit _ -> return (None, ctxt)
-  | Originated contract_hash ->
-      (* TODO: #2653
-         Avoid having to load the script from the cache.
-         This is currently in place to avoid regressions for type-checking
-         errors. We should be able to remove it.
-      *)
-      parse_and_cache_script
-        ctxt
-        ~destination:contract_hash
-        ~get_non_cached_script:(fun ctxt ->
-          (* Look up the script from the context. *)
-          Contract.get_script ctxt destination >>=? fun (ctxt, script_opt) ->
-          match script_opt with
-          | None -> fail (Failed_to_get_script destination)
-          | Some script -> return (script, ctxt))
-      >>=? fun ( Script_ir_translator.Ex_script
-                   (Script {arg_type; entrypoints; _}),
-                 ctxt ) ->
-      (* Find the entrypoint type for the given entrypoint. *)
-      Gas_monad.run
-        ctxt
-        (Script_ir_translator.find_entrypoint
-           ~error_details:(Informative ())
-           arg_type
-           entrypoints
-           entrypoint)
-      >>?= fun (res, ctxt) ->
-      res >>?= fun (Ex_ty_cstr {ty = entry_arg_ty; _}) ->
-      Ticket_scanner.type_has_tickets ctxt entry_arg_ty
-      >>?= fun (has_tickets, ctxt) ->
-      (* Check that the parameter's type matches that of the entry-point, and
-         cast the parameter if this is the case. *)
-      cast_transaction_parameter
-        ctxt
-        location
-        entry_arg_ty
-        parameters_ty
-        parameters
-      >>=? fun (parameters, ctxt) ->
-      Ticket_scanner.tickets_of_value
-        ~include_lazy:true
-        ctxt
-        has_tickets
-        parameters
-      >>=? fun (tickets, ctxt) ->
-      return (Some {destination = Contract destination; tickets}, ctxt)
+let tickets_of_transaction ctxt ~destination:(contract_hash : Contract_hash.t)
+    ~entrypoint ~location ~parameters_ty ~parameters =
+  let destination = Contract.Originated contract_hash in
+  (* TODO: #2653
+     Avoid having to load the script from the cache.
+     This is currently in place to avoid regressions for type-checking
+     errors. We should be able to remove it.
+  *)
+  parse_and_cache_script
+    ctxt
+    ~destination:contract_hash
+    ~get_non_cached_script:(fun ctxt ->
+      (* Look up the script from the context. *)
+      Contract.get_script ctxt destination >>=? fun (ctxt, script_opt) ->
+      match script_opt with
+      | None -> fail (Failed_to_get_script destination)
+      | Some script -> return (script, ctxt))
+  >>=? fun ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
+             ctxt ) ->
+  (* Find the entrypoint type for the given entrypoint. *)
+  Gas_monad.run
+    ctxt
+    (Script_ir_translator.find_entrypoint
+       ~error_details:(Informative ())
+       arg_type
+       entrypoints
+       entrypoint)
+  >>?= fun (res, ctxt) ->
+  res >>?= fun (Ex_ty_cstr {ty = entry_arg_ty; _}) ->
+  Ticket_scanner.type_has_tickets ctxt entry_arg_ty
+  >>?= fun (has_tickets, ctxt) ->
+  (* Check that the parameter's type matches that of the entry-point, and
+     cast the parameter if this is the case. *)
+  cast_transaction_parameter ctxt location entry_arg_ty parameters_ty parameters
+  >>=? fun (parameters, ctxt) ->
+  Ticket_scanner.tickets_of_value ~include_lazy:true ctxt has_tickets parameters
+  >>=? fun (tickets, ctxt) ->
+  return (Some {destination = Contract destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
 let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
@@ -239,12 +227,13 @@ let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
 let tickets_of_operation ctxt
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
   match operation with
+  | Transaction_to_contract {destination = Implicit _; _} -> return (None, ctxt)
   | Transaction_to_contract
       {
         amount = _;
         unparsed_parameters = _;
         entrypoint;
-        destination;
+        destination = Originated destination;
         location;
         parameters_ty;
         parameters;
