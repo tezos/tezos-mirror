@@ -218,13 +218,13 @@ module type MerkelizedOperations = sig
     messages ->
     (messages * history * t) tzresult Lwt.t
 
-  (** [add_external_messages_no_history inbox level payloads messages] behaves
+  (** [add_messages_no_history inbox level payloads messages] behaves
       a [add_external_messages] except that it does not remember the inbox
       history. *)
-  val add_external_messages_no_history :
+  val add_messages_no_history :
     t ->
     Raw_level_repr.t ->
-    string list ->
+    Sc_rollup_inbox_message_repr.serialized list ->
     messages ->
     (messages * t, error trace) result Lwt.t
 

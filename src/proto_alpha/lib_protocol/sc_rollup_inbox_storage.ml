@@ -128,9 +128,15 @@ let add_external_messages ctxt rollup messages =
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
   *)
+  let*? messages =
+    List.map_e
+      (fun message ->
+        Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
+      messages
+  in
   let* current_messages, inbox =
     Sc_rollup_inbox_repr.(
-      add_external_messages_no_history inbox level messages current_messages)
+      add_messages_no_history inbox level messages current_messages)
   in
   let*? ctxt =
     Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages

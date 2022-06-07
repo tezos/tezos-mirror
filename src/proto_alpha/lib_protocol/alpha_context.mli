@@ -2759,10 +2759,10 @@ module Sc_rollup : sig
         messages ->
         (messages * history * t) tzresult Lwt.t
 
-      val add_external_messages_no_history :
+      val add_messages_no_history :
         t ->
         Raw_level.t ->
-        string list ->
+        Message.serialized list ->
         messages ->
         (messages * t, error trace) result Lwt.t
 

@@ -385,10 +385,10 @@ module type MerkelizedOperations = sig
     messages ->
     (messages * history * t) tzresult Lwt.t
 
-  val add_external_messages_no_history :
+  val add_messages_no_history :
     t ->
     Raw_level_repr.t ->
-    string list ->
+    Sc_rollup_inbox_message_repr.serialized list ->
     messages ->
     (messages * t) tzresult Lwt.t
 
@@ -643,14 +643,8 @@ module MakeHashingScheme (Tree : TREE) :
     in
     return (messages, history, inbox)
 
-  let add_external_messages_no_history inbox level payloads messages =
+  let add_messages_no_history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
-    let*? payloads =
-      List.map_e
-        (fun payload ->
-          Sc_rollup_inbox_message_repr.(to_bytes @@ External payload))
-        payloads
-    in
     let* messages, No_history, inbox =
       add_messages_aux No_history inbox level payloads messages
     in
