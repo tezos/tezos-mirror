@@ -510,6 +510,17 @@ smart contract.  There is no deadline for this.
 Getting Started
 ---------------
 
+.. note::
+
+   We use shell variable to generalize command invocations. For
+   instance, we write::
+
+     echo ${tx_rollup_address}
+
+   to emphasis that users are expected to provide the address of their
+   transaction rollup.
+
+
 Originating a Transaction Rollup
 ********************************
 
@@ -518,7 +529,7 @@ can use to originate a transaction rollup.
 
 .. code:: sh
 
-    tezos-client originate tx rollup from <implicit account address>
+    tezos-client originate tx rollup ${tx_rollup_allias} from ${implicit_account_alias}
 
 where ``tx`` is an abbreviation for transaction.
 
@@ -536,23 +547,348 @@ is a valid transaction rollup address.
 When using the ``tezos-client`` to originate a transaction rollup, it outputs
 the newly created address.
 
-Interacting with a Transaction Rollup using ``tezos-client``
-************************************************************
+Starting a Rollup Node
+**********************
 
-The ``tezos-client`` provides dedicated commands to interact with a
-transaction rollup. These commands are not intended to be used in a
-daily workflow, but rather for testing and development purposes.
+Octez does **not** provide an official transaction rollup node. That
+being said, an experimental transaction rollup node is under
+development for testing and demonstration purposes.
 
-It is possible to use the ``tezos-client`` to submit a batch of
-layer-2 operations.
+To get the experimental transaction rollup node, one can build it from
+source. Following the `official procedure
+<https://tezos.gitlab.io/introduction/howtoget.html#compiling-with-make>`_
+is expected to be enough: the binaries will be available at the root
+of the repository after ``make``.
+
+Another approach is to use the Docker images provided by Octez, for
+instance the ``master`` image tag (see `the Docker Hub
+<https://hub.docker.com/r/tezos/tezos>`_). Note that we do not provide
+a specialized entrypoint to interact with the binaries. One needs to
+log into a container built on top of the image to use them.
+
+For instance,
+
+.. code::
+
+   docker run -it --entrypoint=/bin/sh tezos/tezos:master_4435f908_20220706144700
+
+provides a shell with the rollup node and client available in the
+``PATH``.
+
+.. note::
+
+   Similarly to other Octez binaries like the baker, there exists a
+   rollup node and client for each version of the Tezos protocol. You
+   can use the ``014-PtKathma`` binaries on testnets like
+   `Kathmandunet <https://jakartanet.tzkt.io/>_` (``--network
+   kathmandunet``). Note that, compared to testnets like Mondaynet or
+   Dailynet, Kathmandunet is using the same protocol constants as
+   Mainnet, meaning the finality period is 40,000 blocks (about 2
+   weeks).
+
+The first step towards being able to use the experimental transaction
+rollup node is to prepare its configuration file.
 
 .. code:: sh
 
-    tezos-client submit tx rollup batch <batch content in hexadecimal notation> to <transaction rollup address> from <implicit account address>
+    tezos-tx-rollup-node-014-PtKathma init ${mode} config \
+          for ${tx_rollup_address_or_name} \
+          --data-dir ${data_dir} \
+          --rpc-addr ${rpc_address} \
+          [additional options to decide which keys to use to sign which L1 operations]
 
-It is also possible to retrieve the state (that is, size and Merkle
-root) of an inbox thanks to a dedicated RPC of the ``tezos-node``.
+(where ``${rpc_address}`` will be the address of the RPC server
+provided by the rollup node)
+
+The main decision to make here is to choose a mode for the rollup
+node, that is the set of actions a rollup node will perform.
+
+At its core, the rollup node is a software component responsible for
+making a given transaction rollup progress by means of a set of
+dedicated Tezos layer-1 operations.
+
+Finally, the rollup node comes with a concept of “modes” that decide
+the set of actions the rollup node is expected to perform (and, as a
+consequence, requires to provides certain keys).
+
+For instance, the ``observer`` mode makes the rollup node passive. An
+observer node computes the state of the ledger of a transaction
+rollup, but does not make it progress on the layer-1. An observer mode
+can be useful to get a trustworthy source of truth w.r.t. the layer-2
+context. The ``accuser`` mode is similar to the ``observer`` mode,
+with the caveat that if a erroneous commitment is posted on the
+layer-1, it will compute and publish a rejection operation. For the
+security of a transaction rollup to be enforced, it is therefore
+necessary that at least one honest accuser node is operating at all
+time. The ``batcher`` mode will enable a RPC that third-parties can
+use to submit layer-2 operations; the rollup node will then batch them
+together and post them on the layer-1 chain. The ``operator`` mode
+will enable all the features of the rollup node, including the
+injection of the maintenance operations of a transaction rollup
+(publishing, finalizing, removing commitments, dispatching tickets).
+Finally, the ``custom`` mode will allow advanced users to decide which
+set of features to enable.
+
+Each mode will then send a specific set of layer-1 operations. These
+operations have to be signed by the public key of an implicit account
+that owns enough XTZ to pay for the inclusion fees.
+
+These operations notably includes:
+
+  - Submitting batches of layer-2 operations (enabled by providing the
+    ``--batch-signer`` command-line argument)
+  - Submitting commitments (enabled by providing the ``--operator``
+    command-line argument)
+  - Finalizing (``--finalize-commitment-signer``) and removing
+    (``--remove-commitment-signer``) commitments
+  - Dispatching tickets whose withdrawals are authorized by a
+    finalized commitments (``--dispatch-withdrawals-signer``)
+  - Posting rejections (``--rejection-signer``)
+
+These various command-line arguments accept the Tezos implicit account
+aliases registered in the ``~/.tezos-client`` directory.
+
+Note that the same keys can be used to sign several kind of layer-1
+operations.
+
+.. note::
+
+   For the rollup node to work better, it is a good practice to
+   (1) to **reveal the keys associated to these aliases before
+   starting the rollup node**, and (2) to use a dedicated key for
+   batching and submitting layer-2 operations (``--batcher-signer``).
+
+For instance,
 
 .. code:: sh
 
-    tezos-client rpc get /chains/main/blocks/<block>/context/tx_rollup/<transaction rollup address>/inbox/<offset>
+    tezos-tx-rollup-node-014-PtKathma init batcher config for ${rollup}  \
+          --data-dir /tmp/tx-node \
+          --batch-signer ${batcher}
+
+will create a configuration file in ``/tmp/tx-node``, for the
+transaction rollup identified by the variable ``${rollup}``.
+
+Once the configuration is ready, starting the rollup node is as simple as
+
+.. code:: sh
+
+    tezos-tx-rollup-node-014-PtKathma run ${mode} for ${rollup_address_or_name} \
+          --endpoint ${tezos_node_address} \
+          --rpc-addr ${rollup_node_rpc_server_address} \
+          --data-dir ${data_dir} \
+          [--allow-deposit]
+
+The ``--allow-deposit`` argument is required in case you want to make
+the rollup node post commitment to the layer-1.  This is an additional
+layer of security (in addition to having to providing a signer key for
+the commitment operation thanks to the ``--operator`` argument), in
+order to reduce as much as possible the risk for users to have 10,000ꜩ
+frozen for a long period by accident.
+
+The rollup node works by tracking the head of the layer-1 chain, using
+a Tezos node whose addressed is provided with the ``--endpoint``
+argument. It is not possible to run a rollup node without a Tezos node
+available.
+
+.. warning::
+
+   The rollup node has been developed with the assumption that it is
+   executed on the same machine as the Tezos node it tracks. It may
+   not work properly in another set-up (*e.g.*, when ``--endpoint`` is
+   the address of a remote, public Tezos node).
+
+Finally, the rollup node will expose a RPC server at the address
+provided with the ``rpc-addr`` argument. If omitted, the default value
+used by the rollup node is ``localhost:9999``.
+
+Depositing Assets on a Rollup
+*****************************
+
+As discussed in this document, transaction rollups allow their users
+to exchange assets encoded as Michelson tickets.
+
+An example of a smart contract that deposit tickets to a transaction
+rollup can be found in the integration tests of the feature.::
+
+    parameter (pair string nat tx_rollup_l2_address address);
+    storage unit;
+    code {
+           CAR;
+           UNPAIR 4;
+           TICKET;
+           PAIR;
+           SWAP;
+           CONTRACT %deposit (pair (ticket string) tx_rollup_l2_address);
+           ASSERT_SOME;
+           SWAP;
+           PUSH mutez 0;
+           SWAP;
+           TRANSFER_TOKENS;
+           UNIT;
+           NIL operation;
+           DIG 2;
+           CONS;
+           PAIR;
+         }
+
+The ``%default`` entrypoint of this contract takes four arguments: (1)
+the contents and (2) the quantity of a ``ticket string`` to mint, (3)
+the beneficiary of the minted ticket in the layer-2, that is a ``tz4``
+address, and (4) the transaction rollup address that is the target of
+the deposit.
+
+.. code:: sh
+
+    tezos-client originate contract ${contract_alias} \
+                 transferring 0 \
+                 from ${alias} \
+                 running ${path_to_contract} \
+                 --burn-cap 0.401 --force
+
+Once the contract is originated, it becomes possible to deposit
+arbitrary tickets to the layer-2.
+
+Note that the ``tezos-client`` comes with facilities to generate and
+manipulate BLS keys (that are used to authenticate users on the
+layer-2, and to generate layer-2 addresses).
+
+.. code:: sh
+
+    # generate a pair of public and secret keys
+    tezos-client bls gen keys ${alias}
+    # display the keys (including the ``tz4`` hash)
+    tezos-client bls show address ${alias}
+
+So, to mint and deposit a ``ticket string`` whose contents is
+``foobar``, one can make the following contract call.
+
+.. code:: sh
+
+    tezos-client transfer 0 from user to deposit_contract \
+             --arg '(Pair "foobar" ${qty} "${tz4_address}" "${tx_rollup_address}")' \
+             --burn-cap 0.068
+
+Of course, more realistic use cases will require a more
+business-oriented logic for their deposit contracts. For instance,
+they will require the caller to provide XTZ tokens in exchange to mint
+tickets.
+
+To deposit a ticket to a transaction rollup, a smart contract emits an
+internal transaction. The ticket is assigned a hash, that the user can
+retrieve in the operation metadata. This hash is used in the layer-2
+operations to identify the tickets.
+
+For instance, here is the metadata of the internal operation
+responsible for the deposit of our ``foobar`` ticket.::
+
+      Internal operations:
+      Internal Transaction:
+        Amount: ꜩ0
+        From: KT1D9WLMFRndmrYthHruFudcXKvQkFhmW2KM
+        To: txr1aDUUQK7mT31PQbTPFKXFMZgsd7qNq3YkV
+        Entrypoint: deposit
+        Parameter: { Pair (Pair 0x01321183f2d68b3ce59d2b89e40609079d132969ed00 (Pair "foobar" 100))
+                          0xf4bdd875da3fc06d56f9b1f5ad9d603d82683834 ;
+                     string }
+        This transaction was successfully applied
+        Consumed gas: 2525.576
+        Ticket hash: expruTnG5XeYjtLaCBwcEku1Xj4Po8caDWcQdTDhaaXMo3FHRfzCb7
+        Consumed gas: 2525.576
+
+The line of interest is the penultimate line, starting with ``Ticket
+hash:``.
+
+Exchanging Assets inside a Rollup
+*********************************
+
+In addition to an experimental transaction rollup node, we also
+provide an experimental client to interact with said node.
+
+In particular, the preferred way to post layer-2 operations to the
+layer-1 chain is to use a node configured to batch and submit layer-2
+operations.
+
+We list the main commands that are of interest when it comes to
+demonstsrate how rollup works.
+
+To inspect the balance of a layer-2 address for a given ticket hash,
+the ``get balance`` command can be used.
+
+.. code:: sh
+
+    tezos-tx-rollup-client-014-PtKathma get balance for alice of ${ticket_hash}
+
+.. note::
+
+   There is no command to gather the list of ticket hashes a given layer-2 address owns.
+
+To transfer a ticket to another address on the layer-2, the
+``transfer`` command can be used.
+
+.. code:: sh
+
+    tezos-tx-rollup-client-014-PtKathma transfer ${qty} \
+          of ${ticket_hash} \
+          from ${src} to ${dst} \
+          [--endpoint ${tx_rollup_node_address}]
+
+The ``--endpoint`` argument can be omitted if the rollup node is using
+the default RPC server address, that is ``localhost:9999``.
+
+Here, the source has to be an alias identifying a BLS pair of keys
+generated with ``tezos-client bls gen key``, while the destination can
+either be an alias, or a ``tz4`` address directly.
+
+Similarly to Tezos, a transaction rollup also has a notion of L2
+blocks “levels” starting from 0. To get the content of a rollup L2
+block, one can use the following command.
+
+.. code:: sh
+
+    tezos-tx-rollup-client-014-PtKathma get block ${block_id}
+
+where ``block_id`` can either be ``head`` (the latest rollup block), a
+level (0, 1, etc.), or a Tezos block hash.
+
+Finally, it is also possible to “withdraw” a ticket from a transaction
+rollup, and to inject it back in the layer-1.
+
+.. code:: sh
+
+    tezos-tx-rollup-client-014-PtKathma withdraw ${qty} of ${ticket_hash} from ${l2_src} to ${l1_dst}
+
+Similarly to the ``transfer`` command, ``l2_src`` has to be an alias
+to a BLS pair of keys, while ``l1_dst`` can either be an alias or an
+implicit account address directly.
+
+If a rollup node is run using the mode ``operator``, then once the
+commitment related to a withdraw order is finalized, the rollup node
+will “dispatch” the ticket to the ``l1_dst`` address. Once this is
+done, the owner of ``l1_dst`` can use a dedicated ``tezos-client``
+command to transfer their tickets to a smart contract.
+
+To do so, it is necessary to provide the layer-1 with the actual
+contents of the ticket, not just the ticket hash.
+
+.. code:: sh
+
+    tezos-client transfer ${qty} tickets \
+          from ${src} to ${sc_dst} \
+          with entrypoint ${ep} \
+          and contents ${micheline_contents} \
+          and type ${ty} and ticketer ${ticketer}
+
+For instance, to transfer the ownership of our ``foobar`` ticket,
+``micheline_contents='"foobar"'`` (the quotes are necessary for it to
+be interpreted as a micheline string), and ``ty=string``.
+
+To retrieve the values of ``micheline_contents``, ``ty`` and
+``ticketer``, the following command can be used.
+
+.. code:: sh
+
+    tezos-tx-rollup-client-014-PtKathma rpc get "/context/head/tickets/${ticket_hash}"
+
+Besides, the entrypoint ``ep`` of ``sc_dst`` needs to expect a
+``ticket ty`` as its input.
