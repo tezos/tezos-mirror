@@ -678,11 +678,15 @@ let limit : P2p.limits Data_encoding.t =
              (opt "incoming-app-message-queue-size" int31)
              (opt "incoming-message-queue-size" int31)
              (opt "outgoing-message-queue-size" int31)
-             (opt "max_known_points" (tup2 uint16 uint16))))
+             (opt
+                "max_known_points"
+                ~description:
+                  "The max and target size for the known address table."
+                (tup2 uint16 uint16))))
        (obj6
           (opt
              "max_known_peer_ids"
-             ~description:"The max and target size for the known address table."
+             ~description:"The max and target size for the known peers table."
              (tup2 uint16 uint16))
           (dft
              "peer_greylist_size"
