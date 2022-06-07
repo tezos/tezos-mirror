@@ -73,7 +73,7 @@ module ACL = struct
         target
         ~data:"\000\010Hello, world. This is garbage, greylist me !"
     in
-    let* json = RPC.get_greylist_ips client in
+    let* json = RPC.Client.call client RPC.get_network_greylist_ips in
     let greylisted_ips = JSON.(as_list (json |-> "ips")) in
     let nb_greylisted_ips = List.length greylisted_ips in
     if nb_greylisted_ips <> 1 then

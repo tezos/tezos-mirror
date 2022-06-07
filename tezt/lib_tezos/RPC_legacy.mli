@@ -34,9 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /network/greylist/ips *)
-val get_greylist_ips : ?hooks:Process.hooks -> Client.t -> JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/chain_id *)
 val get_chain_id :
   ?endpoint:Client.endpoint ->

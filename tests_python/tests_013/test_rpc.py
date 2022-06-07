@@ -35,12 +35,11 @@ def contract_name():
 
 @pytest.fixture(scope="class", params=[None, "proxy"])
 def sandbox(request, sandbox: Sandbox, contract_name, session: dict):
-    """Adds two nodes to sandbox. Using the first node, originates the
-    identity contract `id.tz` with the name contract_name and makes it
-    address available under session['originated_accounts'].
+    """Adds a node to sandbox. Originates the identity contract
+    `id.tz` with the name contract_name and makes it address available
+    under session['originated_accounts'].
     """
     sandbox.add_node(1, params=constants.NODE_PARAMS, mode=request.param)
-    sandbox.add_node(2, params=constants.NODE_PARAMS, mode=request.param)
     client = sandbox.client(1)
     parameters = protocol.get_parameters()
     parameters['consensus_threshold'] = 0
@@ -80,15 +79,9 @@ class TestRPCsExistence:
     def test_config_file(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/config')
 
-    def test_network_self(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/self')
-
-    def test_constants(self, sandbox: Sandbox):
-        sandbox.client(2).rpc('get', '/network/self')
+    def test_chain_blocks(self, sandbox: Sandbox):
         utils.bake(sandbox.client(1))
         time.sleep(3)
-
-    def test_chain_blocks(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/chains/{CHAIN_ID}/blocks')
 
     def test_chain_chain_id(self, sandbox: Sandbox):
@@ -102,82 +95,6 @@ class TestRPCsExistence:
 
     def test_fetch_protocol_protocol_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/fetch_protocol/{PROTOCOL_HASH}')
-
-    def test_network_connections_peer_id(self, sandbox: Sandbox):
-        peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('get', f'/network/connections/{peer_id}')
-
-    def test_network_greylist_clear(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/greylist/clear')
-
-    def test_network_peers(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/peers')
-
-    def test_network_peers_peer_id(self, sandbox: Sandbox):
-        peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('get', f'/network/peers/{peer_id}')
-
-    def test_network_peers_peer_id_ban(self, sandbox: Sandbox):
-        peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/ban')
-
-    def test_network_peers_peer_id_banned(self, sandbox: Sandbox):
-        peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/banned')
-
-    def test_network_peers_peer_id_unban(self, sandbox: Sandbox):
-        peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/unban')
-
-    def test_network_peers_peer_id_untrust(self, sandbox: Sandbox):
-        peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/untrust')
-
-    def test_network_peers_peer_id_trust(self, sandbox: Sandbox):
-        peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/trust')
-
-    def test_network_points(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/points')
-
-    def test_network_points_point(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', '/network/points')
-        point = points[-1][0]
-        sandbox.client(1).rpc('get', f'/network/points/{point}')
-
-    def test_network_points_point_ban(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', '/network/points')
-        point = points[-1][0]
-        sandbox.client(1).rpc('get', f'/network/points/{point}/ban')
-
-    def test_network_points_point_banned(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', '/network/points')
-        point = points[-1][0]
-        sandbox.client(1).rpc('get', f'/network/points/{point}/banned')
-
-    def test_network_points_point_trust(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', '/network/points')
-        point = points[-1][0]
-        sandbox.client(1).rpc('get', f'/network/points/{point}/trust')
-
-    def test_network_points_point_unban(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', '/network/points')
-        point = points[-1][0]
-        sandbox.client(1).rpc('get', f'/network/points/{point}/unban')
-
-    def test_network_points_point_untrust(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', '/network/points')
-        point = points[-1][0]
-        sandbox.client(1).rpc('get', f'/network/points/{point}/untrust')
-
-    def test_network_stat(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/stat')
-
-    def test_network_version(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/version')
-
-    def test_network_versions(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', '/network/versions')
 
     def test_protocols(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', '/protocols')
@@ -297,7 +214,6 @@ class TestRPCsExistence:
 
     def test_add_transactions(self, sandbox: Sandbox):
         sandbox.client(1).transfer(1.000, 'bootstrap1', 'bootstrap2')
-        sandbox.client(2).transfer(1.000, 'bootstrap3', 'bootstrap4')
         # FIXME: Use client.endorse
         # Not clear where to put it w.r.t to Tenderbake,
         # knowing that bake for does endorse

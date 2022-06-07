@@ -50,6 +50,61 @@ let post_private_injection_operations ?(force = false) ?(async = false) ~ops ()
   @@ fun json ->
   JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
 
+let get_network_self = make GET ["network"; "self"] JSON.as_string
+
+let get_network_greylist_ips = make GET ["network"; "greylist"; "ips"] Fun.id
+
+let get_network_greylist_clear =
+  make GET ["network"; "greylist"; "clear"] Fun.id
+
+let get_network_peers =
+  make GET ["network"; "peers"] @@ fun json ->
+  JSON.(json |> as_list |> List.map @@ fun p -> (p |=> 0 |> as_string, p |=> 1))
+
+let get_network_peer peer_id = make GET ["network"; "peers"; peer_id] Fun.id
+
+let get_network_peer_ban peer_id =
+  make GET ["network"; "peers"; peer_id; "ban"] Fun.id
+
+let get_network_peer_banned peer_id =
+  make GET ["network"; "peers"; peer_id; "banned"] Fun.id
+
+let get_network_peer_unban peer_id =
+  make GET ["network"; "peers"; peer_id; "unban"] Fun.id
+
+let get_network_peer_untrust peer_id =
+  make GET ["network"; "peers"; peer_id; "untrust"] Fun.id
+
+let get_network_peer_trust peer_id =
+  make GET ["network"; "peers"; peer_id; "trust"] Fun.id
+
+let get_network_points =
+  make GET ["network"; "points"] @@ fun json ->
+  JSON.(json |> as_list |> List.map @@ fun p -> (p |=> 0 |> as_string, p |=> 1))
+
+let get_network_point point_id = make GET ["network"; "points"; point_id] Fun.id
+
+let get_network_point_ban point_id =
+  make GET ["network"; "points"; point_id; "ban"] Fun.id
+
+let get_network_point_banned point_id =
+  make GET ["network"; "points"; point_id; "banned"] Fun.id
+
+let get_network_point_unban point_id =
+  make GET ["network"; "points"; point_id; "unban"] Fun.id
+
+let get_network_point_untrust point_id =
+  make GET ["network"; "points"; point_id; "untrust"] Fun.id
+
+let get_network_point_trust point_id =
+  make GET ["network"; "points"; point_id; "trust"] Fun.id
+
+let get_network_stat = make GET ["network"; "stat"] Fun.id
+
+let get_network_version = make GET ["network"; "version"] Fun.id
+
+let get_network_versions = make GET ["network"; "versions"] Fun.id
+
 let get_chain_block ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block] Fun.id
 

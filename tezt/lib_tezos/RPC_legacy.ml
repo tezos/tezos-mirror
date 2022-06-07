@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_greylist_ips ?hooks client =
-  let path = ["network"; "greylist"; "ips"] in
-  Client.rpc ?hooks GET path client
-
 let get_chain_id ?endpoint ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "chain_id"] in
   Client.rpc ?endpoint ?hooks GET path client
