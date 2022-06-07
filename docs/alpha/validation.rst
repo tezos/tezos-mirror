@@ -60,11 +60,11 @@ does not implement this business logic *monolithically*, as described
 above, but it rather presents a more fine-grained API. The rationale
 is to provide specialized variations of the core *validation* and
 *application* functionality, dubbed :ref:`Validation
-modes<validation_modes_alpha>`. These modes enable the protocol to
-distinguish the validation of operations "in the mempool", performed
-by the :doc:`prevalidator<../shell/prevalidation>`, from the
-validation of the operations included in newly received blocks,
-performed by the :ref:`block validator<block_validator>`, in order to
+modes<validation_modes_alpha>`. For example, these modes enable the
+protocol to distinguish operations "in the mempool", whose validation
+is triggered by the :doc:`prevalidator<../shell/prevalidation>`, from
+operations included in newly received blocks, whose validation is
+triggered by the :ref:`block validator<block_validator>`, in order to
 localize validation rules as needed. The resulting concrete API is
 specified by the :package-api:`Protocol
 <tezos-protocol-environment/Tezos_protocol_environment/V8/module-type-T/Updater/module-type-PROTOCOL/index.html>`
@@ -84,25 +84,127 @@ and application for blocks and the operations supported.
 Validation modes
 ================
 
+The Tezos protocol provides different validation modes, intended to be
+used by Tezos *shell* and *baker* software implementations when
+needing to apply (or to assert the validity) of blocks and operations
+under different, or specialized, circumstances -- for example, in
+order to *bake* a block. For each of these validation modes, the API
+specified by the protocol environment offers an entry point so that
+protocol-agnostic components, the Octez shell for instance, are able
+to use these different modes.
+
 .. _full_application_alpha:
 
 Full Application
 ~~~~~~~~~~~~~~~~
+
+The ``Full application`` mode is intended to be used to *fully*
+validate and apply blocks. In particular, this mode is used to
+validate and apply a **known** block, with a known operation trace. A
+Tezos shell implementation should use the full application mode to
+decide whether an incoming block can be safely included in the
+blockchain. That is, all validity checks are enabled: the block's
+signature is correct, and **all** operations included in the block are
+valid; the correct amount of consensus operations have been included
+in order to satisfy the consensus' threshold, etc.
 
 .. _full_construction_alpha:
 
 Full Construction
 ~~~~~~~~~~~~~~~~~
 
+The ``Full construction`` mode is intended to be used when a
+*delegate* is trying to bake a block and therefore needs to filter the
+validity of the desired operation trace, to include only valid
+operations. This mode is mostly similar to the ``Full application``
+mode except that *some* global block validity checks are disabled, and
+consensus operations are validated with slightly different
+preconditions. For instance, since a delegate cannot sign a block
+while it is being built, the signature check is disabled, and it will
+be left to the baker to correctly sign the resulting block after its
+construction is finalized.
+
+In Octez, this mode is mainly used by the baker daemon.
+
 .. _partial_construction_alpha:
 
 Partial Construction
 ~~~~~~~~~~~~~~~~~~~~
 
+The ``Partial construction`` mode, also known as ``Mempool mode`` is
+used by the :doc:`prevalidator component<../shell/prevalidation>` of
+an Octez node to validate incoming operations -- that is, those
+not-yet included into blocks. This mode's business-logic is very close
+to the ``Full construction`` mode, and the differences boil down to
+the intended usage. The partial construction mode does not try to
+fully bake a block, but rather to inform the Octez prevalidator on the
+potential validity of operations (and whether they can safely included
+into a block), so that the latter can **classify** incoming
+operations, and further decide how to process them accordingly.
+
+.. _protocol_classification_alpha:
+
+The protocol provides the shell with the following classification of
+an operation, consisting of one valid kind -- ``Applied`` --, and
+:ref:`four error kinds <error_monad_within_protocol>` defined by the
+protocol environment:
+
+- ``Applied``: the operation is valid and can be included in a
+  potential block in the current context.
+
+- ``Temporary``: the operation is invalid in the current context, but
+  it could *later* become valid -- in the context associated to a
+  successor block of the current head. For instance, a manager
+  operation whose counter value is greater than the one expected (a
+  *"counter-in-the-future"* error), or the manager's balance is
+  insufficient to pay the operation's fees, etc.
+
+- ``Branch``: the operation is invalid in the current context and in
+  any possible context from its future successors, but it might still
+  be valid in an alternative branch. For example: a manager operation
+  with a smaller counter than the one expected (a
+  *"counter-in-the-past"* error), an unexpected endorsement for the
+  current level, etc.
+
+- ``Permanent``: the operation is invalid in the current context, and
+  there isn't any plausible context where it might be or become
+  valid. For example, an operation carrying an invalid signature.
+
+- ``Outdated``: the operation is *too old* to be included in a
+  block. Furthermore, there might be still some value in the
+  information provided by an ``Outdated`` operation. An example is the
+  case of an endorsement which was received *too late*, but that could
+  still be used to form a consensus quorum.
+
 .. _partial_application_alpha:
 
 Partial Application
 ~~~~~~~~~~~~~~~~~~~
+
+The ``Partial application`` mode is used for :ref:`multi-pass
+validation<multi_pass_validation>`. Its aim is to provide Tezos shell
+implementations with a light-weight (read "fast") block application
+mechanism, which can determine whether a block has a *chance* of being
+valid or not, in a situation when the provided context is *not a
+recent one*. That is, when the block candidate succeeds neither the
+head of the chain, nor a close ancestor.
+
+This validation mode is typically used when the node receives a
+significantly large branch -- for instance, while bootstrapping. To
+check whether this branch is plausibly valid or potentially malicious
+spam, the shell retrieves the context from the most recent common
+ancestor between its current head and the announced branch, and
+proceeds to "partially apply" each block of this branch using the
+common ancestor's context.
+
+Indeed, by relying on the ancestor context, this mode can *only*
+assert the validity of consensus-related preconditions (endorsing
+power, block fitness, etc.), as future consensus slots are known in
+advance -- how much in advance being specified by the
+``<PRESERVED_CYCLES>`` protocol constant. Thus, the `Partial
+application` mode provides an over-approximation of the branch's
+validity, and as a result intermediate results are not committed on
+disk in order to prevent potential attacks.
 
 .. _block_validation_overview_alpha:
 
