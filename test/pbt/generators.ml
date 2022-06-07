@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type ('a, 'b) recursion_test_type =
+  | C of ('a * 'b * ('a, 'b) recursion_test_type option)
+
 let char = Crowbar.map [Crowbar.uint8] Char.chr
 
 let int31 : int Crowbar.gen =
@@ -101,6 +104,7 @@ type _ ty =
   | Matching2 : 'a ty * 'b ty -> ('a, 'b) either ty
   | Mu_matching : 'a ty -> 'a list ty
   | Mu_bigmatching : 'a ty * 'b ty -> ('a option * 'b) list ty
+  | Mu_obj : 'a ty * 'b ty -> ('a, 'b) recursion_test_type ty
   | Check_size : 'a ty -> 'a ty
   | StringEnum : int ty
   | Add_padding : 'a ty * int -> 'a ty
@@ -189,6 +193,7 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | Mu_matching ty -> Crowbar.pp ppf "mu_matching(%a)" pp_ty ty
   | Mu_bigmatching (tya, tyb) ->
       Crowbar.pp ppf "mu_bigmatching(%a,%a)" pp_ty tya pp_ty tyb
+  | Mu_obj (tya, tyb) -> Crowbar.pp ppf "mu_obj(%a,%a)" pp_ty tya pp_ty tyb
   | Check_size ty -> Crowbar.pp ppf "check_size(%a)" pp_ty ty
   | StringEnum -> Crowbar.pp ppf "string_enum"
   | Add_padding (ty, n) -> Crowbar.pp ppf "add_padding(%a)(%d)" pp_ty ty n
@@ -346,6 +351,8 @@ let any_ty_fix g =
         map [g] (fun (AnyTy ty) -> AnyTy (Mu_matching ty));
         map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) ->
             AnyTy (Mu_bigmatching (ty_a, ty_b)));
+        map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) ->
+            AnyTy (Mu_obj (ty_a, ty_b)));
         map [g] (fun (AnyTy ty) -> AnyTy (Check_size ty));
         map
           [g; range ~min:1 10]
@@ -1152,6 +1159,48 @@ let full_mu_bigmatching : type a b. a full -> b full -> (a option * b) list full
         v
   end)
 
+let full_mu_obj : type a b. a full -> b full -> (a, b) recursion_test_type full
+    =
+ fun fulla fullb ->
+  let module Fulla = (val fulla) in
+  let module Fullb = (val fullb) in
+  (module struct
+    type t = (Fulla.t, Fullb.t) recursion_test_type
+
+    let ty = Mu_obj (Fulla.ty, Fullb.ty)
+
+    let rec eq (C (xa, xb, xs)) (C (ya, yb, ys)) =
+      Fulla.eq xa ya && Fullb.eq xb yb && Option.equal eq xs ys
+
+    let encoding =
+      let open Data_encoding in
+      mu (fresh_name ()) @@ fun self ->
+      conv
+        (fun (C (xa, xb, xs)) -> (xa, xb, xs))
+        (fun (xa, xb, xs) -> C (xa, xb, xs))
+      @@ obj3
+           (req "a" Fulla.encoding)
+           (req "b" Fullb.encoding)
+           (opt "more" self)
+
+    let gen =
+      Crowbar.fix (fun self ->
+          Crowbar.map
+            [Fulla.gen; Fullb.gen; Crowbar.option self]
+            (fun a b xs -> C (a, b, xs)))
+
+    let rec pp ppf (C (xa, xb, ot)) =
+      Crowbar.pp
+        ppf
+        "C(%a,%a,%a)"
+        Fulla.pp
+        xa
+        Fullb.pp
+        xb
+        (Format.pp_print_option pp)
+        ot
+  end)
+
 let full_check_size : type a. a full -> a full =
  fun full ->
   let module Full = (val full) in
@@ -1938,6 +1987,7 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Mu_matching ty -> full_mu_matching (full_of_ty ty)
   | Mu_bigmatching (tya, tyb) ->
       full_mu_bigmatching (full_of_ty tya) (full_of_ty tyb)
+  | Mu_obj (tya, tyb) -> full_mu_obj (full_of_ty tya) (full_of_ty tyb)
   | Check_size ty -> full_check_size (full_of_ty ty)
   | StringEnum -> full_string_enum
   | Add_padding (ty, n) -> full_add_padding (full_of_ty ty) n
