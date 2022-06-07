@@ -182,7 +182,7 @@ struct
   module List = struct
     include Tezos_error_monad.TzLwtreslib.List
 
-    include Tezos_protocol_environment_structs.V4.M.Lwtreslib_list_combine
+    include Tezos_protocol_environment_structs.V4.Lwtreslib_list_combine
   end
 
   module Char = Char
@@ -194,7 +194,7 @@ struct
 
   module Set = struct
     module type S =
-      Tezos_protocol_environment_structs.V4.M.Replicated_signatures.Set.S
+      Tezos_protocol_environment_structs.V4.Replicated_signatures.Set.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t =
@@ -203,7 +203,7 @@ struct
 
   module Map = struct
     module type S =
-      Tezos_protocol_environment_structs.V4.M.Replicated_signatures.Map.S
+      Tezos_protocol_environment_structs.V4.Replicated_signatures.Map.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t =
@@ -267,7 +267,7 @@ struct
   module Uri = Uri
 
   module Data_encoding = struct
-    include Tezos_protocol_environment_structs.V4.M.Data_encoding
+    include Tezos_protocol_environment_structs.V4.Data_encoding
 
     type tag_size = [`Uint8 | `Uint16]
 
@@ -713,7 +713,7 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
-    include Tezos_protocol_environment_structs.V4.M.Error_monad_infix_globals
+    include Tezos_protocol_environment_structs.V4.Error_monad_infix_globals
 
     let fail e = Lwt.return_error (TzTrace.make e)
 

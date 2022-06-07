@@ -1625,10 +1625,10 @@ let tezos_protocol_environment_sigs =
           include_ "v6.dune.inc";
         ]
 
-let tezos_protocol_environment_structs =
+let tezos_protocol_environment_structs_v0 =
   public_lib
-    "tezos-protocol-environment.structs"
-    ~path:"src/lib_protocol_environment/structs"
+    "tezos-protocol-environment.structs.v0"
+    ~path:"src/lib_protocol_environment/structs/v0"
     ~deps:
       [
         tezos_stdlib;
@@ -1637,18 +1637,43 @@ let tezos_protocol_environment_structs =
         data_encoding;
         bls12_381;
       ]
-    ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"; "V6"]
-    ~dune:
-      Dune.
-        [
-          include_ "v0.dune.inc";
-          include_ "v1.dune.inc";
-          include_ "v2.dune.inc";
-          include_ "v3.dune.inc";
-          include_ "v4.dune.inc";
-          include_ "v5.dune.inc";
-          include_ "v6.dune.inc";
-        ]
+
+let tezos_protocol_environment_structs_v1 =
+  public_lib
+    "tezos-protocol-environment.structs.v1"
+    ~path:"src/lib_protocol_environment/structs/v1"
+    ~deps:
+      [
+        tezos_stdlib;
+        tezos_crypto;
+        tezos_lwt_result_stdlib;
+        data_encoding;
+        bls12_381;
+      ]
+
+let tezos_protocol_environment_structs_v3 =
+  public_lib
+    "tezos-protocol-environment.structs.v3"
+    ~path:"src/lib_protocol_environment/structs/v3"
+    ~deps:
+      [
+        tezos_stdlib;
+        tezos_crypto;
+        tezos_lwt_result_stdlib;
+        data_encoding;
+        bls12_381;
+      ]
+
+let tezos_protocol_environment_structs =
+  public_lib
+    "tezos-protocol-environment.structs"
+    ~path:"src/lib_protocol_environment/structs"
+    ~deps:
+      [
+        tezos_protocol_environment_structs_v0;
+        tezos_protocol_environment_structs_v1;
+        tezos_protocol_environment_structs_v3;
+      ]
 
 let tezos_protocol_environment =
   public_lib
