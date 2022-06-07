@@ -56,33 +56,18 @@ let test_feature_flag =
       bool
       ~error_msg:"Feature flag for the DAL should be disabled") ;
   let* (`OpHash oph1) =
-    Operation.(
-      forge_and_inject_operation
+    Operation.Consensus.(
+      inject
         ~force:true
-        ~batch:
-          (`Consensus
-            (Dal_slot_availability
-               {
-                 endorser = Constant.bootstrap1.public_key_hash;
-                 endorsement = Array.make number_of_slots false;
-               }))
         ~signer:Constant.bootstrap1
+        (slot_availability ~endorsement:(Array.make number_of_slots false))
         client)
   in
-  let* slot_header_operation =
-    Operation.mk_publish_slot_header
-      ~source:Constant.bootstrap1
-      ~index:0
-      ~level:1
-      ~header:0
-      client
-  in
   let* (`OpHash oph2) =
-    Operation.(
-      forge_and_inject_operation
+    Operation.Manager.(
+      inject
         ~force:true
-        ~batch:(`Manager [slot_header_operation])
-        ~signer:Constant.bootstrap1
+        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~header:0]
         client)
   in
   let* mempool = Mempool.get_mempool client in
