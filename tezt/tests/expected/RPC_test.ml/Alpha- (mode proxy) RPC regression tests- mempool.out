@@ -6077,16 +6077,20 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.rollup_address"
                               },
                               "stakers": {
-                                "type": "array",
-                                "items": [
-                                  {
+                                "type": "object",
+                                "properties": {
+                                  "alice": {
                                     "$ref": "#/definitions/Signature.Public_key_hash"
                                   },
-                                  {
+                                  "bob": {
                                     "$ref": "#/definitions/Signature.Public_key_hash"
                                   }
+                                },
+                                "required": [
+                                  "bob",
+                                  "alice"
                                 ],
-                                "additionalItems": false
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -15443,26 +15447,28 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "encoding": {
                           "fields": [
                             {
+                              "name": "alice",
                               "layout": {
                                 "name": "public_key_hash",
                                 "kind": "Ref"
                               },
-                              "kind": "anon",
                               "data_kind": {
                                 "size": 21,
                                 "kind": "Float"
-                              }
+                              },
+                              "kind": "named"
                             },
                             {
+                              "name": "bob",
                               "layout": {
                                 "name": "public_key_hash",
                                 "kind": "Ref"
                               },
-                              "kind": "anon",
                               "data_kind": {
                                 "size": 21,
                                 "kind": "Float"
-                              }
+                              },
+                              "kind": "named"
                             }
                           ]
                         }
@@ -21543,16 +21549,20 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.rollup_address"
                               },
                               "stakers": {
-                                "type": "array",
-                                "items": [
-                                  {
+                                "type": "object",
+                                "properties": {
+                                  "alice": {
                                     "$ref": "#/definitions/Signature.Public_key_hash"
                                   },
-                                  {
+                                  "bob": {
                                     "$ref": "#/definitions/Signature.Public_key_hash"
                                   }
+                                },
+                                "required": [
+                                  "bob",
+                                  "alice"
                                 ],
-                                "additionalItems": false
+                                "additionalProperties": false
                               }
                             },
                             "required": [

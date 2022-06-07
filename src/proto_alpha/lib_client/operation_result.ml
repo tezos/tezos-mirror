@@ -321,15 +321,15 @@ let pp_manager_operation_content (type kind) source pp_result ppf
         Sc_rollup.Game.pp_refutation
         refutation
         (if is_opening_move then "(opening move of game)" else "")
-  | Sc_rollup_timeout {rollup; stakers} ->
+  | Sc_rollup_timeout {rollup; stakers = {alice; bob}} ->
       Format.fprintf
         ppf
         "Punish one of the two stakers %a and %a by timeout in the smart \
          contract rollup at address %a"
         Sc_rollup.Staker.pp
-        (fst stakers)
+        alice
         Sc_rollup.Staker.pp
-        (snd stakers)
+        bob
         Sc_rollup.Address.pp
         rollup
   | Sc_rollup_atomic_batch

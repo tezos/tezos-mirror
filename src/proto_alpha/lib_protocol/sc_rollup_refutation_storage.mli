@@ -104,7 +104,7 @@ val game_move :
 val timeout :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_repr.Staker.t * Sc_rollup_repr.Staker.t ->
+  Sc_rollup_game_repr.Index.t ->
   (Sc_rollup_game_repr.outcome * Raw_context.t) tzresult Lwt.t
 
 (** [apply_outcome ctxt rollup outcome] takes an [outcome] produced
@@ -128,7 +128,7 @@ val timeout :
 val apply_outcome :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_repr.Staker.t * Sc_rollup_repr.Staker.t ->
+  Sc_rollup_game_repr.Index.t ->
   Sc_rollup_game_repr.outcome ->
   (Sc_rollup_game_repr.status * Raw_context.t * Receipt_repr.balance_updates)
   tzresult

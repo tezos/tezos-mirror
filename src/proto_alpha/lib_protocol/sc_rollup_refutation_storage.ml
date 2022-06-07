@@ -146,7 +146,6 @@ let get_conflict_point ctxt rollup staker1 staker2 =
 
 let get_game ctxt rollup stakers =
   let open Lwt_tzresult_syntax in
-  let stakers = Sc_rollup_game_repr.Index.normalize stakers in
   let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
   match game with Some g -> return (g, ctxt) | None -> fail Sc_rollup_no_game
 
@@ -184,7 +183,7 @@ let get_game ctxt rollup stakers =
     } *)
 let init_game ctxt rollup ~refuter ~defender =
   let open Lwt_tzresult_syntax in
-  let stakers = Sc_rollup_game_repr.Index.normalize (refuter, defender) in
+  let stakers = Sc_rollup_game_repr.Index.make refuter defender in
   let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
   match game with
   | Some _ -> fail Sc_rollup_game_already_started
@@ -227,11 +226,13 @@ let init_game ctxt rollup ~refuter ~defender =
 
 let game_move ctxt rollup ~player ~opponent refutation ~is_opening_move =
   let open Lwt_tzresult_syntax in
-  let alice, bob = Sc_rollup_game_repr.Index.normalize (player, opponent) in
+  let ({alice; bob} as stakers : Sc_rollup_game_repr.Index.t) =
+    Sc_rollup_game_repr.Index.make player opponent
+  in
   let* game, ctxt =
     if is_opening_move then
       init_game ctxt rollup ~refuter:player ~defender:opponent
-    else get_game ctxt rollup (alice, bob)
+    else get_game ctxt rollup stakers
   in
   let* () =
     fail_unless
@@ -245,25 +246,21 @@ let game_move ctxt rollup ~player ~opponent refutation ~is_opening_move =
   match move_result with
   | Either.Left outcome -> return (Some outcome, ctxt)
   | Either.Right new_game ->
-      let* ctxt, _ = Store.Game.update (ctxt, rollup) (alice, bob) new_game in
+      let* ctxt, _ = Store.Game.update (ctxt, rollup) stakers new_game in
       let* ctxt, _ =
-        Store.Game_timeout.update
-          (ctxt, rollup)
-          (alice, bob)
-          (timeout_level ctxt)
+        Store.Game_timeout.update (ctxt, rollup) stakers (timeout_level ctxt)
       in
       return (None, ctxt)
 
 let timeout ctxt rollup stakers =
   let open Lwt_tzresult_syntax in
   let level = (Raw_context.current_level ctxt).level in
-  let alice, bob = Sc_rollup_game_repr.Index.normalize stakers in
-  let* ctxt, game = Store.Game.find (ctxt, rollup) (alice, bob) in
+  let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
   match game with
   | None -> fail Sc_rollup_no_game
   | Some game ->
       let* ctxt, timeout_level =
-        Store.Game_timeout.get (ctxt, rollup) (alice, bob)
+        Store.Game_timeout.get (ctxt, rollup) stakers
       in
       let* () =
         fail_unless
@@ -274,15 +271,14 @@ let timeout ctxt rollup stakers =
 
 let apply_outcome ctxt rollup stakers (outcome : Sc_rollup_game_repr.outcome) =
   let open Lwt_tzresult_syntax in
-  let alice, bob = Sc_rollup_game_repr.Index.normalize stakers in
   let losing_staker = Sc_rollup_game_repr.Index.staker stakers outcome.loser in
   let* ctxt, balance_updates =
     Stake_storage.remove_staker ctxt rollup losing_staker
   in
-  let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) (alice, bob) in
-  let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) (alice, bob) in
-  let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) alice in
-  let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) bob in
+  let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
+  let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) stakers in
+  let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.alice in
+  let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.bob in
   return
     ( Sc_rollup_game_repr.Ended (outcome.reason, losing_staker),
       ctxt,

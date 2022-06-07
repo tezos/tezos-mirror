@@ -107,19 +107,32 @@ let pp ppf game =
     game.pvm_name
 
 module Index = struct
-  type t = Staker.t * Staker.t
+  type t = {alice : Staker.t; bob : Staker.t}
 
-  let encoding = Data_encoding.tup2 Staker.encoding Staker.encoding
+  let make a b =
+    let alice, bob =
+      if Compare.Int.(Staker.compare a b > 0) then (b, a) else (a, b)
+    in
+    {alice; bob}
 
-  let compare (a, b) (c, d) =
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {alice; bob} -> (alice, bob))
+      (fun (alice, bob) -> make alice bob)
+      (obj2 (req "alice" Staker.encoding) (req "bob" Staker.encoding))
+
+  let compare {alice = a; bob = b} {alice = c; bob = d} =
     match Staker.compare a c with 0 -> Staker.compare b d | x -> x
 
-  let to_path (a, b) p = Staker.to_b58check a :: Staker.to_b58check b :: p
+  let to_path {alice; bob} p =
+    Staker.to_b58check alice :: Staker.to_b58check bob :: p
 
   let both_of_b58check_opt (a, b) =
-    Option.bind (Staker.of_b58check_opt b) (fun b_staker ->
-        Option.bind (Staker.of_b58check_opt a) (fun a_staker ->
-            Some (a_staker, b_staker)))
+    let ( let* ) = Option.bind in
+    let* a_staker = Staker.of_b58check_opt a in
+    let* b_staker = Staker.of_b58check_opt b in
+    Some (make a_staker b_staker)
 
   let of_path = function [a; b] -> both_of_b58check_opt (a, b) | _ -> None
 
@@ -129,8 +142,8 @@ module Index = struct
     let descr =
       "A pair of stakers that index a smart contract rollup refutation game."
     in
-    let construct (a, b) =
-      Format.sprintf "%s-%s" (Staker.to_b58check a) (Staker.to_b58check b)
+    let construct {alice; bob} =
+      Format.sprintf "%s-%s" (Staker.to_b58check alice) (Staker.to_b58check bob)
     in
     let destruct s =
       match String.split_on_char '-' s with
@@ -143,17 +156,12 @@ module Index = struct
     in
     RPC_arg.make ~descr ~name:"game_index" ~construct ~destruct ()
 
-  let normalize (a, b) =
-    match Staker.compare a b with 1 -> (b, a) | _ -> (a, b)
-
-  let staker stakers player =
-    let alice, bob = normalize stakers in
-    match player with Alice -> alice | Bob -> bob
+  let staker {alice; bob} = function Alice -> alice | Bob -> bob
 end
 
 let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
     ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender =
-  let alice, _ = Index.normalize (refuter, defender) in
+  let ({alice; _} : Index.t) = Index.make refuter defender in
   let alice_to_play = Staker.equal alice refuter in
   let tick = Sc_rollup_tick_repr.of_number_of_ticks child.number_of_ticks in
   {

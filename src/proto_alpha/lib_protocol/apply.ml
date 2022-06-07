@@ -1817,11 +1817,8 @@ let apply_external_manager_operation_content :
       (match outcome with
       | None -> return (Sc_rollup.Game.Ongoing, ctxt, [])
       | Some o ->
-          Sc_rollup.Refutation_storage.apply_outcome
-            ctxt
-            rollup
-            (source, opponent)
-            o)
+          let stakers = Sc_rollup.Game.Index.make source opponent in
+          Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers o)
       >>=? fun (status, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result =
