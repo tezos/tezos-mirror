@@ -75,8 +75,8 @@
         "Tx_rollup_errors_repr",
         "Tx_rollup_state_repr",
 
-	"Dal_slot_repr",
-	"Dal_endorsement_repr",
+        "Dal_slot_repr",
+        "Dal_endorsement_repr",
 	
         "Bond_id_repr",
         "Vote_repr",
@@ -151,7 +151,7 @@
         "Sc_rollup_refutation_storage",
         "Sc_rollup_storage",
 
-	"Dal_slot_storage",
+        "Dal_slot_storage",
 
         "Alpha_context",
         "Script_string",
@@ -204,7 +204,7 @@
         "Sc_rollup_management_protocol",
         "Sc_rollup_operations",
 
-	"Dal_apply",
+        "Dal_apply",
 
         "Baking",
         "Amendment",
