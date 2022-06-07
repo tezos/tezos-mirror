@@ -964,11 +964,34 @@ let import_desc s =
   | 0x03 -> GlobalImport (global_type s)
   | _ -> error s (pos s - 1) "malformed import kind"
 
-let import s =
-  let module_name = name s in
-  let item_name = name s in
-  let idesc = at import_desc s in
-  {module_name; item_name; idesc}
+type utf8 = int list
+
+type import_kont =
+  | ImpKStart
+  (** Import parsing starting point. *)
+  | ImpKModuleName of name_step
+  (** Import module name parsing UTF8 char per char step. *)
+  | ImpKItemName of utf8 * name_step
+  (** Import item name parsing UTF8 char per char step. *)
+  | ImpKStop of import'
+  (** Import final step. *)
+
+let import_step s = function
+  | ImpKStart ->
+    ImpKModuleName NKStart
+
+  | ImpKModuleName (NKStop module_name) ->
+    ImpKItemName (module_name, NKStart)
+  | ImpKModuleName nk ->
+    ImpKModuleName (name_step s nk)
+
+  | ImpKItemName (module_name, NKStop item_name) ->
+    let idesc = at import_desc s in
+    ImpKStop{module_name; item_name; idesc}
+  | ImpKItemName (module_name, nk) ->
+    ImpKItemName (module_name, name_step s nk)
+
+  | ImpKStop _ -> assert false (* Final step, cannot reduce *)
 
 
 (* Table section *)
@@ -994,10 +1017,26 @@ let export_desc s =
   | 0x03 -> GlobalExport (at var s)
   | _ -> error s (pos s - 1) "malformed export kind"
 
-let export s =
-  let name = name s in
-  let edesc = at export_desc s in
-  {name; edesc}
+type export_kont =
+  | ExpKStart
+  (** Export parsing starting point. *)
+  | ExpKName of name_step
+  (** Export name parsing UTF8 char per char step. *)
+  | ExpKStop of export'
+  (** Export final step. *)
+
+let export_step s = function
+  | ExpKStart ->
+    ExpKName NKStart
+
+  | ExpKName (NKStop name) ->
+    let edesc = at export_desc s in
+    ExpKStop {name; edesc}
+  | ExpKName nk ->
+    ExpKName (name_step s nk)
+
+  | ExpKStop _ -> assert false (* Final step, cannot reduce *)
+
 
 (* Start section *)
 
@@ -1454,6 +1493,10 @@ type module_kont' =
 
   (* For the next continuations, the vectors are only used for accumulation, and
      reduce to `MK_Field(.., Rev ..)`. *)
+  | MKImport of import_kont * pos * size * import vec_kont
+  (** Import section parsing. *)
+  | MKExport of export_kont * pos * size * export vec_kont
+  (** Export section parsing. *)
   | MKGlobal of global_type * int * instr_block_kont list * size * global vec_kont
   (** Globals section parsing, containing the starting position, the
       continuation of the current global block instruction, and the size of the
@@ -1595,8 +1638,7 @@ let module_step s state =
        let f = type_ s in (* TODO (#3096): check if small enough to fit in a tick *)
        next @@ MKField (ty, size, Collect (n - 1, f :: l))
      | ImportField ->
-       let f = at import s in (* TODO (#3096): check if small enough to fit in a tick *)
-       next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       next @@ MKImport (ImpKStart, pos s, size, Collect (n, l))
      | FuncField ->
        let f = at var s in (* small enough to fit in a tick *)
        next @@ MKField (ty, size, Collect (n - 1, f :: l))
@@ -1610,8 +1652,7 @@ let module_step s state =
        let gtype = global_type s in
        next @@ MKGlobal (gtype, pos s, [IKNext []], size, Collect (n, l))
      | ExportField ->
-       let f = at export s in (* small enough to fit in a tick *)
-       next @@ MKField (ty, size, Collect (n - 1, f :: l))
+       next @@ MKExport (ExpKStart, pos s, size, Collect (n, l))
      | StartField ->
        (* not a vector *)
        assert false
@@ -1627,6 +1668,24 @@ let module_step s state =
     )
 
   (* These sections have a distinct step mechanism. *)
+
+  | MKImport (ImpKStop import, left, size, Collect (n, l)) ->
+    let f = Source.(import @@ region s left (pos s)) in
+    next @@ MKField (ImportField, size, Collect (n - 1, f :: l))
+  | MKImport (_, _, _, Rev (_, _, _))  ->
+    (* Impossible case, there's no need for reversal. *)
+    assert false
+  | MKImport (k, pos, size, curr_vec) ->
+    next @@ MKImport (import_step s k, pos, size, curr_vec)
+
+  | MKExport (ExpKStop import, left, size, Collect (n, l)) ->
+    let f = Source.(import @@ region s left (pos s)) in
+    next @@ MKField (ExportField, size, Collect (n - 1, f :: l))
+  | MKExport (_, _, _, Rev (_, _, _))  ->
+    (* Impossible case, there's no need for reversal. *)
+    assert false
+  | MKExport (k, pos, size, curr_vec) ->
+    next @@ MKExport (export_step s k, pos, size, curr_vec)
 
   | MKGlobal (gtype, left, [ IKStop res], size, Collect (n, l)) ->
     end_ s ;
