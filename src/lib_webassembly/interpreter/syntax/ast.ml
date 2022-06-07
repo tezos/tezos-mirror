@@ -251,7 +251,7 @@ and elem_segment' =
 type data_segment = data_segment' Source.phrase
 and data_segment' =
 {
-  dinit : string;
+  dinit : Chunked_byte_vector.t;
   dmode : segment_mode;
 }
 

@@ -577,7 +577,9 @@ let elem i seg =
 
 let data i seg =
   let {dinit; dmode} = seg.it in
-  Node ("data $" ^ nat i, segment_mode "memory" dmode @ break_bytes dinit)
+  Node ("data $" ^ nat i,
+        segment_mode "memory" dmode @
+        break_bytes (Chunked_byte_vector.to_string_unstable dinit))
 
 
 (* Modules *)
