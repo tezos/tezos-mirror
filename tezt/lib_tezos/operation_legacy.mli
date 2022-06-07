@@ -152,26 +152,6 @@ val mk_origination :
   Client.t ->
   manager_operation_content Lwt.t
 
-(** [mk_publish_slot_header] allows to construct a manager operation publishing a
-    slot header.
-
-    - Default [counter] is the successor of the counter of [source].
-    - Default [init_balance] is [0] tez.
-    - Default [fee] is [1_000_000] mutez.
-    - Default [gas_limit] is [100_000] gas.
-    - Default [storage_limit] is [10_000]. *)
-val mk_publish_slot_header :
-  source:Account.key ->
-  ?counter:int ->
-  ?fee:int ->
-  ?gas_limit:int ->
-  ?storage_limit:int ->
-  index:int ->
-  level:int ->
-  header:int ->
-  Client.t ->
-  manager_operation_content Lwt.t
-
 (** {2 Helper functions to build manager operations} *)
 
 (** Returns the current counter of the given implicit account *)
@@ -444,24 +424,6 @@ val inject_transfer_ticket :
   amount:int ->
   destination:string ->
   entrypoint:string ->
-  Client.t ->
-  [`OpHash of string] Lwt.t
-
-val inject_publish_slot_header :
-  ?protocol:Protocol.t ->
-  ?async:bool ->
-  ?force:bool ->
-  ?wait_for_injection:Node.t ->
-  ?branch:string ->
-  source:Account.key ->
-  ?signer:Account.key ->
-  ?counter:int ->
-  ?fee:int ->
-  ?gas_limit:int ->
-  ?storage_limit:int ->
-  index:int ->
-  level:int ->
-  header:int ->
   Client.t ->
   [`OpHash of string] Lwt.t
 

@@ -119,10 +119,15 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
       return (`OpHash hash)
 
 module Manager = struct
-  type payload = Transfer of {amount : int; dest : Account.key}
+  type payload =
+    | Transfer of {amount : int; dest : Account.key}
+    | Dal_publish_slot_header of {level : int; index : int; header : int}
 
   let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
     Transfer {amount; dest}
+
+  let dal_publish_slot_header ~level ~index ~header =
+    Dal_publish_slot_header {level; index; header}
 
   type t = {
     source : Account.key;
@@ -139,6 +144,8 @@ module Manager = struct
 
   let json_of_int_as_string n = string_of_int n |> Ezjsonm.string
 
+  let json_of_int n = float_of_int n |> Ezjsonm.float
+
   let get_next_counter ~source client =
     let*! json =
       RPC.Contracts.get_counter
@@ -154,6 +161,16 @@ module Manager = struct
           ("amount", json_of_tez amount);
           ("destination", json_of_account dest);
         ]
+    | Dal_publish_slot_header {level; index; header} ->
+        let slot =
+          `O
+            [
+              ("index", json_of_int index);
+              ("level", json_of_int level);
+              ("header", json_of_int header);
+            ]
+        in
+        [("kind", `String "dal_publish_slot_header"); ("slot", slot)]
 
   let json client {source; counter; fee; gas_limit; storage_limit; payload} =
     let* counter =
@@ -204,6 +221,11 @@ module Manager = struct
         let fee = Option.value fee ~default:1_000 in
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
+        {source; counter; fee; gas_limit; storage_limit; payload}
+    | Dal_publish_slot_header _ ->
+        let fee = Option.value fee ~default:1_000 in
+        let gas_limit = Option.value gas_limit ~default:1_040 in
+        let storage_limit = Option.value storage_limit ~default:0 in
         {source; counter; fee; gas_limit; storage_limit; payload}
 
   let inject ?request ?force ?branch ?signer ?error managers client =

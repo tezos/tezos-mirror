@@ -130,6 +130,11 @@ module Manager : sig
      mutez. *)
   val transfer : ?dest:Account.key -> ?amount:int -> unit -> payload
 
+  (** [dal_publish_slot_header ~level ~index ~header] builds an
+     operation for the data-availability layer that publishes a
+     slot. *)
+  val dal_publish_slot_header : level:int -> index:int -> header:int -> payload
+
   (** A representation of a manager operation. This includes generic
      parameters common to all manager operations. See {!val:make}. *)
   type t

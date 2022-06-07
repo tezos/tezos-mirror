@@ -54,7 +54,6 @@ type manager_op_kind =
       destination : string;
       entrypoint : string;
     }
-  | Dal_publish_slot_header of {level : int; index : int; header : int}
 
 (* This is the manager operations' content type *)
 type manager_operation_content = {
@@ -148,11 +147,6 @@ let mk_transfer_ticket ~source ?counter ?(fee = 1_000_000)
     ~amount ~destination ~entrypoint client =
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
-
-let mk_publish_slot_header ~source ?counter ?(fee = 1_000_000)
-    ?(gas_limit = 1_000_000) ?(storage_limit = 0) ~index ~level ~header client =
-  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
-  @@ Dal_publish_slot_header {index; level; header}
 
 let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
     ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
@@ -251,12 +245,6 @@ let manager_op_content_to_json_string
         ~ticket_ticketer:(Ezjsonm.string ticketer)
         ~entrypoint:(Ezjsonm.string entrypoint)
         "transfer_ticket"
-  | Dal_publish_slot_header {index; level; header} ->
-      let index = `Float (float_of_int index) in
-      let level = `Float (float_of_int level) in
-      let header = `Float (float_of_int header) in
-      let slot = `O [("index", index); ("level", level); ("header", header)] in
-      mk_jsonm ~slot "dal_publish_slot_header"
 
 (* construct a JSON operations with contents and branch *)
 let op_to_json_string ~branch operations_json =
@@ -454,31 +442,6 @@ let inject_transfer_ticket ?protocol ?async ?force ?wait_for_injection ?branch
       ~amount
       ~destination
       ~entrypoint
-  in
-  forge_and_inject_operation
-    ?protocol
-    ?async
-    ?force
-    ?wait_for_injection
-    ?branch
-    ~batch:(`Manager [op])
-    ~signer
-    client
-
-let inject_publish_slot_header ?protocol ?async ?force ?wait_for_injection
-    ?branch ~source ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit
-    ~index ~level ~header client =
-  let* op =
-    mk_publish_slot_header
-      ~source
-      ?counter
-      ?fee
-      ?gas_limit
-      ?storage_limit
-      ~index
-      ~level
-      ~header
-      client
   in
   forge_and_inject_operation
     ?protocol
