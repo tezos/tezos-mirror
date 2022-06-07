@@ -144,7 +144,6 @@ end
 
 let tickets_of_transaction ctxt ~allow_zero_amount_tickets ~destination
     ~parameters_ty ~parameters =
-  let destination = Destination.Contract (Originated destination) in
   Ticket_scanner.type_has_tickets ctxt parameters_ty
   >>?= fun (has_tickets, ctxt) ->
   Ticket_scanner.tickets_of_value
@@ -181,7 +180,7 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
         amount = _;
         unparsed_parameters = _;
         entrypoint = _;
-        destination = Originated destination;
+        destination = Originated _ as contract;
         location = _;
         parameters_ty;
         parameters;
@@ -189,7 +188,7 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
       tickets_of_transaction
         ctxt
         ~allow_zero_amount_tickets
-        ~destination
+        ~destination:(Destination.Contract contract)
         ~parameters_ty
         ~parameters
   | Transaction_to_tx_rollup
@@ -205,13 +204,18 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
           ctxt )
   | Transaction_to_sc_rollup
       {
-        destination = _;
+        destination;
         entrypoint = _;
-        parameters_ty = _;
-        parameters = _;
+        parameters_ty;
+        parameters;
         unparsed_parameters = _;
       } ->
-      failwith "TODO"
+      tickets_of_transaction
+        ctxt
+        ~allow_zero_amount_tickets
+        ~destination:(Destination.Sc_rollup destination)
+        ~parameters_ty
+        ~parameters
   | Origination
       {
         delegate = _;
