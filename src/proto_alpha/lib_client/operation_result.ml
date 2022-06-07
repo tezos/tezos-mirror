@@ -80,7 +80,7 @@ let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
       in
       Format.fprintf
         ppf
-        "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]"
+        "@,@[<hv 2>Script:@ @[<h>%a@]@,@[<hv 2>Initial storage:@ %a@]@]"
         Format.pp_print_text
         source
         pp_micheline_from_lazy_expr

@@ -34,18 +34,18 @@ This sequence of operations was run:
           Script:
             { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
             Initial storage: Unit
-            No delegate for this contract
-            This origination was successfully applied
-            Originated contracts:
-              [CONTRACT_HASH]
-            Storage size: 38 bytes
-            Paid storage size diff: 38 bytes
-            Consumed gas: 1404.067
-            Balance updates:
-              [CONTRACT_HASH] ... -ꜩ0.0095
-              storage fees ........................... +ꜩ0.0095
-              [CONTRACT_HASH] ... -ꜩ0.06425
-              storage fees ........................... +ꜩ0.06425
+          No delegate for this contract
+          This origination was successfully applied
+          Originated contracts:
+            [CONTRACT_HASH]
+          Storage size: 38 bytes
+          Paid storage size diff: 38 bytes
+          Consumed gas: 1404.067
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ0.0095
+            storage fees ........................... +ꜩ0.0095
+            [CONTRACT_HASH] ... -ꜩ0.06425
+            storage fees ........................... +ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
 Injected block at minimal timestamp
