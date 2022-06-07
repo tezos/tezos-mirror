@@ -142,14 +142,12 @@ module Ticket_token_map = struct
       map
 end
 
-let tickets_of_transaction ctxt ~destination:(contract_hash : Contract_hash.t)
-    ~entrypoint:_ ~location:_ ~parameters_ty ~parameters =
-  let destination = Contract.Originated contract_hash in
+let tickets_of_transaction ctxt ~destination ~parameters_ty ~parameters =
+  let destination = Destination.Contract (Originated destination) in
   Ticket_scanner.type_has_tickets ctxt parameters_ty
   >>?= fun (has_tickets, ctxt) ->
   Ticket_scanner.tickets_of_value ~include_lazy:true ctxt has_tickets parameters
-  >>=? fun (tickets, ctxt) ->
-  return (Some {destination = Contract destination; tickets}, ctxt)
+  >>=? fun (tickets, ctxt) -> return (Some {destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
 let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
@@ -170,19 +168,13 @@ let tickets_of_operation ctxt
       {
         amount = _;
         unparsed_parameters = _;
-        entrypoint;
+        entrypoint = _;
         destination = Originated destination;
-        location;
+        location = _;
         parameters_ty;
         parameters;
       } ->
-      tickets_of_transaction
-        ctxt
-        ~destination
-        ~entrypoint
-        ~location
-        ~parameters_ty
-        ~parameters
+      tickets_of_transaction ctxt ~destination ~parameters_ty ~parameters
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
