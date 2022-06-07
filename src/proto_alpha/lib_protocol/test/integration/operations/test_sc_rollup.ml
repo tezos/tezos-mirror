@@ -484,7 +484,7 @@ let test_atomic_batch_fails () =
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* _ = Incremental.add_operation i cement_op in
   let* batch_op =
-    Op.sc_rollup_atomic_batch
+    Op.sc_rollup_execute_outbox_message
       (I i)
       contract
       rollup
@@ -492,7 +492,7 @@ let test_atomic_batch_fails () =
       ~outbox_level:(Raw_level.of_int32_exn 0l)
       ~message_index:0
       ~inclusion_proof:"xyz"
-      ~atomic_transaction_batch:"xyz"
+      ~message:"xyz"
   in
   let expect_apply_failure = function
     | Environment.Ecoproto_error

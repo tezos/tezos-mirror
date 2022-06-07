@@ -348,7 +348,7 @@ let pp_manager_operation_content (type kind) source pp_result ppf
       Format.fprintf
         ppf
         "Execute the outbox message of the smart contract rollup at address \
-         %a, with cemented commit %a, outbox level %a, message  index %d,  \
+         %a, with cemented commit %a, outbox level %a, message index %d, \
          inclusion proof %s and message %s"
         Sc_rollup.Address.pp
         rollup
