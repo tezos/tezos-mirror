@@ -143,7 +143,7 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   Lwt.return (Injection.originated_contracts ~force result)
   >>=? fun contracts ->
   match Apply_results.pack_contents_list op result with
@@ -211,7 +211,7 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -248,7 +248,7 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -343,7 +343,7 @@ let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
     ~src_sk:manager_sk
     ~fee_parameter
     operation
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -401,7 +401,7 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     origination
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   (match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result))
@@ -450,7 +450,7 @@ let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -812,7 +812,7 @@ let originate_tx_rollup (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -847,7 +847,7 @@ let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -886,7 +886,7 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -922,7 +922,7 @@ let submit_tx_rollup_finalize_commitment (cctxt : #full) ~chain ~block
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -958,7 +958,7 @@ let submit_tx_rollup_remove_commitment (cctxt : #full) ~chain ~block
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1014,7 +1014,7 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1048,7 +1048,7 @@ let submit_tx_rollup_return_bond (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1093,7 +1093,7 @@ let tx_rollup_dispatch_tickets (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1134,7 +1134,7 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1167,7 +1167,7 @@ let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1200,7 +1200,7 @@ let sc_rollup_add_messages (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1233,7 +1233,7 @@ let sc_rollup_cement (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1266,7 +1266,7 @@ let sc_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)

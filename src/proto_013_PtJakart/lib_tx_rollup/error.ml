@@ -95,6 +95,25 @@ let () =
       | _ -> None)
     (fun path -> Tx_rollup_configuration_file_does_not_exists path)
 
+type error += Tx_rollup_configuration_file_already_exists of string
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.configuration_file_already_exits"
+    ~title:"Unable to overwrite configuration file"
+    ~description:"A configuration file already exists"
+    ~pp:(fun ppf filepath ->
+      Format.fprintf
+        ppf
+        "The configuration file '%s' already exists. Use --force to overwrite."
+        filepath)
+    `Permanent
+    Data_encoding.(obj1 (req "filepath" string))
+    (function
+      | Tx_rollup_configuration_file_already_exists path -> Some path
+      | _ -> None)
+    (fun path -> Tx_rollup_configuration_file_already_exists path)
+
 type error += Tx_rollup_unable_to_write_configuration_file of string
 
 let () =

@@ -57,6 +57,7 @@ let fetch_tezos_block ~find_in_cache (cctxt : #full) hash :
       cctxt
       ~chain:cctxt#chain
       ~block:(`Hash (hash, 0))
+      ~metadata:`Always
       ()
   in
   find_in_cache hash fetch

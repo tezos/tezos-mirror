@@ -42,6 +42,9 @@ type error += Tx_rollup_originated_in_fork
 (** Error issued when the configuration file does not exists. *)
 type error += Tx_rollup_configuration_file_does_not_exists of string
 
+(** Error issued when the configuration already exists and we try to save it. *)
+type error += Tx_rollup_configuration_file_already_exists of string
+
 (** Error issued when the configuration file cannot be write. *)
 type error += Tx_rollup_unable_to_write_configuration_file of string
 

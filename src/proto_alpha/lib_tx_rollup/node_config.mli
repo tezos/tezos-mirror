@@ -102,8 +102,10 @@ val mode_of_string : string -> mode tzresult
     removes the extra ones. *)
 val check_mode : t -> t tzresult
 
-(** [save configuration] overwrites [configuration] file and returns the filename. *)
-val save : t -> string tzresult Lwt.t
+(** [save ~force configuration] writes the [configuration] file and returns the
+    filename. If [force] is [true] then configuration is overwritten when it
+    exists.  *)
+val save : force:bool -> t -> string tzresult Lwt.t
 
 (** [load ~data_dir] loads a configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t

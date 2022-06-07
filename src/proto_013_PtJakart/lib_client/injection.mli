@@ -115,7 +115,12 @@ val inject_manager_operation :
   ?replace_by_fees:bool ->
   fee_parameter:fee_parameter ->
   'kind Annotated_manager_operation.annotated_list ->
-  'kind Kind.manager result_list tzresult Lwt.t
+  (Operation_hash.t
+  * packed_operation
+  * 'kind Kind.manager contents_list
+  * 'kind Kind.manager contents_result_list)
+  tzresult
+  Lwt.t
 
 (** Collects the addresses of all contracts originated by a batch of operations
     by looking at the operation results. Fails if an operation in the batch is

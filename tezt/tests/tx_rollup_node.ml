@@ -2190,10 +2190,11 @@ let test_tickets_context =
         ~error_msg:"Ticket is %L but expected %R" ;
       unit)
 
-let test_withdrawals =
+let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
+    ~finalize_commitment_signer ~dispatch_withdrawals_signer () =
   Protocol.register_test
     ~__FILE__
-    ~title:"TX_rollup: dispatch withdrawals"
+    ~title
     ~tags:["tx_rollup"; "dispatch"; "withdrawals"]
     (fun protocol ->
       let* parameter_file =
@@ -2204,16 +2205,15 @@ let test_withdrawals =
       let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let originator = Constant.bootstrap2.public_key_hash in
-      let operator = Constant.bootstrap1.public_key_hash in
+      let* () = match before_init with None -> unit | Some f -> f client in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~protocol
           ~originator
           ~operator
-          ~batch_signer:Constant.bootstrap5.public_key_hash
-          ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
-          ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
+          ~batch_signer
+          ~finalize_commitment_signer
+          ~dispatch_withdrawals_signer
           node
           client
       in
@@ -2350,7 +2350,7 @@ let test_withdrawals =
         Client.originate_contract
           ~alias:"withdraw_contract"
           ~amount:Tez.zero
-          ~src:Constant.bootstrap3.public_key_hash
+          ~src:originator
           ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_withdraw.tz"
           ~init:"None"
           ~burn_cap:Tez.one
@@ -2372,6 +2372,52 @@ let test_withdrawals =
       in
       let* () = Client.bake_for_and_wait client in
       unit)
+
+let test_withdrawals =
+  test_round_trip
+    ~title:"TX_rollup: dispatch withdrawals"
+    ~originator:Constant.bootstrap2.public_key_hash
+    ~operator:Constant.bootstrap1.public_key_hash
+    ~batch_signer:Constant.bootstrap5.public_key_hash
+    ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
+    ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
+    ()
+
+let test_single_signer =
+  let operator = Constant.bootstrap1.public_key_hash in
+  test_round_trip
+    ~title:"TX_rollup: single signer for everything"
+    ~originator:Constant.bootstrap2.public_key_hash
+    ~operator
+    ~batch_signer:operator
+    ~finalize_commitment_signer:operator
+    ~dispatch_withdrawals_signer:operator
+    ()
+
+let test_signer_reveals =
+  let operator = "operator" in
+  let other = Constant.bootstrap5.public_key_hash in
+  let before_init client =
+    let* _ = Client.gen_keys ~alias:operator client in
+    let* () =
+      Client.transfer
+        ~amount:(Tez.of_int 20_000)
+        ~giver:Constant.bootstrap1.public_key_hash
+        ~receiver:operator
+        ~burn_cap:Tez.one
+        client
+    in
+    Client.bake_for_and_wait client
+  in
+  test_round_trip
+    ~title:"TX_rollup: operator needs to be revealed"
+    ~originator:Constant.bootstrap2.public_key_hash
+    ~operator
+    ~batch_signer:other
+    ~finalize_commitment_signer:other
+    ~dispatch_withdrawals_signer:other
+    ~before_init
+    ()
 
 let test_accuser =
   Protocol.register_test
@@ -2862,6 +2908,8 @@ let register ~protocols =
   test_committer protocols ;
   test_tickets_context protocols ;
   test_withdrawals protocols ;
+  test_single_signer protocols ;
+  test_signer_reveals protocols ;
   test_accuser protocols ;
   test_batcher_large_message protocols ;
   test_transfer_command protocols ;
