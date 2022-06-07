@@ -8,10 +8,7 @@ local row = grafana.row;
 
 local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
-local node_hardware = import './node_hardware.jsonnet';
-local delegate_hardware = import './delegate_hardware.jsonnet';
 local workers = import './workers.jsonnet';
-local logs = import './logs.jsonnet';
 
 local boardtitle = 'Tezos basic dashboard - branch: ' + std.extVar('branch');
 
