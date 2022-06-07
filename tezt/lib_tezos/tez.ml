@@ -29,6 +29,8 @@ let of_int amount = Int64.(mul 1_000_000L (of_int amount))
 
 let of_mutez_int = Int64.of_int
 
+let of_mutez_int64 t = t
+
 let zero = 0L
 
 let one = of_int 1
