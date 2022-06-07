@@ -106,4 +106,4 @@ let tests =
 let () =
   Alcotest.run
     "Tick_repr"
-    [("Tick_repr", Lib_test.Qcheck_helpers.qcheck_wrap tests)]
+    [("Tick_repr", Lib_test.Qcheck2_helpers.qcheck_wrap tests)]

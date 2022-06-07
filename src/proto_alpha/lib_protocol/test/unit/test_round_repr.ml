@@ -573,15 +573,15 @@ let round_and_offset_oracle (round_durations : Round_repr.Durations.t)
 
 (* Test whether the new version is equivalent to the old one *)
 let test_round_and_offset_correction =
-  Tztest.tztest_qcheck
+  Tztest.tztest_qcheck2
     ~name:"round_and_offset is correct"
-    QCheck.(
-      pair
-        Lib_test.Qcheck_helpers.(pair uint16 uint16)
-        (Lib_test.Qcheck_helpers.int64_range 0L 100000L))
+    QCheck2.(
+      Gen.pair
+        Lib_test.Qcheck2_helpers.(Gen.pair uint16 uint16)
+        (Lib_test.Qcheck2_helpers.int64_range_gen 0L 100000L))
     (fun ((first_round_duration, delay_increment_per_round), level_offset) ->
-      QCheck.assume (first_round_duration > 0) ;
-      QCheck.assume (delay_increment_per_round > 0) ;
+      QCheck2.assume (first_round_duration > 0) ;
+      QCheck2.assume (delay_increment_per_round > 0) ;
       let first_round_duration =
         Period_repr.of_seconds_exn (Int64.of_int first_round_duration)
       and delay_increment_per_round =

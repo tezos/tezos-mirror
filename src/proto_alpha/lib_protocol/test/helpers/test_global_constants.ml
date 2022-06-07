@@ -62,12 +62,11 @@ let assert_ok = function
 (** Filters out values that would cause [register] *)
 let assume_expr_not_too_large expr =
   let node = root expr in
-  QCheck.assume @@ not
+  QCheck2.assume @@ not
   @@ Global_constants_storage.Internal_for_tests.node_too_large node
 
 module Generators = struct
-  let context_arbitrary () =
-    QCheck.make @@ QCheck.Gen.return (create_context () |> assert_ok_lwt)
+  let context_gen () = QCheck2.Gen.return (create_context () |> assert_ok_lwt)
 
   let prims =
     [
@@ -215,17 +214,17 @@ module Generators = struct
       H_constant;
     ]
 
-  let prim_gen = QCheck.Gen.oneofl prims
+  let prim_gen = QCheck2.Gen.oneofl prims
 
   let prims_without_constants_gen =
-    QCheck.Gen.oneofl (List.filter (fun x -> x != H_constant) prims)
+    QCheck2.Gen.oneofl (List.filter (fun x -> x != H_constant) prims)
 
-  let z_gen = QCheck.Gen.map Z.of_int QCheck.Gen.int
+  let z_gen = QCheck2.Gen.map Z.of_int QCheck2.Gen.int
 
   let micheline_node_gen l_gen p_gen annot_gen :
-      ('l, 'p) Micheline.node QCheck.Gen.t =
+      ('l, 'p) Micheline.node QCheck2.Gen.t =
     let open Micheline in
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     fix
       (fun self () ->
         frequency
@@ -297,23 +296,20 @@ module Generators = struct
           (Seq (l, result), x)
 
   let micheline_gen p_gen annot_gen =
-    QCheck.Gen.map
+    QCheck2.Gen.map
       Micheline.strip_locations
-      (micheline_node_gen (QCheck.Gen.return (-1)) p_gen annot_gen)
+      (micheline_node_gen (QCheck2.Gen.return (-1)) p_gen annot_gen)
 
   let canonical_without_constant_gen () =
-    QCheck.Gen.map
+    QCheck2.Gen.map
       strip_locations
       (micheline_node_gen
-         (QCheck.Gen.return (-1))
+         (QCheck2.Gen.return (-1))
          prims_without_constants_gen
-         (QCheck.Gen.return []))
-
-  let canonical_without_constant_arbitrary () =
-    QCheck.make (canonical_without_constant_gen ())
+         (QCheck2.Gen.return []))
 
   let canonical_with_constant_gen () =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     canonical_without_constant_gen () >>= fun expr ->
     let size = Script_repr.micheline_nodes (root expr) in
     0 -- (size - 1) >|= fun loc ->
@@ -321,7 +317,4 @@ module Generators = struct
     | _, None -> assert false
     | node, Some replaced_node ->
         (expr, strip_locations node, strip_locations replaced_node)
-
-  let canonical_with_constant_arbitrary () =
-    QCheck.make (canonical_with_constant_gen ())
 end

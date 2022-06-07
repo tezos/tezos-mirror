@@ -36,8 +36,7 @@ open Protocol
 open Alpha_context
 open Sc_rollup
 open Lwt_syntax
-open Lib_test.Qcheck_helpers
-module Sc_rollup_repr = Protocol.Sc_rollup_repr
+open Lib_test.Qcheck2_helpers
 
 (**
 

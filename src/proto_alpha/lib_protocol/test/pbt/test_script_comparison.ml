@@ -34,7 +34,7 @@
 open Protocol
 open Alpha_context
 open Script_typed_ir
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 (* Reference implementation *)
 
@@ -93,7 +93,7 @@ type ex_comparable_data_3 =
       'a comparable_ty * 'a * 'a * 'a
       -> ex_comparable_data_3
 
-(* We use the Michelson samplers from lib_benchmark and turn them into QCheck
+(* We use the Michelson samplers from lib_benchmark and turn them into QCheck2
    generators *)
 module Parameters = struct
   let atom_size_range : Tezos_benchmark.Base_samplers.range =
@@ -170,23 +170,17 @@ let ex_comparable_data_3_sampler :
   let z = Samplers.Random_value.comparable ty random_state in
   Ex_comparable_data_3 (ty, x, y, z)
 
-let comparable_data_generator : ex_comparable_data QCheck.Gen.t =
-  ex_comparable_data_sampler
+let comparable_data_generator =
+  QCheck2.Gen.make_primitive ~gen:ex_comparable_data_sampler ~shrink:(fun _ ->
+      Seq.empty)
 
-let comparable_data_2_generator : ex_comparable_data_2 QCheck.Gen.t =
-  ex_comparable_data_2_sampler
+let comparable_data_2_generator =
+  QCheck2.Gen.make_primitive ~gen:ex_comparable_data_2_sampler ~shrink:(fun _ ->
+      Seq.empty)
 
-let comparable_data_3_generator : ex_comparable_data_3 QCheck.Gen.t =
-  ex_comparable_data_3_sampler
-
-let comparable_data_arbitrary : ex_comparable_data QCheck.arbitrary =
-  QCheck.make comparable_data_generator
-
-let comparable_data_2_arbitrary : ex_comparable_data_2 QCheck.arbitrary =
-  QCheck.make comparable_data_2_generator
-
-let comparable_data_3_arbitrary : ex_comparable_data_3 QCheck.arbitrary =
-  QCheck.make comparable_data_3_generator
+let comparable_data_3_generator =
+  QCheck2.Gen.make_primitive ~gen:ex_comparable_data_3_sampler ~shrink:(fun _ ->
+      Seq.empty)
 
 (* We need a context because packing (used in one of the tests) and unparsing
    (used for pretty-printing error messages) Michelson data are carbonated
@@ -257,9 +251,9 @@ let qcheck_compare_comparable_eq ~expected ty x y =
  * implementation.
  *)
 let test_compatible_with_reference =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"compatible_with_reference"
-    comparable_data_2_arbitrary
+    comparable_data_2_generator
     (fun (Ex_comparable_data_2 (ty, x, y)) ->
       qcheck_compare_comparable
         ~expected:(reference_compare_comparable ty x y)
@@ -272,9 +266,9 @@ let test_compatible_with_reference =
  * resulting bytes returns 0.
  *)
 let test_compatible_with_packing =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"compatible_with_packing"
-    comparable_data_2_arbitrary
+    comparable_data_2_generator
     (fun (Ex_comparable_data_2 (ty, x, y)) ->
       qcheck_compare_comparable_eq
         ~expected:(compare_through_pack ty x y)
@@ -286,9 +280,9 @@ let test_compatible_with_packing =
  * Tests that compare_comparable is reflexive.
  *)
 let test_reflexivity =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"reflexivity"
-    comparable_data_arbitrary
+    comparable_data_generator
     (fun (Ex_comparable_data (ty, x)) ->
       qcheck_compare_comparable ~expected:0 ty x x)
 
@@ -296,9 +290,9 @@ let test_reflexivity =
  * Tests that compare_comparable is symmetric.
  *)
 let test_symmetry =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"symmetry"
-    comparable_data_2_arbitrary
+    comparable_data_2_generator
     (fun (Ex_comparable_data_2 (ty, x, y)) ->
       qcheck_compare_comparable
         ~expected:(-Script_comparable.compare_comparable ty x y)
@@ -310,9 +304,9 @@ let test_symmetry =
  * Tests that compare_comparable is transitive.
  *)
 let test_transitivity =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"transitivity"
-    comparable_data_3_arbitrary
+    comparable_data_3_generator
     (fun (Ex_comparable_data_3 (ty, x, y, z)) ->
       let cxy = Script_comparable.compare_comparable ty x y in
       let cyz = Script_comparable.compare_comparable ty y z in
@@ -320,13 +314,13 @@ let test_transitivity =
       | 0, n | n, 0 -> qcheck_compare_comparable ~expected:n ty x z
       | -1, -1 -> qcheck_compare_comparable ~expected:(-1) ty x z
       | 1, 1 -> qcheck_compare_comparable ~expected:1 ty x z
-      | _ -> QCheck.assume_fail ())
+      | _ -> QCheck2.assume_fail ())
 
 (* Test.
  * Tests the round-trip property for PACK and UNPACK (modulo compare_comparable).
  *)
 let test_pack_unpack =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~count:100_000
       (* We run this test on many more cases than the default (100) because this
          is a very important property. Packing and then unpacking happens each
@@ -336,7 +330,7 @@ let test_pack_unpack =
          direct consequence of this) is an important property for big maps
          (because the keys are packed and then hashed). *)
     ~name:"pack_unpack"
-    comparable_data_arbitrary
+    comparable_data_generator
     (fun (Ex_comparable_data (ty, x)) ->
       let oty =
         match comparable_option_t (-1) ty with

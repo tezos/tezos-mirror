@@ -67,7 +67,7 @@ let test_check_manager_restriction_fresh =
       with
       | `Fresh -> true
       | `Replace _ | `Fail (`Branch_delayed _) ->
-          QCheck.Test.fail_reportf
+          QCheck2.Test.fail_reportf
             "@[<v 2>Check manager restriction failed!@,\
              %a should not be in the set of precheck managers:@,\
              %a@]"
@@ -110,7 +110,7 @@ let test_check_manager_restriction_fail =
       with
       | `Fail (`Branch_delayed _) -> true
       | `Fresh ->
-          QCheck.Test.fail_reportf
+          QCheck2.Test.fail_reportf
             "@[<v 2>Check manager restriction failed!@,\
              %a should be in the set of precheck managers:@,\
              %a@]"
@@ -119,7 +119,7 @@ let test_check_manager_restriction_fail =
             pp_state
             filter_state
       | `Replace old_oph ->
-          QCheck.Test.fail_reportf
+          QCheck2.Test.fail_reportf
             "@[<v 2>Check manager restriction failed!@,\
              %a is in the set of precheck managers:@,\
              %a@,\
@@ -164,7 +164,7 @@ let test_check_manager_restriction_replace =
       with
       | `Replace _ -> true
       | `Fresh ->
-          QCheck.Test.fail_reportf
+          QCheck2.Test.fail_reportf
             "@[<v 2>Check manager restriction failed!@,\
              %a should be in the set of precheck managers:@,\
              %a@]"
@@ -173,7 +173,7 @@ let test_check_manager_restriction_replace =
             pp_state
             filter_state
       | `Fail (`Branch_delayed _) ->
-          QCheck.Test.fail_reportf
+          QCheck2.Test.fail_reportf
             "@[<v 2>Check manager restriction failed!@,\
              %a is in the set of prechecked managers:@,\
              %a but the old version should have been replaced because the new \
@@ -294,7 +294,7 @@ let test_add_manager_restriction_check =
           ~gas_limit:Alpha_context.Gas.Arith.zero
       with
       | `Fresh ->
-          QCheck.Test.fail_reportf
+          QCheck2.Test.fail_reportf
             "@[<v 2>Check manager restriction failed!@,\
              %a should be in the set of precheck managers:@,\
              %a@]"

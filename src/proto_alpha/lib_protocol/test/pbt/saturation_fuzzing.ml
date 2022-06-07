@@ -32,23 +32,23 @@
 *)
 
 open Protocol.Saturation_repr
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 (** A generator that returns a [t] that cannot be [saturated] *)
-let unsatured_arb = of_option_arb @@ QCheck.map of_int_opt QCheck.int
+let unsatured_gen = of_option_gen @@ QCheck2.Gen.(map of_int_opt int)
 
 (** The general generator for [t]: generates both unsaturated values
     and [saturated]. *)
-let t_arb : may_saturate t QCheck.arbitrary =
-  QCheck.frequency [(1, QCheck.always saturated); (4, unsatured_arb)]
+let t_gen : may_saturate t QCheck2.Gen.t =
+  QCheck2.Gen.(frequency [(1, return saturated); (4, unsatured_gen)])
 
 (* Test.
  * Tests that [add] commutes.
  *)
 let test_add_commutes =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"t1 + t2 = t2 + t1"
-    (QCheck.pair t_arb t_arb)
+    (QCheck2.Gen.pair t_gen t_gen)
     (fun (t1, t2) ->
       let t1_plus_t2 = add t1 t2 in
       let t2_plus_t1 = add t2 t1 in
@@ -58,9 +58,9 @@ let test_add_commutes =
  * Tests that [mul] commutes.
  *)
 let test_mul_commutes =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"t1 * t2 = t2 * t1"
-    (QCheck.pair t_arb t_arb)
+    (QCheck2.Gen.pair t_gen t_gen)
     (fun (t1, t2) ->
       let t1_times_t2 = mul t1 t2 in
       let t2_times_t1 = mul t2 t1 in
@@ -70,7 +70,7 @@ let test_mul_commutes =
  * Tests that [zero] is neutral for [add].
  *)
 let test_add_zero =
-  QCheck.Test.make ~name:"t + 0 = t" t_arb (fun t ->
+  QCheck2.Test.make ~name:"t + 0 = t" t_gen (fun t ->
       let t_plus_zero = add t zero in
       qcheck_eq' ~pp ~expected:t ~actual:t_plus_zero ())
 
@@ -78,9 +78,9 @@ let test_add_zero =
  * Tests that t1 + t2 >= t1
  *)
 let test_add_neq =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"t1 + t2 >= t1"
-    (QCheck.pair t_arb t_arb)
+    (QCheck2.Gen.pair t_gen t_gen)
     (fun (t1, t2) ->
       let t1_plus_t2 = add t1 t2 in
       t1_plus_t2 >= t1)
@@ -90,7 +90,7 @@ let test_add_neq =
  *)
 let test_mul_one =
   let one = safe_int 1 in
-  QCheck.Test.make ~name:"t * 1 = t" t_arb (fun t ->
+  QCheck2.Test.make ~name:"t * 1 = t" t_gen (fun t ->
       let t_times_one = mul t one in
       qcheck_eq' ~pp ~expected:t ~actual:t_times_one ())
 
@@ -98,7 +98,7 @@ let test_mul_one =
  * Tests that [t] times [0] equals [0].
  *)
 let test_mul_zero =
-  QCheck.Test.make ~name:"t * 0 = 0" t_arb (fun t ->
+  QCheck2.Test.make ~name:"t * 0 = 0" t_gen (fun t ->
       let t_times_zero = mul t zero in
       qcheck_eq' ~pp ~expected:zero ~actual:t_times_zero ())
 
@@ -106,7 +106,7 @@ let test_mul_zero =
  * Tests that [t] [sub] [zero] equals [t].
  *)
 let test_sub_zero =
-  QCheck.Test.make ~name:"t - 0 = t" t_arb (fun t ->
+  QCheck2.Test.make ~name:"t - 0 = t" t_gen (fun t ->
       let t_sub_zero = sub t zero in
       qcheck_eq' ~pp ~expected:t ~actual:t_sub_zero ())
 
@@ -114,7 +114,7 @@ let test_sub_zero =
  * Tests that [t] [sub] [t] equals [zero].
  *)
 let test_sub_itself =
-  QCheck.Test.make ~name:"t - t = 0" t_arb (fun t ->
+  QCheck2.Test.make ~name:"t - t = 0" t_gen (fun t ->
       let t_sub_t = sub t t in
       qcheck_eq' ~pp ~expected:zero ~actual:t_sub_t ())
 
@@ -122,9 +122,9 @@ let test_sub_itself =
  * Tests that t1 - t2 <= t1
  *)
 let test_sub_neq =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"t1 - t2 <= t1"
-    (QCheck.pair t_arb t_arb)
+    (QCheck2.Gen.pair t_gen t_gen)
     (fun (t1, t2) ->
       let t1_minus_t2 = sub t1 t2 in
       t1_minus_t2 <= t1)
@@ -133,9 +133,9 @@ let test_sub_neq =
  * Tests that (t1 + t2) - t2 <= t1
  *)
 let test_add_sub =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"(t1 + t2) - t2 <= t1"
-    (QCheck.pair t_arb t_arb)
+    (QCheck2.Gen.pair t_gen t_gen)
     (fun (t1, t2) ->
       let lhs = sub (add t1 t2) t2 in
       lhs <= t1)
@@ -144,9 +144,9 @@ let test_add_sub =
  * Tests that (t1 - t2) + t2 >= t1
  *)
 let test_sub_add =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"(t1 - t2) + t2 >= t1"
-    (QCheck.pair t_arb t_arb)
+    (QCheck2.Gen.pair t_gen t_gen)
     (fun (t1, t2) ->
       let lhs = add (sub t1 t2) t2 in
       lhs >= t1)
@@ -155,25 +155,25 @@ let test_sub_add =
  * Tests that [saturated] >= t
  *)
 let test_leq_saturated =
-  QCheck.Test.make ~name:"t <= saturated" t_arb (fun t -> saturated >= t)
+  QCheck2.Test.make ~name:"t <= saturated" t_gen (fun t -> saturated >= t)
 
 (* Test.
  * Tests that [zero] <= t
  *)
-let test_geq_zero = QCheck.Test.make ~name:"t >= 0" t_arb (fun t -> zero <= t)
+let test_geq_zero = QCheck2.Test.make ~name:"t >= 0" t_gen (fun t -> zero <= t)
 
 (* Test.
  * Tests that [sqrt (t * t) = t]
  *)
 let test_squared_sqrt =
-  QCheck.Test.make ~name:"sqrt t² = t" t_arb (fun t ->
+  QCheck2.Test.make ~name:"sqrt t² = t" t_gen (fun t ->
       mul t t = saturated || sqrt (mul t t) = t)
 
 (* Test.
  * Tests that [(sqrt t) * (sqrt t) <= t]
  *)
 let test_sqrt_squared =
-  QCheck.Test.make ~name:"(sqrt t)² <= t <= (succ (sqrt t))²" t_arb (fun t ->
+  QCheck2.Test.make ~name:"(sqrt t)² <= t <= (succ (sqrt t))²" t_gen (fun t ->
       mul (sqrt t) (sqrt t) <= t && t <= mul (succ (sqrt t)) (succ (sqrt t)))
 
 let tests_add = [test_add_commutes; test_add_zero; test_add_neq]

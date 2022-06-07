@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Liquidity_baking_machine
-open QCheck.Gen
+open QCheck2.Gen
 open Lib_test
 
 let total_xtz = 32_000_000_000_000L
@@ -40,23 +40,21 @@ let rec remove_last_element = function
     list.
 
     The elements themselves are not shrinked. *)
-let shrink_list_spine_tail : 'a list QCheck.Shrink.t =
-  let rec shrinked_list = function
-    | [] -> []
-    | l ->
-        let l = remove_last_element l in
-        l :: shrinked_list l
-  in
-  fun l -> QCheck.Iter.of_list (shrinked_list l)
+let rec shrink_list l =
+  if l == [] then Seq.empty
+  else
+    let l = remove_last_element l in
+    Seq.cons l (shrink_list l)
 
-let gen_balances : int64 -> int -> int -> balances QCheck.Gen.t =
+let gen_balances : int64 -> int -> int -> balances QCheck2.Gen.t =
  fun max_xtz max_tzbtc max_liquidity ->
-  let+ xtz = Qcheck_helpers.int64_strictly_positive_gen max_xtz
-  and+ tzbtc = Qcheck_helpers.int_strictly_positive_gen max_tzbtc
-  and+ liquidity = Qcheck_helpers.int_strictly_positive_gen max_liquidity in
+  let open Qcheck2_helpers in
+  let+ xtz = int64_strictly_positive_gen max_xtz
+  and+ tzbtc = int_strictly_positive_gen max_tzbtc
+  and+ liquidity = int_strictly_positive_gen max_liquidity in
   {xtz; tzbtc; liquidity}
 
-let gen_specs : int -> int -> specs QCheck.Gen.t =
+let gen_specs : int -> int -> specs QCheck2.Gen.t =
  fun total_tzbtc total_liquidity ->
   (* 1. We pick a random number to decide how many implicit account we
         will set-up in the specs. Note that there will be one more
@@ -87,13 +85,7 @@ let gen_specs : int -> int -> specs QCheck.Gen.t =
     accounts_balances;
   }
 
-let arb_specs : tzbtc -> liquidity -> specs QCheck.arbitrary =
- fun total_tzbtc total_liquidity ->
-  QCheck.make
-    ~print:(fun specs -> Format.asprintf "%a" pp_specs specs)
-    (gen_specs total_tzbtc total_liquidity)
-
-type 'a optgen = 'a option QCheck.Gen.t
+type 'a optgen = 'a option QCheck2.Gen.t
 
 let ( let*? ) (m : 'a optgen) (f : 'a -> 'b optgen) =
   let* x = m in
@@ -108,7 +100,7 @@ let ( let*? ) (m : 'a optgen) (f : 'a -> 'b optgen) =
     whole list (at most 100 times). If no generator of [l] is able to
     return a result, then [genopt_oneof l] returns [None]. *)
 let genopt_oneof (l : 'a optgen list) : 'a optgen =
-  let* l = QCheck.Gen.shuffle_l l in
+  let* l = QCheck2.Gen.shuffle_l l in
   let rec aux n = function
     | [] -> if n = 0 then pure None else aux (n - 1) l
     | g :: l -> (
@@ -153,7 +145,7 @@ let genopt_step_tzbtc_to_xtz :
   let*? source = genopt_account_with_tzbtc ?choice:source env state in
   let*? destination = genopt_account ?choice:destination env in
   let+ tzbtc_deposit =
-    Qcheck_helpers.int_strictly_positive_gen
+    Qcheck2_helpers.int_strictly_positive_gen
       (SymbolicMachine.get_tzbtc_balance source env state)
   in
   (* See note (2) *)
@@ -206,7 +198,7 @@ let genopt_step_add_liquidity :
   (* the source needs at least one xtz *)
   if 1L < source_xtz_pool then
     let+ candidate =
-      Qcheck_helpers.int64_strictly_positive_gen source_xtz_pool
+      Qcheck2_helpers.int64_strictly_positive_gen source_xtz_pool
     in
     let xtz_deposit =
       find_xtz_deposit
@@ -253,26 +245,34 @@ let genopt_step :
       genopt_step_remove_liquidity env state ?source ?destination;
     ]
 
-let rec gen_steps :
+let gen_steps :
     ?source:contract_id ->
     ?destination:contract_id ->
     contract_id env ->
     SymbolicMachine.t ->
     int ->
-    contract_id step list QCheck.Gen.t =
+    contract_id step list QCheck2.Gen.t =
  fun ?source ?destination env state size ->
-  if size <= 0 then return []
-  else
-    let* h = genopt_step ?source ?destination env state in
-    match h with
-    | None -> pure []
-    | Some h ->
-        let state = SymbolicMachine.step h env state in
-        let* rst = gen_steps ?source ?destination env state (size - 1) in
-        pure (h :: rst)
+  let rec inner env state size random_state =
+    if size <= 0 then []
+    else
+      let h =
+        QCheck2.Gen.generate1
+          ~rand:random_state
+          (genopt_step ?source ?destination env state)
+      in
+      match h with
+      | None -> []
+      | Some h ->
+          let state = SymbolicMachine.step h env state in
+          let rst = inner env state (size - 1) random_state in
+          h :: rst
+  in
+  QCheck2.Gen.make_primitive ~gen:(inner env state size) ~shrink:(fun l ->
+      shrink_list l)
 
 let gen_scenario :
-    tzbtc -> liquidity -> int -> (specs * contract_id step list) QCheck.Gen.t =
+    tzbtc -> liquidity -> int -> (specs * contract_id step list) QCheck2.Gen.t =
  fun total_tzbtc total_liquidity size ->
   let* specs = gen_specs total_tzbtc total_liquidity in
   let state, env = SymbolicMachine.build specs in
@@ -292,24 +292,13 @@ let pp_scenario fmt (specs, steps) =
          (pp_step pp_contract_id))
       steps)
 
-let arb_scenario :
-    tzbtc ->
-    liquidity ->
-    int ->
-    (specs * contract_id step list) QCheck.arbitrary =
- fun total_tzbtc total_liquidity size ->
-  QCheck.make
-    ~print:(Format.asprintf "%a" pp_scenario)
-    ~shrink:(fun (specs, steps) ->
-      (* See note (1) *)
-      QCheck.Iter.pair (QCheck.Iter.return specs) (shrink_list_spine_tail steps))
-    (gen_scenario total_tzbtc total_liquidity size)
+let print_scenario = Format.asprintf "%a" pp_scenario
 
 let gen_adversary_scenario :
     tzbtc ->
     liquidity ->
     int ->
-    (specs * contract_id * contract_id step list) QCheck.Gen.t =
+    (specs * contract_id * contract_id step list) QCheck2.Gen.t =
  fun total_tzbtc total_liquidity size ->
   let* specs = gen_specs total_tzbtc total_liquidity in
   let state, env = SymbolicMachine.build ~subsidy:0L specs in
@@ -317,22 +306,8 @@ let gen_adversary_scenario :
   let+ scenario = gen_steps ~source:c ~destination:c env state size in
   (specs, c, scenario)
 
-let arb_adversary_scenario :
-    tzbtc ->
-    liquidity ->
-    int ->
-    (specs * contract_id * contract_id step list) QCheck.arbitrary =
- fun total_tzbtc total_liquidity size ->
-  QCheck.make
-    ~print:(fun (specs, _, steps) ->
-      Format.asprintf "%a" pp_scenario (specs, steps))
-    ~shrink:(fun (specs, c, steps) ->
-      (* see note (1) *)
-      QCheck.Iter.triple
-        (QCheck.Iter.return specs)
-        (QCheck.Iter.return c)
-        (shrink_list_spine_tail steps))
-    (gen_adversary_scenario total_tzbtc total_liquidity size)
+let print_adversary_scenario (specs, _, steps) =
+  Format.asprintf "%a" pp_scenario (specs, steps)
 
 (* -------------------------------------------------------------------------- *)
 
@@ -341,7 +316,9 @@ let arb_adversary_scenario :
    We shrink a valid scenario by removing steps from its tails,
    because a prefix of a valid scenario remains a valid
    scenario. Removing a random element of a scenario could lead to an
-   invalid scenario. *)
+   invalid scenario. We have to use QCheck2.Gen.make_primitive to specify
+   the shrinking method of the generator, and avoid defaulting on the
+   shrinking implied by QCheck2.Gen.bind *)
 
 (* Note (2)
 

@@ -395,7 +395,7 @@ let test_not_acceptable_next_level =
            ( ((proposal_round, op_round), (proposal_level, _)),
              (proposal_timestamp, now_timestamp) ) ) ->
       let op_level = Raw_level.succ proposal_level in
-      QCheck.assume
+      QCheck2.assume
       @@ no_error
            ( timestamp_of_round
                round_durations
