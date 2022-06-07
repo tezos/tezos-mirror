@@ -151,6 +151,17 @@ let add_external_messages ctxt rollup external_messages =
   in
   add_messages ctxt rollup messages
 
+let add_internal_message ctxt rollup ~payload ~sender ~source =
+  let open Lwt_result_syntax in
+  (* TODO: #2951
+     Charge gas for serializing the internal message.
+  *)
+  let*? message =
+    Sc_rollup_inbox_message_repr.(
+      to_bytes @@ Internal {payload; sender; source})
+  in
+  add_messages ctxt rollup [message]
+
 module Internal_for_tests = struct
   let update_num_and_size_of_messages = update_num_and_size_of_messages
 end

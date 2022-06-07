@@ -2811,6 +2811,14 @@ module Sc_rollup : sig
     val add_external_messages :
       context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
 
+    val add_internal_message :
+      context ->
+      rollup ->
+      payload:Script.expr ->
+      sender:Contract.t ->
+      source:Signature.public_key_hash ->
+      (t * Z.t * context) tzresult Lwt.t
+
     val inbox : context -> rollup -> (t * context) tzresult Lwt.t
 
     module Proof : sig
