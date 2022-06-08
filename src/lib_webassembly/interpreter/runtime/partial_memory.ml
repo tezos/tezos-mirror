@@ -15,22 +15,24 @@ include Memory_exn
 let page_size = 0x10000L (* 64 KiB *)
 
 module Chunked = struct
-  type t = Chunked_byte_vector.t
+  module Backend = Chunked_byte_vector.Lwt
+
+  type t = Backend.t
 
   let length_from_pages pages = Int64.(mul (of_int32 pages) page_size)
 
-  let create pages = Chunked_byte_vector.create (length_from_pages pages)
+  let create pages = Backend.create (length_from_pages pages)
 
   let grow delta_pages pages =
-    Chunked_byte_vector.grow pages (length_from_pages delta_pages)
+    Backend.grow pages (length_from_pages delta_pages)
 
-  let total_size = Chunked_byte_vector.length
+  let total_size = Backend.length
 
   let total_pages vector = Int64.(div (total_size vector) page_size |> to_int32)
 
-  let load_byte = Chunked_byte_vector.load_byte
+  let load_byte = Backend.load_byte
 
-  let store_byte = Chunked_byte_vector.store_byte
+  let store_byte = Backend.store_byte
 end
 
 type memory = { mutable ty : memory_type; content : Chunked.t }
