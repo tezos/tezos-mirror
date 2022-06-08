@@ -85,6 +85,18 @@ let encoding =
     (fun transactions -> Atomic_transaction_batch {transactions})
     (obj1 (req "transactions" (list transaction_encoding)))
 
+let pp_transaction fmt transaction =
+  Format.fprintf
+    fmt
+    "@[%a@;%a@]"
+    Contract_hash.pp
+    transaction.destination
+    Entrypoint_repr.pp
+    transaction.entrypoint
+
+let pp fmt (Atomic_transaction_batch {transactions}) =
+  Format.pp_print_list pp_transaction fmt transactions
+
 let of_bytes bytes =
   let open Tzresult_syntax in
   match Data_encoding.Binary.of_string_opt encoding bytes with
