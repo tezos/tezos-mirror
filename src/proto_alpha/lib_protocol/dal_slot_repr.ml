@@ -99,7 +99,9 @@ module Slot_market = struct
       | Some ((_slot : slot), current_fees) when Tez_repr.(current_fees >= fees)
         ->
           current_candidate
-      | _ -> Some (slot, fees)
+      | _ ->
+          has_changed := true ;
+          Some (slot, fees)
     in
     let candidates =
       List.mapi
