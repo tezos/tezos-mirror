@@ -286,7 +286,7 @@ let pp_manager_operation_content (type kind) source ppf
       Format.fprintf
         ppf
         "Refute staker %a in the smart contract rollup at address %a using \
-         refutation %a %s@]"
+         refutation %a %s"
         Sc_rollup.Staker.pp
         opponent
         Sc_rollup.Address.pp
