@@ -199,10 +199,13 @@ type consensus_watermark =
 let bytes_of_consensus_watermark = function
   | Preendorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
+  | Dal_slot_availability chain_id
+  (* We reuse the watermark of an endorsement. This is because this
+     operation is temporary and aims to be merged with an endorsement
+     later on. Moreover, there is a leak of abstraction with the shell
+     which makes adding a new watermark a bit awkward. *)
   | Endorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id)
-  | Dal_slot_availability chain_id ->
-      Bytes.cat (Bytes.of_string "\x14") (Chain_id.to_bytes chain_id)
 
 let to_watermark w = Signature.Custom (bytes_of_consensus_watermark w)
 
