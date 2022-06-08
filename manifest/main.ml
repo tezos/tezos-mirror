@@ -321,7 +321,7 @@ let tezos_test_helpers =
     ~deps:
       [uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix; data_encoding]
     ~js_compatible:true
-    ~ocaml:V.(at_least "4.08")
+    ~ocaml:V.(at_least "4.12")
     ~linkall:true
     ~dune:
       Dune.
@@ -348,7 +348,7 @@ let tezos_stdlib =
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
-    ~ocaml:V.(at_least "4.08")
+    ~ocaml:V.(at_least "4.12")
     ~js_compatible:true
     ~inline_tests:ppx_inline_test
 
