@@ -38,6 +38,32 @@ open Error_monad_operators
 
 let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_tzresult x
 
+let context_init_with_sc_rollup_enabled tup =
+  Context.init_with_constants_gen
+    tup
+    {
+      Context.default_test_constants with
+      consensus_threshold = 0;
+      sc_rollup = {Context.default_test_constants.sc_rollup with enable = true};
+    }
+
+let sc_originate block contract parameters_ty =
+  let open Lwt_result_syntax in
+  let kind = Sc_rollup.Kind.Example_arith in
+  let* operation, rollup =
+    Op.sc_rollup_origination
+      ~counter:(Z.of_int 0)
+      (B block)
+      contract
+      kind
+      ""
+      (Script.lazy_expr @@ Expr.from_string parameters_ty)
+  in
+  let* incr = Incremental.begin_construction block in
+  let* incr = Incremental.add_operation incr operation in
+  let* block = Incremental.finalize_block incr in
+  return (block, rollup)
+
 (* Test for Script_ir_translator.parse_and_unparse_script_unaccounted on a
    script declaring views. *)
 let test_unparse_view () =
@@ -760,6 +786,117 @@ let test_forbidden_op_in_view op () =
         op
   | Error _ -> return_unit
 
+(** Test [parse_contract_data] for rollup with unit type. *)
+let test_parse_contract_data_for_unit_rollup () =
+  let open Lwt_result_syntax in
+  let* block, (contract, _) = context_init_with_sc_rollup_enabled T2 in
+  let* block, rollup = sc_originate block contract "unit" in
+  let* incr = Incremental.begin_construction block in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let* ( _ctxt,
+         Typed_contract
+           {
+             arg_ty = Script_typed_ir.Unit_t;
+             address = {destination; entrypoint};
+           } ) =
+    wrap_error_lwt
+    @@ Script_ir_translator.parse_contract_data
+         ctxt
+         (-1)
+         Script_typed_ir.unit_t
+         (Destination.Sc_rollup rollup)
+         ~entrypoint:Entrypoint.default
+  in
+  (* Check that the destinations match. *)
+  let* () =
+    Assert.equal_string
+      ~loc:__LOC__
+      (Destination.to_b58check destination)
+      (Sc_rollup.Address.to_b58check rollup)
+  in
+  (* Check that entrypoints match. *)
+  let* () =
+    Assert.equal_string ~loc:__LOC__ (Entrypoint.to_string entrypoint) "default"
+  in
+  return ()
+
+(** Test [parse_contract_data] for rollup with entrypoints in type. *)
+let test_parse_contract_data_for_rollup_with_entrypoints () =
+  let open Lwt_result_syntax in
+  let* block, (contract, _) = context_init_with_sc_rollup_enabled T2 in
+  let* block, rollup =
+    sc_originate block contract "or (pair %add nat nat) (unit %reset)"
+  in
+  let rollup_destination = Sc_rollup.Address.to_b58check rollup in
+  let* incr = Incremental.begin_construction block in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let* ctxt, Typed_contract {arg_ty = _; address = {destination; entrypoint}} =
+    let*? (Script_typed_ir.Ty_ex_c nat_pair) =
+      Environment.wrap_tzresult Script_typed_ir.(pair_t (-1) nat_t nat_t)
+    in
+    wrap_error_lwt
+    @@ Script_ir_translator.parse_contract_data
+         ctxt
+         (-1)
+         nat_pair
+         (Destination.Sc_rollup rollup)
+         ~entrypoint:(Entrypoint.of_string_strict_exn "add")
+  in
+  (* Check that the destinations match. *)
+  let* () =
+    Assert.equal_string
+      ~loc:__LOC__
+      (Destination.to_b58check destination)
+      rollup_destination
+  in
+  (* Check that entrypoints match. *)
+  let* () =
+    Assert.equal_string ~loc:__LOC__ (Entrypoint.to_string entrypoint) "add"
+  in
+  let* _ctxt, Typed_contract {arg_ty = _; address = {destination; entrypoint}} =
+    wrap_error_lwt
+    @@ Script_ir_translator.parse_contract_data
+         ctxt
+         (-1)
+         Script_typed_ir.unit_t
+         (Destination.Sc_rollup rollup)
+         ~entrypoint:(Entrypoint.of_string_strict_exn "reset")
+  in
+  (* Check that the destinations match. *)
+  let* () =
+    Assert.equal_string
+      ~loc:__LOC__
+      (Destination.to_b58check destination)
+      rollup_destination
+  in
+  (* Check that entrypoints match. *)
+  let* () =
+    Assert.equal_string ~loc:__LOC__ (Entrypoint.to_string entrypoint) "reset"
+  in
+  return ()
+
+(** Test that [parse_contract_data] for rollup with invalid type fails. *)
+let test_parse_contract_data_for_rollup_with_invalid_type () =
+  let open Lwt_result_syntax in
+  let* block, (contract, _) = context_init_with_sc_rollup_enabled T2 in
+  let* block, rollup = sc_originate block contract "string" in
+  let* incr = Incremental.begin_construction block in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let entrypoint = Entrypoint.of_string_strict_exn "add" in
+  let*! res =
+    wrap_error_lwt
+    @@ Script_ir_translator.parse_contract_data
+         ctxt
+         (-1)
+         Script_typed_ir.unit_t
+         (Destination.Sc_rollup rollup)
+         ~entrypoint
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (( = ) (Script_tc_errors.No_such_entrypoint entrypoint))
+
 let tests =
   [
     Tztest.tztest "test unparse view" `Quick test_unparse_view;
@@ -797,4 +934,16 @@ let tests =
       "test forbidden CREATE_CONTRACT in view"
       `Quick
       (test_forbidden_op_in_view "CREATE_CONTRACT");
+    Tztest.tztest
+      "test parse contract data for rollup"
+      `Quick
+      test_parse_contract_data_for_unit_rollup;
+    Tztest.tztest
+      "test parse contract data for rollup with entrypoint"
+      `Quick
+      test_parse_contract_data_for_rollup_with_entrypoints;
+    Tztest.tztest
+      "test parse contract data for rollup with entrypoint"
+      `Quick
+      test_parse_contract_data_for_rollup_with_invalid_type;
   ]
