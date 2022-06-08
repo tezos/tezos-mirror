@@ -332,7 +332,8 @@ let estimated_gas_single (type kind)
         | Sc_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas
         | Sc_rollup_refute_result {consumed_gas; _} -> Ok consumed_gas
         | Sc_rollup_timeout_result {consumed_gas; _} -> Ok consumed_gas
-        | Sc_rollup_atomic_batch_result {consumed_gas; _} -> Ok consumed_gas)
+        | Sc_rollup_atomic_batch_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_return_bond_result {consumed_gas; _} -> Ok consumed_gas)
     | Skipped _ ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
@@ -411,7 +412,8 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Sc_rollup_cement_result _ -> Ok Z.zero
         | Sc_rollup_publish_result _ -> Ok Z.zero
         | Sc_rollup_refute_result _ -> Ok Z.zero
-        | Sc_rollup_timeout_result _ -> Ok Z.zero)
+        | Sc_rollup_timeout_result _ -> Ok Z.zero
+        | Sc_rollup_return_bond_result _ -> Ok Z.zero)
     | Skipped _ ->
         Ok Z.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
@@ -500,7 +502,8 @@ let originated_contracts_single (type kind)
         | Sc_rollup_publish_result _ -> Ok []
         | Sc_rollup_refute_result _ -> Ok []
         | Sc_rollup_timeout_result _ -> Ok []
-        | Sc_rollup_atomic_batch_result _ -> Ok [])
+        | Sc_rollup_atomic_batch_result _ -> Ok []
+        | Sc_rollup_return_bond_result _ -> Ok [])
     | Skipped _ -> Ok [] (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in

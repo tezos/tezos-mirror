@@ -543,3 +543,14 @@ val sc_rollup_atomic_batch :
   inclusion_proof:string ->
   atomic_transaction_batch:string ->
   (packed_operation, tztrace) result Lwt.t
+
+(** [sc_rollup_return_bond ctxt source sc_rollup] returns a commitment bond. *)
+val sc_rollup_return_bond :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Operation.packed tzresult Lwt.t

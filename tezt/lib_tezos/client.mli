@@ -1251,6 +1251,18 @@ module Sc_rollup : sig
     dst:string ->
     t ->
     Process.t
+
+  (** Run [tezos-client submit sc rollup return bond to <sc_rollup> from <src>]. *)
+  val submit_return_bond :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?fee:Tez.t ->
+    ?hooks:Process.hooks ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Runnable.process
 end
 
 (** {2 High-Level Functions} *)

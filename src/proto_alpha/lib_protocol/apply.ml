@@ -1857,6 +1857,17 @@ let apply_external_manager_operation_content :
         ~atomic_transaction_batch
       >>=? fun _ctxt ->
       failwith "Sc_rolup_atomic_batch operation is not yet supported."
+  | Sc_rollup_return_bond {sc_rollup} ->
+      Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup source
+      >>=? fun (ctxt, balance_updates) ->
+      let result =
+        Sc_rollup_return_bond_result
+          {
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            balance_updates;
+          }
+      in
+      return (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 
@@ -2054,6 +2065,13 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
   | Sc_rollup_atomic_batch _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
+  | Sc_rollup_return_bond _ ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
+         should we successfully precheck Sc_rollup_return_bond and any
+         (simple) Sc rollup operation, or should we add some some checks to make
+         the operations Branch_delayed if they cannot be successfully
+         prechecked. *)
+      assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Dal_publish_slot_header {slot} ->
       Dal_apply.validate_publish_slot_header ctxt slot >>?= fun () ->
       return ctxt)
@@ -2235,6 +2253,7 @@ let burn_manager_storage_fees :
       ( ctxt,
         storage_limit,
         Sc_rollup_atomic_batch_result {payload with balance_updates} )
+  | Sc_rollup_return_bond_result _ -> return (ctxt, storage_limit, smopr)
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].

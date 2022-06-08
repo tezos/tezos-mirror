@@ -803,3 +803,17 @@ let sc_rollup_atomic_batch ?counter ?fee ?gas_limit ?storage_limit ctxt
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk ctxt to_sign_op
+
+let sc_rollup_return_bond ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (source : Contract.t) (sc_rollup : Sc_rollup.t) =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    (Sc_rollup_return_bond {sc_rollup})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt to_sign_op

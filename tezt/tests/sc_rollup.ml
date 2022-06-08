@@ -1378,6 +1378,56 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
          Option.map (fun (_hash, c2, _level) -> (c1, c2)) stored_commitment) ;
   check_published_commitment_in_l1 sc_rollup_address client published_commitment
 
+type balances = {liquid : int; frozen : int}
+
+let contract_balances ~pkh client =
+  let*! liquid = RPC.Contracts.get_balance ~contract_id:pkh client in
+  let*! frozen = RPC.Contracts.get_frozen_bonds ~contract_id:pkh client in
+  return {liquid = JSON.as_int liquid; frozen = JSON.as_int frozen}
+
+(** This helper allow to attempt recovering bond for SCORU rollup operator.
+    if [expect_failure] is set to some string then, we expect the command to fail
+    with an error that contains that string. *)
+let attempt_withdraw_stake =
+  let check_eq_int a b =
+    Check.((a = b) int ~error_msg:"expected value %L, got %R")
+  in
+  fun ?expect_failure ~sc_rollup_address client ->
+    (* placehoders *)
+    (* TODO/Fixme:
+        - Shoud provide the rollup operator key (bootstrap1_key) as an
+          argument to scenarios.
+    *)
+    let bootstrap1_key = Constant.bootstrap1.public_key_hash in
+    let* constants = RPC.get_constants ~hooks client in
+    let return_bond_unfreeze =
+      JSON.(constants |-> "sc_rollup_stake_amount" |> as_int)
+    in
+    let return_bond_fee = 1_000_000 in
+    let inject_op () =
+      Client.Sc_rollup.submit_return_bond
+        ~hooks
+        ~rollup:sc_rollup_address
+        ~src:bootstrap1_key
+        ~fee:(Tez.of_mutez_int return_bond_fee)
+        client
+    in
+    match expect_failure with
+    | None ->
+        let*! () = inject_op () in
+        let* old_bal = contract_balances ~pkh:bootstrap1_key client in
+        let* () = Client.bake_for_and_wait ~keys:["bootstrap2"] client in
+        let* new_bal = contract_balances ~pkh:bootstrap1_key client in
+        let expected_liq_new_bal =
+          old_bal.liquid - return_bond_fee + return_bond_unfreeze
+        in
+        check_eq_int new_bal.liquid expected_liq_new_bal ;
+        check_eq_int new_bal.frozen (old_bal.frozen - return_bond_unfreeze) ;
+        unit
+    | Some failure_string ->
+        let*? p = inject_op () in
+        Process.check_error ~msg:(rex failure_string) p
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2942
    Do not pass an explicit value for `?commitment_period until
    https://gitlab.com/tezos/tezos/-/merge_requests/5212 has been merged. *)
@@ -1442,12 +1492,27 @@ let commitment_before_lcc_not_stored ?(commitment_period = 30)
       sc_rollup_node
       (commitment_finalized_level + levels_to_cementation)
   in
+
+  (* Withdraw stake before cementing should fail *)
+  let* () =
+    attempt_withdraw_stake
+      ~sc_rollup_address
+      client
+      ~expect_failure:
+        "Attempted to withdraw while not staked on the last cemented \
+         commitment."
+  in
+
   let* () =
     cement_commitment client ~sc_rollup_address ~hash:cemented_commitment_hash
   in
   let* level_after_cementation =
     Sc_rollup_node.wait_for_level sc_rollup_node (cemented_commitment_level + 1)
   in
+
+  (* Withdraw stake after cementing should succeed *)
+  let* () = attempt_withdraw_stake ~sc_rollup_address client in
+
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   (* Rollup node 2 starts and processes enough levels to publish a commitment.*)
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in

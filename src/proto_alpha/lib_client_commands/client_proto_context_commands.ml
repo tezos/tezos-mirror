@@ -117,6 +117,9 @@ let messages_param =
   | ["file"; path] -> from_path path
   | _ -> if Sys.file_exists p then from_path p else from_text p
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3064
+   Move scoru related params to Client_proto_args.Sc_rollup(_params)
+*)
 let commitment_hash_param =
   Clic.parameter (fun _ commitment_hash ->
       match Sc_rollup.Commitment.Hash.of_b58check_opt commitment_hash with
@@ -2871,6 +2874,58 @@ let commands_rw () =
           ~fee_parameter
           ()
         >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Recover commitment bond from a smart contract rollup."
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args
+         storage_limit_arg
+         counter_arg)
+      (prefixes ["recover"; "bond"; "of"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"Account that owns the bond."
+      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ Sc_rollup_params.sc_rollup_address_param
+           ~usage:"Smart-contract rollup of the bond."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             fee_parameter,
+             storage_limit,
+             counter )
+           source
+           sc_rollup
+           cctxt ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can deposit/recover bonds"
+        | Implicit source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            sc_rollup_return_bond
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~sc_rollup
+              ()
+            >>=? fun _res -> return_unit);
   ]
 
 let commands network () =
