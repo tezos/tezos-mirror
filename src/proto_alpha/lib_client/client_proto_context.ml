@@ -1269,24 +1269,24 @@ let sc_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
-let sc_rollup_atomic_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~rollup ~cemented_commitment ~outbox_level ~message_index ~inclusion_proof
-    ~atomic_transaction_batch ~src_pk ~src_sk ~fee_parameter () =
+let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
+    ?confirmations ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit
+    ?storage_limit ?counter ~source ~rollup ~cemented_commitment ~outbox_level
+    ~message_index ~inclusion_proof ~message ~src_pk ~src_sk ~fee_parameter () =
   let op =
     Annotated_manager_operation.Single_manager
       (Injection.prepare_manager_operation
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_atomic_batch
+         (Sc_rollup_execute_outbox_message
             {
               rollup;
               cemented_commitment;
               outbox_level;
               message_index;
               inclusion_proof;
-              atomic_transaction_batch;
+              message;
             }))
   in
   Injection.inject_manager_operation

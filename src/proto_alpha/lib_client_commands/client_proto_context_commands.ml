@@ -2779,8 +2779,8 @@ let commands_rw () =
     command
       ~group
       ~desc:
-        "Execute an atomic batch of transactions. The transactions are part of \
-         the smart-contract rollup's outbox of a cemented commitment."
+        "Execute a message from a smart-contract rollup's outbox of a cemented \
+         commitment."
       (args7
          fee_arg
          dry_run_switch
@@ -2789,21 +2789,21 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg)
-      (prefixes ["execute"; "transactions"; "of"; "sc"; "rollup"]
+      (prefixes ["execute"; "outbox"; "message"; "of"; "sc"; "rollup"]
       @@ param
            ~name:"rollup"
            ~desc:
-             "The address of the sc rollup where the atomic batch of \
-              transactions resides."
+             "The address of the smart-contract rollup where the message \
+              resides."
            rollup_address_param
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"source"
-           ~desc:"The account used for executing the batch of transactions."
+           ~desc:"The account used for executing the outbox message."
       @@ prefixes ["for"; "commitment"; "hash"]
       @@ param
-           ~name:"last cemented commitment"
-           ~desc:"The hash of the last cemented commitment of the rollup."
+           ~name:"cemented commitment"
+           ~desc:"The hash of the cemented commitment of the rollup."
            commitment_hash_param
       @@ prefixes ["for"; "the"; "outbox"; "level"]
       @@ param
@@ -2813,19 +2813,17 @@ let commands_rw () =
       @@ prefixes ["for"; "the"; "message"; "at"; "index"]
       @@ param
            ~name:"message index"
-           ~desc:
-             "The index of the rollup's outbox message containing the batch of \
-              transactions."
+           ~desc:"The index of the rollup's outbox containing the message."
            non_negative_param
       @@ prefixes ["and"; "inclusion"; "proof"]
       @@ param
            ~name:"inclusion proof"
-           ~desc:"The inclusion proof for the atomic batch of transactions."
+           ~desc:"The inclusion proof for the message."
            unchecked_payload_param
-      @@ prefixes ["and"; "atomic"; "transaction"; "batch"]
+      @@ prefixes ["and"; "message"]
       @@ param
-           ~name:"atomic transaction batch"
-           ~desc:"The atomic batch of transactions to be executed."
+           ~name:"message"
+           ~desc:"The message to be executed."
            unchecked_payload_param
       @@ stop)
       (fun ( fee,
@@ -2841,7 +2839,7 @@ let commands_rw () =
            outbox_level
            message_index
            inclusion_proof
-           atomic_transaction_batch
+           message
            cctxt ->
         (match source with
         | Originated _ ->
@@ -2851,7 +2849,7 @@ let commands_rw () =
         | Implicit source -> return source)
         >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-        sc_rollup_atomic_batch
+        sc_rollup_execute_outbox_message
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
@@ -2868,7 +2866,7 @@ let commands_rw () =
           ~outbox_level
           ~message_index
           ~inclusion_proof
-          ~atomic_transaction_batch
+          ~message
           ~src_pk
           ~src_sk
           ~fee_parameter

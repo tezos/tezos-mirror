@@ -252,12 +252,13 @@ type _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_timeout successful_manager_operation_result
-  | Sc_rollup_atomic_batch_result : {
+  | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
-      -> Kind.sc_rollup_atomic_batch successful_manager_operation_result
+      -> Kind.sc_rollup_execute_outbox_message
+         successful_manager_operation_result
   | Sc_rollup_return_bond_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
@@ -1112,9 +1113,11 @@ module Manager_result = struct
         Sc_rollup_timeout_result
           {consumed_gas = consumed_milligas; status; balance_updates})
 
-  let sc_rollup_atomic_batch_case =
+  let sc_rollup_execute_outbox_message_case =
     make
-      ~op_case:Operation.Encoding.Manager_operations.sc_rollup_atomic_batch_case
+      ~op_case:
+        Operation.Encoding.Manager_operations
+        .sc_rollup_execute_outbox_message_case
       ~encoding:
         Data_encoding.(
           obj4
@@ -1123,12 +1126,13 @@ module Manager_result = struct
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
-        | Successful_manager_result (Sc_rollup_atomic_batch_result _ as op) ->
+        | Successful_manager_result
+            (Sc_rollup_execute_outbox_message_result _ as op) ->
             Some op
         | _ -> None)
-      ~kind:Kind.Sc_rollup_atomic_batch_manager_kind
+      ~kind:Kind.Sc_rollup_execute_outbox_message_manager_kind
       ~proj:(function
-        | Sc_rollup_atomic_batch_result
+        | Sc_rollup_execute_outbox_message_result
             {balance_updates; consumed_gas; paid_storage_size_diff} ->
             ( balance_updates,
               Gas.Arith.ceil consumed_gas,
@@ -1140,7 +1144,7 @@ module Manager_result = struct
                consumed_milligas,
                paid_storage_size_diff ) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_atomic_batch_result
+        Sc_rollup_execute_outbox_message_result
           {
             balance_updates;
             consumed_gas = consumed_milligas;
@@ -1673,10 +1677,10 @@ let equal_manager_kind :
   | Kind.Sc_rollup_timeout_manager_kind, Kind.Sc_rollup_timeout_manager_kind ->
       Some Eq
   | Kind.Sc_rollup_timeout_manager_kind, _ -> None
-  | ( Kind.Sc_rollup_atomic_batch_manager_kind,
-      Kind.Sc_rollup_atomic_batch_manager_kind ) ->
+  | ( Kind.Sc_rollup_execute_outbox_message_manager_kind,
+      Kind.Sc_rollup_execute_outbox_message_manager_kind ) ->
       Some Eq
-  | Kind.Sc_rollup_atomic_batch_manager_kind, _ -> None
+  | Kind.Sc_rollup_execute_outbox_message_manager_kind, _ -> None
   | ( Kind.Sc_rollup_return_bond_manager_kind,
       Kind.Sc_rollup_return_bond_manager_kind ) ->
       Some Eq
@@ -2231,13 +2235,14 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let[@coq_axiom_with_reason "gadt"] sc_rollup_atomic_batch_case =
+  let[@coq_axiom_with_reason "gadt"] sc_rollup_execute_outbox_message_case =
     make_manager_case
-      Operation.Encoding.sc_rollup_atomic_batch_case
-      Manager_result.sc_rollup_atomic_batch_case
+      Operation.Encoding.sc_rollup_execute_outbox_message_case
+      Manager_result.sc_rollup_execute_outbox_message_case
       (function
         | Contents_and_result
-            ( (Manager_operation {operation = Sc_rollup_atomic_batch _; _} as op),
+            ( (Manager_operation
+                 {operation = Sc_rollup_execute_outbox_message _; _} as op),
               res ) ->
             Some (op, res)
         | _ -> None)
@@ -2305,7 +2310,7 @@ let contents_result_encoding =
          make sc_rollup_publish_case;
          make sc_rollup_refute_case;
          make sc_rollup_timeout_case;
-         make sc_rollup_atomic_batch_case;
+         make sc_rollup_execute_outbox_message_case;
          make sc_rollup_return_bond_case;
        ]
 
@@ -3085,32 +3090,42 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Sc_rollup_timeout _; _}, _ -> None
-  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
-      Manager_operation_result
-        {operation_result = Applied (Sc_rollup_atomic_batch_result _); _} ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
-      Manager_operation_result
-        {operation_result = Backtracked (Sc_rollup_atomic_batch_result _, _); _}
-    ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
+  | ( Manager_operation {operation = Sc_rollup_execute_outbox_message _; _},
       Manager_operation_result
         {
-          operation_result =
-            Failed (Alpha_context.Kind.Sc_rollup_atomic_batch_manager_kind, _);
+          operation_result = Applied (Sc_rollup_execute_outbox_message_result _);
           _;
         } ) ->
       Some Eq
-  | ( Manager_operation {operation = Sc_rollup_atomic_batch _; _},
+  | ( Manager_operation {operation = Sc_rollup_execute_outbox_message _; _},
       Manager_operation_result
         {
           operation_result =
-            Skipped Alpha_context.Kind.Sc_rollup_atomic_batch_manager_kind;
+            Backtracked (Sc_rollup_execute_outbox_message_result _, _);
           _;
         } ) ->
       Some Eq
-  | Manager_operation {operation = Sc_rollup_atomic_batch _; _}, _ -> None
+  | ( Manager_operation {operation = Sc_rollup_execute_outbox_message _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed
+              ( Alpha_context.Kind.Sc_rollup_execute_outbox_message_manager_kind,
+                _ );
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Sc_rollup_execute_outbox_message _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped
+              Alpha_context.Kind.Sc_rollup_execute_outbox_message_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Sc_rollup_execute_outbox_message _; _}, _ ->
+      None
 
 let rec kind_equal_list :
     type kind kind2.

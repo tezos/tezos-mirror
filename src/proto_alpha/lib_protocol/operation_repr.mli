@@ -135,7 +135,8 @@ module Kind : sig
 
   type sc_rollup_timeout = Sc_rollup_timeout_kind
 
-  type sc_rollup_atomic_batch = Sc_rollup_atomic_batch_kind
+  type sc_rollup_execute_outbox_message =
+    | Sc_rollup_execute_outbox_message_kind
 
   type sc_rollup_return_bond = Sc_rollup_return_bond_kind
 
@@ -165,7 +166,8 @@ module Kind : sig
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
     | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
-    | Sc_rollup_atomic_batch_manager_kind : sc_rollup_atomic_batch manager
+    | Sc_rollup_execute_outbox_message_manager_kind
+        : sc_rollup_execute_outbox_message manager
     | Sc_rollup_return_bond_manager_kind : sc_rollup_return_bond manager
 end
 
@@ -483,11 +485,10 @@ and _ manager_operation =
       stakers : Sc_rollup_game_repr.Index.t;
     }
       -> Kind.sc_rollup_timeout manager_operation
-  (* [Sc_rollup_atomic_batch] executes an atomic batch of transactions
-      corresponding to a message in the rollup's outbox. Transactions are
-      smart-contract calls and may include any valid payload including ticket
-      transfers. *)
-  | Sc_rollup_atomic_batch : {
+  (* [Sc_rollup_execute_outbox_message] executes a message from the rollup's
+      outbox. Messages may involve transactions to smart contract accounts on
+      Layer 1. *)
+  | Sc_rollup_execute_outbox_message : {
       rollup : Sc_rollup_repr.t;  (** The smart-contract rollup. *)
       cemented_commitment : Sc_rollup_commitment_repr.Hash.t;
           (** The hash of the last cemented commitment that the proof refers to. *)
@@ -497,10 +498,10 @@ and _ manager_operation =
           (** The index of the message in the outbox at that level. *)
       inclusion_proof : string;
           (** A proof that the message is included in the outbox. *)
-      atomic_transaction_batch : string;
+      message : string;
           (** The bytes corresponding to a serialized batch of transactions. *)
     }
-      -> Kind.sc_rollup_atomic_batch manager_operation
+      -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_return_bond : {
       sc_rollup : Sc_rollup_repr.t;
     }
@@ -655,8 +656,8 @@ module Encoding : sig
 
   val sc_rollup_timeout_case : Kind.sc_rollup_timeout Kind.manager case
 
-  val sc_rollup_atomic_batch_case :
-    Kind.sc_rollup_atomic_batch Kind.manager case
+  val sc_rollup_execute_outbox_message_case :
+    Kind.sc_rollup_execute_outbox_message Kind.manager case
 
   val sc_rollup_return_bond_case : Kind.sc_rollup_return_bond Kind.manager case
 
@@ -717,7 +718,8 @@ module Encoding : sig
 
     val sc_rollup_timeout_case : Kind.sc_rollup_timeout case
 
-    val sc_rollup_atomic_batch_case : Kind.sc_rollup_atomic_batch case
+    val sc_rollup_execute_outbox_message_case :
+      Kind.sc_rollup_execute_outbox_message case
 
     val sc_rollup_return_bond_case : Kind.sc_rollup_return_bond case
   end

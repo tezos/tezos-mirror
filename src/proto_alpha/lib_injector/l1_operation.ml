@@ -66,7 +66,7 @@ module Manager_operation = struct
            make sc_rollup_publish_case;
            make sc_rollup_refute_case;
            make sc_rollup_timeout_case;
-           make sc_rollup_atomic_batch_case;
+           make sc_rollup_execute_outbox_message_case;
          ]
 
   let get_case :
@@ -97,7 +97,8 @@ module Manager_operation = struct
     | Sc_rollup_publish _ -> sc_rollup_publish_case
     | Sc_rollup_refute _ -> sc_rollup_refute_case
     | Sc_rollup_timeout _ -> sc_rollup_timeout_case
-    | Sc_rollup_atomic_batch _ -> sc_rollup_atomic_batch_case
+    | Sc_rollup_execute_outbox_message _ ->
+        sc_rollup_execute_outbox_message_case
     | Sc_rollup_return_bond _ -> sc_rollup_return_bond_case
 
   let pp_kind ppf op =
