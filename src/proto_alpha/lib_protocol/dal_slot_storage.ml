@@ -28,7 +28,9 @@ let find ctxt level = Storage.Dal.Slot_headers.find ctxt level
 let finalize_current_slots ctxt =
   let current_level = Raw_context.current_level ctxt in
   let slots = Raw_context.Dal.candidates ctxt in
-  Storage.Dal.Slot_headers.add ctxt current_level.level slots
+  match slots with
+  | [] -> Lwt.return ctxt
+  | _ :: _ -> Storage.Dal.Slot_headers.add ctxt current_level.level slots
 
 let compute_available_slots ctxt slots =
   let fold_available_slots available_slots slot =
