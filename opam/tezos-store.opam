@@ -25,7 +25,7 @@ depends: [
   "camlzip" { >= "1.11" & < "1.12" }
   "tar"
   "tar-unix" { = "2.0.0" }
-  "prometheus"
+  "prometheus" { >= "0.5" }
   "tezos-embedded-protocol-demo-noops" {with-test}
   "tezos-embedded-protocol-genesis" {with-test}
   "tezos-embedded-protocol-alpha" {with-test}

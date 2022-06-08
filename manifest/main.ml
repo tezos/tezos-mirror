@@ -231,7 +231,7 @@ let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.4")
 
 let pringo = external_lib "pringo" V.(at_least "1.3" && less_than "1.4")
 
-let prometheus = external_lib "prometheus" V.True
+let prometheus = external_lib "prometheus" V.(at_least "0.5")
 
 let prometheus_app = external_lib "prometheus-app" V.True
 
