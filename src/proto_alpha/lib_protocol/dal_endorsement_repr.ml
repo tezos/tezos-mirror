@@ -119,12 +119,12 @@ module Accountability = struct
     | None -> false
     | Some bitset ->
         let acc = ref 0 in
-        let max = Bitset.occupied_size_in_bits bitset in
+        let nb_shards = Bitset.occupied_size_in_bits bitset in
         List.iter
           (fun x ->
             match Bitset.mem bitset x with
             | Error _ | Ok false -> ()
             | Ok true -> incr acc)
-          Misc.(0 --> max) ;
-        Compare.Int.(!acc >= threshold)
+          Misc.(0 --> (nb_shards - 1)) ;
+        Compare.Int.(!acc >= threshold * nb_shards / 100)
 end
