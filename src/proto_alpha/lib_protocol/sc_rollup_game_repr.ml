@@ -28,83 +28,105 @@ open Sc_rollup_repr
 
 type player = Alice | Bob
 
-type t = {
-  turn : player;
-  inbox_snapshot : Sc_rollup_inbox_repr.t;
-  level : Raw_level_repr.t;
-  pvm_name : string;
-  dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
-}
+module V1 = struct
+  type t = {
+    turn : player;
+    inbox_snapshot : Sc_rollup_inbox_repr.t;
+    level : Raw_level_repr.t;
+    pvm_name : string;
+    dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
+  }
 
-let player_encoding =
+  let player_encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"Alice"
+          (Tag 0)
+          unit
+          (function Alice -> Some () | _ -> None)
+          (fun () -> Alice);
+        case
+          ~title:"Bob"
+          (Tag 1)
+          unit
+          (function Bob -> Some () | _ -> None)
+          (fun () -> Bob);
+      ]
+
+  let string_of_player = function Alice -> "alice" | Bob -> "bob"
+
+  let pp_player ppf player = Format.fprintf ppf "%s" (string_of_player player)
+
+  let opponent = function Alice -> Bob | Bob -> Alice
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {turn; inbox_snapshot; level; pvm_name; dissection} ->
+        (turn, inbox_snapshot, level, pvm_name, dissection))
+      (fun (turn, inbox_snapshot, level, pvm_name, dissection) ->
+        {turn; inbox_snapshot; level; pvm_name; dissection})
+      (obj5
+         (req "turn" player_encoding)
+         (req "inbox_snapshot" Sc_rollup_inbox_repr.encoding)
+         (req "level" Raw_level_repr.encoding)
+         (req "pvm_name" string)
+         (req
+            "dissection"
+            (list
+               (tup2 (option State_hash.encoding) Sc_rollup_tick_repr.encoding))))
+
+  let pp_dissection ppf d =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";\n")
+      (fun ppf (state, tick) ->
+        Format.fprintf
+          ppf
+          "  %a @ %a"
+          (Format.pp_print_option State_hash.pp)
+          state
+          Sc_rollup_tick_repr.pp
+          tick)
+      ppf
+      d
+
+  let pp ppf game =
+    Format.fprintf
+      ppf
+      "[%a] %a playing; inbox snapshot = %a; level = %a; pvm_name = %s;"
+      pp_dissection
+      game.dissection
+      pp_player
+      game.turn
+      Sc_rollup_inbox_repr.pp
+      game.inbox_snapshot
+      Raw_level_repr.pp
+      game.level
+      game.pvm_name
+end
+
+type versioned = V1 of V1.t
+
+let versioned_encoding =
   let open Data_encoding in
   union
-    ~tag_size:`Uint8
     [
       case
-        ~title:"Alice"
+        ~title:"V1"
         (Tag 0)
-        unit
-        (function Alice -> Some () | _ -> None)
-        (fun () -> Alice);
-      case
-        ~title:"Bob"
-        (Tag 1)
-        unit
-        (function Bob -> Some () | _ -> None)
-        (fun () -> Bob);
+        V1.encoding
+        (function V1 game -> Some game)
+        (fun game -> V1 game);
     ]
 
-let string_of_player = function Alice -> "alice" | Bob -> "bob"
+include V1
 
-let pp_player ppf player = Format.fprintf ppf "%s" (string_of_player player)
+let of_versioned = function V1 game -> game [@@inline]
 
-let opponent = function Alice -> Bob | Bob -> Alice
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {turn; inbox_snapshot; level; pvm_name; dissection} ->
-      (turn, inbox_snapshot, level, pvm_name, dissection))
-    (fun (turn, inbox_snapshot, level, pvm_name, dissection) ->
-      {turn; inbox_snapshot; level; pvm_name; dissection})
-    (obj5
-       (req "turn" player_encoding)
-       (req "inbox_snapshot" Sc_rollup_inbox_repr.encoding)
-       (req "level" Raw_level_repr.encoding)
-       (req "pvm_name" string)
-       (req
-          "dissection"
-          (list
-             (tup2 (option State_hash.encoding) Sc_rollup_tick_repr.encoding))))
-
-let pp_dissection ppf d =
-  Format.pp_print_list
-    ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";\n")
-    (fun ppf (state, tick) ->
-      Format.fprintf
-        ppf
-        "  %a @ %a"
-        (Format.pp_print_option State_hash.pp)
-        state
-        Sc_rollup_tick_repr.pp
-        tick)
-    ppf
-    d
-
-let pp ppf game =
-  Format.fprintf
-    ppf
-    "[%a] %a playing; inbox snapshot = %a; level = %a; pvm_name = %s;"
-    pp_dissection
-    game.dissection
-    pp_player
-    game.turn
-    Sc_rollup_inbox_repr.pp
-    game.inbox_snapshot
-    Raw_level_repr.pp
-    game.level
-    game.pvm_name
+let to_versioned game = V1 game [@@inline]
 
 module Index = struct
   type t = {alice : Staker.t; bob : Staker.t}
