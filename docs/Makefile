@@ -82,11 +82,11 @@ odoc-lite: main docexes
 	@mkdir -p _build/api
 	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
 
-linkcheck:
-	$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)"
+linkcheck: html
+	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
 .PHONY: redirectcheck
-redirectcheck:
+redirectcheck: html
 	@cd $$(pwd)/.. ; ./scripts/lint.sh --check-redirects
 
 # xrefs should be checked:
