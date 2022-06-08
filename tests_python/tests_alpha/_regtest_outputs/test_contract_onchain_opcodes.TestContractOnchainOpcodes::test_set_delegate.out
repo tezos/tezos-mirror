@@ -75,12 +75,12 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 51 bytes
       Consumed gas: 2115.714
-    Internal operations:
-      Internal Delegation:
-        Contract: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        This delegation was successfully applied
-        Consumed gas: 1000
+      Internal operations:
+        Internal Delegation:
+          Contract: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          This delegation was successfully applied
+          Consumed gas: 1000
 
 Injected block at minimal timestamp
 [CONTRACT_HASH] (known as bootstrap5)
@@ -112,12 +112,12 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 51 bytes
       Consumed gas: 1202.968
-    Internal operations:
-      Internal Delegation:
-        Contract: [CONTRACT_HASH]
-        To: nobody
-        This delegation was successfully applied
-        Consumed gas: 1000
+      Internal operations:
+        Internal Delegation:
+          Contract: [CONTRACT_HASH]
+          To: nobody
+          This delegation was successfully applied
+          Consumed gas: 1000
 
 Injected block at minimal timestamp
 none

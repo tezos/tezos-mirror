@@ -30,17 +30,17 @@ This sequence of operations was run:
         [OPERATION_HASH]48f709699019725ba
       Storage size: 578 bytes
       Consumed gas: 2599.458
-    Internal operations:
-      Internal Transaction:
-        Amount: ꜩ1000
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        This transaction was successfully applied
-        Consumed gas: 1000
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ1000
-          [CONTRACT_HASH] ... +ꜩ1000
-          [CONTRACT_HASH] ... -ꜩ0.06425
-          storage fees ........................... +ꜩ0.06425
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ1000
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          This transaction was successfully applied
+          Consumed gas: 1000
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ1000
+            [CONTRACT_HASH] ... +ꜩ1000
+            [CONTRACT_HASH] ... -ꜩ0.06425
+            storage fees ........................... +ꜩ0.06425
 
 Injected block at minimal timestamp

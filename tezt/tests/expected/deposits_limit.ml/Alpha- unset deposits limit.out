@@ -20,7 +20,7 @@ This sequence of operations was run:
     Set deposits limit:
       Delegate: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
       Unlimited deposits
-      The deposits limit was successfully set
+      This deposits limit modification was successfully applied
       Consumed gas: 1000
 
 

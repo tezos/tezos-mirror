@@ -40,44 +40,44 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ0.00075
         [CONTRACT_HASH] ... -ꜩ9001
         [CONTRACT_HASH] ... +ꜩ9001
-    Internal operations:
-      Internal Transaction:
-        Amount: ꜩ0
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        Entrypoint: transfer
-        Parameter: (Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
-                         (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 721))
-        This transaction was successfully applied
-        Updated storage:
-          { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
-        Updated big_maps:
-          Set map(1)[(Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
-                0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 999999279
-          Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 99999279
-          Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 721
-        Storage size: 2263 bytes
-        Paid storage size diff: 68 bytes
-        Consumed gas: 3065.689
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.017
-          storage fees ........................... +ꜩ0.017
-      Internal Transaction:
-        Amount: ꜩ0
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        Entrypoint: mintOrBurn
-        Parameter: (Pair 72007 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
-        This transaction was successfully applied
-        Updated storage:
-          { 2 ; 3 ; 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 ; 72107 }
-        Updated big_maps:
-          Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 72007
-        Storage size: 2048 bytes
-        Paid storage size diff: 70 bytes
-        Consumed gas: 1673.293
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.0175
-          storage fees ........................... +ꜩ0.0175
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          Entrypoint: transfer
+          Parameter: (Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
+                           (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 721))
+          This transaction was successfully applied
+          Updated storage:
+            { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+          Updated big_maps:
+            Set map(1)[(Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
+                  0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 999999279
+            Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 99999279
+            Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 721
+          Storage size: 2263 bytes
+          Paid storage size diff: 68 bytes
+          Consumed gas: 3065.689
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ0.017
+            storage fees ........................... +ꜩ0.017
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          Entrypoint: mintOrBurn
+          Parameter: (Pair 72007 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
+          This transaction was successfully applied
+          Updated storage:
+            { 2 ; 3 ; 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 ; 72107 }
+          Updated big_maps:
+            Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 72007
+          Storage size: 2048 bytes
+          Paid storage size diff: 70 bytes
+          Consumed gas: 1673.293
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ0.0175
+            storage fees ........................... +ꜩ0.0175
 
 Injected block at minimal timestamp

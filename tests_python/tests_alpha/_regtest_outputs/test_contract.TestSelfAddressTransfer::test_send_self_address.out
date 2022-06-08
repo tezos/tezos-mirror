@@ -28,15 +28,15 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 82 bytes
       Consumed gas: 3490.352
-    Internal operations:
-      Internal Transaction:
-        Amount: ꜩ0
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        Parameter: { DROP ; SELF_ADDRESS }
-        This transaction was successfully applied
-        Updated storage: Unit
-        Storage size: 83 bytes
-        Consumed gas: 1203.090
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          Parameter: { DROP ; SELF_ADDRESS }
+          This transaction was successfully applied
+          Updated storage: Unit
+          Storage size: 83 bytes
+          Consumed gas: 1203.090
 
 Injected block at minimal timestamp

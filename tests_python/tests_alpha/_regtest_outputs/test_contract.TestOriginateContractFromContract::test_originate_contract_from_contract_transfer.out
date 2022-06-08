@@ -27,13 +27,13 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 93 bytes
       Consumed gas: 2121.040
-    Internal operations:
-      Internal Origination:
-        From: [CONTRACT_HASH]
-        Credit: ꜩ0
-        Script:
-          { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
-          Initial storage: Unit
+      Internal operations:
+        Internal Origination:
+          From: [CONTRACT_HASH]
+          Credit: ꜩ0
+          Script:
+            { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+            Initial storage: Unit
           No delegate for this contract
           This origination was successfully applied
           Originated contracts:

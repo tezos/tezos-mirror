@@ -173,18 +173,18 @@ This sequence of operations was run:
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100
-    Internal operations:
-      Internal Transaction:
-        Amount: ꜩ100
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        This transaction was successfully applied
-        Updated storage: Unit
-        Storage size: 38 bytes
-        Consumed gas: 1202.802
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ100
-          [CONTRACT_HASH] ... +ꜩ100
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ100
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          This transaction was successfully applied
+          Updated storage: Unit
+          Storage size: 38 bytes
+          Consumed gas: 1202.802
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ100
+            [CONTRACT_HASH] ... +ꜩ100
 
 Injected block at minimal timestamp
 200 ꜩ
@@ -221,18 +221,18 @@ This sequence of operations was run:
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100
-    Internal operations:
-      Internal Transaction:
-        Amount: ꜩ100
-        From: [CONTRACT_HASH]
-        To: [CONTRACT_HASH]
-        This transaction was successfully applied
-        Updated storage: Unit
-        Storage size: 38 bytes
-        Consumed gas: 1202.802
-        Balance updates:
-          [CONTRACT_HASH] ... -ꜩ100
-          [CONTRACT_HASH] ... +ꜩ100
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ100
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          This transaction was successfully applied
+          Updated storage: Unit
+          Storage size: 38 bytes
+          Consumed gas: 1202.802
+          Balance updates:
+            [CONTRACT_HASH] ... -ꜩ100
+            [CONTRACT_HASH] ... +ꜩ100
 
 Injected block at minimal timestamp
 120 ꜩ
