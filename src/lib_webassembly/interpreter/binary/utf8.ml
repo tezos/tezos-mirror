@@ -1,4 +1,4 @@
-exception Utf8
+open Binary_exn
 
 let con n = 0x80 lor (n land 0x3f)
 
@@ -38,7 +38,7 @@ let decode_step get s =
        original implementation since the UTF8 string is read fully and splitted,
        and the end of file state is actually caught by the list pattern
        matching. In that case, [decode] raises [Utf8]. *)
-    try incr i; get s with _ -> raise Utf8 in
+    try incr i; get s with Decode_error.Error _ -> raise Utf8 in
   let b1 = get s in
   let code =
     if b1 < 0x80 then

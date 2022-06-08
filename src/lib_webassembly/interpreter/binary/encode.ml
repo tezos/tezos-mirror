@@ -5,8 +5,8 @@ let version = 1l
 
 (* Errors *)
 
-module Code = Error.Make ()
-exception Code = Code.Error
+open Binary_exn
+exception Code = Encode_error.Error
 
 
 (* Encoding stream *)
@@ -67,7 +67,7 @@ struct
 
   let len i =
     if Int32.to_int (Int32.of_int i) <> i then
-      Code.error Source.no_region
+      Encode_error.error Source.no_region
         "cannot encode length with more than 32 bit";
     vu32 (Int32.of_int i)
 

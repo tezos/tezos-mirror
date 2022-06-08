@@ -1,13 +1,13 @@
 (* Decoding stream *)
 
+open Binary_exn
+
 type stream =
 {
   name : string;
   bytes : string;
   pos : int ref;
 }
-
-exception EOS
 
 let stream name bs = {name; bytes = bs; pos = ref 0}
 
@@ -26,8 +26,7 @@ let get_string n s = let i = pos s in skip n s; String.sub s.bytes i n
 
 (* Errors *)
 
-module Code = Error.Make ()
-exception Code = Code.Error
+exception Code = Decode_error.Error
 
 let string_of_byte b = Printf.sprintf "%02x" b
 let string_of_multi n = Printf.sprintf "%02lx" n
@@ -885,7 +884,7 @@ let name_step s = function
   | NKParse (pos, Collect (n, l)) ->
     let d, offset =
       try Utf8.decode_step get s
-      with Utf8.Utf8 ->
+      with Utf8 ->
         error s pos "malformed UTF-8 encoding"
     in
     NKParse (pos, Collect (n - offset, d :: l))
