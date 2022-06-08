@@ -405,6 +405,7 @@ let tezos_lwt_result_stdlib_bare_functor_outputs =
     ~internal_name:"bare_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_bare_sigs =
   public_lib
@@ -413,6 +414,7 @@ let tezos_lwt_result_stdlib_bare_sigs =
     ~internal_name:"bare_sigs"
     ~js_compatible:true
     ~deps:[lwt; tezos_lwt_result_stdlib_bare_functor_outputs]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_bare_structs =
   public_lib
@@ -421,6 +423,7 @@ let tezos_lwt_result_stdlib_bare_structs =
     ~internal_name:"bare_structs"
     ~js_compatible:true
     ~deps:[lwt; tezos_lwt_result_stdlib_bare_sigs]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_traced_functor_outputs =
   public_lib
@@ -429,6 +432,7 @@ let tezos_lwt_result_stdlib_traced_functor_outputs =
     ~internal_name:"traced_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt; tezos_lwt_result_stdlib_bare_sigs]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_traced_sigs =
   public_lib
@@ -443,6 +447,7 @@ let tezos_lwt_result_stdlib_traced_sigs =
         tezos_lwt_result_stdlib_bare_structs;
         tezos_lwt_result_stdlib_traced_functor_outputs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_traced_structs =
   public_lib
@@ -456,6 +461,7 @@ let tezos_lwt_result_stdlib_traced_structs =
         tezos_lwt_result_stdlib_traced_sigs;
         tezos_lwt_result_stdlib_bare_structs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib =
   public_lib
@@ -473,6 +479,7 @@ let tezos_lwt_result_stdlib =
         tezos_lwt_result_stdlib_traced_sigs;
         tezos_lwt_result_stdlib_traced_structs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_examples_traces =
   public_lib
@@ -485,6 +492,7 @@ let tezos_lwt_result_stdlib_examples_traces =
         tezos_lwt_result_stdlib_bare_structs;
         tezos_lwt_result_stdlib_traced_sigs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let _tezos_lwt_result_stdlib_tests =
   tests
@@ -511,6 +519,7 @@ let _tezos_lwt_result_stdlib_tests =
         qcheck_alcotest;
         tezos_test_helpers;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_error_monad =
   public_lib
