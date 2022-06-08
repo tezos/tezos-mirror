@@ -893,8 +893,10 @@ let check_operator_deposit state config =
           config.Node_config.allow_deposit
           Error.Tx_rollup_deposit_not_allowed
 
-let main_exit_callback state _exit_status =
+let main_exit_callback state rpc_server _exit_status =
   let open Lwt_syntax in
+  let* () = state.State.cctxt#message "Stopping RPC server ..." in
+  let* () = RPC_server.shutdown rpc_server in
   let* () = state.State.cctxt#message "Stopping injector ..." in
   let* () = Injector.shutdown () in
   let* () = state.State.cctxt#message "Stopping batcher ..." in
@@ -968,10 +970,12 @@ let run configuration cctxt =
           state.State.constants)
       signers.submit_batch
   in
-  let* _rpc_server = RPC.start_server configuration state in
+  let* rpc_server = RPC.start_server configuration state in
   let _ =
     (* Register cleaner callback *)
-    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (main_exit_callback state)
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      (main_exit_callback state rpc_server)
   in
   let*! () = Event.(emit node_is_ready) () in
   let* () = catch_up state in
