@@ -131,7 +131,7 @@ let () =
   let open Data_encoding in
   let description = "Slot header with too low fees" in
   register_error_kind
-    `Permanent
+    `Branch
     ~id:"dal_publish_slot_header_with_low_fees"
     ~title:"DAL slot header with low fees"
     ~description
