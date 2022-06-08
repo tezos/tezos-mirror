@@ -2860,6 +2860,12 @@ module Sc_rollup : sig
       dissection : (State_hash.t option * Tick.t) list;
     }
 
+    module Index : sig
+      type t = private {alice : Staker.t; bob : Staker.t}
+
+      val make : Staker.t -> Staker.t -> t
+    end
+
     val opponent : player -> player
 
     type step =
@@ -2929,10 +2935,7 @@ module Sc_rollup : sig
   end
 
   module Refutation_storage : sig
-    type point = {
-      commitment : Sc_rollup_commitment_repr.t;
-      hash : Sc_rollup_commitment_repr.Hash.t;
-    }
+    type point = {commitment : Commitment.t; hash : Commitment.Hash.t}
 
     type conflict_point = point * point
 
@@ -2946,15 +2949,12 @@ module Sc_rollup : sig
       (Game.outcome option * context) tzresult Lwt.t
 
     val timeout :
-      context ->
-      t ->
-      Staker.t * Staker.t ->
-      (Game.outcome * context) tzresult Lwt.t
+      context -> t -> Game.Index.t -> (Game.outcome * context) tzresult Lwt.t
 
     val apply_outcome :
       context ->
       t ->
-      Staker.t * Staker.t ->
+      Game.Index.t ->
       Game.outcome ->
       (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
   end
@@ -3492,7 +3492,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {
       rollup : Sc_rollup.t;
-      stakers : Sc_rollup.Staker.t * Sc_rollup.Staker.t;
+      stakers : Sc_rollup.Game.Index.t;
     }
       -> Kind.sc_rollup_timeout manager_operation
   | Sc_rollup_atomic_batch : {

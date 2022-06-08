@@ -180,7 +180,7 @@ val pp_dissection :
 val pp : Format.formatter -> t -> unit
 
 module Index : sig
-  type t = Staker.t * Staker.t
+  type t = private {alice : Staker.t; bob : Staker.t}
 
   (** [to_path i p] returns a new path with the path to the game indexed
       by [i] added as a prefix to path [p]. See [Path_encoding] module. *)
@@ -196,13 +196,11 @@ module Index : sig
 
   val compare : t -> t -> int
 
-  (** The 'normal form' for indices is when the two stakers appear in
-      the pair in lexical order (we just use [Staker.compare]). *)
-  val normalize : t -> t
+  val make : Staker.t -> Staker.t -> t
 
   (** Given an index in normal form, resolve a given [player] ([Alice]
       or [Bob]) to the actual staker they represent. *)
-  val staker : Staker.t * Staker.t -> player -> Staker.t
+  val staker : t -> player -> Staker.t
 end
 
 (** To begin a game, first the conflict point in the commit tree is

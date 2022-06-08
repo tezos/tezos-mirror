@@ -480,7 +480,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {
       rollup : Sc_rollup_repr.t;
-      stakers : Sc_rollup_repr.Staker.t * Sc_rollup_repr.Staker.t;
+      stakers : Sc_rollup_game_repr.Index.t;
     }
       -> Kind.sc_rollup_timeout manager_operation
   (* [Sc_rollup_atomic_batch] executes an atomic batch of transactions
