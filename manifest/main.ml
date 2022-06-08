@@ -1569,7 +1569,9 @@ let _tezos_context_memory_tests =
       ]
 
 (* This binding assumes that librustzcash.a is installed in the system default
-   directories or in: $OPAM_SWITCH_PREFIX/lib *)
+   directories or in: $OPAM_SWITCH_PREFIX/lib
+
+   Tests are disabled in the .opam because the tests require zcash parameter files. *)
 let tezos_sapling =
   public_lib
     "tezos-sapling"
@@ -1603,6 +1605,7 @@ let tezos_sapling =
         "-lrustzcash";
         "-lpthread";
       ]
+    ~opam_with_test:Never
     ~dune:
       Dune.
         [
@@ -1648,6 +1651,7 @@ let _tezos_sapling_tests =
         alcotest_lwt;
       ]
     ~all_modules_except:["test_js"]
+    ~opam_with_test:Never
 
 let _tezos_sapling_js_tests =
   test
@@ -1659,6 +1663,7 @@ let _tezos_sapling_js_tests =
     ~linkall:true
     ~modes:[JS]
     ~js_compatible:true
+    ~opam_with_test:Never
 
 let _tezos_sapling_ctypes_gen =
   private_exes
@@ -1669,6 +1674,7 @@ let _tezos_sapling_ctypes_gen =
     ~deps:[ctypes_stubs; ctypes]
     ~modules:
       ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
+    ~opam_with_test:Never
 
 let tezos_protocol_environment_sigs_stdlib_compat =
   public_lib
