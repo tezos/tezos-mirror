@@ -37,9 +37,7 @@ module Context_binary = Tezos_context_memory.Context_binary
 (*
 
    We first instantiate an arithmetic PVM capable of generating
-   proofs.
-
-*)
+(* We first instantiate an arithmetic PVM capable of generating proofs. *)
 module Tree :
   Protocol.Environment.Context.TREE
     with type t = Context_binary.t
@@ -82,7 +80,7 @@ module Arith_Context = struct
     (* FIXME: With on-disk context, we cannot commit the empty
        context. Is it also true in our case? *)
     let* context = Context_binary.add_tree context [] tree in
-    let _ = Context_binary.commit ~time:Time.Protocol.epoch context in
+    let* _hash = Context_binary.commit ~time:Time.Protocol.epoch context in
     let index = Context_binary.index context in
     match Context_binary.Tree.kinded_key tree with
     | Some k ->
@@ -105,8 +103,10 @@ module FullArithPVM = Sc_rollup_arith.Make (Arith_Context)
 open FullArithPVM
 
 let setup boot_sector f =
+  let open Lwt_syntax in
   let ctxt = Context_binary.empty in
-  initial_state ctxt boot_sector >>= fun state -> f ctxt state
+  let* state = initial_state ctxt boot_sector in
+  f ctxt state
 
 let pre_boot boot_sector f =
   parse_boot_sector boot_sector |> function
@@ -316,9 +316,9 @@ let test_output_messages_proofs ~valid (source, expected_outputs) =
       payload = source;
     }
   in
-  set_input input state >>= fun state ->
-  eval state >>= fun state ->
-  go ~max_steps:10000 WaitingForInputMessage state >>=? fun state ->
+  let*! state = set_input input state in
+  let*! state = eval state in
+  let* state = go ~max_steps:10000 WaitingForInputMessage state in
   let check_output output =
     let*! result = produce_output_proof ctxt state output in
     if valid then
@@ -330,9 +330,9 @@ let test_output_messages_proofs ~valid (source, expected_outputs) =
     else
       match result with
       | Ok proof ->
-          let*! valid = verify_output_proof proof in
-          fail_unless
-            (not valid)
+          let*! proof_is_valid = verify_output_proof proof in
+          fail_when
+            proof_is_valid
             (Exn (Failure "A wrong output proof is valid."))
       | Error _ -> return ()
   in
@@ -351,7 +351,7 @@ let make_output ~counter n =
   and payload = Atomic_transaction_batch {transactions} in
   Sc_rollup_PVM_sem.{message_counter; payload}
 
-let valid_output_messages =
+let test_valid_output_messages () =
   [
     ("1", []);
     ("1 out", [make_output ~counter:0 1]);
@@ -364,8 +364,9 @@ let valid_output_messages =
         make_output ~counter:2 2;
       ] );
   ]
+  |> List.iter_es (test_output_messages_proofs ~valid:true)
 
-let invalid_output_messages =
+let test_invalid_output_messages () =
   [
     ("1", [make_output ~counter:0 1]);
     ("1 out", [make_output ~counter:1 1]);
@@ -377,18 +378,7 @@ let invalid_output_messages =
         make_output ~counter:2 3;
       ] );
   ]
-
-let test_output_messages () =
-  let open Lwt_result_syntax in
-  let* () =
-    List.iter_es (test_output_messages_proofs ~valid:true) valid_output_messages
-  in
-  let* () =
-    List.iter_es
-      (test_output_messages_proofs ~valid:false)
-      invalid_output_messages
-  in
-  return ()
+  |> List.iter_es (test_output_messages_proofs ~valid:false)
 
 let tests =
   [
@@ -397,5 +387,6 @@ let tests =
     Tztest.tztest "Input message" `Quick test_input_message;
     Tztest.tztest "Parsing message" `Quick test_parsing_messages;
     Tztest.tztest "Evaluating message" `Quick test_evaluation_messages;
-    Tztest.tztest "Output message" `Quick test_output_messages;
+    Tztest.tztest "Valid output messages" `Quick test_valid_output_messages;
+    Tztest.tztest "Invalid output messages" `Quick test_invalid_output_messages;
   ]

@@ -295,15 +295,15 @@ module type S = sig
   type output_proof
 
   (** [output_of_output_proof proof] returns the [output] that is
-     referred to in [proof]'s statement. *)
+      referred to in [proof]'s statement. *)
   val output_of_output_proof : output_proof -> output
 
   (** [state_of_output_proof proof] returns the [state] hash that is
-     referred to in [proof]'s statement. *)
+      referred to in [proof]'s statement. *)
   val state_of_output_proof : output_proof -> hash
 
   (** [verify_output_proof output_proof] returns [true] iff [proof] is
-     a valid witness that its [output] is part of its [state]'s outbox. *)
+      a valid witness that its [output] is part of its [state]'s outbox. *)
   val verify_output_proof : output_proof -> bool Lwt.t
 
   (** [produce_output_proof ctxt state output] returns a proof

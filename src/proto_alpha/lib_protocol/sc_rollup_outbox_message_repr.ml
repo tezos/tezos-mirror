@@ -85,17 +85,21 @@ let encoding =
     (fun transactions -> Atomic_transaction_batch {transactions})
     (obj1 (req "transactions" (list transaction_encoding)))
 
-let pp_transaction fmt transaction =
+let pp_transaction fmt {destination; entrypoint; unparsed_parameters = _} =
   Format.fprintf
     fmt
     "@[%a@;%a@]"
     Contract_hash.pp
-    transaction.destination
+    destination
     Entrypoint_repr.pp
-    transaction.entrypoint
+    entrypoint
 
 let pp fmt (Atomic_transaction_batch {transactions}) =
-  Format.pp_print_list pp_transaction fmt transactions
+  Format.pp_print_list
+    ~pp_sep:Format.pp_print_space
+    pp_transaction
+    fmt
+    transactions
 
 let of_bytes bytes =
   let open Tzresult_syntax in
