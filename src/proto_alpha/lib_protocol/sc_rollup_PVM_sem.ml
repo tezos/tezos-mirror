@@ -288,7 +288,7 @@ module type S = sig
         - the [context] for this instance of the PVM doesn't have access
         to enough of the [state] to build the proof. *)
   val produce_proof :
-    context -> input option -> state -> (proof, string) result Lwt.t
+    context -> input option -> state -> (proof, error) result Lwt.t
 
   (** The following type is inhabited by the proofs that a given [output]
       is part of the outbox of a given [state]. *)
@@ -310,5 +310,5 @@ module type S = sig
       that witnesses the fact that [output] is part of [state]'s
       outbox. *)
   val produce_output_proof :
-    context -> state -> output -> (output_proof, string) result Lwt.t
+    context -> state -> output -> (output_proof, error) result Lwt.t
 end

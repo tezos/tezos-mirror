@@ -257,8 +257,7 @@ end) : TestPVM with type state = int = struct
 
   let verify_proof proof = return proof.valid
 
-  let produce_proof _ _ _ =
-    return (Result.error "Dummy PVM can't produce proof")
+  let produce_proof _ _ _ = Stdlib.failwith "Dummy PVM can't produce proof"
 
   type output_proof = unit
 
@@ -341,8 +340,7 @@ end) : TestPVM with type state = string * int list = struct
 
   let verify_proof proof = return proof.valid
 
-  let produce_proof _ _ _ =
-    return (Result.error "Dummy PVM can't produce proof")
+  let produce_proof _ _ _ = Stdlib.failwith "Dummy PVM can't produce proof"
 
   type output_proof = unit
 

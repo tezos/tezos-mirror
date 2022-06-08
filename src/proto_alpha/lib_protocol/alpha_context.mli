@@ -2576,7 +2576,7 @@ module Sc_rollup : sig
       val verify_proof : proof -> bool Lwt.t
 
       val produce_proof :
-        context -> input option -> state -> (proof, string) result Lwt.t
+        context -> input option -> state -> (proof, error) result Lwt.t
 
       type output_proof
 
@@ -2587,7 +2587,7 @@ module Sc_rollup : sig
       val verify_output_proof : output_proof -> bool Lwt.t
 
       val produce_output_proof :
-        context -> state -> output -> (output_proof, string) result Lwt.t
+        context -> state -> output -> (output_proof, error) result Lwt.t
     end
 
     type t = (module S)
@@ -2694,7 +2694,7 @@ module Sc_rollup : sig
       val get_status : state -> status Lwt.t
 
       val produce_proof :
-        context -> input option -> state -> (proof, string) result Lwt.t
+        context -> input option -> state -> (proof, error) result Lwt.t
     end
 
     module ProtocolImplementation :
@@ -2930,7 +2930,7 @@ module Sc_rollup : sig
       (module PVM_with_context_and_state) ->
       Sc_rollup_inbox_repr.t ->
       Raw_level_repr.t ->
-      (t, string) result Lwt.t
+      (t, error) result Lwt.t
   end
 
   module Game : sig
@@ -2993,7 +2993,7 @@ module Sc_rollup : sig
       State_hash.t option ->
       Tick.t ->
       (State_hash.t option * Tick.t) list ->
-      (unit, string) result Lwt.t
+      (unit, error) result Lwt.t
 
     val play : t -> refutation -> (outcome, t) Either.t Lwt.t
   end

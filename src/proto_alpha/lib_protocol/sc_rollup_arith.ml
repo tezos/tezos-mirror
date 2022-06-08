@@ -1045,15 +1045,17 @@ module Make (Context : P) :
     | Some (_, request) ->
         return (PS.input_request_equal request proof.requested)
 
+  type error += Arith_proof_production_failed
+
   let produce_proof context input_given state =
-    let open Lwt_syntax in
-    let* result =
+    let open Lwt_result_syntax in
+    let*! result =
       Context.produce_proof context state (step_transition input_given)
     in
     match result with
     | Some (tree_proof, requested) ->
-        return (Result.ok {tree_proof; given = input_given; requested})
-    | None -> return (Result.error "Context.produce_proof returned None")
+        return {tree_proof; given = input_given; requested}
+    | None -> fail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)
 
@@ -1083,6 +1085,10 @@ module Make (Context : P) :
     in
     match result with None -> return false | Some _ -> return true
 
+  type error += Arith_output_proof_production_failed
+
+  type error += Arith_invalid_claim_about_outbox
+
   let produce_output_proof context state output_proof_output =
     let open Lwt_result_syntax in
     let*! output_proof_state = state_hash state in
@@ -1092,10 +1098,8 @@ module Make (Context : P) :
     match result with
     | Some (output_proof, true) ->
         return {output_proof; output_proof_state; output_proof_output}
-    | Some (_, false) ->
-        Lwt.return (Result.error "The claim about output does not hold.")
-    | None ->
-        Lwt.return (Result.error "Unable to produce a proof about output.")
+    | Some (_, false) -> fail Arith_invalid_claim_about_outbox
+    | None -> fail Arith_output_proof_production_failed
 end
 
 module ProtocolImplementation = Make (struct

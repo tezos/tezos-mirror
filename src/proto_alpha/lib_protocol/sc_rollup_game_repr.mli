@@ -293,7 +293,7 @@ val find_choice :
     * Sc_rollup_tick_repr.t
     * Sc_rollup_repr.State_hash.t option
     * Sc_rollup_tick_repr.t,
-    string )
+    error )
   result
   Lwt.t
 
@@ -320,7 +320,7 @@ val check_dissection :
   Sc_rollup_repr.State_hash.t option ->
   Sc_rollup_tick_repr.t ->
   (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
-  (unit, string) result Lwt.t
+  (unit, error) result Lwt.t
 
 (** Applies the move [refutation] to the game. Checks the move is
     valid and returns an [Invalid_move] outcome if not.

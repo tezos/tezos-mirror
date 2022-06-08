@@ -357,7 +357,7 @@ module Proof : sig
     Raw_level_repr.t * Z.t ->
     inbox ->
     t ->
-    (Sc_rollup_PVM_sem.input option, string) result Lwt.t
+    (Sc_rollup_PVM_sem.input option, error) result Lwt.t
 
   (** TODO #2997 Currently a placeholder, needs implementation.
 
@@ -368,5 +368,5 @@ module Proof : sig
   val produce_proof :
     inbox ->
     Raw_level_repr.t * Z.t ->
-    (t * Sc_rollup_PVM_sem.input option, string) result Lwt.t
+    (t * Sc_rollup_PVM_sem.input option, error) result Lwt.t
 end

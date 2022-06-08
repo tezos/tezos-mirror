@@ -59,9 +59,15 @@ let cut_at_level level input =
   let input_level = Sc_rollup_PVM_sem.(input.inbox_level) in
   if Raw_level_repr.(level <= input_level) then None else Some input
 
+type error += Sc_rollup_proof_check of string
+
+let proof_error reason =
+  let open Lwt_result_syntax in
+  fail (Sc_rollup_proof_check reason)
+
 let check p reason =
   let open Lwt_result_syntax in
-  if p then return () else fail reason
+  if p then return () else proof_error reason
 
 let valid snapshot commit_level ~pvm_name proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
@@ -83,7 +89,7 @@ let valid snapshot commit_level ~pvm_name proof =
           snapshot
           inbox_proof
     | _ ->
-        fail
+        proof_error
           (Format.asprintf
              "input_requested is %a, inbox proof is %a"
              Sc_rollup_PVM_sem.pp_input_request
@@ -109,10 +115,12 @@ module type PVM_with_context_and_state = sig
   val state : state
 end
 
+type error += Proof_cannot_be_wrap
+
 let produce pvm_and_state inbox commit_level =
   let open Lwt_result_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
-  let* request = Lwt.map Result.ok (P.is_input_state P.state) in
+  let*! request = P.is_input_state P.state in
   let* inbox, input_given =
     match request with
     | Sc_rollup_PVM_sem.No_input_required -> return (None, None)
@@ -136,4 +144,4 @@ let produce pvm_and_state inbox commit_level =
   end in
   match Sc_rollups.wrap_proof (module P_with_proof) with
   | Some pvm_step -> return {pvm_step; inbox}
-  | None -> fail "Could not wrap proof"
+  | None -> fail Proof_cannot_be_wrap

@@ -34,9 +34,6 @@
 open Protocol
 module Context_binary = Tezos_context_memory.Context_binary
 
-(*
-
-   We first instantiate an arithmetic PVM capable of generating
 (* We first instantiate an arithmetic PVM capable of generating proofs. *)
 module Tree :
   Protocol.Environment.Context.TREE
@@ -326,7 +323,7 @@ let test_output_messages_proofs ~valid (source, expected_outputs) =
       | Ok proof ->
           let*! valid = verify_output_proof proof in
           fail_unless valid (Exn (Failure "An output proof is not valid."))
-      | Error err -> failwith "Unexpected error: %s" err
+      | Error _ -> failwith "Error during proof generation"
     else
       match result with
       | Ok proof ->

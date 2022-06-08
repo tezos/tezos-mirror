@@ -800,8 +800,16 @@ module Proof = struct
     | `Node h -> Hash.(equal (of_context_hash h) hash)
     | `Value h -> Hash.(equal (of_context_hash h) hash)
 
-  let drop_error result reason =
-    Lwt.map (Result.map_error (fun _ -> reason)) result
+  type error += Inbox_proof_error of string
+
+  let proof_error reason =
+    let open Lwt_result_syntax in
+    fail (Inbox_proof_error reason)
+
+  let drop_error promise reason =
+    let open Lwt_tzresult_syntax in
+    let*! result = promise in
+    match result with Ok r -> return r | Error _ -> proof_error reason
 
   let rec valid (l, n) inbox proof =
     assert (Z.(geq n zero)) ;
@@ -825,20 +833,20 @@ module Proof = struct
           match payload with
           | None ->
               if equal proof.level inbox then return None
-              else fail "payload is None, inbox proof.level not top"
+              else proof_error "payload is None, inbox proof.level not top"
           | Some msg ->
               return
               @@ Some
                    Sc_rollup_PVM_sem.
                      {inbox_level = l; message_counter = n; payload = msg}
-        else fail "Inbox proof parameters don't match (message level)"
+        else proof_error "Inbox proof parameters don't match (message level)"
     | Some (level, inc, remaining_proof) ->
         if
           verify_inclusion_proof inc level (bottom_level remaining_proof)
           && Raw_level_repr.equal (inbox_level level) l
           && Z.equal level.message_counter n
         then valid (Raw_level_repr.succ l, Z.zero) inbox remaining_proof
-        else fail "Inbox proof parameters don't match (lower level)"
+        else proof_error "Inbox proof parameters don't match (lower level)"
 
   (* TODO #2997 This needs to be implemented when the inbox structure is
      improved. *)

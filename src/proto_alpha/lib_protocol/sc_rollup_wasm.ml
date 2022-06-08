@@ -421,15 +421,17 @@ module V2_0_0 = struct
       | Some (_, request) ->
           return (PS.input_request_equal request proof.requested)
 
+    type error += WASM_proof_production_failed
+
     let produce_proof context input_given state =
-      let open Lwt_syntax in
-      let* result =
+      let open Lwt_result_syntax in
+      let*! result =
         Context.produce_proof context state (step_transition input_given)
       in
       match result with
       | Some (tree_proof, requested) ->
-          return (Result.ok {tree_proof; given = input_given; requested})
-      | None -> return (Result.error "Context.produce_proof returned None")
+          return {tree_proof; given = input_given; requested}
+      | None -> fail WASM_proof_production_failed
 
     type output_proof = {
       output_proof_state : hash;
