@@ -2617,6 +2617,19 @@ let _tezos_webassembly_repl =
     ~opam:""
     ~deps:[tezos_webassembly_interpreter |> open_]
 
+let _tezos_webassembly_test =
+  test
+    "main"
+    ~path:"src/lib_webassembly/test"
+    ~opam:"tezos-webassembly-interpreter"
+    ~deps:
+      [
+        tezos_webassembly_interpreter |> open_;
+        qcheck_core;
+        qcheck_alcotest;
+        alcotest;
+      ]
+
 let _tezos_scoru_wasm =
   public_lib
     "tezos-scoru-wasm"

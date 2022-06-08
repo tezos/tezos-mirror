@@ -22,6 +22,7 @@ let table_error at = function
   | Table.SizeOverflow -> "table size overflow"
   | Table.SizeLimit -> "table size limit reached"
   | Table.Type -> Crash.error at "type mismatch at table access"
+  | Lazy_map.UnexpectedAccess -> "unexpected access in lazy map"
   | exn -> raise exn
 
 let memory_error at = function
@@ -29,6 +30,7 @@ let memory_error at = function
   | Memory.SizeOverflow -> "memory size overflow"
   | Memory.SizeLimit -> "memory size limit reached"
   | Memory.Type -> Crash.error at "type mismatch at memory access"
+  | Lazy_map.UnexpectedAccess -> "unexpected access in lazy map"
   | exn -> raise exn
 
 let numeric_error at = function

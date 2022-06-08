@@ -7,6 +7,8 @@ module type KeyS = sig
 
   val sub : t -> t -> t
 
+  val pred : t -> t
+
   val succ : t -> t
 
   val to_string : t -> string
@@ -29,7 +31,11 @@ module type S = sig
 
   val set : key -> 'a -> 'a t -> 'a t
 
+  val cons : 'a -> 'a t -> 'a t
+
   val grow : ?produce_value:(key -> 'a) -> key -> 'a t -> 'a t
+
+  val concat : 'a t -> 'a t -> 'a t
 end
 
 exception UnexpectedAccess
@@ -40,7 +46,8 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   type key = Key.t
 
   type 'a t = {
-    num_elements: Key.t;
+    first : Key.t;
+    num_elements : Key.t;
     produce_value : Key.t -> 'a;
     mutable values : 'a Map.t
   }
@@ -50,7 +57,7 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   let def_produce_value _ = raise UnexpectedAccess
 
   let create ?(values = Map.empty) ?(produce_value = def_produce_value) num_elements =
-    { num_elements; produce_value; values }
+    { first = Key.zero; num_elements; produce_value; values }
 
   let of_list values =
     let fold (map, len) value =
@@ -61,11 +68,12 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     in
     create ~values num_elements
 
+  let invalid_key key map =
+    Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
+
   let get key map =
-    if
-      Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
-    then
-      raise Memory_exn.Bounds;
+    if invalid_key key map then raise Memory_exn.Bounds;
+    let key = Key.add map.first key in
     match Map.find_opt key map.values with
     | None ->
       (* Need to create the missing key-value association. *)
@@ -76,11 +84,15 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
       value
 
   let set key value map =
-    if
-      Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
-    then
-      raise Memory_exn.Bounds;
+    if invalid_key key map then raise Memory_exn.Bounds;
+    let key = Key.add map.first key in
     { map with values = Map.add key value map.values }
+
+  let cons value map =
+    let first = Key.pred map.first in
+    let values = Map.add first value map.values in
+    let num_elements = Key.succ map.num_elements in
+    { map with first; values; num_elements }
 
   let grow ?produce_value delta map =
     (* Make sure we only grow and never shrink. *)
@@ -88,8 +100,13 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
       let produce_value =
         match produce_value with
         | Some produce_new_value ->
+          let boundary = Key.add map.num_elements map.first in
           fun key ->
-            if Key.compare key map.num_elements >= 0 then
+            if Key.compare key boundary >= 0 then
+              (* Normalize the key so that it is relative to the boundary.
+                 The first new value will be produced with
+                 [produce_value Key.zero]. *)
+              let key = Key.sub key boundary in
               produce_new_value key
             else
               map.produce_value key
@@ -99,9 +116,29 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
       { map with produce_value; num_elements }
     else
       map
+
+  let concat lhs rhs =
+    let boundary = Key.add lhs.first lhs.num_elements in
+    let produce_value key =
+      if Key.compare key boundary >= 0 then
+        rhs.produce_value (Key.sub key boundary |> Key.add rhs.first)
+      else
+        lhs.produce_value key
+    in
+    let num_elements = Key.add lhs.num_elements rhs.num_elements in
+    let rhs_offset = Key.sub boundary rhs.first in
+    let values =
+      Map.fold
+        (fun rhs_key -> Map.add (Key.add rhs_key rhs_offset))
+        rhs.values (* fold subject *)
+        lhs.values (* accumulator *)
+    in
+    { lhs with num_elements; produce_value; values }
 end
 
 module IntMap = Make (Int)
+
+module Int32Map = Make (Int32)
 
 module Int64Map = Make (Int64)
 
@@ -150,6 +187,8 @@ module Mutable = struct
   end
 
   module IntMap = Make (Int)
+
+  module Int32Map = Make (Int32)
 
   module Int64Map = Make (Int64)
 end
