@@ -503,3 +503,11 @@ module Tx_rollup = struct
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
   end
 end
+
+module Dal = struct
+  module Parameters = struct
+    let parameter_file protocol =
+      let args = [(["dal_parametric"; "feature_enable"], Some "true")] in
+      Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
+  end
+end
