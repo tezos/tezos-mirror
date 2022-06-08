@@ -109,7 +109,7 @@ module Kind = struct
   type sc_rollup_execute_outbox_message =
     | Sc_rollup_execute_outbox_message_kind
 
-  type sc_rollup_return_bond = Sc_rollup_return_bond_kind
+  type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
   type 'a manager =
     | Reveal_manager_kind : reveal manager
@@ -139,7 +139,7 @@ module Kind = struct
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
-    | Sc_rollup_return_bond_manager_kind : sc_rollup_return_bond manager
+    | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
 end
 
 type 'a consensus_operation_type =
@@ -428,10 +428,10 @@ and _ manager_operation =
       message : string;
     }
       -> Kind.sc_rollup_execute_outbox_message manager_operation
-  | Sc_rollup_return_bond : {
+  | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup_repr.t;
     }
-      -> Kind.sc_rollup_return_bond manager_operation
+      -> Kind.sc_rollup_recover_bond manager_operation
 
 and counter = Z.t
 
@@ -463,7 +463,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_timeout _ -> Kind.Sc_rollup_timeout_manager_kind
   | Sc_rollup_execute_outbox_message _ ->
       Kind.Sc_rollup_execute_outbox_message_manager_kind
-  | Sc_rollup_return_bond _ -> Kind.Sc_rollup_return_bond_manager_kind
+  | Sc_rollup_recover_bond _ -> Kind.Sc_rollup_recover_bond_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -553,7 +553,7 @@ let sc_rollup_operation_timeout_tag = sc_rollup_operation_tag_offset + 5
 
 let sc_rollup_operation_atomic_batch_tag = sc_rollup_operation_tag_offset + 6
 
-let sc_rollup_operation_return_bond_tag = sc_rollup_operation_tag_offset + 7
+let sc_rollup_operation_recover_bond_tag = sc_rollup_operation_tag_offset + 7
 
 let dal_offset = 230
 
@@ -1145,17 +1145,17 @@ module Encoding = struct
                 });
         }
 
-    let[@coq_axiom_with_reason "gadt"] sc_rollup_return_bond_case =
+    let[@coq_axiom_with_reason "gadt"] sc_rollup_recover_bond_case =
       MCase
         {
-          tag = sc_rollup_operation_return_bond_tag;
-          name = "sc_rollup_return_bond";
+          tag = sc_rollup_operation_recover_bond_tag;
+          name = "sc_rollup_recover_bond";
           encoding = obj1 (req "rollup" Sc_rollup_repr.Address.encoding);
           select =
             (function
-            | Manager (Sc_rollup_return_bond _ as op) -> Some op | _ -> None);
-          proj = (function Sc_rollup_return_bond {sc_rollup} -> sc_rollup);
-          inj = (fun sc_rollup -> Sc_rollup_return_bond {sc_rollup});
+            | Manager (Sc_rollup_recover_bond _ as op) -> Some op | _ -> None);
+          proj = (function Sc_rollup_recover_bond {sc_rollup} -> sc_rollup);
+          inj = (fun sc_rollup -> Sc_rollup_recover_bond {sc_rollup});
         }
   end
 
@@ -1560,10 +1560,10 @@ module Encoding = struct
       sc_rollup_operation_atomic_batch_tag
       Manager_operations.sc_rollup_execute_outbox_message_case
 
-  let sc_rollup_return_bond_case =
+  let sc_rollup_recover_bond_case =
     make_manager_case
-      sc_rollup_operation_return_bond_tag
-      Manager_operations.sc_rollup_return_bond_case
+      sc_rollup_operation_recover_bond_tag
+      Manager_operations.sc_rollup_recover_bond_case
 
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
@@ -1611,7 +1611,7 @@ module Encoding = struct
            make sc_rollup_refute_case;
            make sc_rollup_timeout_case;
            make sc_rollup_execute_outbox_message_case;
-           make sc_rollup_return_bond_case;
+           make sc_rollup_recover_bond_case;
          ]
 
   let contents_list_encoding =
@@ -1839,8 +1839,8 @@ let equal_manager_operation_kind :
   | Sc_rollup_execute_outbox_message _, Sc_rollup_execute_outbox_message _ ->
       Some Eq
   | Sc_rollup_execute_outbox_message _, _ -> None
-  | Sc_rollup_return_bond _, Sc_rollup_return_bond _ -> Some Eq
-  | Sc_rollup_return_bond _, _ -> None
+  | Sc_rollup_recover_bond _, Sc_rollup_recover_bond _ -> Some Eq
+  | Sc_rollup_recover_bond _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =

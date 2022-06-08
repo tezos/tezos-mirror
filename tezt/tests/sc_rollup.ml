@@ -1400,16 +1400,16 @@ let attempt_withdraw_stake =
     *)
     let bootstrap1_key = Constant.bootstrap1.public_key_hash in
     let* constants = RPC.get_constants ~hooks client in
-    let return_bond_unfreeze =
+    let recover_bond_unfreeze =
       JSON.(constants |-> "sc_rollup_stake_amount" |> as_int)
     in
-    let return_bond_fee = 1_000_000 in
+    let recover_bond_fee = 1_000_000 in
     let inject_op () =
-      Client.Sc_rollup.submit_return_bond
+      Client.Sc_rollup.submit_recover_bond
         ~hooks
         ~rollup:sc_rollup_address
         ~src:bootstrap1_key
-        ~fee:(Tez.of_mutez_int return_bond_fee)
+        ~fee:(Tez.of_mutez_int recover_bond_fee)
         client
     in
     match expect_failure with
@@ -1419,10 +1419,10 @@ let attempt_withdraw_stake =
         let* () = Client.bake_for_and_wait ~keys:["bootstrap2"] client in
         let* new_bal = contract_balances ~pkh:bootstrap1_key client in
         let expected_liq_new_bal =
-          old_bal.liquid - return_bond_fee + return_bond_unfreeze
+          old_bal.liquid - recover_bond_fee + recover_bond_unfreeze
         in
         check_eq_int new_bal.liquid expected_liq_new_bal ;
-        check_eq_int new_bal.frozen (old_bal.frozen - return_bond_unfreeze) ;
+        check_eq_int new_bal.frozen (old_bal.frozen - recover_bond_unfreeze) ;
         unit
     | Some failure_string ->
         let*? p = inject_op () in

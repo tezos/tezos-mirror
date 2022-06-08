@@ -797,7 +797,7 @@ val sc_rollup_execute_outbox_message :
   result
   Lwt.t
 
-val sc_rollup_return_bond :
+val sc_rollup_recover_bond :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -816,7 +816,7 @@ val sc_rollup_return_bond :
   sc_rollup:Sc_rollup.t ->
   unit ->
   (Operation_hash.t
-  * Kind.sc_rollup_return_bond Kind.manager contents
-  * Kind.sc_rollup_return_bond Kind.manager Apply_results.contents_result)
+  * Kind.sc_rollup_recover_bond Kind.manager contents
+  * Kind.sc_rollup_recover_bond Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t

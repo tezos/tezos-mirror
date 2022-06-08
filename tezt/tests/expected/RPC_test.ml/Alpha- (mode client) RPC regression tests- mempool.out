@@ -6149,13 +6149,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           },
                           {
-                            "title": "Sc_rollup_return_bond",
+                            "title": "Sc_rollup_recover_bond",
                             "type": "object",
                             "properties": {
                               "kind": {
                                 "type": "string",
                                 "enum": [
-                                  "sc_rollup_return_bond"
+                                  "sc_rollup_recover_bond"
                                 ]
                               },
                               "source": {
@@ -10536,7 +10536,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 }
                               ],
-                              "name": "Sc_rollup_return_bond"
+                              "name": "Sc_rollup_recover_bond"
                             },
                             {
                               "tag": 230,
@@ -21621,13 +21621,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           },
                           {
-                            "title": "Sc_rollup_return_bond",
+                            "title": "Sc_rollup_recover_bond",
                             "type": "object",
                             "properties": {
                               "kind": {
                                 "type": "string",
                                 "enum": [
-                                  "sc_rollup_return_bond"
+                                  "sc_rollup_recover_bond"
                                 ]
                               },
                               "source": {

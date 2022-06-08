@@ -804,7 +804,7 @@ let sc_rollup_execute_outbox_message ?counter ?fee ?gas_limit ?storage_limit
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk ctxt to_sign_op
 
-let sc_rollup_return_bond ?counter ?fee ?gas_limit ?storage_limit ctxt
+let sc_rollup_recover_bond ?counter ?fee ?gas_limit ?storage_limit ctxt
     (source : Contract.t) (sc_rollup : Sc_rollup.t) =
   manager_operation
     ?counter
@@ -813,7 +813,7 @@ let sc_rollup_return_bond ?counter ?fee ?gas_limit ?storage_limit ctxt
     ?storage_limit
     ~source
     ctxt
-    (Sc_rollup_return_bond {sc_rollup})
+    (Sc_rollup_recover_bond {sc_rollup})
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op

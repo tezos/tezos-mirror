@@ -205,27 +205,27 @@ let check_balances_evolution bal_before {liquid; frozen} ~action =
   let* () = Assert.equal_tez ~loc:__LOC__ expected_frozen frozen in
   return ()
 
-let attempt_to_return_bond i contract rollup =
-  let* return_bond_op = Op.sc_rollup_return_bond (I i) contract rollup in
-  let* i = Incremental.add_operation i return_bond_op in
+let attempt_to_recover_bond i contract rollup =
+  let* recover_bond_op = Op.sc_rollup_recover_bond (I i) contract rollup in
+  let* i = Incremental.add_operation i recover_bond_op in
   let* b = Incremental.finalize_block i in
   return b
 
-let return_bond_not_lcc i contract rollup =
+let recover_bond_not_lcc i contract rollup =
   assert_fails_with
     ~__LOC__
-    (attempt_to_return_bond i contract rollup)
+    (attempt_to_recover_bond i contract rollup)
     Sc_rollup_errors.Sc_rollup_not_staked_on_lcc
 
-let return_bond_not_staked i contract rollup =
+let recover_bond_not_staked i contract rollup =
   assert_fails_with
     ~__LOC__
-    (attempt_to_return_bond i contract rollup)
+    (attempt_to_recover_bond i contract rollup)
     Sc_rollup_errors.Sc_rollup_not_staked
 
-let return_bond_with_success i contract rollup =
+let recover_bond_with_success i contract rollup =
   let* bal_before = balances (I i) contract in
-  let* b = attempt_to_return_bond i contract rollup in
+  let* b = attempt_to_recover_bond i contract rollup in
   let* bal_after = balances (B b) contract in
   let* constants = Context.get_constants (I i) in
   let* () =
@@ -236,17 +236,17 @@ let return_bond_with_success i contract rollup =
   in
   return b
 
-(** [test_publish_cement_and_return_bond] creates a rollup, publishes a
+(** [test_publish_cement_and_recover_bond] creates a rollup, publishes a
     commitment and then [challenge_window_in_blocks] blocks later cements
     that commitment.
     The comitter tries to withdraw stake before and after cementing. Only the
     second attempt is expected to succeed. *)
-let test_publish_cement_and_return_bond () =
+let test_publish_cement_and_recover_bond () =
   let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
   let* i = Incremental.begin_construction ctxt in
   (* not staked yet *)
-  let* () = return_bond_not_staked i contract rollup in
+  let* () = recover_bond_not_staked i contract rollup in
   let* c = dummy_commitment i rollup in
   let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
   let* i = Incremental.add_operation i operation in
@@ -258,7 +258,7 @@ let test_publish_cement_and_return_bond () =
   let* i = Incremental.begin_construction b in
   let hash = Sc_rollup.Commitment.hash c in
   (* stake not on LCC *)
-  let* () = return_bond_not_lcc i contract rollup in
+  let* () = recover_bond_not_lcc i contract rollup in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* i = Incremental.add_operation i cement_op in
   let* b = Incremental.finalize_block i in
@@ -270,11 +270,11 @@ let test_publish_cement_and_return_bond () =
     in
     Incremental.begin_construction b ~policy:(Excluding [pkh])
   in
-  (* return bond should succeed *)
-  let* b = return_bond_with_success i contract rollup in
+  (* recover bond should succeed *)
+  let* b = recover_bond_with_success i contract rollup in
   let* i = Incremental.begin_construction b in
   (* not staked anymore *)
-  let* () = return_bond_not_staked i contract rollup in
+  let* () = recover_bond_not_staked i contract rollup in
   return_unit
 
 (** [test_publish_fails_on_backtrack] creates a rollup and then
@@ -519,7 +519,7 @@ let tests =
     Tztest.tztest
       "can publish a commit, cement it and withdraw stake"
       `Quick
-      test_publish_cement_and_return_bond;
+      test_publish_cement_and_recover_bond;
     Tztest.tztest
       "publish will fail if staker is backtracking"
       `Quick
