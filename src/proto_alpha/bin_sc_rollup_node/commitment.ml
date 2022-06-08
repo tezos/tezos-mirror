@@ -151,45 +151,7 @@ let update_last_stored_commitment store (commitment : Sc_rollup.Commitment.t) =
     Commitment_event.commitment_will_not_be_published lcc_level commitment
   else return ()
 
-module type S = sig
-  module PVM : Pvm.S
-
-  val process_head :
-    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
-
-  (** [get_last_cemented_commitment_hash_with_level node_ctxt store]
-      fetches and stores information about the last cemented commitment
-      in the layer1 chain.
-    *)
-  val get_last_cemented_commitment_hash_with_level :
-    Node_context.t -> Store.t -> unit tzresult Lwt.t
-
-  (** [publish_commitment node_ctxt store] publishes the earliest commitment
-      stored in [store] that has not been published yet, unless its inbox level
-      is below or equal to the inbox level of the last cemented commitment in
-      the layer1 chain. In this case, the rollup node checks whether it has
-      computed a commitment whose inbox level is
-      [sc_rollup_commitment_period] levels after the inbox level of the last
-      cemented commitment:
-      {ul
-      {li if the commitment is found and its predecessor hash coincides with
-       the hash of the LCC, the rollup node will try to publish that commitment
-      instead; }
-      {li if the commitment is found but its predecessor hash differs from the
-        hash of the LCC, the rollup node will stop its execution;}
-      {li if no commitment is found, no action is taken by the rollup node;
-        in particular, no commitment is published.}
-    }
-  *)
-  val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
-
-  val cement_commitment_if_possible :
-    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
-
-  val start : unit -> unit Lwt.t
-end
-
-module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
+module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   module PVM = PVM
 
   let build_commitment ~origination_level store block_hash =
