@@ -2646,8 +2646,18 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
+    type 'a proof = {
+      tree_proof : 'a;
+      given : input option;
+      requested : input_request;
+    }
+
     module Make (C : P) : sig
-      include PVM.S with type context = C.Tree.t and type state = C.tree
+      include
+        PVM.S
+          with type context = C.Tree.t
+           and type state = C.tree
+           and type proof = C.proof proof
 
       val get_tick : state -> Tick.t Lwt.t
 
@@ -2658,6 +2668,12 @@ module Sc_rollup : sig
       val produce_proof :
         context -> input option -> state -> (proof, string) result Lwt.t
     end
+
+    module ProtocolImplementation :
+      PVM.S
+        with type context = Context.t
+         and type state = Context.tree
+         and type proof = Context.Proof.tree Context.Proof.t proof
   end
 
   module Number_of_messages : Bounded.Int32.S

@@ -68,39 +68,46 @@ module V2_0_0 = struct
     val get_status : state -> status Lwt.t
   end
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3091
+
+     The tree proof contains enough information to derive given and requested.
+     Get rid of the duplication by writing the projection functions and
+     removing the [given] and [requested] fields.
+  *)
+  type 'a proof = {
+    tree_proof : 'a;
+    given : PS.input option;
+    requested : PS.input_request;
+  }
+
+  let proof_encoding e =
+    let open Data_encoding in
+    conv
+      (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
+      (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
+      (obj3
+         (req "tree_proof" e)
+         (req "given" (option PS.input_encoding))
+         (req "requested" PS.input_request_encoding))
+
   module Make (Context : P) :
-    S with type context = Context.Tree.t and type state = Context.tree = struct
+    S
+      with type context = Context.Tree.t
+       and type state = Context.tree
+       and type proof = Context.proof proof = struct
     module Tree = Context.Tree
 
     type context = Context.Tree.t
 
     type hash = State_hash.t
 
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3091
-
-       The tree proof contains enough information to derive given and requested.
-       Get rid of the duplication by writing the projection functions and
-       removing the [given] and [requested] fields.
-    *)
-    type proof = {
-      tree_proof : Context.proof;
-      given : PS.input option;
-      requested : PS.input_request;
-    }
+    type nonrec proof = Context.proof proof
 
     let proof_input_given p = p.given
 
     let proof_input_requested p = p.requested
 
-    let proof_encoding =
-      let open Data_encoding in
-      conv
-        (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-        (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-        (obj3
-           (req "tree_proof" Context.proof_encoding)
-           (req "given" (option PS.input_encoding))
-           (req "requested" PS.input_request_encoding))
+    let proof_encoding = proof_encoding Context.proof_encoding
 
     let proof_start_state p = Context.proof_before p.tree_proof
 
