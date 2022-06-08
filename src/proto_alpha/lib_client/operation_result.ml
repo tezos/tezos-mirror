@@ -522,6 +522,22 @@ let pp_transaction_result ppf = function
       Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
       pp_paid_storage_size_diff ppf paid_storage_size_diff
 
+let pp_operation_result ~operation_name pp_operation_result ppf = function
+  | Skipped _ -> Format.fprintf ppf "This operation was skipped."
+  | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
+  | Applied op_res ->
+      Format.fprintf
+        ppf
+        "This %s was successfully applied"
+        (operation_name op_res) ;
+      pp_operation_result ppf op_res
+  | Backtracked (op_res, _errs) ->
+      Format.fprintf
+        ppf
+        "This %s was BACKTRACKED, its expected effects were NOT applied."
+        (operation_name op_res) ;
+      pp_operation_result ppf op_res
+
 let pp_manager_operation_contents_result ppf op_result =
   let pp_register_global_constant_result
       (Register_global_constant_result
@@ -740,61 +756,35 @@ let pp_manager_operation_contents_result ppf op_result =
     | Dal_publish_slot_header_result _ as op ->
         pp_dal_publish_slot_header_result op
   in
-  match op_result with
-  | Skipped _ -> Format.fprintf ppf "This operation was skipped."
-  | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
-  | Applied op_res ->
-      Format.fprintf
-        ppf
-        "This %s was successfully applied"
-        (manager_operation_name op_res) ;
-      pp_manager_operation_contents_result ppf op_res
-  | Backtracked (op_res, _errs) ->
-      Format.fprintf
-        ppf
-        "This %s was BACKTRACKED, its expected effects were NOT applied."
-        (manager_operation_name op_res) ;
-      pp_manager_operation_contents_result ppf op_res
+  pp_operation_result
+    ~operation_name:manager_operation_name
+    pp_manager_operation_contents_result
+    ppf
+    op_result
 
-let pp_internal_operation_result (type kind) ppf
-    (op_res : kind internal_manager_operation_result) =
+let pp_internal_operation_and_result ppf
+    (Internal_manager_operation_result (op, res)) =
   let internal_operation_name (type kind) :
       kind successful_internal_manager_operation_result -> string = function
     | ITransaction_result _ -> "transaction"
     | IOrigination_result _ -> "origination"
     | IDelegation_result _ -> "delegation"
   in
-  let pp_internal_operation_contents_result (type kind) ppf
+  let pp_internal_operation_result (type kind) ppf
       (result : kind successful_internal_manager_operation_result) =
     match result with
     | ITransaction_result tx -> pp_transaction_result ppf tx
     | IOrigination_result op_res -> pp_origination_result ppf op_res
     | IDelegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
   in
-  match op_res with
-  | Skipped _ -> Format.fprintf ppf "This operation was skipped."
-  | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
-  | Applied op_res ->
-      Format.fprintf
-        ppf
-        "This %s was successfully applied"
-        (internal_operation_name op_res) ;
-      pp_internal_operation_contents_result ppf op_res
-  | Backtracked (op_res, _errs) ->
-      Format.fprintf
-        ppf
-        "This %s was BACKTRACKED, its expected effects were NOT applied."
-        (internal_operation_name op_res) ;
-      pp_internal_operation_contents_result ppf op_res
-
-let pp_internal_operation_and_result ppf
-    (Internal_manager_operation_result (op, res)) =
   Format.fprintf
     ppf
     "@[<v 2>%a@,%a@]"
     pp_internal_operation
     (Internal_contents op)
-    pp_internal_operation_result
+    (pp_operation_result
+       ~operation_name:internal_operation_name
+       pp_internal_operation_result)
     res
 
 let pp_internal_operation_results_list ppf = function
