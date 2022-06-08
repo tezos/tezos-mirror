@@ -13,7 +13,8 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-PROTOCOLS     = ithaca jakarta alpha
+NAMED_PROTOS  = ithaca jakarta
+PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
@@ -111,9 +112,10 @@ scriptsindoccheck:
 	#scripts/test_doc_scripts.sh use-docker # returns 1 (and eats alot of disk)
 
 sanitycheck:
-	@if grep -Rq alpha 0*; then					\
+	@make clean
+	@if grep -Rq alpha $(NAMED_PROTOS); then					\
 		echo "'alpha' occurs in the docs for released protocols:";	\
-                grep -R alpha 0*;                                               \
+                grep -R alpha $(NAMED_PROTOS);                                               \
 		exit 1;								\
 	fi
 
