@@ -677,15 +677,15 @@ let baking_operation_exception =
   let* () =
     Client.bake_for_and_wait ~context_path:(data_dir // "context") client
   in
-  let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* _ =
-    Operation.inject_delegation
-      ~fee:9_000_000
-      ~source:new_account
-      ~delegate:new_account.public_key_hash
-      client
+    Operation.Manager.(
+      inject
+        [
+          make ~source:new_account ~fee:9_000_000
+          @@ delegation ~delegate:new_account ();
+        ]
+        client)
   in
-  let* () = wait_injection in
   Client.bake_for_and_wait ~context_path:(data_dir // "context") client
 
 let register ~protocols =

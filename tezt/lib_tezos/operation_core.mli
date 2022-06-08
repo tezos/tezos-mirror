@@ -171,6 +171,10 @@ module Manager : sig
      slot. *)
   val dal_publish_slot_header : level:int -> index:int -> header:int -> payload
 
+  (** [delegation ?(delegate=Constant.bootstrap2) ()] builds a
+     delegation operation. *)
+  val delegation : ?delegate:Account.key -> unit -> payload
+
   (** A representation of a manager operation. This includes generic
      parameters common to all manager operations. See {!val:make}. *)
   type t

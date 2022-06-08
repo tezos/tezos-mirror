@@ -170,12 +170,15 @@ module Manager = struct
   type payload =
     | Transfer of {amount : int; dest : Account.key}
     | Dal_publish_slot_header of {level : int; index : int; header : int}
+    | Delegation of {delegate : Account.key}
 
   let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
     Transfer {amount; dest}
 
   let dal_publish_slot_header ~level ~index ~header =
     Dal_publish_slot_header {level; index; header}
+
+  let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
   type t = {
     source : Account.key;
@@ -219,6 +222,8 @@ module Manager = struct
             ]
         in
         [("kind", `String "dal_publish_slot_header"); ("slot", slot)]
+    | Delegation {delegate} ->
+        [("kind", `String "delegation"); ("delegate", json_of_account delegate)]
 
   let json client {source; counter; fee; gas_limit; storage_limit; payload} =
     let* counter =
@@ -270,7 +275,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Dal_publish_slot_header _ ->
+    | Dal_publish_slot_header _ | Delegation _ ->
         let fee = Option.value fee ~default:1_000 in
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:0 in
