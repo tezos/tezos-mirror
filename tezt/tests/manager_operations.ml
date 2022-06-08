@@ -1650,6 +1650,9 @@ module Simple_transfers = struct
   let test_simple_transfers_successive_wrong_counters_no_op_pre =
     Protocol.register_test
       ~__FILE__
+      ~supports:(Protocol.Until_protocol 13)
+        (* This test can be run until proto 14, because the manager
+           restriction 1M is enabled with proto 14 *)
       ~title:
         "Test successive injections with same manager (no operation precheck)"
       ~tags:["transaction"; "transfer"; "counters"; "no_operation_precheck"]
