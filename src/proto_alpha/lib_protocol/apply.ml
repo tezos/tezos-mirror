@@ -1108,16 +1108,6 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
-let prepare_apply_manager_operation_content ~ctxt ~source =
-  let before_operation =
-    (* This context is not used for backtracking. Only to compute
-         gas consumption and originations for the operation result. *)
-    ctxt
-  in
-  Contract.must_exist ctxt source >>=? fun () ->
-  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
-  return (ctxt, before_operation)
-
 let apply_internal_manager_operation_content :
     type kind.
     context ->
@@ -1132,8 +1122,13 @@ let apply_internal_manager_operation_content :
     tzresult
     Lwt.t =
  fun ctxt mode ~payer ~source ~chain_id operation ->
-  prepare_apply_manager_operation_content ~ctxt ~source
-  >>=? fun (ctxt, before_operation) ->
+  let before_operation =
+    (* This context is not used for backtracking, only to compute gas
+       consumption and originations for the operation result. *)
+    ctxt
+  in
+  Contract.must_exist ctxt source >>=? fun () ->
+  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
   let consume_deserialization_gas = Script.When_needed in
   match operation with
   | Transaction_to_contract
@@ -1234,9 +1229,14 @@ let apply_external_manager_operation_content :
     tzresult
     Lwt.t =
  fun ctxt mode ~source ~chain_id ~fee operation ->
+  let before_operation =
+    (* This context is not used for backtracking, only to compute gas
+       consumption and originations for the operation result. *)
+    ctxt
+  in
   let source_contract = Contract.Implicit source in
-  prepare_apply_manager_operation_content ~ctxt ~source:source_contract
-  >>=? fun (ctxt, before_operation) ->
+  Contract.must_exist ctxt source_contract >>=? fun () ->
+  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
   let consume_deserialization_gas =
     (* Note that we used to set this to [Script.When_needed] because
        the deserialization gas was accounted for in the gas consumed
