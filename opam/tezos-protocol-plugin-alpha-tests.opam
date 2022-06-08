@@ -13,7 +13,7 @@ depends: [
   "tezos-base-test-helpers" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "tezos-test-helpers" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.15" }
+  "qcheck-alcotest" { with-test & >= "0.18" }
   "tezos-stdlib-unix" {with-test}
   "tezos-micheline" {with-test}
   "tezos-protocol-plugin-alpha" {with-test}

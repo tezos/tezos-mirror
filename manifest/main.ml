@@ -240,7 +240,7 @@ let prometheus_app_unix = external_sublib prometheus_app "prometheus-app.unix"
 let pyml = external_lib "pyml" V.True
 
 let qcheck_alcotest =
-  external_lib ~js_compatible:true "qcheck-alcotest" V.(at_least "0.15")
+  external_lib ~js_compatible:true "qcheck-alcotest" V.(at_least "0.18")
 
 let qcheck_core = external_lib "qcheck-core" V.True
 

@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.08" }
   "uri"
   "fmt" { >= "0.8.7" }
-  "qcheck-alcotest" { >= "0.15" }
+  "qcheck-alcotest" { >= "0.18" }
   "alcotest" { >= "1.5.0" }
   "lwt" { >= "5.4.0" }
   "pure-splitmix" { = "0.3" }
