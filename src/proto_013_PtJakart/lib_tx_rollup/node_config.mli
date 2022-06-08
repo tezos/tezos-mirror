@@ -64,6 +64,8 @@ type t = {
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
   origination_level : int32 option;
   rpc_addr : P2p_point.Id.t;
+  cors_origins : string list;
+  cors_headers : string list;
   reconnection_delay : float;
   mode : mode;
   signers : signers;

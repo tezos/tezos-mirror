@@ -958,7 +958,7 @@ let run configuration cctxt =
           state.State.constants)
       signers.submit_batch
   in
-  let* _rpc_server = RPC.start configuration state in
+  let* _rpc_server = RPC.start_server configuration state in
   let _ =
     (* Register cleaner callback *)
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (main_exit_callback state)

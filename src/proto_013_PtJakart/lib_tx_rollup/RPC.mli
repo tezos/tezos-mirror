@@ -50,7 +50,7 @@ module Encodings : sig
 end
 
 (** Starts the RPC server of the tx_rollup_node. *)
-val start : Node_config.t -> State.t -> RPC_server.server tzresult Lwt.t
+val start_server : Node_config.t -> State.t -> RPC_server.server tzresult Lwt.t
 
 (** Returns the balance for an l2-address and a ticket. *)
 val balance :
