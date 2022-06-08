@@ -1941,43 +1941,28 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   let source_contract = Contract.Implicit source in
   Contract.must_be_allocated ctxt source_contract >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
-  let consume_deserialization_gas = Script.Always in
-  (* We want to always consume the deserialization gas here, independently of
-     the internal state of the lazy_exprs in the arguments. Otherwise we might
-     risk getting different results if the operation has already been
-     deserialized before (e.g. when retrieve in JSON format). *)
+  let consume_decoding_gas ctxt lexpr =
+    record_trace Gas_quota_exceeded_init_deserialize
+    @@ (* Fail early if the operation does not have enough gas to
+          cover the deserialization cost. We always consider the full
+          deserialization cost, independently from the internal state
+          of the lazy_expr. Otherwise we might risk getting different
+          results if the operation has already been deserialized
+          before (e.g. when retrieved in JSON format). Note that the
+          lazy_expr is not actually decoded here; its deserialization
+          cost is estimated from the size of its bytes. *)
+    Script.consume_decoding_gas ctxt lexpr
+  in
   (match operation with
   | Reveal pk -> Contract.check_public_key pk source >>?= fun () -> return ctxt
   | Transaction {parameters; _} ->
-      Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail early if not enough gas for complete deserialization
-            cost or if deserialization fails. *)
-      ( Script.force_decode_in_context
-          ~consume_deserialization_gas
-          ctxt
-          parameters
-      >|? fun (_arg, ctxt) -> ctxt )
+      Lwt.return @@ consume_decoding_gas ctxt parameters
   | Origination {script; _} ->
       Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      ( Script.force_decode_in_context
-          ~consume_deserialization_gas
-          ctxt
-          script.code
-      >>? fun (_code, ctxt) ->
-        Script.force_decode_in_context
-          ~consume_deserialization_gas
-          ctxt
-          script.storage
-        >|? fun (_storage, ctxt) -> ctxt )
+        ( consume_decoding_gas ctxt script.code >>? fun ctxt ->
+          consume_decoding_gas ctxt script.storage )
   | Register_global_constant {value} ->
-      Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      ( Script.force_decode_in_context ~consume_deserialization_gas ctxt value
-      >|? fun (_value, ctxt) -> ctxt )
+      Lwt.return @@ consume_decoding_gas ctxt value
   | Delegation _ | Set_deposits_limit _ -> return ctxt
   | Tx_rollup_origination ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
@@ -1997,12 +1982,8 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Transfer_ticket {contents; ty; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      ( Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
-      >>? fun (_contents, ctxt) ->
-        Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
-        >|? fun (_ty, ctxt) -> ctxt )
+      @@ ( consume_decoding_gas ctxt contents >>? fun ctxt ->
+           consume_decoding_gas ctxt ty )
   | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.Parametric.
@@ -2023,18 +2004,12 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         Tx_rollup_errors.Too_many_withdrawals
       >>?= fun () ->
       record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      List.fold_left_e
-        (fun ctxt Tx_rollup_reveal.{contents; ty; _} ->
-          Script.force_decode_in_context
-            ~consume_deserialization_gas
-            ctxt
-            contents
-          >>? fun (_contents, ctxt) ->
-          Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
-          >|? fun (_ty, ctxt) -> ctxt)
-        ctxt
-        tickets_info
+      @@ List.fold_left_e
+           (fun ctxt Tx_rollup_reveal.{contents; ty; _} ->
+             Script.consume_decoding_gas ctxt contents >>? fun ctxt ->
+             Script.consume_decoding_gas ctxt ty)
+           ctxt
+           tickets_info
       >>?= fun ctxt -> return ctxt
   | Tx_rollup_rejection
       {message_path; message_result_path; previous_message_result_path; _} ->

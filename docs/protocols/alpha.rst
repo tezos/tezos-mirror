@@ -23,6 +23,11 @@ Breaking Changes
 - Reveal operations can only occur at the head of a manager operation
   batch (MR :gl:`!5182`).
 
+- Operations with non-deserializable scripts may now be propagated and
+  included in blocks. If such an operation is in a block, its
+  application will fail so the operation will have no effect, but its
+  fees will still be taken. (MR :gl:`!5506`)
+
 RPC Changes
 -----------
 
@@ -69,3 +74,8 @@ Internal
 - Precheck no longer returns the gas it has consumed. Instead of
   "replaying" the gas from precheck, `apply_manager_contents` consumes
   the same gas again step by step. (MR :gl:`!5506`)
+
+- Precheck no longer tries to deserialize scripts. It does still check
+  that the operation has enough gas for these deserializations (by
+  consuming an estimated gas cost based on the bytes size: this has
+  not changed). (MR :gl:`!5506`)

@@ -152,6 +152,10 @@ module Script = struct
     Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
     >>? fun ctxt ->
     Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
+
+  let consume_decoding_gas ctxt lexpr =
+    let gas_cost = Script_repr.stable_force_decode_cost lexpr in
+    Raw_context.consume_gas ctxt gas_cost
 end
 
 module Fees = Fees_storage
