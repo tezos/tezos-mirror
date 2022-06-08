@@ -26,29 +26,29 @@ module type S = sig
   val grow : memory -> size -> unit
   (* raises SizeLimit, SizeOverflow, OutOfMemory *)
 
-  val load_byte : memory -> address -> int (* raises Bounds *)
-  val store_byte : memory -> address -> int -> unit (* raises Bounds *)
-  val load_bytes : memory -> address -> int -> string (* raises Bounds *)
-  val store_bytes : memory -> address -> string -> unit (* raises Bounds *)
+  val load_byte : memory -> address -> int Lwt.t (* raises Bounds *)
+  val store_byte : memory -> address -> int -> unit Lwt.t (* raises Bounds *)
+  val load_bytes : memory -> address -> int -> string Lwt.t (* raises Bounds *)
+  val store_bytes : memory -> address -> string -> unit Lwt.t (* raises Bounds *)
 
   val load_num :
-    memory -> address -> offset -> num_type -> num (* raises Bounds *)
+    memory -> address -> offset -> num_type -> num Lwt.t (* raises Bounds *)
   val store_num :
-    memory -> address -> offset -> num -> unit (* raises Bounds *)
+    memory -> address -> offset -> num -> unit Lwt.t (* raises Bounds *)
   val load_num_packed :
-    pack_size -> extension -> memory -> address -> offset -> num_type -> num
+    pack_size -> extension -> memory -> address -> offset -> num_type -> num Lwt.t
   (* raises Type, Bounds *)
   val store_num_packed :
-    pack_size -> memory -> address -> offset -> num -> unit
+    pack_size -> memory -> address -> offset -> num -> unit Lwt.t
   (* raises Type, Bounds *)
 
   val load_vec :
-    memory -> address -> offset -> vec_type -> vec (* raises Bounds *)
+    memory -> address -> offset -> vec_type -> vec Lwt.t (* raises Bounds *)
   val store_vec :
-    memory -> address -> offset -> vec -> unit
+    memory -> address -> offset -> vec -> unit Lwt.t
   (* raises Type, Bounds *)
   val load_vec_packed :
-    pack_size -> vec_extension -> memory -> address -> offset -> vec_type -> vec
+    pack_size -> vec_extension -> memory -> address -> offset -> vec_type -> vec Lwt.t
 (* raises Type, Bounds *)
 
 end

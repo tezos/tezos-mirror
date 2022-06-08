@@ -22,7 +22,7 @@ module type S = sig
   val grow : table -> size -> ref_ -> unit
   (* raises SizeOverflow, SizeLimit, OutOfMemory *)
 
-  val load : table -> index -> ref_ (* raises Bounds *)
+  val load : table -> index -> ref_ Lwt.t (* raises Bounds *)
   val store : table -> index -> ref_ -> unit (* raises Type, Bounds *)
   val blit : table -> index -> ref_ list -> unit (* raises Bounds *)
 

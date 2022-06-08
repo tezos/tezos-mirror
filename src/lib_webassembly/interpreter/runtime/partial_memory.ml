@@ -88,17 +88,21 @@ let store_byte mem = Chunked.store_byte mem.content
 
 (* Copied from [Memory] module *)
 let load_bytes mem a n =
+  let open Lwt.Syntax in
   let buf = Buffer.create n in
-  for i = 0 to n - 1 do
-    Buffer.add_char buf (Char.chr (load_byte mem Int64.(add a (of_int i))))
-  done;
+  let+ () =
+    List.init n (fun i ->
+      let+ c = load_byte mem Int64.(add a (of_int i)) in
+      Buffer.add_char buf (Char.chr c))
+    |> Lwt.join
+  in
   Buffer.contents buf
 
 (* Copied from [Memory] module *)
 let store_bytes mem a bs =
-  for i = String.length bs - 1 downto 0 do
-    store_byte mem Int64.(add a (of_int i)) (Char.code bs.[i])
-  done
+  List.init (String.length bs) (fun i ->
+    store_byte mem Int64.(add a (of_int i)) (Char.code bs.[i]))
+  |> Lwt.join
 
 (* Copied from [Memory] module *)
 let effective_address a o =
@@ -108,27 +112,33 @@ let effective_address a o =
 
 (* Copied from [Memory] module *)
 let loadn mem a o n =
+  let open Lwt.Syntax in
   assert (n > 0 && n <= 8);
   let rec loop a n =
-    if n = 0 then 0L else begin
-      let x = Int64.(shift_left (loop (add a 1L) (n - 1)) 8) in
-      Int64.logor (Int64.of_int (load_byte mem a)) x
+    if n = 0 then Lwt.return 0L else begin
+      let* x0 = loop (Int64.add a 1L) (n - 1) in
+      let x = Int64.shift_left x0 8 in
+      let+ v = load_byte mem a in
+      Int64.logor (Int64.of_int v) x
     end
   in loop (effective_address a o) n
 
 (* Copied from [Memory] module *)
 let storen mem a o n x =
+  let open Lwt.Syntax in
   assert (n > 0 && n <= 8);
   let rec loop a n x =
     if n > 0 then begin
-      Int64.(loop (add a 1L) (n - 1) (shift_right x 8));
+      let* () = Int64.(loop (add a 1L) (n - 1) (shift_right x 8)) in
       store_byte mem a (Int64.to_int x land 0xff)
-    end
-  in loop (effective_address a o) n x
+    end else Lwt.return_unit
+  in
+  loop (effective_address a o) n x
 
 (* Copied from [Memory] module *)
 let load_num mem a o t =
-  let n = loadn mem a o (Types.num_size t) in
+  let open Lwt.Syntax in
+  let+ n = loadn mem a o (Types.num_size t) in
   match t with
   | I32Type -> I32 (Int64.to_int32 n)
   | I64Type -> I64 n
@@ -151,9 +161,11 @@ let extend x n = function
 
 (* Copied from [Memory] module *)
 let load_num_packed sz ext mem a o t =
+  let open Lwt.Syntax in
   assert (packed_size sz <= num_size t);
   let w = packed_size sz in
-  let x = extend (loadn mem a o w) w ext in
+  let+ payload = loadn mem a o w in
+  let x = extend payload w ext in
   match t with
   | I32Type -> I32 (Int64.to_int32 x)
   | I64Type -> I64 x
@@ -172,9 +184,11 @@ let store_num_packed sz mem a o n =
 
 (* Copied from [Memory] module *)
 let load_vec mem a o t =
+  let open Lwt.Syntax in
   match t with
   | V128Type ->
-    V128 (V128.of_bits (load_bytes mem (effective_address a o) (Types.vec_size t)))
+    let+ bits = load_bytes mem (effective_address a o) (Types.vec_size t) in
+    V128 (V128.of_bits bits)
 
 (* Copied from [Memory] module *)
 let store_vec mem a o n =
@@ -183,8 +197,9 @@ let store_vec mem a o n =
 
 (* Copied from [Memory] module *)
 let load_vec_packed sz ext mem a o t =
+  let open Lwt.Syntax in
   assert (packed_size sz < vec_size t);
-  let x = loadn mem a o (packed_size sz) in
+  let+ x = loadn mem a o (packed_size sz) in
   let b = Bytes.make 16 '\x00' in
   Bytes.set_int64_le b 0 x;
   let v = V128.of_bits (Bytes.to_string b) in

@@ -5,9 +5,9 @@ type size = int32
 type index = int32
 type count = int32
 
-module Map = Lazy_map.Mutable.Make (Int32)
+module Map = Lazy_map.Mutable.LwtInt32Map
 
-type table = {mutable ty : table_type; mutable content : ref_ Map.t}
+type table = {mutable ty : table_type; content : ref_ Map.t}
 type t = table
 
 include Memory_exn
@@ -18,8 +18,10 @@ let valid_limits {min; max} =
   | Some m -> I32.le_u min m
 
 let create size r =
-  try Map.create ~produce_value:(fun _ -> r) size
-  with Out_of_memory | Invalid_argument _ -> raise OutOfMemory
+  try
+    Map.create ~produce_value:(fun _ -> Lwt.return r) size
+  with
+    Out_of_memory | Invalid_argument _ -> raise OutOfMemory
 
 let alloc (TableType (lim, _) as ty) r =
   if not (valid_limits lim) then raise Type;
@@ -39,7 +41,7 @@ let grow tab delta r =
   if I32.gt_u old_size new_size then raise SizeOverflow else
   let lim' = {lim with min = new_size} in
   if not (valid_limits lim') then raise SizeLimit else
-  Map.grow delta ~produce_value:(fun _ -> r) tab.content;
+  Map.grow delta ~produce_value:(fun _ -> Lwt.return r) tab.content;
   tab.ty <- TableType (lim', t);
   ()
 
