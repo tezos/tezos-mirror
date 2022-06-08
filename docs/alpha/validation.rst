@@ -211,6 +211,48 @@ disk in order to prevent potential attacks.
 Block Validation
 ================
 
+.. FIXME tezos/tezos#3921:
+
+   Adapt to pipelined block validation up to Lima and v7 environment.
+
+The validity of a blocks depends on a set of precondition checks
+implemented in different steps, which happen at different stages of
+the application (and the construction) of a block.
+
+The first step in the process is to decide whether a candidate block
+is *well-formed*, that is, that it has the expected "shape" of a valid
+block under the current Tezos economic protocol. Given a block
+candidate, the block validation process will then verify that the
+candidate block declares consistent :ref:`level<Level>`,
+:ref:`round<Round>`, and timestamp values; that it carries a valid
+signature, etc. At this step, the block validation process will also
+initialize the data-structures required for subsequent steps.
+
+The second step iterates over the block's operations and proceeds to
+apply them sequentially. When at least one operation is found to be
+invalid, under the conditions described in
+:ref:`operation_validity_alpha` further below, the whole block is
+considered as invalid.
+
+The last step in the block validation process, known as "block
+finalization", aims to verify that the collected consensus operations
+constitute a sufficiently large :ref:`quorum<quorum_alpha>`. That is,
+it will verify that the total endorsing power present in the block is
+greater than the ``CONSENSUS_THRESHOLD`` constant.
+
+This sequence of three steps also yields a new context -- the
+resulting state of the Tezos ledger after the application of the
+candidate block. The shell may decide to commit this context to disk.
+
+The Tezos economic protocol also offers a cheap (read "faster")
+alternative to determine an over-approximation of the validity of a
+block (see :ref:`partial_application_alpha` above). This feature
+allows the shell to propagate blocks faster without needing to fully
+validate them, speeding-up block propagation over the network. Of
+course, as this is an over-approximation, this feature cannot be
+considered to provide a safe guarantee that a block will be valid: in
+particular, it does not validate all kinds of operations.
+
 .. _operation_validity_alpha:
 
 Operation Validation and Application
