@@ -27,7 +27,7 @@ type t = {
   endpoint : Uri.t option;
   rpc_addr : Uri.t option;
   rpc_tls : string option;
-  sym_block_caching_time : int option;
+  sym_block_caching_time : Ptime.span option;
   data_dir : string option;
 }
 
@@ -46,7 +46,7 @@ let pp ppf {endpoint; rpc_addr; rpc_tls; sym_block_caching_time; data_dir} =
     rpc_addr
     (Format.pp_print_option Format.pp_print_string)
     rpc_tls
-    (Format.pp_print_option Format.pp_print_int)
+    (Format.pp_print_option Ptime.Span.pp)
     sym_block_caching_time
     (Format.pp_print_option Format.pp_print_string)
     data_dir
@@ -56,19 +56,23 @@ let example_config =
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
+  let of_span s = Option.bind s Ptime.Span.to_int_s in
   conv
     (fun t ->
       ( Option.map Uri.to_string t.endpoint,
         Option.map Uri.to_string t.rpc_addr,
         t.rpc_tls,
-        Option.map Int32.of_int t.sym_block_caching_time,
+        Option.map Int32.of_int @@ of_span t.sym_block_caching_time,
         t.data_dir ))
     (fun (endpoint, rpc_addr, rpc_tls, sym_block_caching_time, data_dir) ->
       {
         endpoint = Option.map Uri.of_string endpoint;
         rpc_addr = Option.map Uri.of_string rpc_addr;
         rpc_tls;
-        sym_block_caching_time = Option.map Int32.to_int sym_block_caching_time;
+        sym_block_caching_time =
+          Option.map
+            (fun x -> Ptime.Span.of_int_s @@ Int32.to_int x)
+            sym_block_caching_time;
         data_dir;
       })
     (obj5
@@ -83,10 +87,12 @@ let make ~endpoint ~rpc_addr ~rpc_tls ~sym_block_caching_time ~data_dir : t =
 
 let sym_block_caching_time_error sym_block_caching_time =
   match sym_block_caching_time with
-  | Some sym_block_caching_time when sym_block_caching_time <= 0 ->
+  | Some sym_block_caching_time
+    when Ptime.Span.(compare sym_block_caching_time zero <= 0) ->
       Some
-        (Format.sprintf
-           {|--sym-block-caching-time argument and sym_block_caching_time field must be strictly positive, but found %d|}
+        (Format.asprintf
+           {|--sym-block-caching-time argument and sym_block_caching_time field must be strictly positive, but found %a|}
+           Ptime.Span.pp
            sym_block_caching_time)
   | _ -> None
 
@@ -115,7 +121,7 @@ type runtime = {
   rpc_server_address : P2p_addr.t;
   rpc_server_port : int;
   rpc_server_tls : (string * string) option;
-  sym_block_caching_time : int option;
+  sym_block_caching_time : Ptime.span option;
   data_dir : string option;
 }
 

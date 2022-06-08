@@ -38,7 +38,7 @@ type t = private {
       (** A string of the form ["crt,key"] where [crt] is the path
           to the TLS certificate to use and [key] is the path to the key
           to use. Name was chosen to be the same as in [tezos-node run] *)
-  sym_block_caching_time : int option;
+  sym_block_caching_time : Ptime.span option;
       (** The time during which data for a symbolic block identifier
           (like [head], [head~1]) is kept. Smaller values increase [endpoint]'s
           load but yield more up-to-date to clients. Higher values
@@ -67,7 +67,7 @@ type runtime = private {
   rpc_server_port : int;  (** The port of the server *)
   rpc_server_tls : (string * string) option;
       (** The paths to the certificate and key to use for TLS *)
-  sym_block_caching_time : int option;
+  sym_block_caching_time : Ptime.span option;
       (** The duration during which data of symbolic blocks is kept *)
   data_dir : string option;
       (** Path to the data-dir of a running tezos-node. If specified, we use
@@ -82,7 +82,7 @@ val make :
   endpoint:Uri.t option ->
   rpc_addr:Uri.t option ->
   rpc_tls:string option ->
-  sym_block_caching_time:int option ->
+  sym_block_caching_time:Ptime.span option ->
   data_dir:string option ->
   t
 

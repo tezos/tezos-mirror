@@ -118,7 +118,7 @@ type mode =
   | Proxy_client
   | Proxy_server of {
       sleep : float -> unit Lwt.t;
-      sym_block_caching_time : int option;
+      sym_block_caching_time : Ptime.span option;
       on_disk_proxy_builder :
         (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option;
     }
@@ -191,7 +191,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
       let* time_between_blocks =
         match sym_block_caching_time with
         | Some sym_block_caching_time ->
-            Lwt.return @@ Int.to_float sym_block_caching_time
+            Lwt.return @@ Ptime.Span.to_float_s sym_block_caching_time
         | None -> (
             let (module Proxy_environment) = proxy_env in
             let* ro =
