@@ -127,7 +127,7 @@ Error:
 
 ./tezos-client --wait none cement commitment '[SC_ROLLUP_COMMITMENT_HASH]' from bootstrap1 for sc rollup '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 3451.196 units (will add 100 for safety)
+Estimated gas: 3451.198 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -147,7 +147,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000653
     Cement the commitment [SC_ROLLUP_COMMITMENT_HASH] in the smart contract rollup at address [SC_ROLLUP_HASH]
       This operation cementing a commitment on a smart contract rollup was successfully applied
-      Consumed gas: 3451.196
+      Consumed gas: 3451.198
 
 
 ./tezos-client rpc get /chains/main/blocks/head/context/constants

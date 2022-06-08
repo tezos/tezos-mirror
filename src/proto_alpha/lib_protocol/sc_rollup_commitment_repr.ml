@@ -55,71 +55,93 @@ module Hash = struct
   include Path_encoding.Make_hex (H)
 end
 
-type t = {
-  compressed_state : State_hash.t;
-  inbox_level : Raw_level_repr.t;
-  predecessor : Hash.t;
-  number_of_messages : Number_of_messages.t;
-  number_of_ticks : Number_of_ticks.t;
-}
+module V1 = struct
+  type t = {
+    compressed_state : State_hash.t;
+    inbox_level : Raw_level_repr.t;
+    predecessor : Hash.t;
+    number_of_messages : Number_of_messages.t;
+    number_of_ticks : Number_of_ticks.t;
+  }
 
-let pp fmt
-    {
-      compressed_state;
-      inbox_level;
-      predecessor;
-      number_of_messages;
-      number_of_ticks;
-    } =
-  Format.fprintf
-    fmt
-    "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
-     predecessor: %a@ number_of_messages: %ld@ number_of_ticks: %ld@]"
-    State_hash.pp
-    compressed_state
-    Raw_level_repr.pp
-    inbox_level
-    Hash.pp
-    predecessor
-    (Number_of_messages.to_int32 number_of_messages)
-    (Number_of_ticks.to_int32 number_of_ticks)
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           compressed_state;
-           inbox_level;
-           predecessor;
-           number_of_messages;
-           number_of_ticks;
-         } ->
-      ( compressed_state,
-        inbox_level,
-        predecessor,
-        number_of_messages,
-        number_of_ticks ))
-    (fun ( compressed_state,
-           inbox_level,
-           predecessor,
-           number_of_messages,
-           number_of_ticks ) ->
+  let pp fmt
       {
         compressed_state;
         inbox_level;
         predecessor;
         number_of_messages;
         number_of_ticks;
-      })
-    (obj5
-       (req "compressed_state" State_hash.encoding)
-       (req "inbox_level" Raw_level_repr.encoding)
-       (req "predecessor" Hash.encoding)
-       (req "number_of_messages" Number_of_messages.encoding)
-       (req "number_of_ticks" Number_of_ticks.encoding))
+      } =
+    Format.fprintf
+      fmt
+      "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
+       predecessor: %a@ number_of_messages: %ld@ number_of_ticks: %ld@]"
+      State_hash.pp
+      compressed_state
+      Raw_level_repr.pp
+      inbox_level
+      Hash.pp
+      predecessor
+      (Number_of_messages.to_int32 number_of_messages)
+      (Number_of_ticks.to_int32 number_of_ticks)
 
-let hash commitment =
-  let commitment_bytes =
-    Data_encoding.Binary.to_bytes_exn encoding commitment
-  in
-  Hash.hash_bytes [commitment_bytes]
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             compressed_state;
+             inbox_level;
+             predecessor;
+             number_of_messages;
+             number_of_ticks;
+           } ->
+        ( compressed_state,
+          inbox_level,
+          predecessor,
+          number_of_messages,
+          number_of_ticks ))
+      (fun ( compressed_state,
+             inbox_level,
+             predecessor,
+             number_of_messages,
+             number_of_ticks ) ->
+        {
+          compressed_state;
+          inbox_level;
+          predecessor;
+          number_of_messages;
+          number_of_ticks;
+        })
+      (obj5
+         (req "compressed_state" State_hash.encoding)
+         (req "inbox_level" Raw_level_repr.encoding)
+         (req "predecessor" Hash.encoding)
+         (req "number_of_messages" Number_of_messages.encoding)
+         (req "number_of_ticks" Number_of_ticks.encoding))
+
+  let hash commitment =
+    let commitment_bytes =
+      Data_encoding.Binary.to_bytes_exn encoding commitment
+    in
+    Hash.hash_bytes [commitment_bytes]
+end
+
+type versioned = V1 of V1.t
+
+let versioned_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"V1"
+        (Tag 0)
+        V1.encoding
+        (function V1 commitment -> Some commitment)
+        (fun commitment -> V1 commitment);
+    ]
+
+include V1
+
+let of_versioned = function V1 commitment -> commitment [@@inline]
+
+let to_versioned commitment = V1 commitment [@@inline]
