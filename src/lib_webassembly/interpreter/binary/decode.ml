@@ -135,23 +135,23 @@ let sized f s =
 type byte_vector_kont =
   | VKStart
   (** Initial step. *)
-  | VKRead of Chunked_byte_vector.t * int * int
+  | VKRead of Chunked_byte_vector.Buffer.t * int * int
   (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
-  | VKStop of Chunked_byte_vector.t
+  | VKStop of Chunked_byte_vector.Buffer.t
   (** Final step, cannot reduce. *)
 
 let byte_vector_step s = function
   | VKStart ->
     let len = len32 s in
-    let vector = len |> Int64.of_int |> Chunked_byte_vector.create in
+    let vector = len |> Int64.of_int |> Chunked_byte_vector.Buffer.create in
     VKRead (vector, 0, len)
 
-  | VKRead (vector, index, len) when index >= len->
+  | VKRead (vector, index, len) when index >= len ->
     VKStop vector
   | VKRead (vector, index, len) ->
     let c = get s in
-    Chunked_byte_vector.store_byte vector (Int64.of_int index) c;
+    let vector = Chunked_byte_vector.Buffer.add_byte vector c in
     VKRead (vector, index + 1, len)
 
   (* Final step, cannot reduce *)

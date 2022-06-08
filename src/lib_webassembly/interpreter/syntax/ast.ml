@@ -251,7 +251,7 @@ and elem_segment' =
 type data_segment = data_segment' Source.phrase
 and data_segment' =
 {
-  dinit : Chunked_byte_vector.t;
+  dinit : Chunked_byte_vector.Buffer.t;
   dmode : segment_mode;
 }
 
@@ -372,4 +372,3 @@ let string_of_name n =
   in
   List.iter escape n;
   Buffer.contents b
-
