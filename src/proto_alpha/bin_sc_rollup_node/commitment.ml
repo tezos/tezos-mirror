@@ -237,7 +237,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let* () = update_ticks_and_messages store hash in
     store_commitment_if_necessary ~origination_level store current_level hash
 
-  let get_last_cemented_commitment_hash_with_level
+  let sync_last_cemented_commitment_hash_with_level
       ({cctxt; rollup_address; _} : Node_context.t) store =
     let open Lwt_result_syntax in
     let* hash, inbox_level =

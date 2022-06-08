@@ -55,7 +55,7 @@ module type S = sig
       fetches and stores information about the last cemeneted commitment
       in the layer1 chain.
     *)
-  val get_last_cemented_commitment_hash_with_level :
+  val sync_last_cemented_commitment_hash_with_level :
     Node_context.t -> Store.t -> unit tzresult Lwt.t
 
   (** [publish_commitment node_ctxt store] publishes the earliest commitment
