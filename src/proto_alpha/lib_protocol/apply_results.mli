@@ -325,11 +325,11 @@ and _ successful_manager_operation_result =
     }
       -> Kind.sc_rollup_execute_outbox_message
          successful_manager_operation_result
-  | Sc_rollup_return_bond_result : {
+  | Sc_rollup_recover_bond_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.sc_rollup_return_bond successful_manager_operation_result
+      -> Kind.sc_rollup_recover_bond successful_manager_operation_result
 
 (** Result of applying a {!Script_typed_ir.internal_operation}. *)
 and _ successful_internal_manager_operation_result =

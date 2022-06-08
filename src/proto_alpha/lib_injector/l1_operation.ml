@@ -99,7 +99,7 @@ module Manager_operation = struct
     | Sc_rollup_timeout _ -> sc_rollup_timeout_case
     | Sc_rollup_execute_outbox_message _ ->
         sc_rollup_execute_outbox_message_case
-    | Sc_rollup_return_bond _ -> sc_rollup_return_bond_case
+    | Sc_rollup_recover_bond _ -> sc_rollup_recover_bond_case
 
   let pp_kind ppf op =
     let open Operation.Encoding.Manager_operations in

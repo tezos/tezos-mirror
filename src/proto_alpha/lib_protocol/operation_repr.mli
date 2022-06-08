@@ -138,7 +138,7 @@ module Kind : sig
   type sc_rollup_execute_outbox_message =
     | Sc_rollup_execute_outbox_message_kind
 
-  type sc_rollup_return_bond = Sc_rollup_return_bond_kind
+  type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
   type 'a manager =
     | Reveal_manager_kind : reveal manager
@@ -168,7 +168,7 @@ module Kind : sig
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
-    | Sc_rollup_return_bond_manager_kind : sc_rollup_return_bond manager
+    | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
 end
 
 type 'a consensus_operation_type =
@@ -502,10 +502,10 @@ and _ manager_operation =
           (** The bytes corresponding to a serialized batch of transactions. *)
     }
       -> Kind.sc_rollup_execute_outbox_message manager_operation
-  | Sc_rollup_return_bond : {
+  | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup_repr.t;
     }
-      -> Kind.sc_rollup_return_bond manager_operation
+      -> Kind.sc_rollup_recover_bond manager_operation
 
 (** Counters are used as anti-replay protection mechanism in
     manager operations: each manager account stores a counter and
@@ -659,7 +659,8 @@ module Encoding : sig
   val sc_rollup_execute_outbox_message_case :
     Kind.sc_rollup_execute_outbox_message Kind.manager case
 
-  val sc_rollup_return_bond_case : Kind.sc_rollup_return_bond Kind.manager case
+  val sc_rollup_recover_bond_case :
+    Kind.sc_rollup_recover_bond Kind.manager case
 
   module Manager_operations : sig
     type 'b case =
@@ -721,6 +722,6 @@ module Encoding : sig
     val sc_rollup_execute_outbox_message_case :
       Kind.sc_rollup_execute_outbox_message case
 
-    val sc_rollup_return_bond_case : Kind.sc_rollup_return_bond case
+    val sc_rollup_recover_bond_case : Kind.sc_rollup_recover_bond case
   end
 end

@@ -259,11 +259,11 @@ type _ successful_manager_operation_result =
     }
       -> Kind.sc_rollup_execute_outbox_message
          successful_manager_operation_result
-  | Sc_rollup_return_bond_result : {
+  | Sc_rollup_recover_bond_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.sc_rollup_return_bond successful_manager_operation_result
+      -> Kind.sc_rollup_recover_bond successful_manager_operation_result
 
 type _ successful_internal_manager_operation_result =
   | ITransaction_result :
@@ -1151,9 +1151,9 @@ module Manager_result = struct
             paid_storage_size_diff;
           })
 
-  let[@coq_axiom_with_reason "gadt"] sc_rollup_return_bond_case =
+  let[@coq_axiom_with_reason "gadt"] sc_rollup_recover_bond_case =
     make
-      ~op_case:Operation.Encoding.Manager_operations.sc_rollup_return_bond_case
+      ~op_case:Operation.Encoding.Manager_operations.sc_rollup_recover_bond_case
       ~encoding:
         Data_encoding.(
           obj3
@@ -1161,16 +1161,16 @@ module Manager_result = struct
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
-        | Successful_manager_result (Sc_rollup_return_bond_result _ as op) ->
+        | Successful_manager_result (Sc_rollup_recover_bond_result _ as op) ->
             Some op
         | _ -> None)
-      ~kind:Kind.Sc_rollup_return_bond_manager_kind
+      ~kind:Kind.Sc_rollup_recover_bond_manager_kind
       ~proj:(function
-        | Sc_rollup_return_bond_result {balance_updates; consumed_gas} ->
+        | Sc_rollup_recover_bond_result {balance_updates; consumed_gas} ->
             (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas))
       ~inj:(fun (balance_updates, consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_return_bond_result
+        Sc_rollup_recover_bond_result
           {balance_updates; consumed_gas = consumed_milligas})
 end
 
@@ -1681,10 +1681,10 @@ let equal_manager_kind :
       Kind.Sc_rollup_execute_outbox_message_manager_kind ) ->
       Some Eq
   | Kind.Sc_rollup_execute_outbox_message_manager_kind, _ -> None
-  | ( Kind.Sc_rollup_return_bond_manager_kind,
-      Kind.Sc_rollup_return_bond_manager_kind ) ->
+  | ( Kind.Sc_rollup_recover_bond_manager_kind,
+      Kind.Sc_rollup_recover_bond_manager_kind ) ->
       Some Eq
-  | Kind.Sc_rollup_return_bond_manager_kind, _ -> None
+  | Kind.Sc_rollup_recover_bond_manager_kind, _ -> None
 
 module Encoding = struct
   type 'kind case =
@@ -2247,13 +2247,13 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let[@coq_axiom_with_reason "gadt"] sc_rollup_return_bond_case =
+  let[@coq_axiom_with_reason "gadt"] sc_rollup_recover_bond_case =
     make_manager_case
-      Operation.Encoding.sc_rollup_return_bond_case
-      Manager_result.sc_rollup_return_bond_case
+      Operation.Encoding.sc_rollup_recover_bond_case
+      Manager_result.sc_rollup_recover_bond_case
       (function
         | Contents_and_result
-            ( (Manager_operation {operation = Sc_rollup_return_bond _; _} as op),
+            ( (Manager_operation {operation = Sc_rollup_recover_bond _; _} as op),
               res ) ->
             Some (op, res)
         | _ -> None)
@@ -2311,7 +2311,7 @@ let contents_result_encoding =
          make sc_rollup_refute_case;
          make sc_rollup_timeout_case;
          make sc_rollup_execute_outbox_message_case;
-         make sc_rollup_return_bond_case;
+         make sc_rollup_recover_bond_case;
        ]
 
 let contents_and_result_encoding =
@@ -2368,7 +2368,7 @@ let contents_and_result_encoding =
          make sc_rollup_publish_case;
          make sc_rollup_refute_case;
          make sc_rollup_timeout_case;
-         make sc_rollup_return_bond_case;
+         make sc_rollup_recover_bond_case;
        ]
 
 type 'kind contents_result_list =
@@ -2750,32 +2750,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Tx_rollup_return_bond _; _}, _ -> None
-  | ( Manager_operation {operation = Sc_rollup_return_bond _; _},
+  | ( Manager_operation {operation = Sc_rollup_recover_bond _; _},
       Manager_operation_result
-        {operation_result = Applied (Sc_rollup_return_bond_result _); _} ) ->
+        {operation_result = Applied (Sc_rollup_recover_bond_result _); _} ) ->
       Some Eq
-  | ( Manager_operation {operation = Sc_rollup_return_bond _; _},
+  | ( Manager_operation {operation = Sc_rollup_recover_bond _; _},
       Manager_operation_result
-        {operation_result = Backtracked (Sc_rollup_return_bond_result _, _); _}
+        {operation_result = Backtracked (Sc_rollup_recover_bond_result _, _); _}
     ) ->
       Some Eq
-  | ( Manager_operation {operation = Sc_rollup_return_bond _; _},
+  | ( Manager_operation {operation = Sc_rollup_recover_bond _; _},
       Manager_operation_result
         {
           operation_result =
-            Failed (Alpha_context.Kind.Sc_rollup_return_bond_manager_kind, _);
+            Failed (Alpha_context.Kind.Sc_rollup_recover_bond_manager_kind, _);
           _;
         } ) ->
       Some Eq
-  | ( Manager_operation {operation = Sc_rollup_return_bond _; _},
+  | ( Manager_operation {operation = Sc_rollup_recover_bond _; _},
       Manager_operation_result
         {
           operation_result =
-            Skipped Alpha_context.Kind.Sc_rollup_return_bond_manager_kind;
+            Skipped Alpha_context.Kind.Sc_rollup_recover_bond_manager_kind;
           _;
         } ) ->
       Some Eq
-  | Manager_operation {operation = Sc_rollup_return_bond _; _}, _ -> None
+  | Manager_operation {operation = Sc_rollup_recover_bond _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_finalize_commitment _; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_finalize_commitment_result _); _}

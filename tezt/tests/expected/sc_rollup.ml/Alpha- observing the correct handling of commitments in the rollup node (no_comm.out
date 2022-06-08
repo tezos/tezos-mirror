@@ -118,7 +118,7 @@ This simulation failed:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ1
       payload fees(the block proposer) ....... +ꜩ1
-    Sc rollup return commitment bond:[SC_ROLLUP_HASH] 
+    Sc rollup recover commitment bond:[SC_ROLLUP_HASH] 
       From: [PUBLIC_KEY_HASH]
       This operation FAILED.
 
@@ -225,7 +225,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ1
       payload fees(the block proposer) ....... +ꜩ1
-    Sc rollup return commitment bond:[SC_ROLLUP_HASH] 
+    Sc rollup recover commitment bond:[SC_ROLLUP_HASH] 
       From: [PUBLIC_KEY_HASH]
       This smart contract bond retrieval was successfully applied
       Balance updates:

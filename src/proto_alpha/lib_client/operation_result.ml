@@ -332,10 +332,10 @@ let pp_manager_operation_content (type kind) source ppf
         message_index
         inclusion_proof
         message
-  | Sc_rollup_return_bond {sc_rollup} ->
+  | Sc_rollup_recover_bond {sc_rollup} ->
       Format.fprintf
         ppf
-        "Sc rollup return commitment bond:%a @,From: %a"
+        "Sc rollup recover commitment bond:%a @,From: %a"
         Sc_rollup.Address.pp
         sc_rollup
         Contract.pp
@@ -680,8 +680,8 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates ppf balance_updates
   in
-  let pp_sc_rollup_return_bond_result
-      (Sc_rollup_return_bond_result {balance_updates; consumed_gas}) =
+  let pp_sc_rollup_recover_bond_result
+      (Sc_rollup_recover_bond_result {balance_updates; consumed_gas}) =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
@@ -716,7 +716,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_timeout_result _ -> "smart contract rollup refutation timeout"
     | Sc_rollup_execute_outbox_message_result _ ->
         "smart contract output message execution"
-    | Sc_rollup_return_bond_result _ -> "smart contract bond retrieval"
+    | Sc_rollup_recover_bond_result _ -> "smart contract bond retrieval"
     | Dal_publish_slot_header_result _ -> "slot header publishing"
   in
   let pp_manager_operation_contents_result (type kind) ppf
@@ -752,7 +752,8 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_timeout_result _ as op -> pp_sc_rollup_timeout_result op
     | Sc_rollup_execute_outbox_message_result _ as op ->
         pp_sc_rollup_execute_outbox_message_result op
-    | Sc_rollup_return_bond_result _ as op -> pp_sc_rollup_return_bond_result op
+    | Sc_rollup_recover_bond_result _ as op ->
+        pp_sc_rollup_recover_bond_result op
     | Dal_publish_slot_header_result _ as op ->
         pp_dal_publish_slot_header_result op
   in

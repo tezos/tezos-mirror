@@ -1854,11 +1854,11 @@ let apply_external_manager_operation_content :
         ~message
       >>=? fun _ctxt ->
       failwith "Sc_rolup_atomic_batch operation is not yet supported."
-  | Sc_rollup_return_bond {sc_rollup} ->
+  | Sc_rollup_recover_bond {sc_rollup} ->
       Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup source
       >>=? fun (ctxt, balance_updates) ->
       let result =
-        Sc_rollup_return_bond_result
+        Sc_rollup_recover_bond_result
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates;
@@ -2062,9 +2062,9 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
   | Sc_rollup_execute_outbox_message _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
-  | Sc_rollup_return_bond _ ->
+  | Sc_rollup_recover_bond _ ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
-         should we successfully precheck Sc_rollup_return_bond and any
+         should we successfully precheck Sc_rollup_recover_bond and any
          (simple) Sc rollup operation, or should we add some some checks to make
          the operations Branch_delayed if they cannot be successfully
          prechecked. *)
@@ -2251,7 +2251,7 @@ let burn_manager_storage_fees :
         storage_limit,
         Sc_rollup_execute_outbox_message_result {payload with balance_updates}
       )
-  | Sc_rollup_return_bond_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_recover_bond_result _ -> return (ctxt, storage_limit, smopr)
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].

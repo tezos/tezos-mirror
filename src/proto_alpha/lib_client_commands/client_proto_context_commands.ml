@@ -2906,7 +2906,7 @@ let commands_rw () =
             failwith "Only implicit accounts can deposit/recover bonds"
         | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            sc_rollup_return_bond
+            sc_rollup_recover_bond
               cctxt
               ~chain:cctxt#chain
               ~block:cctxt#block

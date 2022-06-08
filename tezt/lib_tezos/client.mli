@@ -1252,8 +1252,8 @@ module Sc_rollup : sig
     t ->
     Process.t
 
-  (** Run [tezos-client submit sc rollup return bond to <sc_rollup> from <src>]. *)
-  val submit_return_bond :
+  (** Run [tezos-client submit sc rollup recover bond to <sc_rollup> from <src>]. *)
+  val submit_recover_bond :
     ?wait:string ->
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->

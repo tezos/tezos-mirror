@@ -544,8 +544,8 @@ val sc_rollup_execute_outbox_message :
   message:string ->
   (packed_operation, tztrace) result Lwt.t
 
-(** [sc_rollup_return_bond ctxt source sc_rollup] returns a commitment bond. *)
-val sc_rollup_return_bond :
+(** [sc_rollup_recover_bond ctxt source sc_rollup] returns a commitment bond. *)
+val sc_rollup_recover_bond :
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->

@@ -1638,7 +1638,7 @@ module Sc_rollup = struct
     in
     Process.check process
 
-  let submit_return_bond ?(wait = "none") ?burn_cap ?storage_limit ?fee ?hooks
+  let submit_recover_bond ?(wait = "none") ?burn_cap ?storage_limit ?fee ?hooks
       ~rollup ~src client =
     let process =
       spawn_command
