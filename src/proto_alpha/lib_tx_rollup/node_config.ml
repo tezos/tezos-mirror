@@ -52,6 +52,8 @@ type t = {
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
   origination_level : int32 option;
   rpc_addr : P2p_point.Id.t;
+  cors_origins : string list;
+  cors_headers : string list;
   reconnection_delay : float;
   mode : mode;
   signers : signers;
@@ -270,6 +272,8 @@ let encoding =
            rollup_id;
            origination_level;
            rpc_addr;
+           cors_origins;
+           cors_headers;
            reconnection_delay;
            mode;
            signers;
@@ -288,7 +292,7 @@ let encoding =
           allow_deposit,
           l2_blocks_cache_size,
           caps ),
-        batch_burn_limit ))
+        (batch_burn_limit, cors_origins, cors_headers) ))
     (fun ( ( data_dir_opt,
              rollup_id,
              origination_level,
@@ -299,7 +303,7 @@ let encoding =
              allow_deposit,
              l2_blocks_cache_size,
              caps ),
-           batch_burn_limit ) ->
+           (batch_burn_limit, cors_origins, cors_headers) ) ->
       let data_dir =
         match data_dir_opt with
         | Some dir -> dir
@@ -310,6 +314,8 @@ let encoding =
         rollup_id;
         origination_level;
         rpc_addr;
+        cors_origins;
+        cors_headers;
         reconnection_delay;
         mode;
         signers;
@@ -369,13 +375,27 @@ let encoding =
              "caps"
              caps_encoding
              default_caps))
-       (obj1
+       (obj3
           (opt
              ~description:
                "The burn limit in for a batch (to be paid for the submission \
                 of messages in the protocol inbox)"
              "batch_burn_limit"
-             Tez.encoding))
+             Tez.encoding)
+          (dft
+             ~description:
+               "CORS origin allowed by the RPC server via \
+                Access-Control-Allow-Origin"
+             "cors-origins"
+             (list string)
+             [])
+          (dft
+             ~description:
+               "Headers reported by Access-Control-Allow-Headers reported \
+                during CORS"
+             "cors-headers"
+             (list string)
+             []))
 
 let get_configuration_filename data_dir =
   let filename = "config.json" in
