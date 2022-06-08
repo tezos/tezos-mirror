@@ -120,6 +120,20 @@ val inject :
   Client.t ->
   [`OpHash of string] Lwt.t
 
+(** [inject_operations] is similar as [inject] for a list of
+   operations. This function calls the RPC
+   {!val:RPC.post_private_injection_operations} which is faster than
+   calling the RPC used by {!val:inject} several times. Note that this
+   function should be used mainly when the time for injecting
+   operations matters. *)
+val inject_operations :
+  ?request:[`Inject | `Notify] ->
+  ?force:bool ->
+  ?error:rex ->
+  t list ->
+  Client.t ->
+  [`OpHash of string] list Lwt.t
+
 module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
@@ -193,6 +207,26 @@ module Manager : sig
     ?storage_limit:int ->
     payload ->
     t
+
+  (** [make_batch] builds a batch of manager operations from a list of
+     payloads and an initial counter. This function calls {!val:make}
+     on all the payloads incrementing the initial [counter] for each
+     operation except for the first one. The function does not fail if
+     the list of [payload] is empty. *)
+  val make_batch :
+    ?source:Account.key ->
+    ?fee:int ->
+    ?gas_limit:int ->
+    ?storage_limit:int ->
+    counter:int ->
+    payload list ->
+    t list
+
+  (** [get_next_counter ~source client] returns the next valid counter
+     value for [source] expected by the protocol for a manager
+     operation where the source is [source]. If the [source] is not
+     provided, the same one as {!val:make} is used. *)
+  val get_next_counter : ?source:Account.key -> Client.t -> int Lwt.t
 
   (** [operation ?branch t client] constructs an operation from a
      manager operation. [branch] can be used to set manually the

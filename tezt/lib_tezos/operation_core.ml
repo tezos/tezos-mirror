@@ -84,15 +84,15 @@ module Tezos_operation = Tezos_base.TzPervasives.Operation
 
 let to_raw_operation t client : Tezos_operation.t Lwt.t =
   let open Tezos_base.TzPervasives in
-  let branch = Block_hash.of_string_exn t.branch in
+  let branch = Block_hash.of_b58check_exn t.branch in
   let* raw = hex t client in
   return Tezos_operation.{shell = {branch}; proto = Hex.to_bytes_exn raw}
 
-let hash t client : string Lwt.t =
+let hash t client : [`OpHash of string] Lwt.t =
   let open Tezos_base.TzPervasives in
   let* op = to_raw_operation t client in
   let hash = Tezos_operation.hash op in
-  return (Operation_hash.to_string hash)
+  return (`OpHash (Operation_hash.to_string hash))
 
 let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
     [`OpHash of string] Lwt.t =
@@ -123,8 +123,34 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
   | Some msg ->
       let*? process = runnable in
       let* () = Process.check_error ~msg process in
-      let* hash = hash t client in
-      return (`OpHash hash)
+      hash t client
+
+let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
+    [`OpHash of string] list Lwt.t =
+  let forge op =
+    let* signature = sign op client in
+    hex ~signature op client
+  in
+  let* ops = Lwt_list.map_s forge t in
+  let waiter =
+    let mode = Client.get_mode client in
+    match Client.mode_to_endpoint mode with
+    | None -> Test.fail "Operation.inject: Endpoint expected"
+    | Some (Proxy_server _) ->
+        Test.fail
+          "Operation.inject: Node endpoint expected instead of proxy server"
+    | Some (Node node) -> Node.wait_for_request ~request node
+  in
+  let rpc = RPC.post_private_injection_operations ~force ~ops () in
+  match error with
+  | None ->
+      let* ophs = RPC.Client.call client rpc in
+      let* () = waiter in
+      return ophs
+  | Some msg ->
+      let*? process = RPC.Client.spawn client rpc in
+      let* () = Process.check_error ~msg process in
+      Lwt_list.map_s (fun op -> hash op client) t
 
 module Consensus = struct
   type t = Slot_availability of {endorsement : bool array}
@@ -197,7 +223,7 @@ module Manager = struct
 
   let json_of_int n = float_of_int n |> Ezjsonm.float
 
-  let get_next_counter ~source client =
+  let get_next_counter ?(source = Constant.bootstrap1) client =
     let*! json =
       RPC.Contracts.get_counter
         ~contract_id:source.Account.public_key_hash
@@ -280,6 +306,13 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:0 in
         {source; counter; fee; gas_limit; storage_limit; payload}
+
+  let make_batch ?source ?fee ?gas_limit ?storage_limit ~counter payloads =
+    List.mapi
+      (fun i payload ->
+        let counter = counter + i in
+        make ?source ?fee ?gas_limit ?storage_limit ~counter payload)
+      payloads
 
   let inject ?request ?force ?branch ?signer ?error managers client =
     let* op = operation ?branch ?signer managers client in
