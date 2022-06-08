@@ -916,7 +916,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             feature_enable = false;
             number_of_slots = 256;
             number_of_shards = 2048;
-            endorsement_lag = 2;
+            endorsement_lag = 1;
             availability_threshold = 50;
           }
       in
