@@ -26,8 +26,8 @@ documentation:linkcheck:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development_manual
-  stage: manual
+    - .rules_template__development_documentation
+  stage: doc
   needs: []
   before_script:
     - . ./scripts/version.sh
