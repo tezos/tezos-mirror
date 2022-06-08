@@ -63,6 +63,10 @@ let alloc (MemoryType lim as ty) =
   if not (valid_limits lim) then raise Type;
   {ty; content = Chunked.create lim.min}
 
+let of_chunks (MemoryType lim as ty) content =
+  if not (valid_limits lim) then raise Type;
+  {ty; content}
+
 let bound mem = Chunked.total_size mem.content
 
 let size mem = Chunked.total_pages mem.content
@@ -102,6 +106,12 @@ let load_bytes mem a n =
 let store_bytes mem a bs =
   List.init (String.length bs) (fun i ->
     store_byte mem Int64.(add a (of_int i)) (Char.code bs.[i]))
+  |> Lwt.join
+
+let store_bytes_from_bytes mem address bs =
+  List.init (Bytes.length bs) (fun offset ->
+    let value = Char.code (Bytes.get bs offset) in
+    store_byte mem Int64.(add address (of_int offset)) value)
   |> Lwt.join
 
 (* Copied from [Memory] module *)

@@ -203,7 +203,6 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
         Bytes.to_string buff
 
     let to_byte_vector { vector; _ } = vector
-
   end
 end
 

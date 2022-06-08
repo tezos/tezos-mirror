@@ -86,18 +86,33 @@ let lookup category list x =
   try Lib.List32.nth list x.it with Failure _ ->
     Crash.error x.at ("undefined " ^ category ^ " " ^ Int32.to_string x.it)
 
-let type_ (inst : module_inst) x = lookup "type" inst.types x
-let func (inst : module_inst) x = lookup "function" inst.funcs x
-let table (inst : module_inst) x = lookup "table" inst.tables x
-let memory (inst : module_inst) x = lookup "memory" inst.memories x
-let global (inst : module_inst) x = lookup "global" inst.globals x
-let elem (inst : module_inst) x = lookup "element segment" inst.elems x
-let data (inst : module_inst) x = lookup "data segment" inst.datas x
+let lookup_intmap category store x =
+  Lwt.catch
+    (fun () -> Instance.Vector.get x.it store)
+    (function
+    | Memory_exn.Bounds ->
+      Crash.error x.at ("undefined " ^ category ^ " " ^ Int32.to_string x.it)
+    | Lazy_map.UnexpectedAccess ->
+      Crash.error x.at (
+        "unexpected access in lazy map for "
+        ^ category
+        ^ " "
+        ^ Int32.to_string x.it
+      )
+    | exn -> Lwt.fail exn)
+
+let type_ (inst : module_inst) x = lookup_intmap "type" inst.types x
+let func (inst : module_inst) x = lookup_intmap "function" inst.funcs x
+let table (inst : module_inst) x = lookup_intmap "table" inst.tables x
+let memory (inst : module_inst) x = lookup_intmap "memory" inst.memories x
+let global (inst : module_inst) x = lookup_intmap "global" inst.globals x
+let elem (inst : module_inst) x = lookup_intmap "element segment" inst.elems x
+let data (inst : module_inst) x = lookup_intmap "data segment" inst.datas x
 let local (frame : frame) x = lookup "local" frame.locals x
 
 let any_ref inst x i at =
   Lwt.catch
-    (fun () -> Table.load (table inst x) i)
+    (fun () -> let* tbl = table inst x in Table.load tbl i)
     (function
     | Table.Bounds -> Trap.error at ("undefined element " ^ Int32.to_string i)
     | exn -> Lwt.fail exn)
@@ -116,8 +131,8 @@ let func_type_of = function
 let block_type inst bt =
   match bt with
   | VarBlockType x -> type_ inst x
-  | ValBlockType None -> FuncType ([], [])
-  | ValBlockType (Some t) -> FuncType ([], [t])
+  | ValBlockType None -> Lwt.return (FuncType ([], []))
+  | ValBlockType (Some t) -> Lwt.return (FuncType ([], [t]))
 
 let take n (vs : 'a stack) at =
   try Lib.List32.take n vs with Failure _ -> Crash.error at "stack underflow"
@@ -138,20 +153,24 @@ let drop n (vs : 'a stack) at =
  *)
 
 let mem_oob frame x i n =
+  let+ mem =  memory frame.inst x in
   I64.gt_u (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (Memory.bound (memory frame.inst x))
+    (Memory.bound mem)
 
 let data_oob frame x i n =
+  let+ data = data frame.inst x in
   I64.gt_u (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (Chunked_byte_vector.length !(data frame.inst x))
+    (Chunked_byte_vector.Lwt.length !data)
 
 let table_oob frame x i n =
+  let+ tbl = table frame.inst x in
   I64.gt_u (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (I64_convert.extend_i32_u (Table.size (table frame.inst x)))
+    (I64_convert.extend_i32_u (Table.size tbl))
 
 let elem_oob frame x i n =
+  let+ elem = elem frame.inst x in
   I64.gt_u (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (I64.of_int_u (Instance.Vector.num_elements !(elem frame.inst x)))
+    (Int64.of_int32 (Instance.Vector.num_elements !elem))
 
 let rec step (c : config) : config Lwt.t =
   let {frame; code = vs, es; _} = c in
@@ -168,20 +187,18 @@ let rec step (c : config) : config Lwt.t =
         vs, []
       )
 
-      | Block (bt, es'), vs -> Lwt.return (
-        let FuncType (ts1, ts2) = block_type frame.inst bt in
+      | Block (bt, es'), vs ->
+        let+ FuncType (ts1, ts2) = block_type frame.inst bt in
         let n1 = Lib.List32.length ts1 in
         let n2 = Lib.List32.length ts2 in
         let args, vs' = take n1 vs e.at, drop n1 vs e.at in
         vs', [Label (n2, [], (args, List.map plain es')) @@ e.at]
-      )
 
-      | Loop (bt, es'), vs -> Lwt.return (
-        let FuncType (ts1, ts2) = block_type frame.inst bt in
+      | Loop (bt, es'), vs ->
+        let+ FuncType (ts1, ts2) = block_type frame.inst bt in
         let n1 = Lib.List32.length ts1 in
         let args, vs' = take n1 vs e.at, drop n1 vs e.at in
         vs', [Label (n1, [e' @@ e.at], (args, List.map plain es')) @@ e.at]
-      )
 
       | If (bt, es1, es2), Num (I32 i) :: vs' -> Lwt.return (
         if i = 0l then
@@ -212,13 +229,14 @@ let rec step (c : config) : config Lwt.t =
         [], [Returning vs @@ e.at]
       )
 
-      | Call x, vs -> Lwt.return (
-        vs, [Invoke (func frame.inst x) @@ e.at]
-      )
+      | Call x, vs ->
+        let+ func = func frame.inst x in
+        vs, [Invoke func @@ e.at]
 
       | CallIndirect (x, y), Num (I32 i) :: vs ->
-        let+ func = func_ref frame.inst x i e.at in
-        if type_ frame.inst y <> Func.type_of func then
+        let+ func = func_ref frame.inst x i e.at
+        and+ type_ = type_ frame.inst y in
+        if type_ <> Func.type_of func then
           vs, [Trapping "indirect call type mismatch" @@ e.at]
         else
           vs, [Invoke func @@ e.at]
@@ -248,45 +266,55 @@ let rec step (c : config) : config Lwt.t =
         v :: vs', []
       )
 
-      | GlobalGet x, vs -> Lwt.return (
-        let value = Global.load (global frame.inst x) in
+      | GlobalGet x, vs ->
+        let+ glob = global frame.inst x in
+        let value = Global.load glob in
         value :: vs, []
-      )
 
-      | GlobalSet x, v :: vs' -> Lwt.return (
-        (try Global.store (global frame.inst x) v; vs', []
-        with Global.NotMutable -> Crash.error e.at "write to immutable global"
-           | Global.Type -> Crash.error e.at "type mismatch at global write")
-      )
+      | GlobalSet x, v :: vs' ->
+        Lwt.catch
+          (fun () ->
+            let+ glob = global frame.inst x in
+            Global.store glob v;
+            vs', [])
+          (function
+          | Global.NotMutable -> Crash.error e.at "write to immutable global"
+          | Global.Type -> Crash.error e.at "type mismatch at global write"
+          | exn -> Lwt.fail exn)
 
       | TableGet x, Num (I32 i) :: vs' ->
         Lwt.catch
           (fun () ->
-            let+ value = Table.load (table frame.inst x) i in
+            let* tbl = table frame.inst x in
+            let+ value = Table.load tbl i in
             Ref value :: vs', [])
           (fun exn ->
             Lwt.return (vs', [Trapping (table_error e.at exn) @@ e.at]))
 
-      | TableSet x, Ref r :: Num (I32 i) :: vs' -> Lwt.return (
-        (try Table.store (table frame.inst x) i r; vs', []
-        with exn -> vs', [Trapping (table_error e.at exn) @@ e.at])
-      )
+      | TableSet x, Ref r :: Num (I32 i) :: vs' ->
+        Lwt.catch
+          (fun () ->
+            let+ tbl = table frame.inst x in
+            Table.store tbl i r;
+            vs', [])
+          (fun exn ->
+            Lwt.return (vs', [Trapping (table_error e.at exn) @@ e.at]))
 
-      | TableSize x, vs -> Lwt.return (
-        Num (I32 (Table.size (table frame.inst x))) :: vs, []
-      )
+      | TableSize x, vs ->
+        let+ tbl = table frame.inst x in
+        Num (I32 (Table.size tbl)) :: vs, []
 
-      | TableGrow x, Num (I32 delta) :: Ref r :: vs' -> Lwt.return (
-        let tab = table frame.inst x in
+      | TableGrow x, Num (I32 delta) :: Ref r :: vs' ->
+        let+ tab = table frame.inst x in
         let old_size = Table.size tab in
         let result =
           try Table.grow tab delta r; old_size
           with Table.SizeOverflow | Table.SizeLimit | Table.OutOfMemory -> -1l
         in Num (I32 result) :: vs', []
-      )
 
-      | TableFill x, Num (I32 n) :: Ref r :: Num (I32 i) :: vs' -> Lwt.return (
-        if table_oob frame x i n then
+      | TableFill x, Num (I32 n) :: Ref r :: Num (I32 i) :: vs' ->
+        let+ oob = table_oob frame x i n in
+        if oob then
           vs', [Trapping (table_error e.at Table.Bounds) @@ e.at]
         else if n = 0l then
           vs', []
@@ -301,10 +329,11 @@ let rec step (c : config) : config Lwt.t =
             Plain (Const (I32 (I32.sub n 1l) @@ e.at));
             Plain (TableFill x);
           ]
-      )
 
-      | TableCopy (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' -> Lwt.return (
-        if table_oob frame x d n || table_oob frame y s n then
+      | TableCopy (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
+        let+ oob_d = table_oob frame x d n
+        and+ oob_s = table_oob frame y s n in
+        if oob_d || oob_s then
           vs', [Trapping (table_error e.at Table.Bounds) @@ e.at]
         else if n = 0l then
           vs', []
@@ -330,38 +359,38 @@ let rec step (c : config) : config Lwt.t =
             Plain (TableGet y);
             Plain (TableSet x);
           ]
-      )
 
-      | TableInit (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' -> Lwt.return (
-        if table_oob frame x d n || elem_oob frame y s n then
-          vs', [Trapping (table_error e.at Table.Bounds) @@ e.at]
+      | TableInit (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
+        let* oob_d = table_oob frame x d n in
+        let* oob_s = elem_oob frame y s n in
+        if oob_d || oob_s then
+          Lwt.return (vs', [Trapping (table_error e.at Table.Bounds) @@ e.at])
         else if n = 0l then
-          vs', []
+          Lwt.return (vs', [])
         else
-          let seg = !(elem frame.inst y) in
+          let* seg = elem frame.inst y in
+          let+ value = Instance.Vector.get s !seg in
           vs', List.map (at e.at) [
             Plain (Const (I32 d @@ e.at));
             (* Note, the [Instance.Vector.get] is logarithmic in the number of
                contained elements in [seg]. However, in a scenario where the PVM
                runs, only the element that will be looked up is in the map
                making the look up cheap. *)
-            Refer (Instance.Vector.get (Int32.to_int s) seg);
+            Refer value;
             Plain (TableSet x);
             Plain (Const (I32 (I32.add d 1l) @@ e.at));
             Plain (Const (I32 (I32.add s 1l) @@ e.at));
             Plain (Const (I32 (I32.sub n 1l) @@ e.at));
             Plain (TableInit (x, y));
           ]
-      )
 
-      | ElemDrop x, vs -> Lwt.return (
-        let seg = elem frame.inst x in
-        seg := Instance.Vector.create 0;
+      | ElemDrop x, vs ->
+        let+ seg = elem frame.inst x in
+        seg := Instance.Vector.create 0l;
         vs, []
-      )
 
       | Load {offset; ty; pack; _}, Num (I32 i) :: vs' ->
-        let mem = memory frame.inst (0l @@ e.at) in
+        let* mem = memory frame.inst (0l @@ e.at) in
         let a = I64_convert.extend_i32_u i in
         Lwt.catch
           (fun () ->
@@ -375,7 +404,7 @@ let rec step (c : config) : config Lwt.t =
             Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
 
       | Store {offset; pack; _}, Num n :: Num (I32 i) :: vs' ->
-        let mem = memory frame.inst (0l @@ e.at) in
+        let* mem = memory frame.inst (0l @@ e.at) in
         let a = I64_convert.extend_i32_u i in
         Lwt.catch
           (fun () ->
@@ -389,7 +418,7 @@ let rec step (c : config) : config Lwt.t =
             Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
 
       | VecLoad {offset; ty; pack; _}, Num (I32 i) :: vs' ->
-        let mem = memory frame.inst (0l @@ e.at) in
+        let* mem = memory frame.inst (0l @@ e.at) in
         let addr = I64_convert.extend_i32_u i in
         Lwt.catch
           (fun () ->
@@ -403,7 +432,7 @@ let rec step (c : config) : config Lwt.t =
             Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
 
       | VecStore {offset; _}, Vec v :: Num (I32 i) :: vs' ->
-        let mem = memory frame.inst (0l @@ e.at) in
+        let* mem = memory frame.inst (0l @@ e.at) in
         let addr = I64_convert.extend_i32_u i in
         Lwt.catch
           (fun () ->
@@ -413,7 +442,7 @@ let rec step (c : config) : config Lwt.t =
             Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
 
       | VecLoadLane ({offset; ty; pack; _}, j), Vec (V128 v) :: Num (I32 i) :: vs' ->
-        let mem = memory frame.inst (0l @@ e.at) in
+        let* mem = memory frame.inst (0l @@ e.at) in
         let addr = I64_convert.extend_i32_u i in
         Lwt.catch
           (fun () ->
@@ -441,7 +470,7 @@ let rec step (c : config) : config Lwt.t =
             Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
 
       | VecStoreLane ({offset; ty; pack; _}, j), Vec (V128 v) :: Num (I32 i) :: vs' ->
-        let mem = memory frame.inst (0l @@ e.at) in
+        let* mem = memory frame.inst (0l @@ e.at) in
         let addr = I64_convert.extend_i32_u i in
         Lwt.catch
           (fun () ->
@@ -460,22 +489,21 @@ let rec step (c : config) : config Lwt.t =
           (fun exn ->
             Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
 
-      | MemorySize, vs -> Lwt.return (
-        let mem = memory frame.inst (0l @@ e.at) in
+      | MemorySize, vs ->
+        let+ mem = memory frame.inst (0l @@ e.at) in
         Num (I32 (Memory.size mem)) :: vs, []
-      )
 
-      | MemoryGrow, Num (I32 delta) :: vs' -> Lwt.return (
-        let mem = memory frame.inst (0l @@ e.at) in
+      | MemoryGrow, Num (I32 delta) :: vs' ->
+        let+ mem = memory frame.inst (0l @@ e.at) in
         let old_size = Memory.size mem in
         let result =
           try Memory.grow mem delta; old_size
           with Memory.SizeOverflow | Memory.SizeLimit | Memory.OutOfMemory -> -1l
         in Num (I32 result) :: vs', []
-      )
 
-      | MemoryFill, Num (I32 n) :: Num k :: Num (I32 i) :: vs' -> Lwt.return (
-        if mem_oob frame (0l @@ e.at) i n then
+      | MemoryFill, Num (I32 n) :: Num k :: Num (I32 i) :: vs' ->
+        let+ oob = mem_oob frame (0l @@ e.at) i n in
+        if oob then
           vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at]
         else if n = 0l then
           vs', []
@@ -490,10 +518,11 @@ let rec step (c : config) : config Lwt.t =
             Plain (Const (I32 (I32.sub n 1l) @@ e.at));
             Plain (MemoryFill);
           ]
-      )
 
-      | MemoryCopy, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' -> Lwt.return (
-        if mem_oob frame (0l @@ e.at) s n || mem_oob frame (0l @@ e.at) d n then
+      | MemoryCopy, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
+        let+ oob_s = mem_oob frame (0l @@ e.at) s n
+        and+ oob_d = mem_oob frame (0l @@ e.at) d n in
+        if oob_s || oob_d then
           vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at]
         else if n = 0l then
           vs', []
@@ -523,18 +552,18 @@ let rec step (c : config) : config Lwt.t =
             Plain (Store
               {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
           ]
-      )
 
-      | MemoryInit x, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' -> Lwt.return (
-        if mem_oob frame (0l @@ e.at) d n || data_oob frame x s n then
-          vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at]
+      | MemoryInit x, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
+        let* mem_oob = mem_oob frame (0l @@ e.at) d n in
+        let* data_oob = data_oob frame x s n in
+        if mem_oob || data_oob then
+          Lwt.return (vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at])
         else if n = 0l then
-          vs', []
+          Lwt.return (vs', [])
         else
-          let seg = !(data frame.inst x) in
-          let b =
-            Int32.of_int (Chunked_byte_vector.load_byte seg (Int64.of_int32 s))
-          in
+          let* seg = data frame.inst x in
+          let+ b = Chunked_byte_vector.Lwt.load_byte !seg (Int64.of_int32 s) in
+          let b = Int32.of_int b in
           vs', List.map (at e.at) [
             Plain (Const (I32 d @@ e.at));
             Plain (Const (I32 b @@ e.at));
@@ -545,13 +574,11 @@ let rec step (c : config) : config Lwt.t =
             Plain (Const (I32 (I32.sub n 1l) @@ e.at));
             Plain (MemoryInit x);
           ]
-      )
 
-      | DataDrop x, vs -> Lwt.return (
-        let seg = data frame.inst x in
-        seg := Chunked_byte_vector.create 0L;
+      | DataDrop x, vs ->
+        let+ seg = data frame.inst x in
+        seg := Chunked_byte_vector.Lwt.create 0L;
         vs, []
-      )
 
       | RefNull t, vs' -> Lwt.return (
         Ref (NullRef t) :: vs', []
@@ -565,10 +592,9 @@ let rec step (c : config) : config Lwt.t =
           Num (I32 0l) :: vs', []
       )
 
-      | RefFunc x, vs' -> Lwt.return (
-        let f = func frame.inst x in
+      | RefFunc x, vs' ->
+        let+ f = func frame.inst x in
         Ref (FuncRef f) :: vs', []
-      )
 
       | Const n, vs -> Lwt.return (
         Num n.it :: vs, []
@@ -797,8 +823,9 @@ let eval_const (inst : module_inst) (const : const) : value Lwt.t =
 
 (* Modules *)
 
-let create_func (inst : module_inst) (f : func) : func_inst =
-  Func.alloc (type_ inst f.it.ftype) (ref inst) f
+let create_func (inst : module_inst) (f : func) : func_inst Lwt.t =
+  let+ type_ = type_ inst f.it.ftype in
+  Func.alloc type_ (ref inst) f
 
 let create_table (inst : module_inst) (tab : table) : table_inst =
   let {ttype} = tab.it in
@@ -814,22 +841,22 @@ let create_global (inst : module_inst) (glob : global) : global_inst Lwt.t =
   let+ v = eval_const inst ginit in
   Global.alloc gtype v
 
-let create_export (inst : module_inst) (ex : export) : export_inst =
+let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
   let {name; edesc} = ex.it in
-  let ext =
+  let+ ext =
     match edesc.it with
-    | FuncExport x -> ExternFunc (func inst x)
-    | TableExport x -> ExternTable (table inst x)
-    | MemoryExport x -> ExternMemory (memory inst x)
-    | GlobalExport x -> ExternGlobal (global inst x)
-  in (name, ext)
+    | FuncExport x -> let+ func = func inst x in ExternFunc func
+    | TableExport x -> let+ tbl = table inst x in ExternTable tbl
+    | MemoryExport x -> let+ mem = memory inst x in ExternMemory mem
+    | GlobalExport x -> let+ glob = global inst x in ExternGlobal glob
+  in
+  (name, ext)
 
 let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst Lwt.t =
   let {etype; einit; _} = seg.it in
   (* TODO: #3076
-     [List.map] and [Instance.Vector.of_list] all have at least linear time
-     complexity and are therefore not suited for a single PVM tick. This
-     function needs to be broken up into ticks. *)
+     [einit] should be changed to a lazy structure. We want to avoid traversing
+     it whole. *)
   let+ init =
     TzStdLib.List.map_s
       (fun v ->
@@ -839,9 +866,14 @@ let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst Lwt.t =
   in
   ref (Instance.Vector.of_list init)
 
-let create_data (inst : module_inst) (seg : data_segment) : data_inst =
+let create_data (inst : module_inst) (seg : data_segment) : data_inst Lwt.t =
   let {dinit; _} = seg.it in
-  ref (Chunked_byte_vector.Buffer.to_byte_vector dinit)
+  (* TODO: #3076
+     Conversion from [Chunked_byte_vector.Buffer.t] to
+     [Chunked_byte_vector.Lwt.t] is currently not efficiently supported. *)
+  let data = Chunked_byte_vector.Buffer.to_string_unstable dinit in
+  let+ data = Chunked_byte_vector.Lwt.of_string data in
+  ref data
 
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst)
@@ -853,10 +885,10 @@ let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst)
       "expected " ^ Types.string_of_extern_type (import_type m im) ^
       ", got " ^ Types.string_of_extern_type (extern_type_of ext));
   match ext with
-  | ExternFunc func -> {inst with funcs = func :: inst.funcs}
-  | ExternTable tab -> {inst with tables = tab :: inst.tables}
-  | ExternMemory mem -> {inst with memories = mem :: inst.memories}
-  | ExternGlobal glob -> {inst with globals = glob :: inst.globals}
+  | ExternFunc func -> {inst with funcs = Vector.cons func inst.funcs}
+  | ExternTable tab -> {inst with tables = Vector.cons tab inst.tables}
+  | ExternMemory mem -> {inst with memories = Vector.cons mem inst.memories}
+  | ExternGlobal glob -> {inst with globals = Vector.cons glob inst.globals}
 
 let init_func (inst : module_inst) (func : func_inst) =
   match func with
@@ -906,26 +938,65 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
     Link.error m.at "wrong number of imports provided for initialisation";
   let inst0 =
     { (List.fold_right2 (add_import m) exts imports empty_module_inst) with
-      types = List.map (fun type_ -> type_.it) types }
+      types =
+        (* TODO: #3076
+           [types] should be a lazy structure so we can avoid traversing it
+           whole. *)
+        List.map (fun type_ -> type_.it) types |> Vector.of_list
+    }
   in
-  let fs = List.map (create_func inst0) funcs in
-  let inst1 = {inst0 with funcs = inst0.funcs @ fs} in
+  let* fs = TzStdLib.List.map_s (create_func inst0) funcs in
+  let inst1 =
+    { inst0 with
+      (* TODO: #3076
+         [fs]/[funcs] should be a lazy structure so we can avoid traversing it
+         completely. *)
+      funcs = Vector.concat inst0.funcs (Vector.of_list fs)
+    }
+  in
   let* new_globals =
     TzStdLib.List.map_s (create_global inst1) globals
   in
   let inst2 =
     { inst1 with
-      tables = inst1.tables @ List.map (create_table inst1) tables;
-      memories = inst1.memories @ List.map (create_memory inst1) memories;
-      globals = inst1.globals @ new_globals;
+      tables =
+        (* TODO: #3076
+           [tables] should be a lazy structure. *)
+        List.map (create_table inst1) tables
+        |> Vector.of_list
+        |> Vector.concat inst1.tables;
+      memories =
+        (* TODO: #3076
+           [memories] should be a lazy structure. *)
+        List.map (create_memory inst1) memories
+        |> Vector.of_list
+        |> Vector.concat inst1.memories;
+      globals =
+        (* TODO: #3076
+           [new_globals]/[globals] should be lazy structures. *)
+        Vector.concat inst1.globals (Vector.of_list new_globals);
     }
   in
+  let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
   let* new_elems = TzStdLib.List.map_s (create_elem inst2) elems in
+  let* new_datas = TzStdLib.List.map_s (create_data inst2) datas in
   let inst =
     { inst2 with
-      exports = List.map (create_export inst2) exports;
-      elems = new_elems;
-      datas = List.map (create_data inst2) datas;
+      exports =
+        (* TODO: #3076
+           [new_exports]/[exports] should be lazy structures. *)
+        List.fold_left
+          (fun exports (k, v) -> NameMap.set k v exports)
+          (NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ())
+          new_exports;
+      elems =
+        (* TODO: #3076
+           [new_elems]/[elems] should be lazy structures. *)
+        Vector.of_list new_elems;
+      datas =
+        (* TODO: #3076
+           [new_data]/[datas] should be lazy structures. *)
+        Vector.of_list new_datas;
     }
   in
   List.iter (init_func inst) fs;

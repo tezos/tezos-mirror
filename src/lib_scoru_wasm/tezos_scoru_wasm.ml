@@ -86,6 +86,8 @@ end = struct
     include T
   end
 
+  module Decodings = Decodings.Make (T)
+
   let compute_step = Lwt.return
 
   let set_input_step _ _ = Lwt.return
@@ -103,4 +105,10 @@ end = struct
         last_input_read = None;
         input_request = No_input_required;
       }
+
+  let _module_instance_of_tree modules =
+    Decodings.Tree.Decoding.run (Decodings.module_instance_decoding modules)
+
+  let _module_instances_of_tree =
+    Decodings.Tree.Decoding.run Decodings.module_instances_decoding
 end
