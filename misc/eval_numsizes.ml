@@ -1,3 +1,5 @@
+open Data_encoding
+
 (* length in bytes for some num representations *)
 
 let l_Z i = String.length (Result.get_ok (Binary.to_string z (Z.of_int64 i)))
@@ -47,3 +49,7 @@ let cutoffs_C =
   (* because of the share tag, we round up to the next full bytes, but the sizes
      should be considered 1byte+2bits, 2bytes+2bits, and 4bytes+2bits *)
   List.map (fun i -> find l_C i 0L Int64.max_int) [2; 3; 5]
+
+let () =
+  (* print out interesting values here *)
+  ()
