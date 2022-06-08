@@ -1748,7 +1748,6 @@ let tezos_protocol_environment_sigs =
     ~ocaml:V.(at_least "4.12")
     ~deps:[tezos_protocol_environment_sigs_stdlib_compat]
     ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ())
-    ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"; "V6"]
     ~dune:
       Dune.
         [

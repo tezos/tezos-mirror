@@ -1,5 +1,6 @@
 (rule
  (targets v0.ml)
+ (mode promote)
  (deps
 
    ;; Part of OCaml stdlib
