@@ -23,26 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Script_typed_ir
+
 (** [log_kinstr logger sty instr] returns [instr] prefixed by an
     [ILog] instruction to log the first instruction in [instr]. Note
     that [logger] value is only available when logging is enables, so
     the type system protects us from calling this by mistake. *)
 val log_kinstr :
-  Script_typed_ir.logger ->
-  ('a, 'b) Script_typed_ir.stack_ty ->
-  ('a, 'b, 'c, 'd) Script_typed_ir.kinstr ->
-  ('a, 'b, 'c, 'd) Script_typed_ir.kinstr
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('a, 'b, 'c, 'd) kinstr
 
 (** [log_entry logger ctxt gas instr sty accu stack] simply calls
     [logger.log_entry] function with the appropriate arguments. Note
     that [logger] value is only available when logging is enables, so
     the type system protects us from calling this by mistake.*)
 val log_entry :
-  Script_typed_ir.logger ->
+  logger ->
   Local_gas_counter.outdated_context ->
   Local_gas_counter.local_gas_counter ->
-  ('a, 'b, 'c, 'd) Script_typed_ir.kinstr ->
-  ('a, 'b) Script_typed_ir.stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('a, 'b) stack_ty ->
   'a ->
   'b ->
   unit
@@ -52,12 +54,12 @@ val log_entry :
     that [logger] value is only available when logging is enables, so
     the type system protects us from calling this by mistake.*)
 val log_exit :
-  Script_typed_ir.logger ->
+  logger ->
   Local_gas_counter.outdated_context ->
   Local_gas_counter.local_gas_counter ->
   Alpha_context.Script.location ->
-  ('c, 'd, 'e, 'f) Script_typed_ir.kinstr ->
-  ('g, 'h) Script_typed_ir.stack_ty ->
+  ('c, 'd, 'e, 'f) kinstr ->
+  ('g, 'h) stack_ty ->
   'g ->
   'h ->
   unit
@@ -70,16 +72,19 @@ val log_exit :
     is only available when logging is enables, so the type system protects
     us from calling this by mistake. *)
 val log_next_kinstr :
-  Script_typed_ir.logger ->
-  ('a, 'b) Script_typed_ir.stack_ty ->
-  ('a, 'b, 'c, 'd) Script_typed_ir.kinstr ->
-  ('a, 'b, 'c, 'd) Script_typed_ir.kinstr tzresult
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('a, 'b, 'c, 'd) kinstr tzresult
 
 (** [log_control logger continuation] simply calls [logger.log_control]
     function with the appropriate arguments. Note that [logger] value
     is only available when logging is enables, so the type system
     protects us from calling this by mistake.*)
-val log_control :
-  Script_typed_ir.logger ->
-  ('a, 'b, 'c, 'd) Script_typed_ir.continuation ->
-  unit
+val log_control : logger -> ('a, 'b, 'c, 'd) continuation -> unit
+
+val log_next_continuation :
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) continuation ->
+  ('a, 'b, 'c, 'd) continuation tzresult

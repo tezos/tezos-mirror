@@ -1169,7 +1169,7 @@ let extract_ir_sized_step :
   | INil (_, _, _), _ -> Instructions.nil
   | IIf_cons _, _ -> Instructions.if_cons
   | IList_iter (_, _, _, _), _ -> Instructions.list_iter
-  | IList_map (_, _, _), _ -> Instructions.list_map
+  | IList_map (_, _, _, _), _ -> Instructions.list_map
   | IList_size (_, _), (list, _) -> Instructions.list_size (Size.list list)
   | IEmpty_set (_, _, _), _ -> Instructions.empty_set
   | ISet_iter _, (set, _) -> Instructions.set_iter (Size.set set)
@@ -1305,7 +1305,7 @@ let extract_ir_sized_step :
   | IIf _, _ -> Instructions.if_
   | ILoop (_, _, _), _ -> Instructions.loop
   | ILoop_left (_, _, _), _ -> Instructions.loop_left
-  | IDip (_, _, _), _ -> Instructions.dip
+  | IDip (_, _, _, _), _ -> Instructions.dip
   | IExec (_, _), _ -> Instructions.exec
   | IApply (_, _, _), _ -> Instructions.apply
   | ILambda (_, _, _), _ -> Instructions.lambda
@@ -1321,7 +1321,7 @@ let extract_ir_sized_step :
   | IAddress (_, _), _ -> Instructions.address
   | IContract (_, _, _, _), _ -> Instructions.contract
   | ITransfer_tokens (_, _), _ -> Instructions.transfer_tokens
-  | IView (_, _, _), _ -> Instructions.view
+  | IView (_, _, _, _), _ -> Instructions.view
   | IImplicit_account (_, _), _ -> Instructions.implicit_account
   | ICreate_contract _, _ -> Instructions.create_contract
   | ISet_delegate (_, _), _ -> Instructions.set_delegate
@@ -1437,14 +1437,14 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KLoop_in _ -> Control.loop_in
   | KLoop_in_left _ -> Control.loop_in_left
   | KIter (_, _, xs, _) -> Control.iter (Size.of_int (List.length xs))
-  | KList_enter_body (_, xs, ys, _, _) ->
+  | KList_enter_body (_, xs, ys, _, _, _) ->
       Control.list_enter_body
         (Size.of_int (List.length xs))
         (Size.of_int (List.length ys))
-  | KList_exit_body (_, _, _, _, _) -> Control.list_exit_body
-  | KMap_enter_body (_, xs, _, _) ->
+  | KList_exit_body (_, _, _, _, _, _) -> Control.list_exit_body
+  | KMap_enter_body (_, xs, _, _, _) ->
       Control.map_enter_body (Size.of_int (List.length xs))
-  | KMap_exit_body (_, _, map, k, _) ->
+  | KMap_exit_body (_, _, map, k, _, _) ->
       let (module Map) = Script_map.get_module map in
       let key_size = Map.OPS.key_size k in
       Control.map_exit_body key_size (Size.map map)

@@ -1116,7 +1116,7 @@ module Registration_section = struct
           ~name:Interpreter_workload.N_IList_map
           ~stack:(Script_list.empty, ((), eos))
           ~stack_type:(list unit @$ unit @$ bot)
-          ~kinstr:(IList_map (dummy_loc, halt, halt))
+          ~kinstr:(IList_map (dummy_loc, halt, Some (list unit), halt))
           ()
     end
 
@@ -1276,7 +1276,8 @@ module Registration_section = struct
      *)
 
     let map_map_code () =
-      IMap_map (dummy_loc, int, IFailwith (dummy_loc, cpair int unit), halt)
+      IMap_map
+        (dummy_loc, map int unit, IFailwith (dummy_loc, cpair int unit), halt)
 
     let () =
       (*
@@ -2005,7 +2006,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IDip
         ~stack_type:(unit @$ unit @$ bot)
-        ~kinstr:(IDip (dummy_loc, halt, halt))
+        ~kinstr:(IDip (dummy_loc, halt, Some unit, halt))
         ()
 
     let dummy_lambda =
@@ -2209,6 +2210,7 @@ module Registration_section = struct
           (IView
              ( dummy_loc,
                View_signature {name; input_ty = unit; output_ty = unit},
+               Some (unit @$ bot),
                halt ))
         ()
 
@@ -2959,7 +2961,7 @@ module Registration_section = struct
         ~amplification:100
         ~name:Interpreter_workload.N_KReturn
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
-          let cont = KReturn (eos, KNil) in
+          let cont = KReturn (eos, Some (unit @$ bot), KNil) in
           let stack = ((), eos) in
           let stack_type = unit @$ bot in
           fun () -> Ex_stack_and_cont {stack; cont; stack_type})
@@ -3036,7 +3038,7 @@ module Registration_section = struct
         ~amplification:100
         ~name:Interpreter_workload.N_KUndip
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
-          let cont = KUndip ((), KNil) in
+          let cont = KUndip ((), Some unit, KNil) in
           let stack = eos in
           let stack_type = bot in
           fun () -> Ex_stack_and_cont {stack; cont; stack_type})
@@ -3085,7 +3087,7 @@ module Registration_section = struct
         KList_enter_body ([], [()] ->
         List.rev singleton
         KNil
-      *)
+       *)
       continuation_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_KList_enter_body
@@ -3093,7 +3095,9 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let kbody = halt in
           fun () ->
-            let cont = KList_enter_body (kbody, [()], [], 1, KNil) in
+            let cont =
+              KList_enter_body (kbody, [()], [], Some (list unit), 1, KNil)
+            in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
         ()
@@ -3114,7 +3118,8 @@ module Registration_section = struct
           fun () ->
             let ys = Samplers.Random_value.value (list unit) rng_state in
             let cont =
-              KList_enter_body (kbody, [], ys.elements, ys.length, KNil)
+              KList_enter_body
+                (kbody, [], ys.elements, Some (list unit), ys.length, KNil)
             in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
@@ -3134,7 +3139,9 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let kbody = halt in
           fun () ->
-            let cont = KList_enter_body (kbody, [], [], 1, KNil) in
+            let cont =
+              KList_enter_body (kbody, [], [], Some (list unit), 1, KNil)
+            in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
         ()
@@ -3153,7 +3160,9 @@ module Registration_section = struct
         ~salt:"_terminal"
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let kbody = halt in
-          let cont = KList_exit_body (kbody, [], [], 1, KNil) in
+          let cont =
+            KList_exit_body (kbody, [], [], Some (list unit), 1, KNil)
+          in
           fun () ->
             Ex_stack_and_cont
               {stack = ((), ((), eos)); stack_type = unit @$ unit @$ bot; cont})
@@ -3163,7 +3172,9 @@ module Registration_section = struct
 
     let map_enter_body_code =
       let kbody = ICdr (dummy_loc, halt) in
-      fun accu -> KMap_enter_body (kbody, accu, Script_map.empty int, KNil)
+      fun accu ->
+        KMap_enter_body
+          (kbody, accu, Script_map.empty int, Some (map int unit), KNil)
 
     let () =
       (*
@@ -3219,8 +3230,9 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun cfg rng_state ->
           let kbody = ICdr (dummy_loc, halt) in
           fun () ->
+            let ty = map int unit in
             let key, map = Maps.generate_map_and_key_in_map cfg rng_state in
-            let cont = KMap_exit_body (kbody, [], map, key, KNil) in
+            let cont = KMap_exit_body (kbody, [], map, key, Some ty, KNil) in
             Ex_stack_and_cont
               {stack = ((), ((), eos)); stack_type = unit @$ unit @$ bot; cont})
         ()

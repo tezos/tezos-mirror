@@ -373,7 +373,7 @@ and kinstr_size :
     | INil (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | IIf_cons {loc = _; branch_if_nil = _; branch_if_cons = _; k = _} ->
         ret_succ_adding accu (base +! (word_size *? 2))
-    | IList_map (_, _, _) -> ret_succ_adding accu base
+    | IList_map (_, _, _, _) -> ret_succ_adding accu base
     | IList_iter (_, ty, _, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | IList_size (_, _) -> ret_succ_adding accu base
@@ -450,15 +450,14 @@ and kinstr_size :
         ret_succ_adding accu (base +! (word_size *? 2))
     | ILoop (_, _, _) -> ret_succ_adding accu (base +! word_size)
     | ILoop_left (_, _, _) -> ret_succ_adding accu (base +! word_size)
-    | IDip (_, _, _) -> ret_succ_adding accu (base +! word_size)
+    | IDip (_, _, _, _) -> ret_succ_adding accu (base +! word_size)
     | IExec (_, _) -> ret_succ_adding accu base
     | IApply (_, ty, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | ILambda (_, lambda, _) ->
         let accu = ret_succ_adding accu (base +! word_size) in
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
-    | IFailwith (_, ty) ->
-        ret_succ_adding (accu ++ ty_size ty) base
+    | IFailwith (_, ty) -> ret_succ_adding (accu ++ ty_size ty) base
     | ICompare (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
     | IEq (_, _) -> ret_succ_adding accu base
@@ -472,8 +471,10 @@ and kinstr_size :
         ret_succ_adding
           (accu ++ ty_size ty)
           (base +! Entrypoint.in_memory_size s +! (word_size *? 2))
-    | IView (_, s, _) ->
-        ret_succ_adding (accu ++ view_signature_size s) (base +! word_size)
+    | IView (_loc, s, sty, _k) ->
+        ret_succ_adding
+          (accu ++ view_signature_size s ++ stack_ty_size sty)
+          (base +! (word_size *? 2))
     | ITransfer_tokens (_, _) -> ret_succ_adding accu base
     | IImplicit_account (_, _) -> ret_succ_adding accu base
     | ICreate_contract {loc = _; storage_type; code; k = _} ->

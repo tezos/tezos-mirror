@@ -542,6 +542,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IList_map :
       Script.location
       * ('a, 'c * 's, 'b, 'c * 's) kinstr
+      * ('b boxed_list, _) ty option
       * ('b boxed_list, 'c * 's, 'r, 'f) kinstr
       -> ('a boxed_list, 'c * 's, 'r, 'f) kinstr
   | IList_iter :
@@ -587,7 +588,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       Script.location
-      * 'a comparable_ty
+      * (('a, 'c) map, _) ty
       * ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * (('a, 'c) map, 'd * 's, 'r, 'f) kinstr
       -> (('a, 'b) map, 'd * 's, 'r, 'f) kinstr
@@ -805,7 +806,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('b, 's, 'r, 'f) kinstr
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
   | IDip :
-      Script.location * ('b, 's, 'c, 't) kinstr * ('a, 'c * 't, 'r, 'f) kinstr
+      Script.location
+      * ('b, 's, 'c, 't) kinstr
+      * ('a, _) ty option
+      * ('a, 'c * 't, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | IExec :
       Script.location * ('b, 's, 'r, 'f) kinstr
@@ -864,6 +868,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IView :
       Script.location
       * ('a, 'b) view_signature
+      * ('b, 'c * 's) stack_ty option
       * ('b option, 'c * 's, 'r, 'f) kinstr
       -> ('a, address * ('c * 's), 'r, 'f) kinstr
   | ITransfer_tokens :
@@ -1112,13 +1117,13 @@ and (_, _, _, _) continuation =
       ('a, 's, 'b, 't) kinstr * ('b, 't, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
   | KReturn :
-      's * ('a, 's, 'r, 'f) continuation
+      's * ('a, 's) stack_ty option * ('a, 's, 'r, 'f) continuation
       -> ('a, end_of_stack, 'r, 'f) continuation
   | KMap_head :
       ('a -> 'b) * ('b, 's, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
   | KUndip :
-      'b * ('b, 'a * 's, 'r, 'f) continuation
+      'b * ('b, _) ty option * ('b, 'a * 's, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
   | KLoop_in :
       ('a, 's, bool, 'a * 's) kinstr * ('a, 's, 'r, 'f) continuation
@@ -1136,6 +1141,7 @@ and (_, _, _, _) continuation =
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
+      * ('b boxed_list, _) ty option
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('c, 's, 'r, 'f) continuation
@@ -1143,6 +1149,7 @@ and (_, _, _, _) continuation =
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
+      * ('b boxed_list, _) ty option
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('b, 'c * 's, 'r, 'f) continuation
@@ -1150,6 +1157,7 @@ and (_, _, _, _) continuation =
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) map
+      * (('a, 'c) map, _) ty option
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('d, 's, 'r, 'f) continuation
   | KMap_exit_body :
@@ -1157,6 +1165,7 @@ and (_, _, _, _) continuation =
       * ('a * 'b) list
       * ('a, 'c) map
       * 'a
+      * (('a, 'c) map, _) ty option
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('c, 'd * 's, 'r, 'f) continuation
   | KView_exit :
@@ -1430,7 +1439,7 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | ICons_list (loc, _) -> loc
   | INil (loc, _, _) -> loc
   | IIf_cons {loc; _} -> loc
-  | IList_map (loc, _, _) -> loc
+  | IList_map (loc, _, _, _) -> loc
   | IList_iter (loc, _, _, _) -> loc
   | IList_size (loc, _) -> loc
   | IEmpty_set (loc, _, _) -> loc
@@ -1495,7 +1504,7 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | IIf {loc; _} -> loc
   | ILoop (loc, _, _) -> loc
   | ILoop_left (loc, _, _) -> loc
-  | IDip (loc, _, _) -> loc
+  | IDip (loc, _, _, _) -> loc
   | IExec (loc, _) -> loc
   | IApply (loc, _, _) -> loc
   | ILambda (loc, _, _) -> loc
@@ -1510,7 +1519,7 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | IAddress (loc, _) -> loc
   | IContract (loc, _, _, _) -> loc
   | ITransfer_tokens (loc, _) -> loc
-  | IView (loc, _, _) -> loc
+  | IView (loc, _, _, _) -> loc
   | IImplicit_account (loc, _) -> loc
   | ICreate_contract {loc; _} -> loc
   | ISet_delegate (loc, _) -> loc
@@ -1829,7 +1838,7 @@ let kinstr_traverse i init f =
     | INil (_, _, k) -> (next [@ocaml.tailcall]) k
     | IIf_cons {loc = _; branch_if_nil = k1; branch_if_cons = k2; k} ->
         (next3 [@ocaml.tailcall]) k1 k2 k
-    | IList_map (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IList_map (_, k1, _, k2) -> (next2 [@ocaml.tailcall]) k1 k2
     | IList_iter (_, _, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
     | IList_size (_, k) -> (next [@ocaml.tailcall]) k
     | IEmpty_set (_, _, k) -> (next [@ocaml.tailcall]) k
@@ -1895,7 +1904,7 @@ let kinstr_traverse i init f =
         (next3 [@ocaml.tailcall]) k1 k2 k
     | ILoop (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
     | ILoop_left (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
-    | IDip (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IDip (_, k1, _, k2) -> (next2 [@ocaml.tailcall]) k1 k2
     | IExec (_, k) -> (next [@ocaml.tailcall]) k
     | IApply (_, _, k) -> (next [@ocaml.tailcall]) k
     | ILambda (_, _, k) -> (next [@ocaml.tailcall]) k
@@ -1909,7 +1918,7 @@ let kinstr_traverse i init f =
     | IGe (_, k) -> (next [@ocaml.tailcall]) k
     | IAddress (_, k) -> (next [@ocaml.tailcall]) k
     | IContract (_, _, _, k) -> (next [@ocaml.tailcall]) k
-    | IView (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IView (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | ITransfer_tokens (_, k) -> (next [@ocaml.tailcall]) k
     | IImplicit_account (_, k) -> (next [@ocaml.tailcall]) k
     | ICreate_contract {k; _} -> (next [@ocaml.tailcall]) k

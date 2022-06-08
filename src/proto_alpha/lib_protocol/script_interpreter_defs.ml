@@ -365,15 +365,15 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   | KCons (_, _) -> Interp_costs.Control.cons
   | KReturn _ -> Interp_costs.Control.return
   | KMap_head (_, _) -> Interp_costs.Control.map_head
-  | KUndip (_, _) -> Interp_costs.Control.undip
+  | KUndip (_, _, _) -> Interp_costs.Control.undip
   | KLoop_in (_, _) -> Interp_costs.Control.loop_in
   | KLoop_in_left (_, _) -> Interp_costs.Control.loop_in_left
   | KIter (_, _, _, _) -> Interp_costs.Control.iter
-  | KList_enter_body (_, xs, _, len, _) ->
+  | KList_enter_body (_, xs, _, _, len, _) ->
       Interp_costs.Control.list_enter_body xs len
-  | KList_exit_body (_, _, _, _, _) -> Interp_costs.Control.list_exit_body
-  | KMap_enter_body (_, _, _, _) -> Interp_costs.Control.map_enter_body
-  | KMap_exit_body (_, _, map, key, _) ->
+  | KList_exit_body (_, _, _, _, _, _) -> Interp_costs.Control.list_exit_body
+  | KMap_enter_body (_, _, _, _, _) -> Interp_costs.Control.map_enter_body
+  | KMap_exit_body (_, _, map, key, _, _) ->
       Interp_costs.Control.map_exit_body key map
   | KView_exit (_, _) -> Interp_costs.Control.view_exit
 
@@ -686,11 +686,12 @@ type ('a, 's, 'b, 't, 'r, 'f) step_type =
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
+type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('m * 'n, 'a * 'b, 'o, 'a * 'b) kinstr ->
   ('m * 'n) list ->
+  (('m, 'o) map, 'c) ty option ->
   ('m, 'o) map ->
   'm ->
   (('m, 'o) map, 'a * 'b, 'e, 'f) continuation ->
@@ -698,35 +699,38 @@ type ('a, 'b, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   'a * 'b ->
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
+type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
   ('j * 'k) list ->
+  (('j, 'a) map, 'f) ty option ->
   ('j, 'a) map ->
   (('j, 'a) map, 'b * 'c, 'd, 'e) continuation ->
   'b ->
   'c ->
   ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
+type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
   'i list ->
   'j list ->
+  ('j boxed_list, 'e) ty option ->
   int ->
   ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
+type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
   'j list ->
   'b list ->
+  ('b boxed_list, 'f) ty option ->
   int ->
   ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
   'a ->
@@ -764,12 +768,13 @@ type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) ilist_map_type =
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
   ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
+  ('f boxed_list, 'i) ty option ->
   'e boxed_list ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
@@ -796,12 +801,13 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) imap_map_type =
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
   (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
   ('h, 'i, 'c, 'd) continuation ->
+  (('e, 'g) map, 'j) ty option ->
   ('e, 'f) map ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t

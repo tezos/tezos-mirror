@@ -308,7 +308,7 @@ let kinstr_split :
                (fun branch_if_cons branch_if_nil k ->
                  IIf_cons {loc; branch_if_cons; branch_if_nil; k});
            }
-  | IList_map (loc, body, k), Item_t (List_t (a, _meta), s) ->
+  | IList_map (loc, body, ty, k), Item_t (List_t (a, _meta), s) ->
       let s = Item_t (a, s) in
       ok
       @@ Ex_split_loop_may_not_fail
@@ -319,7 +319,7 @@ let kinstr_split :
              aft_body_stack_transform =
                (function
                | Item_t (b, s) -> list_t dummy b >|? fun l -> Item_t (l, s));
-             reconstruct = (fun body k -> IList_map (loc, body, k));
+             reconstruct = (fun body k -> IList_map (loc, body, ty, k));
            }
   | IList_iter (loc, ty, body, k), Item_t (List_t (a, _meta), s) ->
       ok
@@ -394,7 +394,8 @@ let kinstr_split :
           continuation = k;
           reconstruct = (fun k -> IEmpty_map (loc, cty, vty, k));
         }
-  | IMap_map (loc, key_ty, body, k), Item_t (Map_t (kty, vty, _meta), s) ->
+  | IMap_map (loc, ty, body, k), Item_t (Map_t (kty, vty, _meta), s) ->
+      let (Map_t (key_ty, _, _)) = ty in
       pair_t dummy key_ty vty >|? fun (Ty_ex_c p) ->
       Ex_split_loop_may_not_fail
         {
@@ -404,7 +405,7 @@ let kinstr_split :
           aft_body_stack_transform =
             (fun (Item_t (b, s)) ->
               map_t dummy kty b >|? fun m -> Item_t (m, s));
-          reconstruct = (fun body k -> IMap_map (loc, key_ty, body, k));
+          reconstruct = (fun body k -> IMap_map (loc, ty, body, k));
         }
   | IMap_iter (loc, kvty, body, k), Item_t (_, stack) ->
       ok
@@ -888,7 +889,7 @@ let kinstr_split :
              continuation = kr;
              reconstruct = (fun kl kr -> ILoop_left (loc, kl, kr));
            }
-  | IDip (loc, body, k), Item_t (a, s) ->
+  | IDip (loc, body, ty, k), Item_t (a, s) ->
       ok
       @@ Ex_split_loop_may_not_fail
            {
@@ -896,7 +897,7 @@ let kinstr_split :
              body;
              continuation = k;
              aft_body_stack_transform = (fun s -> ok @@ Item_t (a, s));
-             reconstruct = (fun body k -> IDip (loc, body, k));
+             reconstruct = (fun body k -> IDip (loc, body, ty, k));
            }
   | IExec (loc, k), Item_t (_, Item_t (Lambda_t (_, b, _meta), s)) ->
       let s = Item_t (b, s) in
@@ -1024,7 +1025,7 @@ let kinstr_split :
              continuation = k;
              reconstruct = (fun k -> ITransfer_tokens (loc, k));
            }
-  | ( IView (loc, (View_signature {output_ty; _} as view_signature), k),
+  | ( IView (loc, (View_signature {output_ty; _} as view_signature), sty, k),
       Item_t (_, Item_t (_, s)) ) ->
       option_t dummy output_ty >|? fun b ->
       let s = Item_t (b, s) in
@@ -1032,7 +1033,7 @@ let kinstr_split :
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IView (loc, view_signature, k));
+          reconstruct = (fun k -> IView (loc, view_signature, sty, k));
         }
   | IImplicit_account (loc, k), Item_t (_, s) ->
       let s = Item_t (contract_unit_t, s) in
@@ -1721,3 +1722,65 @@ let log_next_kinstr logger sty i =
         log_kinstr logger sty k )
   in
   kinstr_rewritek sty i {apply}
+
+let log_next_continuation :
+    type a b c d.
+    logger ->
+    (a, b) stack_ty ->
+    (a, b, c, d) continuation ->
+    (a, b, c, d) continuation tzresult =
+ fun logger stack_ty cont ->
+  let enable_log sty ki = log_kinstr logger sty ki in
+  let mk sty = function KLog _ as k -> k | k -> KLog (k, sty, logger) in
+  match cont with
+  | KCons (ki, k) -> (
+      let ki' = enable_log stack_ty ki in
+      kinstr_final_stack_type stack_ty ki >|? function
+      | None -> KCons (ki', k)
+      | Some sty -> KCons (ki', mk sty k))
+  | KLoop_in (ki, k) ->
+      let (Item_t (Bool_t, sty)) = stack_ty in
+      ok @@ KLoop_in (enable_log sty ki, mk sty k)
+  | KReturn (stack, sty_opt, k) ->
+      let k' = match sty_opt with None -> k | Some sty -> mk sty k in
+      ok @@ KReturn (stack, sty_opt, k')
+  | KLoop_in_left (ki, k) ->
+      let (Item_t (Union_t (a_ty, b_ty, _, _), rest)) = stack_ty in
+      let ki' = enable_log (Item_t (a_ty, rest)) ki in
+      let k' = mk (Item_t (b_ty, rest)) k in
+      ok @@ KLoop_in_left (ki', k')
+  | KUndip (x, ty_opt, k) ->
+      let k' =
+        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, stack_ty)) k
+      in
+      ok @@ KUndip (x, ty_opt, k')
+  | KIter (body, xty, xs, k) ->
+      let body' = enable_log (Item_t (xty, stack_ty)) body in
+      let k' = mk stack_ty k in
+      ok @@ KIter (body', xty, xs, k')
+  | KList_enter_body (body, xs, ys, ty_opt, len, k) ->
+      let k' =
+        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, stack_ty)) k
+      in
+      ok @@ KList_enter_body (body, xs, ys, ty_opt, len, k')
+  | KList_exit_body (body, xs, ys, ty_opt, len, k) ->
+      let (Item_t (_, sty)) = stack_ty in
+      let k' =
+        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, sty)) k
+      in
+      ok @@ KList_exit_body (body, xs, ys, ty_opt, len, k')
+  | KMap_enter_body (body, xs, ys, ty_opt, k) ->
+      let k' =
+        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, stack_ty)) k
+      in
+      ok @@ KMap_enter_body (body, xs, ys, ty_opt, k')
+  | KMap_exit_body (body, xs, ys, yk, ty_opt, k) ->
+      let (Item_t (_, sty)) = stack_ty in
+      let k' =
+        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, sty)) k
+      in
+      ok @@ KMap_exit_body (body, xs, ys, yk, ty_opt, k')
+  | KMap_head (_, _)
+  | KView_exit (_, _)
+  | KLog _ (* This case should never happen. *) | KNil ->
+      ok cont
