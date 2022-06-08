@@ -127,8 +127,37 @@ let get_chain_chain_id ?(chain = "main") () =
 let get_chain_block ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block] Fun.id
 
+type block_metadata = {
+  protocol : string;
+  next_protocol : string;
+  proposer : string;
+  max_operations_ttl : int;
+  dal_slot_availability : bool Array.t option;
+}
+
 let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
+  make GET ["chains"; chain; "blocks"; block; "metadata"] @@ fun json ->
+  let dal_slot_availability =
+    match JSON.(json |-> "dal_slot_availability" |> as_string_opt) with
+    | None -> None
+    | Some slots ->
+        let slot_availability = Z.of_string slots in
+        let length = Z.numbits slot_availability in
+        let array = Array.make length false in
+        List.iter
+          (fun i -> if Z.testbit slot_availability i then array.(i) <- true)
+          (range 0 (length - 1)) ;
+        Some array
+  in
+  let protocol = JSON.(json |-> "protocol" |> as_string) in
+  let next_protocol = JSON.(json |-> "next_protocol" |> as_string) in
+  let proposer =
+    match JSON.(json |-> "proposer" |> as_string_opt) with
+    | None -> (* This should be only for tests protocols *) ""
+    | Some proposer -> proposer
+  in
+  let max_operations_ttl = JSON.(json |-> "max_operations_ttl" |> as_int) in
+  {dal_slot_availability; protocol; next_protocol; proposer; max_operations_ttl}
 
 let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string

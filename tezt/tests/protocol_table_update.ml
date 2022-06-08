@@ -34,14 +34,12 @@ let check_protocol_activation ~migrate_from ~migrate_to ~block client =
   let* migration_block =
     RPC.Client.call client @@ RPC.get_chain_block_metadata ~block ()
   in
-  let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Check.(
-    (protocol = Protocol.hash migrate_from)
+    (migration_block.protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected protocol = %R, got %L") ;
-  let next_protocol = JSON.(migration_block |-> "next_protocol" |> as_string) in
   Check.(
-    (next_protocol = Protocol.hash migrate_to)
+    (migration_block.next_protocol = Protocol.hash migrate_to)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   Lwt.return_unit

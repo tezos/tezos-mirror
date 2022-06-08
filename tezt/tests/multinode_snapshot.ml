@@ -48,7 +48,7 @@ let node_arguments = Node.[Synchronisation_threshold 0]
 
 let get_head_max_op_ttl node =
   let* head = RPC.call node @@ RPC.get_chain_block_metadata () in
-  return JSON.(head |-> "max_operations_ttl" |> as_int)
+  return head.max_operations_ttl
 
 (*
 
@@ -227,7 +227,7 @@ let test_storage_snapshot =
       unit
     in
     iter_block_range_s savepoint head_level @@ fun block ->
-    let* (_ : JSON.t) =
+    let* (_ : RPC.block_metadata) =
       RPC.call node @@ RPC.get_chain_block_metadata ~block ()
     in
     unit

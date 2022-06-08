@@ -78,13 +78,8 @@ let test_feature_flag =
       ~error_msg:"Expected mempool: %R. Got: %L. (Order does not matter)") ;
   let* () = Client.bake_for_and_wait client in
   let* block_metadata = RPC.(call node @@ get_chain_block_metadata ()) in
-  let slot_availability =
-    JSON.(block_metadata |-> "dal_slot_availability" |> is_null)
-  in
-  Check.(
-    (slot_availability = true)
-      bool
-      ~error_msg:"Did not expect to find \"dal_slot_availibility\"") ;
+  if block_metadata.dal_slot_availability <> None then
+    Test.fail "Did not expect to find \"dal_slot_availibility\"" ;
   unit
 
 let register ~protocols = test_feature_flag protocols

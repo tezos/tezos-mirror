@@ -55,17 +55,13 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
          ~block:(string_of_int (migration_level - 1))
          ()
   in
-  let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
   Log.info "checking consistency of block at level %d" (migration_level - 1) ;
   Check.(
-    (protocol = Protocol.hash migrate_from)
+    (non_migration_block.protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected protocol = %R, got %L") ;
-  let next_protocol =
-    JSON.(non_migration_block |-> "next_protocol" |> as_string)
-  in
   Check.(
-    (next_protocol = Protocol.hash migrate_from)
+    (non_migration_block.next_protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   Log.info "checking consistency of block at level %d" migration_level ;
@@ -73,14 +69,12 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
     RPC.Client.call client
     @@ RPC.get_chain_block_metadata ~block:(string_of_int migration_level) ()
   in
-  let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Check.(
-    (protocol = Protocol.hash migrate_from)
+    (migration_block.protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected protocol = %R, got %L") ;
-  let next_protocol = JSON.(migration_block |-> "next_protocol" |> as_string) in
   Check.(
-    (next_protocol = Protocol.hash migrate_to)
+    (migration_block.next_protocol = Protocol.hash migrate_to)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* We call the RPC again to make sure that no side-effect occured
@@ -94,16 +88,12 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
          ~block:(string_of_int (migration_level - 1))
          ()
   in
-  let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
   Check.(
-    (protocol = Protocol.hash migrate_from)
+    (non_migration_block.protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected protocol = %R, got %L") ;
-  let next_protocol =
-    JSON.(non_migration_block |-> "next_protocol" |> as_string)
-  in
   Check.(
-    (next_protocol = Protocol.hash migrate_from)
+    (non_migration_block.next_protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   unit

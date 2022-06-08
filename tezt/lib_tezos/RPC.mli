@@ -162,12 +162,21 @@ val get_chain_chain_id : ?chain:string -> unit -> string t
     [block] defaults to ["head"]. *)
 val get_chain_block : ?chain:string -> ?block:string -> unit -> JSON.t t
 
+type block_metadata = {
+  protocol : string;
+  next_protocol : string;
+  proposer : string;
+  max_operations_ttl : int;
+  dal_slot_availability : bool Array.t option;
+      (** This field is [None] if and only if the [DAL] feature flag is disabled. *)
+}
+
 (** RPC: [GET /chains/[chain]/blocks/[block]/metadata]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_metadata :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> unit -> block_metadata t
 
 (** RPC: [GET /chains/[chain]/blocks/[block]/hash]
 

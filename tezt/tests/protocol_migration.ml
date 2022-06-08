@@ -58,15 +58,13 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
   let* migration_block =
     RPC.Client.call client @@ RPC.get_chain_block_metadata ~block:"2" ()
   in
-  let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Log.info "Checking migration block consistency" ;
   Check.(
-    (protocol = Protocol.hash migrate_from)
+    (migration_block.protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected protocol = %R, got %L") ;
-  let next_protocol = JSON.(migration_block |-> "next_protocol" |> as_string) in
   Check.(
-    (next_protocol = Protocol.hash migrate_from)
+    (migration_block.next_protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* Test that we can still bake after migration *)
@@ -107,8 +105,8 @@ let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
   let* metadata =
     RPC.Client.call client @@ RPC.get_chain_block_metadata ?block ()
   in
-  let protocol = JSON.(metadata |-> "protocol" |> as_string) in
-  let next_protocol = JSON.(metadata |-> "next_protocol" |> as_string) in
+  let protocol = metadata.protocol in
+  let next_protocol = metadata.next_protocol in
   (match expected_block_type with
   | `Migration ->
       Check.(
@@ -348,7 +346,7 @@ let get_proposer ~level client =
   let* metadata =
     RPC.Client.call client @@ RPC.get_chain_block_metadata ~block ()
   in
-  Lwt.return JSON.(metadata |-> "proposer" |> as_string)
+  Lwt.return metadata.proposer
 
 let all_account_keys =
   List.map (fun b -> b.Account.alias) (Array.to_list Account.Bootstrap.keys)
