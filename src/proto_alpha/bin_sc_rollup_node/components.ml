@@ -29,7 +29,7 @@ module type S = sig
 
   module Interpreter : Interpreter.S
 
-  module Commitment : Commitment.S with module PVM = PVM
+  module Commitment : Commitment_sig.S with module PVM = PVM
 
   module RPC_server : RPC_server.S with module PVM = PVM
 end

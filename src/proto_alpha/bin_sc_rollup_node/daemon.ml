@@ -112,7 +112,7 @@ module Make (PVM : Pvm.S) = struct
       (* Get information about the last cemented commitment to determine the
          commitment (if any) to publish next. We do this only once per
          chain event to avoid spamming the layer1 node. *)
-      Components.Commitment.get_last_cemented_commitment_hash_with_level
+      Components.Commitment.sync_last_cemented_commitment_hash_with_level
         node_ctxt
         store
     in
