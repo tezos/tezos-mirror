@@ -373,7 +373,8 @@ and kinstr_size :
     | INil (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | IIf_cons {loc = _; branch_if_nil = _; branch_if_cons = _; k = _} ->
         ret_succ_adding accu (base +! (word_size *? 2))
-    | IList_map (_, _, _, _) -> ret_succ_adding accu base
+    | IList_map (_loc, _k1, ty, _k2) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | IList_iter (_, ty, _, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | IList_size (_, _) -> ret_succ_adding accu base

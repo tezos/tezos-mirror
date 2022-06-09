@@ -367,20 +367,22 @@ and next :
 *)
 and ilist_map :
     type a b c d e f g h i. (a, b, c, d, e, f, g, h, i) ilist_map_type =
- fun g gas body k ks ty accu stack ->
+ fun instrument g gas body k ks ty accu stack ->
   let xs = accu.elements in
   let ys = [] in
   let len = accu.length in
-  let ks = KList_enter_body (body, xs, ys, ty, len, KCons (k, ks)) in
+  let ks =
+    instrument @@ KList_enter_body (body, xs, ys, ty, len, KCons (k, ks))
+  in
   let accu, stack = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
 
 and ilist_iter :
     type a b c d e f g cmp. (a, b, c, d, e, f, g, cmp) ilist_iter_type =
- fun g gas body ty k ks accu stack ->
+ fun instrument g gas body ty k ks accu stack ->
   let xs = accu.elements in
-  let ks = KIter (body, ty, xs, KCons (k, ks)) in
+  let ks = instrument @@ KIter (body, ty, xs, KCons (k, ks)) in
   let accu, stack = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
@@ -587,13 +589,13 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 hd
                 (tl, stack))
       | IList_map (_, body, ty, k) ->
-          (ilist_map [@ocaml.tailcall]) g gas body k ks ty accu stack
+          (ilist_map [@ocaml.tailcall]) id g gas body k ks ty accu stack
       | IList_size (_, k) ->
           let list = accu in
           let len = Script_int.(abs (of_int list.length)) in
           (step [@ocaml.tailcall]) g gas k ks len stack
       | IList_iter (_, ty, body, k) ->
-          (ilist_iter [@ocaml.tailcall]) g gas body ty k ks accu stack
+          (ilist_iter [@ocaml.tailcall]) id g gas body ty k ks accu stack
       (* sets *)
       | IEmpty_set (_, ty, k) ->
           let res = Script_set.empty ty in
@@ -1558,6 +1560,14 @@ and log :
   | IFailwith (kloc, tv) ->
       let {ifailwith} = ifailwith in
       (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
+  | IList_map (_, body, ty, k) ->
+      let (Item_t (_, sty')) = sty in
+      let instrument = Script_interpreter_logging.instrument_cont logger sty' in
+      (ilist_map [@ocaml.tailcall]) instrument g gas body k ks ty accu stack
+  | IList_iter (_, ty, body, k) ->
+      let (Item_t (_, sty')) = sty in
+      let instrument = Script_interpreter_logging.instrument_cont logger sty' in
+      (ilist_iter [@ocaml.tailcall]) instrument g gas body ty k ks accu stack
   | _ -> (step [@ocaml.tailcall]) g gas k ks accu stack
  [@@inline]
 

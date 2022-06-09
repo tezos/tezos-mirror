@@ -777,6 +777,7 @@ type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
@@ -788,6 +789,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
