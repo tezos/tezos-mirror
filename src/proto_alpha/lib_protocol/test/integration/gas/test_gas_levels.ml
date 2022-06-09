@@ -443,6 +443,40 @@ let test_block_mixed_operations () =
   >>=? fun (_block, consumed_gas, gas_limit_total) ->
   check_consumed_gas consumed_gas gas_limit_total
 
+(** Test that emptying an account costs gas *)
+let test_emptying_account_gas () =
+  let open Alpha_context in
+  Context.init1 ~consensus_threshold:0 () >>=? fun (b, bootstrap) ->
+  let {Account.pkh; pk; _} = Account.new_account () in
+  let {Account.pkh = pkh'; _} = Account.new_account () in
+  let contract = Contract.Implicit pkh in
+  let amount = Test_tez.of_int 10 in
+  Op.transaction (B b) bootstrap contract amount >>=? fun op1 ->
+  Block.bake ~operation:op1 b >>=? fun b ->
+  Op.revelation ~fee:Tez.zero (B b) pk >>=? fun op2 ->
+  Block.bake ~operation:op2 b >>=? fun b ->
+  let gas_limit =
+    Op.Custom_gas
+      (Gas.Arith.integral_of_int_exn
+         Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
+  in
+  Op.delegation ~fee:amount ~gas_limit (B b) contract (Some pkh') >>=? fun op ->
+  Incremental.begin_construction b >>=? fun i ->
+  (* The delegation operation should not be valid as the operation
+     effect would be to remove [contract] from the ledger and this
+     generates an extra gas cost.
+
+     This semantics is not expected: see
+     https://gitlab.com/tezos/tezos/-/issues/3188 *)
+  Incremental.add_operation
+    ~expect_failure:(function
+      | [Environment.Ecoproto_error Raw_context.Operation_quota_exceeded] ->
+          return_unit
+      | _err -> assert false)
+    i
+    op
+  >>=? fun _i -> return_unit
+
 let quick (what, how) = Tztest.tztest what `Quick how
 
 let tests =
@@ -475,6 +509,7 @@ let tests =
          test_malformed_block_max_limit_reached' );
        ( "Test the gas consumption of various operations",
          test_block_mixed_operations );
+       ("Test that emptying an account costs gas", test_emptying_account_gas);
      ]
     @ make_batch_test_block_one_origination "nil" nil_contract basic_gas_sampler
     @ make_batch_test_block_one_origination
