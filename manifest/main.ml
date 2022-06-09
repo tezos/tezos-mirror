@@ -5417,10 +5417,10 @@ let _octez_client =
 
 let _octez_codec =
   public_exe
-    "tezos-codec"
+    "octez-codec"
     ~path:"src/bin_codec"
     ~internal_name:"codec"
-    ~synopsis:"Tezos: `tezos-codec` binary to encode and decode values"
+    ~synopsis:"Tezos: `octez-codec` binary to encode and decode values"
     ~release:true
     ~deps:
       ([
