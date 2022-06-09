@@ -3143,6 +3143,25 @@ end = struct
       in
       ()
 
+    let disabled_warnings_to_string l =
+      let int_ranges l =
+        List.sort_uniq compare l
+        |> List.fold_left
+             (fun acc x ->
+               match acc with
+               | [] -> [(x, x)]
+               | (l, u) :: acc when succ u = x -> (l, x) :: acc
+               | _ -> (x, x) :: acc)
+             []
+        |> List.rev
+      in
+      let range_to_flag (x, y) =
+        if x = y then sf "-%d" x
+        else if x + 1 = y then sf "-%d-%d" x y
+        else sf "-%d..%d" x y
+      in
+      List.map range_to_flag (int_ranges l) |> String.concat ""
+
     let make ~name =
       let name_underscore = Name.name_underscore name in
       let name_dash = Name.name_dash name in
@@ -3178,16 +3197,23 @@ end = struct
         Dune.V s_expr
       in
       let warnings =
-        match number with
-        (* [Other] and [Alpha] protocols can be edited and should be
-           fixed whenever a warning that we care about triggers. We
-           only want to disable a limited set of warnings *)
-        | Other | Alpha -> "+a-4-40..42-44-45-48-70"
-        (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
-        | V _ as number ->
-            if N.(number >= 014) then "+a-4-40..42-44-45-48-70"
-            else if N.(number >= 011) then "+a-4-40..42-44-45-48-51-70"
-            else "+a-4-6-7-9-16-29-32-40..42-44-45-48-51-60-67-68-70"
+        let disabled_by_default = [4; 40; 41; 42; 44; 45; 48; 70] in
+        let disabled_warnings =
+          match number with
+          (* [Other] and [Alpha] protocols can be edited and should be
+             fixed whenever a warning that we care about triggers. We
+             only want to disable a limited set of warnings *)
+          | Other | Alpha -> disabled_by_default
+          (* [V _] protocols can't be edited to accommodate warnings, we need to disable warnings instead. *)
+          | V _ as number ->
+              let disabled_extra =
+                if N.(number >= 014) then []
+                else if N.(number >= 011) then [51]
+                else [6; 7; 9; 16; 29; 32; 51; 60; 67; 68]
+              in
+              disabled_by_default @ disabled_extra
+        in
+        sf "+a%s" (disabled_warnings_to_string disabled_warnings)
       in
       let warn_error = "+a" in
       let environment =
