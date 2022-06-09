@@ -353,11 +353,11 @@ let empty rollup level =
 
 let consume_n_messages n ({nb_available_messages; _} as inbox) :
     t option tzresult =
-  if Compare.Int.(n < 0) then
-    error (Invalid_number_of_messages_to_consume (Int64.of_int n))
-  else if Compare.Int64.(Int64.of_int n > nb_available_messages) then ok None
+  let n = Int64.of_int32 n in
+  if Compare.Int64.(n < 0L) then error (Invalid_number_of_messages_to_consume n)
+  else if Compare.Int64.(n > nb_available_messages) then ok None
   else
-    let nb_available_messages = Int64.(sub nb_available_messages (of_int n)) in
+    let nb_available_messages = Int64.(sub nb_available_messages n) in
     ok (Some {inbox with nb_available_messages})
 
 let key_of_message = Data_encoding.Binary.to_string_exn Data_encoding.z

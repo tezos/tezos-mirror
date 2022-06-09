@@ -159,7 +159,7 @@ val starting_level_of_current_commitment_period : t -> Raw_level_repr.t
 (** [consume_n_messages n inbox] returns an inbox where [n] messages have
     been consumed, or [None] if there are strictly less than [n] messages
     available in [inbox]. *)
-val consume_n_messages : int -> t -> t option tzresult
+val consume_n_messages : int32 -> t -> t option tzresult
 
 module Hash : S.HASH
 
