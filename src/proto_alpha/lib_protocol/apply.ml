@@ -1121,14 +1121,14 @@ let apply_internal_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id operation ->
-  let before_operation =
-    (* This context is not used for backtracking, only to compute gas
-       consumption and originations for the operation result. *)
-    ctxt
-  in
-  Contract.must_exist ctxt source >>=? fun () ->
-  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
+ fun ctxt_before_op mode ~payer ~source ~chain_id operation ->
+  Contract.must_exist ctxt_before_op source >>=? fun () ->
+  Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
+  >>?= fun ctxt ->
+  (* Note that [ctxt_before_op] will be used again later to compute
+     gas consumption and originations for the operation result (by
+     comparing it with the [ctxt] we will have at the end of the
+     application). *)
   let consume_deserialization_gas = Script.When_needed in
   match operation with
   | Transaction_to_contract
@@ -1148,7 +1148,7 @@ let apply_internal_manager_operation_content :
         ~pkh
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
         (ITransaction_result res
@@ -1170,7 +1170,7 @@ let apply_internal_manager_operation_content :
         ~contract_hash
         ~amount
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
         ~payer
         ~chain_id
         ~mode
@@ -1185,7 +1185,7 @@ let apply_internal_manager_operation_content :
         ~parameters
         ~payer
         ~dst_rollup:destination
-        ~since:before_operation
+        ~since:ctxt_before_op
   | Origination
       {
         origination = {delegate; script; credit};
@@ -1207,11 +1207,11 @@ let apply_internal_manager_operation_content :
         ~delegate
         ~source
         ~credit
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, origination_result, ops) ->
       (ctxt, IOrigination_result origination_result, ops)
   | Delegation delegate ->
-      apply_delegation ~ctxt ~source ~delegate ~before_operation
+      apply_delegation ~ctxt ~source ~delegate ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, IDelegation_result {consumed_gas}, ops)
 
@@ -1228,15 +1228,15 @@ let apply_external_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~source ~chain_id ~fee operation ->
-  let before_operation =
-    (* This context is not used for backtracking, only to compute gas
-       consumption and originations for the operation result. *)
-    ctxt
-  in
+ fun ctxt_before_op mode ~source ~chain_id ~fee operation ->
   let source_contract = Contract.Implicit source in
-  Contract.must_exist ctxt source_contract >>=? fun () ->
-  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
+  Contract.must_exist ctxt_before_op source_contract >>=? fun () ->
+  Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
+  >>?= fun ctxt ->
+  (* Note that [ctxt_before_op] will be used again later to compute
+     gas consumption and originations for the operation result (by
+     comparing it with the [ctxt] we will have at the end of the
+     application). *)
   let consume_deserialization_gas =
     (* Note that we used to set this to [Script.When_needed] because
        the deserialization gas was accounted for in the gas consumed
@@ -1270,7 +1270,7 @@ let apply_external_manager_operation_content :
       return
         ( ctxt,
           (Reveal_result
-             {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
+             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt}
             : kind successful_manager_operation_result),
           [] )
   | Transaction {amount; parameters; destination = Implicit pkh; entrypoint} ->
@@ -1286,7 +1286,7 @@ let apply_external_manager_operation_content :
         ~pkh
         ~parameter:(Untyped_arg parameters)
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
       {amount; parameters; destination = Originated contract_hash; entrypoint}
@@ -1302,7 +1302,7 @@ let apply_external_manager_operation_content :
         ~contract_hash
         ~amount
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
         ~payer:source
         ~chain_id
         ~mode
@@ -1396,7 +1396,7 @@ let apply_external_manager_operation_content :
         Tx_rollup_dispatch_tickets_result
           {
             balance_updates = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             paid_storage_size_diff;
           }
       in
@@ -1432,7 +1432,7 @@ let apply_external_manager_operation_content :
         Transfer_ticket_result
           {
             balance_updates = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             paid_storage_size_diff;
           }
       in
@@ -1476,11 +1476,15 @@ let apply_external_manager_operation_content :
         ~delegate
         ~source:source_contract
         ~credit
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, origination_result, ops) ->
       (ctxt, Origination_result origination_result, ops)
   | Delegation delegate ->
-      apply_delegation ~ctxt ~source:source_contract ~delegate ~before_operation
+      apply_delegation
+        ~ctxt
+        ~source:source_contract
+        ~delegate
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, Delegation_result {consumed_gas}, ops)
   | Register_global_constant {value} ->
@@ -1509,7 +1513,7 @@ let apply_external_manager_operation_content :
         Register_global_constant_result
           {
             balance_updates = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             size_of_constant = paid_size;
             global_address = address;
           }
@@ -1540,14 +1544,14 @@ let apply_external_manager_operation_content :
       return
         ( ctxt,
           Set_deposits_limit_result
-            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Tx_rollup_origination ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
         Tx_rollup_origination_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             originated_tx_rollup;
             balance_updates = [];
           }
@@ -1568,7 +1572,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_submit_batch_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
             paid_storage_size_diff;
           }
@@ -1610,7 +1614,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_commit_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates = burn_update @ balance_updates;
           }
       in
@@ -1629,7 +1633,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_return_bond_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
           }
       in
@@ -1642,7 +1646,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_finalize_commitment_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates = [];
             level;
           }
@@ -1656,7 +1660,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_remove_commitment_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates = [];
             level;
           }
@@ -1762,20 +1766,20 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_rejection_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
           }
       in
       return (ctxt, result, [])
   | Dal_publish_slot_header {slot} ->
       Dal_apply.apply_publish_slot_header ctxt slot fee >>?= fun ctxt ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Dal_publish_slot_header_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       Sc_rollup_operations.originate ctxt ~kind ~boot_sector ~parameters_ty
       >>=? fun ({address; size}, ctxt) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_originate_result
           {address; consumed_gas; size; balance_updates = []}
@@ -1784,19 +1788,19 @@ let apply_external_manager_operation_content :
   | Sc_rollup_add_messages {rollup; messages} ->
       Sc_rollup.Inbox.add_external_messages ctxt rollup messages
       >>=? fun (inbox_after, _size, ctxt) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
       Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
       >>=? fun ctxt ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Sc_rollup_cement_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
       Sc_rollup.Stake_storage.publish_commitment ctxt rollup source commitment
       >>=? fun (staked_hash, published_at_level, ctxt, balance_updates) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_publish_result
           {staked_hash; consumed_gas; published_at_level; balance_updates}
@@ -1817,7 +1821,7 @@ let apply_external_manager_operation_content :
           let stakers = Sc_rollup.Game.Index.make source opponent in
           Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers o)
       >>=? fun (status, ctxt, balance_updates) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_refute_result {status; consumed_gas; balance_updates}
       in
@@ -1827,7 +1831,7 @@ let apply_external_manager_operation_content :
       >>=? fun (outcome, ctxt) ->
       Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers outcome
       >>=? fun (status, ctxt, balance_updates) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_timeout_result {status; consumed_gas; balance_updates}
       in
@@ -1857,7 +1861,7 @@ let apply_external_manager_operation_content :
       let result =
         Sc_rollup_recover_bond_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
           }
       in
