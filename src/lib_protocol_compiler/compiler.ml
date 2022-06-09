@@ -23,11 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let warnings = Defaults.warnings
+let default_warnings = Defaults.warnings
 
-let extra_warnings = "-6-7-9-29"
-
-let warn_error = "-a+8"
+let default_warn_error = "-a+8"
 
 let () = Clflags.unsafe_string := false
 
@@ -167,8 +165,13 @@ type driver = {
   link_shared : string -> string list -> unit;
 }
 
+let parse_options errflag s =
+  Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
+
 let main {compile_ml; pack_objects; link_shared} =
   Random.self_init () ;
+  parse_options false default_warnings ;
+  parse_options true default_warn_error ;
   let anonymous = ref []
   and static = ref false
   and register = ref false
@@ -201,6 +204,14 @@ let main {compile_ml; pack_objects; link_shared} =
             Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
             Stdlib.exit 0),
         " Display version information" );
+      ( "-warning",
+        Arg.String (fun s -> parse_options false s),
+        " <list> Enable or disable ocaml warnings according to <list>. This \
+         extends the default: " ^ default_warnings );
+      ( "-warn-error",
+        Arg.String (fun s -> parse_options true s),
+        " <list> Enable or disable ocaml error status according to <list>. \
+         This extends the default: " ^ default_warn_error );
     ]
   in
   let usage_msg =
@@ -282,12 +293,6 @@ let main {compile_ml; pack_objects; link_shared} =
   Clflags.nopervasives := true ;
   Clflags.no_std_include := true ;
   Clflags.include_dirs := [Filename.dirname functor_file] ;
-  let parse_options errflag s =
-    Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
-  in
-  parse_options false warnings ;
-  parse_options false extra_warnings ;
-  parse_options true warn_error ;
   load_embedded_cmis tezos_protocol_env ;
   let packed_protocol_object = compile_ml ~for_pack functor_file in
   let register_objects =

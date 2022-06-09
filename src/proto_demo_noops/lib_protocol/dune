@@ -62,7 +62,7 @@
 (rule
  (alias runtest_compile_protocol)
  (deps main.ml main.mli (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
+ (action (run %{bin:tezos-protocol-compiler} -no-hash-check -warn-error +a .)))
 
 (library
  (name tezos_protocol_demo_noops_functor)

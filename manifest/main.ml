@@ -3465,6 +3465,15 @@ include Tezos_raw_protocol_%s.Main
                          final_protocol_versions
                       then E
                       else S "-no-hash-check");
+                      (match disable_warnings with
+                      | [] -> E
+                      | l ->
+                          H
+                            [
+                              S "-warning";
+                              S (Flags.disabled_warnings_to_string l);
+                            ]);
+                      H [S "-warn-error"; S "+a"];
                       S ".";
                     ];
               ]
