@@ -9,3 +9,14 @@
  (libraries json-data-encoding json-data-encoding-bson zarith zarith_stubs_js
    ezjsonm either)
  (flags (:standard)))
+
+(documentation
+ (mld_files tutorial))
+
+(rule
+ (targets tutorial.mld)
+ (deps tutorial.md)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run md2mld %{deps}))))

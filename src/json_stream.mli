@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Like most other [.mli] files in this directory, this is not intended for
+    end-users. Instead, the interface from this file is used internally to
+    assemble the end-user-intended module {!Data_encoding}. Refer to that module
+    for doucmentation. *)
+
 type jsonm_lexeme =
   [ `Null
   | `Bool of bool
@@ -56,7 +61,7 @@ val string_seq_of_jsonm_lexeme_seq :
     instructions become invalid: the content of [buff] may have been rewritten
     by the side effect of forcing the next element.
 
-    @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32. *)
+    @raise Invalid_argument if [Bytes.length buffer] is less than 32. *)
 val blit_instructions_seq_of_jsonm_lexeme_seq :
   newline:bool ->
   buffer:bytes ->

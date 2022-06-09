@@ -26,6 +26,12 @@
 
 (** Type-safe serialization and deserialization of data structures. *)
 
+(** This page is for the API documentation of data-encoding: the technical
+    description of each of the available type and combinator exported by the
+    data-encoding library.
+
+    For a high-level view and a tutorial, see {!page-tutorial}. *)
+
 (** {1 Data Encoding} *)
 
 (** {2 Overview}
@@ -520,7 +526,7 @@ module Encoding : sig
      Note that in general you should use a total function (i.e., one defined
      over the whole of the ['a] type) for the [matching_function]. However, in
      the case where you have a good reason to use a partial function, you should
-     raise {!No_case_matched} in the dead branches. Reasons why you may want to
+     raise [No_case_matched] in the dead branches. Reasons why you may want to
      do so include:
      - ['a] is an open variant and you will complete the matching function
        later, and
@@ -738,7 +744,7 @@ let expr_encoding =
         (fun l -> Literal l);
         ]
   )
-}]
+]}
 
         Interestingly, the cases for known lengths can be generated
         programmatically.
@@ -1359,7 +1365,7 @@ let expr_encoding =
 
     (** [or_int32 ~i32_title ~alt_title ?alt_description c] creates a new
         compact encoding for the disjunction of
-        any type [a] (see {!case}) with [int32]. It uses the same number
+        any type [a] (see {!val-case}) with [int32]. It uses the same number
         of bits as {!int32}, that is 2, and uses the spare tag ([11]) within
         this size for values of type [a].
 
@@ -2044,7 +2050,7 @@ module Registration : sig
       assuming it is correctly described by the registered encoding [r].
       If [r] does not correctly describe [b], then it returns [None].
 
-      See {!Binary.slice_string} for details about slicing. *)
+      See {!Binary.Slicer.slice_string} for details about slicing. *)
   val slice :
     t -> string -> (Binary.Slicer.slice list, Binary.read_error) result
 
@@ -2052,7 +2058,7 @@ module Registration : sig
       for all of the registered encodings. It returns a list of the slicing for
       each of the registered encodings that correctly describe [b].
 
-      See {!Binary.slice_string} for details about slicing. *)
+      See {!Binary.Slicer.slice_string} for details about slicing. *)
   val slice_all : string -> (string * Binary.Slicer.slice list) list
 
   (** [find id] is [Some r] if [register (def id e)] has been called, in which
