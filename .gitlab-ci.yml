@@ -75,10 +75,10 @@ include:
   # The job `unified_coverage` must have the same name on merge requests and the default branch
   # /!\ Limitations of using rules with include:
   # https://docs.gitlab.com/ee/ci/yaml/includes.html#use-variables-with-include
-  # Only run on merge requests
+  # Only run on merge requests that do not have the label `ci--no-coverage`
   - local: .gitlab/ci/test_coverage.yml
     rules:
-      - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /(?:^|[,])ci--no-coverage(?:$|[,])/'
   # Only run on default branch
   - local: .gitlab/ci/test_coverage_default.yml
     rules:
