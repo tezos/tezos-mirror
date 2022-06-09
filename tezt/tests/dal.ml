@@ -178,7 +178,7 @@ let test_slot_management_logic =
     Test.fail "Expected the context to contain some information about the DAL" ;
   let* operations_result = RPC_legacy.get_operations client in
   let fees_error =
-    Failed {error_id = "proto.alpha.dal_publish_slot_header_with_low_fees"}
+    Failed {error_id = "proto.alpha.dal_publish_slot_heade_duplicate"}
   in
   (* The baker sorts operations fee wise. Consequently order of
      application for the operations will be: oph3 > oph2 > oph4 > oph1

@@ -127,35 +127,29 @@ let validate_publish_slot_header ctxt Dal.Slot.{index; _} =
     (Dal_publish_slot_header_invalid_index
        {given = index; maximum = number_of_slots - 1})
 
-type error +=
-  | Dal_publish_slot_header_candidate_with_low_fees of {proposed_fees : Tez.t}
+type error += Dal_publish_slot_header_duplicate of {slot : Dal.Slot.t}
 
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3114
 
    Better error message *)
 let () =
   let open Data_encoding in
-  let description = "Slot header with too low fees" in
+  let description = "A slot header for this slot was already proposed" in
   register_error_kind
-    `Branch
-    ~id:"dal_publish_slot_header_with_low_fees"
-    ~title:"DAL slot header with low fees"
+    `Permanent
+    ~id:"dal_publish_slot_heade_duplicate"
+    ~title:"DAL publish slot header duplicate"
     ~description
-    ~pp:(fun ppf proposed ->
-      Format.fprintf ppf "%s: Proposed fees %a." description Tez.pp proposed)
-    (obj1 (req "proposed" Tez.encoding))
+    ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
+    (obj1 (req "proposed" Dal.Slot.encoding))
     (function
-      | Dal_publish_slot_header_candidate_with_low_fees {proposed_fees} ->
-          Some proposed_fees
-      | _ -> None)
-    (fun proposed_fees ->
-      Dal_publish_slot_header_candidate_with_low_fees {proposed_fees})
+      | Dal_publish_slot_header_duplicate {slot} -> Some slot | _ -> None)
+    (fun slot -> Dal_publish_slot_header_duplicate {slot})
 
-let apply_publish_slot_header ctxt slot proposed_fees =
+let apply_publish_slot_header ctxt slot =
   assert_dal_feature_enabled ctxt >>? fun () ->
-  let ctxt, updated = Dal.Slot.update_slot_fees ctxt slot proposed_fees in
-  if updated then ok ctxt
-  else error (Dal_publish_slot_header_candidate_with_low_fees {proposed_fees})
+  Dal.Slot.register_slot ctxt slot >>? fun (ctxt, updated) ->
+  if updated then ok ctxt else error (Dal_publish_slot_header_duplicate {slot})
 
 let dal_finalisation ctxt =
   only_if_dal_feature_enabled

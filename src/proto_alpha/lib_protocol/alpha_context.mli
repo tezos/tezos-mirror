@@ -3110,9 +3110,7 @@ module Dal : sig
 
     val pp : Format.formatter -> t -> unit
 
-    val current_slot_fees : context -> t -> Tez.t option
-
-    val update_slot_fees : context -> t -> Tez.t -> context * bool
+    val register_slot : context -> t -> (context * bool) tzresult
 
     val find : context -> Raw_level.t -> t list option tzresult Lwt.t
 

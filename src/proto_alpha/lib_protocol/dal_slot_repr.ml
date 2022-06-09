@@ -75,46 +75,32 @@ module Slot_market = struct
      Think harder about this data structure and whether it can be
      optimized. *)
 
-  type t = (slot * Tez_repr.t) option list
+  module IntMap = Map.Make (Compare.Int)
+
+  type t = {length : int; slots : slot IntMap.t}
 
   let init ~length =
-    let l =
-      List.init
-        ~when_negative_length:
-          "Dal_slot_repr.Slot_market.init: length cannot be negative"
-        length
-        (fun _ -> None)
-    in
-    match l with Error msg -> invalid_arg msg | Ok l -> l
+    if Compare.Int.(length < 0) then
+      invalid_arg "Dal_slot_repr.Slot_market.init: length cannot be negative" ;
+    let slots = IntMap.empty in
+    {length; slots}
 
-  let current_fees candidates index =
-    match List.nth candidates index with
-    | None | Some None -> None
-    | Some (Some ((_ : slot), tez)) -> Some tez
+  let length {length; _} = length
 
-  let update candidates slot fees =
-    let has_changed = ref false in
-    let may_replace_candidate current_candidate =
-      match current_candidate with
-      | Some ((_slot : slot), current_fees) when Tez_repr.(current_fees >= fees)
-        ->
-          current_candidate
-      | _ ->
-          has_changed := true ;
-          Some (slot, fees)
-    in
-    let candidates =
-      List.mapi
-        (fun i candidate ->
-          if Compare.Int.(i = slot.index) then may_replace_candidate candidate
-          else candidate)
-        candidates
-    in
-    (candidates, !has_changed)
+  let register t new_slot =
+    if not Compare.Int.(0 <= new_slot.index && new_slot.index < t.length) then
+      None
+    else
+      let has_changed = ref false in
+      let update = function
+        | None ->
+            has_changed := true ;
+            Some new_slot
+        | Some x -> Some x
+      in
+      let slots = IntMap.update new_slot.index update t.slots in
+      let t = {t with slots} in
+      Some (t, !has_changed)
 
-  let candidates candidates =
-    List.filter_map
-      (fun candidate ->
-        Option.map (fun (slot, (_fee : Tez_repr.t)) -> slot) candidate)
-      candidates
+  let candidates t = t.slots |> IntMap.to_seq |> Seq.map snd |> List.of_seq
 end

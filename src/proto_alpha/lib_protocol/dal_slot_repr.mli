@@ -78,31 +78,30 @@ val encoding : t Data_encoding.t
 val pp : Format.formatter -> t -> unit
 
 (** Only one slot header is accepted per slot index. If two slots
-   headers are included into a block, we use the fee market to know
-   which slot header will be chosen.
+   headers are included into a block, the second one will fail.
 
-  This is encapsulated in the following module.
-*)
+   Consequently, we rely on the order of operations which is done
+   thanks to the fee market.
+
+  This is encapsulated in the following module.  *)
 module Slot_market : sig
   (** Represent the fee market for a list of slots. *)
   type t
 
-  (** [init ~length] encodes a list of [length] slots without candidates. *)
+  (** [init ~length] encodes a list of [length] slots without
+     candidates. *)
   val init : length:int -> t
 
-  (** [current_fees t index] returns [Some fees] if the best candidate
-     recorded for slot at index [index] was posted with fees
-     [fees]. [None] is returned iff no candidate were recorded or if
-     the index is negative. It is the responsability of the caller to
-     ensure [index] is below some reasonable upper bound. *)
-  val current_fees : t -> index -> Tez_repr.t option
+  (** [length t] returns the [length] provided at initialisation time
+     (see {!val:init}). *)
+  val length : t -> int
 
-  (** [update t index fees] updates the candidate associated to index
-     [index]. Returns [Some (_, true)] if the candidate was better
-     than the current one. Returns [Some (_, false)] otherwise. It is
-     a no-op if the [index] is not in the interval [0;length] where is
-     the value provided to the [init] function. *)
-  val update : t -> slot -> Tez_repr.t -> t * bool
+  (** [register t index fees] updates the candidate associated to
+     index [index]. Returns [Some (_, true)] if the candidate is
+     registered. Returns [Some (_, false)] otherwise. Returns [None]
+     if the [index] is not in the interval [0;length] where [length]
+     is the value provided to the [init] function. *)
+  val register : t -> slot -> (t * bool) option
 
   (** [candidates t] returns a list of slot candidates. *)
   val candidates : t -> slot list
