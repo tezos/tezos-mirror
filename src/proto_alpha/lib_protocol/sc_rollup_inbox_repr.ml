@@ -617,18 +617,20 @@ module MakeHashingScheme (Tree : TREE) :
 
   let add_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
-    if Raw_level_repr.(level < inbox.level) then
-      fail (Invalid_level_add_messages level)
-    else
-      let history, inbox = archive_if_needed history inbox level in
-      let* messages, inbox =
-        List.fold_left_es
-          (fun (messages, inbox) payload -> add_message inbox payload messages)
-          (messages, inbox)
-          payloads
-      in
-      let current_messages_hash () = hash_messages messages in
-      return (messages, history, {inbox with current_messages_hash})
+    let* () =
+      fail_when
+        Raw_level_repr.(level < inbox.level)
+        (Invalid_level_add_messages level)
+    in
+    let history, inbox = archive_if_needed history inbox level in
+    let* messages, inbox =
+      List.fold_left_es
+        (fun (messages, inbox) payload -> add_message inbox payload messages)
+        (messages, inbox)
+        payloads
+    in
+    let current_messages_hash () = hash_messages messages in
+    return (messages, history, {inbox with current_messages_hash})
 
   let add_external_messages history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
