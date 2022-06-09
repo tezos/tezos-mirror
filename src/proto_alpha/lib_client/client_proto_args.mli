@@ -106,6 +106,8 @@ val non_negative_z_param :
   ('a, full) Clic.params ->
   (Z.t -> 'a, full) Clic.params
 
+val non_negative_parameter : (int, full) Clic.parameter
+
 val global_constant_param :
   name:string ->
   desc:string ->
@@ -240,12 +242,20 @@ module Tx_rollup : sig
 end
 
 module Sc_rollup_params : sig
-  val sc_rollup_address_param :
-    ?name:string ->
-    usage:string ->
-    ('a, full) Clic.params ->
-    (Alpha_context.Sc_rollup.t -> 'a, full) Clic.params
+  val sc_rollup_address_parameter : (Sc_rollup.t, full) Clic.parameter
+
+  val rollup_kind_parameter : (Sc_rollup.PVM.t, full) Clic.parameter
+
+  val boot_sector_parameter :
+    ((module Sc_rollup.PVM.S) -> string tzresult Lwt.t, full) Clic.parameter
+
+  val messages_parameter :
+    ([`Bin of string | `Json of Data_encoding.json], full) Clic.parameter
+
+  val commitment_hash_parameter :
+    (Sc_rollup.Commitment.Hash.t, full) Clic.parameter
+
+  val unchecked_payload_parameter : (string, full) Clic.parameter
 end
 
-val fee_parameter_args :
-  (Injection.fee_parameter, Protocol_client_context.full) Clic.arg
+val fee_parameter_args : (Injection.fee_parameter, full) Clic.arg

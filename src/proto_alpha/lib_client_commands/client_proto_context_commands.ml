@@ -70,75 +70,10 @@ let report_michelson_errors ?(no_print_source = false) ~msg
       cctxt#error "%s" msg >>= fun () -> Lwt.return_none
   | Ok data -> Lwt.return_some data
 
-let non_negative_param =
-  Clic.parameter (fun _ s ->
-      match int_of_string_opt s with
-      | Some i when i >= 0 -> return i
-      | _ -> failwith "Parameter should be a non-negative integer literal")
-
 let block_hash_param =
   Clic.parameter (fun _ s ->
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
-
-let rollup_kind_param =
-  Clic.parameter (fun _ name ->
-      match Sc_rollup.Kind.pvm_of_name ~name with
-      | None ->
-          failwith
-            "Parameter '%s' is not a valid rollup name (must be one of %s)"
-            name
-            (String.concat ", " Sc_rollup.Kind.all_names)
-      | Some k -> return k)
-
-let boot_sector_param =
-  let from_text s =
-    return (fun (module R : Sc_rollup.PVM.S) ->
-        R.parse_boot_sector s |> function
-        | None -> failwith "Invalid boot sector"
-        | Some boot_sector -> return boot_sector)
-  in
-  file_or_text_parameter ~from_text ()
-
-let messages_param =
-  let from_path path =
-    Lwt_utils_unix.Json.read_file path >>=? fun json -> return (`Json json)
-  in
-  let from_text text =
-    try return (`Json (Ezjsonm.from_string text))
-    with Ezjsonm.Parse_error _ ->
-      failwith "Given text is not valid JSON: '%s'" text
-  in
-  Clic.parameter @@ fun _ p ->
-  match String.split ~limit:1 ':' p with
-  | ["bin"; path] ->
-      Lwt_utils_unix.read_file path >>= fun bin -> return (`Bin bin)
-  | ["text"; text] -> from_text text
-  | ["file"; path] -> from_path path
-  | _ -> if Sys.file_exists p then from_path p else from_text p
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3064
-   Move scoru related params to Client_proto_args.Sc_rollup(_params)
-*)
-let commitment_hash_param =
-  Clic.parameter (fun _ commitment_hash ->
-      match Sc_rollup.Commitment.Hash.of_b58check_opt commitment_hash with
-      | None ->
-          failwith
-            "Parameter '%s' is not a valid B58-encoded rollup commitment hash"
-            commitment_hash
-      | Some hash -> return hash)
-
-let rollup_address_param =
-  Clic.parameter (fun _ name ->
-      match Sc_rollup.Address.of_b58check_opt name with
-      | None ->
-          failwith
-            "Parameter '%s' is not a valid B58-encoded rollup address"
-            name
-      | Some addr -> return addr)
-
-let unchecked_payload_param = file_or_text_parameter ~from_text:return ()
 
 let group =
   {
@@ -472,7 +407,7 @@ let commands_ro () =
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_param))
+            non_negative_parameter))
       (prefixes ["get"; "receipt"; "for"]
       @@ param
            ~name:"operation"
@@ -1499,13 +1434,13 @@ let commands_rw () =
               "wait until 'N' additional blocks after the operation appears in \
                the considered chain"
             ~default:"0"
-            non_negative_param)
+            non_negative_parameter)
          (default_arg
             ~long:"check-previous"
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_param)
+            non_negative_parameter)
          (arg
             ~long:"branch"
             ~placeholder:"block_hash"
@@ -2286,7 +2221,7 @@ let commands_rw () =
            ~desc:
              "Position of the message in the inbox with the result being \
               disputed."
-           non_negative_param
+           non_negative_parameter
       @@ prefixes ["with"; "content"]
       @@ Tx_rollup.message_param
            ~usage:"Message content with the result being disputed."
@@ -2410,7 +2345,7 @@ let commands_rw () =
       @@ Clic.param
            ~name:"message index"
            ~desc:"Index of the message whose withdrawals will be dispatched."
-           non_negative_param
+           non_negative_parameter
       @@ prefixes ["with"; "the"; "context"; "hash"]
       @@ Tx_rollup.context_hash_param
            ~usage:
@@ -2572,7 +2507,7 @@ let commands_rw () =
       @@ param
            ~name:"sc_rollup_kind"
            ~desc:"kind of the smart-contract rollup to be originated"
-           rollup_kind_param
+           Sc_rollup_params.rollup_kind_parameter
       @@ prefixes ["of"; "type"]
       @@ param
            ~name:"parameters_type"
@@ -2582,7 +2517,7 @@ let commands_rw () =
       @@ param
            ~name:"boot_sector"
            ~desc:"the initialization state for the smart-contract rollup"
-           boot_sector_param
+           Sc_rollup_params.boot_sector_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2644,7 +2579,7 @@ let commands_rw () =
              "the message(s) to be sent to the rollup (syntax: \
               bin:<path_to_binary_file>|text:<json list of string \
               messages>|file:<json_file>)"
-           messages_param
+           Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2653,7 +2588,7 @@ let commands_rw () =
       @@ param
            ~name:"dst"
            ~desc:"address of the destination rollup"
-           rollup_address_param
+           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2715,7 +2650,7 @@ let commands_rw () =
       @@ param
            ~name:"commitment"
            ~desc:"the hash of the commitment to be cemented for a sc rollup"
-           commitment_hash_param
+           Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2726,7 +2661,7 @@ let commands_rw () =
            ~desc:
              "the address of the sc rollup where the commitment will be \
               cemented"
-           rollup_address_param
+           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2795,7 +2730,7 @@ let commands_rw () =
            ~desc:
              "The address of the smart-contract rollup where the message \
               resides."
-           rollup_address_param
+           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"source"
@@ -2804,7 +2739,7 @@ let commands_rw () =
       @@ param
            ~name:"cemented commitment"
            ~desc:"The hash of the cemented commitment of the rollup."
-           commitment_hash_param
+           Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["for"; "the"; "outbox"; "level"]
       @@ param
            ~name:"outbox level"
@@ -2814,17 +2749,17 @@ let commands_rw () =
       @@ param
            ~name:"message index"
            ~desc:"The index of the rollup's outbox containing the message."
-           non_negative_param
+           non_negative_parameter
       @@ prefixes ["and"; "inclusion"; "proof"]
       @@ param
            ~name:"inclusion proof"
            ~desc:"The inclusion proof for the message."
-           unchecked_payload_param
+           Sc_rollup_params.unchecked_payload_parameter
       @@ prefixes ["and"; "message"]
       @@ param
            ~name:"message"
            ~desc:"The message to be executed."
-           unchecked_payload_param
+           Sc_rollup_params.unchecked_payload_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2888,8 +2823,10 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Account that owns the bond."
       @@ prefixes ["for"; "sc"; "rollup"]
-      @@ Sc_rollup_params.sc_rollup_address_param
-           ~usage:"Smart-contract rollup of the bond."
+      @@ Clic.param
+           ~name:"smart contract rollup address"
+           ~desc:"the address of the smart-contract rollup of the bond"
+           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
