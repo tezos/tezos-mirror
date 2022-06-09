@@ -1490,26 +1490,36 @@ module Sc_rollup = struct
          end))
          (Make_index (Sc_rollup_repr.Index))
 
-  module Make_versioned (Versioned_value : sig
-    val name : string
+  module Make_versioned
+      (Versioned_value : Sc_rollup_data_version_sig.S) (Data_storage : sig
+        type context
 
-    module Index : Storage_description.INDEX
+        type key
 
-    include Sc_rollup_data_version_sig.S
-  end) =
+        type value = Versioned_value.versioned
+
+        val get : context -> key -> (Raw_context.t * value) tzresult Lwt.t
+
+        val find :
+          context -> key -> (Raw_context.t * value option) tzresult Lwt.t
+
+        val update :
+          context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+        val init :
+          context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+        val add :
+          context -> key -> value -> (Raw_context.t * int * bool) tzresult Lwt.t
+
+        val add_or_remove :
+          context ->
+          key ->
+          value option ->
+          (Raw_context.t * int * bool) tzresult Lwt.t
+      end) =
   struct
-    include
-      Make_indexed_carbonated_data_storage
-        (Make_subcontext (Registered) (Indexed_context.Raw_context)
-           (struct
-             let name = [Versioned_value.name]
-           end))
-           (Make_index (Versioned_value.Index))
-        (struct
-          type t = Versioned_value.versioned
-
-          let encoding = Versioned_value.versioned_encoding
-        end)
+    include Data_storage
 
     type value = Versioned_value.t
 
@@ -1624,12 +1634,23 @@ module Sc_rollup = struct
         let encoding = Data_encoding.int32
       end)
 
-  module Commitments = Make_versioned (struct
-    include Sc_rollup_commitment_repr
-    module Index = Hash
+  module Commitments_versioned =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitments"]
+         end))
+         (Make_index (Sc_rollup_commitment_repr.Hash))
+      (struct
+        type t = Sc_rollup_commitment_repr.versioned
 
-    let name = "commitments"
-  end)
+        let encoding = Sc_rollup_commitment_repr.versioned_encoding
+      end)
+
+  module Commitments = struct
+    include Commitments_versioned
+    include Make_versioned (Sc_rollup_commitment_repr) (Commitments_versioned)
+  end
 
   module Commitment_stake_count =
     Make_indexed_carbonated_data_storage
@@ -1657,12 +1678,23 @@ module Sc_rollup = struct
         let encoding = Raw_level_repr.encoding
       end)
 
-  module Game = Make_versioned (struct
-    include Sc_rollup_game_repr
-    module Index = Index
+  module Game_versioned =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["game"]
+         end))
+         (Make_index (Sc_rollup_game_repr.Index))
+      (struct
+        type t = Sc_rollup_game_repr.versioned
 
-    let name = "game"
-  end)
+        let encoding = Sc_rollup_game_repr.versioned_encoding
+      end)
+
+  module Game = struct
+    include Game_versioned
+    include Make_versioned (Sc_rollup_game_repr) (Game_versioned)
+  end
 
   module Game_timeout =
     Make_indexed_carbonated_data_storage
