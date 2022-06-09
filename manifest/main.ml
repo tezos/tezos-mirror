@@ -4494,7 +4494,7 @@ module Protocol = Protocol
     let daemon daemon =
       only_if active @@ fun () ->
       public_exe
-        (sf "tezos-%s-%s" daemon name_dash)
+        (sf "octez-%s-%s" daemon name_dash)
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
         ~path:(path // sf "bin_%s" daemon)
         ~synopsis:(sf "Tezos/Protocol: %s binary" daemon)

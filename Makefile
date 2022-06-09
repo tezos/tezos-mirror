@@ -35,11 +35,11 @@ PROFILE?=dev
 VALID_PROFILES=dev release static
 
 TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server \
-    $(foreach p, $(active_protocol_versions), tezos-baker-$(p)) \
-    $(foreach p, $(active_protocol_versions), tezos-accuser-$(p)) \
+    $(foreach p, $(active_protocol_versions), octez-baker-$(p)) \
+    $(foreach p, $(active_protocol_versions), octez-accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
-		             echo tezos-endorser-$(p); fi)) \
+		             echo octez-endorser-$(p); fi)) \
     $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
     $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
     $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
