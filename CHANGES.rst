@@ -25,6 +25,9 @@ be documented here either.
 Node
 ----
 
+- Fix a bug that leads to forgetting the trusted status of peers when connection
+  is lost
+
 - Added store metrics to expose the amount of data written while
   storing the last block and the completion time of the last merge.
 

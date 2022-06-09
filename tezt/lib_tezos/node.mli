@@ -163,6 +163,16 @@ val add_peer_with_id : t -> t -> unit Lwt.t
     In other words it is the address where [from] can contact [node]. *)
 val point_and_id : ?from:t -> t -> string Lwt.t
 
+(** Get the P2P point of a node.
+
+    Return [(<ADDRESS>,<PORT>)] where [<PORT>] is the P2P
+    port and [<ADDRESS>] is the reachable address of the node.
+
+    [<ADDRESS>] is obtained using [Runner.address runner] with [?from]
+    being the runner of [from] and [runner] is the runner of the node.
+    In other words it is the address where [from] can contact [node]. *)
+val point : ?from:t -> t -> string * int
+
 (** See [Daemon.Make.name] *)
 val name : t -> string
 

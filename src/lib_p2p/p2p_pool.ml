@@ -84,7 +84,10 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
         let table = Gc_point_set.create to_remove_target in
         P2p_point.Table.iter
           (fun p point_info ->
-            if P2p_point_state.is_disconnected point_info then
+            if
+              P2p_point_state.is_disconnected point_info
+              && not (P2p_point_state.Info.trusted point_info)
+            then
               let time =
                 match P2p_point_state.Info.last_miss point_info with
                 | None -> now
@@ -128,6 +131,10 @@ let register_point ?trusted ?expected_peer_id pool ((addr, port) as point) =
       let point_info =
         P2p_point_state.Info.create ?trusted ?expected_peer_id addr port
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3175
+         GC is off by one, it keeps one extra connection as it does not take
+         into account the subsequent add.
+      *)
       Option.iter
         (fun (max, _) ->
           if P2p_point.Table.length pool.known_points >= max then gc_points pool)
@@ -196,8 +203,10 @@ let gc_peer_ids
           (fun peer_id peer_info ->
             let created = P2p_peer_state.Info.created peer_info in
             let score = score @@ P2p_peer_state.Info.peer_metadata peer_info in
-            if P2p_peer_state.is_disconnected peer_info then
-              Gc_peer_set.insert (score, created, peer_id) table)
+            if
+              P2p_peer_state.is_disconnected peer_info
+              && not (P2p_peer_state.Info.trusted peer_info)
+            then Gc_peer_set.insert (score, created, peer_id) table)
           known_peer_ids ;
         let to_remove = Gc_peer_set.get table in
         ListLabels.iter to_remove ~f:(fun (_, _, peer_id) ->
@@ -215,6 +224,10 @@ let register_peer pool peer_id =
           peer_id
           ~peer_metadata:(pool.peer_meta_config.peer_meta_initial ())
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3175
+         GC is off by one, it keeps one extra connection as it does not take
+         into account the subsequent add.
+      *)
       Option.iter
         (fun (max, _) ->
           if P2p_peer.Table.length pool.known_peer_ids >= max then

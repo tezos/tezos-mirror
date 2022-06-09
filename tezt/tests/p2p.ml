@@ -299,7 +299,7 @@ let test_advertised_port () =
   let advertised_port_from_peers_file = port_from_peers_file path in
   if advertised_port_from_peers_file <> advertised_net_port then
     Test.fail
-      "advertised-net-port: Unexcpected port number received (got %d, expeted \
+      "advertised-net-port: Unexpected port number received (got %d, expeted \
        %d)"
       advertised_port_from_peers_file
       advertised_net_port
@@ -307,10 +307,133 @@ let test_advertised_port () =
 
   unit
 
+module Known_Points_GC = struct
+  (* Create a node that accept only
+     1 point in its known points set *)
+  let create_node () =
+    let node = Node.create [Connections 0] in
+    let* () = Node.identity_generate node in
+    let* () = Node.config_init node [] in
+    let () =
+      Node.Config_file.update
+        node
+        (JSON.update
+           "p2p"
+           (JSON.update
+              "limits"
+              (JSON.put
+                 ("max_known_points", JSON.parse ~origin:__LOC__ "[0,0]"))))
+      (* Here we set the max known point to 0 as there is an off-by-one error on
+         the max size interpretation in lib_p2p as GC is triggered just before
+         adding one element.
+         What we actually get is a set of size 1.
+      *)
+    in
+    Lwt.return node
+
+  let included ~sub ~super ~fail =
+    List.iter
+      (fun data -> if not @@ List.mem data super then fail data else ())
+      sub
+
+  let known_points node =
+    let* points = RPC.(call node get_network_points) in
+    Lwt.return
+    @@ List.map
+         (fun (str, _) ->
+           match String.split_on_char ':' str with
+           | [addr; port] -> (addr, int_of_string port)
+           | _ -> assert false)
+         points
+
+  let test_trusted_preservation () =
+    Test.register
+      ~__FILE__
+      ~title:"check preservation of trusted known points and peers"
+      ~tags:["p2p"; "pool"; "gc"]
+    @@ fun () ->
+    let* node_1 = create_node () in
+    let nodes = List.init 6 (fun _ -> Node.create []) in
+    let* () = Node.run node_1 [] in
+    let* () = Node.wait_for_ready node_1 in
+    let* client = Client.init ~endpoint:(Node node_1) () in
+    (* register (as trusted) the nodes, they are more max_known_points *)
+    let* () =
+      Lwt_list.iter_s
+        (fun node -> Client.Admin.trust_address ~peer:node client)
+        nodes
+    in
+    let* known_points = known_points node_1 in
+    let registered_points = List.map Node.point nodes in
+    (* check that all trusted nodes remains in the known points list *)
+    included
+      ~sub:registered_points
+      ~super:known_points
+      ~fail:(fun (addr, port) ->
+        Test.fail "point %s:%d should be known" addr port) ;
+    included
+      ~sub:known_points
+      ~super:registered_points
+      ~fail:(fun (addr, port) ->
+        Test.fail "point %s:%d should not be known" addr port) ;
+    Lwt.return_unit
+
+  let test_non_trusted_removal () =
+    Test.register
+      ~__FILE__
+      ~title:"check non-preservation of known points"
+      ~tags:["p2p"; "pool"; "gc"]
+    @@ fun () ->
+    let* node_1 = create_node () in
+    let node_A = Node.create [] in
+    let nodes = List.init 3 (fun _ -> Node.create []) in
+    let* () = Node.run node_1 [] in
+    let* () = Node.wait_for_ready node_1 in
+
+    let* client = Client.init ~endpoint:(Node node_1) () in
+    (* trust all the nodes  to register them in known points
+       and then untrust all the nodes but node_A
+    *)
+    let* () = Client.Admin.trust_address ~peer:node_A client in
+    let* () =
+      Lwt_list.iter_s
+        (fun node -> Client.Admin.trust_address ~peer:node client)
+        nodes
+    in
+    let* () =
+      Lwt_list.iter_s
+        (fun node -> Client.Admin.untrust_address ~peer:node client)
+        nodes
+    in
+    (* register a new node to trigger the GC *)
+    let node_B = Node.create [] in
+    let* () = Client.Admin.trust_address ~peer:node_B client in
+    let* known_points = known_points node_1 in
+    let registered_points = List.map Node.point [node_A; node_B] in
+    (* check that only node_A and
+       node_B remains in the known points list *)
+    included
+      ~sub:registered_points
+      ~super:known_points
+      ~fail:(fun (addr, port) ->
+        Test.fail "point %s:%d should be known" addr port) ;
+    included
+      ~sub:known_points
+      ~super:registered_points
+      ~fail:(fun (addr, port) ->
+        Test.fail "point %s:%d should not be known" addr port) ;
+    Lwt.return_unit
+
+  let tests () =
+    test_trusted_preservation () ;
+    test_non_trusted_removal ()
+end
+
 let register_protocol_independent () =
   Maintenance.tests () ;
   ACL.tests () ;
-  test_advertised_port ()
+  test_advertised_port () ;
+  Known_Points_GC.tests ()
 
 let register ~(protocols : Protocol.t list) =
   check_peer_option protocols ;

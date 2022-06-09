@@ -251,8 +251,15 @@ module Admin : sig
   (** Ask a node to trust the address and port of another node. *)
   val trust_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
 
+  (** Ask a node to untrust the address and port of another node. *)
+  val untrust_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
+
   (** Same as [trust_address], but do not wait for the process to exit. *)
   val spawn_trust_address : ?endpoint:endpoint -> peer:Node.t -> t -> Process.t
+
+  (** Same as [untrust_address], but do not wait for the process to exit. *)
+  val spawn_untrust_address :
+    ?endpoint:endpoint -> peer:Node.t -> t -> Process.t
 
   (** Connect a node to another peer. *)
   val connect_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t

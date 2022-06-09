@@ -514,6 +514,13 @@ let point_and_id ?from node =
   let* id = wait_for_identity node in
   Lwt.return (address ^ string_of_int (net_port node) ^ "#" ^ id)
 
+let point ?from node =
+  let from =
+    match from with None -> None | Some peer -> peer.persistent_state.runner
+  in
+  let address = Runner.address ?from node.persistent_state.runner in
+  (address, net_port node)
+
 let add_peer_with_id node peer =
   let* peer = point_and_id ~from:node peer in
   add_argument node (Peer peer) ;
