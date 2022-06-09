@@ -64,27 +64,40 @@ val log_exit :
   'h ->
   unit
 
-(** [log_next_kinstr logger sty instr] instruments the next instruction
-    in [instr] with [ILog] instructions to make sure it will be logged.
-    This instrumentation has a performance cost, but importantly, it is
-    only ever paid when logging is enabled. Otherwise, the possibility
-    to instrument the script is costless. Note also that [logger] value
-    is only available when logging is enables, so the type system protects
-    us from calling this by mistake. *)
-val log_next_kinstr :
-  logger ->
-  ('a, 'b) stack_ty ->
-  ('a, 'b, 'c, 'd) kinstr ->
-  ('a, 'b, 'c, 'd) kinstr tzresult
-
 (** [log_control logger continuation] simply calls [logger.log_control]
     function with the appropriate arguments. Note that [logger] value
     is only available when logging is enables, so the type system
     protects us from calling this by mistake.*)
 val log_control : logger -> ('a, 'b, 'c, 'd) continuation -> unit
 
+(** [log_next_continuation logger sty cont] instruments the next
+    continuation in [cont] with [KLog] continuations to ensure
+    logging.
+
+    This instrumentation has a performance cost, but importantly, it
+    is only ever paid when logging is enabled. Otherwise, the
+    possibility to instrument the script is costless. Note also that
+    [logger] value is only available when logging is enabled, so the
+    type system protects us from calling this by mistake. *)
 val log_next_continuation :
   logger ->
   ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) continuation ->
   ('a, 'b, 'c, 'd) continuation tzresult
+
+(** [log_next_kinstr_and_cont logger sty instr cont] instruments the
+    next instruction in [instr] with [ILog] instructions and the next
+    continuation in [cont] with [KLog] continuations to make sure they
+    will be logged.
+
+    This instrumentation has a performance cost, but importantly, it
+    is only ever paid when logging is enabled. Otherwise, the
+    possibility to instrument the script is costless. Note also that
+    [logger] value is only available when logging is enabled, so the
+    type system protects us from calling this by mistake. *)
+val log_next_kinstr_and_cont :
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  (('a, 'b, 'c, 'd) kinstr * ('c, 'd, 'e, 'f) continuation) tzresult

@@ -328,7 +328,7 @@ and next :
   | Some gas -> (
       match ks0 with
       | KLog (ks, sty, logger) ->
-          (klog [@ocaml.tailcall]) logger g gas sty ks accu stack
+          (klog [@ocaml.tailcall]) logger g gas sty ks0 ks accu stack
       | KNil -> Lwt.return (Ok (accu, stack, ctxt, gas))
       | KCons (k, ks) -> (step [@ocaml.tailcall]) g gas k ks accu stack
       | KLoop_in (ki, ks') ->
@@ -1544,7 +1544,8 @@ and log :
         sty
         accu
         stack) ;
-  Script_interpreter_logging.log_next_kinstr logger sty k >>?= fun k ->
+  Script_interpreter_logging.log_next_kinstr_and_cont logger sty k ks
+  >>?= fun (k, ks) ->
   match k with
   | IMul_teznat (loc, k) ->
       (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
@@ -1567,35 +1568,21 @@ and klog :
     local_gas_counter ->
     (a, s) stack_ty ->
     (a, s, r, f) continuation ->
+    (a, s, r, f) continuation ->
     a ->
     s ->
     (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
- fun logger g gas stack_ty ks accu stack ->
+ fun logger g gas stack_ty k0 ks accu stack ->
   (match ks with
   | KLog _ -> ()
   | _ -> Script_interpreter_logging.log_control logger ks) ;
   Script_interpreter_logging.log_next_continuation logger stack_ty ks
   >>?= function
   | KCons (ki, k) -> (step [@ocaml.tailcall]) g gas ki k accu stack
-  | KLoop_in (ki, k) ->
-      (kloop_in [@ocaml.tailcall])
-        g
-        gas
-        (KLog (ks, stack_ty, logger))
-        ki
-        k
-        accu
-        stack
+  | KLoop_in (ki, k) -> (kloop_in [@ocaml.tailcall]) g gas k0 ki k accu stack
   | KReturn (_, _, _) as k -> (next [@ocaml.tailcall]) g gas k accu stack
   | KLoop_in_left (ki, k) ->
-      (kloop_in_left [@ocaml.tailcall])
-        g
-        gas
-        (KLog (ks, stack_ty, logger))
-        ki
-        k
-        accu
-        stack
+      (kloop_in_left [@ocaml.tailcall]) g gas k0 ki k accu stack
   | KUndip (_, _, _) as k -> (next [@ocaml.tailcall]) g gas k accu stack
   | KIter (body, xty, xs, k) ->
       (kiter [@ocaml.tailcall]) g gas body xty xs k accu stack

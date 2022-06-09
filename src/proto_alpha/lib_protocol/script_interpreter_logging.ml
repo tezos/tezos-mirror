@@ -1784,3 +1784,11 @@ let log_next_continuation :
   | KView_exit (_, _)
   | KLog _ (* This case should never happen. *) | KNil ->
       ok cont
+
+let log_next_kinstr_and_cont logger sty i k =
+  let open Result_syntax in
+  let* i' = log_next_kinstr logger sty i in
+  let* sty' = kinstr_final_stack_type sty i in
+  let+ k' = Option.map_e (fun sty -> log_next_continuation logger sty k) sty' in
+  (* [sty'] being [None] implies that [i] never returns, so [k] won't be executed anyway. *)
+  (i', Option.value ~default:k k')
