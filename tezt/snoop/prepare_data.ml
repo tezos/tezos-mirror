@@ -124,7 +124,6 @@ let prepare_sapling_data snoop cfg protocol =
   let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 0) in
   let* () =
     call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
-        let open Lwt in
         Snoop.sapling_generate
           ~protocol
           ~tx_count:1
@@ -136,7 +135,6 @@ let prepare_sapling_data snoop cfg protocol =
   let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 1) in
   let* () =
     call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
-        let open Lwt in
         Snoop.sapling_generate
           ~protocol
           ~tx_count:cfg.sapling_tx_count
@@ -148,7 +146,6 @@ let prepare_sapling_data snoop cfg protocol =
   let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 2) in
   let* () =
     call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
-        let open Lwt in
         Snoop.sapling_generate
           ~protocol
           ~tx_count:cfg.sapling_tx_count
@@ -159,7 +156,6 @@ let prepare_sapling_data snoop cfg protocol =
   in
   let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 3) in
   call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
-      let open Lwt in
       Snoop.sapling_generate
         ~protocol
         ~tx_count:cfg.sapling_tx_count
