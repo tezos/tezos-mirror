@@ -214,3 +214,8 @@ module PeerGreylist = struct
   let list acl =
     PeerFIFOCache.fold (fun e acc -> e :: acc) acl.greylist_peers []
 end
+
+module Internal_for_tests = struct
+  module PeerFIFOCache = PeerFIFOCache
+  module IpTable = IpTable
+end

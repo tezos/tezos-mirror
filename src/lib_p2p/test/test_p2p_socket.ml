@@ -517,7 +517,7 @@ module Garbled_data = struct
     let open Lwt_result_syntax in
     let* _info, auth_fd = accept sched socket in
     let* conn = P2p_socket.accept ~canceler auth_fd encoding in
-    let* () = P2p_socket.raw_write_sync conn garbled_msg in
+    let* () = P2p_socket.Internal_for_tests.raw_write_sync conn garbled_msg in
     let*! err = P2p_socket.read conn in
     let* () = tzassert (is_connection_closed err) __POS__ in
     let*! _stat = P2p_socket.close conn in
