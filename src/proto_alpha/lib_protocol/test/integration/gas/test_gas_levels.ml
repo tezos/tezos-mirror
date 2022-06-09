@@ -310,7 +310,12 @@ let combine_operations_with_gas ?counter block src list_dst =
   let rec make_op_list full_gas op_list = function
     | [] -> return (full_gas, List.rev op_list)
     | (dst, gas_limit) :: t ->
-        Op.transaction ~gas_limit (B block) src dst Alpha_context.Tez.zero
+        Op.transaction
+          ~gas_limit:(Custom_gas gas_limit)
+          (B block)
+          src
+          dst
+          Alpha_context.Tez.zero
         >>=? fun op ->
         make_op_list
           (Alpha_context.Gas.Arith.add full_gas gas_limit)

@@ -126,7 +126,7 @@ let low_gas_limit_diagnostic (infos : infos) op =
 let test_low_gas_limit kind () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
-  let gas_limit = Gas.Arith.zero in
+  let gas_limit = Op.Low in
   let* op =
     select_op ~gas_limit ~force_reveal:true ~source:infos.contract1 kind infos
   in
@@ -154,7 +154,7 @@ let high_gas_limit_diagnostic (infos : infos) op =
 let test_high_gas_limit kind () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
-  let gas_limit = Gas.Arith.integral_of_int_exn 10_000_000 in
+  let gas_limit = Op.Custom_gas (Gas.Arith.integral_of_int_exn 10_000_000) in
   let* op =
     select_op ~gas_limit ~force_reveal:true ~source:infos.contract1 kind infos
   in
@@ -391,7 +391,9 @@ let exceeding_block_gas_diagnostic ~mempool_mode (infos : infos) op =
 let test_exceeding_block_gas ~mempool_mode kind () =
   let open Lwt_result_syntax in
   let* infos = init_context ~hard_gas_limit_per_block:gb_limit () in
-  let gas_limit = Gas.Arith.add gb_limit Gas.Arith.(integral_of_int_exn 1) in
+  let gas_limit =
+    Op.Custom_gas (Gas.Arith.add gb_limit Gas.Arith.(integral_of_int_exn 1))
+  in
   let* operation =
     select_op ~force_reveal:true ~source:infos.contract1 ~gas_limit kind infos
   in

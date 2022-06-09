@@ -930,11 +930,10 @@ let fill_inbox b tx_rollup contract contents k =
   Context.Contract.counter (B b) contract >>=? fun counter ->
   Incremental.begin_construction b >>=? fun i ->
   let rec fill_inbox i inbox_size counter =
-    (* By default, the [gas_limit] is the maximum gas that can be
-       consumed by an operation. We set a lower (arbitrary) limit to
-       be able to reach the size limit of an operation. *)
+    (* We set an arbitrary gas limit to be able to reach the size
+       limit of an operation. *)
     Op.tx_rollup_submit_batch
-      ~gas_limit:(Gas.Arith.integral_of_int_exn 20_000)
+      ~gas_limit:(Custom_gas (Gas.Arith.integral_of_int_exn 20_000))
       ~counter
       (I i)
       contract
@@ -990,7 +989,7 @@ let test_inbox_count_too_big () =
        consumed by an operation. We set a lower (arbitrary) limit to
        be able to reach the size limit of an operation. *)
     Op.tx_rollup_submit_batch
-      ~gas_limit:(Gas.Arith.integral_of_int_exn 3_500)
+      ~gas_limit:(Custom_gas (Gas.Arith.integral_of_int_exn 3_500))
       ~counter
       (I i)
       contract
@@ -1005,7 +1004,7 @@ let test_inbox_count_too_big () =
   Context.Contract.counter (B b) contract >>=? fun counter ->
   fill_inbox i counter message_count >>=? fun (i, counter) ->
   Op.tx_rollup_submit_batch
-    ~gas_limit:(Gas.Arith.integral_of_int_exn 2_500)
+    ~gas_limit:(Custom_gas (Gas.Arith.integral_of_int_exn 2_500))
     ~counter
     (I i)
     contract
@@ -2510,6 +2509,7 @@ module Rejection = struct
       tx_rollup
       level
       message
+      ~gas_limit:Max
       ~message_position
       ~message_path
       ~message_result_hash
@@ -3484,7 +3484,7 @@ module Rejection = struct
     let message0, _ = Tx_rollup_message.make_batch "xoxo" in
     let message0_hash = Tx_rollup_message_hash.hash_uncarbonated message0 in
     Op.tx_rollup_submit_batch
-      ~gas_limit:(Gas.Arith.integral_of_int_exn 2_500)
+      ~gas_limit:(Custom_gas (Gas.Arith.integral_of_int_exn 2_500))
       (I i)
       account
       tx_rollup

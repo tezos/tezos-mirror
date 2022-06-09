@@ -60,7 +60,7 @@ let init_context ?hard_gas_limit_per_block () =
   in
   (* Set a gas_limit to avoid the default gas_limit of the helpers
      ([hard_gas_limit_per_operation]) *)
-  let gas_limit = Gas.Arith.integral_of_int_exn 10_000 in
+  let gas_limit = Op.Custom_gas (Gas.Arith.integral_of_int_exn 10_000) in
   (* Create and fund an account use for originate a Tx and a Sc
      rollup *)
   let rollup_account = Account.new_account () in

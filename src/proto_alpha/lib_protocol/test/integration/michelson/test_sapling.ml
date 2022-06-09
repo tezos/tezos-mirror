@@ -726,7 +726,7 @@ module Interpreter_tests = struct
     Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.of_int 10 in
     let dst = Alpha_context.Contract.Originated dst in
-    Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
+    Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
       ~expect_apply_failure:(fun _ -> return_unit)
@@ -761,7 +761,7 @@ module Interpreter_tests = struct
     in
     Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.of_int 10 in
-    Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
+    Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
       ~expect_apply_failure:(fun _ -> return_unit)
@@ -911,6 +911,7 @@ module Interpreter_tests = struct
     let fee = Test_tez.of_int 10 in
     Tez.one_mutez *? Int64.of_int 15 >>?= fun amount_tez ->
     Op.transaction
+      ~gas_limit:Max
       ~fee
       (B block_start)
       src
@@ -925,6 +926,7 @@ module Interpreter_tests = struct
     let pkh = Context.Contract.pkh src in
     Alpha_context.Contract.get_counter ctx pkh >>= wrap >>=? fun counter ->
     Op.transaction
+      ~gas_limit:Max
       ~counter
       ~fee
       (B block_start)
@@ -1006,7 +1008,14 @@ module Interpreter_tests = struct
     in
     let parameters = parameters_of_list list_transac in
     let dst = Contract.Originated dst in
-    Op.transaction ~fee:(Test_tez.of_int 10) (B b) src dst Tez.zero ~parameters
+    Op.transaction
+      ~gas_limit:Max
+      ~fee:(Test_tez.of_int 10)
+      (B b)
+      src
+      dst
+      Tez.zero
+      ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit
 
@@ -1046,10 +1055,24 @@ module Interpreter_tests = struct
     in
     let fee = Test_tez.of_int 10 in
     let dst = Contract.Originated dst in
-    Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_1
+    Op.transaction
+      ~gas_limit:Max
+      ~fee
+      (B b)
+      src
+      dst
+      Tez.zero
+      ~parameters:parameters_1
     >>=? fun operation ->
     next_block b operation >>=? fun b ->
-    Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_2
+    Op.transaction
+      ~gas_limit:Max
+      ~fee
+      (B b)
+      src
+      dst
+      Tez.zero
+      ~parameters:parameters_2
     >>=? fun operation ->
     next_block b operation >>=? fun b ->
     Incremental.begin_construction b >>=? fun incr ->
@@ -1118,7 +1141,8 @@ module Interpreter_tests = struct
     in
     let fee = Test_tez.of_int 10 in
     let dst = Contract.Originated dst in
-    Op.transaction ~fee (B b) src dst Tez.zero ~parameters >>=? fun operation ->
+    Op.transaction ~gas_limit:Max ~fee (B b) src dst Tez.zero ~parameters
+    >>=? fun operation ->
     next_block b operation >>=? fun b ->
     let contract = "0x" ^ to_hex dst Alpha_context.Contract.encoding in
     let hex_transac_2 = hex_shield ~memo_size:8 w anti_replay_2 in
@@ -1127,7 +1151,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     let dst_2 = Contract.Originated dst_2 in
-    Op.transaction ~fee (B b) src dst_2 Tez.zero ~parameters
+    Op.transaction ~gas_limit:Max ~fee (B b) src dst_2 Tez.zero ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit
 end

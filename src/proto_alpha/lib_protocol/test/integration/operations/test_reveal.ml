@@ -430,8 +430,7 @@ let test_no_reveal_when_gas_exhausted () =
    | false -> ())
   >>=? fun () ->
   (* We craft a new (bad) reveal operation with a 0 gas_limit *)
-  Op.revelation ~fee:Tez.zero ~gas_limit:Gas.Arith.zero (B blk) new_c.pk
-  >>=? fun op ->
+  Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk >>=? fun op ->
   Incremental.begin_construction blk >>=? fun inc ->
   (* The application of this operation is expected to fail with a
      {! Protocol.Raw_context.Operation_quota_exceeded} error *)
@@ -565,7 +564,7 @@ let test_valid_reveal_after_gas_exhausted_one () =
   >>=? fun () ->
   Incremental.begin_construction blk >>=? fun inc ->
   (* We first craft a (bad) reveal operation with a 0 gas_limit *)
-  Op.revelation ~fee:Tez.zero ~gas_limit:Gas.Arith.zero (B blk) new_c.pk
+  Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk
   >>=? fun bad_reveal ->
   (* While the second is a valid one *)
   Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->

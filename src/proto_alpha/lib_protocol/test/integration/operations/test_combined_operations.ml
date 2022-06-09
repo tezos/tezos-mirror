@@ -48,7 +48,7 @@ open Alpha_context
 
 let ten_tez = Test_tez.of_int 10
 
-let gas_limit = Alpha_context.Gas.Arith.integral_of_int_exn 3000
+let gas_limit = Op.Custom_gas (Alpha_context.Gas.Arith.integral_of_int_exn 3000)
 
 (** Groups ten transactions between the same parties. *)
 let test_multiple_transfers () =

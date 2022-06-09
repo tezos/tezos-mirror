@@ -318,11 +318,23 @@ let test_batch_exceeding_block_gas ~mempool_mode kind1 kind2 () =
   let* reveal = mk_reveal ~counter ~source infos in
   let counter = Z.succ counter in
   let operation gas_limit =
-    select_op ~gas_limit ~counter ~force_reveal:false ~source kind1 infos
+    select_op
+      ~gas_limit:(Custom_gas gas_limit)
+      ~counter
+      ~force_reveal:false
+      ~source
+      kind1
+      infos
   in
   let counter = Z.succ counter in
   let operation2 gas_limit =
-    select_op ~gas_limit ~counter ~force_reveal:false ~source kind2 infos
+    select_op
+      ~gas_limit:(Custom_gas gas_limit)
+      ~counter
+      ~force_reveal:false
+      ~source
+      kind2
+      infos
   in
   let* op_case1 = operation g_limit in
   let* op2_case1 = operation2 Gas.Arith.zero in
