@@ -2104,6 +2104,7 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
         ( ctxt,
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
+  | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
 
 let burn_origination_storage_fees ctxt
     {

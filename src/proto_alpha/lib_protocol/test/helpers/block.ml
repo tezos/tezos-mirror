@@ -758,6 +758,7 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
             let open Apply_results in
             fun (Successful_manager_result r) ->
               match r with
+              | Transaction_result (Transaction_to_sc_rollup_result _)
               | Reveal_result _ | Delegation_result _
               | Set_deposits_limit_result _ | Tx_rollup_origination_result _
               | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
@@ -774,9 +775,8 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Sc_rollup_recover_bond_result _ ->
                   balance_updates_rev
               | Transaction_result
-                  (Transaction_to_contract_result {balance_updates; _})
-              | Transaction_result
-                  (Transaction_to_tx_rollup_result {balance_updates; _})
+                  ( Transaction_to_contract_result {balance_updates; _}
+                  | Transaction_to_tx_rollup_result {balance_updates; _} )
               | Origination_result {balance_updates; _}
               | Register_global_constant_result {balance_updates; _} ->
                   List.rev_append balance_updates balance_updates_rev)

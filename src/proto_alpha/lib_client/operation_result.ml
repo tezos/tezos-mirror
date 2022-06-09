@@ -443,6 +443,13 @@ let pp_storage_size ppf storage_size =
   if storage_size <> Z.zero then
     Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size)
 
+let pp_inbox_after ppf inbox_after =
+  Format.fprintf
+    ppf
+    "@,Resulting inbox state: %a"
+    Sc_rollup.Inbox.pp
+    inbox_after
+
 let pp_lazy_storage_diff ppf = function
   | None -> ()
   | Some lazy_storage_diff -> (
@@ -521,6 +528,9 @@ let pp_transaction_result ppf = function
       pp_balance_updates ppf balance_updates ;
       Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
       pp_paid_storage_size_diff ppf paid_storage_size_diff
+  | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
+      pp_consumed_gas ppf consumed_gas ;
+      pp_inbox_after ppf inbox_after
 
 let pp_operation_result ~operation_name pp_operation_result ppf = function
   | Skipped _ -> Format.fprintf ppf "This operation was skipped."
@@ -628,11 +638,7 @@ let pp_manager_operation_contents_result ppf op_result =
   let pp_sc_rollup_add_messages_result
       (Sc_rollup_add_messages_result {consumed_gas; inbox_after}) =
     pp_consumed_gas ppf consumed_gas ;
-    Format.fprintf
-      ppf
-      "@,Resulting inbox state: %a"
-      Sc_rollup.Inbox.pp
-      inbox_after
+    pp_inbox_after ppf inbox_after
   in
   let pp_sc_rollup_cement_result (Sc_rollup_cement_result {consumed_gas}) =
     pp_consumed_gas ppf consumed_gas

@@ -181,6 +181,10 @@ and successful_transaction_result =
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
+  | Transaction_to_sc_rollup_result of {
+      consumed_gas : Gas.Arith.fp;
+      inbox_after : Sc_rollup.Inbox.t;
+    }
 
 (** Result of applying an origination, either internal or external. *)
 and successful_origination_result = {

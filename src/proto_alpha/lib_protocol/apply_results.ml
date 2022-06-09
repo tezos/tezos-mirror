@@ -147,6 +147,10 @@ type successful_transaction_result =
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
+  | Transaction_to_sc_rollup_result of {
+      consumed_gas : Gas.Arith.fp;
+      inbox_after : Sc_rollup.Inbox.t;
+    }
 
 type successful_origination_result = {
   lazy_storage_diff : Lazy_storage.diffs option;
@@ -544,6 +548,19 @@ module Manager_result = struct
                 ticket_hash;
                 paid_storage_size_diff;
               });
+        case
+          ~title:"To_sc_rollup"
+          (Tag 2)
+          (obj2
+             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+             (req "inbox_after" Sc_rollup.Inbox.encoding))
+          (function
+            | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
+                Some (consumed_gas, inbox_after)
+            | _ -> None)
+          (function
+            | consumed_gas, inbox_after ->
+                Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
       ]
 
   let[@coq_axiom_with_reason "gadt"] transaction_case =
