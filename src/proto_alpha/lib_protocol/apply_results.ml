@@ -426,19 +426,13 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.reveal_case
       ~encoding:
         Data_encoding.(
-          obj2
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Reveal_result _ as op) -> Some op
         | _ -> None)
       ~kind:Kind.Reveal_manager_kind
-      ~proj:(function
-        | Reveal_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Reveal_result {consumed_gas = consumed_milligas})
+      ~proj:(function Reveal_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Reveal_result {consumed_gas})
 
   let[@coq_axiom_with_reason "gadt"] transaction_contract_variant_cases =
     union
@@ -446,11 +440,10 @@ module Manager_result = struct
         case
           ~title:"To_contract"
           (Tag 0)
-          (obj9
+          (obj8
              (opt "storage" Script.expr_encoding)
              (dft "balance_updates" Receipt.balance_updates_encoding [])
              (dft "originated_contracts" (list Contract.originated_encoding) [])
-             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
              (dft "storage_size" z Z.zero)
              (dft "paid_storage_size_diff" z Z.zero)
@@ -472,7 +465,6 @@ module Manager_result = struct
                   ( storage,
                     balance_updates,
                     originated_contracts,
-                    Gas.Arith.ceil consumed_gas,
                     consumed_gas,
                     storage_size,
                     paid_storage_size_diff,
@@ -483,19 +475,17 @@ module Manager_result = struct
                  balance_updates,
                  originated_contracts,
                  consumed_gas,
-                 consumed_milligas,
                  storage_size,
                  paid_storage_size_diff,
                  allocated_destination_contract,
                  lazy_storage_diff ) ->
-            assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
             Transaction_to_contract_result
               {
                 storage;
                 lazy_storage_diff;
                 balance_updates;
                 originated_contracts;
-                consumed_gas = consumed_milligas;
+                consumed_gas;
                 storage_size;
                 paid_storage_size_diff;
                 allocated_destination_contract;
@@ -503,9 +493,8 @@ module Manager_result = struct
         case
           ~title:"To_tx_rollup"
           (Tag 1)
-          (obj5
+          (obj4
              (dft "balance_updates" Receipt.balance_updates_encoding [])
-             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
              (req "ticket_hash" Ticket_hash.encoding)
              (req "paid_storage_size_diff" n))
@@ -519,21 +508,18 @@ module Manager_result = struct
                 } ->
                 Some
                   ( balance_updates,
-                    Gas.Arith.ceil consumed_gas,
                     consumed_gas,
                     ticket_hash,
                     paid_storage_size_diff )
             | _ -> None)
           (fun ( balance_updates,
                  consumed_gas,
-                 consumed_milligas,
                  ticket_hash,
                  paid_storage_size_diff ) ->
-            assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
             Transaction_to_tx_rollup_result
               {
                 balance_updates;
-                consumed_gas = consumed_milligas;
+                consumed_gas;
                 ticket_hash;
                 paid_storage_size_diff;
               });
@@ -554,10 +540,9 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.origination_case
       ~encoding:
-        (obj7
+        (obj6
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.originated_encoding) [])
-           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero)
@@ -582,7 +567,6 @@ module Manager_result = struct
                hence the order difference with regards to the record above. *)
             ( balance_updates,
               originated_contracts,
-              Gas.Arith.ceil consumed_gas,
               consumed_gas,
               storage_size,
               paid_storage_size_diff,
@@ -592,17 +576,15 @@ module Manager_result = struct
         (fun ( balance_updates,
                originated_contracts,
                consumed_gas,
-               consumed_milligas,
                storage_size,
                paid_storage_size_diff,
                lazy_storage_diff ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Origination_result
           {
             lazy_storage_diff;
             balance_updates;
             originated_contracts;
-            consumed_gas = consumed_milligas;
+            consumed_gas;
             storage_size;
             paid_storage_size_diff;
           })
@@ -612,9 +594,8 @@ module Manager_result = struct
       ~op_case:
         Operation.Encoding.Manager_operations.register_global_constant_case
       ~encoding:
-        (obj5
+        (obj4
            (dft "balance_updates" Receipt.balance_updates_encoding [])
-           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (req "global_address" Script_expr_hash.encoding))
@@ -625,74 +606,49 @@ module Manager_result = struct
       ~proj:(function
         | Register_global_constant_result
             {balance_updates; consumed_gas; size_of_constant; global_address} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              size_of_constant,
-              global_address ))
+            (balance_updates, consumed_gas, size_of_constant, global_address))
       ~kind:Kind.Register_global_constant_manager_kind
       ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               size_of_constant,
-               global_address ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        (fun (balance_updates, consumed_gas, size_of_constant, global_address) ->
         Register_global_constant_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            size_of_constant;
-            global_address;
-          })
+          {balance_updates; consumed_gas; size_of_constant; global_address})
 
   let delegation_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.delegation_case
       ~encoding:
         Data_encoding.(
-          obj2
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Delegation_result _ as op) -> Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
       ~proj:(function[@coq_match_with_default]
-        | Delegation_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Delegation_result {consumed_gas = consumed_milligas})
+        | Delegation_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Delegation_result {consumed_gas})
 
   let set_deposits_limit_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.set_deposits_limit_case
       ~encoding:
         Data_encoding.(
-          obj2
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Set_deposits_limit_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Set_deposits_limit_manager_kind
       ~proj:(function
-        | Set_deposits_limit_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Set_deposits_limit_result {consumed_gas = consumed_milligas})
+        | Set_deposits_limit_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Set_deposits_limit_result {consumed_gas})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.tx_rollup_origination_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "originated_rollup" Tx_rollup.encoding))
       ~select:(function
@@ -703,31 +659,18 @@ module Manager_result = struct
       ~proj:(function
         | Tx_rollup_origination_result
             {balance_updates; consumed_gas; originated_tx_rollup} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              originated_tx_rollup ))
-      ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               originated_tx_rollup ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, consumed_gas, originated_tx_rollup))
+      ~inj:(fun (balance_updates, consumed_gas, originated_tx_rollup) ->
         Tx_rollup_origination_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            originated_tx_rollup;
-          })
+          {balance_updates; consumed_gas; originated_tx_rollup})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_submit_batch_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.tx_rollup_submit_batch_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "paid_storage_size_diff" n))
       ~select:(function
@@ -738,31 +681,18 @@ module Manager_result = struct
       ~proj:(function
         | Tx_rollup_submit_batch_result
             {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              paid_storage_size_diff ))
-      ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               paid_storage_size_diff ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, consumed_gas, paid_storage_size_diff))
+      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
         Tx_rollup_submit_batch_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            paid_storage_size_diff;
-          })
+          {balance_updates; consumed_gas; paid_storage_size_diff})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_commit_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.tx_rollup_commit_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj2
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Tx_rollup_commit_result _ as op) -> Some op
@@ -770,20 +700,17 @@ module Manager_result = struct
       ~kind:Kind.Tx_rollup_commit_manager_kind
       ~proj:(function
         | Tx_rollup_commit_result {balance_updates; consumed_gas} ->
-            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Tx_rollup_commit_result
-          {balance_updates; consumed_gas = consumed_milligas})
+            (balance_updates, consumed_gas))
+      ~inj:(fun (balance_updates, consumed_gas) ->
+        Tx_rollup_commit_result {balance_updates; consumed_gas})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_return_bond_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.tx_rollup_return_bond_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj2
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Tx_rollup_return_bond_result _ as op) ->
@@ -792,11 +719,9 @@ module Manager_result = struct
       ~kind:Kind.Tx_rollup_return_bond_manager_kind
       ~proj:(function
         | Tx_rollup_return_bond_result {balance_updates; consumed_gas} ->
-            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Tx_rollup_return_bond_result
-          {balance_updates; consumed_gas = consumed_milligas})
+            (balance_updates, consumed_gas))
+      ~inj:(fun (balance_updates, consumed_gas) ->
+        Tx_rollup_return_bond_result {balance_updates; consumed_gas})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_finalize_commitment_case =
     make
@@ -804,9 +729,8 @@ module Manager_result = struct
         Operation.Encoding.Manager_operations.tx_rollup_finalize_commitment_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "level" Tx_rollup_level.encoding))
       ~select:(function
@@ -818,11 +742,10 @@ module Manager_result = struct
       ~proj:(function
         | Tx_rollup_finalize_commitment_result
             {balance_updates; consumed_gas; level} ->
-            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas, level))
-      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas, level) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, consumed_gas, level))
+      ~inj:(fun (balance_updates, consumed_gas, level) ->
         Tx_rollup_finalize_commitment_result
-          {balance_updates; consumed_gas = consumed_milligas; level})
+          {balance_updates; consumed_gas; level})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_remove_commitment_case =
     make
@@ -830,9 +753,8 @@ module Manager_result = struct
         Operation.Encoding.Manager_operations.tx_rollup_remove_commitment_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "level" Tx_rollup_level.encoding))
       ~select:(function
@@ -844,20 +766,18 @@ module Manager_result = struct
       ~proj:(function
         | Tx_rollup_remove_commitment_result
             {balance_updates; consumed_gas; level} ->
-            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas, level))
-      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas, level) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, consumed_gas, level))
+      ~inj:(fun (balance_updates, consumed_gas, level) ->
         Tx_rollup_remove_commitment_result
-          {balance_updates; consumed_gas = consumed_milligas; level})
+          {balance_updates; consumed_gas; level})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_rejection_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.tx_rollup_rejection_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj2
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Tx_rollup_rejection_result _ as op) ->
@@ -866,11 +786,9 @@ module Manager_result = struct
       ~kind:Kind.Tx_rollup_rejection_manager_kind
       ~proj:(function
         | Tx_rollup_rejection_result {balance_updates; consumed_gas} ->
-            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Tx_rollup_rejection_result
-          {balance_updates; consumed_gas = consumed_milligas})
+            (balance_updates, consumed_gas))
+      ~inj:(fun (balance_updates, consumed_gas) ->
+        Tx_rollup_rejection_result {balance_updates; consumed_gas})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_dispatch_tickets_case =
     make
@@ -878,9 +796,8 @@ module Manager_result = struct
         Operation.Encoding.Manager_operations.tx_rollup_dispatch_tickets_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -892,31 +809,18 @@ module Manager_result = struct
       ~proj:(function
         | Tx_rollup_dispatch_tickets_result
             {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              paid_storage_size_diff ))
-      ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               paid_storage_size_diff ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, consumed_gas, paid_storage_size_diff))
+      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
         Tx_rollup_dispatch_tickets_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            paid_storage_size_diff;
-          })
+          {balance_updates; consumed_gas; paid_storage_size_diff})
 
   let[@coq_axiom_with_reason "gadt"] transfer_ticket_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.transfer_ticket_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -926,51 +830,33 @@ module Manager_result = struct
       ~proj:(function
         | Transfer_ticket_result
             {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              paid_storage_size_diff ))
-      ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               paid_storage_size_diff ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, consumed_gas, paid_storage_size_diff))
+      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
         Transfer_ticket_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            paid_storage_size_diff;
-          })
+          {balance_updates; consumed_gas; paid_storage_size_diff})
 
   let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =
     make
       ~op_case:
         Operation.Encoding.Manager_operations.dal_publish_slot_header_case
       ~encoding:
-        (obj2
-           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+        (obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Dal_publish_slot_header_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Dal_publish_slot_header_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
+        | Dal_publish_slot_header_result {consumed_gas} -> consumed_gas)
       ~kind:Kind.Dal_publish_slot_header_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Dal_publish_slot_header_result {consumed_gas = consumed_milligas})
+      ~inj:(fun consumed_gas -> Dal_publish_slot_header_result {consumed_gas})
 
   let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_originate_case
       ~encoding:
-        (obj5
+        (obj4
            (req "balance_updates" Receipt.balance_updates_encoding)
            (req "address" Sc_rollup.Address.encoding)
-           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "size" z))
       ~select:(function
@@ -980,24 +866,17 @@ module Manager_result = struct
       ~proj:(function
         | Sc_rollup_originate_result
             {balance_updates; address; consumed_gas; size} ->
-            ( balance_updates,
-              address,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              size ))
+            (balance_updates, address, consumed_gas, size))
       ~kind:Kind.Sc_rollup_originate_manager_kind
-      ~inj:
-        (fun (balance_updates, address, consumed_gas, consumed_milligas, size) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+      ~inj:(fun (balance_updates, address, consumed_gas, size) ->
         Sc_rollup_originate_result
-          {balance_updates; address; consumed_gas = consumed_milligas; size})
+          {balance_updates; address; consumed_gas; size})
 
   let sc_rollup_add_messages_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_add_messages_case
       ~encoding:
-        (obj3
-           (req "consumed_gas" Gas.Arith.n_integral_encoding)
+        (obj2
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "inbox_after" Sc_rollup.Inbox.encoding))
       ~select:(function
@@ -1006,37 +885,28 @@ module Manager_result = struct
         | _ -> None)
       ~proj:(function
         | Sc_rollup_add_messages_result {consumed_gas; inbox_after} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas, inbox_after))
+            (consumed_gas, inbox_after))
       ~kind:Kind.Sc_rollup_add_messages_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas, inbox_after) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_add_messages_result
-          {consumed_gas = consumed_milligas; inbox_after})
+      ~inj:(fun (consumed_gas, inbox_after) ->
+        Sc_rollup_add_messages_result {consumed_gas; inbox_after})
 
   let sc_rollup_cement_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_cement_case
       ~encoding:
-        (obj2
-           (req "consumed_gas" Gas.Arith.n_integral_encoding)
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+        (obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Sc_rollup_cement_result _ as op) -> Some op
         | _ -> None)
-      ~proj:(function
-        | Sc_rollup_cement_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~proj:(function Sc_rollup_cement_result {consumed_gas} -> consumed_gas)
       ~kind:Kind.Sc_rollup_cement_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_cement_result {consumed_gas = consumed_milligas})
+      ~inj:(fun consumed_gas -> Sc_rollup_cement_result {consumed_gas})
 
   let sc_rollup_publish_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_publish_case
       ~encoding:
-        (obj5
-           (req "consumed_gas" Gas.Arith.n_integral_encoding)
+        (obj4
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "staked_hash" Sc_rollup.Commitment.Hash.encoding)
            (req "published_at_level" Raw_level.encoding)
@@ -1048,34 +918,19 @@ module Manager_result = struct
       ~proj:(function
         | Sc_rollup_publish_result
             {consumed_gas; staked_hash; published_at_level; balance_updates} ->
-            ( Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              staked_hash,
-              published_at_level,
-              balance_updates ))
+            (consumed_gas, staked_hash, published_at_level, balance_updates))
       ~kind:Kind.Sc_rollup_publish_manager_kind
       ~inj:
-        (fun ( consumed_gas,
-               consumed_milligas,
-               staked_hash,
-               published_at_level,
-               balance_updates ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        (fun (consumed_gas, staked_hash, published_at_level, balance_updates) ->
         Sc_rollup_publish_result
-          {
-            consumed_gas = consumed_milligas;
-            staked_hash;
-            published_at_level;
-            balance_updates;
-          })
+          {consumed_gas; staked_hash; published_at_level; balance_updates})
 
   let sc_rollup_refute_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_refute_case
       ~encoding:
         Data_encoding.(
-          obj4
-            (req "consumed_gas" Gas.Arith.n_integral_encoding)
+          obj3
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "status" Sc_rollup.Game.status_encoding)
             (req "balance_updates" Receipt.balance_updates_encoding))
@@ -1084,19 +939,16 @@ module Manager_result = struct
         | _ -> None)
       ~proj:(function
         | Sc_rollup_refute_result {consumed_gas; status; balance_updates} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas, status, balance_updates))
+            (consumed_gas, status, balance_updates))
       ~kind:Kind.Sc_rollup_refute_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas, status, balance_updates) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_refute_result
-          {consumed_gas = consumed_milligas; status; balance_updates})
+      ~inj:(fun (consumed_gas, status, balance_updates) ->
+        Sc_rollup_refute_result {consumed_gas; status; balance_updates})
 
   let sc_rollup_timeout_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_timeout_case
       ~encoding:
-        (obj4
-           (req "consumed_gas" Gas.Arith.n_integral_encoding)
+        (obj3
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "status" Sc_rollup.Game.status_encoding)
            (req "balance_updates" Receipt.balance_updates_encoding))
@@ -1106,12 +958,10 @@ module Manager_result = struct
         | _ -> None)
       ~proj:(function
         | Sc_rollup_timeout_result {consumed_gas; status; balance_updates} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas, status, balance_updates))
+            (consumed_gas, status, balance_updates))
       ~kind:Kind.Sc_rollup_timeout_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas, status, balance_updates) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_timeout_result
-          {consumed_gas = consumed_milligas; status; balance_updates})
+      ~inj:(fun (consumed_gas, status, balance_updates) ->
+        Sc_rollup_timeout_result {consumed_gas; status; balance_updates})
 
   let sc_rollup_execute_outbox_message_case =
     make
@@ -1120,9 +970,8 @@ module Manager_result = struct
         .sc_rollup_execute_outbox_message_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -1134,31 +983,18 @@ module Manager_result = struct
       ~proj:(function
         | Sc_rollup_execute_outbox_message_result
             {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              paid_storage_size_diff ))
-      ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               paid_storage_size_diff ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, consumed_gas, paid_storage_size_diff))
+      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
         Sc_rollup_execute_outbox_message_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            paid_storage_size_diff;
-          })
+          {balance_updates; consumed_gas; paid_storage_size_diff})
 
   let[@coq_axiom_with_reason "gadt"] sc_rollup_recover_bond_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_recover_bond_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj2
             (req "balance_updates" Receipt.balance_updates_encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Sc_rollup_recover_bond_result _ as op) ->
@@ -1167,11 +1003,9 @@ module Manager_result = struct
       ~kind:Kind.Sc_rollup_recover_bond_manager_kind
       ~proj:(function
         | Sc_rollup_recover_bond_result {balance_updates; consumed_gas} ->
-            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_recover_bond_result
-          {balance_updates; consumed_gas = consumed_milligas})
+            (balance_updates, consumed_gas))
+      ~inj:(fun (balance_updates, consumed_gas) ->
+        Sc_rollup_recover_bond_result {balance_updates; consumed_gas})
 end
 
 type 'kind iselect =
@@ -1406,10 +1240,9 @@ module Internal_manager_result = struct
     make
       ~op_case:Internal_result.origination_case
       ~encoding:
-        (obj7
+        (obj6
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.originated_encoding) [])
-           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero)
@@ -1435,7 +1268,6 @@ module Internal_manager_result = struct
                hence the order difference with regards to the record above. *)
             ( balance_updates,
               originated_contracts,
-              Gas.Arith.ceil consumed_gas,
               consumed_gas,
               storage_size,
               paid_storage_size_diff,
@@ -1445,17 +1277,15 @@ module Internal_manager_result = struct
         (fun ( balance_updates,
                originated_contracts,
                consumed_gas,
-               consumed_milligas,
                storage_size,
                paid_storage_size_diff,
                lazy_storage_diff ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         IOrigination_result
           {
             lazy_storage_diff;
             balance_updates;
             originated_contracts;
-            consumed_gas = consumed_milligas;
+            consumed_gas;
             storage_size;
             paid_storage_size_diff;
           })
@@ -1465,20 +1295,15 @@ module Internal_manager_result = struct
       ~op_case:Internal_result.delegation_case
       ~encoding:
         Data_encoding.(
-          obj2
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_internal_manager_result (IDelegation_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
       ~proj:(function[@coq_match_with_default]
-        | IDelegation_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        IDelegation_result {consumed_gas = consumed_milligas})
+        | IDelegation_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> IDelegation_result {consumed_gas})
 end
 
 let internal_manager_operation_result_encoding :
