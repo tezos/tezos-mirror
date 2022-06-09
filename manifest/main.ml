@@ -5367,11 +5367,11 @@ let _octez_client =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exes
-    ["tezos-client"; "tezos-admin-client"]
+    ["octez-client"; "octez-admin-client"]
     ~path:"src/bin_client"
     ~internal_names:["main_client"; "main_admin"]
-    ~opam:"tezos-client"
-    ~synopsis:"Tezos: `tezos-client` binary"
+    ~opam:"octez-client"
+    ~synopsis:"Tezos: `octez-client` binary"
     ~release:true
     ~deps:
       ([
@@ -5397,10 +5397,10 @@ let _octez_client =
           install
             [
               as_
-                "tezos-init-sandboxed-client.sh"
-                "tezos-init-sandboxed-client.sh";
+                "octez-init-sandboxed-client.sh"
+                "octez-init-sandboxed-client.sh";
             ]
-            ~package:"tezos-client"
+            ~package:"octez-client"
             ~section:"bin";
           alias_rule
             "runtest_compile_protocol"
