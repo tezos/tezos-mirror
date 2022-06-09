@@ -66,12 +66,12 @@ include module type of RPC_legacy
 
 (** RPC: [GET /network/connections]
 
-    Result is a list of [(address, port)] pairs. *)
+    Returns the list of [(address, port)] pairs. *)
 val get_network_connections : (string * int) list t
 
 (** RPC: [GET /network/connections/<peer_id>]
 
-    Result is the address and port of the given peer ID if connected.
+    Returns the address and port of the given peer ID if connected.
     This RPC returns 404 Not Found if the peer ID is not connected. *)
 val get_network_connection : string -> (string * int) t
 
@@ -137,13 +137,24 @@ val get_network_versions : JSON.t t
 
 (** RPC: [POST /private/injection/operations]
 
-    Result is the hashes of the operations that were injected. *)
+    Returns the hashes of the operations that were injected. *)
 val post_private_injection_operations :
   ?force:bool ->
   ?async:bool ->
   ops:Hex.t list ->
   unit ->
   [`OpHash of string] list t
+
+(** RPC: [POST /injection/operation] *)
+val post_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+
+(** RPC: [POST /private/injection/operation] *)
+val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+
+(** RPC: [GET /chains/[chain]/chain_id]
+
+    Returns the chain ID. *)
+val get_chain_chain_id : ?chain:string -> unit -> string t
 
 (** RPC: [GET /chains/[chain]/blocks/[block]]
 
@@ -158,11 +169,27 @@ val get_chain_block : ?chain:string -> ?block:string -> unit -> JSON.t t
 val get_chain_block_metadata :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/[chain]/blocks/[block]/hash]
+
+    Returns the hash. *)
+val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
+
 (** RPC: [GET /chains/[chain]/blocks/[block]/header]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [PATCH /chains/[chain]] to set ["bootstrapped"]
+
+    Example: to force the chain to be considered bootstrapped,
+    use [patch_chain_bootstrapped true]. *)
+val patch_chain_bootstrapped : ?chain:string -> bool -> unit t
+
+(** RPC: [GET /chains/[chain]/is_bootstrapped]
+
+    Returns the value of [sync_state], e.g. ["synced"]. *)
+val get_chain_is_bootstrapped : ?chain:string -> unit -> string t
 
 (** A level and its hash *)
 type block_descriptor = {block_hash : string; level : int}

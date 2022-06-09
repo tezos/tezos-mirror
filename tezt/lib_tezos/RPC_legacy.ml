@@ -24,25 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_chain_id ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "chain_id"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_block_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "hash"] in
-  let* json = Client.rpc ?endpoint ?hooks GET path client in
-  return (JSON.as_string json)
-
-let force_bootstrapped ?endpoint ?hooks ?(chain = "main") ?(bootstrapped = true)
-    client =
-  let path = ["chains"; chain] in
-  let data = `O [("bootstrapped", `Bool bootstrapped)] in
-  Client.rpc ?endpoint ?hooks ~data PATCH path client
-
-let is_bootstrapped ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "is_bootstrapped"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
 let raw_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     client =
   let path =
@@ -146,16 +127,6 @@ let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
 let inject_block ?endpoint ?hooks ~data client =
   let path = ["injection"; "block"] in
   Client.rpc ?endpoint ?hooks ~data POST path client
-
-let inject_operation ?endpoint ?hooks ?(async = false) ~data client =
-  let path = ["injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let private_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
-  let path = ["private"; "injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in

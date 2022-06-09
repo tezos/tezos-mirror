@@ -2150,8 +2150,7 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
 
 let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   let signed_op = op_str_hex ^ signature in
-  let*! r = RPC.inject_operation ~data:(`String signed_op) client in
-  return r
+  RPC.Client.call client @@ RPC.post_injection_operation (`String signed_op)
 
 let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client =
@@ -2228,8 +2227,9 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
     Operation.sign_manager_op_bytes ~signer (Hex.to_bytes (`Hex op_str_hex))
   in
   let* _run =
-    let* chain_id = RPC.get_chain_id client in
+    let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
     let op_runnable =
+      (* Please don't do that. Build [JSON.u] values and use [JSON.encode_u]. *)
       Format.asprintf
         {|{ "operation":
             {"branch": "%s",
@@ -2240,14 +2240,13 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
         ops_json
         Tezos_crypto.Signature.pp
         signature
-        (JSON.encode chain_id)
+        (JSON.encode_u (`String chain_id))
     in
     RPC.post_run_operation ~data:(Ezjsonm.from_string op_runnable) client
   in
   let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
   let signed_op = op_str_hex ^ signature in
-  let*! r = RPC.inject_operation ~data:(`String signed_op) client in
-  return r
+  RPC.Client.call client @@ RPC.post_injection_operation (`String signed_op)
 
 let check_batch_operations_are_in_applied_mempool ops oph n =
   let open JSON in
@@ -2545,7 +2544,10 @@ let propagation_future_endorsement =
   Log.info "%s" step6_msg ;
   let (`Hex bytes) = Hex.of_bytes bytes in
   let injection_waiter = wait_for_injection node_2 in
-  let*! _ = RPC.private_inject_operation ~data:(`String bytes) client_2 in
+  let* _ =
+    RPC.Client.call client_2
+    @@ RPC.post_private_injection_operation (`String bytes)
+  in
   let* () = injection_waiter in
   Log.info "%s" step7_msg ;
   let* () = Client.Admin.trust_address client_2 ~peer:node_3
@@ -3417,7 +3419,9 @@ let force_operation_injection =
   in
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
-  let*? p = RPC.inject_operation ~data:(`String signed_op) client1 in
+  let*? p =
+    RPC.Client.spawn client1 @@ RPC.post_injection_operation (`String signed_op)
+  in
   let injection_error_rex =
     rex
       ~opts:[`Dotall]
@@ -3425,16 +3429,24 @@ let force_operation_injection =
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step6_msg ;
-  let*? p = RPC.private_inject_operation ~data:(`String signed_op) client1 in
+  let*? p =
+    RPC.Client.spawn client1
+    @@ RPC.post_private_injection_operation (`String signed_op)
+  in
   let access_error_rex =
     rex ~opts:[`Dotall] "Fatal error:\n  .HTTP 403. Access denied to: .*"
   in
   let* () = Process.check_error ~msg:access_error_rex p in
   Log.info "%s" step7_msg ;
-  let*? p = RPC.inject_operation ~data:(`String signed_op) client2 in
+  let*? p =
+    RPC.Client.spawn client2 @@ RPC.post_injection_operation (`String signed_op)
+  in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step8_msg ;
-  let*! _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
+  let* _ =
+    RPC.Client.call client2
+    @@ RPC.post_private_injection_operation (`String signed_op)
+  in
   unit
 
 (** This test tries to inject an operation with an old known branch *)
@@ -3500,7 +3512,8 @@ let injecting_old_operation_fails =
   in
   log_step 5 step5 ;
   let*? process =
-    RPC.inject_operation ~data:(`String (op_str_hex ^ signature)) client
+    RPC.Client.spawn client
+    @@ RPC.post_injection_operation (`String (op_str_hex ^ signature))
   in
   let injection_error_rex =
     rex

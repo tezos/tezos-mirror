@@ -34,58 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chain/[chain]/chain_id *)
-val get_chain_id :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/hash *)
-val get_block_hash :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  string Lwt.t
-
-(** Call RPC /chain/[chain] *)
-val force_bootstrapped :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?bootstrapped:bool ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/is_bootstrapped *)
-val is_bootstrapped :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /injection/operation *)
-val inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Runnable.process
-
-(** Call RPC /private/injection/operation *)
-val private_inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Runnable.process
-
 (** Call RPC /injection/block *)
 val inject_block :
   ?endpoint:Client.endpoint ->

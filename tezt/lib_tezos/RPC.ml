@@ -105,14 +105,47 @@ let get_network_version = make GET ["network"; "version"] Fun.id
 
 let get_network_versions = make GET ["network"; "versions"] Fun.id
 
+let post_injection_operation ?(async = false) data =
+  make
+    POST
+    ["injection"; "operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
+
+let post_private_injection_operation ?(async = false) data =
+  make
+    POST
+    ["private"; "injection"; "operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
+
+let get_chain_chain_id ?(chain = "main") () =
+  make GET ["chains"; chain; "chain_id"] JSON.as_string
+
 let get_chain_block ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block] Fun.id
 
 let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "metadata"] Fun.id
 
+let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string
+
 let get_chain_block_header ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
+
+let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
+  make
+    PATCH
+    ["chains"; chain]
+    ~data:(`O [("bootstrapped", `Bool bootstrapped)])
+    ignore
+
+let get_chain_is_bootstrapped ?(chain = "main") () =
+  make GET ["chains"; chain; "is_bootstrapped"] @@ fun json ->
+  JSON.(json |-> "sync_state" |> as_string)
 
 type block_descriptor = {block_hash : string; level : int}
 

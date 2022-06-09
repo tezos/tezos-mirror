@@ -40,10 +40,6 @@ let get_branch ?offset client =
   let* json = RPC.get_branch ?offset client in
   return (JSON.as_string json)
 
-let get_chain_id client =
-  let* json = RPC.get_chain_id client in
-  return (JSON.as_string json)
-
 let make ~branch ~signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
 
@@ -103,7 +99,8 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
   in
   let* (`Hex op) = hex ~signature t client in
   let inject_rpc =
-    if force then RPC.private_inject_operation else RPC.inject_operation
+    if force then RPC.post_private_injection_operation
+    else RPC.post_injection_operation
   in
   let waiter =
     let mode = Client.get_mode client in
@@ -114,7 +111,7 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
           "Operation.inject: Node endpoint expected instead of proxy server"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let runnable = inject_rpc ~data:(`String op) client in
+  let runnable = RPC.Client.spawn client @@ inject_rpc (`String op) in
   match error with
   | None ->
       let* () = waiter in
@@ -182,7 +179,7 @@ module Consensus = struct
     in
     let* chain_id =
       match chain_id with
-      | None -> get_chain_id client
+      | None -> RPC.Client.call client @@ RPC.get_chain_chain_id ()
       | Some branch -> return branch
     in
     return (make ~branch ~signer ~kind:(Consensus {chain_id}) json)
