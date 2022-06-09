@@ -141,6 +141,12 @@ module V2_0_0 = struct
           val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
         end
 
+        val get : tree t
+
+        val set : tree -> unit t
+
+        val lift : 'a Lwt.t -> 'a t
+
         val find_value : Tree.key -> 'a Data_encoding.t -> 'a option t
 
         val set_value : Tree.key -> 'a Data_encoding.t -> 'a -> unit t
@@ -174,6 +180,12 @@ module V2_0_0 = struct
           match Data_encoding.Binary.of_bytes_opt encoding bytes with
           | None -> internal_error "Error during decoding" state
           | Some v -> return (state, Some v)
+
+        let get s = Lwt.return (s, Some s)
+
+        let set s _ = Lwt.return (s, Some ())
+
+        let lift m s = Lwt.map (fun r -> (s, Some r)) m
 
         let find_value key encoding state =
           let open Lwt_syntax in
@@ -295,6 +307,7 @@ module V2_0_0 = struct
       end)
     end
 
+    module WASM_machine = Wasm_2_0_0.Make (Tree)
     open State
 
     type state = State.state
@@ -367,14 +380,15 @@ module V2_0_0 = struct
 
     let set_input input = state_of @@ set_input_monadic input
 
-    let reboot = return ()
-
     let eval_step =
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3090
 
          Call into tickified parsing/evaluation exposed in lib_webassembly.
       *)
-      reboot
+      let open Monad.Syntax in
+      let* s = get in
+      let* s = lift (WASM_machine.step s) in
+      set s
 
     let ticked m =
       let open Monad.Syntax in
