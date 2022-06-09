@@ -2183,6 +2183,120 @@ let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
+let parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
+  function
+  | String (loc, v) as expr ->
+      (* The limitation of length of string is same as entrypoint *)
+      if Compare.Int.(String.length v > 31) then error (View_name_too_long v)
+      else
+        let rec check_char i =
+          if Compare.Int.(i < 0) then ok v
+          else if Script_ir_annot.is_allowed_char v.[i] then check_char (i - 1)
+          else error (Bad_view_name loc)
+        in
+        Gas.consume ctxt (Typecheck_costs.check_printable v) >>? fun ctxt ->
+        record_trace
+          (Invalid_syntactic_constant
+             ( loc,
+               strip_locations expr,
+               "string [a-zA-Z0-9_.%@] and the maximum string length of 31 \
+                characters" ))
+          ( check_char (String.length v - 1) >>? fun v ->
+            Script_string.of_string v >|? fun s -> (s, ctxt) )
+  | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
+
+let parse_toplevel :
+    context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
+ fun ctxt ~legacy toplevel ->
+  record_trace (Ill_typed_contract (toplevel, []))
+  @@
+  match root toplevel with
+  | Int (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Int_kind))
+  | String (loc, _) -> error (Invalid_kind (loc, [Seq_kind], String_kind))
+  | Bytes (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Bytes_kind))
+  | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [Seq_kind], Prim_kind))
+  | Seq (_, fields) -> (
+      let rec find_fields ctxt p s c views fields =
+        match fields with
+        | [] -> ok (ctxt, (p, s, c, views))
+        | Int (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Int_kind))
+        | String (loc, _) :: _ ->
+            error (Invalid_kind (loc, [Prim_kind], String_kind))
+        | Bytes (loc, _) :: _ ->
+            error (Invalid_kind (loc, [Prim_kind], Bytes_kind))
+        | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Seq_kind))
+        | Prim (loc, K_parameter, [arg], annot) :: rest -> (
+            match p with
+            | None -> find_fields ctxt (Some (arg, loc, annot)) s c views rest
+            | Some _ -> error (Duplicate_field (loc, K_parameter)))
+        | Prim (loc, K_storage, [arg], annot) :: rest -> (
+            match s with
+            | None -> find_fields ctxt p (Some (arg, loc, annot)) c views rest
+            | Some _ -> error (Duplicate_field (loc, K_storage)))
+        | Prim (loc, K_code, [arg], annot) :: rest -> (
+            match c with
+            | None -> find_fields ctxt p s (Some (arg, loc, annot)) views rest
+            | Some _ -> error (Duplicate_field (loc, K_code)))
+        | Prim (loc, ((K_parameter | K_storage | K_code) as name), args, _) :: _
+          ->
+            error (Invalid_arity (loc, name, 1, List.length args))
+        | Prim (loc, K_view, [name; input_ty; output_ty; view_code], _) :: rest
+          ->
+            parse_view_name ctxt name >>? fun (str, ctxt) ->
+            Gas.consume
+              ctxt
+              (Michelson_v1_gas.Cost_of.Interpreter.view_update str views)
+            >>? fun ctxt ->
+            if Script_map.mem str views then error (Duplicated_view_name loc)
+            else
+              let views' =
+                Script_map.update
+                  str
+                  (Some {input_ty; output_ty; view_code})
+                  views
+              in
+              find_fields ctxt p s c views' rest
+        | Prim (loc, K_view, args, _) :: _ ->
+            error (Invalid_arity (loc, K_view, 4, List.length args))
+        | Prim (loc, name, _, _) :: _ ->
+            let allowed = [K_parameter; K_storage; K_code; K_view] in
+            error (Invalid_primitive (loc, allowed, name))
+      in
+      find_fields ctxt None None None (Script_map.empty string_t) fields
+      >>? fun (ctxt, toplevel) ->
+      match toplevel with
+      | None, _, _, _ -> error (Missing_field K_parameter)
+      | Some _, None, _, _ -> error (Missing_field K_storage)
+      | Some _, Some _, None, _ -> error (Missing_field K_code)
+      | ( Some (p, ploc, pannot),
+          Some (s, sloc, sannot),
+          Some (c, cloc, cannot),
+          views ) ->
+          let p_pannot =
+            (* root name can be attached to either the parameter
+               primitive or the toplevel constructor (legacy only).
+
+               In the latter case we move it to the parameter type.
+            *)
+            Script_ir_annot.has_field_annot p >>? function
+            | true -> ok (p, pannot)
+            | false -> (
+                match pannot with
+                | [single] when legacy -> (
+                    is_field_annot ploc single >|? fun is_field_annot ->
+                    match (is_field_annot, p) with
+                    | true, Prim (loc, prim, args, annots) ->
+                        (Prim (loc, prim, args, single :: annots), [])
+                    | _ -> (p, []))
+                | _ -> ok (p, pannot))
+          in
+          (* only one field annot is allowed to set the root entrypoint name *)
+          p_pannot >>? fun (arg_type, pannot) ->
+          Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
+          Script_ir_annot.error_unexpected_annot cloc cannot >>? fun () ->
+          Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
+          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
+
 (* -- parse data of any type -- *)
 
 (*
@@ -2370,7 +2484,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       traced
         ( parse_address ctxt expr >>?= fun (address, ctxt) ->
           let loc = location expr in
-          parse_contract
+          parse_contract_data
             ~stack_depth:(stack_depth + 1)
             ctxt
             loc
@@ -4787,7 +4901,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
              I_XOR;
            ]
 
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract :
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract_data :
     type arg argc.
     stack_depth:int ->
     context ->
@@ -4797,188 +4911,118 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract) tzresult Lwt.t =
  fun ~stack_depth ctxt loc arg destination ~entrypoint ->
+  let error_details = Informative loc in
+  parse_contract
+    ~stack_depth:(stack_depth + 1)
+    ctxt
+    ~error_details
+    loc
+    arg
+    destination
+    ~entrypoint
+  >>=? fun (ctxt, res) -> Lwt.return (res >|? fun res -> (ctxt, res))
+
+(* [parse_contract] is used both to:
+   - parse contract data by [parse_data] ([parse_contract_data])
+   - to execute the [CONTRACT] instruction ([parse_contract_for_script]).
+
+   The return type resembles the [Gas_monad]:
+   - the outer [tzresult] is for gas exhaustion and internal errors
+   - the inner [result] is for other legitimate cases of failure.
+
+   The inner [result] is turned into an [option] by [parse_contract_for_script].
+   Both [tzresult] are merged by [parse_contract_data].
+*)
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract :
+    type arg argc err.
+    stack_depth:int ->
+    context ->
+    error_details:(location, err) error_details ->
+    Script.location ->
+    (arg, argc) ty ->
+    Destination.t ->
+    entrypoint:Entrypoint.t ->
+    (context * (arg typed_contract, err) result) tzresult Lwt.t =
+ fun ~stack_depth ctxt ~error_details loc arg destination ~entrypoint ->
+  let error ctxt f_err : context * (_, err) result =
+    ( ctxt,
+      Error
+        (match error_details with
+        | Fast -> (Inconsistent_types_fast : err)
+        | Informative loc -> trace_of_error @@ f_err loc) )
+  in
+  Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
   match destination with
   | Contract contract -> (
       match contract with
       | Implicit _ ->
-          if Entrypoint.is_default entrypoint then
-            (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-            Lwt.return
-              ( Gas_monad.run ctxt
-              @@ ty_eq ~error_details:(Informative loc) arg unit_t
-              >>? fun (eq, ctxt) ->
-                eq >|? fun Eq ->
-                let destination : Destination.t = Contract contract in
-                let address = {destination; entrypoint} in
-                (ctxt, Typed_contract {arg_ty = arg; address}) )
-          else fail (No_such_entrypoint entrypoint)
-      | Originated _ -> (
-          trace (Invalid_contract (loc, contract))
-          @@ Contract.get_script_code ctxt contract
-          >>=? fun (ctxt, code) ->
-          match code with
-          | None -> fail (Invalid_contract (loc, contract))
-          | Some code ->
+          Lwt.return
+            (if Entrypoint.is_default entrypoint then
+             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+             Gas_monad.run ctxt @@ ty_eq ~error_details arg unit_t
+             >|? fun (eq, ctxt) ->
+             ( ctxt,
+               eq >|? fun Eq ->
+               let address = {destination; entrypoint} in
+               Typed_contract {arg_ty = arg; address} )
+            else
+              (* An implicit account on any other entrypoint is not a valid contract. *)
+              ok (error ctxt (fun _loc -> No_such_entrypoint entrypoint)))
+      | Originated _ ->
+          trace
+            (Invalid_contract (loc, contract))
+            ( Contract.get_script_code ctxt contract >>=? fun (ctxt, code) ->
               Lwt.return
-                ( Script.force_decode_in_context
-                    ~consume_deserialization_gas:When_needed
-                    ctxt
-                    code
-                >>? fun (code, ctxt) ->
-                  (* can only fail because of gas *)
-                  parse_toplevel ctxt ~legacy:true code
-                  >>? fun ({arg_type; _}, ctxt) ->
-                  parse_parameter_ty_and_entrypoints
-                    ctxt
-                    ~stack_depth:(stack_depth + 1)
-                    ~legacy:true
-                    arg_type
-                  >>? fun ( Ex_parameter_ty_and_entrypoints
-                              {arg_type = targ; entrypoints},
-                            ctxt ) ->
-                  (* we don't check targ size here because it's a legacy contract code *)
-                  Gas_monad.run ctxt
-                  @@ find_entrypoint_for_type
-                       ~error_details:(Informative loc)
-                       ~full:targ
-                       ~expected:arg
-                       entrypoints
-                       entrypoint
-                  >>? fun (entrypoint_arg, ctxt) ->
-                  entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-                  let address = {destination; entrypoint} in
-                  (ctxt, Typed_contract {arg_ty; address}) )))
+                (match code with
+                | None ->
+                    ok
+                      (error ctxt (fun loc -> Invalid_contract (loc, contract)))
+                | Some code ->
+                    Script.force_decode_in_context
+                      ~consume_deserialization_gas:When_needed
+                      ctxt
+                      code
+                    >>? fun (code, ctxt) ->
+                    (* can only fail because of gas *)
+                    parse_toplevel ctxt ~legacy:true code
+                    >>? fun ({arg_type; _}, ctxt) ->
+                    parse_parameter_ty_and_entrypoints
+                      ctxt
+                      ~stack_depth:(stack_depth + 1)
+                      ~legacy:true
+                      arg_type
+                    >>? fun ( Ex_parameter_ty_and_entrypoints
+                                {arg_type = targ; entrypoints},
+                              ctxt ) ->
+                    Gas_monad.run ctxt
+                    @@ find_entrypoint_for_type
+                         ~error_details
+                         ~full:targ
+                         ~expected:arg
+                         entrypoints
+                         entrypoint
+                    >|? fun (entrypoint_arg, ctxt) ->
+                    ( ctxt,
+                      entrypoint_arg >|? fun (entrypoint, arg_ty) ->
+                      let address = {destination; entrypoint} in
+                      Typed_contract {arg_ty; address} )) ))
   | Tx_rollup tx_rollup ->
-      Tx_rollup_state.assert_exist ctxt tx_rollup >>=? fun ctxt ->
+      Tx_rollup_state.assert_exist ctxt tx_rollup >|=? fun ctxt ->
       if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
         (* /!\ This pattern matching needs to remain in sync with
-           [parse_contract] and [parse_tx_rollup_deposit_parameters]. *)
+           [parse_tx_rollup_deposit_parameters]. *)
         match arg with
         | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _) ->
             let address = {destination; entrypoint} in
-            return (ctxt, Typed_contract {arg_ty = arg; address})
+            (ctxt, ok @@ Typed_contract {arg_ty = arg; address})
         | _ ->
-            fail
-            @@ Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg)
-      else fail (No_such_entrypoint entrypoint)
+            error ctxt (fun loc ->
+                Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg))
+      else error ctxt (fun _loc -> No_such_entrypoint entrypoint)
   | Sc_rollup _ ->
       (* TODO #2800
          Implement typechecking of sc rollup deposits. *)
-      fail (No_such_entrypoint entrypoint)
-
-and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
-  function
-  | String (loc, v) as expr ->
-      (* The limitation of length of string is same as entrypoint *)
-      if Compare.Int.(String.length v > 31) then error (View_name_too_long v)
-      else
-        let rec check_char i =
-          if Compare.Int.(i < 0) then ok v
-          else if Script_ir_annot.is_allowed_char v.[i] then check_char (i - 1)
-          else error (Bad_view_name loc)
-        in
-        Gas.consume ctxt (Typecheck_costs.check_printable v) >>? fun ctxt ->
-        record_trace
-          (Invalid_syntactic_constant
-             ( loc,
-               strip_locations expr,
-               "string [a-zA-Z0-9_.%@] and the maximum string length of 31 \
-                characters" ))
-          ( check_char (String.length v - 1) >>? fun v ->
-            Script_string.of_string v >|? fun s -> (s, ctxt) )
-  | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
-
-and parse_toplevel :
-    context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
- fun ctxt ~legacy toplevel ->
-  record_trace (Ill_typed_contract (toplevel, []))
-  @@
-  match root toplevel with
-  | Int (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Int_kind))
-  | String (loc, _) -> error (Invalid_kind (loc, [Seq_kind], String_kind))
-  | Bytes (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Bytes_kind))
-  | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [Seq_kind], Prim_kind))
-  | Seq (_, fields) -> (
-      let rec find_fields ctxt p s c views fields =
-        match fields with
-        | [] -> ok (ctxt, (p, s, c, views))
-        | Int (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Int_kind))
-        | String (loc, _) :: _ ->
-            error (Invalid_kind (loc, [Prim_kind], String_kind))
-        | Bytes (loc, _) :: _ ->
-            error (Invalid_kind (loc, [Prim_kind], Bytes_kind))
-        | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Seq_kind))
-        | Prim (loc, K_parameter, [arg], annot) :: rest -> (
-            match p with
-            | None -> find_fields ctxt (Some (arg, loc, annot)) s c views rest
-            | Some _ -> error (Duplicate_field (loc, K_parameter)))
-        | Prim (loc, K_storage, [arg], annot) :: rest -> (
-            match s with
-            | None -> find_fields ctxt p (Some (arg, loc, annot)) c views rest
-            | Some _ -> error (Duplicate_field (loc, K_storage)))
-        | Prim (loc, K_code, [arg], annot) :: rest -> (
-            match c with
-            | None -> find_fields ctxt p s (Some (arg, loc, annot)) views rest
-            | Some _ -> error (Duplicate_field (loc, K_code)))
-        | Prim (loc, ((K_parameter | K_storage | K_code) as name), args, _) :: _
-          ->
-            error (Invalid_arity (loc, name, 1, List.length args))
-        | Prim (loc, K_view, [name; input_ty; output_ty; view_code], _) :: rest
-          ->
-            parse_view_name ctxt name >>? fun (str, ctxt) ->
-            Gas.consume
-              ctxt
-              (Michelson_v1_gas.Cost_of.Interpreter.view_update str views)
-            >>? fun ctxt ->
-            if Script_map.mem str views then error (Duplicated_view_name loc)
-            else
-              let views' =
-                Script_map.update
-                  str
-                  (Some {input_ty; output_ty; view_code})
-                  views
-              in
-              find_fields ctxt p s c views' rest
-        | Prim (loc, K_view, args, _) :: _ ->
-            error (Invalid_arity (loc, K_view, 4, List.length args))
-        | Prim (loc, name, _, _) :: _ ->
-            let allowed = [K_parameter; K_storage; K_code; K_view] in
-            error (Invalid_primitive (loc, allowed, name))
-      in
-      find_fields ctxt None None None (Script_map.empty string_t) fields
-      >>? fun (ctxt, toplevel) ->
-      match toplevel with
-      | None, _, _, _ -> error (Missing_field K_parameter)
-      | Some _, None, _, _ -> error (Missing_field K_storage)
-      | Some _, Some _, None, _ -> error (Missing_field K_code)
-      | ( Some (p, ploc, pannot),
-          Some (s, sloc, sannot),
-          Some (c, cloc, cannot),
-          views ) ->
-          let p_pannot =
-            (* root name can be attached to either the parameter
-               primitive or the toplevel constructor (legacy only).
-
-               In the latter case we move it to the parameter type.
-            *)
-            Script_ir_annot.has_field_annot p >>? function
-            | true -> ok (p, pannot)
-            | false -> (
-                match pannot with
-                | [single] when legacy -> (
-                    is_field_annot ploc single >|? fun is_field_annot ->
-                    match (is_field_annot, p) with
-                    | true, Prim (loc, prim, args, annots) ->
-                        (Prim (loc, prim, args, single :: annots), [])
-                    | _ -> (p, []))
-                | _ -> ok (p, pannot))
-          in
-          (* only one field annot is allowed to set the root entrypoint name *)
-          p_pannot >>? fun (arg_type, pannot) ->
-          Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
-          Script_ir_annot.error_unexpected_annot cloc cannot >>? fun () ->
-          Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
-          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
+      return (error ctxt (fun _loc -> No_such_entrypoint entrypoint))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
@@ -4992,90 +5036,18 @@ let parse_contract_for_script :
     Destination.t ->
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract option) tzresult Lwt.t =
- fun ctxt loc arg contract ~entrypoint ->
-  match contract with
-  | Contract contract -> (
-      match contract with
-      | Implicit _ ->
-          if Entrypoint.is_default entrypoint then
-            (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-            Lwt.return
-              ( Gas_monad.run ctxt @@ ty_eq ~error_details:Fast arg unit_t
-              >|? fun (eq, ctxt) ->
-                match eq with
-                | Ok Eq ->
-                    let destination : Destination.t = Contract contract in
-                    let address = {destination; entrypoint} in
-                    let contract = Typed_contract {arg_ty = arg; address} in
-                    (ctxt, Some contract)
-                | Error Inconsistent_types_fast -> (ctxt, None) )
-          else
-            Lwt.return
-              ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-              >|? fun ctxt ->
-                (* An implicit account on any other entrypoint is not a valid contract. *)
-                (ctxt, None) )
-      | Originated _ -> (
-          (* Originated account *)
-          trace (Invalid_contract (loc, contract))
-          @@ Contract.get_script_code ctxt contract
-          >>=? fun (ctxt, code) ->
-          match code with
-          | None -> return (ctxt, None)
-          | Some code ->
-              Lwt.return
-                ( Script.force_decode_in_context
-                    ~consume_deserialization_gas:When_needed
-                    ctxt
-                    code
-                >>? fun (code, ctxt) ->
-                  (* can only fail because of gas *)
-                  match parse_toplevel ctxt ~legacy:true code with
-                  | Error _ -> error (Invalid_contract (loc, contract))
-                  | Ok ({arg_type; _}, ctxt) -> (
-                      match
-                        parse_parameter_ty_and_entrypoints
-                          ctxt
-                          ~stack_depth:0
-                          ~legacy:true
-                          arg_type
-                      with
-                      | Error _ -> error (Invalid_contract (loc, contract))
-                      | Ok
-                          ( Ex_parameter_ty_and_entrypoints
-                              {arg_type = targ; entrypoints},
-                            ctxt ) -> (
-                          (* we don't check targ size here because it's a legacy contract code *)
-                          Gas_monad.run ctxt
-                          @@ find_entrypoint_for_type
-                               ~error_details:Fast
-                               ~full:targ
-                               ~expected:arg
-                               entrypoints
-                               entrypoint
-                          >|? fun (entrypoint_arg, ctxt) ->
-                          match entrypoint_arg with
-                          | Ok (entrypoint, arg_ty) ->
-                              let destination = Destination.Contract contract in
-                              let address = {destination; entrypoint} in
-                              let contract = Typed_contract {arg_ty; address} in
-                              (ctxt, Some contract)
-                          | Error Inconsistent_types_fast -> (ctxt, None))) )))
-  | Tx_rollup tx_rollup -> (
-      (* /!\ This pattern matching needs to remain in sync with
-         [parse_contract_for_script] and
-         [parse_tx_rollup_deposit_parameters]. *)
-      match arg with
-      | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _)
-        when Entrypoint.(
-               entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint) -> (
-          Tx_rollup_state.find ctxt tx_rollup >|=? function
-          | ctxt, Some _ ->
-              let address = {destination = contract; entrypoint} in
-              (ctxt, Some (Typed_contract {arg_ty = arg; address}))
-          | ctxt, None -> (ctxt, None))
-      | _ -> return (ctxt, None))
-  | Sc_rollup _ -> return (ctxt, None)
+ fun ctxt loc arg destination ~entrypoint ->
+  parse_contract
+    ~stack_depth:0
+    ctxt
+    ~error_details:Fast
+    loc
+    arg
+    destination
+    ~entrypoint
+  >|=? fun (ctxt, res) ->
+  ( ctxt,
+    match res with Ok res -> Some res | Error Inconsistent_types_fast -> None )
 
 let view_size view =
   let open Script_typed_ir_size in
@@ -6077,8 +6049,8 @@ let unparse_code ctxt mode code =
   Global_constants_storage.expand ctxt (strip_locations code)
   >>=? fun (ctxt, code) -> unparse_code ~stack_depth:0 ctxt mode (root code)
 
-let parse_contract context loc arg_ty contract ~entrypoint =
-  parse_contract ~stack_depth:0 context loc arg_ty contract ~entrypoint
+let parse_contract_data context loc arg_ty contract ~entrypoint =
+  parse_contract_data ~stack_depth:0 context loc arg_ty contract ~entrypoint
 
 let parse_toplevel ctxt ~legacy toplevel =
   Global_constants_storage.expand ctxt toplevel >>=? fun (ctxt, toplevel) ->

@@ -56,7 +56,7 @@
    consume gas, and thus are parameterized by an [Alpha_context.t].
 
    The variety of functions reflects the variety of things one might want to parse,
-   from [parse_data] for arbitrary Micheline expressions to [parse_contract] for
+   from [parse_data] for arbitrary Micheline expressions to [parse_contract_data] for
    well-formed Michelson contracts.
 *)
 
@@ -366,7 +366,7 @@ val parse_and_unparse_script_unaccounted :
   Script.t ->
   (Script.t * context) tzresult Lwt.t
 
-val parse_contract :
+val parse_contract_data :
   context ->
   Script.location ->
   ('a, _) Script_typed_ir.ty ->
