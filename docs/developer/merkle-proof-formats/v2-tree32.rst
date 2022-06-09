@@ -31,8 +31,7 @@ value of tree
 ^^^^^^^^^^^^^
 
 Let ``p`` be the byte length of ``length``. If length < (1<<8) then p =
-1. Else if length < (1<<16) then p = 2. Otherwise p = 4. (Undefined for
-p = 3 now)
+1. Else if length < (1<<16) then p = 2. Otherwise p = 4.
 
 +-----------------------+-----------------------+-----------------------+
 | Name                  | Size                  | Contents              |
@@ -273,8 +272,7 @@ value of elt
 ^^^^^^^^^^^^
 
 Let ``p`` be the byte length of ``length``. If length < (1<<8) then p =
-1. Else if length < (1<<16) then p = 2. Otherwise p = 4. (Undefined for
-p = 3 now)
+1. Else if length < (1<<16) then p = 2. Otherwise p = 4.
 
 +-----------------------+-----------------------+-----------------------+
 | Name                  | Size                  | Contents              |
