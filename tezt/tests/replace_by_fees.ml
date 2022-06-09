@@ -106,7 +106,7 @@ let default_fee = 1000
 let replacement_fee = minimal_replacement_fee default_fee
 
 (* Default gas limit used in the tests of this module *)
-let default_gas = 1000
+let default_gas = 1000 + Constant.manager_operation_gas_cost
 
 (* Default transferred amount used in the tests of this module *)
 let default_amount = 1
@@ -411,15 +411,14 @@ let replace_simple_op_with_a_batched_low_fees =
     ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
     ()
 
-(* Sum of fees of the second operation is ok, ans gas is ok in the whole batch.
-   So, replacement is ok. *)
+(* Sum of fees of the second operation is ok, and gas is ok in the
+   whole batch. So, replacement is ok. *)
 let replace_simple_op_with_a_batched =
   replacement_test_helper
     ~__LOC__
     ~title:"2nd operation's gas limit is constant. Replacement possible."
-    ~op1:default_op
-    ~op2:
-      {default_op with gas = default_gas / 2; fee = (replacement_fee / 2) + 1}
+    ~op1:{default_op with gas = default_gas * 2}
+    ~op2:{default_op with gas = default_gas; fee = (replacement_fee / 2) + 1}
     ~size2:2
     ~incheck1:check_applied
     ~incheck2:check_applied

@@ -681,7 +681,14 @@ let baking_operation_exception =
     Operation.Manager.(
       inject
         [
-          make ~source:new_account ~fee:9_000_000
+          make
+            ~source:new_account
+            ~fee:9_000_000
+              (* Emptying an account costs gas: we add 400 to the
+                 minimal manager operation gas cost to cover this
+                 possibility. See issue
+                 https://gitlab.com/tezos/tezos/-/issues/3188 *)
+            ~gas_limit:(Constant.manager_operation_gas_cost + 400)
           @@ delegation ~delegate:new_account ();
         ]
         client)
