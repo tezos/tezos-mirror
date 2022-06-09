@@ -1,7 +1,5 @@
 .. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
-.. _multinetwork:
-
 Multinetwork Node
 =================
 

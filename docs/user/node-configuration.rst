@@ -66,7 +66,7 @@ The easiest way to amend this default configuration is to use
    # If you want to restart from an empty cfg file:
    tezos-node config reset <…>
 
-However, note that the ``network`` configuration parameter, needed to run the node on a network other than the default one (Mainnet), can only be defined when the configuration file is initialized (using ``init``), and cannot be updated later (using ``update``). See the instructions for :ref:`running the node in test networks <multinetwork>`.
+However, note that the ``network`` configuration parameter, needed to run the node on a network other than the default one (Mainnet), can only be defined when the configuration file is initialized (using ``init``), and cannot be updated later (using ``update``). See the instructions for :doc:`running the node in test networks <./multinetwork>`.
 
 For example, the following script initializes and fills a configuration file using several command-line options:
 

@@ -136,7 +136,7 @@ Note that this is merely a network identity and it is not related in
 any way to a Tezos address on the blockchain.
 
 If you wish to run your node on a test network, now is also a good time
-to configure your node (see :ref:`multinetwork`).
+to configure your node (see :ref:`builtin_networks`).
 
 Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
