@@ -57,5 +57,44 @@ module type Finite_key_pool_S = sig
     Base_samplers.sampler
 end
 
-(** Create a finite key pool. *)
-module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S
+module V0 : sig
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V0.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V0.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V0.Secret_key.t
+
+  (** Create a finite key pool. *)
+  module Make_finite_key_pool
+      (Arg : Param_S with type algo := Tezos_crypto.Signature.V0.algo) :
+    Finite_key_pool_S
+end
+
+module V1 : sig
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V1.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V1.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V1.Secret_key.t
+
+  (** Create a finite key pool. *)
+  module Make_finite_key_pool
+      (Arg : Param_S with type algo := Tezos_crypto.Signature.V1.algo) :
+    Finite_key_pool_S
+end
+
+module V_latest : sig
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash :=
+        Tezos_crypto.Signature.V_latest.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V_latest.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V_latest.Secret_key.t
+
+  (** Create a finite key pool. *)
+  module Make_finite_key_pool
+      (Arg : Param_S with type algo := Tezos_crypto.Signature.V_latest.algo) :
+    Finite_key_pool_S
+end
+
+include module type of V_latest
