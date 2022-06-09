@@ -17,25 +17,45 @@ __pycache__
 
 /manifest/manifest
 /tezos-node
+/octez-node
 /tezos-tx-rollup-*
+/octez-tx-rollup-*
 /tezos-validator
+/octez-validator
 /tezos-protocol-compiler
+/octez-protocol-compiler
 /tezos-client
+/octez-client
 /tezos-admin-client
+/octez-admin-client
 /tezos-baker-*
+/octez-baker-*
 /tezos-endorser-*
+/octez-endorser-*
 /tezos-accuser-*
+/octez-accuser-*
 /tezos-proxy-server
+/octez-proxy-server
 /tezos-signer
+/octez-signer
 /tezos-sandbox
+/octez-sandbox
 /tezos-codec
+/octez-codec
 /tezos-snoop
+/octez-snoop
 /tezos-tps-evaluation
+/octez-tps-evaluation
 /tezos-tps-evaluation-*
+/octez-tps-evaluation-*
 /tezos-sc-rollup-node-*
+/octez-sc-rollup-node-*
 /tezos-sc-rollup-client-*
+/octez-sc-rollup-client-*
 /tezos-dal-node
+/octez-dal-node
 /tezos-binaries
+/octez-binaries
 
 /src/proto_*/parameters/*-parameters.json
 
