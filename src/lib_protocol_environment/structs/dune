@@ -6,6 +6,8 @@
  (public_name tezos-protocol-environment.structs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment.structs.v0
-  tezos-protocol-environment.structs.v1
-  tezos-protocol-environment.structs.v3))
+  tezos-stdlib
+  tezos-crypto
+  tezos-lwt-result-stdlib
+  data-encoding
+  bls12-381))
