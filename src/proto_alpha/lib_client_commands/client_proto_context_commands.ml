@@ -2502,21 +2502,22 @@ let commands_rw () =
       (prefixes ["originate"; "sc"; "rollup"; "from"]
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the account originating the smart-contract rollup"
+           ~desc:"Name of the account originating the smart-contract rollup."
       @@ prefixes ["of"; "kind"]
       @@ param
            ~name:"sc_rollup_kind"
-           ~desc:"kind of the smart-contract rollup to be originated"
+           ~desc:"Kind of the smart-contract rollup to be originated."
            Sc_rollup_params.rollup_kind_parameter
       @@ prefixes ["of"; "type"]
       @@ param
            ~name:"parameters_type"
-           ~desc:"the type of parameters that the smart-contract rollup accepts"
+           ~desc:
+             "The type of parameters that the smart-contract rollup accepts."
            data_parameter
       @@ prefixes ["booting"; "with"]
       @@ param
            ~name:"boot_sector"
-           ~desc:"the initialization state for the smart-contract rollup"
+           ~desc:"The initialization state for the smart-contract rollup."
            Sc_rollup_params.boot_sector_parameter
       @@ stop)
       (fun ( fee,
@@ -2576,18 +2577,18 @@ let commands_rw () =
       @@ param
            ~name:"messages"
            ~desc:
-             "the message(s) to be sent to the rollup (syntax: \
+             "The message(s) to be sent to the rollup (syntax: \
               bin:<path_to_binary_file>|text:<json list of string \
-              messages>|file:<json_file>)"
+              messages>|file:<json_file>)."
            Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the source contract"
+           ~desc:"Name of the source contract."
       @@ prefixes ["to"]
       @@ param
            ~name:"dst"
-           ~desc:"address of the destination rollup"
+           ~desc:"Address of the destination smart-contract rollup."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
@@ -2649,18 +2650,18 @@ let commands_rw () =
       (prefixes ["cement"; "commitment"]
       @@ param
            ~name:"commitment"
-           ~desc:"the hash of the commitment to be cemented for a sc rollup"
+           ~desc:"The hash of the commitment to be cemented for a sc rollup."
            Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the source contract"
+           ~desc:"Name of the source contract."
       @@ prefixes ["for"; "sc"; "rollup"]
       @@ param
            ~name:"sc_rollup"
            ~desc:
-             "the address of the sc rollup where the commitment will be \
-              cemented"
+             "The address of the sc rollup where the commitment will be \
+              cemented."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
@@ -2821,11 +2822,11 @@ let commands_rw () =
       (prefixes ["recover"; "bond"; "of"]
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"Account that owns the bond."
+           ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "sc"; "rollup"]
       @@ Clic.param
            ~name:"smart contract rollup address"
-           ~desc:"the address of the smart-contract rollup of the bond"
+           ~desc:"The address of the smart-contract rollup of the bond."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
