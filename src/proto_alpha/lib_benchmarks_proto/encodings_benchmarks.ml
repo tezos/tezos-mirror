@@ -303,9 +303,18 @@ end
 module BLS = struct
   open Tezos_shell_benchmarks.Encoding_benchmarks_helpers
 
+  let check () =
+    if not Bls12_381.built_with_blst_portable then (
+      Format.eprintf
+        "BLS must be built without ADX to run the BLS benchmarks. Try \
+         compiling again after setting the environment variable BLST_PORTABLE. \
+         Aborting.@." ;
+      Stdlib.failwith "bls_not_built_with_blst_portable")
+
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
+         ~check
          ~name:"ENCODING_BLS_FR"
          ~to_bytes:Bls12_381.Fr.to_bytes
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
@@ -314,6 +323,7 @@ module BLS = struct
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
+         ~check
          ~name:"ENCODING_BLS_G1"
          ~to_bytes:Bls12_381.G1.to_bytes
          ~generator:(fun rng_state -> Bls12_381.G1.random ~state:rng_state ())
@@ -322,6 +332,7 @@ module BLS = struct
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
+         ~check
          ~name:"ENCODING_BLS_G2"
          ~to_bytes:Bls12_381.G2.to_bytes
          ~generator:(fun rng_state -> Bls12_381.G2.random ~state:rng_state ())
@@ -330,6 +341,7 @@ module BLS = struct
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
+         ~check
          ~name:"DECODING_BLS_FR"
          ~to_bytes:Bls12_381.Fr.to_bytes
          ~from_bytes:Bls12_381.Fr.of_bytes_exn
@@ -339,6 +351,7 @@ module BLS = struct
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
+         ~check
          ~name:"DECODING_BLS_G1"
          ~to_bytes:Bls12_381.G1.to_bytes
          ~from_bytes:Bls12_381.G1.of_bytes_exn
@@ -348,6 +361,7 @@ module BLS = struct
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
+         ~check
          ~name:"DECODING_BLS_G2"
          ~to_bytes:Bls12_381.G2.to_bytes
          ~from_bytes:Bls12_381.G2.of_bytes_exn
@@ -357,6 +371,7 @@ module BLS = struct
   let () =
     Registration_helpers.register
     @@ fixed_size_shared
+         ~check
          ~name:"BLS_FR_FROM_Z"
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
          ~make_bench:(fun generator () ->
@@ -369,6 +384,7 @@ module BLS = struct
   let () =
     Registration_helpers.register
     @@ fixed_size_shared
+         ~check
          ~name:"BLS_FR_TO_Z"
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
          ~make_bench:(fun generator () ->
