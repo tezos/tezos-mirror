@@ -143,6 +143,7 @@ type tag =
   | Cache
   | Carbonated_map
   | Tx_rollup
+  | Tickets
 
 type list_mode = All | Any | Exactly
 

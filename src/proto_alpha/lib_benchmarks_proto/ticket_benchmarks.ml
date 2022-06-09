@@ -87,15 +87,18 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
            ~const1:Builtin_benchmarks.timer_variable
            ~const2:(Free_variable.of_string "compare_ticket_hash"))
 
-  let models = [("compare", compare_model)]
+  let models = [("compare_tickets", compare_model)]
 
   let benchmark rng_state _conf () =
     let bytes = Base_samplers.bytes rng_state ~size:{min = 1; max = 64} in
     let hash =
       Ticket_hash.of_script_expr_hash @@ Script_expr_hash.hash_bytes [bytes]
     in
+    let hash2 =
+      Ticket_hash.of_script_expr_hash @@ Script_expr_hash.hash_bytes [bytes]
+    in
     let workload = () in
-    let closure () = ignore (Ticket_hash.compare hash hash) in
+    let closure () = ignore (Ticket_hash.compare hash hash2) in
     Generator.Plain {workload; closure}
 
   let create_benchmarks ~rng_state ~bench_num config =
@@ -143,7 +146,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
            ~const1:Builtin_benchmarks.timer_variable
            ~const2:(Free_variable.of_string "compare_contract"))
 
-  let models = [("compare", compare_model)]
+  let models = [("compare_tickets", compare_model)]
 
   let benchmark rng_state _conf () =
     let bytes = Base_samplers.bytes rng_state ~size:{min = 32; max = 64} in
@@ -151,8 +154,9 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
     let op_hash = Operation.hash_raw {shell = {branch}; proto = bytes} in
     let nonce = Origination_nonce.Internal_for_tests.initial op_hash in
     let contract = Contract.Internal_for_tests.originated_contract nonce in
+    let contract2 = Contract.Internal_for_tests.originated_contract nonce in
     let workload = () in
-    let closure () = ignore (Contract.compare contract contract) in
+    let closure () = ignore (Contract.compare contract contract2) in
     Generator.Plain {workload; closure}
 
   let create_benchmarks ~rng_state ~bench_num config =

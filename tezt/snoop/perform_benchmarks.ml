@@ -249,6 +249,12 @@ let perform_cache_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Cache] snoop) in
   perform_benchmarks [] snoop benches
 
+let perform_tickets_benchmarks snoop proto =
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Tickets; Proto proto] snoop)
+  in
+  perform_benchmarks [] snoop benches
+
 let perform_misc_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Misc] snoop) in
   perform_benchmarks [] snoop benches
@@ -271,6 +277,7 @@ let main protocol =
   let* () = perform_misc_benchmarks snoop in
   let* () = perform_interpreter_benchmarks snoop protocol in
   let* () = perform_typechecker_benchmarks snoop protocol in
+  let* () = perform_tickets_benchmarks snoop protocol in
   let* () = perform_global_constants_benchmarks snoop in
   let* () = perform_cache_benchmarks snoop in
   let* () = perform_encoding_benchmarks snoop protocol in
