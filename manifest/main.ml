@@ -5533,10 +5533,10 @@ let _tztop =
 
 let _octez_signer =
   public_exe
-    "tezos-signer"
+    "octez-signer"
     ~path:"src/bin_signer"
     ~internal_name:"main_signer"
-    ~synopsis:"Tezos: `tezos-signer` binary"
+    ~synopsis:"Tezos: `octez-signer` binary"
     ~release:true
     ~deps:
       [
