@@ -125,6 +125,8 @@ val genesis :
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
+  ?dal_enable:bool ->
+  ?hard_gas_limit_per_block:Gas.Arith.integral ->
   (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
   block tzresult Lwt.t
 
@@ -266,6 +268,8 @@ val prepare_initial_context_params :
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
+  ?dal_enable:bool ->
+  ?hard_gas_limit_per_block:Gas.Arith.integral ->
   (Account.t * Tez.t * Signature.Public_key_hash.t option) list ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )

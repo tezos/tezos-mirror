@@ -423,7 +423,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
-    initial_accounts =
+    ?dal_enable ?hard_gas_limit_per_block initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -482,6 +482,14 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let sc_rollup_enable =
     Option.value ~default:constants.sc_rollup.enable sc_rollup_enable
   in
+  let dal_enable =
+    Option.value ~default:constants.dal.feature_enable dal_enable
+  in
+  let hard_gas_limit_per_block =
+    Option.value
+      ~default:constants.hard_gas_limit_per_block
+      hard_gas_limit_per_block
+  in
   let constants =
     {
       constants with
@@ -503,6 +511,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
           origination_size = tx_rollup_origination_size;
         };
       sc_rollup = {constants.sc_rollup with enable = sc_rollup_enable};
+      dal = {constants.dal with feature_enable = dal_enable};
+      hard_gas_limit_per_block;
     }
   in
   (* Check there is at least one roll *)
@@ -550,7 +560,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?tx_rollup_origination_size ?sc_rollup_enable
+    ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
+    ?hard_gas_limit_per_block
     (initial_accounts :
       (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
   prepare_initial_context_params
@@ -569,6 +580,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?tx_rollup_sunset_level
     ?tx_rollup_origination_size
     ?sc_rollup_enable
+    ?dal_enable
+    ?hard_gas_limit_per_block
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context

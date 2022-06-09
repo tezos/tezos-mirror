@@ -26,6 +26,9 @@
 open Protocol
 open Alpha_context
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3181
+   Improve documentation of the operation helpers *)
+
 val endorsement :
   ?delegate:public_key_hash * Slot.t list ->
   ?slot:Slot.t ->
@@ -100,6 +103,9 @@ val unsafe_transaction :
 val delegation :
   ?force_reveal:bool ->
   ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?counter:Z.t ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   public_key_hash option ->
@@ -108,33 +114,41 @@ val delegation :
 val set_deposits_limit :
   ?force_reveal:bool ->
   ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
   Context.t ->
   Contract.t ->
   Tez.tez option ->
   Operation.packed tzresult Lwt.t
 
 (** [revelation ?fee ?gas_limit ?forge_pkh ctxt pkh] Creates a new
-   [Reveal] {!manager_operation} to reveal a public key [pkh] applying
-   to current context [ctxt].
+    [Reveal] {!manager_operation} to reveal a public key [pkh]
+    applying to current context [ctxt].
 
     Optional arguments allow to override defaults:
 
     {ul {li [?fee:Tez.tez]: specify a fee, otherwise set to
-   [Tez.zero].}
+    [Tez.zero].}
 
-       {li [?gas_limit:Gas.Arith.integral]: force a gas limit,
-   otherwise set to 10000 gas units.}
+    {li [?gas_limit:Gas.Arith.integral]: force a gas limit, otherwise
+    set to 10000 gas units.}
 
-       {li [?forge_pkh]: use a
-   provided [pkh] as source, instead of hashing [pkh]. Useful for
-   forging non-honest reveal operations} *)
+    {li [?forge_pkh]: use a provided [pkh] as source, instead of
+    hashing [pkh]. Useful for forging non-honest reveal operations}
+
+    {li [?storage_limit:counter]: forces a storage limit, otherwise
+    set to [Z.zero]}
+*)
 val revelation :
-  ?fee:Tez.tez ->
+  ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  ?counter:counter ->
   ?forge_pkh:public_key_hash option ->
   Context.t ->
   public_key ->
-  Operation.packed tzresult Lwt.t
+  (packed_operation, tztrace) result Lwt.t
 
 val failing_noop :
   Context.t -> public_key_hash -> string -> Operation.packed tzresult Lwt.t
@@ -496,7 +510,7 @@ val sc_rollup_origination :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
    [source]'s public key if the latter has not been revealed
-   yet. Enabled (set to [true]) by default.}}*)
+   yet. Enabled (set to [true]) by default.}} *)
 val sc_rollup_publish :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -534,6 +548,7 @@ val sc_rollup_execute_outbox_message :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:counter ->
+  ?force_reveal:bool ->
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
@@ -550,7 +565,57 @@ val sc_rollup_recover_bond :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
+  ?force_reveal:bool ->
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
   Operation.packed tzresult Lwt.t
+
+val sc_rollup_add_messages :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  string list ->
+  Operation.packed tzresult Lwt.t
+
+val sc_rollup_refute :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  public_key_hash ->
+  Sc_rollup.Game.refutation ->
+  bool ->
+  Operation.packed tzresult Lwt.t
+
+val sc_rollup_timeout :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Sc_rollup.Game.Index.t ->
+  Operation.packed tzresult Lwt.t
+
+val dal_publish_slot_header :
+  ?force_reveal:bool ->
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  Dal.Slot.t ->
+  (packed_operation, tztrace) result Lwt.t
