@@ -99,7 +99,7 @@ let man = description @ Node_run_command.Manpage.examples
 
 let info =
   let version = Tezos_version.Bin_version.version_string in
-  Cmdliner.Cmd.info ~doc:"The Tezos node" ~man ~version "tezos-node"
+  Cmdliner.Cmd.info ~doc:"The Octez node" ~man ~version "octez-node"
 
 module Node_metrics_command = struct
   let dump_metrics () =

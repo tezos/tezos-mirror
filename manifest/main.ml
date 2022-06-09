@@ -1707,7 +1707,7 @@ let octez_context =
   public_lib
     "tezos-context"
     ~path:"src/lib_context"
-    ~synopsis:"Tezos: on-disk context abstraction for `tezos-node`"
+    ~synopsis:"Tezos: on-disk context abstraction for `octez-node`"
     ~deps:[octez_context_disk; octez_context_memory]
 
 let _octez_context_tests =
@@ -1946,7 +1946,7 @@ let octez_shell_context =
     "tezos-shell-context"
     ~path:"src/lib_protocol_environment/shell_context"
     ~synopsis:
-      "Tezos: economic-protocols environment implementation for `tezos-node`"
+      "Tezos: economic-protocols environment implementation for `octez-node`"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2136,7 +2136,7 @@ let octez_protocol_updater =
   public_lib
     "tezos-protocol-updater"
     ~path:"src/lib_protocol_updater"
-    ~synopsis:"Tezos: economic-protocol dynamic loading for `tezos-node`"
+    ~synopsis:"Tezos: economic-protocol dynamic loading for `octez-node`"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2267,7 +2267,7 @@ let octez_store =
   public_lib
     "tezos-store"
     ~path:"src/lib_store"
-    ~synopsis:"Tezos: store for `tezos-node`"
+    ~synopsis:"Tezos: store for `octez-node`"
     ~description:
       {|This library provides abstraction for storing and iterating over blocks.
 tezos-store is a virtual library that provides two implementations:
@@ -2344,7 +2344,7 @@ let octez_shell =
     "tezos-shell"
     ~path:"src/lib_shell"
     ~synopsis:
-      "Tezos: core of `tezos-node` (gossip, validation scheduling, mempool, \
+      "Tezos: core of `octez-node` (gossip, validation scheduling, mempool, \
        ...)"
     ~documentation:[Dune.[S "package"; S "tezos-shell"]]
     ~inline_tests:ppx_expect
@@ -3920,16 +3920,16 @@ module Protocol = Protocol
             | V _ as number when N.(number <= 003) ->
                 sf
                   "Tezos/Protocol: %s (economic-protocol definition, embedded \
-                   in `tezos-node`)"
+                   in `octez-node`)"
                   (if N.(number == 000) then name_dash else name_underscore)
             | Other ->
                 sf
                   "Tezos/Protocol: %s (economic-protocol definition, embedded \
-                   in `tezos-node`)"
+                   in `octez-node`)"
                   name_underscore
             | Alpha | V _ ->
                 "Tezos/Protocol: economic-protocol definition, embedded in \
-                 `tezos-node`")
+                 `octez-node`")
           ~modules:["Registerer"]
           ~linkall:true
           ~flags:(Flags.standard ~disable_warnings ())
@@ -5298,10 +5298,10 @@ let _octez_node =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exe
-    "tezos-node"
+    "octez-node"
     ~path:"src/bin_node"
     ~internal_name:"main"
-    ~synopsis:"Tezos: `tezos-node` binary"
+    ~synopsis:"Tezos: `octez-node` binary"
     ~release:true
     ~deps:
       ([
@@ -5337,8 +5337,8 @@ let _octez_node =
       Dune.
         [
           install
-            [as_ "tezos-sandboxed-node.sh" "tezos-sandboxed-node.sh"]
-            ~package:"tezos-node"
+            [as_ "octez-sandboxed-node.sh" "octez-sandboxed-node.sh"]
+            ~package:"octez-node"
             ~section:"bin";
         ]
 
