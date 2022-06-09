@@ -45,7 +45,7 @@ let prepare_genesis base_dir =
       index
       ~chain_id:(Chain_id.of_block_hash genesis_block)
       ~time:(Time.Protocol.of_seconds 0L)
-      ~protocol:(Obj.magic ())
+      ~protocol:Protocol_hash.zero
   in
   let*! o = Tezos_context.Context.checkout index context_hash in
   match o with
