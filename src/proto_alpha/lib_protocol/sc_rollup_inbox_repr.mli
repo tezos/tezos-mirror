@@ -136,7 +136,7 @@ val encoding : t Data_encoding.t
 val empty : Sc_rollup_repr.t -> Raw_level_repr.t -> t
 
 (** [inbox_level inbox] returns the maximum level of message insertion in
-   [inbox] or its initial level. *)
+    [inbox] or its initial level. *)
 val inbox_level : t -> Raw_level_repr.t
 
 (** [number_of_available_messages inbox] returns the number of
@@ -176,10 +176,10 @@ module type MerkelizedOperations = sig
   type messages = tree
 
   (** The history is a merkelized sequence of [messages], one per
-     level. The history is typically used by the rollup node to
-     produce inclusion proofs. The protocol only manipulates an empty
-     history as it does not remember previous messages and only keeps
-     a witness of the latest state of the history. *)
+      level. The history is typically used by the rollup node to
+      produce inclusion proofs. The protocol only manipulates an empty
+      history as it does not remember previous messages and only keeps
+      a witness of the latest state of the history. *)
   type history
 
   val history_encoding : history Data_encoding.t
@@ -192,23 +192,19 @@ module type MerkelizedOperations = sig
   val history_at_genesis : bound:int64 -> history
 
   (** [add_external_messages history inbox level payloads messages] inserts a
-     list of [payloads] as new messages in the [messages] of the current
-     [level] of the [inbox]. This function returns the new sequence
-     of messages as well as updated [inbox] and [history].
+      list of [payloads] as new messages in the [messages] of the current
+      [level] of the [inbox]. This function returns the new sequence
+      of messages as well as updated [inbox] and [history].
 
-     If the [inbox]'s level is older than [level], the [inbox] is updated
-     so that the messages of the levels older than [level] are archived.
-     To archive a sequence of [messages] for a given [level], we push
-     it at the end of the [history] and update the witness of this
-     history in the [inbox]. The [inbox]'s messages for the current
-     level are also emptied to insert the [payloads] in a fresh sequence
-     of [messages] for [level].
+      If the [inbox]'s level is older than [level], the [inbox] is updated
+      so that the messages of the levels older than [level] are archived.
+      To archive a sequence of [messages] for a given [level], we push
+      it at the end of the [history] and update the witness of this
+      history in the [inbox]. The [inbox]'s messages for the current
+      level are also emptied to insert the [payloads] in a fresh sequence
+      of [messages] for [level].
 
-     This function fails if [level] is older than [inbox]'s [level].
-
-     This function fails with {!Max_number_of_available_messages_reached}
-     if the inbox is full.
-
+      This function fails if [level] is older than [inbox]'s [level].
   *)
   val add_external_messages :
     history ->
@@ -219,7 +215,7 @@ module type MerkelizedOperations = sig
     (messages * history * t) tzresult Lwt.t
 
   (** [add_messages_no_history inbox level payloads messages] behaves
-      a [add_external_messages] except that it does not remember the inbox
+      as {!add_external_messages} except that it does not remember the inbox
       history. *)
   val add_messages_no_history :
     t ->
@@ -229,9 +225,9 @@ module type MerkelizedOperations = sig
     (messages * t, error trace) result Lwt.t
 
   (** [get_message messages idx] returns [Some message] if the
-     sequence of [messages] has a more than [idx] messages and
-     [message] is at position [idx] in this sequence.
-     Returns [None] otherwise. *)
+      sequence of [messages] has a more than [idx] messages and
+      [message] is at position [idx] in this sequence.
+      Returns [None] otherwise. *)
   val get_message : messages -> Z.t -> message option Lwt.t
 
   (** [get_message_payload messages idx] returns [Some payload] if the
@@ -241,15 +237,15 @@ module type MerkelizedOperations = sig
   val get_message_payload : messages -> Z.t -> string option Lwt.t
 
   (** Given a inbox [A] at some level [L] and another inbox [B] at
-     some level [L' >= L], an [inclusion_proof] guarantees that [A] is
-     an older version of [B].
+      some level [L' >= L], an [inclusion_proof] guarantees that [A] is
+      an older version of [B].
 
-     To be more precise, an [inclusion_proof] guarantees that the
-     previous levels messages of [A] are included in the previous
-     levels messages of [B]. The current messages of [A] and [B]
-     are not considered.
+      To be more precise, an [inclusion_proof] guarantees that the
+      previous levels messages of [A] are included in the previous
+      levels messages of [B]. The current messages of [A] and [B]
+      are not considered.
 
-     The size of this proof is O(log_basis (L' - L)). *)
+      The size of this proof is O(log_basis (L' - L)). *)
   type inclusion_proof
 
   val inclusion_proof_encoding : inclusion_proof Data_encoding.t
@@ -259,14 +255,14 @@ module type MerkelizedOperations = sig
   (** [number_of_proof_steps proof] returns the length of [proof]. *)
   val number_of_proof_steps : inclusion_proof -> int
 
-  (** [produce_inclusion_proof history inbox1 inbox2] exploits
-     [history] to produce a self-contained proof that [inbox1] is an
-     older version of [inbox2]. *)
+  (** [produce_inclusion_proof history inboxA inboxB] exploits
+      [history] to produce a self-contained proof that [inboxA] is an
+      older version of [inboxB]. *)
   val produce_inclusion_proof : history -> t -> t -> inclusion_proof option
 
-  (** [verify_inclusion_proof proof inbox1 inbox2] returns [true] iff
-     [proof] is a minimal and valid proof that [inbox1] is included in
-     [inbox2]. *)
+  (** [verify_inclusion_proof proof inboxA inboxA] returns [true] iff
+      [proof] is a minimal and valid proof that [inboxA] is included in
+      [inboxB]. *)
   val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
 end
 
@@ -314,10 +310,11 @@ type inbox = t
     earlier in this file into the inbox proof as it is required by a
     refutation. *)
 module Proof : sig
+  type starting_point := Raw_level_repr.t * Z.t
+
   (** An inbox proof has three parameters:
 
-      - the [starting_point], of type [Raw_level_repr.t * Z.t], specifying
-      a location in the inbox ;
+      - the {!starting_point} specifying a location in the inbox ;
 
       - the [message], of type [Sc_rollup_PVM_sem.input option] ;
 
@@ -349,12 +346,12 @@ module Proof : sig
 
   val encoding : t Data_encoding.t
 
-  (** See the docstring for [Proof.t] for details of proof semantics.
+  (** See the docstring for {t} for details of proof semantics.
 
       [valid starting_point inbox proof] will return the third parameter
       of the proof, [message], iff the proof is valid. *)
   val valid :
-    Raw_level_repr.t * Z.t ->
+    starting_point ->
     inbox ->
     t ->
     (Sc_rollup_PVM_sem.input option, error) result Lwt.t

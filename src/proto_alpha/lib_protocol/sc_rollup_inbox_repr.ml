@@ -32,8 +32,7 @@
 
    This module is designed to:
 
-   1. give a constant-time access to the number of available messages
-   ;
+   1. give a constant-time access to the number of available messages ;
 
    2. provide a space-efficient representation for proofs of inbox
    inclusions (only for inboxes obtained at the end of block
