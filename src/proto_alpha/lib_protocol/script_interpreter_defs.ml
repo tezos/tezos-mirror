@@ -675,7 +675,15 @@ let rec interp_stack_prefix_preserving_operation :
 
    To improve readibility, we introduce their types as abbreviations:
 
-*)
+ *)
+
+(* A function of this type either introduces type-preserving
+   instrumentation of a continuation for the purposes of logging
+   or returns given continuation unchanged. *)
+type ('a, 'b, 'c, 'd) cont_instrumentation =
+  ('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation
+
+let id x = x
 
 type ('a, 's, 'b, 't, 'r, 'f) step_type =
   outdated_context * step_constants ->

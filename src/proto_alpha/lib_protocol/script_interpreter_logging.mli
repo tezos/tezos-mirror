@@ -70,6 +70,11 @@ val log_exit :
     protects us from calling this by mistake.*)
 val log_control : logger -> ('a, 'b, 'c, 'd) continuation -> unit
 
+val instrument_cont :
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) Script_interpreter_defs.cont_instrumentation
+
 (** [log_next_continuation logger sty cont] instruments the next
     continuation in [cont] with [KLog] continuations to ensure
     logging.

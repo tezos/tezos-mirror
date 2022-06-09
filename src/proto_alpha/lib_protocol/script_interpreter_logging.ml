@@ -1723,6 +1723,14 @@ let log_next_kinstr logger sty i =
   in
   kinstr_rewritek sty i {apply}
 
+let instrument_cont :
+    type a b c d.
+    logger ->
+    (a, b) stack_ty ->
+    (a, b, c, d) continuation ->
+    (a, b, c, d) continuation =
+ fun logger sty -> function KLog _ as k -> k | k -> KLog (k, sty, logger)
+
 let log_next_continuation :
     type a b c d.
     logger ->
@@ -1731,53 +1739,66 @@ let log_next_continuation :
     (a, b, c, d) continuation tzresult =
  fun logger stack_ty cont ->
   let enable_log sty ki = log_kinstr logger sty ki in
-  let mk sty = function KLog _ as k -> k | k -> KLog (k, sty, logger) in
   match cont with
   | KCons (ki, k) -> (
       let ki' = enable_log stack_ty ki in
       kinstr_final_stack_type stack_ty ki >|? function
       | None -> KCons (ki', k)
-      | Some sty -> KCons (ki', mk sty k))
+      | Some sty -> KCons (ki', instrument_cont logger sty k))
   | KLoop_in (ki, k) ->
       let (Item_t (Bool_t, sty)) = stack_ty in
-      ok @@ KLoop_in (enable_log sty ki, mk sty k)
+      ok @@ KLoop_in (enable_log sty ki, instrument_cont logger sty k)
   | KReturn (stack, sty_opt, k) ->
-      let k' = match sty_opt with None -> k | Some sty -> mk sty k in
+      let k' =
+        match sty_opt with
+        | None -> k
+        | Some sty -> instrument_cont logger sty k
+      in
       ok @@ KReturn (stack, sty_opt, k')
   | KLoop_in_left (ki, k) ->
       let (Item_t (Union_t (a_ty, b_ty, _, _), rest)) = stack_ty in
       let ki' = enable_log (Item_t (a_ty, rest)) ki in
-      let k' = mk (Item_t (b_ty, rest)) k in
+      let k' = instrument_cont logger (Item_t (b_ty, rest)) k in
       ok @@ KLoop_in_left (ki', k')
   | KUndip (x, ty_opt, k) ->
       let k' =
-        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, stack_ty)) k
+        match ty_opt with
+        | None -> k
+        | Some ty -> instrument_cont logger (Item_t (ty, stack_ty)) k
       in
       ok @@ KUndip (x, ty_opt, k')
   | KIter (body, xty, xs, k) ->
       let body' = enable_log (Item_t (xty, stack_ty)) body in
-      let k' = mk stack_ty k in
+      let k' = instrument_cont logger stack_ty k in
       ok @@ KIter (body', xty, xs, k')
   | KList_enter_body (body, xs, ys, ty_opt, len, k) ->
       let k' =
-        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, stack_ty)) k
+        match ty_opt with
+        | None -> k
+        | Some ty -> instrument_cont logger (Item_t (ty, stack_ty)) k
       in
       ok @@ KList_enter_body (body, xs, ys, ty_opt, len, k')
   | KList_exit_body (body, xs, ys, ty_opt, len, k) ->
       let (Item_t (_, sty)) = stack_ty in
       let k' =
-        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, sty)) k
+        match ty_opt with
+        | None -> k
+        | Some ty -> instrument_cont logger (Item_t (ty, sty)) k
       in
       ok @@ KList_exit_body (body, xs, ys, ty_opt, len, k')
   | KMap_enter_body (body, xs, ys, ty_opt, k) ->
       let k' =
-        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, stack_ty)) k
+        match ty_opt with
+        | None -> k
+        | Some ty -> instrument_cont logger (Item_t (ty, stack_ty)) k
       in
       ok @@ KMap_enter_body (body, xs, ys, ty_opt, k')
   | KMap_exit_body (body, xs, ys, yk, ty_opt, k) ->
       let (Item_t (_, sty)) = stack_ty in
       let k' =
-        match ty_opt with None -> k | Some ty -> mk (Item_t (ty, sty)) k
+        match ty_opt with
+        | None -> k
+        | Some ty -> instrument_cont logger (Item_t (ty, sty)) k
       in
       ok @@ KMap_exit_body (body, xs, ys, yk, ty_opt, k')
   | KMap_head (_, _)
