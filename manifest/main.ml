@@ -5449,10 +5449,10 @@ let _octez_codec =
 
 let _octez_proxy_server =
   public_exe
-    "tezos-proxy-server"
+    "octez-proxy-server"
     ~path:"src/bin_proxy_server"
     ~internal_name:"main_proxy_server"
-    ~synopsis:"Tezos: `tezos-proxy-server` binary"
+    ~synopsis:"Octez: `octez-proxy-server` binary"
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives" |> open_;
