@@ -1588,16 +1588,21 @@ module Sc_rollup = struct
         let encoding = Raw_level_repr.encoding
       end)
 
-  module Inbox =
+  module Inbox_versioned =
     Indexed_context.Make_carbonated_map
       (struct
         let name = ["inbox"]
       end)
       (struct
-        type t = Sc_rollup_inbox_repr.t
+        type t = Sc_rollup_inbox_repr.versioned
 
-        let encoding = Sc_rollup_inbox_repr.encoding
+        let encoding = Sc_rollup_inbox_repr.versioned_encoding
       end)
+
+  module Inbox = struct
+    include Inbox_versioned
+    include Make_versioned (Sc_rollup_inbox_repr) (Inbox_versioned)
+  end
 
   module Last_cemented_commitment =
     Indexed_context.Make_carbonated_map
