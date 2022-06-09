@@ -629,12 +629,15 @@ module Revamped = struct
   let one_operation_per_manager_per_block_disable_precheck =
     Protocol.register_test
       ~__FILE__
+      ~supports:(Protocol.Until_protocol 13)
+        (* This test can be run until proto 14, because the manager
+           restriction 1M will be enable with proto 14 *)
       ~title:"Manager_restriction_disable_precheck"
       ~tags:["mempool"; "manager_restriction"; "disable_precheck"]
     @@ fun protocol ->
     log_step
       1
-      "Initialize a node, with the precheck of operation disable and a client." ;
+      "Initialize a node, with the precheck of operation disabled and a client." ;
     let* node, client =
       Client.init_with_protocol
         ~nodes_args:[Synchronisation_threshold 0; Disable_operations_precheck]
