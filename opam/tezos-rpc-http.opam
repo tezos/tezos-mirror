@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "resto-cohttp" { >= "0.6" & < "0.7" }
+  "resto-cohttp" { >= "0.8" & < "0.9" }
 ]
 build: [
   ["rm" "-r" "vendors"]
