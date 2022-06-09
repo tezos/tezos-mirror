@@ -2384,21 +2384,31 @@ module Registration_section = struct
         ()
   end
 
-  module Sapling = struct
-    let () =
-      let memo_size =
-        match Alpha_context.Sapling.Memo_size.parse_z Z.zero with
-        | Error _ -> assert false
-        | Ok sz -> sz
-      in
-      simple_benchmark
-        ~name:Interpreter_workload.N_ISapling_empty_state
-        ~kinstr:
-          (ISapling_empty_state
-             ( kinfo (unit @$ bot),
-               memo_size,
-               halt (sapling_state memo_size @$ unit @$ bot) ))
-        ()
+  let () =
+    let memo_size =
+      match Alpha_context.Sapling.Memo_size.parse_z Z.zero with
+      | Error _ -> assert false
+      | Ok sz -> sz
+    in
+    simple_benchmark
+      ~name:Interpreter_workload.N_ISapling_empty_state
+      ~kinstr:
+        (ISapling_empty_state
+           ( kinfo (unit @$ bot),
+             memo_size,
+             halt (sapling_state memo_size @$ unit @$ bot) ))
+      ()
+
+  module type Type_transaction = sig
+    val type_transaction : Sapling_generation.type_transaction
+
+    val suffix : string
+  end
+
+  module Register_Sapling_benchmark (Type_transaction : Type_transaction) =
+  struct
+    let is_empty =
+      match Type_transaction.type_transaction with Empty -> true | _ -> false
 
     let () =
       (* Note that memo_size is hardcoded to 0 in module [Sapling_generation]. *)
@@ -2408,7 +2418,9 @@ module Registration_section = struct
         | Ok sz -> sz
       in
       let info, name =
-        info_and_name ~intercept:false "ISapling_verify_update"
+        info_and_name
+          ~intercept:is_empty
+          ("ISapling_verify_update_" ^ Type_transaction.suffix)
       in
       let module B : Benchmark.S = struct
         let name = name
@@ -2469,10 +2481,12 @@ module Registration_section = struct
           match config.sapling with
           | {sapling_txs_file; seed} ->
               let transitions =
-                Sapling_generation.load ~filename:sapling_txs_file
+                Sapling_generation.load
+                  ~filename:sapling_txs_file
+                  Type_transaction.type_transaction
               in
               let length = List.length transitions in
-              if length < bench_num then
+              if length < bench_num && not is_empty then
                 Format.eprintf
                   "ISapling_verify_update: warning, only %d available \
                    transactions (requested %d)@."
@@ -2485,6 +2499,29 @@ module Registration_section = struct
                 (fun (_, transition) () ->
                   let ctxt, state, step_constants =
                     prepare_sapling_execution_environment seed transition
+                  in
+                  let address =
+                    Alpha_context.Contract.(
+                      to_b58check (Originated step_constants.self))
+                  in
+                  let chain_id =
+                    Environment.Chain_id.to_b58check step_constants.chain_id
+                  in
+                  let anti_replay = address ^ chain_id in
+                  (* Checks that the transaction is correct*)
+                  let () =
+                    match
+                      Sapling_validator.verify_update
+                        (Sapling_generation.alpha_to_raw ctxt)
+                        (Obj.magic state)
+                        transition.sapling_tx
+                        anti_replay
+                      |> Lwt_main.run
+                    with
+                    | Ok (_, Some _) -> ()
+                    | Ok (_, None) ->
+                        Stdlib.failwith "benchmarked transaction is incorrect"
+                    | _ -> assert false
                   in
                   let stack_instr =
                     Ex_stack_and_kinstr
@@ -2499,7 +2536,43 @@ module Registration_section = struct
       Registration_helpers.register (module B)
   end
 
-  (* when benchmarking, compile bls12-381 without ADX, see
+  module Sapling_empty = struct
+    let module A = Register_Sapling_benchmark (struct
+      let type_transaction = Sapling_generation.Empty
+
+      let suffix = "empty"
+    end) in
+    ()
+  end
+
+  module Sapling_no_inputs = struct
+    let module A = Register_Sapling_benchmark (struct
+      let type_transaction = Sapling_generation.No_inputs
+
+      let suffix = "no_inputs"
+    end) in
+    ()
+  end
+
+  module Sapling_no_outputs = struct
+    let module A = Register_Sapling_benchmark (struct
+      let type_transaction = Sapling_generation.No_outputs
+
+      let suffix = "no_output"
+    end) in
+    ()
+  end
+
+  module Sapling_full = struct
+    let module A = Register_Sapling_benchmark (struct
+      let type_transaction = Sapling_generation.Full_transaction
+
+      let suffix = "full"
+    end) in
+    ()
+  end
+
+  (* when benchmarking, compile bls12-381-unix without ADX, see
      https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
   *)
   module Bls12_381 = struct

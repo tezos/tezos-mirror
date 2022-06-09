@@ -136,7 +136,11 @@ module Apply_diff_bench : Benchmark.S = struct
     ignore rng_state ;
     match config.sapling with
     | {sapling_txs_file; seed} ->
-        let transitions = Sapling_generation.load ~filename:sapling_txs_file in
+        let transitions =
+          Sapling_generation.load
+            ~filename:sapling_txs_file
+            Sapling_generation.Full_transaction
+        in
         let length = List.length transitions in
         if length < bench_num then
           Format.eprintf

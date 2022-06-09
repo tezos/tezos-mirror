@@ -1077,10 +1077,10 @@ module Instructions = struct
 
   let sapling_empty_state = ir_sized_step N_ISapling_empty_state nullary
 
-  let sapling_verify_update inputs outputs bound_data _state =
+  let sapling_verify_update inputs outputs _bound_data _state =
     ir_sized_step
       N_ISapling_verify_update
-      (ternary "inputs" inputs "outputs" outputs "bound_data" bound_data)
+      (binary "inputs" inputs "outputs" outputs)
 
   let map_get_and_update key_size map_size =
     ir_sized_step

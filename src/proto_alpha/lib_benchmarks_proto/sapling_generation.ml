@@ -93,8 +93,10 @@ type forge_info = {
   nf : Tezos_sapling.Core.Client.Nullifier.t;
 }
 
-let random_amount sum =
-  Random.int64 (Int64.sub Tezos_sapling.Core.Validator.UTXO.max_amount sum)
+let random_amount state sum =
+  Random.State.int64
+    state
+    (Int64.sub Tezos_sapling.Core.Validator.UTXO.max_amount sum)
 
 let reverse diff =
   Protocol.Sapling_repr.
@@ -126,7 +128,7 @@ let rec gen_rcm state =
 (* Adds a commitment, ciphertext, cv to an rpc_diff *)
 let add_input diff vk index position sum state =
   let rcm = gen_rcm state in
-  let amount = random_amount sum in
+  let amount = random_amount state sum in
   let new_idx, address =
     Tezos_sapling.Core.Client.Viewing_key.new_address vk index
   in
@@ -216,9 +218,9 @@ let state_from_rpc_diff rpc_diff =
     rpc_diff.Protocol.Sapling_repr.commitments_and_ciphertexts
 
 (* Create an (unspendable) output from a proving context and a vk *)
-let output proving_ctx vk sum =
+let output proving_ctx vk sum state =
   let address = Tezos_sapling.Core.Client.Viewing_key.dummy_address () in
-  let amount = random_amount sum in
+  let amount = random_amount state sum in
   let rcm = Tezos_sapling.Core.Client.Rcm.random () in
   let esk = Tezos_sapling.Core.Client.DH.esk_random () in
   let cv_o, proof_o =
@@ -241,12 +243,12 @@ let output proving_ctx vk sum =
   (Tezos_sapling.Core.Validator.UTXO.{cm; proof_o; ciphertext}, amount)
 
 (* Returns a list of outputs and the sum of their amount *)
-let outputs nb_output proving_ctx vk =
+let outputs nb_output proving_ctx vk state =
   let rec aux output_amount list_outputs nb_output sum =
     match nb_output with
     | 0 -> (output_amount, list_outputs)
     | nb_output ->
-        let output, amount = output proving_ctx vk sum in
+        let output, amount = output proving_ctx vk sum state in
         assert (
           Int64.compare
             amount
@@ -336,7 +338,7 @@ let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     ~index:index_start
     state
   >>=? fun (diff, to_forge) ->
-  Protocol.Sapling_storage.apply_diff ctxt id diff
+  Protocol.Sapling_storage.apply_diff ctxt id (reverse diff)
   >|= Protocol.Environment.wrap_tzresult
   >>=? fun (ctxt, _size) -> return (diff, to_forge, sk, vk, ctxt, id)
 
@@ -364,7 +366,7 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
   Tezos_sapling.Core.Client.Proving.with_proving_ctx (fun proving_ctx ->
       make_inputs to_forge local_state proving_ctx sk vk root anti_replay
       >>=? fun inputs ->
-      let output_amount, outputs = outputs nb_output proving_ctx vk in
+      let output_amount, outputs = outputs nb_output proving_ctx vk state in
       let input_amount =
         List.fold_left
           (fun sum {amount; _} ->
@@ -381,9 +383,9 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
       in
       let balance = Int64.sub input_amount output_amount in
       let bound_data =
-        (* in the reference usage this contains a pkh encoded in micheline,
-           thus roughly 32 bytes *)
-        String.make 32 '0'
+        (* The bound data are benched separately so we add
+           empty bound data*)
+        ""
       in
       let binding_sig =
         Tezos_sapling.Core.Client.Proving.make_binding_sig
@@ -467,7 +469,9 @@ let get_all_sapling_data_files directory =
   in
   loop []
 
-let load ~filename =
+type type_transaction = Empty | No_inputs | No_outputs | Full_transaction
+
+let load ~filename type_transaction =
   if not (Sys.file_exists filename) then (
     Format.eprintf "Sapling_generation.load: file does not exist@." ;
     Stdlib.failwith "Sapling_generation.load")
@@ -480,6 +484,20 @@ let load ~filename =
     in
     let files = get_all_sapling_data_files filename in
     List.concat_map load_file files
+    |> List.filter (fun (_str, transac) ->
+           match type_transaction with
+           | Empty ->
+               List.is_empty transac.sapling_tx.outputs
+               && List.is_empty transac.sapling_tx.inputs
+           | No_inputs ->
+               (not (List.is_empty transac.sapling_tx.outputs))
+               && List.is_empty transac.sapling_tx.inputs
+           | No_outputs ->
+               List.is_empty transac.sapling_tx.outputs
+               && not (List.is_empty transac.sapling_tx.inputs)
+           | Full_transaction ->
+               (not (List.is_empty transac.sapling_tx.outputs))
+               && not (List.is_empty transac.sapling_tx.inputs))
   else load_file filename
 
 let shared_seed = [|9798798; 217861209; 876786|]
@@ -520,8 +538,12 @@ let generate (save_to : string) (tx_count : int)
          match seeds with
          | [] -> return acc
          | (i, seed) :: tl ->
-             let nb_input = 1 + Random.int max_inputs in
-             let nb_output = 1 + Random.int max_outputs in
+             let nb_input =
+               if max_inputs = 0 then 0 else 1 + Random.int max_inputs
+             in
+             let nb_output =
+               if max_outputs = 0 then 0 else 1 + Random.int max_outputs
+             in
              let nb_nf = 1 + Random.int max_nullifiers in
              let nb_cm =
                nb_input + nb_nf + Random.int max_additional_commitments

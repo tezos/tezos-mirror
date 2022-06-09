@@ -43,9 +43,9 @@ module Sapling_gen_cmd = struct
                  "Ill-formatted --max-%s option (expected integer), exiting"
                  name ;
                exit 1
-           | res when res <= 0 ->
+           | res when res < 0 ->
                Format.eprintf
-                 "--max-%s should be a strictly positive integer, exiting"
+                 "--max-%s should be a  positive integer, exiting"
                  name ;
                exit 1
            | res -> return res))
