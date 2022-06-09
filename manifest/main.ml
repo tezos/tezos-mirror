@@ -289,7 +289,7 @@ let tls = external_lib "tls" V.(at_least "0.10")
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
 
-let uri = external_lib ~js_compatible:true "uri" V.True
+let uri = external_lib ~js_compatible:true "uri" V.(at_least "2.2.0")
 
 let utop = external_lib "utop" V.(at_least "2.8")
 
