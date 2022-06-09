@@ -99,8 +99,13 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
         ~range:{min = 0; max = conf.max_new_message_size}
         rng_state
     in
-    let new_message =
+    let new_external_message =
       Base_samplers.uniform_string ~nbytes:new_message_size rng_state
+    in
+    let new_message =
+      WithExceptions.Result.get_ok ~loc:__LOC__
+      @@ Sc_rollup_inbox_message_repr.(
+           to_bytes @@ External new_external_message)
     in
     let workload = () in
     let closure () =
@@ -180,8 +185,12 @@ module Sc_rollup_add_external_messages_benchmark = struct
   let models = [("scoru", add_message_model)]
 
   let benchmark rng_state conf () =
-    let message =
+    let external_message =
       Base_samplers.string rng_state ~size:{min = 1; max = conf.max_length}
+    in
+    let message =
+      WithExceptions.Result.get_ok ~loc:__LOC__
+      @@ Sc_rollup_inbox_message_repr.(to_bytes @@ External external_message)
     in
     let last_level_int =
       Base_samplers.sample_in_interval
@@ -191,7 +200,7 @@ module Sc_rollup_add_external_messages_benchmark = struct
     let last_level =
       Raw_level_repr.of_int32_exn (Int32.of_int last_level_int)
     in
-    let message_length = String.length message in
+    let message_length = String.length (message :> string) in
 
     let new_ctxt =
       let open Lwt_result_syntax in
@@ -267,7 +276,7 @@ module Sc_rollup_add_external_messages_benchmark = struct
     let workload = {message_length; level = last_level_int} in
     let closure () =
       ignore
-        (Sc_rollup_inbox_repr.add_external_messages_no_history
+        (Sc_rollup_inbox_repr.add_messages_no_history
            inbox
            last_level
            [message]

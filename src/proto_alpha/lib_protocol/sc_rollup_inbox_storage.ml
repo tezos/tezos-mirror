@@ -28,7 +28,10 @@ open Sc_rollup_errors
 module Store = Storage.Sc_rollup
 
 let update_num_and_size_of_messages ~num_messages ~total_messages_size message =
-  (num_messages + 1, total_messages_size + String.length message)
+  ( num_messages + 1,
+    total_messages_size
+    + String.length
+        (message : Sc_rollup_inbox_message_repr.serialized :> string) )
 
 let inbox ctxt rollup =
   let open Lwt_tzresult_syntax in
@@ -59,7 +62,7 @@ let assert_inbox_nb_messages_in_commitment_period inbox extra_messages =
     Compare.Int64.(nb_messages_in_commitment_period > limit)
     Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
-let add_external_messages ctxt rollup messages =
+let add_messages ctxt rollup messages =
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_tzresult_syntax in
   let open Raw_context in
@@ -130,13 +133,34 @@ let add_external_messages ctxt rollup messages =
   *)
   let* current_messages, inbox =
     Sc_rollup_inbox_repr.(
-      add_external_messages_no_history inbox level messages current_messages)
+      add_messages_no_history inbox level messages current_messages)
   in
   let*? ctxt =
     Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
   in
   let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
   return (inbox, Z.of_int size, ctxt)
+
+let add_external_messages ctxt rollup external_messages =
+  let open Lwt_result_syntax in
+  let*? messages =
+    List.map_e
+      (fun message ->
+        Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
+      external_messages
+  in
+  add_messages ctxt rollup messages
+
+let add_internal_message ctxt rollup ~payload ~sender ~source =
+  let open Lwt_result_syntax in
+  (* TODO: #2951
+     Charge gas for serializing the internal message.
+  *)
+  let*? message =
+    Sc_rollup_inbox_message_repr.(
+      to_bytes @@ Internal {payload; sender; source})
+  in
+  add_messages ctxt rollup [message]
 
 module Internal_for_tests = struct
   let update_num_and_size_of_messages = update_num_and_size_of_messages

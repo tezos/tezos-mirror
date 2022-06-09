@@ -91,6 +91,8 @@ let encoding =
         (fun msg -> External msg);
     ]
 
+type serialized = string
+
 let to_bytes msg =
   let open Tzresult_syntax in
   match Data_encoding.Binary.to_string_opt encoding msg with

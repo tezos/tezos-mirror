@@ -56,9 +56,11 @@ type t =
     }
   | External of string
 
-(** [bytes_of_inbox_message msg] encodes the inbox message [msg] in binary
-    format. *)
-val to_bytes : t -> string tzresult
+(** A typed version of a message serialized in binary format. *)
+type serialized = private string
+
+(** [to_bytes msg] encodes the inbox message [msg] in binary format. *)
+val to_bytes : t -> serialized tzresult
 
 module Internal_for_tests : sig
   (** [of_bytes bs] decodes [bs] as an [inbox_message]. *)

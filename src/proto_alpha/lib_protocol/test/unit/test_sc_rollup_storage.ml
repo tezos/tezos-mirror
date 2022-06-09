@@ -2310,14 +2310,17 @@ let test_carbonated_memory_inbox_set_messages () =
     @@ Sc_rollup_in_memory_inbox.current_messages ctxt rollup
   in
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
+  let*? messages_to_add =
+    Environment.wrap_tzresult
+    @@ List.map_e
+         (fun external_message ->
+           Sc_rollup_inbox_message_repr.(to_bytes @@ External external_message))
+         ["CAFEBABE"; "CAFEBABE"; "CAFEBABE"]
+  in
   let* current_messages, _ =
     lift
     @@ Sc_rollup_inbox_repr.(
-         add_external_messages_no_history
-           inbox
-           level
-           ["CAFEBABE"; "CAFEBABE"; "CAFEBABE"]
-           current_messages)
+         add_messages_no_history inbox level messages_to_add current_messages)
   in
   let*? ctxt' =
     Environment.wrap_tzresult

@@ -2713,7 +2713,9 @@ module Sc_rollup : sig
           }
         | External of string
 
-      val to_bytes : t -> string tzresult
+      type serialized = private string
+
+      val to_bytes : t -> serialized tzresult
 
       module Internal_for_tests : sig
         val of_bytes : string -> t tzresult
@@ -2757,10 +2759,10 @@ module Sc_rollup : sig
         messages ->
         (messages * history * t) tzresult Lwt.t
 
-      val add_external_messages_no_history :
+      val add_messages_no_history :
         t ->
         Raw_level.t ->
-        string list ->
+        Message.serialized list ->
         messages ->
         (messages * t, error trace) result Lwt.t
 
@@ -2808,6 +2810,14 @@ module Sc_rollup : sig
 
     val add_external_messages :
       context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
+
+    val add_internal_message :
+      context ->
+      rollup ->
+      payload:Script.expr ->
+      sender:Contract.t ->
+      source:Signature.public_key_hash ->
+      (t * Z.t * context) tzresult Lwt.t
 
     val inbox : context -> rollup -> (t * context) tzresult Lwt.t
 
