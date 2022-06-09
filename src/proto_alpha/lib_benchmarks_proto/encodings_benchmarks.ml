@@ -259,7 +259,6 @@ end
 
 let () = Registration_helpers.register (module Decoding_micheline)
 
-(* TODO: benchmark timestamps with big values (>64 bits) *)
 module Timestamp = struct
   let () =
     Registration_helpers.register
@@ -273,28 +272,42 @@ module Timestamp = struct
         Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
       ~make_bench:(fun generator () ->
         let tstamp_string = generator () in
-        let closure () = ignore (Script_timestamp.to_string tstamp_string) in
+        let closure () = ignore (Script_timestamp.to_notation tstamp_string) in
         Generator.Plain {workload = (); closure})
       ()
 
   let () =
-    Registration_helpers.register
-    @@
-    let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
-    fixed_size_shared
-      ~name:"TIMESTAMP_READABLE_DECODING"
-      ~generator:(fun rng_state ->
-        let seconds_in_year = 30_000_000 in
-        let offset = Random.State.int rng_state seconds_in_year in
-        let tstamp =
-          Script_timestamp.of_zint (Z.of_int (1597764116 + offset))
-        in
-        Script_timestamp.to_string tstamp)
-      ~make_bench:(fun generator () ->
-        let tstamp_string = generator () in
-        let closure () = ignore (Script_timestamp.of_string tstamp_string) in
-        Generator.Plain {workload = (); closure})
-      ()
+    let b, b_intercept =
+      let open Tezos_shell_benchmarks.Encoding_benchmarks_helpers in
+      nsqrtn_shared_with_intercept
+        ~name:"TIMESTAMP_READABLE_DECODING"
+        ~generator:(fun rng_state ->
+          let offset =
+            Base_samplers.nat ~size:{min = 1; max = 100_000} rng_state
+          in
+          let tstamp =
+            Script_timestamp.of_zint Z.(of_int 1597764116 + offset)
+          in
+          Script_timestamp.to_string tstamp)
+        ~make_bench:(fun generator () ->
+          let tstamp_string = generator () in
+          let bytes = String.length tstamp_string in
+          let closure () = ignore (Script_timestamp.of_string tstamp_string) in
+          Generator.Plain {workload = {bytes}; closure})
+        ~generator_intercept:(fun rng_state ->
+          let seconds_in_year = 30_000_000 in
+          let offset = Random.State.int rng_state seconds_in_year in
+          let tstamp =
+            Script_timestamp.of_zint (Z.of_int (1597764116 + offset))
+          in
+          Script_timestamp.to_string tstamp)
+        ~make_bench_intercept:(fun generator () ->
+          let tstamp_string = generator () in
+          let closure () = ignore (Script_timestamp.of_string tstamp_string) in
+          Generator.Plain {workload = {bytes = 0}; closure})
+    in
+    Registration_helpers.register b ;
+    Registration_helpers.register b_intercept
 end
 
 (* when benchmarking, compile bls12-381 without ADX, see
