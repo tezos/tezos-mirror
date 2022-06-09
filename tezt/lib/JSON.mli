@@ -179,6 +179,20 @@ val as_int64_opt : t -> int64 option
 (** Test whether [as_int64] would succeed. *)
 val is_int64 : t -> bool
 
+(** Get the integer value from a [`Float] or [`String] node (32-bit version).
+
+    @raise Error if:
+    - the input is not a [`Float] nor a [`String];
+    - the input is a [`Float] but is not an integer;
+    - the input is a [`String] but does not denote a valid decimal integer. *)
+val as_int32 : t -> int32
+
+(** Same as [as_int32], but return [None] instead of raising [Error]. *)
+val as_int32_opt : t -> int32 option
+
+(** Test whether [as_int32] would succeed. *)
+val is_int32 : t -> bool
+
 (** Get the float value from a [`Float] or [`String] node.
 
     @raise Error if:

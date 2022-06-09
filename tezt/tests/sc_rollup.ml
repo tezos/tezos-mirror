@@ -47,6 +47,55 @@ let hooks = Tezos_regression.hooks
    block finality time is 2. *)
 let block_finality_time = 2
 
+type sc_rollup_constants = {
+  origination_size : int;
+  challenge_window_in_blocks : int;
+  max_available_messages : int;
+  stake_amount : Tez.t;
+  commitment_period_in_blocks : int;
+  max_lookahead_in_blocks : int32;
+  max_active_outbox_levels : int32;
+  max_outbox_messages_per_level : int;
+}
+
+let get_sc_rollup_constants client =
+  let* json = RPC.get_constants client in
+  let open JSON in
+  let origination_size = json |-> "sc_rollup_origination_size" |> as_int in
+  let challenge_window_in_blocks =
+    json |-> "sc_rollup_challenge_window_in_blocks" |> as_int
+  in
+  let max_available_messages =
+    json |-> "sc_rollup_max_available_messages" |> as_int
+  in
+  let stake_amount =
+    json |-> "sc_rollup_stake_amount" |> as_string |> Int64.of_string
+    |> Tez.of_mutez_int64
+  in
+  let commitment_period_in_blocks =
+    json |-> "sc_rollup_commitment_period_in_blocks" |> as_int
+  in
+  let max_lookahead_in_blocks =
+    json |-> "sc_rollup_max_lookahead_in_blocks" |> as_int32
+  in
+  let max_active_outbox_levels =
+    json |-> "sc_rollup_max_active_outbox_levels" |> as_int32
+  in
+  let max_outbox_messages_per_level =
+    json |-> "sc_rollup_max_outbox_messages_per_level" |> as_int
+  in
+  return
+    {
+      origination_size;
+      challenge_window_in_blocks;
+      max_available_messages;
+      stake_amount;
+      commitment_period_in_blocks;
+      max_lookahead_in_blocks;
+      max_active_outbox_levels;
+      max_outbox_messages_per_level;
+    }
+
 let make_parameter name value =
   Option.map (fun v -> ([name], Option.some @@ Int.to_string v)) value
   |> Option.to_list
@@ -80,10 +129,8 @@ let setup ?commitment_period ?challenge_window f ~protocol =
   f node client bootstrap1_key
 
 let get_sc_rollup_commitment_period_in_blocks client =
-  let* constants = RPC.get_constants ~hooks client in
-  constants
-  |> JSON.get "sc_rollup_commitment_period_in_blocks"
-  |> JSON.as_int |> return
+  let* constants = get_sc_rollup_constants client in
+  return constants.commitment_period_in_blocks
 
 let sc_rollup_node_rpc sc_node service =
   let* curl = RPC.Curl.get () in
@@ -1432,9 +1479,11 @@ let attempt_withdraw_stake =
    Do not pass an explicit value for `?commitment_period until
    https://gitlab.com/tezos/tezos/-/merge_requests/5212 has been merged. *)
 (* Test that nodes do not publish commitments before the last cemented commitment. *)
-let commitment_before_lcc_not_stored ?(commitment_period = 30)
-    ?(challenge_window = 20_160) _protocol sc_rollup_node sc_rollup_address node
-    client =
+let commitment_before_lcc_not_stored _protocol sc_rollup_node sc_rollup_address
+    node client =
+  let* constants = get_sc_rollup_constants client in
+  let commitment_period = constants.commitment_period_in_blocks in
+  let challenge_window = constants.challenge_window_in_blocks in
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
   let* init_level =
     RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
@@ -1901,7 +1950,7 @@ let register ~protocols =
     "no_commitment_publish_before_lcc"
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2976
        change tests so that we do not need to repeat custom parameters. *)
-    (commitment_before_lcc_not_stored ~challenge_window:1)
+    commitment_before_lcc_not_stored
     protocols ;
   test_commitment_scenario
     "first_published_at_level_global"
