@@ -18,7 +18,6 @@ module V0 = struct
   module Data_encoding = V0_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
-  module Error_monad_classification = V0_error_monad_classification
 end
 
 module V1 = struct
@@ -43,7 +42,6 @@ module V1 = struct
   module Hex = V1_hex
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
-  module Error_monad_classification = V0_error_monad_classification
 end
 
 module V2 = struct
@@ -67,7 +65,6 @@ module V2 = struct
   module Hex = V1_hex
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
-  module Error_monad_classification = V0_error_monad_classification
 end
 
 module V3 = struct
@@ -79,7 +76,6 @@ module V3 = struct
   module Hex = V1_hex
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
-  module Error_monad_classification = V0_error_monad_classification
 end
 
 module V4 = struct

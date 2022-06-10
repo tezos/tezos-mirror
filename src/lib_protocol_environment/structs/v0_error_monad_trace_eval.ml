@@ -25,6 +25,23 @@
 
 open Tezos_error_monad.Error_monad
 
+type t =
+  [ `Branch  (** Errors that may not happen in another context *)
+  | `Temporary  (** Errors that may not happen in a later context *)
+  | `Permanent  (** Errors that will happen no matter the context *) ]
+
+let default_category = `Temporary
+
+let string_of_category = function
+  | `Permanent -> "permanent"
+  | `Temporary -> "temporary"
+  | `Branch -> "branch"
+
+let classify = function
+  | `Permanent -> Tezos_error_monad.Error_classification.Permanent
+  | `Temporary -> Temporary
+  | `Branch -> Branch
+
 let record_trace_eval mk_err =
   let open Result_syntax in
   function
