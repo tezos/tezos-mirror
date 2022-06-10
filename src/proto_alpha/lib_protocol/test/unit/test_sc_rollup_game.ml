@@ -60,6 +60,12 @@ let tick_of_int_exn n =
 
 let hash_int n = Sc_rollup_repr.State_hash.hash_string [Format.sprintf "%d" n]
 
+let init_dissection start_hash =
+  Stdlib.List.init 32 (fun i ->
+      if i = 0 then (Some start_hash, tick_of_int_exn 0)
+      else if i = 31 then (None, tick_of_int_exn 10000)
+      else (Some (hash_int i), tick_of_int_exn i))
+
 let two_stakers_in_conflict () =
   let* ctxt, rollup, refuter, defender =
     T.originate_rollup_and_deposit_with_two_stakers ()
@@ -122,12 +128,7 @@ let two_stakers_in_conflict () =
 let test_poorly_distributed_dissection () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
   let start_hash = Sc_rollup_repr.State_hash.hash_string ["foo"] in
-  let dissection =
-    Stdlib.List.init 32 (fun i ->
-        if i = 0 then (Some start_hash, tick_of_int_exn 0)
-        else if i = 31 then (None, tick_of_int_exn 10000)
-        else (Some (hash_int i), tick_of_int_exn i))
-  in
+  let dissection = init_dissection start_hash in
   let move =
     Sc_rollup_game_repr.
       {choice = Sc_rollup_tick_repr.initial; step = Dissection dissection}
