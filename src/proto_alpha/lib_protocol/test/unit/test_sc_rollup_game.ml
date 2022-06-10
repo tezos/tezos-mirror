@@ -37,6 +37,7 @@ open Lwt_result_syntax
 module Commitment_repr = Sc_rollup_commitment_repr
 module T = Test_sc_rollup_storage
 module R = Sc_rollup_refutation_storage
+module G = Sc_rollup_game_repr
 module Tick = Sc_rollup_tick_repr
 
 let check_reason ~loc (outcome : Sc_rollup_game_repr.outcome option) s =
@@ -66,6 +67,13 @@ let init_dissection ?(size = 32) start_hash =
     else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
   in
   Stdlib.List.init size init_tick
+
+let init_refutation ?size start_hash =
+  G.
+    {
+      choice = Sc_rollup_tick_repr.initial;
+      step = Dissection (init_dissection ?size start_hash);
+    }
 
 let two_stakers_in_conflict () =
   let* ctxt, rollup, refuter, defender =
@@ -129,11 +137,7 @@ let two_stakers_in_conflict () =
 let test_poorly_distributed_dissection () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
   let start_hash = Sc_rollup_repr.State_hash.hash_string ["foo"] in
-  let dissection = init_dissection start_hash in
-  let move =
-    Sc_rollup_game_repr.
-      {choice = Sc_rollup_tick_repr.initial; step = Dissection dissection}
-  in
+  let move = init_refutation start_hash in
   let* outcome, _ctxt =
     T.lift
     @@ R.game_move
