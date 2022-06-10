@@ -56,6 +56,8 @@ type dummy_proof = {
   valid : bool;
 }
 
+module Tick_map = Map.Make (Sc_rollup_tick_repr)
+
 let dummy_proof_encoding : dummy_proof Data_encoding.t =
   let open Data_encoding in
   conv
@@ -100,27 +102,21 @@ let tick_to_int_exn t =
 
 let random_dissection start_at start_hash stop_at stop_hash :
     (State_hash.t option * Tick.t) list option Lwt.t =
-  match start_hash with
-  | Some _ ->
-      let start_int = tick_to_int_exn start_at in
-      let stop_int = tick_to_int_exn stop_at in
-      let dist = stop_int - start_int in
-      let branch = min (dist + 1) 32 in
-      let size = (dist + 1) / branch in
+  let start_int = tick_to_int_exn start_at in
+  let stop_int = tick_to_int_exn stop_at in
+  let dist = stop_int - start_int in
+  let branch = min (dist + 1) 32 in
+  let size = (dist + 1) / branch in
 
-      if dist = 1 then return None
-      else
-        return
-        @@ Result.to_option
-             (List.init branch ~when_negative_length:"error" (fun i ->
-                  if i = 0 then (start_hash, start_at)
-                  else if i = branch - 1 then (stop_hash, stop_at)
-                  else
-                    ( Some (random_hash ()),
-                      tick_of_int_exn (start_int + (i * size)) )))
-  | None ->
-      (* Because at start state is always present. *)
-      assert false
+  if dist = 1 then return None
+  else
+    return
+    @@ Result.to_option
+         (List.init branch ~when_negative_length:"error" (fun i ->
+              if i = 0 then (Some start_hash, start_at)
+              else if i = branch - 1 then (stop_hash, stop_at)
+              else
+                (Some (random_hash ()), tick_of_int_exn (start_int + (i * size)))))
 
 (**
  `genlist` is a `correct list` generator. It generates a list of strings that
@@ -236,7 +232,8 @@ end) : TestPVM with type state = int = struct
 
   let state_hash (x : state) = return (State_hash.hash_string [Int.to_string x])
 
-  let is_input_state _ = return No_input_required
+  let is_input_state x =
+    if x >= P.target then return Initial else return No_input_required
 
   let initial_state _ _ = return P.target
 
@@ -299,7 +296,8 @@ end) : TestPVM with type state = string * int list = struct
 
   let initial_state _ _ = return ("hello", P.initial_prog)
 
-  let is_input_state _ = return No_input_required
+  let is_input_state (_, c) =
+    match c with [] -> return Initial | _ -> return No_input_required
 
   let set_input _ state = return state
 
@@ -430,33 +428,44 @@ end
    from a PVM.
 *)
 module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
-  (** [execute_until tick stat prop] runs eval until the tick
-     satisfies pred or until the state machine does not change
-     anymore. It returns the new tick and the modified state *)
-  let execute_until tick state pred =
+  (** [exec_all state tick] runs eval until the state machine reaches a
+      state where it requires an input. It returns the new state and the
+      final tick.
+      *)
+  let exec_all state tick =
     let rec loop state tick =
       let* isinp = PVM.is_input_state state in
       match isinp with
       | No_input_required ->
-          if pred tick state then return (tick, state)
-          else
+          let* s = PVM.eval state in
+          let* hash1 = PVM.state_hash state in
+          let* hash2 = PVM.state_hash s in
+
+          if State_hash.equal hash1 hash2 then assert false
+          else loop s (Tick.next tick)
+      | _ -> return (state, tick)
+    in
+    loop state tick
+
+  (** [state_at to_tick from_state from_tick] returns the state at tick
+      [to_tick], or [None] if that's past the point at which the machine
+      has stopped. *)
+  let state_at to_tick from_state from_tick =
+    let rec loop state tick =
+      let* isinp = PVM.is_input_state state in
+      if Tick.equal to_tick tick then return (Some state, tick)
+      else
+        match isinp with
+        | No_input_required ->
             let* s = PVM.eval state in
             let* hash1 = PVM.state_hash state in
             let* hash2 = PVM.state_hash s in
 
-            if State_hash.equal hash1 hash2 then return (tick, state)
+            if State_hash.equal hash1 hash2 then assert false
             else loop s (Tick.next tick)
-      | _ -> return (tick, state)
+        | _ -> return (None, to_tick)
     in
-    loop state tick
-
-  (** [state_at tick default_state default_tick] is a computation of
-     the state. If runs eval from default_tick to tick starting from
-     default_state. *)
-  let state_at tick default_state default_tick =
-    execute_until default_tick default_state (fun tick' _ ->
-        Tick.(tick' = tick))
-    >>= fun (t, s) -> return (Some s, t)
+    loop from_state from_tick
 
   (** [dissection_of_section start_tick start_state stop_tick] creates
      a dissection with at most [32] pieces that are (roughly) equal
@@ -464,41 +473,38 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
      until the correct tick. Note that the last piece can be as much
      as 31 ticks longer than the others.  *)
   let dissection_of_section start_tick start_state stop_tick =
-    match start_state with
-    | Some start_state ->
-        let start_int = tick_to_int_exn start_tick in
-        let stop_int = tick_to_int_exn stop_tick in
-        let dist = stop_int - start_int in
-        if dist = 1 then return None
-        else
-          let branch = min (dist + 1) 32 in
-          let size = (dist + 1) / branch in
-          let tick_list =
-            Result.to_option
-            @@ List.init branch ~when_negative_length:"error" (fun i ->
-                   if i = branch - 1 then stop_tick
-                   else tick_of_int_exn (start_int + (i * size)))
-          in
-          let a =
-            Option.map
-              (fun a ->
-                List.map
-                  (fun tick ->
-                    let hash =
-                      Lwt_main.run
-                      @@ let* state, _ = state_at tick start_state start_tick in
-                         match state with
-                         | None -> return None
-                         | Some s ->
-                             let* h = PVM.state_hash s in
-                             return (Some h)
-                    in
-                    (hash, tick))
-                  a)
-              tick_list
-          in
-          return a
-    | None -> assert false
+    let start_int = tick_to_int_exn start_tick in
+    let stop_int = tick_to_int_exn stop_tick in
+    let dist = stop_int - start_int in
+    if dist = 1 then return None
+    else
+      let branch = min (dist + 1) 32 in
+      let size = (dist + 1) / branch in
+      let tick_list =
+        Result.to_option
+        @@ List.init branch ~when_negative_length:"error" (fun i ->
+               if i = branch - 1 then stop_tick
+               else tick_of_int_exn (start_int + (i * size)))
+      in
+      let a =
+        Option.map
+          (fun a ->
+            List.map
+              (fun tick ->
+                let hash =
+                  Lwt_main.run
+                  @@ let* state, _ = state_at tick start_state start_tick in
+                     match state with
+                     | None -> return None
+                     | Some s ->
+                         let* h = PVM.state_hash s in
+                         return (Some h)
+                in
+                (hash, tick))
+              a)
+          tick_list
+      in
+      return a
 
   type client = {
     initial : (Tick.t * PVM.hash) option Lwt.t;
@@ -592,17 +598,19 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     If the length is longer it creates a random decision and outputs a Refine
      decision with this dissection.*)
   let random_decision d =
-    let cardinal = List.length d in
-    let x = max 0 (Random.int (cardinal - 1)) in
-    let start_state, start =
-      match List.nth d x with Some (s, t) -> (s, t) | None -> assert false
+    let number_of_somes =
+      List.length
+        (List.filter (function Some _, _ -> true | None, _ -> false) d)
+    in
+    let x = Random.int (number_of_somes - 1) in
+    let start_hash, start =
+      match List.nth d x with Some (Some s, t) -> (s, t) | _ -> assert false
     in
     let _, stop =
       match List.nth d (x + 1) with
       | Some (s, t) -> (s, t)
       | None -> assert false
     in
-    let start_hash = start_state in
     let stop_hash = Some (random_hash ()) in
     let* random_dissection =
       random_dissection start start_hash stop stop_hash
@@ -611,9 +619,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     match random_dissection with
     | None ->
         let* pvm_proof =
-          match start_state with
-          | Some s -> PVM.Utils.make_invalid_proof s (Some (random_hash ()))
-          | None -> assert false
+          PVM.Utils.make_invalid_proof start_hash (Some (random_hash ()))
         in
         let wrapped =
           let module P = struct
@@ -668,11 +674,14 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
           state_at start_tick PVM.Utils.default_state Tick.initial
         in
         let* next_dissection =
-          dissection_of_section start_tick start_state next_tick
+          match start_state with
+          | None -> return None
+          | Some s -> dissection_of_section start_tick s next_tick
         in
-
         let* stop_state, _ =
-          state_at next_tick PVM.Utils.default_state Tick.initial
+          match start_state with
+          | None -> return (None, next_tick)
+          | Some s -> state_at next_tick s start_tick
         in
         let* refutation =
           match next_dissection with
@@ -711,9 +720,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
   let machine_directed =
     let start_state = PVM.Utils.default_state in
     let initial =
-      let* stop_at, stop_state =
-        execute_until Tick.initial start_state @@ fun _ _ -> false
-      in
+      let* stop_state, stop_at = exec_all start_state Tick.initial in
       let* stop_hash = PVM.state_hash stop_state in
       return (Some (stop_at, stop_hash))
     in
@@ -845,10 +852,7 @@ let test_random_dissection (module P : TestPVM) start_at length =
     match Tick.of_int start_at with None -> assert false | Some x -> x
   in
   let* option_dissection =
-    S.dissection_of_section
-      section_start_at
-      (Some section_start_state)
-      section_stop_at
+    S.dissection_of_section section_start_at section_start_state section_stop_at
   in
   let dissection =
     match option_dissection with
@@ -908,7 +912,7 @@ let testRandomDissection =
         let testing_lwt =
           let start_at = tick_of_int_exn start_int in
           let stop_at = tick_of_int_exn (start_int + length) in
-          let start_hash = Some (random_hash ()) in
+          let start_hash = random_hash () in
           let stop_hash = Some (random_hash ()) in
 
           let* dissection_opt =
@@ -924,7 +928,7 @@ let testRandomDissection =
           let new_hash = aux stop_hash in
           let* check =
             Game.check_dissection
-              start_hash
+              (Some start_hash)
               start_at
               new_hash
               stop_at

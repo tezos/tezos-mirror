@@ -156,7 +156,7 @@ type player = Alice | Bob
     Invariants:
     -----------
     - [dissection] must contain at least 3 values
-    - only the last value in [dissection] may be [None]
+    - the first state hash value in [dissection] must not be [None]
     - [inbox_snapshot] never changes once the game is created
 *)
 type t = {
@@ -308,8 +308,12 @@ val find_choice :
     the current dissection.
 
     Finally, we check that [dissection] is well formed: it has correctly
-    ordered the ticks, and it contains no [None] states except for
-    possibly the last one. *)
+    ordered the ticks, and it begins with a real hash of the form [Some
+    s] not a [None] state. Note that we have to allow the possibility of
+    multiple [None] states because the restrictions on dissection shape
+    (which are necessary to prevent a 'linear-time game' attack) will
+    mean that sometimes the honest play is a dissection with multiple
+    [None] states. *)
 val check_dissection :
   Sc_rollup_repr.State_hash.t option ->
   Sc_rollup_tick_repr.t ->
