@@ -153,12 +153,17 @@ let add_external_messages ctxt rollup external_messages =
 
 let add_internal_message ctxt rollup ~payload ~sender ~source =
   let open Lwt_result_syntax in
-  (* TODO: #2951
-     Charge gas for serializing the internal message.
-  *)
+  let internal_message =
+    {Sc_rollup_inbox_message_repr.payload; sender; source}
+  in
+  (* Pay gas for serializing an internal message. *)
+  let*? ctxt =
+    Raw_context.consume_gas
+      ctxt
+      (Sc_rollup_costs.cost_serialize_internal_inbox_message internal_message)
+  in
   let*? message =
-    Sc_rollup_inbox_message_repr.(
-      to_bytes @@ Internal {payload; sender; source})
+    Sc_rollup_inbox_message_repr.(to_bytes @@ Internal internal_message)
   in
   add_messages ctxt rollup [message]
 
