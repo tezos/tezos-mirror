@@ -1922,6 +1922,8 @@ module Tx_rollup = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Deserialization of transfer ticket"
+        (* TX rollups activated with (Proto 13) Jakarta  *)
+      ~supports:(Protocol.From_protocol 13)
       ~tags:
         [
           "precheck";
@@ -1968,6 +1970,8 @@ module Tx_rollup = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Deserialization of transfer ticket too large"
+        (* TX rollups activated with (Proto 13) Jakarta  *)
+      ~supports:(Protocol.From_protocol 13)
       ~tags:
         ["precheck"; "deserialization"; "gas"; "transfer_ticket"; "tx_rollup"]
     @@ fun protocol ->
@@ -2004,4 +2008,4 @@ let register ~protocols =
   Reveal.register ~protocols ;
   Simple_transfers.register ~protocols ;
   Simple_contract_calls.register ~protocols ;
-  Tx_rollup.register ~protocols:[Alpha]
+  Tx_rollup.register ~protocols
