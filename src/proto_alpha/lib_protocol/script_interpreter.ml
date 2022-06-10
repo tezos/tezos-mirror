@@ -1549,6 +1549,24 @@ and log :
   Script_interpreter_logging.log_next_kinstr_and_cont logger sty k ks
   >>?= fun (k, ks) ->
   match k with
+  | IIf_none {branch_if_none; branch_if_some; k; _} -> (
+      let (Item_t (_, sty_if_none)) = sty in
+      Script_interpreter_logging.kinstr_final_stack_type
+        sty_if_none
+        branch_if_none
+      >>?= fun sty_opt ->
+      let ks' =
+        match sty_opt with
+        | None -> KCons (k, ks)
+        | Some sty' ->
+            Script_interpreter_logging.instrument_cont logger sty'
+            @@ KCons (k, ks)
+      in
+      match accu with
+      | None ->
+          let accu, stack = stack in
+          (step [@ocaml.tailcall]) g gas branch_if_none ks' accu stack
+      | Some v -> (step [@ocaml.tailcall]) g gas branch_if_some ks' v stack)
   | IMul_teznat (loc, k) ->
       (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
   | IMul_nattez (loc, k) ->

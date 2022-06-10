@@ -106,3 +106,8 @@ val log_next_kinstr_and_cont :
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   (('a, 'b, 'c, 'd) kinstr * ('c, 'd, 'e, 'f) continuation) tzresult
+
+val kinstr_final_stack_type :
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('c, 'd) stack_ty option tzresult
