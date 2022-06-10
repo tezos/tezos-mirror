@@ -115,7 +115,7 @@ module type PVM_with_context_and_state = sig
   val state : state
 end
 
-type error += Proof_cannot_be_wrap
+type error += Proof_cannot_be_wrapped
 
 let produce pvm_and_state inbox commit_level =
   let open Lwt_result_syntax in
@@ -144,4 +144,4 @@ let produce pvm_and_state inbox commit_level =
   end in
   match Sc_rollups.wrap_proof (module P_with_proof) with
   | Some pvm_step -> return {pvm_step; inbox}
-  | None -> fail Proof_cannot_be_wrap
+  | None -> fail Proof_cannot_be_wrapped
