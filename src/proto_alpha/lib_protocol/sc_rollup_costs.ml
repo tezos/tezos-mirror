@@ -55,12 +55,12 @@ end
 
 (* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
    [l] is linear in the sum of lengths of the messages, and it is logarithmic
-   in [l]. That is, [cost_add_external_messages([m_1; .. ; m_n], l)] =
+   in [l]. That is, [cost_add_serialized_messages([m_1; .. ; m_n], l)] =
    `n * cost_add_message_base +
     cost_add_message_per_bytes * \sum_{i=1}^n length(m_i) +
     cost_add_inbox_per_level * l`.
 *)
-let cost_add_external_messages ~num_messages ~total_messages_size l =
+let cost_add_serialized_messages ~num_messages ~total_messages_size l =
   let open S_syntax in
   let log_level =
     if Int32.equal l Int32.zero then Saturation_repr.safe_int 0

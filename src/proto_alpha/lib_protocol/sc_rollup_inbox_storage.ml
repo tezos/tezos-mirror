@@ -119,13 +119,13 @@ let add_messages ctxt rollup messages =
   let*? current_messages, ctxt =
     Sc_rollup_in_memory_inbox.current_messages ctxt rollup
   in
-  let gas_cost_add_external_messages =
-    Sc_rollup_costs.cost_add_external_messages
+  let cost_add_serialized_messages =
+    Sc_rollup_costs.cost_add_serialized_messages
       ~num_messages
       ~total_messages_size
       levels
   in
-  let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_external_messages in
+  let*? ctxt = Raw_context.consume_gas ctxt cost_add_serialized_messages in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
