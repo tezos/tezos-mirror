@@ -50,6 +50,7 @@ type t = Atomic_transaction_batch of {transactions : transaction list}
     typed values. *)
 val of_bytes : string -> t tzresult
 
+(** Module containing functions exposed so they can be used in test. *)
 module Internal_for_tests : sig
   (** [to_bytes msg] returns the bytes of the given outbox
         message [msg]. *)
