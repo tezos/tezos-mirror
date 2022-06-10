@@ -1567,6 +1567,22 @@ and log :
           let accu, stack = stack in
           (step [@ocaml.tailcall]) g gas branch_if_none ks' accu stack
       | Some v -> (step [@ocaml.tailcall]) g gas branch_if_some ks' v stack)
+  | IOpt_map {body; k; loc = _} -> (
+      match accu with
+      | None -> (step [@ocaml.tailcall]) g gas k ks None stack
+      | Some v ->
+          let (Item_t (Option_t (ty, _, _), rest)) = sty in
+          let bsty = Item_t (ty, rest) in
+          let kmap_head = KMap_head (Option.some, KCons (k, ks)) in
+          Script_interpreter_logging.kinstr_final_stack_type bsty body
+          >>?= fun sty_opt ->
+          let ks' =
+            match sty_opt with
+            | None -> kmap_head
+            | Some sty' ->
+                Script_interpreter_logging.instrument_cont logger sty' kmap_head
+          in
+          (step [@ocaml.tailcall]) g gas body ks' v stack)
   | IMul_teznat (loc, k) ->
       (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
   | IMul_nattez (loc, k) ->
