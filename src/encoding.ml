@@ -1004,7 +1004,7 @@ let mu name ?title ?description fix =
         make @@ Mu {kind = `Variable; name; title; description; fix}
       in
       let fixed_precursor = fix precursor in
-      ignore (classify fixed_precursor) ;
+      ignore (classify fixed_precursor : Kind.t) ;
       fixed_precursor
 
 let result ok_enc error_enc =
