@@ -67,7 +67,7 @@ let two_stakers_in_conflict () =
   let hash1 = Sc_rollup_repr.State_hash.hash_string ["foo"] in
   let hash2 = Sc_rollup_repr.State_hash.hash_string ["bar"] in
   let hash3 = Sc_rollup_repr.State_hash.hash_string ["xyz"] in
-  let commit1 =
+  let parent_commit =
     Commitment_repr.
       {
         predecessor = Commitment_repr.Hash.zero;
@@ -83,7 +83,7 @@ let two_stakers_in_conflict () =
          ctxt
          rollup
          defender
-         commit1
+         parent_commit
   in
   let child1 =
     Commitment_repr.
