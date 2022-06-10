@@ -60,7 +60,8 @@ let new_context () =
     ctxt
   in
   let* ctxt = mint_tez_for ctxt "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG" in
-  mint_tez_for ctxt "tz1RikjCkrEde1QQmuesp796jCxeiyE6t3Vo"
+  let* ctxt = mint_tez_for ctxt "tz1RikjCkrEde1QQmuesp796jCxeiyE6t3Vo" in
+  mint_tez_for ctxt "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 let new_sc_rollup ctxt =
   let+ rollup, _size, ctxt =
