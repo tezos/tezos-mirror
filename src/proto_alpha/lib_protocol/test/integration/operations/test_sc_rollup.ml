@@ -428,6 +428,7 @@ let test_originating_with_valid_type () =
     let* incr = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt incr in
     let* expr, _ctxt = wrap @@ Sc_rollup.parameters_type ctxt rollup in
+    let expr = WithExceptions.Option.get ~loc:__LOC__ expr in
     let*? expr, _ctxt =
       Environment.wrap_tzresult
       @@ Script.force_decode_in_context
