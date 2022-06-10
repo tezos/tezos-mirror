@@ -1,9 +1,5 @@
 (**
-  A lazy map is a fixed-size key-value association where each value is created
-  dynamically.
-
-  In many ways this data structure mimics an array, but its lookup has
-  logarithmic time complexity and it supports non-int keys - hence "map".
+  A lazy map is a key-value association where each value is created dynamically.
 *)
 
 module Effect : sig
@@ -27,16 +23,6 @@ end
 *)
 module type KeyS = sig
   include Map.OrderedType
-
-  val zero : t
-
-  val add : t -> t -> t
-
-  val sub : t -> t -> t
-
-  val pred : t -> t
-
-  val succ : t -> t
 
   val to_string : t -> string
 end
@@ -62,19 +48,10 @@ module type S = sig
       mutation. *)
   val to_string : ('a -> string) -> 'a t -> string
 
-  (** [num_elements map] returns the maximum number of elements in the lazy
-      map. *)
-  val num_elements : 'a t -> key
-
   (** [create ?values num_elements produce_value] produces a lazy map with
       [num_elements] entries where each is created using [produce_value].
       [values] may be provided to supply an initial set of entries. *)
-  val create : ?values:'a Map.t -> ?produce_value:'a producer -> key -> 'a t
-
-  (** [of_list values] creates a map where each association is the index in the
-      list to its value. The first item's key is [zero], the second is
-      [succ zero] and so on. *)
-  val of_list : 'a list -> 'a t
+  val create : ?values:'a Map.t -> ?produce_value:'a producer -> unit -> 'a t
 
   (** [get key map] retrieves the element at [key].
 
@@ -86,20 +63,27 @@ module type S = sig
       @raises Memory_exn.Bounds when trying to set an invalid key *)
   val set : key -> 'a -> 'a t -> 'a t
 
-  (** [cons value map] prepends a value to the front. That value can then be
-      accessed using the [zero] key.
+  (** [merge_into ?choose_producer ?map_key source dest] produces a new lazy map
+      by merging [source] into [dest].
 
-      Time complexity: O(log(instantiated_elements_in_map)) *)
-  val cons : 'a -> 'a t -> 'a t
+      The keys of [source] can be transformed using [map_key] prior to merging.
+      By default no keys will be transformed.
 
-  (** [grow delta ?produce_value map] creates a new lazy map that has [delta]
-      more items than [map]. This also retains all values that have previously
-      existed. New values will be created with [produce_values] if provided,
-      starting with [Key.zero] for the new values. *)
-  val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
+      If a [key] was instantiated in [dest] it will also be present in the
+      resulting lazy map.
 
-  (** [concat lhs rhs] Concatenates two lazy maps. *)
-  val concat : 'a t -> 'a t -> 'a t
+      [choose_producer source_producer dest_producer] will be
+      used to determine the new producer function - by default the [dest]
+      producer is chosen. *)
+  val merge_into :
+    ?map_key:(key -> key) ->
+    ?choose_producer:('a producer -> 'a producer -> 'a producer) ->
+    'a t ->
+    'a t ->
+    'a t
+
+  (** [with_producer morph] lifts a morphism for a [producer] to one on [t]. *)
+  val with_producer : ('a producer -> 'a producer) -> 'a t -> 'a t
 end
 
 (** [UnexpectedAccess] is raised in the default of the [produce_value] argument
@@ -134,17 +118,13 @@ module Mutable : sig
 
     type 'a t
 
-    val num_elements : 'a t -> key
-
     val of_immutable : 'a Map.t -> 'a t
 
-    val create : ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> key -> 'a t
+    val create : ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> unit -> 'a t
 
     val get : key -> 'a t -> 'a Map.effect
 
     val set : key -> 'a -> 'a t -> unit
-
-    val grow : ?produce_value:'a Map.producer -> key -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Map.t
   end

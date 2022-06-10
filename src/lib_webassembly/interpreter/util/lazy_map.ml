@@ -27,16 +27,6 @@ end
 module type KeyS = sig
   include Map.OrderedType
 
-  val zero : t
-
-  val add : t -> t -> t
-
-  val sub : t -> t -> t
-
-  val pred : t -> t
-
-  val succ : t -> t
-
   val to_string : t -> string
 end
 
@@ -55,21 +45,20 @@ module type S = sig
 
   val to_string : ('a -> string) -> 'a t -> string
 
-  val num_elements : 'a t -> key
-
-  val create : ?values:'a Map.t -> ?produce_value:'a producer -> key -> 'a t
-
-  val of_list : 'a list -> 'a t
+  val create : ?values:'a Map.t -> ?produce_value:'a producer -> unit -> 'a t
 
   val get : key -> 'a t -> 'a effect
 
   val set : key -> 'a -> 'a t -> 'a t
 
-  val cons : 'a -> 'a t -> 'a t
+  val merge_into :
+    ?map_key:(key -> key) ->
+    ?choose_producer:('a producer -> 'a producer -> 'a producer) ->
+    'a t ->
+    'a t ->
+    'a t
 
-  val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
-
-  val concat : 'a t -> 'a t -> 'a t
+  val with_producer : ('a producer -> 'a producer) -> 'a t -> 'a t
 end
 
 exception UnexpectedAccess
@@ -87,57 +76,37 @@ struct
   type 'a producer = key -> 'a effect
 
   type 'a t = {
-    first : key;
-    num_elements : key;
     produce_value : 'a producer;
     mutable values : 'a Map.t
   }
 
   let pp pp_value =
-    let pp_values fmt (first, values) =
+    let pp_values fmt values =
       Map.bindings values
       |> Format.fprintf fmt "@[<hv>%a@]"
            (Format.pp_print_list
               ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
               (fun ppf (k, v) ->
-                 Format.fprintf ppf "%s => %a" Key.(to_string (sub k first)) pp_value v))
+                 Format.fprintf ppf "%s => %a" (Key.to_string k) pp_value v))
     in
     fun fmt map ->
       Format.fprintf
         fmt
-        "@[<hv 2>{ first = %s;@ num_elements = %s;@ values = @[<hv 2>[ %a ]@] }@]"
-        (Key.to_string map.first)
-        (Key.to_string map.num_elements)
+        "@[<hv 2>{ values = @[<hv 2>[ %a ]@] }@]"
         pp_values
-        (map.first, map.values)
+        map.values
 
   let to_string show_value map =
     let pp_value fmt value = Format.pp_print_string fmt (show_value value) in
     Format.asprintf "%a" (pp pp_value) map
 
-  let num_elements map = map.num_elements
-
   let def_produce_value _ = raise UnexpectedAccess
 
-  let create ?(values = Map.empty) ?(produce_value = def_produce_value) num_elements =
-    { first = Key.zero; num_elements; produce_value; values }
-
-  let of_list values =
-    let fold (map, len) value =
-      Map.add len value map, Key.succ len
-    in
-    let values, num_elements =
-      List.fold_left fold (Map.empty, Key.zero) values
-    in
-    create ~values num_elements
-
-  let invalid_key key map =
-    Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
+  let create ?(values = Map.empty) ?(produce_value = def_produce_value) () =
+    { produce_value; values }
 
   let get key map =
     let open Effect in
-    if invalid_key key map then raise Memory_exn.Bounds;
-    let key = Key.add map.first key in
     match Map.find_opt key map.values with
     | None ->
       (* Need to create the missing key-value association. *)
@@ -148,56 +117,20 @@ struct
       return value
 
   let set key value map =
-    if invalid_key key map then raise Memory_exn.Bounds;
-    let key = Key.add map.first key in
     { map with values = Map.add key value map.values }
 
-  let cons value map =
-    let first = Key.pred map.first in
-    let values = Map.add first value map.values in
-    let num_elements = Key.succ map.num_elements in
-    { map with first; values; num_elements }
-
-  let grow ?produce_value delta map =
-    (* Make sure we only grow and never shrink. *)
-    if Key.compare delta Key.zero > 0 then
-      let produce_value =
-        match produce_value with
-        | Some produce_new_value ->
-          let boundary = Key.add map.num_elements map.first in
-          fun key ->
-            if Key.compare key boundary >= 0 then
-              (* Normalize the key so that it is relative to the boundary.
-                 The first new value will be produced with
-                 [produce_value Key.zero]. *)
-              let key = Key.sub key boundary in
-              produce_new_value key
-            else
-              map.produce_value key
-        | None -> map.produce_value
-      in
-      let num_elements = Key.add map.num_elements delta in
-      { map with produce_value; num_elements }
-    else
-      map
-
-  let concat lhs rhs =
-    let boundary = Key.add lhs.first lhs.num_elements in
-    let produce_value key =
-      if Key.compare key boundary >= 0 then
-        rhs.produce_value (Key.sub key boundary |> Key.add rhs.first)
-      else
-        lhs.produce_value key
-    in
-    let num_elements = Key.add lhs.num_elements rhs.num_elements in
-    let rhs_offset = Key.sub boundary rhs.first in
+  let merge_into ?(map_key = Fun.id) ?(choose_producer = fun _ dest -> dest) src dest =
+    let produce_value = choose_producer src.produce_value dest.produce_value in
     let values =
       Map.fold
-        (fun rhs_key -> Map.add (Key.add rhs_key rhs_offset))
-        rhs.values (* fold subject *)
-        lhs.values (* accumulator *)
+        (fun src_key -> Map.add (map_key src_key))
+        src.values (* fold subject *)
+        dest.values (* accumulator *)
     in
-    { lhs with num_elements; produce_value; values }
+    { produce_value; values }
+
+  let with_producer morph map =
+    { map with produce_value = morph map.produce_value }
 end
 
 module IntMap = Make (Effect.Identity) (Int)
@@ -222,17 +155,13 @@ module Mutable = struct
 
     type 'a t
 
-    val num_elements : 'a t -> key
-
     val of_immutable : 'a Map.t -> 'a t
 
-    val create : ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> key -> 'a t
+    val create : ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> unit -> 'a t
 
     val get : key -> 'a t -> 'a Map.effect
 
     val set : key -> 'a -> 'a t -> unit
-
-    val grow : ?produce_value:'a Map.producer -> key -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Map.t
   end
@@ -249,20 +178,14 @@ module Mutable = struct
 
     type 'a t = 'a Map.t ref
 
-    let num_elements map_ref = Map.num_elements !map_ref
-
     let of_immutable = ref
 
-    let create ?values ?produce_value num_elements =
-      of_immutable (Map.create ?values ?produce_value num_elements)
+    let create ?values ?produce_value unit =
+      of_immutable (Map.create ?values ?produce_value unit)
 
     let get key map_ref = Map.get key !map_ref
 
-    let set key value map_ref =
-      map_ref := Map.set key value !map_ref
-
-    let grow ?produce_value delta map_ref =
-      map_ref := Map.grow ?produce_value delta !map_ref
+    let set key value map_ref = map_ref := Map.set key value !map_ref
 
     let snapshot map_ref = !map_ref
   end

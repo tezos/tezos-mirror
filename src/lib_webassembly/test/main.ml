@@ -1,6 +1,6 @@
 let tests =
   [
-    ("Lazy_map", Lazy_map_tests.tests);
+    ("Lazy_vector", Lazy_vector_tests.tests);
     ("Chunked_byte_vector", Chunked_byte_vector_tests.tests);
   ]
 
