@@ -1868,7 +1868,8 @@ let apply_external_manager_operation_content :
         ~inclusion_proof
         ~message
       >>=? fun _ctxt ->
-      failwith "Sc_rolup_atomic_batch operation is not yet supported."
+      failwith
+        "Sc_rollup_execute_outbox_message operation is not yet supported."
   | Sc_rollup_recover_bond {sc_rollup} ->
       Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup source
       >>=? fun (ctxt, balance_updates) ->
