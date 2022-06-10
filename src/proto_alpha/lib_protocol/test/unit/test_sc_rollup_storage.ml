@@ -120,7 +120,7 @@ let deposit_stake_and_check_balances ctxt rollup staker =
       let+ () = assert_balance_increased ctxt ctxt' bonds_account stake in
       ctxt')
 
-(** Originate a rollup with one staker and make a deposit to the initial LCC *)
+(** Originate a rollup with one staker and make a deposit to the initial LCC. *)
 let originate_rollup_and_deposit_with_one_staker () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
@@ -130,7 +130,8 @@ let originate_rollup_and_deposit_with_one_staker () =
   let+ ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   (ctxt, rollup, staker)
 
-(** Originate a rollup with two stakers and make a deposit to the initial LCC *)
+(** Originate a rollup with two stakers and make a deposit to the initial LCC.
+*)
 let originate_rollup_and_deposit_with_two_stakers () =
   let* ctxt = new_context () in
   let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
@@ -143,6 +144,25 @@ let originate_rollup_and_deposit_with_two_stakers () =
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker1 in
   let+ ctxt = deposit_stake_and_check_balances ctxt rollup staker2 in
   (ctxt, rollup, staker1, staker2)
+
+(** Originate a rollup with three stakers and make a deposit to the initial LCC.
+*)
+let originate_rollup_and_deposit_with_three_stakers () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let staker1 =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let staker2 =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1RikjCkrEde1QQmuesp796jCxeiyE6t3Vo"
+  in
+  let staker3 =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+  in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker1 in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker2 in
+  let+ ctxt = deposit_stake_and_check_balances ctxt rollup staker3 in
+  (ctxt, rollup, staker1, staker2, staker3)
 
 (** Trivial assertion.
 
