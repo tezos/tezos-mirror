@@ -815,14 +815,14 @@ open Apply_operation_result
 open Apply_internal_results
 
 let assert_tx_rollup_feature_enabled ctxt =
+  let open Result_syntax in
   let level = (Level.current ctxt).level in
-  Raw_level.of_int32 @@ Constants.tx_rollup_sunset_level ctxt >>?= fun sunset ->
-  fail_when Raw_level.(sunset <= level) Tx_rollup_feature_disabled
-  >>=? fun () ->
-  fail_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_feature_disabled
+  let* sunset = Raw_level.of_int32 @@ Constants.tx_rollup_sunset_level ctxt in
+  let* () = error_when Raw_level.(sunset <= level) Tx_rollup_feature_disabled in
+  error_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_feature_disabled
 
 let assert_sc_rollup_feature_enabled ctxt =
-  fail_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
+  error_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
 let update_script_storage_and_ticket_balances ctxt ~self storage
     lazy_storage_diff ticket_diffs operations =
@@ -1007,7 +1007,7 @@ let ex_ticket_size :
 
 let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
     ~dst_rollup ~since =
-  assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+  assert_tx_rollup_feature_enabled ctxt >>?= fun () ->
   (* If the ticket deposit fails on L2 for some reason
      (e.g. [Balance_overflow] in the recipient), then it is
      returned to [payer]. As [payer] is implicit, it cannot own
@@ -1215,7 +1215,7 @@ let apply_internal_manager_operation_content :
         parameters = _;
         unparsed_parameters = payload;
       } ->
-      assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
+      assert_sc_rollup_feature_enabled ctxt >>?= fun () ->
       (* TODO: #3242
          We could rather change the type of [source] in
          {!Script_type_ir.internal_operation}. Only originated accounts should
@@ -2001,11 +2001,12 @@ let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
          ~remaining_block_gas
          ~gas_limit
   in
-  let ctxt = Gas.set_limit ctxt gas_limit in
-  let*? ctxt =
+  let*? remaining_gas =
     record_trace
       Insufficient_gas_for_manager
-      (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation)
+      (Gas.consume_from
+         (Gas.Arith.fp gas_limit)
+         Michelson_v1_gas.Cost_of.manager_operation)
   in
   let*? () = Fees.check_storage_limit ctxt ~storage_limit in
   let*? () =
@@ -2025,101 +2026,111 @@ let precheck_checks_contents (type kind) ctxt remaining_balance ~still_allocated
           cost is estimated from the size of its bytes. *)
     Script.consume_decoding_gas ctxt lexpr
   in
-  let* ctxt =
+  let*? () =
+    let open Result_syntax in
     match operation with
-    | Reveal pk ->
-        Contract.check_public_key pk source >>?= fun () -> return ctxt
+    | Reveal pk -> Contract.check_public_key pk source
     | Transaction {parameters; _} ->
-        Lwt.return @@ consume_decoding_gas ctxt parameters
+        let* _remaining_gas = consume_decoding_gas remaining_gas parameters in
+        return_unit
     | Origination {script; _} ->
-        Lwt.return
-          ( consume_decoding_gas ctxt script.code >>? fun ctxt ->
-            consume_decoding_gas ctxt script.storage )
+        let* remaining_gas = consume_decoding_gas remaining_gas script.code in
+        let* _remaining_gas =
+          consume_decoding_gas remaining_gas script.storage
+        in
+        return_unit
     | Register_global_constant {value} ->
-        Lwt.return @@ consume_decoding_gas ctxt value
-    | Delegation _ | Set_deposits_limit _ -> return ctxt
-    | Tx_rollup_origination ->
-        assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
+        let* _remaining_gas = consume_decoding_gas remaining_gas value in
+        return_unit
+    | Delegation _ | Set_deposits_limit _ -> return_unit
+    | Tx_rollup_origination -> assert_tx_rollup_feature_enabled ctxt
     | Tx_rollup_submit_batch {content; _} ->
-        assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+        let* () = assert_tx_rollup_feature_enabled ctxt in
         let size_limit = Constants.tx_rollup_hard_size_limit_per_message ctxt in
         let _message, message_size = Tx_rollup_message.make_batch content in
-        Tx_rollup_gas.hash_cost message_size >>?= fun cost ->
-        Gas.consume ctxt cost >>?= fun ctxt ->
-        fail_unless
+        let* cost = Tx_rollup_gas.hash_cost message_size in
+        let* _remaining_gas = Gas.consume_from remaining_gas cost in
+        error_unless
           Compare.Int.(message_size <= size_limit)
           Tx_rollup_errors.Message_size_exceeds_limit
-        >>=? fun () -> return ctxt
     | Tx_rollup_commit _ | Tx_rollup_return_bond _
     | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
-        assert_tx_rollup_feature_enabled ctxt >>=? fun () -> return ctxt
+        assert_tx_rollup_feature_enabled ctxt
     | Transfer_ticket {contents; ty; _} ->
-        assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-        Lwt.return
-        @@ ( consume_decoding_gas ctxt contents >>? fun ctxt ->
-             consume_decoding_gas ctxt ty )
+        let* () = assert_tx_rollup_feature_enabled ctxt in
+        let* remaining_gas = consume_decoding_gas remaining_gas contents in
+        let* _remaining_gas = consume_decoding_gas remaining_gas ty in
+        return_unit
     | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
-        assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+        let* () = assert_tx_rollup_feature_enabled ctxt in
         let Constants.Parametric.
               {max_messages_per_inbox; max_withdrawals_per_batch; _} =
           Constants.tx_rollup ctxt
         in
-        Tx_rollup_errors.check_path_depth
-          `Commitment
-          (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-          ~count_limit:max_messages_per_inbox
-        >>?= fun () ->
-        error_when
-          Compare.List_length_with.(tickets_info = 0)
-          Tx_rollup_errors.No_withdrawals_to_dispatch
-        >>?= fun () ->
-        error_when
-          Compare.List_length_with.(tickets_info > max_withdrawals_per_batch)
-          Tx_rollup_errors.Too_many_withdrawals
-        >>?= fun () ->
-        record_trace Gas_quota_exceeded_init_deserialize
-        @@ List.fold_left_e
-             (fun ctxt Tx_rollup_reveal.{contents; ty; _} ->
-               Script.consume_decoding_gas ctxt contents >>? fun ctxt ->
-               Script.consume_decoding_gas ctxt ty)
-             ctxt
-             tickets_info
-        >>?= fun ctxt -> return ctxt
+        let* () =
+          Tx_rollup_errors.check_path_depth
+            `Commitment
+            (Tx_rollup_commitment.Merkle.path_depth message_result_path)
+            ~count_limit:max_messages_per_inbox
+        in
+        let* () =
+          error_when
+            Compare.List_length_with.(tickets_info = 0)
+            Tx_rollup_errors.No_withdrawals_to_dispatch
+        in
+        let* () =
+          error_when
+            Compare.List_length_with.(tickets_info > max_withdrawals_per_batch)
+            Tx_rollup_errors.Too_many_withdrawals
+        in
+        let* _remaining_gas =
+          record_trace
+            Gas_quota_exceeded_init_deserialize
+            (List.fold_left_e
+               (fun remaining_gas Tx_rollup_reveal.{contents; ty; _} ->
+                 let* remaining_gas =
+                   Script.consume_decoding_gas remaining_gas contents
+                 in
+                 Script.consume_decoding_gas remaining_gas ty)
+               remaining_gas
+               tickets_info)
+        in
+        return_unit
     | Tx_rollup_rejection
         {message_path; message_result_path; previous_message_result_path; _} ->
-        assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+        let* () = assert_tx_rollup_feature_enabled ctxt in
         let Constants.Parametric.{max_messages_per_inbox; _} =
           Constants.tx_rollup ctxt
         in
-        Tx_rollup_errors.check_path_depth
-          `Inbox
-          (Tx_rollup_inbox.Merkle.path_depth message_path)
-          ~count_limit:max_messages_per_inbox
-        >>?= fun () ->
-        Tx_rollup_errors.check_path_depth
-          `Commitment
-          (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-          ~count_limit:max_messages_per_inbox
-        >>?= fun () ->
+        let* () =
+          Tx_rollup_errors.check_path_depth
+            `Inbox
+            (Tx_rollup_inbox.Merkle.path_depth message_path)
+            ~count_limit:max_messages_per_inbox
+        in
+        let* () =
+          Tx_rollup_errors.check_path_depth
+            `Commitment
+            (Tx_rollup_commitment.Merkle.path_depth message_result_path)
+            ~count_limit:max_messages_per_inbox
+        in
         Tx_rollup_errors.check_path_depth
           `Commitment
           (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
           ~count_limit:max_messages_per_inbox
-        >>?= fun () -> return ctxt
     | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
     | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
     | Sc_rollup_execute_outbox_message _ ->
-        assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
+        assert_sc_rollup_feature_enabled ctxt
     | Sc_rollup_recover_bond _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
            should we successfully precheck Sc_rollup_recover_bond and any
            (simple) Sc rollup operation, or should we add some some checks to make
            the operations Branch_delayed if they cannot be successfully
            prechecked. *)
-        assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
+        assert_sc_rollup_feature_enabled ctxt
     | Dal_publish_slot_header {slot} ->
-        Dal_apply.validate_publish_slot_header ctxt slot >>?= fun () ->
-        return ctxt
+        Dal_apply.validate_publish_slot_header ctxt slot
   in
   let+ new_balance, still_allocated =
     Contract.simulate_spending

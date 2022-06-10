@@ -189,6 +189,11 @@ module Gas = struct
 
   let consume = Raw_context.consume_gas
 
+  let consume_from available_gas cost =
+    match raw_consume available_gas cost with
+    | Some remaining_gas -> ok remaining_gas
+    | None -> error Operation_quota_exceeded
+
   let check_limit_and_consume_from_block_gas
       ~(hard_gas_limit_per_operation : Arith.integral)
       ~(remaining_block_gas : Arith.fp) ~(gas_limit : Arith.integral) =
@@ -241,9 +246,9 @@ module Script = struct
     >>? fun ctxt ->
     Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
 
-  let consume_decoding_gas ctxt lexpr =
+  let consume_decoding_gas available_gas lexpr =
     let gas_cost = Script_repr.stable_force_decode_cost lexpr in
-    Raw_context.consume_gas ctxt gas_cost
+    Gas.consume_from available_gas gas_cost
 end
 
 module Level = struct

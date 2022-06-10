@@ -421,13 +421,20 @@ module Gas : sig
 
   val pp_cost : Format.formatter -> cost -> unit
 
+  type error += Operation_quota_exceeded (* `Temporary *)
+
   (** [consume ctxt cost] subtracts [cost] to the current operation
      gas level in [ctxt]. This operation may fail with
      [Operation_quota_exceeded] if the operation gas level would
      go below zero. *)
   val consume : context -> cost -> context tzresult
 
-  type error += Operation_quota_exceeded (* `Temporary *)
+  (** [consume_from available_gas cost] subtracts [cost] from
+      [available_gas] and returns the remaining gas.
+
+      @return [Error Operation_quota_exceeded] if the remaining gas
+      would fall below [0]. *)
+  val consume_from : Arith.fp -> cost -> Arith.fp tzresult
 
   type error += Block_quota_exceeded (* `Temporary *)
 
@@ -718,17 +725,16 @@ module Script : sig
   val force_bytes_in_context :
     context -> lazy_expr -> (bytes * context) tzresult
 
-  (** [consume_decoding_gas ctxt lexpr] substracts (a lower bound on)
-      the cost to deserialize [lexpr] from the current operation gas
-      level in [ctxt]. The cost does not depend on the internal state
-      of the lazy_expr.
+  (** [consume_decoding_gas available_gas lexpr] subtracts (a lower
+      bound on) the cost to deserialize [lexpr] from [available_gas].
+      The cost does not depend on the internal state of the lazy_expr.
 
-      @return [Error Operation_quota_exceeded] if the operation gas
-      level would fall below [0].
+      @return [Error Operation_quota_exceeded] if the remaining gas
+      would fall below [0].
 
       This mimics the gas consuming part of {!force_decode_in_context}
       called with [consume_deserialization_gas:Always]. *)
-  val consume_decoding_gas : context -> lazy_expr -> context tzresult
+  val consume_decoding_gas : Gas.Arith.fp -> lazy_expr -> Gas.Arith.fp tzresult
 
   val unit_parameter : lazy_expr
 
