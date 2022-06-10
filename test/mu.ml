@@ -101,7 +101,7 @@ let points () =
   assert (tree_points_done <= 4) ;
   (* [mu_forest] is evaluated once, the evaluation creates one [Mu] node, each
       instantiation of [Mu] can call the fixpointing function at most twice. *)
-  assert (tree_points_done <= 2) ;
+  assert (forest_points_done <= 2) ;
   ()
 
 let tiny_test () =
