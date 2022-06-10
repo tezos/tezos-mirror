@@ -1583,6 +1583,22 @@ and log :
                 Script_interpreter_logging.instrument_cont logger sty' kmap_head
           in
           (step [@ocaml.tailcall]) g gas body ks' v stack)
+  | IIf_left {branch_if_left; branch_if_right; k; _} -> (
+      let (Item_t (Union_t (ty, _, _, _), rest)) = sty in
+      Script_interpreter_logging.kinstr_final_stack_type
+        (Item_t (ty, rest))
+        branch_if_left
+      >>?= fun sty_opt ->
+      let k' =
+        match sty_opt with
+        | None -> KCons (k, ks)
+        | Some sty' ->
+            Script_interpreter_logging.instrument_cont logger sty'
+            @@ KCons (k, ks)
+      in
+      match accu with
+      | L v -> (step [@ocaml.tailcall]) g gas branch_if_left k' v stack
+      | R v -> (step [@ocaml.tailcall]) g gas branch_if_right k' v stack)
   | IMul_teznat (loc, k) ->
       (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
   | IMul_nattez (loc, k) ->
