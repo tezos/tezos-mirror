@@ -140,27 +140,28 @@ let dedup_canonicalize uf =
       (Binary_schema.toplevel_encoding, Binary_schema.description) Hashtbl.t =
     Hashtbl.create 100
   in
-  let rec help prev_len acc = function
-    | [] ->
-        let fixedup =
-          List.map
-            (fun (desc, layout) -> (desc, fixup_references uf layout))
-            acc
-        in
-        if List.compare_length_with fixedup prev_len = 0 then
-          List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
-        else (
-          Hashtbl.clear tbl ;
-          help (List.length fixedup) [] fixedup)
-    | (name, layout) :: tl -> (
-        match Hashtbl.find_opt tbl layout with
-        | None ->
-            let desc = UF.find uf name in
-            Hashtbl.add tbl layout desc ;
-            help prev_len ((desc.title, layout) :: acc) tl
-        | Some original_desc ->
-            UF.union uf ~new_canonical:original_desc ~existing:name ;
-            help prev_len acc tl)
+  let rec help prev_len acc l =
+    Hashtbl.clear tbl ;
+    let acc =
+      List.fold_left
+        (fun acc (name, layout) ->
+          match Hashtbl.find_opt tbl layout with
+          | None ->
+              let desc = UF.find uf name in
+              Hashtbl.add tbl layout desc ;
+              (desc.title, layout) :: acc
+          | Some original_desc ->
+              UF.union uf ~new_canonical:original_desc ~existing:name ;
+              acc)
+        acc
+        l
+    in
+    let fixedup =
+      List.map (fun (desc, layout) -> (desc, fixup_references uf layout)) acc
+    in
+    if List.compare_length_with fixedup prev_len = 0 then
+      List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
+    else help (List.length fixedup) [] fixedup
   in
   help 0 []
 
