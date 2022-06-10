@@ -957,7 +957,7 @@ module Make (Context : P) :
     let* counter = OutputCounter.get in
     let* () = OutputCounter.set (Z.succ counter) in
     let unparsed_parameters =
-      Micheline.(Int (dummy_location, Z.of_int v) |> strip_locations)
+      Micheline.(Int ((), Z.of_int v) |> strip_locations)
     in
     let destination = Contract_hash.zero in
     let entrypoint = Entrypoint_repr.default in
