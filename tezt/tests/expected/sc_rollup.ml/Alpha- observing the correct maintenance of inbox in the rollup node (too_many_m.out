@@ -834,7 +834,4 @@ This simulation failed:
       This operation FAILED.
 
 Error:
-  { "id":
-    "proto.alpha.Sc_rollup_max_number_of_messages_reached_for_commitment_period",
-  "description": "Maximum number of messages reached for commitment period",
-  "data": {} }
+  Maximum number of messages reached for commitment period

@@ -230,18 +230,25 @@ let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
     ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender =
   let ({alice; _} : Index.t) = Index.make refuter defender in
   let alice_to_play = Staker.equal alice refuter in
-  let tick = Sc_rollup_tick_repr.of_number_of_ticks child.number_of_ticks in
+  let open Sc_rollup_tick_repr in
+  let tick = of_number_of_ticks child.number_of_ticks in
   {
     turn = (if alice_to_play then Alice else Bob);
     inbox_snapshot = inbox;
     level = child.inbox_level;
     pvm_name;
     dissection =
-      [
-        make_chunk (Some parent.compressed_state) Sc_rollup_tick_repr.initial;
-        make_chunk (Some child.compressed_state) tick;
-        make_chunk None (Sc_rollup_tick_repr.next tick);
-      ];
+      (if equal tick initial then
+       [
+         make_chunk (Some child.compressed_state) initial;
+         make_chunk None (next initial);
+       ]
+      else
+        [
+          make_chunk (Some parent.compressed_state) initial;
+          make_chunk (Some child.compressed_state) tick;
+          make_chunk None (next tick);
+        ]);
   }
 
 type step =

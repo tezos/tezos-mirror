@@ -162,7 +162,10 @@ module V1 : sig
 
     Invariants:
     -----------
-    - [dissection] must contain at least 3 values
+    - [dissection] must contain at least 2 values (normally it will be 32
+    values, but smaller if there isn't enough space for a dissection
+    that size. The initial game dissection will be 3 values except in
+    the case of a zero-tick commit when it will have 2 values.)
     - the first state hash value in [dissection] must not be [None]
     - [inbox_snapshot] never changes once the game is created
   *)
