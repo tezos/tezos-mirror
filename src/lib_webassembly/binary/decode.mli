@@ -1,3 +1,5 @@
+module Vector = Lazy_vector.LwtInt32Vector
+
 exception Code of Source.region * string
 
 (** Instruction parsing continuations. *)
@@ -26,6 +28,11 @@ type ('a, 'b) vec_map_kont =
 (** Vector accumulator without mapping. *)
 type 'a vec_kont = ('a, 'a) vec_map_kont
 
+(** Lazy vector accumulator, with the current offset to write the next value in
+    the vector. *)
+type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
+
+(** Position of a value on the stream. *)
 type pos = private int
 
 (** Size checking version of {!sized} for CPS-style parsing. *)
@@ -146,7 +153,7 @@ type _ field_type =
 
 (** Result of a section parsing, being either a single value or a vector. *)
 type field =
-  | VecField : 'a field_type * 'a list * int -> field
+  | VecField : 'a field_type * 'a Vector.t -> field
   | SingleField : 'a field_type * 'a option -> field
 
 (** Module parsing steps *)
@@ -156,43 +163,41 @@ type module_kont =
       (** Custom section which are skipped, with the next section to parse. *)
   | MKFieldStart : 'a field_type * section_tag -> module_kont
       (** Starting point of a section, handles parsing generic section header. *)
-  | MKField : 'a field_type * size * 'a vec_kont -> module_kont
+  | MKField : 'a field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
-      Ast.var list * Ast.func list * Ast.func vec_kont * bool
+      Ast.var Vector.t * Ast.func Vector.t * Ast.func lazy_vec_kont * bool
       -> module_kont
       (** Elaboration of functions from the code section with their declared type in
       the func section, and accumulating invariants conditions associated to
       functions. *)
-  | MKBuild of Ast.func list option * bool
+  | MKBuild of Ast.func Vector.t option * bool
       (** Accumulating the parsed sections vectors into a module and checking
       invariants. *)
   | MKStop of Ast.module_' (* TODO (#3120): actually, should be module_ *)
       (** Final step of the parsing, cannot reduce. *)
-  (* For the next continuations, the vectors are only used for accumulation, and
-     reduce to `MK_Field(.., Rev ..)`. *)
-  | MKImport of import_kont * pos * size * Ast.import vec_kont
+  | MKImport of import_kont * pos * size * Ast.import lazy_vec_kont
       (** Import section parsing. *)
-  | MKExport of export_kont * pos * size * Ast.export vec_kont
+  | MKExport of export_kont * pos * size * Ast.export lazy_vec_kont
       (** Export section parsing. *)
   | MKGlobal of
       Types.global_type
       * int
       * instr_block_kont list
       * size
-      * Ast.global vec_kont
+      * Ast.global lazy_vec_kont
       (** Globals section parsing, containing the starting position, the
       continuation of the current global block instruction, and the size of the
       section. *)
-  | MKElem of elem_kont * int * size * Ast.elem_segment vec_kont
+  | MKElem of elem_kont * int * size * Ast.elem_segment lazy_vec_kont
       (** Element segments section parsing, containing the current element parsing
       continuation, the starting position of the current element, the size of
       the section. *)
-  | MKData of data_kont * int * size * Ast.data_segment vec_kont
+  | MKData of data_kont * int * size * Ast.data_segment lazy_vec_kont
       (** Data segments section parsing, containing the current data parsing
       continuation, the starting position of the current data, the size of the
       section. *)
-  | MKCode of code_kont * int * size * Ast.func vec_kont
+  | MKCode of code_kont * int * size * Ast.func lazy_vec_kont
       (** Code section parsing, containing the current function parsing
       continuation, the starting position of the current function, the size of
       the section. *)
@@ -202,7 +207,7 @@ type stream = {name : string; bytes : string; pos : pos ref}
 
 (** Decoding continuation step. *)
 type decode_kont = {
-  building_state : field list;
+  building_state : field Vector.t;
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
   stream : stream;  (** Parsed stream. *)
@@ -214,12 +219,12 @@ val make_stream : name:string -> bytes:string -> stream
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]
    since it cannot reduce. *)
-val module_step : decode_kont -> decode_kont
+val module_step : decode_kont -> decode_kont Lwt.t
 
 (** [decode ~name ~bytes] decodes a module [name] from its [bytes] encoding.
 
     @raise Code on parsing errors. *)
-val decode : name:string -> bytes:string -> Ast.module_
+val decode : name:string -> bytes:string -> Ast.module_ Lwt.t
 
 (** [decode ~name ~bytes] decodes a custom section of name [name] from its
     [bytes] encoding.

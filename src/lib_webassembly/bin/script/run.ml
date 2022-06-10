@@ -361,7 +361,7 @@ let rec run_definition def : Ast.module_ Lwt.t =
   match def.it with
   | Textual m -> Lwt.return m
   | Encoded (name, bytes) ->
-      let+ () = trace_lwt "Decoding..." in
+      let* () = trace_lwt "Decoding..." in
       Decode.decode ~name ~bytes
   | Quoted (_, s) ->
       let* () = trace_lwt "Parsing quote..." in
