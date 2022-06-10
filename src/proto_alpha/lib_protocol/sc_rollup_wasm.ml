@@ -68,39 +68,46 @@ module V2_0_0 = struct
     val get_status : state -> status Lwt.t
   end
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3091
+
+     The tree proof contains enough information to derive given and requested.
+     Get rid of the duplication by writing the projection functions and
+     removing the [given] and [requested] fields.
+  *)
+  type 'a proof = {
+    tree_proof : 'a;
+    given : PS.input option;
+    requested : PS.input_request;
+  }
+
+  let proof_encoding e =
+    let open Data_encoding in
+    conv
+      (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
+      (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
+      (obj3
+         (req "tree_proof" e)
+         (req "given" (option PS.input_encoding))
+         (req "requested" PS.input_request_encoding))
+
   module Make (Context : P) :
-    S with type context = Context.Tree.t and type state = Context.tree = struct
+    S
+      with type context = Context.Tree.t
+       and type state = Context.tree
+       and type proof = Context.proof proof = struct
     module Tree = Context.Tree
 
     type context = Context.Tree.t
 
     type hash = State_hash.t
 
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3091
-
-       The tree proof contains enough information to derive given and requested.
-       Get rid of the duplication by writing the projection functions and
-       removing the [given] and [requested] fields.
-    *)
-    type proof = {
-      tree_proof : Context.proof;
-      given : PS.input option;
-      requested : PS.input_request;
-    }
+    type nonrec proof = Context.proof proof
 
     let proof_input_given p = p.given
 
     let proof_input_requested p = p.requested
 
-    let proof_encoding =
-      let open Data_encoding in
-      conv
-        (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-        (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-        (obj3
-           (req "tree_proof" Context.proof_encoding)
-           (req "given" (option PS.input_encoding))
-           (req "requested" PS.input_request_encoding))
+    let proof_encoding = proof_encoding Context.proof_encoding
 
     let proof_start_state p = Context.proof_before p.tree_proof
 
@@ -133,6 +140,12 @@ module V2_0_0 = struct
         module Syntax : sig
           val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
         end
+
+        val get : tree t
+
+        val set : tree -> unit t
+
+        val lift : 'a Lwt.t -> 'a t
 
         val find_value : Tree.key -> 'a Data_encoding.t -> 'a option t
 
@@ -167,6 +180,12 @@ module V2_0_0 = struct
           match Data_encoding.Binary.of_bytes_opt encoding bytes with
           | None -> internal_error "Error during decoding" state
           | Some v -> return (state, Some v)
+
+        let get s = Lwt.return (s, Some s)
+
+        let set s _ = Lwt.return (s, Some ())
+
+        let lift m s = Lwt.map (fun r -> (s, Some r)) m
 
         let find_value key encoding state =
           let open Lwt_syntax in
@@ -288,6 +307,7 @@ module V2_0_0 = struct
       end)
     end
 
+    module WASM_machine = Wasm_2_0_0.Make (Tree)
     open State
 
     type state = State.state
@@ -360,14 +380,15 @@ module V2_0_0 = struct
 
     let set_input input = state_of @@ set_input_monadic input
 
-    let reboot = return ()
-
     let eval_step =
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3090
 
          Call into tickified parsing/evaluation exposed in lib_webassembly.
       *)
-      reboot
+      let open Monad.Syntax in
+      let* s = get in
+      let* s = lift (WASM_machine.step s) in
+      set s
 
     let ticked m =
       let open Monad.Syntax in

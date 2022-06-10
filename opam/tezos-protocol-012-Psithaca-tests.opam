@@ -21,6 +21,7 @@ depends: [
   "tezos-micheline" {with-test}
   "tezos-benchmark-012-Psithaca" {with-test}
   "tezos-benchmark-type-inference-012-Psithaca" {with-test}
+  "tezos-context" {with-test}
   "tezos-test-helpers" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
   "qcheck-alcotest" { with-test & >= "0.15" }

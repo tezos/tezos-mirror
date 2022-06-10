@@ -59,8 +59,6 @@ module V2_0_0 : sig
     val get_status : state -> status Lwt.t
   end
 
-  module ProtocolImplementation : S with type context = Context.t
-
   module type P = sig
     module Tree :
       Context.TREE with type key = string list and type value = bytes
@@ -82,6 +80,23 @@ module V2_0_0 : sig
       Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
   end
 
+  type 'a proof = {
+    tree_proof : 'a;
+    given : Sc_rollup_PVM_sem.input option;
+    requested : Sc_rollup_PVM_sem.input_request;
+  }
+
+  val proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t
+
   module Make (Context : P) :
-    S with type context = Context.Tree.t and type state = Context.tree
+    S
+      with type context = Context.Tree.t
+       and type state = Context.tree
+       and type proof = Context.proof proof
+
+  module ProtocolImplementation :
+    S
+      with type context = Context.t
+       and type state = Context.tree
+       and type proof = Context.Proof.tree Context.Proof.t proof
 end

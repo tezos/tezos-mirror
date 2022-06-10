@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,23 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune build @@src/proto_alpha/lib_protocol/test/integration/runtest
-    Subject:      Entrypoint
-*)
-
-let () =
-  Alcotest_lwt.run
-    "protocol > integration"
-    [
-      ("constants", Test_constants.tests);
-      ("liquidity baking", Test_liquidity_baking.tests);
-      ("storage description", Test_storage.tests);
-      ("storage tests", Test_storage_functions.tests);
-      ("token movements", Test_token.tests);
-      ("frozen bonds", Test_frozen_bonds.tests);
-      ("sc rollup wasm", Test_sc_rollup_wasm.tests);
-    ]
-  |> Lwt_main.run
+module Make
+    (Tree : Context.TREE with type key = string list and type value = bytes) : sig
+  val step : Tree.tree -> Tree.tree Lwt.t
+end

@@ -1100,6 +1100,17 @@ struct
     let complete ctxt s = Base58.complete ctxt s
   end
 
+  module Wasm_2_0_0 = struct
+    module Make
+        (Tree : Context.TREE with type key = string list and type value = bytes) =
+    struct
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3090
+         The expected implementation of this function is the step
+         function implemented in `lib_webassembly'. *)
+      let step (t : Tree.tree) = Lwt.return t
+    end
+  end
+
   module Lift (P : Updater.PROTOCOL) = struct
     let environment_version = Protocol.V6
 

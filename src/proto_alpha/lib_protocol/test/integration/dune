@@ -4,6 +4,7 @@
 (executable
  (name main)
  (libraries
+  tezos-context
   alcotest-lwt
   tezos-base
   tezos-client-alpha
