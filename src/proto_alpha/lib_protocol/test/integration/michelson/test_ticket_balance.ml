@@ -53,6 +53,7 @@ let transaction block ~baker ~sender ~entrypoint ~recipient ~parameters =
   let* operation =
     Op.transaction
       (B block)
+      ~gas_limit:Max
       ~entrypoint
       ~parameters
       ~fee:Tez.one

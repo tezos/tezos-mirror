@@ -48,7 +48,9 @@ module Cost_of = struct
 
   let int_bytes (z : 'a Script_int.num) = z_bytes (Script_int.to_zint z)
 
-  let manager_operation = step_cost @@ S.safe_int 1_000
+  let manager_operation_int = 1_000
+
+  let manager_operation = step_cost @@ S.safe_int manager_operation_int
 
   module Generated_costs = struct
     (* Automatically generated costs functions. *)
@@ -1823,4 +1825,8 @@ module Cost_of = struct
     let chest ~plaintext_size =
       atomic_step_cost (cost_ENCODING_Chest ~plaintext_size)
   end
+end
+
+module Internal_for_tests = struct
+  let int_cost_of_manager_operation = Cost_of.manager_operation_int
 end

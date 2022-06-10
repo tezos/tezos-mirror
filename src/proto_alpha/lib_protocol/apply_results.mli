@@ -426,14 +426,9 @@ type block_metadata = {
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding
 
-type precheck_result = {
-  consumed_gas : Gas.Arith.fp;
-  balance_updates : Receipt.balance_updates;
-}
-
 type 'kind prechecked_contents = {
   contents : 'kind contents;
-  result : precheck_result;
+  balance_updates : Receipt.balance_updates;
 }
 
 type _ prechecked_contents_list =

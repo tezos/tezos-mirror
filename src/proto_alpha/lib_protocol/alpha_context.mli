@@ -692,6 +692,18 @@ module Script : sig
   val force_bytes_in_context :
     context -> lazy_expr -> (bytes * context) tzresult
 
+  (** [consume_decoding_gas ctxt lexpr] substracts (a lower bound on)
+      the cost to deserialize [lexpr] from the current operation gas
+      level in [ctxt]. The cost does not depend on the internal state
+      of the lazy_expr.
+
+      @return [Error Operation_quota_exceeded] if the operation gas
+      level would fall below [0].
+
+      This mimics the gas consuming part of {!force_decode_in_context}
+      called with [consume_deserialization_gas:Always]. *)
+  val consume_decoding_gas : context -> lazy_expr -> context tzresult
+
   val unit_parameter : lazy_expr
 
   val strip_locations_cost : _ michelson_node -> Gas.cost

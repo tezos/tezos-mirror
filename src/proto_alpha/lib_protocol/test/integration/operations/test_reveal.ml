@@ -407,7 +407,14 @@ let test_already_revealed_manager_in_batch () =
    With !5182 we have fixed this situation by revealing the manager
    contract at application time. The following test isolates the
    failing reveal and asserts that the manager is not revealed after
-   the failing op. *)
+   the failing op.
+
+   As of !5506, the reveal operation does not pass precheck
+   anyway. Unfortunately, this means that this test has lost some of
+   its original purpose. Fortunately, {!test_empty_account_on_reveal}
+   offers a similar scenario to what this test was supposed to do: a
+   reveal fails during application and we check that the contract is
+   not revealed afterward. *)
 let test_no_reveal_when_gas_exhausted () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
@@ -423,17 +430,19 @@ let test_no_reveal_when_gas_exhausted () =
    | false -> ())
   >>=? fun () ->
   (* We craft a new (bad) reveal operation with a 0 gas_limit *)
-  Op.revelation ~fee:Tez.zero ~gas_limit:Gas.Arith.zero (B blk) new_c.pk
-  >>=? fun op ->
+  Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk >>=? fun op ->
   Incremental.begin_construction blk >>=? fun inc ->
   (* The application of this operation is expected to fail with a
      {! Protocol.Raw_context.Operation_quota_exceeded} error *)
-  let expect_apply_failure = function
-    | [Environment.Ecoproto_error Raw_context.Operation_quota_exceeded] ->
+  let expect_failure = function
+    | [
+        Environment.Ecoproto_error Apply.Insufficient_gas_for_manager;
+        Environment.Ecoproto_error Raw_context.Operation_quota_exceeded;
+      ] ->
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_apply_failure inc op >>=? fun inc ->
+  Incremental.add_operation ~expect_failure inc op >>=? fun inc ->
   (* We assert the manager key is still unrevealed, as the operation has failed *)
   Context.Contract.is_manager_key_revealed (I inc) new_contract
   >>=? fun revelead ->
@@ -555,7 +564,7 @@ let test_valid_reveal_after_gas_exhausted_one () =
   >>=? fun () ->
   Incremental.begin_construction blk >>=? fun inc ->
   (* We first craft a (bad) reveal operation with a 0 gas_limit *)
-  Op.revelation ~fee:Tez.zero ~gas_limit:Gas.Arith.zero (B blk) new_c.pk
+  Op.revelation ~fee:Tez.zero ~gas_limit:Zero (B blk) new_c.pk
   >>=? fun bad_reveal ->
   (* While the second is a valid one *)
   Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->

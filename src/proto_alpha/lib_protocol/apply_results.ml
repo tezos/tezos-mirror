@@ -3320,14 +3320,9 @@ let block_metadata_encoding =
                 the feature flag will be activated. *)
              (varopt "dal_slot_availability" Dal.Endorsement.encoding)))
 
-type precheck_result = {
-  consumed_gas : Gas.Arith.fp;
-  balance_updates : Receipt.balance_updates;
-}
-
 type 'kind prechecked_contents = {
   contents : 'kind contents;
-  result : precheck_result;
+  balance_updates : Receipt.balance_updates;
 }
 
 type _ prechecked_contents_list =

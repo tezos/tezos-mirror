@@ -117,6 +117,7 @@ let transaction block ~sender ~recipient ~amount ~parameters =
   let* operation =
     Op.transaction
       (I block)
+      ~gas_limit:Max
       ~entrypoint:Entrypoint.default
       ~parameters
       ~fee:Tez.zero

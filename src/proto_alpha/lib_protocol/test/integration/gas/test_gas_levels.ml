@@ -310,7 +310,12 @@ let combine_operations_with_gas ?counter block src list_dst =
   let rec make_op_list full_gas op_list = function
     | [] -> return (full_gas, List.rev op_list)
     | (dst, gas_limit) :: t ->
-        Op.transaction ~gas_limit (B block) src dst Alpha_context.Tez.zero
+        Op.transaction
+          ~gas_limit:(Custom_gas gas_limit)
+          (B block)
+          src
+          dst
+          Alpha_context.Tez.zero
         >>=? fun op ->
         make_op_list
           (Alpha_context.Gas.Arith.add full_gas gas_limit)
@@ -344,7 +349,9 @@ let bake_operations_with_gas ?counter block src list_list_dst =
   return (block, consumed_gas, gas_limit_total)
 
 let basic_gas_sampler () =
-  Alpha_context.Gas.Arith.integral_of_int_exn (100 + Random.int 900)
+  Alpha_context.Gas.Arith.integral_of_int_exn
+    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100
+   + Random.int 900)
 
 let generic_test_block_one_origination contract gas_sampler structure =
   block_with_one_origination contract >>=? fun (block, src, dst) ->
@@ -436,6 +443,40 @@ let test_block_mixed_operations () =
   >>=? fun (_block, consumed_gas, gas_limit_total) ->
   check_consumed_gas consumed_gas gas_limit_total
 
+(** Test that emptying an account costs gas *)
+let test_emptying_account_gas () =
+  let open Alpha_context in
+  Context.init1 ~consensus_threshold:0 () >>=? fun (b, bootstrap) ->
+  let {Account.pkh; pk; _} = Account.new_account () in
+  let {Account.pkh = pkh'; _} = Account.new_account () in
+  let contract = Contract.Implicit pkh in
+  let amount = Test_tez.of_int 10 in
+  Op.transaction (B b) bootstrap contract amount >>=? fun op1 ->
+  Block.bake ~operation:op1 b >>=? fun b ->
+  Op.revelation ~fee:Tez.zero (B b) pk >>=? fun op2 ->
+  Block.bake ~operation:op2 b >>=? fun b ->
+  let gas_limit =
+    Op.Custom_gas
+      (Gas.Arith.integral_of_int_exn
+         Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
+  in
+  Op.delegation ~fee:amount ~gas_limit (B b) contract (Some pkh') >>=? fun op ->
+  Incremental.begin_construction b >>=? fun i ->
+  (* The delegation operation should not be valid as the operation
+     effect would be to remove [contract] from the ledger and this
+     generates an extra gas cost.
+
+     This semantics is not expected: see
+     https://gitlab.com/tezos/tezos/-/issues/3188 *)
+  Incremental.add_operation
+    ~expect_failure:(function
+      | [Environment.Ecoproto_error Raw_context.Operation_quota_exceeded] ->
+          return_unit
+      | _err -> assert false)
+    i
+    op
+  >>=? fun _i -> return_unit
+
 let quick (what, how) = Tztest.tztest what `Quick how
 
 let tests =
@@ -468,6 +509,7 @@ let tests =
          test_malformed_block_max_limit_reached' );
        ( "Test the gas consumption of various operations",
          test_block_mixed_operations );
+       ("Test that emptying an account costs gas", test_emptying_account_gas);
      ]
     @ make_batch_test_block_one_origination "nil" nil_contract basic_gas_sampler
     @ make_batch_test_block_one_origination

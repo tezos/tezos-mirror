@@ -122,6 +122,7 @@ type error +=
   | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
   | Multiple_revelation
   | Gas_quota_exceeded_init_deserialize
+  | Insufficient_gas_for_manager
   | Inconsistent_sources
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
@@ -727,6 +728,19 @@ let () =
     (fun () -> Gas_quota_exceeded_init_deserialize) ;
   register_error_kind
     `Permanent
+    ~id:"operation.insufficient_gas_for_manager"
+    ~title:"Not enough gas for initial manager cost"
+    ~description:
+      (Format.asprintf
+         "Gas limit was not high enough to cover the initial cost of manager \
+          operations. At least %a expected."
+         Gas.pp_cost
+         Michelson_v1_gas.Cost_of.manager_operation)
+    Data_encoding.empty
+    (function Insufficient_gas_for_manager -> Some () | _ -> None)
+    (fun () -> Insufficient_gas_for_manager) ;
+  register_error_kind
+    `Permanent
     ~id:"operation.inconsistent_sources"
     ~title:"Inconsistent sources in operation pack"
     ~description:
@@ -1108,24 +1122,6 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
-let prepare_apply_manager_operation_content ~ctxt ~source
-    ~gas_consumed_in_precheck =
-  let before_operation =
-    (* This context is not used for backtracking. Only to compute
-         gas consumption and originations for the operation result. *)
-    ctxt
-  in
-  Contract.must_exist ctxt source >>=? fun () ->
-  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
-  (match gas_consumed_in_precheck with
-  | None -> Ok ctxt
-  | Some gas -> Gas.consume ctxt gas)
-  >>?= fun ctxt ->
-  let consume_deserialization_gas = Script.When_needed in
-  (* [note]: deserialization gas has already been accounted for in the gas
-     consumed by the precheck and the lazy_exprs have been forced. *)
-  return (ctxt, before_operation, consume_deserialization_gas)
-
 let apply_internal_manager_operation_content :
     type kind.
     context ->
@@ -1139,12 +1135,15 @@ let apply_internal_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id operation ->
-  prepare_apply_manager_operation_content
-    ~ctxt
-    ~source
-    ~gas_consumed_in_precheck:None
-  >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
+ fun ctxt_before_op mode ~payer ~source ~chain_id operation ->
+  Contract.must_exist ctxt_before_op source >>=? fun () ->
+  Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
+  >>?= fun ctxt ->
+  (* Note that [ctxt_before_op] will be used again later to compute
+     gas consumption and originations for the operation result (by
+     comparing it with the [ctxt] we will have at the end of the
+     application). *)
+  let consume_deserialization_gas = Script.When_needed in
   match operation with
   | Transaction_to_contract
       {
@@ -1163,7 +1162,7 @@ let apply_internal_manager_operation_content :
         ~pkh
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
         (ITransaction_result res
@@ -1185,7 +1184,7 @@ let apply_internal_manager_operation_content :
         ~contract_hash
         ~amount
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
         ~payer
         ~chain_id
         ~mode
@@ -1200,7 +1199,7 @@ let apply_internal_manager_operation_content :
         ~parameters
         ~payer
         ~dst_rollup:destination
-        ~since:before_operation
+        ~since:ctxt_before_op
   | Origination
       {
         origination = {delegate; script; credit};
@@ -1222,11 +1221,11 @@ let apply_internal_manager_operation_content :
         ~delegate
         ~source
         ~credit
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, origination_result, ops) ->
       (ctxt, IOrigination_result origination_result, ops)
   | Delegation delegate ->
-      apply_delegation ~ctxt ~source ~delegate ~before_operation
+      apply_delegation ~ctxt ~source ~delegate ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, IDelegation_result {consumed_gas}, ops)
 
@@ -1236,7 +1235,6 @@ let apply_external_manager_operation_content :
     Script_ir_translator.unparsing_mode ->
     source:public_key_hash ->
     chain_id:Chain_id.t ->
-    gas_consumed_in_precheck:Gas.cost option ->
     fee:Tez.t ->
     kind manager_operation ->
     (context
@@ -1244,13 +1242,24 @@ let apply_external_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~source ~chain_id ~gas_consumed_in_precheck ~fee operation ->
+ fun ctxt_before_op mode ~source ~chain_id ~fee operation ->
   let source_contract = Contract.Implicit source in
-  prepare_apply_manager_operation_content
-    ~ctxt
-    ~source:source_contract
-    ~gas_consumed_in_precheck
-  >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
+  Contract.must_exist ctxt_before_op source_contract >>=? fun () ->
+  Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
+  >>?= fun ctxt ->
+  (* Note that [ctxt_before_op] will be used again later to compute
+     gas consumption and originations for the operation result (by
+     comparing it with the [ctxt] we will have at the end of the
+     application). *)
+  let consume_deserialization_gas =
+    (* Note that we used to set this to [Script.When_needed] because
+       the deserialization gas was accounted for in the gas consumed
+       by precheck. However, we no longer have access to this precheck
+       gas, so we want to always consume the deserialization gas
+       again, independently of the internal state of the lazy_exprs in
+       the arguments. *)
+    Script.Always
+  in
   match operation with
   | Reveal pk ->
       (* TODO #2603
@@ -1275,7 +1284,7 @@ let apply_external_manager_operation_content :
       return
         ( ctxt,
           (Reveal_result
-             {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
+             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt}
             : kind successful_manager_operation_result),
           [] )
   | Transaction {amount; parameters; destination = Implicit pkh; entrypoint} ->
@@ -1291,7 +1300,7 @@ let apply_external_manager_operation_content :
         ~pkh
         ~parameter:(Untyped_arg parameters)
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
       {amount; parameters; destination = Originated contract_hash; entrypoint}
@@ -1307,7 +1316,7 @@ let apply_external_manager_operation_content :
         ~contract_hash
         ~amount
         ~entrypoint
-        ~before_operation
+        ~before_operation:ctxt_before_op
         ~payer:source
         ~chain_id
         ~mode
@@ -1401,7 +1410,7 @@ let apply_external_manager_operation_content :
         Tx_rollup_dispatch_tickets_result
           {
             balance_updates = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             paid_storage_size_diff;
           }
       in
@@ -1437,7 +1446,7 @@ let apply_external_manager_operation_content :
         Transfer_ticket_result
           {
             balance_updates = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             paid_storage_size_diff;
           }
       in
@@ -1481,11 +1490,15 @@ let apply_external_manager_operation_content :
         ~delegate
         ~source:source_contract
         ~credit
-        ~before_operation
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, origination_result, ops) ->
       (ctxt, Origination_result origination_result, ops)
   | Delegation delegate ->
-      apply_delegation ~ctxt ~source:source_contract ~delegate ~before_operation
+      apply_delegation
+        ~ctxt
+        ~source:source_contract
+        ~delegate
+        ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, Delegation_result {consumed_gas}, ops)
   | Register_global_constant {value} ->
@@ -1514,7 +1527,7 @@ let apply_external_manager_operation_content :
         Register_global_constant_result
           {
             balance_updates = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             size_of_constant = paid_size;
             global_address = address;
           }
@@ -1545,14 +1558,14 @@ let apply_external_manager_operation_content :
       return
         ( ctxt,
           Set_deposits_limit_result
-            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Tx_rollup_origination ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
         Tx_rollup_origination_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             originated_tx_rollup;
             balance_updates = [];
           }
@@ -1560,6 +1573,8 @@ let apply_external_manager_operation_content :
       return (ctxt, result, [])
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
       let message, message_size = Tx_rollup_message.make_batch content in
+      Tx_rollup_gas.hash_cost message_size >>?= fun cost ->
+      Gas.consume ctxt cost >>?= fun ctxt ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_inbox.append_message ctxt tx_rollup state message
       >>=? fun (ctxt, state, paid_storage_size_diff) ->
@@ -1571,7 +1586,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_submit_batch_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
             paid_storage_size_diff;
           }
@@ -1613,7 +1628,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_commit_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates = burn_update @ balance_updates;
           }
       in
@@ -1632,7 +1647,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_return_bond_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
           }
       in
@@ -1645,7 +1660,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_finalize_commitment_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates = [];
             level;
           }
@@ -1659,7 +1674,7 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_remove_commitment_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates = [];
             level;
           }
@@ -1765,20 +1780,20 @@ let apply_external_manager_operation_content :
       let result =
         Tx_rollup_rejection_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
           }
       in
       return (ctxt, result, [])
   | Dal_publish_slot_header {slot} ->
       Dal_apply.apply_publish_slot_header ctxt slot fee >>?= fun ctxt ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Dal_publish_slot_header_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
       Sc_rollup_operations.originate ctxt ~kind ~boot_sector ~parameters_ty
       >>=? fun ({address; size}, ctxt) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_originate_result
           {address; consumed_gas; size; balance_updates = []}
@@ -1787,19 +1802,19 @@ let apply_external_manager_operation_content :
   | Sc_rollup_add_messages {rollup; messages} ->
       Sc_rollup.Inbox.add_external_messages ctxt rollup messages
       >>=? fun (inbox_after, _size, ctxt) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
       Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
       >>=? fun ctxt ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Sc_rollup_cement_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
       Sc_rollup.Stake_storage.publish_commitment ctxt rollup source commitment
       >>=? fun (staked_hash, published_at_level, ctxt, balance_updates) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_publish_result
           {staked_hash; consumed_gas; published_at_level; balance_updates}
@@ -1820,7 +1835,7 @@ let apply_external_manager_operation_content :
           let stakers = Sc_rollup.Game.Index.make source opponent in
           Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers o)
       >>=? fun (status, ctxt, balance_updates) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_refute_result {status; consumed_gas; balance_updates}
       in
@@ -1830,7 +1845,7 @@ let apply_external_manager_operation_content :
       >>=? fun (outcome, ctxt) ->
       Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers outcome
       >>=? fun (status, ctxt, balance_updates) ->
-      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_timeout_result {status; consumed_gas; balance_updates}
       in
@@ -1860,7 +1875,7 @@ let apply_external_manager_operation_content :
       let result =
         Sc_rollup_recover_bond_result
           {
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
             balance_updates;
           }
       in
@@ -1912,7 +1927,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   apply ctxt [] ops
 
 let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
-    ~(only_batch : bool) : (context * precheck_result) tzresult Lwt.t =
+    ~(only_batch : bool) : (context * Receipt.balance_updates) tzresult Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
                                    source;
@@ -1936,49 +1951,36 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   @@ Gas.consume_limit_in_block ctxt gas_limit
   >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
-  let ctxt_before = ctxt in
+  record_trace
+    Insufficient_gas_for_manager
+    (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation)
+  >>?= fun ctxt ->
   Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
   let source_contract = Contract.Implicit source in
   Contract.must_be_allocated ctxt source_contract >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
-  let consume_deserialization_gas = Script.Always in
-  (* We want to always consume the deserialization gas here, independently of
-     the internal state of the lazy_exprs in the arguments. Otherwise we might
-     risk getting different results if the operation has already been
-     deserialized before (e.g. when retrieve in JSON format). *)
+  let consume_decoding_gas ctxt lexpr =
+    record_trace Gas_quota_exceeded_init_deserialize
+    @@ (* Fail early if the operation does not have enough gas to
+          cover the deserialization cost. We always consider the full
+          deserialization cost, independently from the internal state
+          of the lazy_expr. Otherwise we might risk getting different
+          results if the operation has already been deserialized
+          before (e.g. when retrieved in JSON format). Note that the
+          lazy_expr is not actually decoded here; its deserialization
+          cost is estimated from the size of its bytes. *)
+    Script.consume_decoding_gas ctxt lexpr
+  in
   (match operation with
   | Reveal pk -> Contract.check_public_key pk source >>?= fun () -> return ctxt
   | Transaction {parameters; _} ->
-      Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail early if not enough gas for complete deserialization
-             cost or if deserialization fails. The gas consumed here is
-            "replayed" in [apply_manager_contents]. *)
-      ( Script.force_decode_in_context
-          ~consume_deserialization_gas
-          ctxt
-          parameters
-      >|? fun (_arg, ctxt) -> ctxt )
+      Lwt.return @@ consume_decoding_gas ctxt parameters
   | Origination {script; _} ->
       Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      ( Script.force_decode_in_context
-          ~consume_deserialization_gas
-          ctxt
-          script.code
-      >>? fun (_code, ctxt) ->
-        Script.force_decode_in_context
-          ~consume_deserialization_gas
-          ctxt
-          script.storage
-        >|? fun (_storage, ctxt) -> ctxt )
+        ( consume_decoding_gas ctxt script.code >>? fun ctxt ->
+          consume_decoding_gas ctxt script.storage )
   | Register_global_constant {value} ->
-      Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      ( Script.force_decode_in_context ~consume_deserialization_gas ctxt value
-      >|? fun (_value, ctxt) -> ctxt )
+      Lwt.return @@ consume_decoding_gas ctxt value
   | Delegation _ | Set_deposits_limit _ -> return ctxt
   | Tx_rollup_origination ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
@@ -1998,12 +2000,8 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Transfer_ticket {contents; ty; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       Lwt.return
-      @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      ( Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
-      >>? fun (_contents, ctxt) ->
-        Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
-        >|? fun (_ty, ctxt) -> ctxt )
+      @@ ( consume_decoding_gas ctxt contents >>? fun ctxt ->
+           consume_decoding_gas ctxt ty )
   | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.Parametric.
@@ -2024,18 +2022,12 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         Tx_rollup_errors.Too_many_withdrawals
       >>?= fun () ->
       record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* See comment in the Transaction branch *)
-      List.fold_left_e
-        (fun ctxt Tx_rollup_reveal.{contents; ty; _} ->
-          Script.force_decode_in_context
-            ~consume_deserialization_gas
-            ctxt
-            contents
-          >>? fun (_contents, ctxt) ->
-          Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
-          >|? fun (_ty, ctxt) -> ctxt)
-        ctxt
-        tickets_info
+      @@ List.fold_left_e
+           (fun ctxt Tx_rollup_reveal.{contents; ty; _} ->
+             Script.consume_decoding_gas ctxt contents >>? fun ctxt ->
+             Script.consume_decoding_gas ctxt ty)
+           ctxt
+           tickets_info
       >>?= fun ctxt -> return ctxt
   | Tx_rollup_rejection
       {message_path; message_result_path; previous_message_result_path; _} ->
@@ -2075,9 +2067,6 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source_contract) `Block_fees fee
-  >|=? fun (ctxt, balance_updates) ->
-  let consumed_gas = Gas.consumed ~since:ctxt_before ~until:ctxt in
-  (ctxt, {balance_updates; consumed_gas})
 
 let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
   match trr with
@@ -2288,7 +2277,7 @@ let burn_internal_storage_fees :
   | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
-    ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
+    (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
     * packed_internal_manager_operation_result list)
@@ -2311,7 +2300,6 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     ctxt
     mode
     ~source
-    ~gas_consumed_in_precheck
     ~chain_id
     ~fee
     operation
@@ -2379,10 +2367,7 @@ let rec mark_skipped :
  fun ~payload_producer level prechecked_contents_list ->
   match[@coq_match_with_default] prechecked_contents_list with
   | PrecheckedSingle
-      {
-        contents = Manager_operation {operation; _};
-        result = {balance_updates; _};
-      } ->
+      {contents = Manager_operation {operation; _}; balance_updates} ->
       Single_result
         (Manager_operation_result
            {
@@ -2391,11 +2376,7 @@ let rec mark_skipped :
              internal_operation_results = [];
            })
   | PrecheckedCons
-      ( {
-          contents = Manager_operation {operation; _};
-          result = {balance_updates; _};
-        },
-        rest ) ->
+      ({contents = Manager_operation {operation; _}; balance_updates}, rest) ->
       Cons_result
         ( Manager_operation_result
             {
@@ -2445,14 +2426,14 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
     match contents_list with
     | Single contents ->
         precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        >>=? fun (ctxt, result) ->
-        return (ctxt, PrecheckedSingle {contents; result})
+        >>=? fun (ctxt, balance_updates) ->
+        return (ctxt, PrecheckedSingle {contents; balance_updates})
     | Cons (contents, rest) ->
         precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        >>=? fun (ctxt, result) ->
+        >>=? fun (ctxt, balance_updates) ->
         rec_precheck_manager_contents_list ctxt rest
         >>=? fun (ctxt, results_rest) ->
-        return (ctxt, PrecheckedCons ({contents; result}, results_rest))
+        return (ctxt, PrecheckedCons ({contents; balance_updates}, results_rest))
   in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
   check_counters_consistency contents_list >>=? fun () ->
@@ -2525,17 +2506,8 @@ let rec apply_manager_contents_list_rec :
  fun ctxt mode ~payload_producer chain_id prechecked_contents_list ->
   let level = Level.current ctxt in
   match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle
-      {
-        contents = Manager_operation _ as op;
-        result = {consumed_gas; balance_updates};
-      } ->
-      apply_manager_contents
-        ctxt
-        mode
-        chain_id
-        ~gas_consumed_in_precheck:(Some (Gas.cost_of_gas consumed_gas))
-        op
+  | PrecheckedSingle {contents = Manager_operation _ as op; balance_updates} ->
+      apply_manager_contents ctxt mode chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
@@ -2543,18 +2515,8 @@ let rec apply_manager_contents_list_rec :
       in
       (ctxt_result, Single_result result)
   | PrecheckedCons
-      ( {
-          contents = Manager_operation _ as op;
-          result = {consumed_gas; balance_updates};
-        },
-        rest ) -> (
-      apply_manager_contents
-        ctxt
-        mode
-        chain_id
-        ~gas_consumed_in_precheck:(Some (Gas.cost_of_gas consumed_gas))
-        op
-      >>= function
+      ({contents = Manager_operation _ as op; balance_updates}, rest) -> (
+      apply_manager_contents ctxt mode chain_id op >>= function
       | Failure, operation_result, internal_operation_results ->
           let result =
             Manager_operation_result

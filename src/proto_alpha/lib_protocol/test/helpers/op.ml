@@ -151,6 +151,25 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
   Environment.wrap_tzresult @@ Operation.of_list operations
   >>?= fun operations -> return @@ sign account.sk ctxt operations
 
+type gas_limit = Max | High | Low | Zero | Custom_gas of Gas.Arith.integral
+
+let default_low_gas_limit =
+  Gas.Arith.integral_of_int_exn
+    Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation
+
+let default_high_gas_limit =
+  Gas.Arith.integral_of_int_exn
+    (49_000 + Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
+
+let resolve_gas_limit ctxt = function
+  | Max ->
+      Context.get_constants ctxt >>=? fun c ->
+      return c.parametric.hard_gas_limit_per_operation
+  | High -> return default_high_gas_limit
+  | Low -> return default_low_gas_limit
+  | Zero -> return Gas.Arith.zero
+  | Custom_gas x -> return x
+
 let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
   assert (match packed_operations with [] -> false | _ :: _ -> true) ;
@@ -194,7 +213,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
              fee = Tez.zero;
              counter;
              operation = Reveal public_key;
-             gas_limit = Gas.Arith.integral_of_int_exn 10_000;
+             gas_limit = default_high_gas_limit;
              storage_limit = Z.zero;
            }
        in
@@ -243,21 +262,18 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
    integration tests. Instead, we went for the minimal interference
    path and left original behaviour as default. *)
 let manager_operation ?(force_reveal = true) ?counter ?(fee = Tez.zero)
-    ?gas_limit ?storage_limit ?public_key ~source ctxt operation =
+    ?(gas_limit = High) ?storage_limit ?public_key ~source ctxt operation =
   (match counter with
   | Some counter -> return counter
   | None -> Context.Contract.counter ctxt source)
   >>=? fun counter ->
   Context.get_constants ctxt >>=? fun c ->
-  let gas_limit =
-    let default = c.parametric.hard_gas_limit_per_operation in
-    Option.value ~default gas_limit
-  in
   let storage_limit =
     Option.value
       ~default:c.parametric.hard_storage_limit_per_operation
       storage_limit
   in
+  resolve_gas_limit ctxt gas_limit >>=? fun gas_limit ->
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
   let counter = Z.succ counter in
@@ -288,7 +304,7 @@ let manager_operation ?(force_reveal = true) ?counter ?(fee = Tez.zero)
           fee = Tez.zero;
           counter;
           operation = Reveal public_key;
-          gas_limit = Gas.Arith.integral_of_int_exn 10_000;
+          gas_limit = default_high_gas_limit;
           storage_limit = Z.zero;
         }
     in
@@ -305,8 +321,7 @@ let manager_operation ?(force_reveal = true) ?counter ?(fee = Tez.zero)
     in
     Contents_list (Cons (op_reveal, Single op))
 
-let revelation ?(fee = Tez.zero)
-    ?(gas_limit = Gas.Arith.integral_of_int_exn 10000) ?(storage_limit = Z.zero)
+let revelation ?(fee = Tez.zero) ?(gas_limit = High) ?(storage_limit = Z.zero)
     ?counter ?(forge_pkh = None) ctxt public_key =
   (* If Some pkh is provided to ?forge_pkh we take that hash at face
      value, otherwise we honestly compute the hash from
@@ -317,7 +332,7 @@ let revelation ?(fee = Tez.zero)
     | Some pkh -> pkh
     | None -> Signature.Public_key.hash public_key
   in
-
+  resolve_gas_limit ctxt gas_limit >>=? fun gas_limit ->
   let source = Contract.Implicit pkh in
   (match counter with
   | None -> Context.Contract.counter ctxt source
@@ -437,16 +452,11 @@ let transaction ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
 let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
     dst =
   let top = Delegation dst in
-  let gas_limit =
-    match gas_limit with
-    | None -> Gas.Arith.integral_of_int_exn 1000
-    | Some g -> g
-  in
   manager_operation
     ?force_reveal
     ?fee
     ?counter
-    ~gas_limit
+    ?gas_limit
     ?storage_limit
     ~source
     ctxt
@@ -458,17 +468,12 @@ let delegation ?force_reveal ?fee ?gas_limit ?counter ?storage_limit ctxt source
 let set_deposits_limit ?force_reveal ?fee ?gas_limit ?storage_limit ?counter
     ctxt source limit =
   let top = Set_deposits_limit limit in
-  let gas_limit =
-    match gas_limit with
-    | None -> Gas.Arith.integral_of_int_exn 1000
-    | Some g -> g
-  in
   manager_operation
     ?force_reveal
     ?fee
     ?counter
     ?storage_limit
-    ~gas_limit
+    ?gas_limit
     ~source
     ctxt
     top

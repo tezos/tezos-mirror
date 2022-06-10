@@ -505,3 +505,8 @@ module Cost_of : sig
     val chest : plaintext_size:int -> Gas.cost
   end
 end
+
+module Internal_for_tests : sig
+  (** [int] value of {!Cost_of.manager_operation} *)
+  val int_cost_of_manager_operation : int
+end

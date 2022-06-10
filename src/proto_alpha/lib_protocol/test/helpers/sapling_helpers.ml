@@ -395,6 +395,7 @@ module Interpreter_helpers = struct
     in
     let fee = Test_tez.of_int 10 in
     Op.transaction
+      ~gas_limit:Max
       ~fee
       (B block)
       src

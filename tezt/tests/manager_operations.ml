@@ -907,16 +907,19 @@ module Deserialisation = struct
     in
     unit
 
-  let test_not_enough_gas_deserialization =
+  let test_not_enough_gas_deserialization ~supports ~manager_operation_cost =
     Protocol.register_test
       ~__FILE__
       ~title:"Contract call with not enough gas to deserialize argument"
+      ~supports
       ~tags:["precheck"; "gas"; "deserialization"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract = originate_noop_contract nodes.main in
     let size_kB = 20 in
-    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let min_deserialization_gas =
+      manager_operation_cost + deserialization_gas ~size_kB
+    in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       inject_call_with_bytes
@@ -927,6 +930,16 @@ module Deserialisation = struct
         nodes.main.client
     in
     unit
+
+  let test_not_enough_gas_deserialization protocols =
+    test_not_enough_gas_deserialization
+      ~supports:(Protocol.Until_protocol 13)
+      ~manager_operation_cost:0
+      protocols ;
+    test_not_enough_gas_deserialization
+      ~supports:(Protocol.From_protocol 14)
+      ~manager_operation_cost:Constant.manager_operation_gas_cost
+      protocols
 
   let test_deserialization_gas_accounting =
     Protocol.register_test
@@ -1402,20 +1415,16 @@ module Simple_transfers = struct
       Constant.bootstrap2
       ~revealed:true
 
-  let test_simple_transfer_not_enough_gas =
+  let test_simple_transfer_not_enough_gas ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer with not enough gas"
       ~tags:["transaction"; "transfer"]
+      ~supports
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _ =
-      Memchecks.with_applied_checks
-        ~__LOC__
-        nodes
-        ~expected_statuses:["failed"]
-        ~expected_errors:[["gas_exhausted.operation"]]
-      @@ fun () ->
+      decide_error nodes @@ fun () ->
       Operation.inject_transfer
         ~protocol
         ~source:Constant.bootstrap2
@@ -1427,6 +1436,22 @@ module Simple_transfers = struct
       (* Gas too small *)
     in
     unit
+
+  let test_simple_transfer_not_enough_gas protocols =
+    test_simple_transfer_not_enough_gas
+      ~supports:(Protocol.From_protocol 14)
+      (fun nodes -> Memchecks.with_refused_checks ~__LOC__ nodes)
+      protocols ;
+    test_simple_transfer_not_enough_gas
+      ~supports:(Protocol.Until_protocol 13)
+      (fun nodes f ->
+        Memchecks.with_applied_checks
+          ~__LOC__
+          nodes
+          ~expected_statuses:["failed"]
+          ~expected_errors:[["gas_exhausted.operation"]]
+          f)
+      protocols
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2077
      Once this issue is fixed change the test to check that the operation is refused
