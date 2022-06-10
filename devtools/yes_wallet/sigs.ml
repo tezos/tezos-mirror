@@ -38,24 +38,45 @@ module type PROTOCOL = sig
     val to_mutez : t -> int64
   end
 
+  module Signature : sig
+    type public_key_hash
+
+    type public_key
+
+    type secret_key
+
+    type signature
+
+    module To_latest : sig
+      val public_key_hash :
+        public_key_hash -> Tezos_crypto.Signature.V_latest.public_key_hash
+
+      val public_key : public_key -> Tezos_crypto.Signature.V_latest.public_key
+
+      val secret_key : secret_key -> Tezos_crypto.Signature.V_latest.secret_key
+
+      val signature : signature -> Tezos_crypto.Signature.V_latest.signature
+    end
+  end
+
   module Delegate : sig
     val fold :
       context ->
       order:[`Sorted | `Undefined] ->
       init:'a ->
-      f:(Tezos_crypto.Signature.public_key_hash -> 'a -> 'a Lwt.t) ->
+      f:(Signature.public_key_hash -> 'a -> 'a Lwt.t) ->
       'a Lwt.t
 
     val pubkey :
       context ->
-      Tezos_crypto.Signature.public_key_hash ->
-      Tezos_crypto.Signature.public_key tzresult Lwt.t
+      Signature.public_key_hash ->
+      Signature.public_key tzresult Lwt.t
 
     val staking_balance :
-      context -> Tezos_crypto.Signature.public_key_hash -> Tez.t tzresult Lwt.t
+      context -> Signature.public_key_hash -> Tez.t tzresult Lwt.t
 
     val deactivated :
-      context -> Tezos_crypto.Signature.public_key_hash -> bool tzresult Lwt.t
+      context -> Signature.public_key_hash -> bool tzresult Lwt.t
   end
 
   val hash : Tezos_crypto.Protocol_hash.t

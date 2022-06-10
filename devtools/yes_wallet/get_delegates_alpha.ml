@@ -37,6 +37,11 @@ module Get_delegates = struct
     let ( +? ) a b = Environment.wrap_tzresult (a +? b)
   end
 
+  module Signature = struct
+    include Tezos_crypto.Signature.V1
+    module To_latest = Tezos_crypto.Signature.Of_V1
+  end
+
   module Delegate = struct
     open Alpha_context.Delegate
 
