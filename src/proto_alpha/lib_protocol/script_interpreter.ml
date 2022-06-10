@@ -388,31 +388,31 @@ and ilist_iter :
  [@@inline]
 
 and iset_iter : type a b c d e f g. (a, b, c, d, e, f, g) iset_iter_type =
- fun g gas body ty k ks accu stack ->
+ fun instrument g gas body ty k ks accu stack ->
   let set = accu in
   let l = List.rev (Script_set.fold (fun e acc -> e :: acc) set []) in
-  let ks = KIter (body, ty, l, KCons (k, ks)) in
+  let ks = instrument @@ KIter (body, ty, l, KCons (k, ks)) in
   let accu, stack = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
 
 and imap_map :
     type a b c d e f g h i j. (a, b, c, d, e, f, g, h, i, j) imap_map_type =
- fun g gas body k ks ty accu stack ->
+ fun instrument g gas body k ks ty accu stack ->
   let map = accu in
   let xs = List.rev (Script_map.fold (fun k v a -> (k, v) :: a) map []) in
   let ys = Script_map.empty_from map in
-  let ks = KMap_enter_body (body, xs, ys, ty, KCons (k, ks)) in
+  let ks = instrument @@ KMap_enter_body (body, xs, ys, ty, KCons (k, ks)) in
   let accu, stack = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
 
 and imap_iter :
     type a b c d e f g h cmp. (a, b, c, d, e, f, g, h, cmp) imap_iter_type =
- fun g gas body ty k ks accu stack ->
+ fun instrument g gas body ty k ks accu stack ->
   let map = accu in
   let l = List.rev (Script_map.fold (fun k v a -> (k, v) :: a) map []) in
-  let ks = KIter (body, ty, l, KCons (k, ks)) in
+  let ks = instrument @@ KIter (body, ty, l, KCons (k, ks)) in
   let accu, stack = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
@@ -462,7 +462,7 @@ and ifailwith : ifailwith_type =
   }
 
 and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
- fun logger g gas k ks accu stack ->
+ fun instrument logger g gas k ks accu stack ->
   let arg = accu and code, stack = stack in
   let (Lam (code, _)) = code in
   let code =
@@ -471,7 +471,7 @@ and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
     | Some logger ->
         Script_interpreter_logging.log_kinstr logger code.kbef code.kinstr
   in
-  let ks = KReturn (stack, None, KCons (k, ks)) in
+  let ks = instrument @@ KReturn (stack, None, KCons (k, ks)) in
   (step [@ocaml.tailcall]) g gas code ks arg (EmptyCell, EmptyCell)
 
 and step : type a s b t r f. (a, s, b, t, r, f) step_type =
@@ -602,7 +602,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | ISet_iter (_, ty, body, k) ->
-          (iset_iter [@ocaml.tailcall]) g gas body ty k ks accu stack
+          (iset_iter [@ocaml.tailcall]) id g gas body ty k ks accu stack
       | ISet_mem (_, k) ->
           let set, stack = stack in
           let res = Script_set.mem accu set in
@@ -619,9 +619,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_map.empty kty and stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_map (_, ty, body, k) ->
-          (imap_map [@ocaml.tailcall]) g gas body k ks (Some ty) accu stack
+          (imap_map [@ocaml.tailcall]) id g gas body k ks (Some ty) accu stack
       | IMap_iter (_, kvty, body, k) ->
-          (imap_iter [@ocaml.tailcall]) g gas body kvty k ks accu stack
+          (imap_iter [@ocaml.tailcall]) id g gas body kvty k ks accu stack
       | IMap_mem (_, k) ->
           let map, stack = stack in
           let res = Script_map.mem accu map in
@@ -926,7 +926,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let ks = KUndip (ign, ty, KCons (k, ks)) in
           let accu, stack = stack in
           (step [@ocaml.tailcall]) g gas b ks accu stack
-      | IExec (_, k) -> iexec None g gas k ks accu stack
+      | IExec (_, k) -> iexec id None g gas k ks accu stack
       | IApply (_, capture_ty, k) ->
           let capture = accu in
           let lam, stack = stack in
@@ -1599,17 +1599,24 @@ and log :
       match accu with
       | L v -> (step [@ocaml.tailcall]) g gas branch_if_left k' v stack
       | R v -> (step [@ocaml.tailcall]) g gas branch_if_right k' v stack)
-  | IMul_teznat (loc, k) ->
-      (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
-  | IMul_nattez (loc, k) ->
-      (imul_nattez [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
-  | ILsl_nat (loc, k) ->
-      (ilsl_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
-  | ILsr_nat (loc, k) ->
-      (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
-  | IFailwith (kloc, tv) ->
-      let {ifailwith} = ifailwith in
-      (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
+  | IIf_cons {branch_if_cons; branch_if_nil; k; _} -> (
+      let (Item_t (_, sty')) = sty in
+      Script_interpreter_logging.kinstr_final_stack_type sty' branch_if_nil
+      >>?= fun sty' ->
+      let k' =
+        match sty' with
+        | None -> KCons (k, ks)
+        | Some sty' ->
+            Script_interpreter_logging.instrument_cont logger sty'
+            @@ KCons (k, ks)
+      in
+      match accu.elements with
+      | [] ->
+          let accu, stack = stack in
+          (step [@ocaml.tailcall]) g gas branch_if_nil k' accu stack
+      | hd :: tl ->
+          let tl = {elements = tl; length = accu.length - 1} in
+          (step [@ocaml.tailcall]) g gas branch_if_cons k' hd (tl, stack))
   | IList_map (_, body, ty, k) ->
       let (Item_t (_, sty')) = sty in
       let instrument = Script_interpreter_logging.instrument_cont logger sty' in
@@ -1618,6 +1625,85 @@ and log :
       let (Item_t (_, sty')) = sty in
       let instrument = Script_interpreter_logging.instrument_cont logger sty' in
       (ilist_iter [@ocaml.tailcall]) instrument g gas body ty k ks accu stack
+  | ISet_iter (_, ty, body, k) ->
+      let (Item_t (_, rest)) = sty in
+      let instrument = Script_interpreter_logging.instrument_cont logger rest in
+      (iset_iter [@ocaml.tailcall]) instrument g gas body ty k ks accu stack
+  | IMap_map (_, ty, body, k) ->
+      let (Item_t (_, rest)) = sty in
+      let instrument = Script_interpreter_logging.instrument_cont logger rest in
+      (imap_map [@ocaml.tailcall])
+        instrument
+        g
+        gas
+        body
+        k
+        ks
+        (Some ty)
+        accu
+        stack
+  | IMap_iter (_, kvty, body, k) ->
+      let (Item_t (_, rest)) = sty in
+      let instrument = Script_interpreter_logging.instrument_cont logger rest in
+      (imap_iter [@ocaml.tailcall]) instrument g gas body kvty k ks accu stack
+  | IMul_teznat (loc, k) ->
+      (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
+  | IMul_nattez (loc, k) ->
+      (imul_nattez [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
+  | ILsl_nat (loc, k) ->
+      (ilsl_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
+  | ILsr_nat (loc, k) ->
+      (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
+  | IIf {branch_if_true; branch_if_false; k; _} ->
+      let (Item_t (Bool_t, rest)) = sty in
+      Script_interpreter_logging.kinstr_final_stack_type rest branch_if_true
+      >>?= fun sty' ->
+      let k' =
+        match sty' with
+        | None -> KCons (k, ks)
+        | Some sty' ->
+            Script_interpreter_logging.instrument_cont logger sty'
+            @@ KCons (k, ks)
+      in
+      let res, stack = stack in
+      if accu then (step [@ocaml.tailcall]) g gas branch_if_true k' res stack
+      else (step [@ocaml.tailcall]) g gas branch_if_false k' res stack
+  | ILoop (_, body, k) ->
+      let ks =
+        Script_interpreter_logging.instrument_cont logger sty
+        @@ KLoop_in (body, KCons (k, ks))
+      in
+      (next [@ocaml.tailcall]) g gas ks accu stack
+  | ILoop_left (_, bl, br) ->
+      let ks =
+        Script_interpreter_logging.instrument_cont logger sty
+        @@ KLoop_in_left (bl, KCons (br, ks))
+      in
+      (next [@ocaml.tailcall]) g gas ks accu stack
+  | IDip (_, b, ty, k) ->
+      let (Item_t (_, rest)) = sty in
+      Script_interpreter_logging.kinstr_final_stack_type rest b
+      >>?= fun rest' ->
+      let ign = accu in
+      let ks =
+        match rest' with
+        | None -> KUndip (ign, ty, KCons (k, ks))
+        | Some rest' ->
+            Script_interpreter_logging.instrument_cont
+              logger
+              rest'
+              (KUndip (ign, ty, KCons (k, ks)))
+      in
+      let accu, stack = stack in
+      (step [@ocaml.tailcall]) g gas b ks accu stack
+  | IExec (_, k) ->
+      let (Item_t (_, Item_t (Lambda_t (_, ret, _), _))) = sty in
+      let sty' = Item_t (ret, Bot_t) in
+      let instrument = Script_interpreter_logging.instrument_cont logger sty' in
+      iexec instrument (Some logger) g gas k ks accu stack
+  | IFailwith (kloc, tv) ->
+      let {ifailwith} = ifailwith in
+      (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
   | _ -> (step [@ocaml.tailcall]) g gas k ks accu stack
  [@@inline]
 

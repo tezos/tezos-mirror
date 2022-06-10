@@ -801,6 +801,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
@@ -812,6 +813,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
@@ -823,6 +825,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'cmp) imap_iter_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'a, 'b) kinstr ->
@@ -891,6 +894,7 @@ type ifailwith_type = {
 [@@unboxed]
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
+  ('a, end_of_stack, 'e, 'f) cont_instrumentation ->
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
