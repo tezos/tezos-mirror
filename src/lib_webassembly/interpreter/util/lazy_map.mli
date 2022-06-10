@@ -6,6 +6,20 @@
   logarithmic time complexity and it supports non-int keys - hence "map".
 *)
 
+module Effect : sig
+  module type S = sig
+    type 'a t
+
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+
+    val return : 'a -> 'a t
+  end
+
+  module Identity : S with type 'a t = 'a
+
+  module Lwt : S with type 'a t = 'a Lwt.t
+end
+
 (** [KeyS] is the qualifier signature for key types in the lazy map.
     Externally visible and accessible keys of the lazy map are always
     non-negative. However, the lazy map implementation may internally use
@@ -31,9 +45,22 @@ end
 module type S = sig
   type key
 
+  type 'a effect
+
+  type 'a producer = key -> 'a effect
+
   module Map : Map.S with type key = key
 
   type 'a t
+
+  (** [pp pp_value] gives you a pretty-printer. This function is a witness of
+      internal mutation. *)
+  val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
+  (** [to_string show map] generates a string representation of [map] by using
+      [show] for its values. Like [pp] this function is witness of internal
+      mutation. *)
+  val to_string : ('a -> string) -> 'a t -> string
 
   (** [num_elements map] returns the maximum number of elements in the lazy
       map. *)
@@ -42,7 +69,7 @@ module type S = sig
   (** [create ?values num_elements produce_value] produces a lazy map with
       [num_elements] entries where each is created using [produce_value].
       [values] may be provided to supply an initial set of entries. *)
-  val create : ?values:'a Map.t -> ?produce_value:(key -> 'a) -> key -> 'a t
+  val create : ?values:'a Map.t -> ?produce_value:'a producer -> key -> 'a t
 
   (** [of_list values] creates a map where each association is the index in the
       list to its value. The first item's key is [zero], the second is
@@ -52,7 +79,7 @@ module type S = sig
   (** [get key map] retrieves the element at [key].
 
       @raises Memory_exn.Bounds when trying to access an invalid key  *)
-  val get : key -> 'a t -> 'a
+  val get : key -> 'a t -> 'a effect
 
   (** [set key value map] sets the element at [key] to [value].
 
@@ -69,7 +96,7 @@ module type S = sig
       more items than [map]. This also retains all values that have previously
       existed. New values will be created with [produce_values] if provided,
       starting with [Key.zero] for the new values. *)
-  val grow : ?produce_value:(key -> 'a) -> key -> 'a t -> 'a t
+  val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
 
   (** [concat lhs rhs] Concatenates two lazy maps. *)
   val concat : 'a t -> 'a t -> 'a t
@@ -79,13 +106,21 @@ end
     to [S.create]. *)
 exception UnexpectedAccess
 
-module Make (Key : KeyS) : S with type key = Key.t
+module Make (Effect : Effect.S) (Key : KeyS) : S with
+  type key = Key.t and
+  type 'a effect = 'a Effect.t
 
-module IntMap : S with type key = int
+module IntMap : S with type key = int and type 'a effect = 'a
 
-module Int32Map : S with type key = int32
+module Int32Map : S with type key = int32 and type 'a effect = 'a
 
-module Int64Map : S with type key = int64
+module Int64Map : S with type key = int64 and type 'a effect = 'a
+
+module LwtIntMap : S with type key = int and type 'a effect = 'a Lwt.t
+
+module LwtInt32Map : S with type key = int32 and type 'a effect = 'a Lwt.t
+
+module LwtInt64Map : S with type key = int64 and type 'a effect = 'a Lwt.t
 
 (** [Make] generates a lazy map module using a given [Key] module. *)
 module Mutable : sig
@@ -93,28 +128,40 @@ module Mutable : sig
   module type S = sig
     type key
 
-    module Map : S with type key = key
+    type 'a effect
+
+    module Map : S with type key = key and type 'a effect = 'a effect
 
     type 'a t
 
     val num_elements : 'a t -> key
 
-    val create : ?values:('a Map.Map.t) -> ?produce_value:(key -> 'a) -> key -> 'a t
+    val of_immutable : 'a Map.t -> 'a t
 
-    val get : key -> 'a t -> 'a
+    val create : ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> key -> 'a t
+
+    val get : key -> 'a t -> 'a Map.effect
 
     val set : key -> 'a -> 'a t -> unit
 
-    val grow : ?produce_value:(key -> 'a) -> key -> 'a t -> unit
+    val grow : ?produce_value:'a Map.producer -> key -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Map.t
   end
 
-  module Make (Key : KeyS) : S with type key = Key.t
+  module Make (Effect : Effect.S) (Key : KeyS) : S with
+    type key = Key.t and
+    type 'a effect = 'a Effect.t
 
-  module IntMap : S with type key = int
+  module IntMap : S with type key = int and type 'a effect = 'a
 
-  module Int32Map : S with type key = int32
+  module Int32Map : S with type key = int32 and type 'a effect = 'a
 
-  module Int64Map : S with type key = int64
+  module Int64Map : S with type key = int64 and type 'a effect = 'a
+
+  module LwtIntMap : S with type key = int and type 'a effect = 'a Lwt.t
+
+  module LwtInt32Map : S with type key = int32 and type 'a effect = 'a Lwt.t
+
+  module LwtInt64Map : S with type key = int64 and type 'a effect = 'a Lwt.t
 end

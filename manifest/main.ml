@@ -2596,6 +2596,7 @@ let tezos_webassembly_interpreter =
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
     ~all_modules_except:["main"]
     ~dune:Dune.[[S "include"; S "dune.inc"]]
+    ~deps:[tezos_lwt_result_stdlib]
 
 let _tezos_webassembly_repl =
   private_exe

@@ -1,3 +1,6 @@
+open Lwt.Syntax
+module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
+
 open Script
 open Source
 
@@ -340,7 +343,7 @@ let rec run_definition def : Ast.module_ =
     let def' = Parse.string_to_module s in
     run_definition def'
 
-let run_action act : Values.value list =
+let run_action act : Values.value list Lwt.t =
   match act.it with
   | Invoke (x_opt, name, vs) ->
     trace ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...");
@@ -359,7 +362,7 @@ let run_action act : Values.value list =
     | None -> Assert.error act.at "undefined export"
     )
 
- | Get (x_opt, name) ->
+ | Get (x_opt, name) -> Lwt.return (
     trace ("Getting global \"" ^ Ast.string_of_name name ^ "\"...");
     let inst = lookup_instance x_opt act.at in
     (match Instance.export inst name with
@@ -367,6 +370,7 @@ let run_action act : Values.value list =
     | Some _ -> Assert.error act.at "export is not a global"
     | None -> Assert.error act.at "undefined export"
     )
+ )
 
 
 let assert_nan_pat n nan =
@@ -437,17 +441,18 @@ let assert_message at name msg re =
     Assert.error at ("wrong " ^ name ^ " error")
   end
 
-let run_assertion ass =
+let run_assertion ass : unit Lwt.t =
   match ass.it with
-  | AssertMalformed (def, re) ->
+  | AssertMalformed (def, re) -> Lwt.return (
     trace "Asserting malformed...";
-    (match ignore (run_definition def) with
+    (match ignore (run_definition def : Ast.module_) with
     | exception Decode.Code (_, msg) -> assert_message ass.at "decoding" msg re
     | exception Parse.Syntax (_, msg) -> assert_message ass.at "parsing" msg re
     | _ -> Assert.error ass.at "expected decoding/parsing error"
     )
+  )
 
-  | AssertInvalid (def, re) ->
+  | AssertInvalid (def, re) -> Lwt.return (
     trace "Asserting invalid...";
     (match
       let m = run_definition def in
@@ -457,55 +462,63 @@ let run_assertion ass =
       assert_message ass.at "validation" msg re
     | _ -> Assert.error ass.at "expected validation error"
     )
+  )
 
   | AssertUnlinkable (def, re) ->
     trace "Asserting unlinkable...";
     let m = run_definition def in
     if not !Flags.unchecked then Valid.check_module m;
-    (match
-      let imports = Import.link m in
-      ignore (Eval.init m imports)
-    with
-    | exception (Import.Unknown (_, msg) | Eval.Link (_, msg)) ->
-      assert_message ass.at "linking" msg re
-    | _ -> Assert.error ass.at "expected linking error"
-    )
+    Lwt.try_bind
+      (fun () ->
+        let imports = Import.link m in
+        Eval.init m imports)
+      (fun _ -> Assert.error ass.at "expected linking error")
+      (function
+      | Import.Unknown (_, msg) | Eval.Link (_, msg) ->
+        Lwt.return (assert_message ass.at "linking" msg re)
+      | exn -> Lwt.fail exn)
 
   | AssertUninstantiable (def, re) ->
     trace "Asserting trap...";
     let m = run_definition def in
     if not !Flags.unchecked then Valid.check_module m;
-    (match
-      let imports = Import.link m in
-      ignore (Eval.init m imports)
-    with
-    | exception Eval.Trap (_, msg) ->
-      assert_message ass.at "instantiation" msg re
-    | _ -> Assert.error ass.at "expected instantiation error"
-    )
+    Lwt.try_bind
+      (fun () ->
+        let imports = Import.link m in
+        Eval.init m imports)
+      (fun _ -> Assert.error ass.at "expected instantiation error")
+      (function
+      | Eval.Trap (_, msg) ->
+        Lwt.return (assert_message ass.at "instantiation" msg re)
+      | exn -> Lwt.fail exn)
 
   | AssertReturn (act, rs) ->
     trace ("Asserting return...");
-    let got_vs = run_action act in
+    let+ got_vs = run_action act in
     let expect_rs = List.map (fun r -> r.it) rs in
     assert_result ass.at got_vs expect_rs
 
   | AssertTrap (act, re) ->
     trace ("Asserting trap...");
-    (match run_action act with
-    | exception Eval.Trap (_, msg) -> assert_message ass.at "runtime" msg re
-    | _ -> Assert.error ass.at "expected runtime error"
-    )
+    Lwt.try_bind
+      (fun () -> run_action act)
+      (fun _ -> Assert.error ass.at "expected runtime error")
+      (function
+      | Eval.Trap (_, msg) ->
+        Lwt.return (assert_message ass.at "runtime" msg re)
+      | exn -> Lwt.fail exn)
 
   | AssertExhaustion (act, re) ->
     trace ("Asserting exhaustion...");
-    (match run_action act with
-    | exception Eval.Exhaustion (_, msg) ->
-      assert_message ass.at "exhaustion" msg re
-    | _ -> Assert.error ass.at "expected exhaustion error"
-    )
+    Lwt.try_bind
+      (fun () -> run_action act)
+      (fun _ -> Assert.error ass.at "expected exhaustion error")
+      (function
+      | Eval.Exhaustion (_, msg) ->
+        Lwt.return (assert_message ass.at "exhaustion" msg re)
+      | exn -> Lwt.fail exn)
 
-let rec run_command cmd =
+let rec run_command cmd : unit Lwt.t =
   match cmd.it with
   | Module (x_opt, def) ->
     quote := cmd :: !quote;
@@ -523,11 +536,13 @@ let rec run_command cmd =
     if not !Flags.dry then begin
       trace "Initializing...";
       let imports = Import.link m in
-      let inst = Eval.init m imports in
+      let+ inst = Eval.init m imports in
       bind instances x_opt inst
+    end else begin
+      Lwt.return_unit
     end
 
-  | Register (name, x_opt) ->
+  | Register (name, x_opt) -> Lwt.return (
     quote := cmd :: !quote;
     if not !Flags.dry then begin
       trace ("Registering module \"" ^ Ast.string_of_name name ^ "\"...");
@@ -535,18 +550,23 @@ let rec run_command cmd =
       registry := Map.add (Utf8.encode name) inst !registry;
       Import.register name (lookup_registry (Utf8.encode name))
     end
+  )
 
   | Action act ->
     quote := cmd :: !quote;
     if not !Flags.dry then begin
-      let vs = run_action act in
-      if vs <> [] then print_values vs
+      let+ vs = run_action act in
+      if vs <> [] then print_values vs;
+    end else begin
+      Lwt.return_unit
     end
 
   | Assertion ass ->
     quote := cmd :: !quote;
     if not !Flags.dry then begin
       run_assertion ass
+    end else begin
+      Lwt.return_unit
     end
 
   | Meta cmd ->
@@ -555,10 +575,10 @@ let rec run_command cmd =
 and run_meta cmd =
   match cmd.it with
   | Script (x_opt, script) ->
-    run_quote_script script;
+    let+ () = run_quote_script script in
     bind scripts x_opt (lookup_script None cmd.at)
 
-  | Input (x_opt, file) ->
+  | Input (x_opt, file) -> Lwt.return (
     (try if not (input_file file run_quote_script) then
       Abort.error cmd.at "aborting"
     with Sys_error msg -> IO.error cmd.at msg);
@@ -569,25 +589,32 @@ and run_meta cmd =
         bind instances x_opt (lookup_instance None cmd.at)
       end
     end
+  )
 
-  | Output (x_opt, Some file) ->
+  | Output (x_opt, Some file) -> Lwt.return (
     (try
       output_file file
         (fun () -> lookup_script x_opt cmd.at)
         (fun () -> lookup_module x_opt cmd.at)
     with Sys_error msg -> IO.error cmd.at msg)
+  )
 
-  | Output (x_opt, None) ->
+  | Output (x_opt, None) -> Lwt.return (
     (try output_stdout (fun () -> lookup_module x_opt cmd.at)
     with Sys_error msg -> IO.error cmd.at msg)
+  )
 
 and run_script script =
-  List.iter run_command script
+  TzStdLib.List.iter_s run_command script
 
 and run_quote_script script =
   let save_quote = !quote in
   quote := [];
-  (try run_script script with exn -> quote := save_quote; raise exn);
+  let+ () =
+    Lwt.catch
+      (fun () -> run_script script)
+      (fun exn -> quote := save_quote; raise exn)
+  in
   bind scripts None (List.rev !quote);
   quote := !quote @ save_quote
 

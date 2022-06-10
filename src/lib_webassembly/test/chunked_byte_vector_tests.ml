@@ -44,13 +44,11 @@ let grow_works =
 let internal_num_pages_edge_case =
   let test () =
     let open Alcotest in
-    let open Internal_for_tests in
-    check int64 "exact value" 0L (num_pages 0L) ;
-    check int64 "exact value" 1L (num_pages page_size) ;
-    check int64 "exact value" 1L (num_pages (Int64.pred page_size)) ;
-    check int64 "exact value" 2L (num_pages (Int64.succ page_size))
+    check int64 "exact value" 0L (Chunk.num_needed 0L) ;
+    check int64 "exact value" 1L (Chunk.num_needed Chunk.size) ;
+    check int64 "exact value" 1L (Chunk.num_needed (Int64.pred Chunk.size)) ;
+    check int64 "exact value" 2L (Chunk.num_needed (Int64.succ Chunk.size))
   in
-
   ("internal: num_pages edge case", `Quick, test)
 
 let tests =
