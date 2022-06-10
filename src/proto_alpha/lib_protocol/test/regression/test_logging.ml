@@ -406,4 +406,10 @@ let () =
         parameter = "Left (Pair True False)";
         storage = "None";
       };
+      {
+        filename = "opt_map";
+        amount = Tez.zero;
+        parameter = "7";
+        storage = "Some 3";
+      };
     |]
