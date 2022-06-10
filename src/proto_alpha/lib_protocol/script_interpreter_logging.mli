@@ -111,3 +111,10 @@ val kinstr_final_stack_type :
   ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd) stack_ty option tzresult
+
+(** [dipn_stack_ty witness stack_ty] returns the type of the stack
+    on which instructions inside dipped block will be operating. *)
+val dipn_stack_ty :
+  ('a, 's, 'e, 'z, 'c, 'u, 'd, 'w) stack_prefix_preservation_witness ->
+  ('c, 'u) stack_ty ->
+  ('a, 's) stack_ty

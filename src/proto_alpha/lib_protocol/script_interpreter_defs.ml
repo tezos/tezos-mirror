@@ -695,6 +695,7 @@ type ('a, 's, 'b, 't, 'r, 'f) step_type =
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
+  ('a, 'b, 'e, 'f) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('m * 'n, 'a * 'b, 'o, 'a * 'b) kinstr ->
@@ -708,6 +709,7 @@ type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
+  ('a, 'b * 'c, 'd, 'e) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
@@ -720,6 +722,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
   ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
@@ -733,6 +736,7 @@ type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
+  ('b, 'a * 'c, 'd, 'e) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
@@ -766,6 +770,7 @@ type ('a, 'b, 'c, 'r, 'f, 's) kloop_in_type =
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
+  ('a, 's, 'r, 'f) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('b, 'a * 's, 'a, 's) kinstr ->
@@ -905,6 +910,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type =
+  ('o, end_of_stack, 'e, 'f) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('i, 'o) view_signature ->

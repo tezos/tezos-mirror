@@ -1813,3 +1813,13 @@ let log_next_kinstr_and_cont logger sty i k =
   let+ k' = Option.map_e (fun sty -> log_next_continuation logger sty k) sty' in
   (* [sty'] being [None] implies that [i] never returns, so [k] won't be executed anyway. *)
   (i', Option.value ~default:k k')
+
+let rec dipn_stack_ty :
+    type a s e z c u d w.
+    (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
+    (c, u) stack_ty ->
+    (a, s) stack_ty =
+ fun witness stack ->
+  match (witness, stack) with
+  | KPrefix (_, _, witness'), Item_t (_, sty) -> dipn_stack_ty witness' sty
+  | KRest, sty -> sty
