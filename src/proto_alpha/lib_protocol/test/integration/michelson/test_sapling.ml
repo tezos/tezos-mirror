@@ -903,7 +903,7 @@ module Interpreter_tests = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_1
-      (Contract.Originated dst)
+      dst
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()
@@ -940,7 +940,7 @@ module Interpreter_tests = struct
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_2
-      (Contract.Originated dst)
+      dst
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()
@@ -950,7 +950,6 @@ module Interpreter_tests = struct
     let is_root_in block dst root =
       Incremental.begin_construction block >>=? fun incr ->
       let ctx_2 = Incremental.alpha_ctxt incr in
-      let dst = Contract.Originated dst in
       Alpha_services.Contract.script Block.rpc_ctxt block dst >>=? fun script ->
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
       Script_ir_translator.parse_script
@@ -1054,13 +1053,13 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
     let fee = Test_tez.of_int 10 in
-    let dst = Contract.Originated dst in
+    let cdst = Contract.Originated dst in
     Op.transaction
       ~gas_limit:Max
       ~fee
       (B b)
       src
-      dst
+      cdst
       Tez.zero
       ~parameters:parameters_1
     >>=? fun operation ->
@@ -1070,7 +1069,7 @@ module Interpreter_tests = struct
       ~fee
       (B b)
       src
-      dst
+      cdst
       Tez.zero
       ~parameters:parameters_2
     >>=? fun operation ->

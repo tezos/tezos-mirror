@@ -66,7 +66,7 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
   Alpha_services.Contract.entrypoint_type
     cctxt
     (chain, block)
-    (Contract.Originated contract)
+    contract
     entrypoint
     ~normalize_types
   >>= function
@@ -111,7 +111,7 @@ let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
   Alpha_services.Contract.list_entrypoints
     cctxt
     (chain, block)
-    (Contract.Originated contract)
+    contract
     ~normalize_types
 
 let list_contract_unreachables cctxt ~chain ~block ~contract =

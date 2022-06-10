@@ -381,7 +381,6 @@ module Client_state = struct
 
   (** Call the node RPC to obtain the storage diff of a contract *)
   let get_diff cctxt contract offset_commitment offset_nullifier =
-    let contract = Protocol.Alpha_context.Contract.Originated contract in
     Protocol.Alpha_services.Contract.single_sapling_get_diff
       cctxt
       (cctxt#chain, cctxt#block)

@@ -82,21 +82,27 @@ val counter :
   counter shell_tzresult Lwt.t
 
 val script :
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.t shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Contract_hash.t ->
+  Script.t shell_tzresult Lwt.t
 
 val script_opt :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.t option shell_tzresult Lwt.t
 
 val storage :
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Contract_hash.t ->
+  Script.expr shell_tzresult Lwt.t
 
 val entrypoint_type :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Entrypoint.t ->
   normalize_types:bool ->
   Script.expr shell_tzresult Lwt.t
@@ -104,7 +110,7 @@ val entrypoint_type :
 val list_entrypoints :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   normalize_types:bool ->
   (Michelson_v1_primitives.prim list list * (string * Script.expr) list)
   shell_tzresult
@@ -113,7 +119,7 @@ val list_entrypoints :
 val storage_opt :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.expr option shell_tzresult Lwt.t
 
 val big_map_get :
@@ -126,14 +132,14 @@ val big_map_get :
 val contract_big_map_get_opt :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.expr * Script.expr ->
   Script.expr option shell_tzresult Lwt.t
 
 val single_sapling_get_diff :
   'a #RPC_context.simple ->
   'a ->
-  Contract.t ->
+  Contract_hash.t ->
   ?offset_commitment:int64 ->
   ?offset_nullifier:int64 ->
   unit ->

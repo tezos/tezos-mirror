@@ -43,6 +43,9 @@ RPC Changes
 
 - Deprecate the ``endorsing_rights`` RPC for whole cycles, by deprecating the ``cycle`` parameter. (:gl:`!5082`)
 
+- Some contract RPCs working on originated contracts only may return a different
+  error than before on implicit accounts. (MR :gl:`!5373`)
+
 Bug Fixes
 ---------
 
