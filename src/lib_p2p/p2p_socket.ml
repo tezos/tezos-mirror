@@ -201,7 +201,7 @@ module Connection_message = struct
 end
 
 module Metadata = struct
-  let write ~canceler metadata_config cryptobox_data fd message =
+  let write ~canceler metadata_config fd cryptobox_data message =
     let open Lwt_result_syntax in
     let encoded_message_len =
       Data_encoding.Binary.length
@@ -229,7 +229,7 @@ module Metadata = struct
             (last = encoded_message_len)
             Tezos_base.Data_encoding_wrapper.Unexpected_size_of_encoded_value
         in
-        Crypto.write_chunk ~canceler cryptobox_data fd buf
+        Crypto.write_chunk ~canceler fd cryptobox_data buf
 
   let read ~canceler metadata_config fd cryptobox_data =
     let open Lwt_result_syntax in
