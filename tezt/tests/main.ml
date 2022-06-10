@@ -130,6 +130,7 @@ let () =
   Multinode_snapshot.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since K. *)
   Governance_dictator.register ~protocols:[Alpha] ;
+  Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Config.register () ;
   Events.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since K. *)
