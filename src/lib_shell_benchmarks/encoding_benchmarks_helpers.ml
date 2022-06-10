@@ -139,6 +139,61 @@ let linear_shared ?(check = fun () -> ()) ~name ~generator ~make_bench () =
   end in
   ((module Bench) : Benchmark.t)
 
+(* Generic function to cook benchmarks for nlogn-time encodings *)
+let nsqrtn_shared_with_intercept ~name ~generator ~make_bench
+    ~generator_intercept ~make_bench_intercept =
+  let const = Free_variable.of_string (Format.asprintf "%s_const" name) in
+  let coeff = Free_variable.of_string (Format.asprintf "%s_coeff" name) in
+  let model =
+    Model.make
+      ~conv:(fun {Shared_linear.bytes} -> (bytes, ()))
+      ~model:
+        (Model.nsqrtn_split_const
+           ~intercept1:Builtin_benchmarks.timer_variable
+           ~intercept2:const
+           ~coeff)
+  in
+  let codegen =
+    Model.make
+      ~conv:(fun {Shared_linear.bytes} -> (bytes, ()))
+      ~model:(Model.nsqrtn_const ~intercept:const ~coeff)
+  in
+  let module Bench : Benchmark.S = struct
+    let name = name
+
+    let info = Format.asprintf "Benchmarking %s" name
+
+    let tags = ["encoding"]
+
+    include Shared_linear
+
+    let create_benchmarks ~rng_state ~bench_num () =
+      let generator () = generator rng_state in
+      List.repeat bench_num (make_bench generator)
+
+    let () = Registration.register_for_codegen name (Model.For_codegen codegen)
+
+    let models = [("encoding", model); ("codegen", codegen)]
+  end in
+  let module Bench_intercept : Benchmark.S = struct
+    let name = name ^ "_intercept"
+
+    let info = Format.asprintf "Benchmarking %s (intercept case)" name
+
+    let tags = ["encoding"]
+
+    include Shared_linear
+
+    let create_benchmarks ~rng_state ~bench_num () =
+      let generator () = generator_intercept rng_state in
+      List.repeat bench_num (make_bench_intercept generator)
+
+    let () = Registration.register_for_codegen name (Model.For_codegen codegen)
+
+    let models = [("encoding", model); ("codegen", codegen)]
+  end in
+  (((module Bench) : Benchmark.t), ((module Bench_intercept) : Benchmark.t))
+
 let make_encode_fixed_size :
     type a.
     ?check:(unit -> unit) ->

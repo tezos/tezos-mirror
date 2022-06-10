@@ -45,6 +45,7 @@ type tag =
   | Cache
   | Carbonated_map
   | Tx_rollup
+  | Tickets
 
 type michelson_term_kind = Data | Code
 
@@ -358,6 +359,7 @@ let string_of_tag (tag : tag) =
   | Cache -> "cache"
   | Carbonated_map -> "carbonated_map"
   | Tx_rollup -> "tx_rollup"
+  | Tickets -> "tickets"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in

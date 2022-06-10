@@ -306,6 +306,43 @@ let nlogn ~intercept ~coeff =
   end in
   (module M : Model_impl with type arg_type = int * unit)
 
+let nsqrtn_const ~intercept ~coeff =
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size" @@ fun size ->
+        free ~name:intercept + (free ~name:coeff * (size * sqrt size))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
+let nsqrtn_split_const ~intercept1 ~intercept2 ~coeff =
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size" @@ fun size ->
+        free ~name:intercept1 + free ~name:intercept2
+        + (free ~name:coeff * (size * sqrt size))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
 let logn ~coeff =
   let module M = struct
     type arg_type = int * unit

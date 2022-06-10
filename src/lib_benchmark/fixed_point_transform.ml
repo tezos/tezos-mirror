@@ -411,6 +411,8 @@ end = struct
 
   let log2 = lift_unop X.log2
 
+  let sqrt = lift_unop X.sqrt
+
   let free ~name = raise (Codegen_error (Term_is_not_closed name))
 
   let lt = lift_binop X.lt

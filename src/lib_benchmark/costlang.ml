@@ -50,6 +50,8 @@ module type S = sig
 
   val log2 : size repr -> size repr
 
+  val sqrt : size repr -> size repr
+
   val free : name:Free_variable.t -> size repr
 
   val lt : size repr -> size repr -> bool repr
@@ -102,6 +104,8 @@ module Pp : S with type 'a repr = string and type size = string = struct
   let shift_right x i = Format.asprintf "(%s lsr %d)" x i
 
   let log2 x = Format.asprintf "(log2 %s)" x
+
+  let sqrt x = Format.asprintf "(sqrt %s)" x
 
   let free ~name = Format.asprintf "free(%a)" Free_variable.pp name
 
@@ -157,6 +161,8 @@ module Free_variables :
   let shift_right x _i = x
 
   let log2 x = x
+
+  let sqrt x = x
 
   let free ~name = Set.singleton name
 
@@ -216,6 +222,8 @@ module Parameters :
 
   let log2 _x _ = String.Set.empty
 
+  let sqrt _x _ = String.Set.empty
+
   let free ~name _ =
     ignore name ;
     String.Set.empty
@@ -271,6 +279,8 @@ module Eval : S with type 'a repr = 'a and type size = float = struct
   let shift_right x i = x /. (2. ** float_of_int i)
 
   let log2 x = log x /. log 2.
+
+  let sqrt = sqrt
 
   let free ~name = raise (Term_contains_free_variable name)
 
@@ -412,6 +422,12 @@ struct
         }
     else raise (Eval_linear_combination "log2")
 
+  let sqrt (x : size repr) subst =
+    let (Affine a) = x subst in
+    if Affine_ops.is_const a then
+      Affine {linear_comb = Free_variable.Sparse_vec.zero; const = sqrt a.const}
+    else raise (Eval_linear_combination "sqrt")
+
   let free ~name subst =
     match subst name with
     | Some const -> Affine {const; linear_comb = Free_variable.Sparse_vec.zero}
@@ -548,6 +564,7 @@ functor
       | Max_tag of int * int
       | Min_tag of int * int
       | Log2_tag of int
+      | Sqrt_tag of int
       | Free_tag of {name : Free_variable.t}
 
     let prj {repr; _} = repr
@@ -625,6 +642,9 @@ functor
 
     let log2 x =
       insert_if_not_present X.(fun () -> log2 x.repr) (Log2_tag x.tag)
+
+    let sqrt x =
+      insert_if_not_present X.(fun () -> sqrt x.repr) (Sqrt_tag x.tag)
 
     let free ~name =
       insert_if_not_present X.(fun () -> free ~name) (Free_tag {name})
@@ -721,6 +741,8 @@ functor
 
     let log2 x = lift1 X.log2 x
 
+    let sqrt x = lift1 X.sqrt x
+
     let free ~name = dyn (X.free ~name)
 
     let lt x y = lift2 X.lt x y
@@ -795,6 +817,8 @@ functor
       {cont = (fun k -> x.cont (fun x -> k (X.shift_right x i)))}
 
     let log2 = lift_unop X.log2
+
+    let sqrt = lift_unop X.sqrt
 
     let free ~name = ret (X.free ~name)
 
@@ -922,6 +946,15 @@ module Fold_constants (X : S) = struct
     | Int i -> X.(log2 (int i))
     | Float f -> X.(log2 (float f))
     | Not_const term -> X.(log2 term)
+    | Bool _ -> assert false
+
+  let sqrt x =
+    inj
+    @@
+    match x with
+    | Int i -> X.(sqrt (int i))
+    | Float f -> X.(sqrt (float f))
+    | Not_const term -> X.(sqrt term)
     | Bool _ -> assert false
 
   let free ~name = Not_const (X.free ~name)

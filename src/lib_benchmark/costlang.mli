@@ -59,6 +59,8 @@ module type S = sig
 
   val log2 : size repr -> size repr
 
+  val sqrt : size repr -> size repr
+
   val free : name:Free_variable.t -> size repr
 
   val lt : size repr -> size repr -> bool repr

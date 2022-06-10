@@ -101,6 +101,10 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
     unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "log2 @[<h>%a@]" x Arg_app)
 
+  let sqrt x =
+    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+        Format.fprintf fmtr "sqrt @[<h>%a@]" x Arg_app)
+
   let free ~name fmtr _c = Format.fprintf fmtr "free(%a)" Free_variable.pp name
 
   let lt x y =
