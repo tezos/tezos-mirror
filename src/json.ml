@@ -184,7 +184,14 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
         kind
         left
         right
-  | _ -> e
+  | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 | Uint16
+  | Int31 | Int32 | Int64 | N | Z | RangedInt _ | RangedFloat _ | Float
+  | Bytes _ | String _
+  | Padded (_, _)
+  | String_enum (_, _)
+  | Array _ | List _ | Obj _ | Tup _ | Union _ | Mu _ | Describe _ | Splitted _
+  | Dynamic_size _ | Check_size _ | Delayed _ ->
+      e
 
 and lift_union_in_pair :
     type a b.
@@ -402,7 +409,7 @@ let from_string s =
   match Ezjsonm.from_string ("[" ^ s ^ "]") with
   | exception Ezjsonm.Parse_error (_, msg) -> Error msg
   | `A [json] -> Ok json
-  | _ -> Error "Malformed value"
+  | `A ([] | _ :: _ :: _) | `O _ -> Error "Malformed value"
 
 let encoding =
   let binary : Json_repr.ezjsonm Encoding.t =

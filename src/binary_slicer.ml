@@ -391,7 +391,9 @@ and read_variable_pair :
       let right = read_rec e2 ?name state in
       assert (state.remaining_bytes = 0) ;
       (left, right)
-  | _ -> assert false
+  | `Dynamic, (`Fixed _ | `Dynamic) -> assert false
+  | `Fixed _, (`Fixed _ | `Dynamic) -> assert false
+  | `Variable, (`Variable | `Dynamic) -> assert false
 
 and read_list :
     type a.

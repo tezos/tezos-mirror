@@ -85,7 +85,14 @@ let rec lookup_id_descr ({encoding; _} : 'a Encoding.t) =
   | Check_size {encoding; _} ->
       lookup_id_descr encoding
   | Describe {id; description; _} -> Some (id, description)
-  | _ -> None
+  | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 | Uint16
+  | Int31 | Int32 | Int64 | N | Z | RangedInt _ | RangedFloat _ | Float
+  | Bytes _ | String _
+  | Padded (_, _)
+  | String_enum (_, _)
+  | Array _ | List _ | Obj _ | Objs _ | Tup _ | Tups _ | Union _ | Mu _ | Conv _
+  | Delayed _ ->
+      None
 
 let register ?pp encoding =
   match lookup_id_descr encoding with
