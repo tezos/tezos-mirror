@@ -1,14 +1,14 @@
 (env
  (release
-  (flags "-noassert")))
+  (flags
+   (:standard -noassert))))
 
 (library
  (name data_encoding)
  (public_name data-encoding)
  (js_of_ocaml)
  (libraries json-data-encoding json-data-encoding-bson zarith zarith_stubs_js
-   ezjsonm either)
- (flags (:standard)))
+   ezjsonm either))
 
 (documentation
  (mld_files tutorial))
