@@ -373,8 +373,8 @@ and kinstr_size :
     | INil (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | IIf_cons {loc = _; branch_if_nil = _; branch_if_cons = _; k = _} ->
         ret_succ_adding accu (base +! (word_size *? 2))
-    | IList_map (_loc, _k1, ty, _k2) ->
-        ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
+    | IList_map (_loc, _k1, _, _k2) ->
+        ret_succ_adding accu (base +! (word_size *? 2))
     | IList_iter (_, ty, _, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | IList_size (_, _) -> ret_succ_adding accu base
@@ -472,9 +472,9 @@ and kinstr_size :
         ret_succ_adding
           (accu ++ ty_size ty)
           (base +! Entrypoint.in_memory_size s +! (word_size *? 2))
-    | IView (_loc, s, sty, _k) ->
+    | IView (_loc, s, _, _k) ->
         ret_succ_adding
-          (accu ++ view_signature_size s ++ stack_ty_size sty)
+          (accu ++ view_signature_size s)
           (base +! (word_size *? 2))
     | ITransfer_tokens (_, _) -> ret_succ_adding accu base
     | IImplicit_account (_, _) -> ret_succ_adding accu base

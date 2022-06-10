@@ -903,3 +903,14 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
   'g ->
   ('g, 'a) lambda * 'b ->
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type =
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  ('i, 'o) view_signature ->
+  ('o, 'a * 'b) stack_ty option ->
+  ('o option, 'a * 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  'i ->
+  address * ('a * 'b) ->
+  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
