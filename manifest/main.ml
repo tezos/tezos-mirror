@@ -1637,18 +1637,6 @@ let tezos_protocol_environment_structs =
         data_encoding;
         bls12_381;
       ]
-    ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"; "V6"]
-    ~dune:
-      Dune.
-        [
-          include_ "v0.dune.inc";
-          include_ "v1.dune.inc";
-          include_ "v2.dune.inc";
-          include_ "v3.dune.inc";
-          include_ "v4.dune.inc";
-          include_ "v5.dune.inc";
-          include_ "v6.dune.inc";
-        ]
 
 let tezos_protocol_environment =
   public_lib

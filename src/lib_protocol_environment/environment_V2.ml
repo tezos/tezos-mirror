@@ -121,7 +121,7 @@ struct
      shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
      versions. Thus we open the module, hiding the incompatible, newer modules.
   *)
-  open Tezos_protocol_environment_structs.V2.M
+  open Tezos_protocol_environment_structs.V2
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
@@ -539,7 +539,7 @@ struct
         (struct
           let id = Format.asprintf "proto.%s." Param.name
         end)
-        (Tezos_protocol_environment_structs.V2.M.Error_monad_classification)
+        (Tezos_protocol_environment_structs.V2.Error_monad_trace_eval)
 
     let error_encoding = Data_encoding.dynamic_size error_encoding
   end

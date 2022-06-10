@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_error_monad.Error_monad
+
 type t =
   [ `Branch  (** Errors that may not happen in another context *)
   | `Temporary  (** Errors that may not happen in a later context *)
@@ -39,3 +41,20 @@ let classify = function
   | `Permanent -> Tezos_error_monad.Error_classification.Permanent
   | `Temporary -> Temporary
   | `Branch -> Branch
+
+let record_trace_eval mk_err =
+  let open Result_syntax in
+  function
+  | Error trace ->
+      let* err = mk_err () in
+      fail (TzTrace.cons err trace)
+  | ok -> ok
+
+let trace_eval mk_err f =
+  let open Lwt_result_syntax in
+  let*! r = f in
+  match r with
+  | Error trace ->
+      let* err = mk_err () in
+      Lwt.return_error (TzTrace.cons err trace)
+  | ok -> Lwt.return ok

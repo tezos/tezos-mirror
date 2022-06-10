@@ -137,7 +137,7 @@ struct
         Stdlib.exit 1
 
   include Stdlib
-  open Tezos_protocol_environment_structs.V3.M
+  open Tezos_protocol_environment_structs.V3
   module Pervasives = Stdlib
 
   module Logging = struct
@@ -172,7 +172,7 @@ struct
   module List = struct
     include Tezos_error_monad.TzLwtreslib.List
 
-    include Tezos_protocol_environment_structs.V3.M.Lwtreslib_list_combine
+    include Tezos_protocol_environment_structs.V3.Lwtreslib_list_combine
   end
 
   module Char = Char
@@ -184,7 +184,7 @@ struct
 
   module Set = struct
     module type S =
-      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Set.S
+      Tezos_protocol_environment_structs.V3.Replicated_signatures.Set.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t =
@@ -193,7 +193,7 @@ struct
 
   module Map = struct
     module type S =
-      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Map.S
+      Tezos_protocol_environment_structs.V3.Replicated_signatures.Map.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t =
@@ -626,7 +626,7 @@ struct
         (struct
           let id = Format.asprintf "proto.%s." Param.name
         end)
-        (Tezos_protocol_environment_structs.V3.M.Error_monad_classification)
+        (Tezos_protocol_environment_structs.V3.Error_monad_trace_eval)
 
     let error_encoding = Data_encoding.dynamic_size error_encoding
   end
@@ -664,12 +664,12 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
-    include Tezos_protocol_environment_structs.V3.M.Error_monad_infix_globals
+    include Tezos_protocol_environment_structs.V3.Error_monad_infix_globals
 
     include
-      Tezos_protocol_environment_structs.V3.M.Error_monad_preallocated_values
+      Tezos_protocol_environment_structs.V3.Error_monad_preallocated_values
 
-    include Tezos_protocol_environment_structs.V3.M.Error_monad_trace_eval
+    include Tezos_protocol_environment_structs.V3.Error_monad_trace_eval
 
     let fail e = Lwt.return_error (TzTrace.make e)
 

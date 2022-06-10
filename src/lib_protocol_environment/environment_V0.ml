@@ -44,7 +44,7 @@ module type V0 = sig
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
-       and type MBytes.t = Tezos_protocol_environment_structs.V0.M.MBytes.t
+       and type MBytes.t = Tezos_protocol_environment_structs.V0.MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
@@ -109,7 +109,7 @@ struct
      shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
      versions. Thus we open the module, hiding the incompatible, newer modules.
   *)
-  open Tezos_protocol_environment_structs.V0.M
+  open Tezos_protocol_environment_structs.V0
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
@@ -344,7 +344,7 @@ struct
         (struct
           let id = Format.asprintf "proto.%s." Param.name
         end)
-        (Tezos_protocol_environment_structs.V0.M.Error_monad_classification)
+        (Tezos_protocol_environment_structs.V0.Error_monad_trace_eval)
 
     let error_encoding = Data_encoding.dynamic_size error_encoding
   end
