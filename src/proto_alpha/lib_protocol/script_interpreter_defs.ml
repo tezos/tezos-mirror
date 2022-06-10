@@ -529,6 +529,26 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
          refactoring away to reach it. *)
       assert false
 
+let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
+    ~parameters_ty ~parameters =
+  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  >>?= fun () ->
+  unparse_data ctxt Optimized parameters_ty parameters
+  >>=? fun (unparsed_parameters, ctxt) ->
+  Lwt.return
+    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+    >|? fun ctxt ->
+      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
+      ( Transaction_to_sc_rollup
+          {
+            destination;
+            entrypoint;
+            parameters_ty;
+            parameters;
+            unparsed_parameters;
+          },
+        ctxt ) )
+
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to a destination and
    an entrypoint instantiated with argument [parameters] of type
@@ -566,10 +586,14 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~entrypoint
         ~parameters_ty
         ~parameters
-  | Sc_rollup _ ->
-      (* TODO #2801
-         Implement transfers to sc rollups. *)
-      failwith "Transferring to smart-contract rollups is not yet supported")
+  | Sc_rollup destination ->
+      make_transaction_to_sc_rollup
+        ctxt
+        ~destination
+        ~amount
+        ~entrypoint
+        ~parameters_ty
+        ~parameters)
   >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
