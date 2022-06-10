@@ -46,9 +46,11 @@ let slice_all bytes =
   EncodingTable.fold
     (fun enc_id (Record {encoding; _}) sliced ->
       try
-        let _ = Binary_reader.of_string_exn encoding bytes in
-        let slice = Binary_slicer.slice_string_exn encoding bytes in
-        (enc_id, slice) :: sliced
+        match Binary_reader.of_string encoding bytes with
+        | Ok _ ->
+            let slice = Binary_slicer.slice_string_exn encoding bytes in
+            (enc_id, slice) :: sliced
+        | Error _ -> sliced
       with
       | (Out_of_memory | Stack_overflow) as e -> raise e
       | _ -> sliced)
