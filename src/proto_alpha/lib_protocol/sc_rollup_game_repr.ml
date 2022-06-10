@@ -360,9 +360,9 @@ let check_dissection start start_tick stop stop_tick dissection =
     | Some (a, a_tick), Some (b, b_tick) ->
         let* () =
           check
-            (Option.equal State_hash.equal a start)
+            (Option.equal State_hash.equal a start && not (Option.is_none a))
             (match start with
-            | None -> assert false
+            | None -> "The start hash must not be None"
             | Some start ->
                 Format.asprintf
                   "The start hash should be equal to %a"
@@ -398,11 +398,12 @@ let check_dissection start start_tick stop stop_tick dissection =
   in
   let rec traverse states =
     match states with
-    | (Some _, tick) :: (next_state, next_tick) :: others ->
+    | (None, _) :: (Some _, _) :: _ ->
+        fail "Cannot return to a Some state after being at a None state"
+    | (_, tick) :: (next_state, next_tick) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           traverse ((next_state, next_tick) :: others)
         else fail "Ticks should only increase in dissection"
-    | (None, _) :: _ :: _ -> fail "None should not occur before end"
     | _ -> return ()
   in
   traverse dissection
