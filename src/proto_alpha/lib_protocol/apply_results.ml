@@ -2368,6 +2368,7 @@ let contents_and_result_encoding =
          make sc_rollup_publish_case;
          make sc_rollup_refute_case;
          make sc_rollup_timeout_case;
+         make sc_rollup_execute_outbox_message_case;
          make sc_rollup_recover_bond_case;
        ]
 

@@ -551,7 +551,7 @@ let sc_rollup_operation_refute_tag = sc_rollup_operation_tag_offset + 4
 
 let sc_rollup_operation_timeout_tag = sc_rollup_operation_tag_offset + 5
 
-let sc_rollup_operation_atomic_batch_tag = sc_rollup_operation_tag_offset + 6
+let sc_rollup_execute_outbox_message_tag = sc_rollup_operation_tag_offset + 6
 
 let sc_rollup_operation_recover_bond_tag = sc_rollup_operation_tag_offset + 7
 
@@ -1094,7 +1094,7 @@ module Encoding = struct
     let[@coq_axiom_with_reason "gadt"] sc_rollup_execute_outbox_message_case =
       MCase
         {
-          tag = sc_rollup_operation_atomic_batch_tag;
+          tag = sc_rollup_execute_outbox_message_tag;
           name = "sc_rollup_execute_outbox_message";
           encoding =
             obj6
@@ -1557,7 +1557,7 @@ module Encoding = struct
 
   let sc_rollup_execute_outbox_message_case =
     make_manager_case
-      sc_rollup_operation_atomic_batch_tag
+      sc_rollup_execute_outbox_message_tag
       Manager_operations.sc_rollup_execute_outbox_message_case
 
   let sc_rollup_recover_bond_case =
