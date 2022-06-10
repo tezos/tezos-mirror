@@ -81,7 +81,7 @@ integration:sandboxes:acc-endorsement:
 
 # definition for the environment to run all integration tests
 # integration tests are run only on x86_64 architectures (for now)
-.integration_python_template:
+.pytest_template:
   extends:
     - .test_template
   needs:
@@ -100,7 +100,7 @@ integration:sandboxes:acc-endorsement:
 
 integration:static-binaries:
   extends:
-    - .integration_python_template
+    - .pytest_template
   allow_failure: true
   needs:
     - build:static-x86_64-linux-binaries
@@ -111,16 +111,17 @@ integration:static-binaries:
     - make -C ../ build-parameters
     - poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
 
-integration:pytest:
+.pytest_integration:
   extends:
-    - .integration_python_template
+    - .pytest_template
     - .template__coverage_files
   # the number of jobs have been choosen to give jobs of maximal
   # length ~10 minutes and to accommodate the addition of new protocol
   # test suites without increasing wall time of the test stage.
-  parallel: 25
+  variables:
+    TESTS: ""
   script:
-    - poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800
+    - poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800 $TESTS
     - ../scripts/ci/merge_coverage.sh
   artifacts:
     paths:
@@ -132,8 +133,23 @@ integration:pytest:
     expire_in: 7 day
     when: always
 
+integration:pytest:
+  extends:
+    - .pytest_integration
+  parallel: 9
+  variables:
+    TESTS: "tests_alpha"
+
+integration:pytest_old_protocols:
+  extends:
+    - .pytest_integration
+    - .rules_template__extended_test_pipeline
+  parallel: 16
+  variables:
+    TESTS: "--ignore tests_alpha"
+
 integration:pytest_examples:
-  extends: .integration_python_template
+  extends: .pytest_template
   script:
     - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
     - PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
