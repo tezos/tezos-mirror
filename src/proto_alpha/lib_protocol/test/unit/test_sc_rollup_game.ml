@@ -60,11 +60,12 @@ let tick_of_int_exn n =
 
 let hash_int n = Sc_rollup_repr.State_hash.hash_string [Format.sprintf "%d" n]
 
-let init_dissection start_hash =
-  Stdlib.List.init 32 (fun i ->
-      if i = 0 then (Some start_hash, tick_of_int_exn 0)
-      else if i = 31 then (None, tick_of_int_exn 10000)
-      else (Some (hash_int i), tick_of_int_exn i))
+let init_dissection ?(size = 32) start_hash =
+  let init_tick i =
+    if i = size - 1 then (None, tick_of_int_exn 10000)
+    else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
+  in
+  Stdlib.List.init size init_tick
 
 let two_stakers_in_conflict () =
   let* ctxt, rollup, refuter, defender =
