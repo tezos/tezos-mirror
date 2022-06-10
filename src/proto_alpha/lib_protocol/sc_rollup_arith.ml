@@ -1076,13 +1076,10 @@ module Make (Context : P) :
     let* equal = Output.mapped_to (output_key output) output tree in
     return (tree, equal)
 
-  let verify_output_proof proof =
+  let verify_output_proof p =
     let open Lwt_syntax in
-    let* result =
-      Context.verify_proof
-        proof.output_proof
-        (has_output proof.output_proof_output)
-    in
+    let transition = has_output p.output_proof_output in
+    let* result = Context.verify_proof p.output_proof transition in
     match result with None -> return false | Some _ -> return true
 
   type error += Arith_output_proof_production_failed
