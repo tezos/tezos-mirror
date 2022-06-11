@@ -538,8 +538,7 @@ end)
       let* c = originated in
       let* entrypoint = entrypoint in
       let destination = Alpha_context.Destination.Contract (Originated c) in
-      let address = {destination; entrypoint} in
-      return (Typed_contract {arg_ty; address})
+      return (Typed_contract {arg_ty; destination; entrypoint})
 
     let generate_sc_rollup_contract :
         type arg argc.
@@ -550,8 +549,7 @@ end)
       let* ru = sc_rollup in
       let* entrypoint = entrypoint in
       let destination = Alpha_context.Destination.Sc_rollup ru in
-      let address = {destination; entrypoint} in
-      return (Typed_contract {arg_ty; address})
+      return (Typed_contract {arg_ty; destination; entrypoint})
 
     let generate_any_type_contract :
         type arg argc.
@@ -578,8 +576,7 @@ end)
               Alpha_context.Destination.Contract (Implicit pkh)
             in
             let entrypoint = Alpha_context.Entrypoint.default in
-            let address = {destination; entrypoint} in
-            return (Typed_contract {arg_ty; address})
+            return (Typed_contract {arg_ty; destination; entrypoint})
           else generate_any_type_contract arg_ty
       | Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _) ->
           let* b = Base_samplers.uniform_bool in
@@ -587,8 +584,7 @@ end)
             let* tx_rollup = tx_rollup in
             let destination = Alpha_context.Destination.Tx_rollup tx_rollup in
             let entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint in
-            let address = {destination; entrypoint} in
-            return (Typed_contract {arg_ty; address})
+            return (Typed_contract {arg_ty; destination; entrypoint})
           else generate_any_type_contract arg_ty
       | _ -> generate_any_type_contract arg_ty
 

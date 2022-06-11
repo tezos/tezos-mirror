@@ -373,7 +373,9 @@ let unparse_tx_rollup_l2_address ~loc ctxt mode
       let b58check = Tx_rollup_l2_address.to_b58check tx_address in
       (String (loc, b58check), ctxt)
 
-let unparse_contract ~loc ctxt mode (Typed_contract {arg_ty = _; address}) =
+let unparse_contract ~loc ctxt mode
+    (Typed_contract {arg_ty = _; destination; entrypoint}) =
+  let address = {destination; entrypoint} in
   unparse_address ~loc ctxt mode address
 
 let unparse_signature ~loc ctxt mode s =
@@ -4926,8 +4928,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
              >|? fun (eq, ctxt) ->
              ( ctxt,
                eq >|? fun Eq ->
-               let address = {destination; entrypoint} in
-               Typed_contract {arg_ty = arg; address} )
+               Typed_contract {arg_ty = arg; destination; entrypoint} )
             else
               (* An implicit account on any other entrypoint is not a valid contract. *)
               ok (error ctxt (fun _loc -> No_such_entrypoint entrypoint)))
@@ -4967,8 +4968,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                     >|? fun (entrypoint_arg, ctxt) ->
                     ( ctxt,
                       entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-                      let address = {destination; entrypoint} in
-                      Typed_contract {arg_ty; address} )) ))
+                      Typed_contract {arg_ty; destination; entrypoint} )) ))
   | Tx_rollup tx_rollup ->
       Tx_rollup_state.assert_exist ctxt tx_rollup >|=? fun ctxt ->
       if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
@@ -4976,8 +4976,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
            [parse_tx_rollup_deposit_parameters]. *)
         match arg with
         | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _) ->
-            let address = {destination; entrypoint} in
-            (ctxt, ok @@ Typed_contract {arg_ty = arg; address})
+            (ctxt, ok @@ Typed_contract {arg_ty = arg; destination; entrypoint})
         | _ ->
             error ctxt (fun loc ->
                 Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg))
@@ -5015,8 +5014,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
             >|? fun (entrypoint_arg, ctxt) ->
             ( ctxt,
               entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-              let address = {destination; entrypoint} in
-              Typed_contract {arg_ty; address} ))
+              Typed_contract {arg_ty; destination; entrypoint} ))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
