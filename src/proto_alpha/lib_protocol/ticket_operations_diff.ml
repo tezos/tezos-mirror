@@ -146,7 +146,12 @@ let tickets_of_transaction ctxt ~destination ~parameters_ty ~parameters =
   let destination = Destination.Contract (Originated destination) in
   Ticket_scanner.type_has_tickets ctxt parameters_ty
   >>?= fun (has_tickets, ctxt) ->
-  Ticket_scanner.tickets_of_value ~include_lazy:true ctxt has_tickets parameters
+  Ticket_scanner.tickets_of_value
+    ~include_lazy:true
+    ~allow_zero_amount_tickets:true
+    ctxt
+    has_tickets
+    parameters
   >>=? fun (tickets, ctxt) -> return (Some {destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
@@ -155,7 +160,12 @@ let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
      storage does not contain tickets, storage is not scanned. *)
   Ticket_scanner.type_has_tickets ctxt storage_type
   >>?= fun (has_tickets, ctxt) ->
-  Ticket_scanner.tickets_of_value ctxt ~include_lazy:true has_tickets storage
+  Ticket_scanner.tickets_of_value
+    ctxt
+    ~include_lazy:true
+    ~allow_zero_amount_tickets:true
+    has_tickets
+    storage
   >|=? fun (tickets, ctxt) ->
   let destination = Destination.Contract (Originated preorigination) in
   (Some {tickets; destination}, ctxt)

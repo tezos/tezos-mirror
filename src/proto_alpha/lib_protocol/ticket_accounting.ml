@@ -74,7 +74,12 @@ module Ticket_token_map = struct
 end
 
 let ticket_balances_of_value ctxt ~include_lazy ty value =
-  Ticket_scanner.tickets_of_value ~include_lazy ctxt ty value
+  Ticket_scanner.tickets_of_value
+    ~include_lazy
+    ~allow_zero_amount_tickets:true
+    ctxt
+    ty
+    value
   >>=? fun (tickets, ctxt) ->
   List.fold_left_e
     (fun (acc, ctxt) ticket ->

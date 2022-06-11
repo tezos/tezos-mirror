@@ -81,6 +81,7 @@ let collect_token_diffs_of_node ctxt has_tickets node ~get_token_and_amount acc
     (* It's currently not possible to have nested lazy structures, but this is
        for future proofing. *)
     ~include_lazy:true
+    ~allow_zero_amount_tickets:true
     has_tickets
     (Micheline.root node)
   >>=? fun (ex_tickets, ctxt) ->
