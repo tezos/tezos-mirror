@@ -1110,6 +1110,14 @@ and ('arg, 'ret) lambda =
       -> ('arg, 'ret) lambda
 [@@coq_force_gadt]
 
+and 'arg typed_destination =
+  | Typed_implicit : public_key_hash -> unit typed_destination
+  | Typed_originated of Contract_hash.t
+  | Typed_tx_rollup :
+      Tx_rollup.t
+      -> (_ ticket, tx_rollup_l2_address) pair typed_destination
+  | Typed_sc_rollup of Sc_rollup.t
+
 and 'arg typed_contract =
   | Typed_contract : {
       arg_ty : ('arg, _) ty;
