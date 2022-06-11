@@ -1760,3 +1760,14 @@ type 'a value_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a}
 val value_traverse : ('t, _) ty -> 't -> 'r -> 'r value_traverse -> 'r
 
 val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty_ex_c
+
+module Typed_destination : sig
+  val untyped : _ typed_destination -> Destination.t
+
+  module Internal_for_tests : sig
+    (* This function doesn't guarantee that the contract is well-typed wrt its
+       registered type at origination, it only guarantees that the type is
+       plausible wrt to the destination kind. *)
+    val typed_exn : ('a, _) ty -> Destination.t -> 'a typed_destination
+  end
+end

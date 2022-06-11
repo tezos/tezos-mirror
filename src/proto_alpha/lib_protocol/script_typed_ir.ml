@@ -2154,3 +2154,31 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
 
 let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty_ex_c = function
   | Item_t (ty, _) -> Ty_ex_c ty
+
+module Typed_destination = struct
+  let untyped : type a. a typed_destination -> Destination.t = function
+    | Typed_implicit pkh -> Destination.Contract (Implicit pkh)
+    | Typed_originated contract_hash ->
+        Destination.Contract (Originated contract_hash)
+    | Typed_tx_rollup tx_rollup -> Destination.Tx_rollup tx_rollup
+    | Typed_sc_rollup sc_rollup -> Destination.Sc_rollup sc_rollup
+
+  module Internal_for_tests = struct
+    let typed_exn :
+        type a ac. (a, ac) ty -> Destination.t -> a typed_destination =
+     fun ty destination ->
+      match (destination, ty) with
+      | Contract (Implicit pkh), Unit_t -> Typed_implicit pkh
+      | Contract (Implicit _), _ ->
+          invalid_arg "Implicit contracts expect type unit"
+      | Contract (Originated contract_hash), _ -> Typed_originated contract_hash
+      | Tx_rollup tx_rollup, Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _)
+        ->
+          Typed_tx_rollup tx_rollup
+      | Tx_rollup _, _ ->
+          invalid_arg
+            "Transaction rollups expect type (pair (ticket _) \
+             tx_rollup_l2_address)"
+      | Sc_rollup sc_rollup, _ -> Typed_sc_rollup sc_rollup
+  end
+end
