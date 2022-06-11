@@ -479,25 +479,39 @@ let apply ctxt gas capture_ty capture lam =
       let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
-let make_transaction_to_contract ctxt ~destination ~amount ~entrypoint ~location
-    ~parameters_ty ~parameters =
+let make_transaction_to_contract ctxt ~(destination : Contract.t) ~amount
+    ~entrypoint ~location ~parameters_ty ~parameters =
   unparse_data ctxt Optimized parameters_ty parameters
   >>=? fun (unparsed_parameters, ctxt) ->
   Lwt.return
     ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
     >|? fun ctxt ->
       let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-      ( Transaction_to_contract
-          {
-            destination;
-            amount;
-            entrypoint;
-            location;
-            parameters_ty;
-            parameters;
-            unparsed_parameters;
-          },
-        ctxt ) )
+      match destination with
+      | Implicit _ ->
+          ( Transaction_to_contract
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            ctxt )
+      | Originated _ ->
+          ( Transaction_to_contract
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            ctxt ) )
 
 let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
     ~entrypoint ~(parameters_ty : (t, tc) ty) ~parameters =
