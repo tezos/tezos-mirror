@@ -1791,6 +1791,8 @@ end
 module Tx_rollup : sig
   include BASIC_DATA
 
+  val in_memory_size : t -> Cache_memory_helpers.sint
+
   val rpc_arg : t RPC_arg.arg
 
   val to_b58check : t -> string
@@ -2753,6 +2755,8 @@ module Sc_rollup : sig
   type t = Sc_rollup_repr.t
 
   type rollup := t
+
+  val in_memory_size : t -> Cache_memory_helpers.sint
 
   module Staker :
     S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
