@@ -5517,7 +5517,7 @@ module Withdraw = struct
       Incremental.begin_construction block >>=? fun incr ->
       Incremental.add_operation
         ~expect_apply_failure:
-          (check_proto_error Apply.Forbidden_zero_ticket_quantity)
+          (check_proto_error Ticket_scanner.Forbidden_zero_ticket_quantity)
         incr
         operation
       >>=? fun _incr -> return_unit
@@ -5559,7 +5559,7 @@ module Withdraw = struct
       Incremental.begin_construction block >>=? fun incr ->
       Incremental.add_operation
         ~expect_apply_failure:
-          (check_proto_error Apply.Forbidden_zero_ticket_quantity)
+          (check_proto_error Ticket_scanner.Forbidden_zero_ticket_quantity)
         incr
         operation
       >>=? fun _incr -> return_unit
@@ -5578,7 +5578,7 @@ module Withdraw = struct
       Incremental.begin_construction block >>=? fun incr ->
       Incremental.add_operation
         ~expect_apply_failure:
-          (check_proto_error Apply.Forbidden_zero_ticket_quantity)
+          (check_proto_error Ticket_scanner.Forbidden_zero_ticket_quantity)
         incr
         operation
       >>=? fun _incr -> return_unit

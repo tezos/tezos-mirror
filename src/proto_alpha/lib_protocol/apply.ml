@@ -126,7 +126,6 @@ type error +=
   | Inconsistent_sources
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
-  | Forbidden_zero_ticket_quantity
   | Incorrect_reveal_position
 
 let () =
@@ -783,15 +782,6 @@ let () =
     (fun delegate -> Zero_frozen_deposits delegate) ;
   register_error_kind
     `Permanent
-    ~id:"forbidden_zero_amount_ticket"
-    ~title:"Zero ticket amount is not allowed"
-    ~description:
-      "It is not allowed to use a zero amount ticket in this operation."
-    Data_encoding.empty
-    (function Forbidden_zero_ticket_quantity -> Some () | _ -> None)
-    (fun () -> Forbidden_zero_ticket_quantity) ;
-  register_error_kind
-    `Permanent
     ~id:"operations.incorrect_reveal_position"
     ~title:"Incorrect reveal position"
     ~description:"Incorrect reveal position in batch"
@@ -1028,7 +1018,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
   >>?= fun ticket_amount ->
   error_when
     Tx_rollup_l2_qty.(ticket_amount <= zero)
-    Forbidden_zero_ticket_quantity
+    Ticket_scanner.Forbidden_zero_ticket_quantity
   >>?= fun () ->
   let deposit, message_size =
     Tx_rollup_message.make_deposit
@@ -1348,7 +1338,7 @@ let apply_external_manager_operation_content :
              Tx_rollup_reveal.{contents; ty; ticketer; amount; claimer} ->
           error_when
             Tx_rollup_l2_qty.(amount <= zero)
-            Forbidden_zero_ticket_quantity
+            Ticket_scanner.Forbidden_zero_ticket_quantity
           >>?= fun () ->
           Tx_rollup_ticket.parse_ticket
             ~consume_deserialization_gas
@@ -1418,7 +1408,9 @@ let apply_external_manager_operation_content :
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
       (* The encoding ensures that the amount is in a natural number. Here is
          mainly to check that it is non-zero.*)
-      error_when Compare.Z.(amount <= Z.zero) Forbidden_zero_ticket_quantity
+      error_when
+        Compare.Z.(amount <= Z.zero)
+        Ticket_scanner.Forbidden_zero_ticket_quantity
       >>?= fun () ->
       error_when
         (match destination with Implicit _ -> true | Originated _ -> false)
