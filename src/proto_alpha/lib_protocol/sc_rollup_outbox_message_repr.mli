@@ -45,6 +45,10 @@ type transaction = {
 (** A type representing messages from Layer 2 to Layer 1. *)
 type t = Atomic_transaction_batch of {transactions : transaction list}
 
+val encoding : t Data_encoding.t
+
+val pp : Format.formatter -> t -> unit
+
 (** [of_bytes ctxt bs] decodes an outbox message value from the
     given bytes [bs]. The function involves parsing Micheline expressions to
     typed values. *)

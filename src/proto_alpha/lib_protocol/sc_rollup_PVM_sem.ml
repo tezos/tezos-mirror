@@ -135,6 +135,26 @@ let input_request_equal a b =
       Raw_level_repr.equal l m && Z.equal n o
   | First_after _, _ -> false
 
+type output = {message_counter : Z.t; payload : Sc_rollup_outbox_message_repr.t}
+
+let output_encoding =
+  let open Data_encoding in
+  conv
+    (fun {message_counter; payload} -> (message_counter, payload))
+    (fun (message_counter, payload) -> {message_counter; payload})
+    (obj2
+       (req "message_counter" n)
+       (req "payload" Sc_rollup_outbox_message_repr.encoding))
+
+let pp_output fmt {message_counter; payload} =
+  Format.fprintf
+    fmt
+    "@[%a@;%a@;@]"
+    Z.pp_print
+    message_counter
+    Sc_rollup_outbox_message_repr.pp
+    payload
+
 module type S = sig
   (**
 
@@ -268,5 +288,27 @@ module type S = sig
         - the [context] for this instance of the PVM doesn't have access
         to enough of the [state] to build the proof. *)
   val produce_proof :
-    context -> input option -> state -> (proof, string) result Lwt.t
+    context -> input option -> state -> (proof, error) result Lwt.t
+
+  (** The following type is inhabited by the proofs that a given [output]
+      is part of the outbox of a given [state]. *)
+  type output_proof
+
+  (** [output_of_output_proof proof] returns the [output] that is
+      referred to in [proof]'s statement. *)
+  val output_of_output_proof : output_proof -> output
+
+  (** [state_of_output_proof proof] returns the [state] hash that is
+      referred to in [proof]'s statement. *)
+  val state_of_output_proof : output_proof -> hash
+
+  (** [verify_output_proof output_proof] returns [true] iff [proof] is
+      a valid witness that its [output] is part of its [state]'s outbox. *)
+  val verify_output_proof : output_proof -> bool Lwt.t
+
+  (** [produce_output_proof ctxt state output] returns a proof
+      that witnesses the fact that [output] is part of [state]'s
+      outbox. *)
+  val produce_output_proof :
+    context -> state -> output -> (output_proof, error) result Lwt.t
 end

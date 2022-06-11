@@ -32,14 +32,78 @@
 *)
 
 open Protocol
-open Sc_rollup_arith.ProtocolImplementation
+module Context_binary = Tezos_context_memory.Context_binary
 
-let create_context () =
-  Context.init1 () >>=? fun (block, _contract) -> return block.context
+(* We first instantiate an arithmetic PVM capable of generating proofs. *)
+module Tree :
+  Protocol.Environment.Context.TREE
+    with type t = Context_binary.t
+     and type tree = Context_binary.tree
+     and type key = string list
+     and type value = bytes = struct
+  type t = Context_binary.t
+
+  type tree = Context_binary.tree
+
+  type key = Context_binary.key
+
+  type value = Context_binary.value
+
+  include Context_binary.Tree
+end
+
+module Arith_Context = struct
+  module Tree = Tree
+
+  type tree = Tree.tree
+
+  type proof = Context_binary.Proof.tree Context_binary.Proof.t
+
+  let proof_encoding =
+    Tezos_context_helpers.Merkle_proof_encoding.V2.Tree2.tree_proof_encoding
+
+  let kinded_hash_to_state_hash = function
+    | `Value hash | `Node hash ->
+        Sc_rollup_repr.State_hash.hash_bytes [Context_hash.to_bytes hash]
+
+  let proof_before proof =
+    kinded_hash_to_state_hash proof.Context_binary.Proof.before
+
+  let proof_after proof =
+    kinded_hash_to_state_hash proof.Context_binary.Proof.after
+
+  let produce_proof context tree step =
+    let open Lwt_syntax in
+    (* FIXME: With on-disk context, we cannot commit the empty
+       context. Is it also true in our case? *)
+    let* context = Context_binary.add_tree context [] tree in
+    let* _hash = Context_binary.commit ~time:Time.Protocol.epoch context in
+    let index = Context_binary.index context in
+    match Context_binary.Tree.kinded_key tree with
+    | Some k ->
+        let* p = Context_binary.produce_tree_proof index k step in
+        return (Some p)
+    | None -> return None
+
+  let verify_proof proof step =
+    let open Lwt_syntax in
+    let* result = Context_binary.verify_tree_proof proof step in
+    match result with
+    | Ok v -> return (Some v)
+    | Error _ ->
+        (* We skip the error analysis here since proof verification is not a
+           job for the rollup node. *)
+        return None
+end
+
+module FullArithPVM = Sc_rollup_arith.Make (Arith_Context)
+open FullArithPVM
 
 let setup boot_sector f =
-  create_context () >>=? fun ctxt ->
-  initial_state ctxt boot_sector >>= fun state -> f state
+  let open Lwt_syntax in
+  let ctxt = Context_binary.empty in
+  let* state = initial_state ctxt boot_sector in
+  f ctxt state
 
 let pre_boot boot_sector f =
   parse_boot_sector boot_sector |> function
@@ -49,13 +113,14 @@ let pre_boot boot_sector f =
 let test_preboot () =
   [""; "1"; "1 2 +"]
   |> List.iter_es (fun boot_sector ->
-         pre_boot boot_sector @@ fun _state -> return ())
+         pre_boot boot_sector @@ fun _ctxt _state -> return ())
 
-let boot boot_sector f = pre_boot boot_sector @@ fun state -> eval state >>= f
+let boot boot_sector f =
+  pre_boot boot_sector @@ fun ctxt state -> eval state >>= f ctxt
 
 let test_boot () =
   let open Sc_rollup_PVM_sem in
-  boot "" @@ fun state ->
+  boot "" @@ fun _ctxt state ->
   is_input_state state >>= function
   | Initial -> return ()
   | First_after _ ->
@@ -66,7 +131,7 @@ let test_boot () =
 
 let test_input_message () =
   let open Sc_rollup_PVM_sem in
-  boot "" @@ fun state ->
+  boot "" @@ fun _ctxt state ->
   let input =
     {
       inbox_level = Raw_level_repr.root;
@@ -97,7 +162,7 @@ let go ~max_steps target_status state =
 
 let test_parsing_message ~valid (source, expected_code) =
   let open Sc_rollup_PVM_sem in
-  boot "" @@ fun state ->
+  boot "" @@ fun _ctxt state ->
   let input =
     {
       inbox_level = Raw_level_repr.root;
@@ -165,7 +230,7 @@ let test_parsing_messages () =
 let test_evaluation_message ~valid
     (boot_sector, source, expected_stack, expected_vars) =
   let open Sc_rollup_PVM_sem in
-  boot boot_sector @@ fun state ->
+  boot boot_sector @@ fun _ctxt state ->
   let input =
     {
       inbox_level = Raw_level_repr.root;
@@ -237,6 +302,81 @@ let test_evaluation_messages () =
   >>=? fun () ->
   List.iter_es (test_evaluation_message ~valid:false) invalid_messages
 
+let test_output_messages_proofs ~valid (source, expected_outputs) =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_PVM_sem in
+  boot "" @@ fun ctxt state ->
+  let input =
+    {
+      inbox_level = Raw_level_repr.root;
+      message_counter = Z.zero;
+      payload = source;
+    }
+  in
+  let*! state = set_input input state in
+  let*! state = eval state in
+  let* state = go ~max_steps:10000 WaitingForInputMessage state in
+  let check_output output =
+    let*! result = produce_output_proof ctxt state output in
+    if valid then
+      match result with
+      | Ok proof ->
+          let*! valid = verify_output_proof proof in
+          fail_unless valid (Exn (Failure "An output proof is not valid."))
+      | Error _ -> failwith "Error during proof generation"
+    else
+      match result with
+      | Ok proof ->
+          let*! proof_is_valid = verify_output_proof proof in
+          fail_when
+            proof_is_valid
+            (Exn (Failure "A wrong output proof is valid."))
+      | Error _ -> return ()
+  in
+  List.iter_es check_output expected_outputs
+
+let make_output ~counter n =
+  let open Sc_rollup_outbox_message_repr in
+  let unparsed_parameters =
+    Micheline.(Int (dummy_location, Z.of_int n) |> strip_locations)
+  in
+  let destination = Contract_hash.zero in
+  let entrypoint = Entrypoint_repr.default in
+  let transaction = {unparsed_parameters; destination; entrypoint} in
+  let transactions = [transaction] in
+  let message_counter = Z.of_int counter
+  and payload = Atomic_transaction_batch {transactions} in
+  Sc_rollup_PVM_sem.{message_counter; payload}
+
+let test_valid_output_messages () =
+  [
+    ("1", []);
+    ("1 out", [make_output ~counter:0 1]);
+    ("1 out 2 out", [make_output ~counter:0 1; make_output ~counter:1 2]);
+    ("1 out 1 1 + out", [make_output ~counter:0 1; make_output ~counter:1 2]);
+    ( "1 out 1 1 + out out",
+      [
+        make_output ~counter:0 1;
+        make_output ~counter:1 2;
+        make_output ~counter:2 2;
+      ] );
+  ]
+  |> List.iter_es (test_output_messages_proofs ~valid:true)
+
+let test_invalid_output_messages () =
+  [
+    ("1", [make_output ~counter:0 1]);
+    ("1 out", [make_output ~counter:1 1]);
+    ("1 out 1 1 + out", [make_output ~counter:0 1; make_output ~counter:3 2]);
+    ( "1 out 1 1 + out out",
+      [
+        make_output ~counter:0 1;
+        make_output ~counter:1 2;
+        make_output ~counter:2 3;
+      ] );
+  ]
+  |> List.iter_es (test_output_messages_proofs ~valid:false)
+
 let tests =
   [
     Tztest.tztest "PreBoot" `Quick test_preboot;
@@ -244,4 +384,6 @@ let tests =
     Tztest.tztest "Input message" `Quick test_input_message;
     Tztest.tztest "Parsing message" `Quick test_parsing_messages;
     Tztest.tztest "Evaluating message" `Quick test_evaluation_messages;
+    Tztest.tztest "Valid output messages" `Quick test_valid_output_messages;
+    Tztest.tztest "Invalid output messages" `Quick test_invalid_output_messages;
   ]

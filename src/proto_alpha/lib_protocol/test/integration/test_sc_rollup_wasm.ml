@@ -119,6 +119,7 @@ let should_boot () =
   | Ok proof ->
       let*! is_correct = Verifier.verify_proof proof in
       if is_correct then return_unit else Stdlib.failwith "incorrect proof"
-  | Error err -> Stdlib.failwith ("Could not produce a proof " ^ err)
+  | Error err ->
+      failwith "Could not produce a proof %a" Environment.Error_monad.pp err
 
 let tests = [Tztest.tztest "should boot" `Quick should_boot]

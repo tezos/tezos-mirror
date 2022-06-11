@@ -37,8 +37,13 @@
    - a variable [a] is interpreted as storing the topmost element of the
      stack in the storage under the name "a" ;
 
+   - a variable [out] is interpreted as adding a message to the outbox
+     containing a single transaction batch with the topmost element of the
+     stack as payload, the zero contract as destination, and a default
+     entrypoint ;
+
    - a symbol [+] pops two integers [x] and [y] and pushes [x + y] on
-   the stack.
+     the stack ;
 
    If a message is not syntactically correct or does not evaluate
    correctly, the machine stops its evaluation and waits for the next

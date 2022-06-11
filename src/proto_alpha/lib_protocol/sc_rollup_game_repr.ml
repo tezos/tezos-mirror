@@ -325,6 +325,12 @@ let outcome_encoding =
     (fun (loser, reason) -> {loser; reason})
     (obj2 (req "loser" player_encoding) (req "reason" reason_encoding))
 
+type error += Game_error of string
+
+let game_error reason =
+  let open Lwt_result_syntax in
+  fail (Game_error reason)
+
 let find_choice game tick =
   let open Lwt_result_syntax in
   let rec traverse states =
@@ -333,16 +339,16 @@ let find_choice game tick =
         if Sc_rollup_tick_repr.(tick = state_tick) then
           return (state, tick, next_state, next_tick)
         else traverse ((next_state, next_tick) :: others)
-    | _ -> fail "This choice was not proposed"
+    | _ -> game_error "This choice was not proposed"
   in
   traverse game.dissection
 
 let check pred reason =
   let open Lwt_result_syntax in
-  if pred then return () else fail reason
+  if pred then return () else game_error reason
 
 let check_dissection start start_tick stop stop_tick dissection =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let len = Z.of_int @@ List.length dissection in
   let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
   let should_be_equal_to what =
@@ -353,7 +359,9 @@ let check_dissection start start_tick stop stop_tick dissection =
       check Z.(equal len (of_int 32)) (should_be_equal_to (Z.of_int 32))
     else if Z.(gt dist one) then
       check Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
-    else fail (Format.asprintf "Cannot have a dissection of only one section")
+    else
+      game_error
+        (Format.asprintf "Cannot have a dissection of only one section")
   in
   let* _ =
     match (List.hd dissection, List.last_opt dissection) with
@@ -394,16 +402,16 @@ let check_dissection start start_tick stop stop_tick dissection =
                b_tick
                pp
                stop_tick))
-    | _ -> fail "Dissection should contain at least 2 elements"
+    | _ -> game_error "Dissection should contain at least 2 elements"
   in
   let rec traverse states =
     match states with
     | (None, _) :: (Some _, _) :: _ ->
-        fail "Cannot return to a Some state after being at a None state"
+        game_error "Cannot return to a Some state after being at a None state"
     | (_, tick) :: (next_state, next_tick) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           traverse ((next_state, next_tick) :: others)
-        else fail "Ticks should only increase in dissection"
+        else game_error "Ticks should only increase in dissection"
     | _ -> return ()
   in
   traverse dissection
@@ -450,8 +458,8 @@ let check_proof_start_stop start start_tick stop stop_tick proof =
        stop_proof)
 
 let play game refutation =
-  let result =
-    let open Lwt_result_syntax in
+  let open Lwt_result_syntax in
+  let*! result =
     let* start, start_tick, stop, stop_tick =
       find_choice game refutation.choice
     in
@@ -467,24 +475,20 @@ let play game refutation =
                pvm_name = game.pvm_name;
                dissection = states;
              })
-    | Proof proof -> (
+    | Proof proof ->
         let* _ = check_proof_start_stop start start_tick stop stop_tick proof in
         let {inbox_snapshot; level; pvm_name; _} = game in
-        let*! proof_valid =
+        let* proof_valid =
           Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof
         in
-        match proof_valid with
-        | Error s ->
-            fail (Format.asprintf "Invalid proof: %s" s) (* Illformed? *)
-        | Ok proof_valid ->
-            let* _ = check proof_valid "Invalid proof" in
-            return
-              (Either.Left
-                 {loser = opponent game.turn; reason = Conflict_resolved}))
+        let* _ = check proof_valid "Invalid proof" in
+        return
+          (Either.Left {loser = opponent game.turn; reason = Conflict_resolved})
   in
-  Lwt.map
-    (fun r ->
-      match r with
-      | Ok x -> x
-      | Error e -> Either.Left {loser = game.turn; reason = Invalid_move e})
-    result
+  let game_over reason =
+    Either.Left {loser = game.turn; reason = Invalid_move reason}
+  in
+  match result with
+  | Ok x -> Lwt.return x
+  | Error (Game_error e) -> Lwt.return @@ game_over e
+  | Error _ -> Lwt.return @@ game_over "undefined"

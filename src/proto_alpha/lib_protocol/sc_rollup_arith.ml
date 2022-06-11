@@ -335,6 +335,13 @@ module Make (Context : P) :
 
       let set k v = set_value (key k) P.encoding v
 
+      let mapped_to k v state =
+        let open Lwt_syntax in
+        let* state', _ = Monad.(run (set k v) state) in
+        let* t = Tree.find_tree state (key k)
+        and* t' = Tree.find_tree state' (key k) in
+        Lwt.return (Option.equal Tree.equal t t')
+
       let pp =
         let open Monad.Syntax in
         let* l = children [P.name] P.encoding in
@@ -630,6 +637,28 @@ module Make (Context : P) :
         | Some false -> Format.fprintf fmt "evaluation fails"
     end)
 
+    module OutputCounter = MakeVar (struct
+      type t = Z.t
+
+      let initial = Z.zero
+
+      let name = "output_counter"
+
+      let encoding = Data_encoding.z
+
+      let pp = Z.pp_print
+    end)
+
+    module Output = MakeDict (struct
+      type t = Sc_rollup_PVM_sem.output
+
+      let name = "output"
+
+      let encoding = Sc_rollup_PVM_sem.output_encoding
+
+      let pp = Sc_rollup_PVM_sem.pp_output
+    end)
+
     let pp =
       let open Monad.Syntax in
       let* status_pp = Status.pp in
@@ -640,10 +669,23 @@ module Make (Context : P) :
       let* lexer_state_pp = LexerState.pp in
       let* evaluation_result_pp = EvaluationResult.pp in
       let* vars_pp = Vars.pp in
+      let* output_pp = Output.pp in
+      let* stack = Stack.to_list in
       return @@ fun fmt () ->
       Format.fprintf
         fmt
-        "@[<v 0 >@;%a@;%a@;%a@;%a@;%a@;%a@;%a@;%a@]"
+        "@[<v 0 >@;\
+         %a@;\
+         %a@;\
+         %a@;\
+         %a@;\
+         %a@;\
+         %a@;\
+         %a@;\
+         vars : %a@;\
+         output :%a@;\
+         stack : %a@;\
+         @]"
         status_pp
         ()
         message_counter_pp
@@ -660,6 +702,10 @@ module Make (Context : P) :
         ()
         vars_pp
         ()
+        output_pp
+        ()
+        Format.(pp_print_list pp_print_int)
+        stack
   end
 
   open State
@@ -905,6 +951,21 @@ module Make (Context : P) :
         | None -> stop_parsing true
         | _ -> stop_parsing false)
 
+  let output v =
+    let open Monad.Syntax in
+    let open Sc_rollup_outbox_message_repr in
+    let* counter = OutputCounter.get in
+    let* () = OutputCounter.set (Z.succ counter) in
+    let unparsed_parameters =
+      Micheline.(Int ((), Z.of_int v) |> strip_locations)
+    in
+    let destination = Contract_hash.zero in
+    let entrypoint = Entrypoint_repr.default in
+    let transaction = {unparsed_parameters; destination; entrypoint} in
+    let payload = Atomic_transaction_batch {transactions = [transaction]} in
+    let output = Sc_rollup_PVM_sem.{message_counter = counter; payload} in
+    Output.set (Z.to_string counter) output
+
   let evaluate =
     let open Monad.Syntax in
     let* i = Code.pop in
@@ -913,7 +974,10 @@ module Make (Context : P) :
     | Some (IPush x) -> Stack.push x
     | Some (IStore x) -> (
         let* v = Stack.top in
-        match v with None -> stop_evaluating false | Some v -> Vars.set x v)
+        match v with
+        | None -> stop_evaluating false
+        | Some v ->
+            if Compare.String.(x = "out") then output v else Vars.set x v)
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
@@ -981,15 +1045,58 @@ module Make (Context : P) :
     | Some (_, request) ->
         return (PS.input_request_equal request proof.requested)
 
+  type error += Arith_proof_production_failed
+
   let produce_proof context input_given state =
-    let open Lwt_syntax in
-    let* result =
+    let open Lwt_result_syntax in
+    let*! result =
       Context.produce_proof context state (step_transition input_given)
     in
     match result with
     | Some (tree_proof, requested) ->
-        return (Result.ok {tree_proof; given = input_given; requested})
-    | None -> return (Result.error "Context.produce_proof returned None")
+        return {tree_proof; given = input_given; requested}
+    | None -> fail Arith_proof_production_failed
+
+  (* TEMPORARY: The following definitions will be extended in a future commit. *)
+
+  type output_proof = {
+    output_proof : Context.proof;
+    output_proof_state : hash;
+    output_proof_output : PS.output;
+  }
+
+  let output_of_output_proof s = s.output_proof_output
+
+  let state_of_output_proof s = s.output_proof_state
+
+  let output_key (output : PS.output) = Z.to_string output.message_counter
+
+  let has_output output tree =
+    let open Lwt_syntax in
+    let* equal = Output.mapped_to (output_key output) output tree in
+    return (tree, equal)
+
+  let verify_output_proof p =
+    let open Lwt_syntax in
+    let transition = has_output p.output_proof_output in
+    let* result = Context.verify_proof p.output_proof transition in
+    match result with None -> return false | Some _ -> return true
+
+  type error += Arith_output_proof_production_failed
+
+  type error += Arith_invalid_claim_about_outbox
+
+  let produce_output_proof context state output_proof_output =
+    let open Lwt_result_syntax in
+    let*! output_proof_state = state_hash state in
+    let*! result =
+      Context.produce_proof context state @@ has_output output_proof_output
+    in
+    match result with
+    | Some (output_proof, true) ->
+        return {output_proof; output_proof_state; output_proof_output}
+    | Some (_, false) -> fail Arith_invalid_claim_about_outbox
+    | None -> fail Arith_output_proof_production_failed
 end
 
 module ProtocolImplementation = Make (struct

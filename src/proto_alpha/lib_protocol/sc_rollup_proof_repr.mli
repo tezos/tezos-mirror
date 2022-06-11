@@ -26,18 +26,18 @@
 
 (** A refutation game proof is required as part of the final move in a
     game.
-    
+
     This proof is basically a combination of a PVM proof (provided by
     each implementation of the PVM signature) and an inbox proof. To
     check the proof we must check each part separately and then also
     check that they match on the two points where they touch:
-      
+
       - the [input_requested] of the PVM proof should match the starting
-      point of the inbox proof ; 
-      
+      point of the inbox proof ;
+
       - the [input_given] of the PVM proof should match the output
       message of the inbox proof.
-    
+
     It is also often the case that the PVM proof has [No_input_required]
     for its [input_requested] and [None] for its [input_given]. If this
     is the case, we don't need the inbox proof at all and the [inbox]
@@ -77,16 +77,16 @@ val start : t -> State_hash.t
 val stop : t -> State_hash.t option
 
 (** Check the validity of a proof.
-    
+
     This function requires a few bits of data (available from the
     refutation game record in the storage):
-      
+
       - a snapshot of the inbox, used by the [inbox] proof ;
-      
+
       - the inbox level of the commitment, used to determine if an
       output from the [inbox] proof is too recent to be allowed into the
       PVM proof ;
-      
+
       - the [pvm_name], used to check that the proof given has the right
       PVM kind. *)
 val valid :
@@ -94,7 +94,7 @@ val valid :
   Raw_level_repr.t ->
   pvm_name:string ->
   t ->
-  (bool, string) result Lwt.t
+  (bool, error) result Lwt.t
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S
@@ -122,4 +122,4 @@ val produce :
   (module PVM_with_context_and_state) ->
   Sc_rollup_inbox_repr.t ->
   Raw_level_repr.t ->
-  (t, string) result Lwt.t
+  (t, error) result Lwt.t

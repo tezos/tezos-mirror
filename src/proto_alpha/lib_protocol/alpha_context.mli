@@ -2530,6 +2530,11 @@ module Sc_rollup : sig
 
   val input_request_equal : input_request -> input_request -> bool
 
+  type output = {
+    message_counter : Z.t;
+    payload : Sc_rollup_outbox_message_repr.t;
+  }
+
   module PVM : sig
     type boot_sector = string
 
@@ -2571,7 +2576,18 @@ module Sc_rollup : sig
       val verify_proof : proof -> bool Lwt.t
 
       val produce_proof :
-        context -> input option -> state -> (proof, string) result Lwt.t
+        context -> input option -> state -> (proof, error) result Lwt.t
+
+      type output_proof
+
+      val output_of_output_proof : output_proof -> output
+
+      val state_of_output_proof : output_proof -> State_hash.t
+
+      val verify_output_proof : output_proof -> bool Lwt.t
+
+      val produce_output_proof :
+        context -> state -> output -> (output_proof, error) result Lwt.t
     end
 
     type t = (module S)
@@ -2678,7 +2694,7 @@ module Sc_rollup : sig
       val get_status : state -> status Lwt.t
 
       val produce_proof :
-        context -> input option -> state -> (proof, string) result Lwt.t
+        context -> input option -> state -> (proof, error) result Lwt.t
     end
 
     module ProtocolImplementation :
@@ -2854,6 +2870,36 @@ module Sc_rollup : sig
     end
   end
 
+  module Outbox : sig
+    (** See {!Sc_rollup_outbox_message_repr}. *)
+    module Message : sig
+      type transaction = {
+        unparsed_parameters : Script.expr;
+        destination : Contract_hash.t;
+        entrypoint : Entrypoint.t;
+      }
+
+      type t = Atomic_transaction_batch of {transactions : transaction list}
+
+      val of_bytes : string -> t tzresult
+
+      module Internal_for_tests : sig
+        val to_bytes : t -> string tzresult
+      end
+    end
+
+    val record_applied_message :
+      context ->
+      t ->
+      Raw_level.t ->
+      message_index:int ->
+      (Z.t * context) tzresult Lwt.t
+  end
+
+  module Errors : sig
+    type error += Sc_rollup_does_not_exist of t
+  end
+
   module type PVM_with_proof = sig
     include PVM.S
 
@@ -2884,7 +2930,7 @@ module Sc_rollup : sig
       (module PVM_with_context_and_state) ->
       Sc_rollup_inbox_repr.t ->
       Raw_level_repr.t ->
-      (t, string) result Lwt.t
+      (t, error) result Lwt.t
   end
 
   module Game : sig
@@ -2947,7 +2993,7 @@ module Sc_rollup : sig
       State_hash.t option ->
       Tick.t ->
       (State_hash.t option * Tick.t) list ->
-      (unit, string) result Lwt.t
+      (unit, error) result Lwt.t
 
     val play : t -> refutation -> (outcome, t) Either.t Lwt.t
   end
@@ -3004,36 +3050,6 @@ module Sc_rollup : sig
   val initial_level : context -> t -> Raw_level.t tzresult Lwt.t
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
-
-  module Outbox : sig
-    (** See {!Sc_rollup_outbox_message_repr}. *)
-    module Message : sig
-      type transaction = {
-        unparsed_parameters : Script.expr;
-        destination : Contract_hash.t;
-        entrypoint : Entrypoint.t;
-      }
-
-      type t = Atomic_transaction_batch of {transactions : transaction list}
-
-      val of_bytes : string -> t tzresult
-
-      module Internal_for_tests : sig
-        val to_bytes : t -> string tzresult
-      end
-    end
-
-    val record_applied_message :
-      context ->
-      t ->
-      Raw_level.t ->
-      message_index:int ->
-      (Z.t * context) tzresult Lwt.t
-  end
-
-  module Errors : sig
-    type error += Sc_rollup_does_not_exist of t
-  end
 
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
