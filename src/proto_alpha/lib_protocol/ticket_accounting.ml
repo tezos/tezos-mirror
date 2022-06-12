@@ -220,7 +220,10 @@ let update_ticket_balances ctxt ~self ~ticket_diffs operations =
       (Compare.Z.(Script_int.to_zint amount <= Z.neg balance_diff), ctxt)
   in
   (* Collect diffs from operations *)
-  Ticket_operations_diff.ticket_diffs_of_operations ctxt operations
+  Ticket_operations_diff.ticket_diffs_of_operations
+    ~allow_zero_amount_tickets:true
+    ctxt
+    operations
   >>=? fun (ticket_op_diffs, ctxt) ->
   (* Update balances for self-contract. *)
   Ticket_token_map.to_list ctxt ticket_diffs >>?= fun (ticket_diffs, ctxt) ->

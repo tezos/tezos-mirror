@@ -142,20 +142,22 @@ module Ticket_token_map = struct
       map
 end
 
-let tickets_of_transaction ctxt ~destination ~parameters_ty ~parameters =
+let tickets_of_transaction ctxt ~allow_zero_amount_tickets ~destination
+    ~parameters_ty ~parameters =
   let destination = Destination.Contract (Originated destination) in
   Ticket_scanner.type_has_tickets ctxt parameters_ty
   >>?= fun (has_tickets, ctxt) ->
   Ticket_scanner.tickets_of_value
     ~include_lazy:true
-    ~allow_zero_amount_tickets:true
+    ~allow_zero_amount_tickets
     ctxt
     has_tickets
     parameters
   >>=? fun (tickets, ctxt) -> return (Some {destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
-let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
+let tickets_of_origination ctxt ~allow_zero_amount_tickets ~preorigination
+    ~storage_type ~storage =
   (* Extract any tickets from the storage. Note that if the type of the contract
      storage does not contain tickets, storage is not scanned. *)
   Ticket_scanner.type_has_tickets ctxt storage_type
@@ -163,14 +165,14 @@ let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
   Ticket_scanner.tickets_of_value
     ctxt
     ~include_lazy:true
-    ~allow_zero_amount_tickets:true
+    ~allow_zero_amount_tickets
     has_tickets
     storage
   >|=? fun (tickets, ctxt) ->
   let destination = Destination.Contract (Originated preorigination) in
   (Some {tickets; destination}, ctxt)
 
-let tickets_of_operation ctxt
+let tickets_of_operation ctxt ~allow_zero_amount_tickets
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
   match operation with
   | Transaction_to_contract {destination = Implicit _; _} -> return (None, ctxt)
@@ -184,7 +186,12 @@ let tickets_of_operation ctxt
         parameters_ty;
         parameters;
       } ->
-      tickets_of_transaction ctxt ~destination ~parameters_ty ~parameters
+      tickets_of_transaction
+        ctxt
+        ~allow_zero_amount_tickets
+        ~destination
+        ~parameters_ty
+        ~parameters
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
@@ -203,7 +210,12 @@ let tickets_of_operation ctxt
         storage_type;
         storage;
       } ->
-      tickets_of_origination ctxt ~preorigination ~storage_type ~storage
+      tickets_of_origination
+        ctxt
+        ~allow_zero_amount_tickets
+        ~preorigination
+        ~storage_type
+        ~storage
   | Delegation _ -> return (None, ctxt)
 
 let add_transfer_to_token_map ctxt token_map {destination; tickets} =
@@ -216,10 +228,11 @@ let add_transfer_to_token_map ctxt token_map {destination; tickets} =
     (token_map, ctxt)
     tickets
 
-let ticket_token_map_of_operations ctxt ops =
+let ticket_token_map_of_operations ctxt ~allow_zero_amount_tickets ops =
   List.fold_left_es
     (fun (token_map, ctxt) op ->
-      tickets_of_operation ctxt op >>=? fun (res, ctxt) ->
+      tickets_of_operation ctxt ~allow_zero_amount_tickets op
+      >>=? fun (res, ctxt) ->
       match res with
       | Some ticket_trans ->
           add_transfer_to_token_map ctxt token_map ticket_trans
@@ -228,8 +241,9 @@ let ticket_token_map_of_operations ctxt ops =
     ops
 
 (** Traverses a list of operations and scans for tickets. *)
-let ticket_diffs_of_operations ctxt operations =
-  ticket_token_map_of_operations ctxt operations >>=? fun (token_map, ctxt) ->
+let ticket_diffs_of_operations ctxt ~allow_zero_amount_tickets operations =
+  ticket_token_map_of_operations ctxt ~allow_zero_amount_tickets operations
+  >>=? fun (token_map, ctxt) ->
   Ticket_token_map.fold
     ctxt
     (fun ctxt acc ticket_token destination_map ->
