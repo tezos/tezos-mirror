@@ -23,34 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group =
-  {Clic.name = "dal-daemon"; title = "Commands related to the DAL daemon"}
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
+   use another storage solution that irmin as we don't need backtracking *)
 
-let data_dir_arg =
-  let default = Configuration.default_data_dir in
-  Clic.default_arg
-    ~long:"data-dir"
-    ~placeholder:"data-dir"
-    ~doc:
-      (Format.sprintf
-         "The path to the DAL daemon data directory. Default value is %s"
-         default)
-    ~default
-    (Client_config.string_parameter ())
+(* Relative path to store directory from base-dir *)
+let path = "store"
 
-let run_command =
-  let open Clic in
-  command
-    ~group
-    ~desc:"Run the DAL daemon."
-    (args1 data_dir_arg)
-    (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
+module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
+include StoreMaker.Make (Irmin.Contents.String)
 
-let commands () = [run_command]
+let info message =
+  let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
+  Irmin.Info.Default.v ~author:"DAL Node" ~message date
 
-let select_commands _ _ =
-  let open Lwt_result_syntax in
-  return (commands ())
+let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+let init config =
+  let open Lwt_syntax in
+  let dir = Configuration.data_dir_path config path in
+  let* repo = Repo.v (Irmin_pack.config dir) in
+  let* store = main repo in
+  let* () = Event.(emit store_is_ready ()) in
+  Lwt.return store

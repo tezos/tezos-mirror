@@ -23,34 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group =
-  {Clic.name = "dal-daemon"; title = "Commands related to the DAL daemon"}
+module RPC_server = struct
+  let register _store _configuration = RPC_directory.empty
 
-let data_dir_arg =
-  let default = Configuration.default_data_dir in
-  Clic.default_arg
-    ~long:"data-dir"
-    ~placeholder:"data-dir"
-    ~doc:
-      (Format.sprintf
-         "The path to the DAL daemon data directory. Default value is %s"
-         default)
-    ~default
-    (Client_config.string_parameter ())
+  let start configuration dir =
+    let open Lwt_syntax in
+    let Configuration.{rpc_addr; rpc_port; _} = configuration in
+    let rpc_addr = P2p_addr.of_string_exn rpc_addr in
+    let host = Ipaddr.V6.to_string rpc_addr in
+    let node = `TCP (`Port rpc_port) in
+    let acl = RPC_server.Acl.default rpc_addr in
+    Lwt.catch
+      (fun () ->
+        let* server =
+          RPC_server.launch
+            ~media_types:Media_type.all_media_types
+            ~host
+            ~acl
+            node
+            dir
+        in
+        return_ok server)
+      fail_with_exn
 
-let run_command =
-  let open Clic in
-  command
-    ~group
-    ~desc:"Run the DAL daemon."
-    (args1 data_dir_arg)
-    (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
+  let shutdown = RPC_server.shutdown
 
-let commands () = [run_command]
+  let install_finalizer rpc_server =
+    let open Lwt_syntax in
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+    let* () = shutdown rpc_server in
+    let* () = Event.(emit shutdown_node exit_status) in
+    Tezos_base_unix.Internal_event_unix.close ()
+end
 
-let select_commands _ _ =
+let run ~data_dir _ctxt =
   let open Lwt_result_syntax in
-  return (commands ())
-
-let () = Client_main_run.run (module Client_config) ~select_commands
+  let*! () = Event.(emit starting_node) () in
+  let* config = Configuration.load ~data_dir in
+  let config = {config with data_dir} in
+  let*! store = Store.init config in
+  let* rpc_server = RPC_server.(start config (register config store)) in
+  let _ = RPC_server.install_finalizer rpc_server in
+  let*! () =
+    Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
+  in
+  let*! () = Event.(emit node_is_ready ()) in
+  Lwt_utils.never_ending ()

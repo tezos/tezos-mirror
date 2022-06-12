@@ -23,34 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group =
-  {Clic.name = "dal-daemon"; title = "Commands related to the DAL daemon"}
+include Internal_event.Simple
 
-let data_dir_arg =
-  let default = Configuration.default_data_dir in
-  Clic.default_arg
-    ~long:"data-dir"
-    ~placeholder:"data-dir"
-    ~doc:
-      (Format.sprintf
-         "The path to the DAL daemon data directory. Default value is %s"
-         default)
-    ~default
-    (Client_config.string_parameter ())
+let section = ["dal"; "node"]
 
-let run_command =
-  let open Clic in
-  command
-    ~group
-    ~desc:"Run the DAL daemon."
-    (args1 data_dir_arg)
-    (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
+let starting_node =
+  declare_0
+    ~section
+    ~name:"starting_dal_node"
+    ~msg:"Starting the DAL node"
+    ~level:Notice
+    ()
 
-let commands () = [run_command]
+let shutdown_node =
+  declare_1
+    ~section
+    ~name:"stopping_dal_node"
+    ~msg:"Stopping DAL node"
+    ~level:Notice
+    ("exit_status", Data_encoding.int8)
 
-let select_commands _ _ =
-  let open Lwt_result_syntax in
-  return (commands ())
+let store_is_ready =
+  declare_0
+    ~section
+    ~name:"dal_node_store_is_ready"
+    ~msg:"The DAL node store is ready"
+    ~level:Notice
+    ()
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+let rpc_server_is_ready =
+  declare_2
+    ~section
+    ~name:"dal_node_rpc_server_is_ready"
+    ~msg:"The DAL node is listening to {addr}:{port}"
+    ~level:Notice
+    ("addr", Data_encoding.string)
+    ("port", Data_encoding.uint16)
+
+let node_is_ready =
+  declare_0
+    ~section
+    ~name:"dal_node_is_ready"
+    ~msg:"The DAL node is ready"
+    ~level:Notice
+    ()
+
+let data_dir_not_found =
+  declare_1
+    ~section
+    ~name:"dal_node_no_data_dir"
+    ~msg:
+      "The DAL node data directory {path} doesn't exists. Create using: \
+       init-config --data-dir={path} "
+    ~level:Error
+    ("path", Data_encoding.(string))
