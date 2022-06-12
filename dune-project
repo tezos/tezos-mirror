@@ -66,6 +66,7 @@
 (package (name tezos-context))
 (package (name tezos-context-ops))
 (package (name tezos-crypto))
+(package (name tezos-dal-node))
 (package (name tezos-embedded-protocol-000-Ps9mPmXa))
 (package (name tezos-embedded-protocol-001-PtCJ7pwo))
 (package (name tezos-embedded-protocol-002-PsYLVpVv))

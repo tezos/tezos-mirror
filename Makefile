@@ -45,7 +45,7 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
     $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
     $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 
-UNRELEASED_TEZOS_BIN=
+UNRELEASED_TEZOS_BIN=tezos-dal-node
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
