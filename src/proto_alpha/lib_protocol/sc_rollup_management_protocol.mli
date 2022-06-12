@@ -56,7 +56,7 @@ type transaction = private
 (** A type representing a batch of Layer 2 to Layer 1 transactions. *)
 type atomic_transaction_batch = private {transactions : transaction list}
 
-(** A type representing messages from Layer 2 to Layer 1. *)
+(** A typed representation of {!Sc_rollup.Outbox.Message.t}. *)
 type outbox_message = private
   | Atomic_transaction_batch of atomic_transaction_batch
 
@@ -71,11 +71,15 @@ val make_internal_inbox_message :
   source:public_key_hash ->
   (Sc_rollup.Inbox.Message.t * context) tzresult Lwt.t
 
-(** [outbox_message_of_bytes ctxt bs] decodes an outbox message value from the
-    given bytes [bs]. The function involves parsing Micheline expressions to
-    typed values. *)
-val outbox_message_of_bytes :
-  context -> string -> (outbox_message * context) tzresult Lwt.t
+(** [outbox_message_of_outbox_message_repr ctxt msg] returns a typed version of
+    of the given outbox message [msg].
+
+    Fails with an [Sc_rollup_invalid_destination] error in case the parameters
+    don't match the type of the entrypoint and destination. *)
+val outbox_message_of_outbox_message_repr :
+  context ->
+  Sc_rollup.Outbox.Message.t ->
+  (outbox_message * context) tzresult Lwt.t
 
 (** Function for constructing and encoding {!inbox_message} and
     {!outbox_message} values. Since Layer 1 only ever consumes {!outbox_message}

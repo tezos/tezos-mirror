@@ -120,15 +120,9 @@ let transactions_batch_of_internal ctxt transactions =
   in
   ({transactions}, ctxt)
 
-(** TODO: #2951
-    Carbonate [of_bytes] step.
-    Gas for decoding the binary values should be be accounted for.
-  *)
-let outbox_message_of_bytes ctxt bytes =
+let outbox_message_of_outbox_message_repr ctxt
+    (Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}) =
   let open Lwt_tzresult_syntax in
-  let*? (Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}) =
-    Sc_rollup.Outbox.Message.of_bytes bytes
-  in
   let+ ts, ctxt = transactions_batch_of_internal ctxt transactions in
   (Atomic_transaction_batch ts, ctxt)
 
