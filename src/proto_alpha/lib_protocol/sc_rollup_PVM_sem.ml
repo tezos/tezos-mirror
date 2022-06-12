@@ -294,6 +294,9 @@ module type S = sig
       is part of the outbox of a given [state]. *)
   type output_proof
 
+  (** [output_proof_encoding] encoding value for [output_proof]s. *)
+  val output_proof_encoding : output_proof Data_encoding.t
+
   (** [output_of_output_proof proof] returns the [output] that is
       referred to in [proof]'s statement. *)
   val output_of_output_proof : output_proof -> output

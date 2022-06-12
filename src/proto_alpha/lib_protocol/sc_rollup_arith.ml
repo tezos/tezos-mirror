@@ -1065,6 +1065,18 @@ module Make (Context : P) :
     output_proof_output : PS.output;
   }
 
+  let output_proof_encoding =
+    let open Data_encoding in
+    conv
+      (fun {output_proof; output_proof_state; output_proof_output} ->
+        (output_proof, output_proof_state, output_proof_output))
+      (fun (output_proof, output_proof_state, output_proof_output) ->
+        {output_proof; output_proof_state; output_proof_output})
+      (obj3
+         (req "output_proof" Context.proof_encoding)
+         (req "output_proof_state" State_hash.encoding)
+         (req "output_proof_output" PS.output_encoding))
+
   let output_of_output_proof s = s.output_proof_output
 
   let state_of_output_proof s = s.output_proof_state

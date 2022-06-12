@@ -2580,6 +2580,8 @@ module Sc_rollup : sig
 
       type output_proof
 
+      val output_proof_encoding : output_proof Data_encoding.t
+
       val output_of_output_proof : output_proof -> output
 
       val state_of_output_proof : output_proof -> State_hash.t
