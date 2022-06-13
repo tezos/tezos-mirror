@@ -65,11 +65,18 @@ def package_role(
     (text, lib) = parse_role(text)
     src = find_dot_opam(lib)
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
+    if name == 'package-name':
+        node = nodes.literal(text, text)
+        return [node], []
     project_url = os.environ.get(
         'CI_MERGE_REQUEST_SOURCE_PROJECT_URL',
         os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'),
     )
     src_url = project_url + "/tree/" + branch + "/" + src
+    if name == 'package-src':
+        node = nodes.reference(rawtext, src, refuri=src_url, **options)
+        return [node], []
+    # name == 'package'
     if os.path.isdir('_build/api/odoc/_html/' + lib):
         if os.path.isdir(
             os.path.join(
@@ -90,12 +97,7 @@ def package_role(
         raise ValueError('package_role: no API for package ', lib)
     else:
         url = src_url
-    if name == 'package':
-        node = nodes.reference(rawtext, text, refuri=url, **options)
-    elif name == 'package-name':
-        node = nodes.literal(text, text)
-    elif name == 'package-src':
-        node = nodes.reference(rawtext, src, refuri=src_url, **options)
+    node = nodes.reference(rawtext, text, refuri=url, **options)
     return [node], []
 
 
