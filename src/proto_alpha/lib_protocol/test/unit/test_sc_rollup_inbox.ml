@@ -80,16 +80,18 @@ let test_add_messages payloads =
     (err "Invalid number of available messages.")
 
 let test_consume_messages (payloads, nb_consumed_messages) =
-  let nb_payloads = List.length payloads in
+  let nb_payloads = List.length payloads |> Int32.of_int in
   setup_inbox_with_messages [payloads]
   @@ fun _messages _history inbox _inboxes ->
   consume_n_messages nb_consumed_messages inbox |> Environment.wrap_tzresult
   >>?= function
   | Some inbox ->
-      let available_messages = nb_payloads - nb_consumed_messages in
+      let available_messages = Int32.sub nb_payloads nb_consumed_messages in
       fail_unless
         Z.(
-          equal (number_of_available_messages inbox) (of_int available_messages))
+          equal
+            (number_of_available_messages inbox)
+            (of_int32 available_messages))
         (err "Invalid number of available messages.")
   | None ->
       fail_unless
@@ -215,7 +217,7 @@ let tests =
       QCheck2.Gen.(
         let* l = list_size small_int string in
         let* n = 0 -- ((List.length l * 2) + 1) in
-        return (l, n))
+        return (l, Int32.of_int n))
       test_consume_messages;
   ]
   @

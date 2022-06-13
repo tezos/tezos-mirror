@@ -80,12 +80,12 @@ let valid snapshot commit_level ~pvm_name proof =
     | Sc_rollup_PVM_sem.No_input_required, None -> return None
     | Sc_rollup_PVM_sem.Initial, Some inbox_proof ->
         Sc_rollup_inbox_repr.Proof.valid
-          (Raw_level_repr.root, Z.zero)
+          {inbox_level = Raw_level_repr.root; message_counter = Z.zero}
           snapshot
           inbox_proof
     | Sc_rollup_PVM_sem.First_after (level, counter), Some inbox_proof ->
         Sc_rollup_inbox_repr.Proof.valid
-          (level, Z.succ counter)
+          {inbox_level = level; message_counter = Z.succ counter}
           snapshot
           inbox_proof
     | _ ->

@@ -2776,7 +2776,7 @@ module Sc_rollup : sig
 
     val number_of_available_messages : t -> Z.t
 
-    val consume_n_messages : int -> t -> t option tzresult
+    val consume_n_messages : int32 -> t -> t option tzresult
 
     module Hash : S.HASH
 

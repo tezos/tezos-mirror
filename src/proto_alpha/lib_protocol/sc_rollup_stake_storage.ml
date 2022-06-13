@@ -372,9 +372,8 @@ let cement_commitment ctxt rollup new_lcc =
   consume_n_messages
     ctxt
     rollup
-    (Int32.to_int
-    @@ Sc_rollup_repr.Number_of_messages.to_int32
-         new_lcc_commitment.number_of_messages)
+    (Sc_rollup_repr.Number_of_messages.to_int32
+       new_lcc_commitment.number_of_messages)
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in

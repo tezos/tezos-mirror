@@ -32,8 +32,7 @@
 
    This module is designed to:
 
-   1. give a constant-time access to the number of available messages
-   ;
+   1. give a constant-time access to the number of available messages ;
 
    2. provide a space-efficient representation for proofs of inbox
    inclusions (only for inboxes obtained at the end of block
@@ -353,11 +352,11 @@ let empty rollup level =
 
 let consume_n_messages n ({nb_available_messages; _} as inbox) :
     t option tzresult =
-  if Compare.Int.(n < 0) then
-    error (Invalid_number_of_messages_to_consume (Int64.of_int n))
-  else if Compare.Int64.(Int64.of_int n > nb_available_messages) then ok None
+  let n = Int64.of_int32 n in
+  if Compare.Int64.(n < 0L) then error (Invalid_number_of_messages_to_consume n)
+  else if Compare.Int64.(n > nb_available_messages) then ok None
   else
-    let nb_available_messages = Int64.(sub nb_available_messages (of_int n)) in
+    let nb_available_messages = Int64.(sub nb_available_messages n) in
     ok (Some {inbox with nb_available_messages})
 
 let key_of_message = Data_encoding.Binary.to_string_exn Data_encoding.z
@@ -617,18 +616,20 @@ module MakeHashingScheme (Tree : TREE) :
 
   let add_messages_aux history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
-    if Raw_level_repr.(level < inbox.level) then
-      fail (Invalid_level_add_messages level)
-    else
-      let history, inbox = archive_if_needed history inbox level in
-      let* messages, inbox =
-        List.fold_left_es
-          (fun (messages, inbox) payload -> add_message inbox payload messages)
-          (messages, inbox)
-          payloads
-      in
-      let current_messages_hash () = hash_messages messages in
-      return (messages, history, {inbox with current_messages_hash})
+    let* () =
+      fail_when
+        Raw_level_repr.(level < inbox.level)
+        (Invalid_level_add_messages level)
+    in
+    let history, inbox = archive_if_needed history inbox level in
+    let* messages, inbox =
+      List.fold_left_es
+        (fun (messages, inbox) payload -> add_message inbox payload messages)
+        (messages, inbox)
+        payloads
+    in
+    let current_messages_hash () = hash_messages messages in
+    return (messages, history, {inbox with current_messages_hash})
 
   let add_external_messages history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
@@ -722,6 +723,8 @@ include (
 type inbox = t
 
 module Proof = struct
+  type starting_point = {inbox_level : Raw_level_repr.t; message_counter : Z.t}
+
   type t = {
     skips : (inbox * inclusion_proof) list;
     (* The [skips] value in this record makes it potentially unbounded
@@ -811,7 +814,7 @@ module Proof = struct
     let*! result = promise in
     match result with Ok r -> return r | Error _ -> proof_error reason
 
-  let rec valid (l, n) inbox proof =
+  let rec valid {inbox_level = l; message_counter = n} inbox proof =
     assert (Z.(geq n zero)) ;
     let open Lwt_result_syntax in
     match split_proof proof with
@@ -845,7 +848,11 @@ module Proof = struct
           verify_inclusion_proof inc level (bottom_level remaining_proof)
           && Raw_level_repr.equal (inbox_level level) l
           && Z.equal level.message_counter n
-        then valid (Raw_level_repr.succ l, Z.zero) inbox remaining_proof
+        then
+          valid
+            {inbox_level = Raw_level_repr.succ l; message_counter = Z.zero}
+            inbox
+            remaining_proof
         else proof_error "Inbox proof parameters don't match (lower level)"
 
   (* TODO #2997 This needs to be implemented when the inbox structure is
