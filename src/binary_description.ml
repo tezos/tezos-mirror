@@ -135,35 +135,32 @@ let add_n_reference uf {descriptions} =
     {title = n_reference_name; description = Some n_reference_description} ;
   {descriptions = (n_reference_name, n_encoding) :: descriptions}
 
-let dedup_canonicalize uf =
+let dedup_canonicalize uf l =
   let tbl :
       (Binary_schema.toplevel_encoding, Binary_schema.description) Hashtbl.t =
     Hashtbl.create 100
   in
-  let rec help prev_len l =
+  let rec run prev_len l =
     Hashtbl.clear tbl ;
-    let acc =
-      List.fold_left
-        (fun acc (name, layout) ->
-          match Hashtbl.find_opt tbl layout with
-          | None ->
-              let desc = UF.find uf name in
-              Hashtbl.add tbl layout desc ;
-              (desc.title, layout) :: acc
-          | Some original_desc ->
-              UF.union uf ~new_canonical:original_desc ~existing:name ;
-              acc)
-        []
-        l
-    in
     let fixedup =
-      List.map (fun (desc, layout) -> (desc, fixup_references uf layout)) acc
+      l
+      |> List.filter_map (fun (name, layout) ->
+             match Hashtbl.find_opt tbl layout with
+             | None ->
+                 let desc = UF.find uf name in
+                 Hashtbl.add tbl layout desc ;
+                 Some (desc.title, layout)
+             | Some original_desc ->
+                 UF.union uf ~new_canonical:original_desc ~existing:name ;
+                 None)
+      |> List.map (fun (desc, layout) -> (desc, fixup_references uf layout))
     in
-    if List.compare_length_with fixedup prev_len = 0 then
+    let len = List.length fixedup in
+    if len = prev_len then
       List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
-    else help (List.length fixedup) fixedup
+    else run len fixedup
   in
-  help 0
+  run (List.length l) l
 
 type pdesc = P : 'x Encoding.desc -> pdesc
 
@@ -553,8 +550,8 @@ let describe (type x) (encoding : x Encoding.t) =
             UF.union uf ~new_canonical:(UF.find uf name) ~existing:reference ;
             false
         | Obj _ | Cases _ | Int_enum _ -> true)
-      references.descriptions
+      (List.rev references.descriptions)
   in
-  let fields = List.rev (dedup_canonicalize uf filtered) in
+  let fields = dedup_canonicalize uf filtered in
   let toplevel = fixup_references uf toplevel in
   {Binary_schema.toplevel; fields}
