@@ -320,7 +320,9 @@ and read_variable_pair :
       let right = read_rec e2 state in
       assert (state.remaining_bytes = 0) ;
       (left, right)
-  | _ -> assert false
+  | `Dynamic, (`Fixed _ | `Dynamic) -> assert false
+  | `Fixed _, (`Fixed _ | `Dynamic) -> assert false
+  | `Variable, (`Variable | `Dynamic) -> assert false
 
 (* Should be rejected by [Encoding.Kind.combine] *)
 and read_list : type a. read_error -> int -> a Encoding.t -> state -> a list =

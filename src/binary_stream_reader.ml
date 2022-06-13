@@ -362,7 +362,7 @@ let rec read_rec :
       (match state.remaining_bytes with
       | Some remaining when whole && limit < remaining ->
           raise_read_error Size_limit_exceeded
-      | _ -> ()) ;
+      | Some _ | None -> ()) ;
       let state = {state with allowed_bytes = Some limit} in
       read_rec whole e state @@ fun (v, state) ->
       let allowed_bytes =
@@ -418,7 +418,9 @@ and read_variable_pair :
         read_rec true e2 state @@ fun (right, state) ->
         assert (state.remaining_bytes = Some 0) ;
         k ((left, right), state)
-  | _ ->
+  | `Dynamic, (`Fixed _ | `Dynamic)
+  | `Fixed _, (`Fixed _ | `Dynamic)
+  | `Variable, (`Variable | `Dynamic) ->
       (* Should be rejected by [Encoding.Kind.combine] *)
       assert false
 

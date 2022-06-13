@@ -234,7 +234,8 @@ and classify_desc : type a. a desc -> Kind.t =
   | Padded ({encoding; _}, n) -> (
       match classify_desc encoding with
       | `Fixed m -> `Fixed (n + m)
-      | _ -> assert false (* by construction (see [Fixed.padded]) *))
+      | `Dynamic | `Variable ->
+          assert false (* by construction (see [Fixed.padded]) *))
   | String_enum (_, cases) ->
       `Fixed Binary_size.(integer_to_size @@ enum_size cases)
   | Obj (Opt {kind; _}) -> (kind :> Kind.t)
@@ -396,7 +397,7 @@ module Fixed = struct
       invalid_arg "Cannot create a padding of negative or null fixed length." ;
     match classify e with
     | `Fixed _ -> make @@ Padded (e, n)
-    | _ -> invalid_arg "Cannot pad non-fixed size encoding"
+    | `Dynamic | `Variable -> invalid_arg "Cannot pad non-fixed size encoding"
 
   let list n e =
     if n <= 0 then
@@ -431,7 +432,9 @@ module Variable = struct
     | `Fixed n, Some max_length ->
         let limit = n * max_length in
         make @@ Check_size {limit; encoding}
-    | _, _ -> encoding
+    | `Fixed _, None -> encoding
+    | `Dynamic, (Some _ | None) -> encoding
+    | `Variable, _ -> (* checked by check_not_variable *) assert false
 
   let list ?max_length e =
     check_not_variable "a list" e ;
@@ -444,7 +447,9 @@ module Variable = struct
     | `Fixed n, Some max_length ->
         let limit = n * max_length in
         make @@ Check_size {limit; encoding}
-    | _, _ -> encoding
+    | `Fixed _, None -> encoding
+    | `Dynamic, (Some _ | None) -> encoding
+    | `Variable, _ -> (* checked by check_not_variable *) assert false
 end
 
 let dynamic_size ?(kind = `Uint30) e = make @@ Dynamic_size {kind; encoding = e}
@@ -574,7 +579,32 @@ let rec is_obj : type a. Mu_visited.t -> a t -> bool =
   | Splitted {is_obj; _} -> is_obj
   | Delayed f -> is_obj visited (f ())
   | Describe {encoding; _} -> is_obj visited encoding
-  | _ -> false
+  | Padded (_encoding, _) ->
+      (* TODO: This should be fixed or documented *) false
+  | Check_size {encoding = _; _} ->
+      (* TODO: This should be fixed or documented *) false
+  | String_enum _ -> false
+  | Array _ -> false
+  | List _ -> false
+  | Tup _ -> false
+  | Tups _ -> false
+  | Null -> false
+  | Constant _ -> false
+  | Bool -> false
+  | Int8 -> false
+  | Uint8 -> false
+  | Int16 -> false
+  | Uint16 -> false
+  | Int31 -> false
+  | Int32 -> false
+  | Int64 -> false
+  | N -> false
+  | Z -> false
+  | RangedInt _ -> false
+  | RangedFloat _ -> false
+  | Float -> false
+  | Bytes _ -> false
+  | String _ -> false
 
 let is_obj e = is_obj Mu_visited.empty e
 
@@ -593,7 +623,36 @@ let rec is_tup : type a. Mu_visited.t -> a t -> bool =
   | Splitted {is_tup; _} -> is_tup
   | Delayed f -> is_tup visited (f ())
   | Describe {encoding; _} -> is_tup visited encoding
-  | _ -> false
+  | Padded (_encoding, _) ->
+      (* TODO: This should be fixed or documented *)
+      false
+  | Check_size {encoding = _; _} ->
+      (* TODO: This should be fixed or documented *)
+      false
+  | String_enum _ -> false
+  | Array _ -> false
+  | List _ -> false
+  | Obj _ -> false
+  | Objs _ -> false
+  | Empty -> false
+  | Ignore -> false
+  | Null -> false
+  | Constant _ -> false
+  | Bool -> false
+  | Int8 -> false
+  | Uint8 -> false
+  | Int16 -> false
+  | Uint16 -> false
+  | Int31 -> false
+  | Int32 -> false
+  | Int64 -> false
+  | N -> false
+  | Z -> false
+  | RangedInt _ -> false
+  | RangedFloat _ -> false
+  | Float -> false
+  | Bytes _ -> false
+  | String _ -> false
 
 let is_tup e = is_tup Mu_visited.empty e
 
@@ -916,7 +975,7 @@ let mu name ?title ?description fix =
   let fix e =
     match !self with
     | Some (e0, e') when e == e0 -> e'
-    | _ ->
+    | Some _ | None ->
         (* The limit is 2 because we can be forcing it once in binary and once
            in json "at the same time" in case of a splitted encoding. *)
         if !fixing >= 2 then
@@ -945,7 +1004,7 @@ let mu name ?title ?description fix =
         make @@ Mu {kind = `Variable; name; title; description; fix}
       in
       let fixed_precursor = fix precursor in
-      ignore (classify fixed_precursor) ;
+      ignore (classify fixed_precursor : Kind.t) ;
       fixed_precursor
 
 let result ok_enc error_enc =

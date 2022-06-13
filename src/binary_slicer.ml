@@ -391,7 +391,9 @@ and read_variable_pair :
       let right = read_rec e2 ?name state in
       assert (state.remaining_bytes = 0) ;
       (left, right)
-  | _ -> assert false
+  | `Dynamic, (`Fixed _ | `Dynamic) -> assert false
+  | `Fixed _, (`Fixed _ | `Dynamic) -> assert false
+  | `Variable, (`Variable | `Dynamic) -> assert false
 
 and read_list :
     type a.
@@ -423,8 +425,8 @@ and read_fixed_list :
 
 (** Various entry points *)
 
-let slice_exn encoding state =
-  let _ = read_rec encoding state in
+let slice_exn (encoding : 'a Encoding.t) state =
+  let (_ : 'a) = read_rec encoding state in
   List.rev state.slices
 
 let slice encoding state =
@@ -433,7 +435,7 @@ let slice encoding state =
 let slice_opt encoding state =
   try Some (slice_exn encoding state) with Read_error _ -> None
 
-let slice_string_exn encoding buffer =
+let slice_string_exn (encoding : 'a Encoding.t) buffer =
   let len = String.length buffer in
   let state =
     {
@@ -444,7 +446,7 @@ let slice_string_exn encoding buffer =
       allowed_bytes = None;
     }
   in
-  let _ = read_rec encoding state in
+  let (_ : 'a) = read_rec encoding state in
   if state.offset <> len then raise Extra_bytes ;
   List.rev state.slices
 

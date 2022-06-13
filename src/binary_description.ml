@@ -551,7 +551,7 @@ let describe (type x) (encoding : x Encoding.t) =
         | Binary_schema.Obj {fields = [Anonymous_field (_, Ref reference)]} ->
             UF.union uf ~new_canonical:(UF.find uf name) ~existing:reference ;
             false
-        | _ -> true)
+        | Obj _ | Cases _ | Int_enum _ -> true)
       references.descriptions
   in
   let fields = List.rev (dedup_canonicalize uf filtered) in

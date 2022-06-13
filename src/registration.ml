@@ -46,9 +46,11 @@ let slice_all bytes =
   EncodingTable.fold
     (fun enc_id (Record {encoding; _}) sliced ->
       try
-        let _ = Binary_reader.of_string_exn encoding bytes in
-        let slice = Binary_slicer.slice_string_exn encoding bytes in
-        (enc_id, slice) :: sliced
+        match Binary_reader.of_string encoding bytes with
+        | Ok _ ->
+            let slice = Binary_slicer.slice_string_exn encoding bytes in
+            (enc_id, slice) :: sliced
+        | Error _ -> sliced
       with
       | (Out_of_memory | Stack_overflow) as e -> raise e
       | _ -> sliced)
@@ -78,14 +80,22 @@ let binary_pretty_printer (Record {encoding; pp; _}) fmt bytes =
       let json = Json.construct encoding data in
       Format.fprintf fmt "%a" Json.pp json
 
-let rec lookup_id_descr ({encoding; _} : 'a Encoding.t) =
-  match encoding with
-  | Splitted {encoding; _}
-  | Dynamic_size {encoding; _}
-  | Check_size {encoding; _} ->
-      lookup_id_descr encoding
-  | Describe {id; description; _} -> Some (id, description)
-  | _ -> None
+let rec lookup_id_descr : 'a. 'a Encoding.t -> _ =
+  fun (type a) ({encoding; _} : a Encoding.t) ->
+   match encoding with
+   | Splitted {encoding; _}
+   | Dynamic_size {encoding; _}
+   | Check_size {encoding; _} ->
+       lookup_id_descr encoding
+   | Describe {id; description; _} -> Some (id, description)
+   | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 | Uint16
+   | Int31 | Int32 | Int64 | N | Z | RangedInt _ | RangedFloat _ | Float
+   | Bytes _ | String _
+   | Padded (_, _)
+   | String_enum (_, _)
+   | Array _ | List _ | Obj _ | Objs _ | Tup _ | Tups _ | Union _ | Mu _
+   | Conv _ | Delayed _ ->
+       None
 
 let register ?pp encoding =
   match lookup_id_descr encoding with
