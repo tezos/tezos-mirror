@@ -46,6 +46,11 @@ RPC Changes
 - Some contract RPCs working on originated contracts only may return a different
   error than before on implicit accounts. (MR :gl:`!5373`)
 
+Operation receipts
+------------------
+
+- Remove field ``consumed_gas``, deprecated in Jakarta. Use field ``consumed_milligas`` instead. (:gl:`!5536`)
+
 Bug Fixes
 ---------
 
