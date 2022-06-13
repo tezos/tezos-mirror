@@ -435,15 +435,17 @@ let delete c contract =
       (* For non implicit contract Big_map should be cleared *)
       failwith "Non implicit contracts cannot be removed"
   | Implicit _ ->
+      (* Implicit contract do not have: [Code], [Storage],
+         [Paid_storage_space] and [Used_storage_space]. We do not need
+         to delete them. Futhermore, these storages space are
+         carbonated, thus, require gas to be deleted (even when they
+         do not exist). An implicit contract deletion should not cost
+         extra gas. *)
       Contract_delegate_storage.unlink c contract >>=? fun c ->
       Storage.Contract.Spendable_balance.remove_existing c contract
       >>=? fun c ->
       Contract_manager_storage.remove_existing c contract >>=? fun c ->
-      Storage.Contract.Counter.remove_existing c contract >>=? fun c ->
-      Storage.Contract.Code.remove c contract >>=? fun (c, _, _) ->
-      Storage.Contract.Storage.remove c contract >>=? fun (c, _, _) ->
-      Storage.Contract.Paid_storage_space.remove c contract >>= fun c ->
-      Storage.Contract.Used_storage_space.remove c contract >|= ok
+      Storage.Contract.Counter.remove_existing c contract
 
 let allocated c contract = Storage.Contract.Spendable_balance.mem c contract
 
