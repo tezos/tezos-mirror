@@ -26,6 +26,8 @@ def setup(app):
         raise ValueError('package_role: opam cache already set!!!')
     OPAM_CACHE = {}
     for path, _, files in os.walk('..'):
+        if re.match("^../_opam/", path):
+            continue
         for file in files:
             parts = re.match("^([^/]*)[.]opam$", file)
             if parts:
