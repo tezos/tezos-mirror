@@ -34,7 +34,7 @@ CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-TEZOS_BIN=octez-node octez-validator octez-client octez-admin-client octez-signer octez-codec octez-protocol-compiler octez-snoop octez-proxy-server \
+OCTEZ_BIN=octez-node octez-validator octez-client octez-admin-client octez-signer octez-codec octez-protocol-compiler octez-snoop octez-proxy-server \
     $(foreach p, $(active_protocol_versions), octez-baker-$(p)) \
     $(foreach p, $(active_protocol_versions), octez-accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \
@@ -45,7 +45,7 @@ TEZOS_BIN=octez-node octez-validator octez-client octez-admin-client octez-signe
     $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
     $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 
-UNRELEASED_TEZOS_BIN=octez-dal-node
+UNRELEASED_OCTEZ_BIN=octez-dal-node
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
@@ -77,13 +77,13 @@ release:
 build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
-.PHONY: $(TEZOS_BIN)
-$(TEZOS_BIN):
+.PHONY: $(OCTEZ_BIN)
+$(OCTEZ_BIN):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
-.PHONY: $(UNRELEASED_TEZOS_BIN)
-$(UNRELEASED_TEZOS_BIN):
+.PHONY: $(UNRELEASED_OCTEZ_BIN)
+$(UNRELEASED_OCTEZ_BIN):
 	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	@cp -f _build/install/default/bin/$@ ./
 
@@ -93,9 +93,9 @@ ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) \
+		$(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
@@ -336,9 +336,9 @@ ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) \
+		$(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) ./
 
 .PHONY: docker-image-build
 docker-image-build:
@@ -402,7 +402,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f ${TEZOS_BIN} ${UNRELEASED_TEZOS_BIN}
+	@-rm -f ${OCTEZ_BIN} ${UNRELEASED_OCTEZ_BIN}
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
