@@ -44,7 +44,6 @@ type error +=
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
-  | Forbidden_zero_ticket_quantity
   | Incorrect_reveal_position
   | Inconsistent_sources
 

@@ -65,7 +65,12 @@ let collect_token_amounts ctxt tickets =
 let tokens_of_value ~include_lazy ctxt ty x =
   let*? has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
   let* tickets, ctxt =
-    Ticket_scanner.tickets_of_value ~include_lazy ctxt has_tickets x
+    Ticket_scanner.tickets_of_value
+      ~include_lazy
+      ~allow_zero_amount_tickets:true
+      ctxt
+      has_tickets
+      x
   in
   let* tas, ctxt = collect_token_amounts ctxt tickets in
   let* bm, ctxt =

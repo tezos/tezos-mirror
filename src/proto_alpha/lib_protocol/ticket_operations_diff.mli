@@ -39,12 +39,18 @@ type ticket_token_diff = private {
     (Alpha_context.Destination.t * Script_int.n Script_int.num) list;
 }
 
-(** [ticket_diffs_of_operations ctxt ops] returns a list of ticket-tokens diffs
-    given a context, [ctxt], and list of packed operations, [ops]. The diffs
-    result from either a [Transaction] operation with parameters containing
-    tickets, or an [Origination] operation with the initial storage containing
-    tickets. *)
+(** [ticket_diffs_of_operations ctxt ~allow_zero_amount_tickets ops] returns a
+    list of ticket-tokens diffs given a context, [ctxt], and list of packed
+    operations, [ops]. The diffs result from either a [Transaction] operation
+    with parameters containing tickets, or an [Origination] operation with the
+    initial storage containing tickets.
+
+    The flag [allow_zero_amount_tickets] decides whether or not tickets with
+    amount zero are allowed. If the flag is set to [false] and a zero-amount
+    ticket is encountered, an {!Ticket_scanner.Forbidden_zero_ticket_quantity}
+    error is returned. *)
 val ticket_diffs_of_operations :
   Alpha_context.context ->
+  allow_zero_amount_tickets:bool ->
   Script_typed_ir.packed_internal_operation list ->
   (ticket_token_diff list * Alpha_context.context) tzresult Lwt.t

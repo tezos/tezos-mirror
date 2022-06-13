@@ -36,6 +36,26 @@
 open Protocol
 open Alpha_context
 
+let assert_fails ~loc ?error m =
+  let open Lwt_result_syntax in
+  let*! res = m in
+  match res with
+  | Ok _ -> Stdlib.failwith "Expected failure"
+  | Error err_res -> (
+      match (err_res, error) with
+      | Environment.Ecoproto_error err' :: _, Some err when err = err' ->
+          (* Matched exact error. *)
+          return_unit
+      | _, Some _ ->
+          (* Expected a different error. *)
+          let msg =
+            Printf.sprintf "Expected a different error at location %s" loc
+          in
+          Stdlib.failwith msg
+      | _, None ->
+          (* Any error is ok. *)
+          return ())
+
 let ( let* ) m f = m >>=? f
 
 let wrap m = m >|= Environment.wrap_tzresult
@@ -105,7 +125,8 @@ let assert_equals_ex_tickets ctxt ~loc ex_tickets expected =
     (List.sort String.compare str_tickets)
     (List.sort String.compare str_tickets_expected)
 
-let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
+let tickets_of_value ctxt ~include_lazy ~allow_zero_amount_tickets ~type_exp
+    ~value_exp =
   let Script_ir_translator.Ex_ty ty, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
     Result.value_f
@@ -125,17 +146,35 @@ let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
   let* ht, ctxt =
     wrap @@ Lwt.return @@ Ticket_scanner.type_has_tickets ctxt ty
   in
-  wrap @@ Ticket_scanner.tickets_of_value ctxt ~include_lazy ht value
+  wrap
+  @@ Ticket_scanner.tickets_of_value
+       ctxt
+       ~include_lazy
+       ~allow_zero_amount_tickets
+       ht
+       value
 
-let assert_contains_tickets ctxt ~loc ~include_lazy ~type_exp ~value_exp
-    expected =
+let assert_contains_tickets ctxt ~loc ~include_lazy ~allow_zero_amount_tickets
+    ~type_exp ~value_exp expected =
   let* ex_tickets, _ =
-    tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp
+    tickets_of_value
+      ctxt
+      ~include_lazy
+      ~allow_zero_amount_tickets
+      ~type_exp
+      ~value_exp
   in
   assert_equals_ex_tickets ctxt ~loc ex_tickets expected
 
-let assert_fail_non_empty_overlay ctxt ~loc ~include_lazy ~type_exp ~value_exp =
-  tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp >>= fun res ->
+let assert_fail_non_empty_overlay ctxt ~loc ~include_lazy
+    ~allow_zero_amount_tickets ~type_exp ~value_exp =
+  tickets_of_value
+    ctxt
+    ~include_lazy
+    ~allow_zero_amount_tickets
+    ~type_exp
+    ~value_exp
+  >>= fun res ->
   match res with
   | Error [x] ->
       let x = Format.kasprintf Fun.id "%a" Error_monad.pp x in
@@ -224,6 +263,7 @@ let assert_big_map_int_ticket_string_ref ~loc ~pre_populated ~big_map_exp
   assert_contains_tickets
     ctxt
     ~include_lazy:true
+    ~allow_zero_amount_tickets:true
     ~loc
     ~type_exp:"big_map int (ticket string)"
     ~value_exp
@@ -235,9 +275,48 @@ let assert_fail_non_empty_overlay_with_big_map_ref ~loc ~pre_populated
   assert_fail_non_empty_overlay
     ctxt
     ~include_lazy:true
+    ~allow_zero_amount_tickets:true
     ~loc
     ~type_exp:"big_map int (ticket string)"
     ~value_exp
+
+let assert_string_tickets ~loc ~include_lazy ~type_exp ~value_exp ~expected =
+  let* ctxt = new_ctxt () in
+  let* ex_tickets, ctxt = make_string_tickets ctxt expected in
+  let contains_zero_amount_tickets =
+    List.exists (fun (_, _, amount) -> amount = 0) expected
+  in
+  let* () =
+    assert_contains_tickets
+      ctxt
+      ~include_lazy
+      ~allow_zero_amount_tickets:true
+      ~loc
+      ~type_exp
+      ~value_exp
+      ex_tickets
+  in
+  if contains_zero_amount_tickets then
+    assert_fails
+      ~loc:__LOC__
+      ~error:Ticket_scanner.Forbidden_zero_ticket_quantity
+      (tickets_of_value
+         ctxt
+         ~include_lazy
+         ~allow_zero_amount_tickets:false
+         ~type_exp
+         ~value_exp)
+  else
+    (* If there are no zero-amount tickets we still want them to pass with
+       [allow_zero_amount_tickets] flag set to false. *)
+    assert_contains_tickets
+      ctxt
+      ~include_lazy
+      ~allow_zero_amount_tickets:false
+      ~loc
+      ~type_exp
+      ~value_exp
+      ex_tickets
 
 (** Test that the ticket can be extracted from a a single unit ticket *)
 let test_tickets_in_unit_ticket () =
@@ -256,20 +335,10 @@ let test_tickets_in_unit_ticket () =
     ctxt
     ~loc:__LOC__
     ~include_lazy:false
+    ~allow_zero_amount_tickets:true
     ~type_exp
     ~value_exp
     [ex_ticket]
-
-let assert_string_tickets ~loc ~include_lazy ~type_exp ~value_exp ~expected =
-  let* ctxt = new_ctxt () in
-  let* ex_tickets, ctxt = make_string_tickets ctxt expected in
-  assert_contains_tickets
-    ctxt
-    ~include_lazy
-    ~loc
-    ~type_exp
-    ~value_exp
-    ex_tickets
 
 (** Test that all tickets can be extracted from a list of tickets *)
 let test_tickets_in_list () =
@@ -283,6 +352,7 @@ let test_tickets_in_list () =
           Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1;
           Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2;
           Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3;
+          Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "orange" 0;
         }
       |}
     ~expected:
@@ -290,6 +360,7 @@ let test_tickets_in_list () =
         ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", 1);
         ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "green", 2);
         ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue", 3);
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "orange", 0);
       ]
 
 (** Test that all tickets can be extracted from a pair of tickets *)
@@ -297,17 +368,19 @@ let test_tickets_in_pair () =
   assert_string_tickets
     ~loc:__LOC__
     ~include_lazy:false
-    ~type_exp:"pair (ticket string) (ticket string)"
+    ~type_exp:"pair (ticket string) (ticket string) (ticket string)"
     ~value_exp:
       {|
         Pair
           (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1)
           (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2)
+          (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 0)
       |}
     ~expected:
       [
         ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", 1);
         ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "green", 2);
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue", 0);
       ]
 
 (** Test that all tickets from a map can be extracted. *)
@@ -321,12 +394,14 @@ let test_tickets_in_map () =
         {
           Elt 1 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1);
           Elt 2 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2);
+          Elt 3 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 0);
         }
     |}
     ~expected:
       [
         ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", 1);
         ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "green", 2);
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue", 0);
       ]
 
 (** Test that all tickets from a big-map with non-empty overlay fails.
@@ -339,6 +414,7 @@ let test_tickets_in_big_map () =
     ctxt
     ~loc:__LOC__
     ~include_lazy:true
+    ~allow_zero_amount_tickets:false
     ~type_exp:"big_map int (ticket string)"
     ~value_exp:
       {|
@@ -360,6 +436,7 @@ let test_tickets_in_big_map_strict_only () =
         {
           Elt 1 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1);
           Elt 2 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2);
+          Elt 3 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 0);
         }
       |}
     ~expected:[]
@@ -374,6 +451,7 @@ let test_tickets_in_list_in_big_map () =
     ctxt
     ~loc:__LOC__
     ~include_lazy:true
+    ~allow_zero_amount_tickets:true
     ~type_exp:"(big_map int (list(ticket string)))"
     ~value_exp:
       {|
@@ -422,6 +500,16 @@ let test_tickets_in_or_left () =
     ~type_exp:"or (ticket string) int"
     ~value_exp:{| Left (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1) |}
     ~expected:[("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", 1)]
+
+(** Test that tickets can be extracted from the left side of an or-expression
+    with zero-amount ticket. *)
+let test_tickets_in_or_left_with_zero_amount () =
+  assert_string_tickets
+    ~loc:__LOC__
+    ~include_lazy:false
+    ~type_exp:"or (ticket string) int"
+    ~value_exp:{| Left (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 0) |}
+    ~expected:[("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", 0)]
 
 (** Test that tickets can be extracted from the right side of an or-expression. *)
 let test_tickets_in_or_right () =
@@ -564,6 +652,10 @@ let tests =
       `Quick
       test_tickets_in_pair_big_map_and_list_strict_only;
     Tztest.tztest "Test tickets in or left" `Quick test_tickets_in_or_left;
+    Tztest.tztest
+      "Test tickets in or left"
+      `Quick
+      test_tickets_in_or_left_with_zero_amount;
     Tztest.tztest "Test tickets in or right" `Quick test_tickets_in_or_right;
     Tztest.tztest
       "Test tickets in empty big-map ref"

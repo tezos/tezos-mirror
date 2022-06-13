@@ -286,6 +286,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
               (Ticket_scanner.tickets_of_value
                  ctxt
                  ~include_lazy:true
+                 ~allow_zero_amount_tickets:true
                  has_tickets
                  boxed_ticket_list))
        in
