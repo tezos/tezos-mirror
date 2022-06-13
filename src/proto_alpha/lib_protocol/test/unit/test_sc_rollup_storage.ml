@@ -39,6 +39,28 @@ module Commitment_repr = Sc_rollup_commitment_repr
 (** Lift a computation using using environment errors to use shell errors. *)
 let lift k = Lwt.map Environment.wrap_tzresult k
 
+(** [new_context_with_stakers n] creates a context with [n] stakers initially
+    credited with 100 000 tez. *)
+let new_context_with_stakers nb_stakers =
+  let initial_balance = Int64.of_string "100_000_000_000" in
+  let*? initial_balances =
+    List.init ~when_negative_length:[] nb_stakers (fun _ -> initial_balance)
+  in
+  let* b, contracts = Context.init_n ~initial_balances nb_stakers () in
+  let+ inc = Incremental.begin_construction b in
+  let state = Incremental.validation_state inc in
+  let ctxt = state.ctxt in
+  (* Necessary to originate rollups. *)
+  let ctxt = Alpha_context.Origination_nonce.init ctxt Operation_hash.zero in
+  let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+  let stakers =
+    List.map
+      (function
+        | Alpha_context.Contract.Implicit key -> key | _ -> assert false)
+      contracts
+  in
+  (ctxt, stakers)
+
 let initial_staker_balance = Tez_repr.of_mutez_exn 100_000_000_000L
 
 let new_context () =
@@ -76,6 +98,16 @@ let new_sc_rollup ctxt =
       ~parameters_ty
   in
   (rollup, ctxt)
+
+let new_context_with_stakers_and_rollup nb_stakers =
+  let* ctxt, stakers = new_context_with_stakers nb_stakers in
+  let+ rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  (ctxt, rollup, stakers)
+
+let new_context_with_rollup () =
+  let* ctxt = new_context () in
+  let+ rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  (ctxt, rollup)
 
 let equal_tez ~loc =
   Assert.equal ~loc Tez_repr.( = ) "Tez aren't equal" Tez_repr.pp
@@ -119,6 +151,16 @@ let deposit_stake_and_check_balances ctxt rollup staker =
       let bonds_account = `Frozen_bonds (staker_contract, bond_id) in
       let+ () = assert_balance_increased ctxt ctxt' bonds_account stake in
       ctxt')
+
+(** Originate a rollup with [nb_stakers] stakers and make a deposit to the
+    initial LCC. *)
+let originate_rollup_and_deposit_with_n_stakers nb_stakers =
+  let* ctxt, rollup, stakers = new_context_with_stakers_and_rollup nb_stakers in
+  let deposit ctxt staker =
+    deposit_stake_and_check_balances ctxt rollup staker
+  in
+  let+ ctxt = List.fold_left_es deposit ctxt stakers in
+  (ctxt, rollup, stakers)
 
 (** Originate a rollup with one staker and make a deposit to the initial LCC. *)
 let originate_rollup_and_deposit_with_one_staker () =
