@@ -1578,10 +1578,12 @@ and log :
   Script_interpreter_logging.log_next_kinstr logger sty k >>?= fun k ->
   match k with
   | IIf_none {branch_if_none; branch_if_some; k; _} -> (
-      let (Item_t (_, sty_if_none)) = sty in
-      Script_interpreter_logging.kinstr_final_stack_type
-        sty_if_none
-        branch_if_none
+      let (Item_t (Option_t (ty, _, _), rest)) = sty in
+      Script_interpreter_logging.branched_final_stack_type
+        [
+          Ex_init_stack_ty (rest, branch_if_none);
+          Ex_init_stack_ty (Item_t (ty, rest), branch_if_some);
+        ]
       >>?= fun sty_opt ->
       let ks' =
         match sty_opt with
@@ -1612,10 +1614,12 @@ and log :
           in
           (step [@ocaml.tailcall]) g gas body ks' v stack)
   | IIf_left {branch_if_left; branch_if_right; k; _} -> (
-      let (Item_t (Union_t (ty, _, _, _), rest)) = sty in
-      Script_interpreter_logging.kinstr_final_stack_type
-        (Item_t (ty, rest))
-        branch_if_left
+      let (Item_t (Union_t (lty, rty, _, _), rest)) = sty in
+      Script_interpreter_logging.branched_final_stack_type
+        [
+          Ex_init_stack_ty (Item_t (lty, rest), branch_if_left);
+          Ex_init_stack_ty (Item_t (rty, rest), branch_if_right);
+        ]
       >>?= fun sty_opt ->
       let k' =
         match sty_opt with
@@ -1628,8 +1632,12 @@ and log :
       | L v -> (step [@ocaml.tailcall]) g gas branch_if_left k' v stack
       | R v -> (step [@ocaml.tailcall]) g gas branch_if_right k' v stack)
   | IIf_cons {branch_if_cons; branch_if_nil; k; _} -> (
-      let (Item_t (_, sty')) = sty in
-      Script_interpreter_logging.kinstr_final_stack_type sty' branch_if_nil
+      let (Item_t ((List_t (elty, _) as lty), rest)) = sty in
+      Script_interpreter_logging.branched_final_stack_type
+        [
+          Ex_init_stack_ty (rest, branch_if_nil);
+          Ex_init_stack_ty (Item_t (elty, Item_t (lty, rest)), branch_if_cons);
+        ]
       >>?= fun sty' ->
       let k' =
         match sty' with
@@ -1675,7 +1683,11 @@ and log :
       (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
   | IIf {branch_if_true; branch_if_false; k; _} ->
       let (Item_t (Bool_t, rest)) = sty in
-      Script_interpreter_logging.kinstr_final_stack_type rest branch_if_true
+      Script_interpreter_logging.branched_final_stack_type
+        [
+          Ex_init_stack_ty (rest, branch_if_true);
+          Ex_init_stack_ty (rest, branch_if_false);
+        ]
       >>?= fun sty' ->
       let k' =
         match sty' with
@@ -1862,7 +1874,8 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
             logger,
             descr.kinstr )
       in
-      step (outdated_ctxt, sc) gas log KNil accu stack)
+      let knil = KLog (KNil, descr.kaft, logger) in
+      step (outdated_ctxt, sc) gas log knil accu stack)
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 

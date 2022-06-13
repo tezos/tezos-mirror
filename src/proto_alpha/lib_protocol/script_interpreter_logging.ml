@@ -99,6 +99,11 @@ type ('a, 's, 'r, 'f) ex_split_kinstr =
     }
       -> ('a, 's, 'r, 'f) ex_split_kinstr
 
+type ('r, 'f) ex_init_stack_ty =
+  | Ex_init_stack_ty :
+      ('a, 's) stack_ty * ('a, 's, 'r, 'f) kinstr
+      -> ('r, 'f) ex_init_stack_ty
+
 let rec stack_prefix_preservation_witness_split_input :
     type a s b t c u d v.
     (b, t, c, u, a, s, d, v) stack_prefix_preservation_witness ->
@@ -1628,6 +1633,15 @@ let rec kinstr_final_stack_type :
           | None -> ok None))
   | Ex_split_halt _ -> ok @@ Some s
   | Ex_split_failwith {cast = {cast = _}; _} -> ok None
+
+let rec branched_final_stack_type :
+    type r f. (r, f) ex_init_stack_ty list -> (r, f) stack_ty option tzresult =
+  function
+  | [] -> ok None
+  | Ex_init_stack_ty (init_sty, branch) :: bs -> (
+      kinstr_final_stack_type init_sty branch >>? function
+      | Some _ as sty -> ok sty
+      | None -> branched_final_stack_type bs)
 
 let kinstr_rewritek :
     type a s r f.

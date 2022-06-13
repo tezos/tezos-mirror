@@ -25,6 +25,15 @@
 
 open Script_typed_ir
 
+(** An existential container for an instruction paired with its
+    initial stack type. This is used internally to pack together
+    execution branches with different initial stack types but
+    the same final stack type (which we want to compute). *)
+type ('r, 'f) ex_init_stack_ty =
+  | Ex_init_stack_ty :
+      ('a, 's) stack_ty * ('a, 's, 'r, 'f) kinstr
+      -> ('r, 'f) ex_init_stack_ty
+
 (** [log_kinstr logger sty instr] returns [instr] prefixed by an
     [ILog] instruction to log the first instruction in [instr]. Note
     that [logger] value is only available when logging is enables, so
@@ -107,6 +116,9 @@ val kinstr_final_stack_type :
   ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd) stack_ty option tzresult
+
+val branched_final_stack_type :
+  ('r, 'f) ex_init_stack_ty list -> ('r, 'f) stack_ty option tzresult
 
 (** [dipn_stack_ty witness stack_ty] returns the type of the stack
     on which instructions inside dipped block will be operating. *)
