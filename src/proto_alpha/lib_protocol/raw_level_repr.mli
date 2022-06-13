@@ -41,11 +41,15 @@ include Compare.S with type t := raw_level
 
 val to_int32 : raw_level -> int32
 
+val to_int32_non_negative : raw_level -> Bounded.Int32.NonNegative.t
+
 (** @raise Invalid_argument when the level to encode is negative *)
 val of_int32_exn : int32 -> raw_level
 
 (** Can trigger Unexpected_level error when the level to encode is negative *)
 val of_int32 : int32 -> raw_level tzresult
+
+val of_int32_non_negative : Bounded.Int32.NonNegative.t -> raw_level
 
 val diff : raw_level -> raw_level -> int32
 

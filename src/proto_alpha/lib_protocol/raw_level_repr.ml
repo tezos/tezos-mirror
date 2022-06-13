@@ -62,6 +62,11 @@ let diff = Int32.sub
 
 let to_int32 l = l
 
+let to_int32_non_negative l =
+  match Bounded.Int32.NonNegative.of_int32 l with
+  | Some x -> x
+  | _ -> assert false (* invariant: raw_levels are non-negative *)
+
 type error += Unexpected_level of Int32.t (* `Permanent *)
 
 let () =
@@ -86,6 +91,11 @@ let of_int32_exn l =
   match of_int32 l with
   | Ok l -> l
   | Error _ -> invalid_arg "Level_repr.of_int32"
+
+let of_int32_non_negative l =
+  match of_int32 (Bounded.Int32.NonNegative.to_int32 l) with
+  | Ok l -> l
+  | Error _ -> assert false (* invariant: raw_levels are non-negative *)
 
 let encoding =
   Data_encoding.conv_with_guard

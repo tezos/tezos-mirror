@@ -133,7 +133,7 @@ module V2_0_0 = struct
       module Monad : sig
         type 'a t
 
-        val run : 'a t -> state -> (state * 'a option) Lwt.t
+        val run : 'a t -> state -> (state * 'a) Lwt.t
 
         val return : 'a -> 'a t
 
@@ -146,21 +146,15 @@ module V2_0_0 = struct
         val set : tree -> unit t
 
         val lift : 'a Lwt.t -> 'a t
-
-        val find_value : Tree.key -> 'a Data_encoding.t -> 'a option t
-
-        val set_value : Tree.key -> 'a Data_encoding.t -> 'a -> unit t
       end = struct
-        type 'a t = state -> (state * 'a option) Lwt.t
+        type 'a t = state -> (state * 'a) Lwt.t
 
-        let return x state = Lwt.return (state, Some x)
+        let return x state = Lwt.return (state, x)
 
         let bind m f state =
           let open Lwt_syntax in
           let* state, res = m state in
-          match res with
-          | None -> return (state, None)
-          | Some res -> f res state
+          f res state
 
         module Syntax = struct
           let ( let* ) = bind
@@ -168,143 +162,12 @@ module V2_0_0 = struct
 
         let run m state = m state
 
-        let internal_error_key = ["internal_error"]
+        let get s = Lwt.return (s, s)
 
-        let internal_error msg tree =
-          let open Lwt_syntax in
-          let* tree = Tree.add tree internal_error_key (Bytes.of_string msg) in
-          return (tree, None)
+        let set s _ = Lwt.return (s, ())
 
-        let decode encoding bytes state =
-          let open Lwt_syntax in
-          match Data_encoding.Binary.of_bytes_opt encoding bytes with
-          | None -> internal_error "Error during decoding" state
-          | Some v -> return (state, Some v)
-
-        let get s = Lwt.return (s, Some s)
-
-        let set s _ = Lwt.return (s, Some ())
-
-        let lift m s = Lwt.map (fun r -> (s, Some r)) m
-
-        let find_value key encoding state =
-          let open Lwt_syntax in
-          let* obytes = Tree.find state key in
-          match obytes with
-          | None -> return (state, Some None)
-          | Some bytes ->
-              let* state, value = decode encoding bytes state in
-              return (state, Some value)
-
-        let set_value key encoding value tree =
-          let open Lwt_syntax in
-          Data_encoding.Binary.to_bytes_opt encoding value |> function
-          | None -> internal_error "Internal_Error during encoding" tree
-          | Some bytes ->
-              let* tree = Tree.add tree key bytes in
-              return (tree, Some ())
+        let lift m s = Lwt.map (fun r -> (s, r)) m
       end
-
-      open Monad
-
-      module MakeVar (P : sig
-        type t
-
-        val name : string
-
-        val initial : t
-
-        val encoding : t Data_encoding.t
-      end) =
-      struct
-        let key = [P.name]
-
-        let get =
-          let open Monad.Syntax in
-          let* v = find_value key P.encoding in
-          match v with None -> return P.initial | Some v -> return v
-
-        let set = set_value key P.encoding
-      end
-
-      module CurrentTick = MakeVar (struct
-        include Sc_rollup_tick_repr
-
-        let name = "tick"
-      end)
-
-      module Boot_sector = MakeVar (struct
-        type t = string
-
-        let name = "boot_sector"
-
-        let initial = ""
-
-        let encoding = Data_encoding.string
-
-        let _pp fmt s = Format.fprintf fmt "%s" s
-      end)
-
-      module Status = MakeVar (struct
-        type t = status
-
-        let initial = Computing
-
-        let encoding =
-          Data_encoding.string_enum
-            [
-              ("Computing", Computing);
-              ("WaitingForInputMessage", WaitingForInputMessage);
-            ]
-
-        let name = "status"
-
-        let string_of_status = function
-          | Computing -> "Computing"
-          | WaitingForInputMessage -> "WaitingForInputMessage"
-
-        let _pp fmt status = Format.fprintf fmt "%s" (string_of_status status)
-      end)
-
-      module CurrentLevel = MakeVar (struct
-        type t = Raw_level_repr.t
-
-        let initial = Raw_level_repr.root
-
-        let encoding = Raw_level_repr.encoding
-
-        let name = "current_level"
-
-        let _pp = Raw_level_repr.pp
-      end)
-
-      module MessageCounter = MakeVar (struct
-        type t = Z.t option
-
-        let initial = None
-
-        let encoding = Data_encoding.option Data_encoding.n
-
-        let name = "message_counter"
-
-        let _pp fmt = function
-          | None -> Format.fprintf fmt "None"
-          | Some c -> Format.fprintf fmt "Some %a" Z.pp_print c
-      end)
-
-      module NextMessage = MakeVar (struct
-        type t = string option
-
-        let initial = None
-
-        let encoding = Data_encoding.(option string)
-
-        let name = "next_message"
-
-        let _pp fmt = function
-          | None -> Format.fprintf fmt "None"
-          | Some s -> Format.fprintf fmt "Some %s" s
-      end)
     end
 
     module WASM_machine = Wasm_2_0_0.Make (Tree)
@@ -315,88 +178,101 @@ module V2_0_0 = struct
     open Monad
 
     let initial_state ctxt _boot_sector =
+      let open Lwt_syntax in
       let state = Tree.empty ctxt in
+      let* state = Tree.add state ["wasm-version"] (Bytes.of_string "2.0.0") in
       Lwt.return state
 
     let state_hash state =
       let m =
-        let open Monad.Syntax in
-        let* status = Status.get in
-        match status with
-        | _ ->
-            Context_hash.to_bytes @@ Tree.hash state |> fun h ->
-            return @@ State_hash.hash_bytes [h]
+        Context_hash.to_bytes @@ Tree.hash state |> fun h ->
+        return @@ State_hash.hash_bytes [h]
       in
       let open Lwt_syntax in
       let* state = Monad.run m state in
-      match state with
-      | _, Some hash -> return hash
-      | _ -> (* Hash computation always succeeds. *) assert false
+      match state with _, hash -> return hash
 
-    let result_of ~default m state =
+    let result_of m state =
       let open Lwt_syntax in
       let* _, v = run m state in
-      match v with None -> return default | Some v -> return v
+      return v
 
     let state_of m state =
       let open Lwt_syntax in
       let* s, _ = run m state in
       return s
 
-    let get_tick =
-      result_of ~default:Sc_rollup_tick_repr.initial CurrentTick.get
-
-    let is_input_state_monadic =
+    let get_tick : Sc_rollup_tick_repr.t Monad.t =
       let open Monad.Syntax in
-      let* status = Status.get in
-      match status with
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
+      let* s = get in
+      let* info = lift (WASM_machine.get_info s) in
+      return @@ Sc_rollup_tick_repr.of_z info.current_tick
 
-         Implement handling of input logic.
-      *)
-      | WaitingForInputMessage -> (
-          let* level = CurrentLevel.get in
-          let* counter = MessageCounter.get in
-          match counter with
-          | Some n -> return (PS.First_after (level, n))
-          | None -> return PS.Initial)
-      | _ -> return PS.No_input_required
+    let get_tick : state -> Sc_rollup_tick_repr.t Lwt.t = result_of get_tick
+
+    let get_status : status Monad.t =
+      let open Monad.Syntax in
+      let* s = get in
+      let* info = lift (WASM_machine.get_info s) in
+      return
+      @@
+      match info.input_request with
+      | No_input_required -> Computing
+      | Input_required -> WaitingForInputMessage
+
+    let get_last_message_read : _ Monad.t =
+      let open Monad.Syntax in
+      let* s = get in
+      let* info = lift (WASM_machine.get_info s) in
+      return
+      @@
+      match info.last_input_read with
+      | Some {inbox_level; message_counter} ->
+          let inbox_level = Raw_level_repr.of_int32_non_negative inbox_level in
+          Some (inbox_level, message_counter)
+      | _ -> None
 
     let is_input_state =
-      result_of ~default:PS.No_input_required @@ is_input_state_monadic
+      let open Monad.Syntax in
+      let* status = get_status in
+      match status with
+      | WaitingForInputMessage -> (
+          let* last_read = get_last_message_read in
+          match last_read with
+          | Some (level, n) -> return (PS.First_after (level, n))
+          | None -> return PS.Initial)
+      | Computing -> return PS.No_input_required
 
-    let get_status = result_of ~default:Computing @@ Status.get
+    let is_input_state = result_of is_input_state
 
-    let set_input_monadic input =
+    let get_status : state -> status Lwt.t = result_of get_status
+
+    let set_input_state input =
       let open PS in
       let {inbox_level; message_counter; payload} = input in
       let open Monad.Syntax in
-      let* boot_sector = Boot_sector.get in
-      let msg = boot_sector ^ payload in
-      let* () = CurrentLevel.set inbox_level in
-      let* () = MessageCounter.set (Some message_counter) in
-      let* () = NextMessage.set (Some msg) in
-      return ()
-
-    let set_input input = state_of @@ set_input_monadic input
-
-    let eval_step =
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3090
-
-         Call into tickified parsing/evaluation exposed in lib_webassembly.
-      *)
-      let open Monad.Syntax in
       let* s = get in
-      let* s = lift (WASM_machine.step s) in
+      let* s =
+        lift
+          (WASM_machine.set_input_step
+             {
+               inbox_level = Raw_level_repr.to_int32_non_negative inbox_level;
+               message_counter;
+             }
+             payload
+             s)
+      in
       set s
 
-    let ticked m =
-      let open Monad.Syntax in
-      let* tick = CurrentTick.get in
-      let* () = CurrentTick.set (Sc_rollup_tick_repr.next tick) in
-      m
+    let set_input input = state_of @@ set_input_state input
 
-    let eval state = state_of (ticked eval_step) state
+    let eval_step =
+      let open Monad.Syntax in
+      let* s = get in
+      let* s = lift (WASM_machine.compute_step s) in
+      set s
+
+    let eval state = state_of eval_step state
 
     let step_transition input_given state =
       let open Lwt_syntax in
@@ -434,6 +310,7 @@ module V2_0_0 = struct
       | None -> fail WASM_proof_production_failed
 
     type output_proof = {
+      output_proof : Context.proof;
       output_proof_state : hash;
       output_proof_output : PS.output;
     }
@@ -441,28 +318,63 @@ module V2_0_0 = struct
     let output_proof_encoding =
       let open Data_encoding in
       conv
-        (fun {output_proof_state; output_proof_output} ->
-          (output_proof_state, output_proof_output))
-        (fun (output_proof_state, output_proof_output) ->
-          {output_proof_state; output_proof_output})
-        (obj2
-           (req "output_proof" State_hash.encoding)
-           (req "output_proof_state" PS.output_encoding))
+        (fun {output_proof; output_proof_state; output_proof_output} ->
+          (output_proof, output_proof_state, output_proof_output))
+        (fun (output_proof, output_proof_state, output_proof_output) ->
+          {output_proof; output_proof_state; output_proof_output})
+        (obj3
+           (req "output_proof" Context.proof_encoding)
+           (req "output_proof_state" State_hash.encoding)
+           (req "output_proof_output" PS.output_encoding))
 
-    (* FIXME: #3176
-       The WASM PVM must provide an implementation for these
-       proofs. These are likely to be similar to the proofs about the
-       PVM execution steps. *)
     let output_of_output_proof s = s.output_proof_output
 
     let state_of_output_proof s = s.output_proof_state
 
-    let verify_output_proof _proof = Lwt.return true
+    let has_output : PS.output -> bool Monad.t = function
+      | {outbox_level; message_index; message} ->
+          let open Monad.Syntax in
+          let* s = get in
+          let* result =
+            lift
+              (WASM_machine.get_output
+                 {
+                   outbox_level =
+                     Raw_level_repr.to_int32_non_negative outbox_level;
+                   message_index;
+                 }
+                 s)
+          in
+          let message_encoded =
+            Data_encoding.Binary.to_string_exn
+              Sc_rollup_outbox_message_repr.encoding
+              message
+          in
+          return @@ Compare.String.(result = message_encoded)
 
-    let produce_output_proof _context state output_proof_output =
+    let verify_output_proof p =
+      let open Lwt_syntax in
+      let transition = run @@ has_output p.output_proof_output in
+      let* result = Context.verify_proof p.output_proof transition in
+      match result with None -> return false | Some _ -> return true
+
+    type error += Wasm_output_proof_production_failed
+
+    type error += Wasm_invalid_claim_about_outbox
+
+    let produce_output_proof context state output_proof_output =
       let open Lwt_result_syntax in
       let*! output_proof_state = state_hash state in
-      return {output_proof_state; output_proof_output}
+      let*! result =
+        Context.produce_proof context state
+        @@ run
+        @@ has_output output_proof_output
+      in
+      match result with
+      | Some (output_proof, true) ->
+          return {output_proof; output_proof_state; output_proof_output}
+      | Some (_, false) -> fail Wasm_invalid_claim_about_outbox
+      | None -> fail Wasm_output_proof_production_failed
   end
 
   module ProtocolImplementation = Make (struct

@@ -53,6 +53,8 @@ val to_int : t -> int option
     a negative number so an [option] isn't required. *)
 val of_number_of_ticks : Sc_rollup_repr.Number_of_ticks.t -> t
 
+val of_z : Z.t -> t
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

@@ -32,12 +32,75 @@
 
 open Sigs
 
+type input = {
+  inbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
+  message_counter : Z.t;
+}
+
+type output = {
+  outbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
+  message_index : Z.t;
+}
+
+type input_request = No_input_required | Input_required
+
+type info = {
+  current_tick : Z.t;
+      (** The number of ticks processed by the VM, zero for the initial state.
+
+      [current_tick] must be incremented for each call to [step] *)
+  last_input_read : input option;
+      (** The last message to be read by the VM, if any. *)
+  input_request : input_request;  (** The current VM input request. *)
+}
+
 module Make (T : TreeS) : sig
-  val step : T.tree -> T.tree Lwt.t
+  (** [compute_step] forwards the VM by one compute tick.
+
+      If the VM is expecting input, it gets stuck.
+
+      If the VM is already stuck, this function may raise an exception. *)
+  val compute_step : T.tree -> T.tree Lwt.t
+
+  (** [set_input_step] forwards the VM by one input tick.
+
+      If the VM is not expecting input, it gets stuck.
+
+      If the VM is already stuck, this function may raise an exception. *)
+  val set_input_step : input -> string -> T.tree -> T.tree Lwt.t
+
+  (** [get_output output state] returns the payload associated with the given output.
+
+      The result is meant to be deserialized using [Sc_rollup_PVM_sem.output_encoding].
+
+      If the output is missing, this function may raise an exception.
+      *)
+  val get_output : output -> T.tree -> string Lwt.t
+
+  (** [get_info] provides a typed view of the current machine state.
+
+      Should not raise. *)
+  val get_info : T.tree -> info Lwt.t
 end = struct
   module Tree = struct
     include T
   end
 
-  let step = Lwt.return
+  let compute_step = Lwt.return
+
+  let set_input_step _ _ = Lwt.return
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
+
+     Implement handling of input logic.
+  *)
+
+  let get_output _ _ = Lwt.return ""
+
+  let get_info _ =
+    Lwt.return
+      {
+        current_tick = Z.of_int 0;
+        last_input_read = None;
+        input_request = No_input_required;
+      }
 end

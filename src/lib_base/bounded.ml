@@ -65,4 +65,10 @@ module Int32 = struct
             | Some x -> Ok x)
           int32)
   end
+
+  module NonNegative = Make (struct
+    let min_int = 0l
+
+    let max_int = Int32.max_int
+  end)
 end
