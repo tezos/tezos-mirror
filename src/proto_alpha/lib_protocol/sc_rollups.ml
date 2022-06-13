@@ -150,50 +150,53 @@ let wrapped_proof_module p =
 
 let wrapped_proof_encoding =
   let open Data_encoding in
-  union
-    ~tag_size:`Uint8
-    [
-      case
-        ~title:"Arithmetic PVM with proof"
-        (Tag 0)
-        Sc_rollup_arith.ProtocolImplementation.proof_encoding
-        (function
-          | Arith_pvm_with_proof pvm ->
-              let (module P : PVM_with_proof
-                    with type proof =
-                      Sc_rollup_arith.ProtocolImplementation.proof) =
-                pvm
-              in
-              Some P.proof
-          | _ -> None)
-        (fun proof ->
-          let module P = struct
-            include Sc_rollup_arith.ProtocolImplementation
+  let encoding =
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"Arithmetic PVM with proof"
+          (Tag 0)
+          Sc_rollup_arith.ProtocolImplementation.proof_encoding
+          (function
+            | Arith_pvm_with_proof pvm ->
+                let (module P : PVM_with_proof
+                      with type proof =
+                        Sc_rollup_arith.ProtocolImplementation.proof) =
+                  pvm
+                in
+                Some P.proof
+            | _ -> None)
+          (fun proof ->
+            let module P = struct
+              include Sc_rollup_arith.ProtocolImplementation
 
-            let proof = proof
-          end in
-          Arith_pvm_with_proof (module P));
-      case
-        ~title:"Wasm 2.0.0 PVM with proof"
-        (Tag 1)
-        Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof_encoding
-        (function
-          | Wasm_2_0_0_pvm_with_proof pvm ->
-              let (module P : PVM_with_proof
-                    with type proof =
-                      Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof) =
-                pvm
-              in
-              Some P.proof
-          | _ -> None)
-        (fun proof ->
-          let module P = struct
-            include Sc_rollup_wasm.V2_0_0.ProtocolImplementation
+              let proof = proof
+            end in
+            Arith_pvm_with_proof (module P));
+        case
+          ~title:"Wasm 2.0.0 PVM with proof"
+          (Tag 1)
+          Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof_encoding
+          (function
+            | Wasm_2_0_0_pvm_with_proof pvm ->
+                let (module P : PVM_with_proof
+                      with type proof =
+                        Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof) =
+                  pvm
+                in
+                Some P.proof
+            | _ -> None)
+          (fun proof ->
+            let module P = struct
+              include Sc_rollup_wasm.V2_0_0.ProtocolImplementation
 
-            let proof = proof
-          end in
-          Wasm_2_0_0_pvm_with_proof (module P));
-    ]
+              let proof = proof
+            end in
+            Wasm_2_0_0_pvm_with_proof (module P));
+      ]
+  in
+  check_size Constants_repr.sc_max_wrapped_proof_binary_size encoding
 
 let wrap_proof pvm_with_proof =
   let (module P : PVM_with_proof) = pvm_with_proof in

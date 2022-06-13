@@ -72,6 +72,9 @@ val max_allowed_global_constant_depth : int
  *)
 val michelson_maximum_type_size : int
 
+(** A size limit for {!Sc_rollups.wrapped_proof} binary encoding. *)
+val sc_max_wrapped_proof_binary_size : int
+
 type fixed
 
 val fixed_encoding : fixed Data_encoding.encoding
