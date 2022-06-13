@@ -313,6 +313,12 @@ let non_negative_z_parameter =
 let non_negative_z_param ~name ~desc next =
   Clic.param ~name ~desc non_negative_z_parameter next
 
+let non_negative_parameter =
+  Clic.parameter (fun _ s ->
+      match int_of_string_opt s with
+      | Some i when i >= 0 -> return i
+      | _ -> failwith "Parameter should be a non-negative integer literal")
+
 let fee_arg =
   arg
     ~long:"fee"
@@ -893,17 +899,59 @@ module Sc_rollup_params = struct
                encoded in a base58 string."
               s)
 
-  let sc_rollup_address_param ?(name = "smart contract rollup address") ~usage
-      next =
-    Clic.param
-      ~name
-      ~desc:
-        (Format.sprintf
-           "@[@[%s@]@.@[Smart contract rollup address encoded in a base58 \
-            string.@]@]"
-           usage)
-      sc_rollup_address_parameter
-      next
+  let rollup_kind_parameter =
+    Clic.parameter (fun _ name ->
+        match Sc_rollup.Kind.pvm_of_name ~name with
+        | None ->
+            failwith
+              "Parameter '%s' is not a valid rollup name (must be one of %s)"
+              name
+              (String.concat ", " Sc_rollup.Kind.all_names)
+        | Some k -> return k)
+
+  let boot_sector_parameter =
+    let from_text s =
+      return (fun (module R : Sc_rollup.PVM.S) ->
+          R.parse_boot_sector s |> function
+          | None -> failwith "Invalid boot sector"
+          | Some boot_sector -> return boot_sector)
+    in
+    file_or_text_parameter ~from_text ()
+
+  let messages_parameter =
+    let open Lwt_result_syntax in
+    let from_json text =
+      try return (`Json (Ezjsonm.from_string text))
+      with Ezjsonm.Parse_error _ ->
+        failwith "Given text is not valid JSON: '%s'" text
+    in
+    let from_bin_file (cctxt : #Client_context.full) path =
+      let* bin = cctxt#read_file path in
+      return (`Bin bin)
+    in
+    let from_json_file (cctxt : #Client_context.full) path =
+      let* json_string = cctxt#read_file path in
+      from_json json_string
+    in
+    Clic.parameter (fun (cctxt : #Client_context.full) p ->
+        Client_aliases.parse_alternatives
+          [
+            ("text", from_json);
+            ("file", from_json_file cctxt);
+            ("bin", from_bin_file cctxt);
+          ]
+          p)
+
+  let commitment_hash_parameter =
+    Clic.parameter (fun _ commitment_hash ->
+        match Sc_rollup.Commitment.Hash.of_b58check_opt commitment_hash with
+        | None ->
+            failwith
+              "Parameter '%s' is not a valid B58-encoded rollup commitment hash"
+              commitment_hash
+        | Some hash -> return hash)
+
+  let unchecked_payload_parameter = file_or_text_parameter ~from_text:return ()
 end
 
 let fee_parameter_args =
