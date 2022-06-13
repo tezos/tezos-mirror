@@ -723,6 +723,8 @@ include (
 type inbox = t
 
 module Proof = struct
+  type starting_point = {inbox_level : Raw_level_repr.t; message_counter : Z.t}
+
   type t = {
     skips : (inbox * inclusion_proof) list;
     (* The [skips] value in this record makes it potentially unbounded
@@ -812,7 +814,7 @@ module Proof = struct
     let*! result = promise in
     match result with Ok r -> return r | Error _ -> proof_error reason
 
-  let rec valid (l, n) inbox proof =
+  let rec valid {inbox_level = l; message_counter = n} inbox proof =
     assert (Z.(geq n zero)) ;
     let open Lwt_result_syntax in
     match split_proof proof with
@@ -846,7 +848,11 @@ module Proof = struct
           verify_inclusion_proof inc level (bottom_level remaining_proof)
           && Raw_level_repr.equal (inbox_level level) l
           && Z.equal level.message_counter n
-        then valid (Raw_level_repr.succ l, Z.zero) inbox remaining_proof
+        then
+          valid
+            {inbox_level = Raw_level_repr.succ l; message_counter = Z.zero}
+            inbox
+            remaining_proof
         else proof_error "Inbox proof parameters don't match (lower level)"
 
   (* TODO #2997 This needs to be implemented when the inbox structure is

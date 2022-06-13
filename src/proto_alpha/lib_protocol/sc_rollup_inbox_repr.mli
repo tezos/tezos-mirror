@@ -310,7 +310,7 @@ type inbox = t
     earlier in this file into the inbox proof as it is required by a
     refutation. *)
 module Proof : sig
-  type starting_point := Raw_level_repr.t * Z.t
+  type starting_point = {inbox_level : Raw_level_repr.t; message_counter : Z.t}
 
   (** An inbox proof has three parameters:
 
