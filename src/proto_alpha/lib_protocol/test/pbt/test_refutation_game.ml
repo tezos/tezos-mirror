@@ -261,6 +261,8 @@ end) : TestPVM with type state = int = struct
 
   type output_proof = unit
 
+  let output_proof_encoding = Data_encoding.unit
+
   let state_of_output_proof _ =
     Stdlib.failwith "Dummy PVM can't handle output proof"
 
@@ -343,6 +345,8 @@ end) : TestPVM with type state = string * int list = struct
   let produce_proof _ _ _ = Stdlib.failwith "Dummy PVM can't produce proof"
 
   type output_proof = unit
+
+  let output_proof_encoding = Data_encoding.unit
 
   let state_of_output_proof _ =
     Stdlib.failwith "Dummy PVM can't handle output proof"

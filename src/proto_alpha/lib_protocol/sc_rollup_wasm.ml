@@ -438,6 +438,17 @@ module V2_0_0 = struct
       output_proof_output : PS.output;
     }
 
+    let output_proof_encoding =
+      let open Data_encoding in
+      conv
+        (fun {output_proof_state; output_proof_output} ->
+          (output_proof_state, output_proof_output))
+        (fun (output_proof_state, output_proof_output) ->
+          {output_proof_state; output_proof_output})
+        (obj2
+           (req "output_proof" State_hash.encoding)
+           (req "output_proof_state" PS.output_encoding))
+
     (* FIXME: #3176
        The WASM PVM must provide an implementation for these
        proofs. These are likely to be similar to the proofs about the

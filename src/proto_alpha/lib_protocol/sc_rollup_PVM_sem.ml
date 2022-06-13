@@ -135,25 +135,34 @@ let input_request_equal a b =
       Raw_level_repr.equal l m && Z.equal n o
   | First_after _, _ -> false
 
-type output = {message_counter : Z.t; payload : Sc_rollup_outbox_message_repr.t}
+type output = {
+  outbox_level : Raw_level_repr.t;
+  message_index : Z.t;
+  message : Sc_rollup_outbox_message_repr.t;
+}
 
 let output_encoding =
   let open Data_encoding in
   conv
-    (fun {message_counter; payload} -> (message_counter, payload))
-    (fun (message_counter, payload) -> {message_counter; payload})
-    (obj2
-       (req "message_counter" n)
-       (req "payload" Sc_rollup_outbox_message_repr.encoding))
+    (fun {outbox_level; message_index; message} ->
+      (outbox_level, message_index, message))
+    (fun (outbox_level, message_index, message) ->
+      {outbox_level; message_index; message})
+    (obj3
+       (req "outbox_level" Raw_level_repr.encoding)
+       (req "message_index" n)
+       (req "message" Sc_rollup_outbox_message_repr.encoding))
 
-let pp_output fmt {message_counter; payload} =
+let pp_output fmt {outbox_level; message_index; message} =
   Format.fprintf
     fmt
-    "@[%a@;%a@;@]"
+    "@[%a@;%a@;%a@;@]"
+    Raw_level_repr.pp
+    outbox_level
     Z.pp_print
-    message_counter
+    message_index
     Sc_rollup_outbox_message_repr.pp
-    payload
+    message
 
 module type S = sig
   (**
@@ -293,6 +302,9 @@ module type S = sig
   (** The following type is inhabited by the proofs that a given [output]
       is part of the outbox of a given [state]. *)
   type output_proof
+
+  (** [output_proof_encoding] encoding value for [output_proof]s. *)
+  val output_proof_encoding : output_proof Data_encoding.t
 
   (** [output_of_output_proof proof] returns the [output] that is
       referred to in [proof]'s statement. *)

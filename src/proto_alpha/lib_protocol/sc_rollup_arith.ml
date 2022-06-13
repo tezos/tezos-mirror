@@ -962,8 +962,11 @@ module Make (Context : P) :
     let destination = Contract_hash.zero in
     let entrypoint = Entrypoint_repr.default in
     let transaction = {unparsed_parameters; destination; entrypoint} in
-    let payload = Atomic_transaction_batch {transactions = [transaction]} in
-    let output = Sc_rollup_PVM_sem.{message_counter = counter; payload} in
+    let message = Atomic_transaction_batch {transactions = [transaction]} in
+    let* outbox_level = CurrentLevel.get in
+    let output =
+      Sc_rollup_PVM_sem.{outbox_level; message_index = counter; message}
+    in
     Output.set (Z.to_string counter) output
 
   let evaluate =
@@ -1065,11 +1068,23 @@ module Make (Context : P) :
     output_proof_output : PS.output;
   }
 
+  let output_proof_encoding =
+    let open Data_encoding in
+    conv
+      (fun {output_proof; output_proof_state; output_proof_output} ->
+        (output_proof, output_proof_state, output_proof_output))
+      (fun (output_proof, output_proof_state, output_proof_output) ->
+        {output_proof; output_proof_state; output_proof_output})
+      (obj3
+         (req "output_proof" Context.proof_encoding)
+         (req "output_proof_state" State_hash.encoding)
+         (req "output_proof_output" PS.output_encoding))
+
   let output_of_output_proof s = s.output_proof_output
 
   let state_of_output_proof s = s.output_proof_state
 
-  let output_key (output : PS.output) = Z.to_string output.message_counter
+  let output_key (output : PS.output) = Z.to_string output.message_index
 
   let has_output output tree =
     let open Lwt_syntax in

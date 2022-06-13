@@ -302,13 +302,13 @@ let test_evaluation_messages () =
   >>=? fun () ->
   List.iter_es (test_evaluation_message ~valid:false) invalid_messages
 
-let test_output_messages_proofs ~valid (source, expected_outputs) =
+let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
   let open Lwt_result_syntax in
   let open Sc_rollup_PVM_sem in
   boot "" @@ fun ctxt state ->
   let input =
     {
-      inbox_level = Raw_level_repr.root;
+      inbox_level = Raw_level_repr.of_int32_exn (Int32.of_int inbox_level);
       message_counter = Z.zero;
       payload = source;
     }
@@ -335,7 +335,7 @@ let test_output_messages_proofs ~valid (source, expected_outputs) =
   in
   List.iter_es check_output expected_outputs
 
-let make_output ~counter n =
+let make_output ~outbox_level ~message_index n =
   let open Sc_rollup_outbox_message_repr in
   let unparsed_parameters =
     Micheline.(Int (dummy_location, Z.of_int n) |> strip_locations)
@@ -344,38 +344,72 @@ let make_output ~counter n =
   let entrypoint = Entrypoint_repr.default in
   let transaction = {unparsed_parameters; destination; entrypoint} in
   let transactions = [transaction] in
-  let message_counter = Z.of_int counter
-  and payload = Atomic_transaction_batch {transactions} in
-  Sc_rollup_PVM_sem.{message_counter; payload}
+  let message_index = Z.of_int message_index in
+  let outbox_level = Raw_level_repr.of_int32_exn (Int32.of_int outbox_level) in
+  let message = Atomic_transaction_batch {transactions} in
+  Sc_rollup_PVM_sem.{outbox_level; message_index; message}
 
 let test_valid_output_messages () =
-  [
-    ("1", []);
-    ("1 out", [make_output ~counter:0 1]);
-    ("1 out 2 out", [make_output ~counter:0 1; make_output ~counter:1 2]);
-    ("1 out 1 1 + out", [make_output ~counter:0 1; make_output ~counter:1 2]);
-    ( "1 out 1 1 + out out",
-      [
-        make_output ~counter:0 1;
-        make_output ~counter:1 2;
-        make_output ~counter:2 2;
-      ] );
-  ]
-  |> List.iter_es (test_output_messages_proofs ~valid:true)
+  let test inbox_level =
+    let outbox_level = inbox_level in
+    [
+      ("1", []);
+      ("1 out", [make_output ~outbox_level ~message_index:0 1]);
+      ( "1 out 2 out",
+        [
+          make_output ~outbox_level ~message_index:0 1;
+          make_output ~outbox_level ~message_index:1 2;
+        ] );
+      ( "1 out 1 1 + out",
+        [
+          make_output ~outbox_level ~message_index:0 1;
+          make_output ~outbox_level ~message_index:1 2;
+        ] );
+      ( "1 out 1 1 + out out",
+        [
+          make_output ~outbox_level ~message_index:0 1;
+          make_output ~outbox_level ~message_index:1 2;
+          make_output ~outbox_level ~message_index:2 2;
+        ] );
+    ]
+    |> List.iter_es (test_output_messages_proofs ~valid:true ~inbox_level)
+  in
+  (* Test for different inbox/outbox levels. *)
+  List.iter_es test [0; 1; 2345]
 
 let test_invalid_output_messages () =
+  let inbox_level = 0 in
+  let outbox_level = inbox_level in
   [
-    ("1", [make_output ~counter:0 1]);
-    ("1 out", [make_output ~counter:1 1]);
-    ("1 out 1 1 + out", [make_output ~counter:0 1; make_output ~counter:3 2]);
+    ("1", [make_output ~outbox_level ~message_index:0 1]);
+    ("1 out", [make_output ~outbox_level ~message_index:1 1]);
+    ( "1 out 1 1 + out",
+      [
+        make_output ~outbox_level ~message_index:0 1;
+        make_output ~outbox_level ~message_index:3 2;
+      ] );
     ( "1 out 1 1 + out out",
       [
-        make_output ~counter:0 1;
-        make_output ~counter:1 2;
-        make_output ~counter:2 3;
+        make_output ~outbox_level ~message_index:0 1;
+        make_output ~outbox_level ~message_index:1 2;
+        make_output ~outbox_level ~message_index:2 3;
       ] );
   ]
-  |> List.iter_es (test_output_messages_proofs ~valid:false)
+  |> List.iter_es (test_output_messages_proofs ~valid:false ~inbox_level)
+
+let test_invalid_outbox_level () =
+  let inbox_level = 42 in
+  let outbox_level = inbox_level - 1 in
+  [
+    ("1", []);
+    ("1 out", [make_output ~outbox_level ~message_index:0 1]);
+    ( "1 out 2 out",
+      [
+        make_output ~outbox_level ~message_index:0 1;
+        make_output ~outbox_level ~message_index:1 2;
+      ] );
+  ]
+  |> List.iter_es (test_output_messages_proofs ~valid:false ~inbox_level)
 
 let tests =
   [
@@ -386,4 +420,5 @@ let tests =
     Tztest.tztest "Evaluating message" `Quick test_evaluation_messages;
     Tztest.tztest "Valid output messages" `Quick test_valid_output_messages;
     Tztest.tztest "Invalid output messages" `Quick test_invalid_output_messages;
+    Tztest.tztest "Invalid outbox level" `Quick test_invalid_outbox_level;
   ]

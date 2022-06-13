@@ -2530,9 +2530,36 @@ module Sc_rollup : sig
 
   val input_request_equal : input_request -> input_request -> bool
 
+  module Outbox : sig
+    (** See {!Sc_rollup_outbox_message_repr}. *)
+    module Message : sig
+      type transaction = {
+        unparsed_parameters : Script.expr;
+        destination : Contract_hash.t;
+        entrypoint : Entrypoint.t;
+      }
+
+      type t = Atomic_transaction_batch of {transactions : transaction list}
+
+      val of_bytes : string -> t tzresult
+
+      module Internal_for_tests : sig
+        val to_bytes : t -> string tzresult
+      end
+    end
+
+    val record_applied_message :
+      context ->
+      t ->
+      Raw_level.t ->
+      message_index:int ->
+      (Z.t * context) tzresult Lwt.t
+  end
+
   type output = {
-    message_counter : Z.t;
-    payload : Sc_rollup_outbox_message_repr.t;
+    outbox_level : Raw_level.t;
+    message_index : Z.t;
+    message : Outbox.Message.t;
   }
 
   module PVM : sig
@@ -2579,6 +2606,8 @@ module Sc_rollup : sig
         context -> input option -> state -> (proof, error) result Lwt.t
 
       type output_proof
+
+      val output_proof_encoding : output_proof Data_encoding.t
 
       val output_of_output_proof : output_proof -> output
 
@@ -2868,32 +2897,6 @@ module Sc_rollup : sig
     module Proof : sig
       type t
     end
-  end
-
-  module Outbox : sig
-    (** See {!Sc_rollup_outbox_message_repr}. *)
-    module Message : sig
-      type transaction = {
-        unparsed_parameters : Script.expr;
-        destination : Contract_hash.t;
-        entrypoint : Entrypoint.t;
-      }
-
-      type t = Atomic_transaction_batch of {transactions : transaction list}
-
-      val of_bytes : string -> t tzresult
-
-      module Internal_for_tests : sig
-        val to_bytes : t -> string tzresult
-      end
-    end
-
-    val record_applied_message :
-      context ->
-      t ->
-      Raw_level.t ->
-      message_index:int ->
-      (Z.t * context) tzresult Lwt.t
   end
 
   module Errors : sig
