@@ -1493,9 +1493,13 @@ module Dal = struct
     let threshold =
       ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
     in
+    let number_of_shards =
+      ctxt.back.constants.Constants_parametric_repr.dal.number_of_shards
+    in
     Dal_endorsement_repr.Accountability.is_slot_available
       ctxt.back.dal_endorsement_slot_accountability
       ~threshold
+      ~number_of_shards
 
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
 
