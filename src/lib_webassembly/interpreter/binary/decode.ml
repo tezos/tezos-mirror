@@ -131,6 +131,32 @@ let sized f s =
   require (pos s = start + size) s start "section size mismatch";
   x
 
+(** Incremental chunked byte vector creation (from implicit input). *)
+type byte_vector_kont =
+  | VKStart
+  (** Initial step. *)
+  | VKRead of Chunked_byte_vector.Buffer.t * int * int
+  (** Reading step, containing the current position in the string and the
+      length, reading byte per byte. *)
+  | VKStop of Chunked_byte_vector.Buffer.t
+  (** Final step, cannot reduce. *)
+
+let byte_vector_step s = function
+  | VKStart ->
+    let len = len32 s in
+    let vector = len |> Int64.of_int |> Chunked_byte_vector.Buffer.create in
+    VKRead (vector, 0, len)
+
+  | VKRead (vector, index, len) when index >= len ->
+    VKStop vector
+  | VKRead (vector, index, len) ->
+    let c = get s in
+    let vector = Chunked_byte_vector.Buffer.add_byte vector c in
+    VKRead (vector, index + 1, len)
+
+  (* Final step, cannot reduce *)
+  | VKStop vector -> assert false
+
 
 (* Types *)
 
@@ -1278,6 +1304,7 @@ type data_kont =
         offset_kont: pos * instr_block_kont list
       }
   (** Data segment mode parsing step. *)
+  | DKInit of { dmode: segment_mode; init_kont: byte_vector_kont }
   | DKStop of data_segment'
   (** Final step of a data segment parsing. *)
 
@@ -1291,9 +1318,8 @@ let data_start s =
   | 0x01l ->
     (* passive *)
     let mode_pos = pos s in
-    let dinit = string s in
     let dmode = Source.(Passive @@ region s mode_pos mode_pos) in
-    DKStop {dmode; dinit}
+    DKInit { dmode; init_kont = VKStart }
   | 0x02l ->
     (* active *)
     let left = pos s in
@@ -1305,16 +1331,22 @@ let data_start s =
 let data_step s =
   function
   | DKStart -> data_start s
+
   | DKMode { left; index; offset_kont = (left_offset, [ IKStop offset ]) } ->
     end_ s;
     let right = pos s in
     let offset = Source.(offset @@ region s left_offset right) in
     let dmode = Source.(Active {index; offset} @@ region s left right) in
-    let dinit = string s in
-    DKStop {dmode; dinit}
+    DKInit { dmode; init_kont = VKStart }
   | DKMode { left; index; offset_kont = (left_offset, k) } ->
     let k' = instr_block_step s k in
     DKMode { left; index; offset_kont = (left_offset, k') }
+
+  | DKInit { dmode; init_kont = VKStop dinit } ->
+    DKStop { dmode; dinit }
+  | DKInit { dmode; init_kont } ->
+    DKInit { dmode; init_kont = byte_vector_step s init_kont }
+
   | DKStop _ -> assert false (* final step, cannot reduce *)
 
 (* DataCount section *)

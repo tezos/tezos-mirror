@@ -841,11 +841,7 @@ let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst Lwt.t =
 
 let create_data (inst : module_inst) (seg : data_segment) : data_inst =
   let {dinit; _} = seg.it in
-  (* TODO: #3076
-     [Chunked_byte_vector.of_string] has linear time complexity. It is not
-     suited for evaluation in a PVM tick. This function needs to be broken up
-     into ticks. *)
-  ref (Chunked_byte_vector.of_string dinit)
+  ref (Chunked_byte_vector.Buffer.to_byte_vector dinit)
 
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst)
@@ -891,7 +887,7 @@ let run_data i data =
     assert (index.it = 0l);
     offset.it @ [
       Const (I32 0l @@ at) @@ at;
-      Const (I32 (Int32.of_int (String.length data.it.dinit)) @@ at) @@ at;
+      Const (I32 (Int32.of_int (Int64.to_int (Chunked_byte_vector.Buffer.length data.it.dinit))) @@ at) @@ at;
       MemoryInit x @@ at;
       DataDrop x @@ at
     ]

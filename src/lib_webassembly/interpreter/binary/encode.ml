@@ -857,6 +857,7 @@ struct
   (* Data section *)
   let data seg =
     let {dinit; dmode} = seg.it in
+    let dinit = Chunked_byte_vector.Buffer.to_string_unstable dinit in
     match dmode.it with
     | Passive ->
       vu32 0x01l; string dinit

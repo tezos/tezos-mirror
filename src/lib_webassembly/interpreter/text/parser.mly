@@ -881,17 +881,17 @@ data :
   | LPAR DATA bind_var_opt string_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
-      fun () -> {dinit = $4; dmode = Passive @@ at} @@ at }
+      fun () -> {dinit = Chunked_byte_vector.Buffer.of_string $4; dmode = Passive @@ at} @@ at }
   | LPAR DATA bind_var_opt memory_use offset string_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
-      {dinit = $6; dmode = Active {index = $4 c memory; offset = $5 c} @@ at} @@ at }
+      {dinit = Chunked_byte_vector.Buffer.of_string $6; dmode = Active {index = $4 c memory; offset = $5 c} @@ at} @@ at }
   | LPAR DATA bind_var_opt offset string_list RPAR  /* Sugar */
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
-      {dinit = $5; dmode = Active {index = 0l @@ at; offset = $4 c} @@ at} @@ at }
+      {dinit = Chunked_byte_vector.Buffer.of_string $5; dmode = Active {index = 0l @@ at; offset = $4 c} @@ at} @@ at }
 
 memory :
   | LPAR MEMORY bind_var_opt memory_fields RPAR
@@ -915,7 +915,7 @@ memory_fields :
       let offset = [i32_const (0l @@ at) @@ at] @@ at in
       let size = Int32.(div (add (of_int (String.length $3)) 65535l) 65536l) in
       [{mtype = MemoryType {min = size; max = Some size}} @@ at],
-      [{dinit = $3; dmode = Active {index = x; offset} @@ at} @@ at],
+      [{dinit = Chunked_byte_vector.Buffer.of_string $3; dmode = Active {index = x; offset} @@ at} @@ at],
       [], [] }
 
 global :
