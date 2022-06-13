@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,35 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type rpc_error =
-  | Empty_answer
-  | Connection_failed of string
-  | Bad_request of string
-  | Forbidden
-  | Method_not_allowed of RPC_service.meth list
-  | Unsupported_media_type of string option
-  | Not_acceptable of {proposed : string; acceptable : string}
-  | Unexpected_status_code of {
-      code : Cohttp.Code.status_code;
-      content : string;
-      media_type : string option;
-    }
-  | Unexpected_content_type of {
-      received : string;
-      acceptable : string list;
-      body : string;
-    }
-  | Unexpected_content of {
-      content : string;
-      media_type : string;
-      error : string;
-    }
-  | OCaml_exception of string
-  | Unauthorized_host of string option
-  | Unauthorized_uri
-  | Redirect_not_supported
-      (** Indicates that the endpoint returned a redirect, which the client does
-        not yet know how to follow. *)
+(** This module provides a middleware that is used by the proxy server to
+    forward unsupported RPCs to a full node. *)
 
-type error +=
-  | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}
+(** A Resto middleware that rewrites any queries that the proxy server cannot
+    handle and forwards them to the full node at the given [Uri.t]. *)
+val query_forwarder : Uri.t -> Resto_cohttp_server.Server.middleware

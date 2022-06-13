@@ -48,24 +48,32 @@
 null
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
@@ -84,19 +92,25 @@ Fatal error:
 "[PUBLIC_KEY_HASH]"
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
@@ -118,14 +132,18 @@ Fatal error:
 "0"
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
@@ -325,14 +343,18 @@ null
 "0"
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-Fatal error:
-  No service found at this URL
-  
+Error:
+  Rpc request failed:
+     - meth: GET
+     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
+     - error: The client does not support following HTTP redirects yet.
 
 ./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {

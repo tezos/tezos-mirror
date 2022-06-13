@@ -49,6 +49,7 @@ type rpc_error =
   | OCaml_exception of string
   | Unauthorized_host of string option
   | Unauthorized_uri
+  | Redirect_not_supported
 
 type error +=
   | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}
@@ -164,6 +165,12 @@ let rpc_error_encoding =
         unit
         (function Unauthorized_uri -> Some () | _ -> None)
         (function () -> Unauthorized_uri);
+      case
+        (Tag 11)
+        ~title:"Redirect not supported"
+        unit
+        (function Redirect_not_supported -> Some () | _ -> None)
+        (function () -> Redirect_not_supported);
     ]
 
 let pp_rpc_error ppf err =
@@ -242,6 +249,10 @@ let pp_rpc_error ppf err =
       Format.fprintf
         ppf
         "@[<v 2>The server doesn't authorize this endpoint (ACL filtering).@]"
+  | Redirect_not_supported ->
+      Format.fprintf
+        ppf
+        "@[<v 2>The client does not support following HTTP redirects yet.@]"
 
 let () =
   register_error_kind

@@ -222,6 +222,7 @@ let main_promise (config_file : string option)
       address = rpc_server_address;
       port = rpc_server_port;
       tls_cert_and_key = rpc_server_tls;
+      forwarding_endpoint = endpoint;
     }
   in
   Proxy_server_main_run.run dir server_args

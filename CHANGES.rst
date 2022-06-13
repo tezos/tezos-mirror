@@ -85,6 +85,9 @@ Signer
 
 Proxy server
 ------------
+- Changed the proxy server's handling of requests it doesn't know how to serve:
+  it now forwards the client to the full node at the given `--endpoint`, by
+  responding with a ``301 Moved Permanently`` redirect.
 
 Protocol Compiler And Environment
 ---------------------------------

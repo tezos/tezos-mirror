@@ -2181,7 +2181,7 @@ let tezos_rpc_http_server =
         tezos_rpc |> open_;
         tezos_rpc_http |> open_;
       ]
-    ~modules:["RPC_server"; "RPC_logging"]
+    ~modules:["RPC_server"; "RPC_logging"; "RPC_middleware"]
     ~private_modules:["RPC_logging"]
 
 let _tezos_rpc_http_server_tests =
