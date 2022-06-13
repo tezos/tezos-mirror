@@ -18,7 +18,8 @@
   tezos-rpc-http
   tezos-rpc-http-client-unix
   tezos-protocol-013-PtJakart
-  tezos-sc-rollup-013-PtJakart)
+  tezos-sc-rollup-013-PtJakart
+  uri)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

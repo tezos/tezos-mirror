@@ -28,6 +28,7 @@ depends: [
   "tezos-rpc-http"
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
+  "uri" { >= "2.2.0" }
   "tezos-client-base-unix"
   "tezos-mockup"
   "tezos-mockup-proxy"

@@ -10,7 +10,8 @@
   tezos-client-base
   tezos-protocol-004-Pt24m4xi
   tezos-signer-backends
-  tezos-rpc)
+  tezos-rpc
+  uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

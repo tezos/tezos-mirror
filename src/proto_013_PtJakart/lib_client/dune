@@ -15,7 +15,8 @@
   tezos-signer-backends
   tezos-protocol-plugin-013-PtJakart
   tezos-protocol-013-PtJakart.parameters
-  tezos-rpc)
+  tezos-rpc
+  uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))

@@ -14,7 +14,8 @@
   tezos-baking-alpha
   tezos-protocol-alpha.parameters
   tezos-crypto
-  alcotest-lwt)
+  alcotest-lwt
+  uri)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

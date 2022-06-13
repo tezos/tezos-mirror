@@ -3708,6 +3708,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc |> if_ N.(number >= 001) |> open_;
             tezos_client_commands |> if_ N.(number == 000) |> open_;
             tezos_stdlib_unix |> if_ N.(number == 000);
+            uri |> if_ N.(number >= 001);
           ]
         ~bisect_ppx:N.(number >= 008)
         ?inline_tests:(if N.(number >= 009) then Some ppx_inline_test else None)
@@ -3817,6 +3818,8 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc |> open_;
             tezos_client_base_unix |> if_ N.(number >= 009) |> open_;
             plugin |> if_some |> if_ N.(number >= 008) |> open_;
+            (* uri used by the stresstest command introduced in 011 *)
+            uri |> if_ N.(number >= 011);
           ]
         ~bisect_ppx:N.(number >= 008)
         ~linkall:true
@@ -3902,6 +3905,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc_http |> open_;
             lwt_canceler;
             lwt_exit;
+            uri;
           ]
         ~linkall:true
         ~all_modules_except:
@@ -3997,6 +4001,7 @@ include Tezos_raw_protocol_%s.Main
             parameters |> if_some |> if_ N.(number >= 012);
             tezos_crypto |> if_ N.(number >= 012);
             alcotest_lwt;
+            uri;
           ]
     in
     let baking_commands =
@@ -4018,6 +4023,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_client_commands |> open_;
             baking |> if_some |> open_;
             tezos_rpc |> open_;
+            uri;
           ]
         ~linkall:true
         ~modules:
@@ -4134,6 +4140,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc_http_client_unix |> open_;
             main |> open_;
             sc_rollup |> if_some |> open_;
+            uri;
           ]
     in
     let _sc_rollup_node =
@@ -4225,6 +4232,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_stdlib_unix |> open_;
             tx_rollup |> if_some |> open_;
             raw_protocol |> open_;
+            uri;
           ]
     in
     let _tx_rollup_node =

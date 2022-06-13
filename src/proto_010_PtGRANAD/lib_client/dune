@@ -12,7 +12,8 @@
   tezos-protocol-010-PtGRANAD
   tezos-signer-backends
   tezos-protocol-plugin-010-PtGRANAD
-  tezos-rpc)
+  tezos-rpc
+  uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))

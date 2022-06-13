@@ -19,6 +19,7 @@ depends: [
   "tezos-signer-backends"
   "tezos-protocol-plugin-012-Psithaca"
   "tezos-rpc"
+  "uri" { >= "2.2.0" }
   "tezos-micheline" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}

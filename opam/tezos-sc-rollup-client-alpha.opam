@@ -19,6 +19,7 @@ depends: [
   "tezos-rpc-http-client-unix"
   "tezos-protocol-alpha"
   "tezos-sc-rollup-alpha"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]
