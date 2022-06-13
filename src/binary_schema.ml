@@ -30,8 +30,10 @@ let filter_map f l =
   List.rev (List.fold_left (fun acc x -> filter_cons acc (f x)) [] l)
 
 open Encoding
+open Hash_builtin
 
 type integer_extended = [Binary_size.integer | `Int32 | `Int64]
+[@@deriving hash]
 
 type field_descr =
   | Named_field of string * Kind.t * layout
@@ -65,6 +67,7 @@ and toplevel_encoding =
   | Int_enum of {size : Binary_size.integer; cases : (int * string) list}
 
 and description = {title : string; description : string option}
+[@@deriving hash]
 
 type t = {
   toplevel : toplevel_encoding;

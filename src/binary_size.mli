@@ -54,15 +54,15 @@ val int64 : int
 
 val float : int
 
-type tag_size = [`Uint8 | `Uint16]
+type tag_size = [`Uint8 | `Uint16] [@@deriving hash]
 
 val tag_size : tag_size -> int
 
-type signed_integer = [`Int31 | `Int16 | `Int8]
+type signed_integer = [`Int31 | `Int16 | `Int8] [@@deriving hash]
 
-type unsigned_integer = [`Uint30 | `Uint16 | `Uint8]
+type unsigned_integer = [`Uint30 | `Uint16 | `Uint8] [@@deriving hash]
 
-type integer = [signed_integer | unsigned_integer]
+type integer = [signed_integer | unsigned_integer] [@@deriving hash]
 
 val integer_to_size : [< integer] -> int
 

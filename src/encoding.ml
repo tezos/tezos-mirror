@@ -24,10 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type limit = No_limit | At_most of int | Exactly of int
+open Hash_builtin
+
+type limit = No_limit | At_most of int | Exactly of int [@@deriving hash]
 
 module Kind = struct
-  type t = [`Fixed of int | `Dynamic | `Variable]
+  type t = [`Fixed of int | `Dynamic | `Variable] [@@deriving hash]
 
   type length = [`Fixed of int | `Variable]
 

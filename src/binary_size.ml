@@ -49,15 +49,15 @@ let int64 = 8
 
 let float = 8
 
-type tag_size = [`Uint8 | `Uint16]
+type tag_size = [`Uint8 | `Uint16] [@@deriving hash]
 
 let tag_size = function `Uint8 -> uint8 | `Uint16 -> uint16
 
-type signed_integer = [`Int31 | `Int16 | `Int8]
+type signed_integer = [`Int31 | `Int16 | `Int8] [@@deriving hash]
 
-type unsigned_integer = [`Uint30 | `Uint16 | `Uint8]
+type unsigned_integer = [`Uint30 | `Uint16 | `Uint8] [@@deriving hash]
 
-type integer = [signed_integer | unsigned_integer]
+type integer = [signed_integer | unsigned_integer] [@@deriving hash]
 
 let signed_range_to_size min max : [> signed_integer] =
   if min >= ~-128 && max <= 127 then `Int8

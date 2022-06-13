@@ -136,20 +136,24 @@ let add_n_reference uf {descriptions} =
   {descriptions = (n_reference_name, n_encoding) :: descriptions}
 
 let dedup_canonicalize uf l =
-  let tbl :
-      (Binary_schema.toplevel_encoding, Binary_schema.description) Hashtbl.t =
-    Hashtbl.create 100
-  in
+  let module Tbl = Hashtbl.Make (struct
+    type t = Binary_schema.toplevel_encoding
+
+    let hash = Binary_schema.hash_toplevel_encoding
+
+    let equal a b = a = b
+  end) in
+  let tbl : Binary_schema.description Tbl.t = Tbl.create 100 in
   let rec run l =
-    Hashtbl.clear tbl ;
+    Tbl.clear tbl ;
     let new_union = ref false in
     let fixedup =
       l
       |> List.filter_map (fun (name, layout) ->
-             match Hashtbl.find_opt tbl layout with
+             match Tbl.find_opt tbl layout with
              | None ->
                  let desc = UF.find uf name in
-                 Hashtbl.add tbl layout desc ;
+                 Tbl.add tbl layout desc ;
                  Some (desc.title, layout)
              | Some original_desc ->
                  new_union := true ;
