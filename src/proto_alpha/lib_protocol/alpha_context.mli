@@ -2531,8 +2531,9 @@ module Sc_rollup : sig
   val input_request_equal : input_request -> input_request -> bool
 
   type output = {
-    message_counter : Z.t;
-    payload : Sc_rollup_outbox_message_repr.t;
+    outbox_level : Raw_level.t;
+    message_index : Z.t;
+    message : Sc_rollup_outbox_message_repr.t;
   }
 
   module PVM : sig
