@@ -1,5 +1,6 @@
 local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local singlestat = grafana.singlestat;
+local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
@@ -133,6 +134,25 @@ local node_instance = '{instance="$node_instance"}';
         legendFormat=incoming,
       )
     ),
+
+  incomingConnectionsMean:
+    statPanel.new(
+      title='Incoming connections mean',
+      datasource='Prometheus',
+    ).addTarget(
+      prometheus.target(
+        namespace + '_p2p_connections_incoming' + node_instance
+      )
+    ).addThresholds([
+      {
+        color: 'green',
+        value: 0,
+      },
+      {
+        color: 'red',
+        value: 1,
+      },
+    ]),
 
   mempoolPending:
     local applied = 'Applied';

@@ -278,6 +278,41 @@ local node_instance = '{instance="$node_instance"}';
       )
     ),
 
+  invalidBlocksMean: statPanel.new(
+    title='Invalid blocks mean',
+    datasource='Prometheus',
+  ).addTarget(
+    prometheus.target(
+      namespace + '_store_invalid_blocks' + node_instance
+    )
+  ).addThresholds([
+    {
+      color: 'green',
+      value: 0,
+    },
+    {
+      color: 'red',
+      value: 1,
+    },
+  ]),
+
+  alternateHeadsCount:
+    local alternateHeads = 'Alternate heads count';
+    graphPanel.new(
+      title='Alternate heads count',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      aliasColors={
+        [alternateHeads]: 'yellow',
+      },
+    ).addTarget(
+      prometheus.target(
+        namespace + '_store_alternate_heads_count',
+        legendFormat=alternateHeads,
+      )
+    ),
+
   gasConsumedHistory:
     local blocks = 'Gas consumed';
     graphPanel.new(
@@ -346,6 +381,29 @@ local node_instance = '{instance="$node_instance"}';
         legendFormat=validation,
       )
     ),
+
+  blocksValidationMean:
+    local treatment = namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
+    local completion = namespace + '_validator_block_last_finished_request_completion_timestamp' + node_instance;
+    local blocksValidation = 'blocks validation mean';
+    statPanel.new(
+      title='Blocks validation mean',
+      datasource='Prometheus',
+    ).addTarget(
+      prometheus.target(
+        completion + ' - ' + treatment,
+        legendFormat=blocksValidation,
+      )
+    ).addThresholds([
+      {
+        color: 'green',
+        value: 0,
+      },
+      {
+        color: 'red',
+        value: 1,
+      },
+    ]),
 
   headOperations:
     local consensus = 'Consensus';

@@ -1,5 +1,6 @@
 local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local singlestat = grafana.singlestat;
+local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
@@ -183,6 +184,30 @@ local node_instance = '{instance="$node_instance"}';
     )
   ,
 
+  peerValidatorErrorsMean:
+    local system_error = namespace + '_validator_peer_system_error' + node_instance;
+    local too_short_locator = namespace + '_validator_peer_too_short_locator' + node_instance;
+    local unavailable_protocol = namespace + '_validator_peer_unavailable_protocol' + node_instance;
+    local unknown_ancestor = namespace + '_validator_peer_unknown_ancestor' + node_instance;
+    local unknown_error = namespace + '_validator_peer_unknown_error' + node_instance;
+    statPanel.new(
+      title='Peer validators errors',
+      datasource='Prometheus',
+    ).addTarget(
+      prometheus.target(
+        system_error + ' + ' + too_short_locator + ' + ' + unavailable_protocol + ' + ' + unknown_ancestor + ' + ' + unknown_error
+      )
+    ).addThresholds([
+      {
+        color: 'green',
+        value: 0,
+      },
+      {
+        color: 'red',
+        value: 1,
+      },
+    ]),
+
 
   validatorTreatmentRequests:
     local chainPush = namespace + '_validator_chain_last_finished_request_push_timestamp' + node_instance;
@@ -252,6 +277,27 @@ local node_instance = '{instance="$node_instance"}';
         blockCompletionTime,
         legendFormat=block,
       ),
+    ]),
+
+  chainValidatorRequestCompletionMean:
+    local chainTreatment = namespace + '_validator_chain_last_finished_request_treatment_timestamp' + node_instance;
+    local chainCompletion = namespace + '_validator_chain_last_finished_request_completion_timestamp' + node_instance;
+    statPanel.new(
+      title='Chain validator request completion',
+      datasource='Prometheus',
+    ).addTarget(
+      prometheus.target(
+        chainCompletion + ' - ' + chainTreatment
+      )
+    ).addThresholds([
+      {
+        color: 'green',
+        value: 0,
+      },
+      {
+        color: 'red',
+        value: 1,
+      },
     ]),
 
 }

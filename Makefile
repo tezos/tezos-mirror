@@ -1,4 +1,4 @@
-all: basic full
+all: basic full compact
 
 BRANCH ?= master
 
@@ -18,3 +18,5 @@ fmt:
 basic: octez-basic.jsonnet
 
 full: octez-full.jsonnet
+
+compact: octez-compact.jsonnet
