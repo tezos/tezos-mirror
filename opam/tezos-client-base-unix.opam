@@ -22,6 +22,7 @@ depends: [
   "tezos-proxy"
   "tezos-signer-backends"
   "lwt-exit"
+  "uri" { >= "2.2.0" }
   "tezos-base-test-helpers" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
   "alcotest-lwt" { with-test & >= "1.5.0" }

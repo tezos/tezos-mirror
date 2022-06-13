@@ -13,6 +13,7 @@ depends: [
   "tezos-rpc"
   "tezos-shell-services"
   "tezos-sapling"
+  "uri" { >= "2.2.0" }
   "alcotest" { with-test & >= "1.5.0" }
 ]
 build: [

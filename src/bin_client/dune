@@ -20,6 +20,7 @@
   tezos-proxy
   tezos-client-base-unix
   tezos-signer-backends.unix
+  uri
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)
    (-> void_for_linking-tezos-client-genesis.empty))

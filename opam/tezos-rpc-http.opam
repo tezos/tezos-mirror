@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "resto-cohttp" { >= "0.8" & < "0.9" }
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

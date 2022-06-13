@@ -22,6 +22,7 @@
   tezos-shell-services
   tezos-shell-context
   tezos-version
+  uri
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)
    (-> void_for_linking-tezos-client-genesis.empty))

@@ -9,7 +9,8 @@
   tezos-base
   tezos-client-base
   tezos-shell-services
-  tezos-protocol-environment)
+  tezos-protocol-environment
+  uri)
  (flags (:standard)
         -open Tezos_base.TzPervasives)
  (modules registration registration_intf mockup_args))

@@ -20,7 +20,8 @@
   ptime.clock.os
   ezjsonm
   lwt
-  ipaddr)
+  ipaddr
+  uri)
  (js_of_ocaml (javascript_files ptime.js))
  (flags
   (:standard)

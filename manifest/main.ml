@@ -710,6 +710,7 @@ let tezos_rpc =
         tezos_error_monad |> open_;
         resto;
         resto_directory;
+        uri;
       ]
     ~js_compatible:true
 
@@ -845,6 +846,7 @@ let tezos_event_logging =
         tezos_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_lwt_result_stdlib;
         lwt_log_core;
+        uri;
       ]
     ~js_compatible:true
 
@@ -891,6 +893,7 @@ let tezos_stdlib_unix =
         mtime_clock_os;
         lwt_log;
         conf_libev;
+        uri;
       ]
 
 let tezos_clic =
@@ -984,6 +987,7 @@ let tezos_base =
         ezjsonm;
         lwt;
         ipaddr;
+        uri;
       ]
     ~js_compatible:true
     ~js_of_ocaml:[[S "javascript_files"; S "ptime.js"]]
@@ -1014,6 +1018,7 @@ let tezos_base_unix =
         tezos_stdlib |> open_;
         tezos_stdlib_unix |> open_;
         data_encoding |> open_;
+        uri;
       ]
 
 let lib_base_tests ?dep_files names =
@@ -2071,7 +2076,7 @@ let tezos_rpc_http =
     "tezos-rpc-http"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Tezos: library of auto-documented RPCs (http server and client)"
-    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; resto_cohttp]
+    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; resto_cohttp; uri]
     ~modules:["RPC_client_errors"; "media_type"]
 
 let tezos_rpc_http_client =
@@ -2188,6 +2193,7 @@ let tezos_client_base =
         tezos_rpc |> open_;
         tezos_shell_services |> open_;
         tezos_sapling;
+        uri;
       ]
     ~modules:[":standard"; "bip39_english"]
     ~linkall:true
@@ -2249,6 +2255,7 @@ let tezos_signer_backends =
         tezos_rpc_http_client |> open_;
         tezos_signer_services |> open_;
         tezos_shell_services |> open_;
+        uri;
       ]
 
 let _tezos_signer_backends_tests =
@@ -2266,6 +2273,7 @@ let _tezos_signer_backends_tests =
         tezos_client_base |> open_;
         tezos_signer_backends |> open_;
         alcotest_lwt;
+        uri;
       ]
 
 let tezos_signer_backends_unix =
@@ -2288,6 +2296,7 @@ let tezos_signer_backends_unix =
         tezos_signer_services |> open_;
         tezos_signer_backends |> open_;
         tezos_shell_services |> open_;
+        uri;
         select
           ~package:ledgerwallet_tezos
           ~source_if_present:"ledger.available.ml"
@@ -2326,6 +2335,7 @@ let tezos_client_commands =
         tezos_stdlib_unix;
         tezos_signer_backends;
         data_encoding |> open_;
+        uri;
       ]
     ~linkall:true
 
@@ -2340,6 +2350,7 @@ let tezos_mockup_registration =
         tezos_client_base;
         tezos_shell_services;
         tezos_protocol_environment;
+        uri;
       ]
     ~modules:["registration"; "registration_intf"; "mockup_args"]
 
@@ -2357,6 +2368,7 @@ let tezos_mockup_proxy =
         resto_cohttp_self_serving_client;
         tezos_rpc_http_client;
         tezos_shell_services;
+        uri;
       ]
 
 (* Depends on tezos_p2p to register the relevant RPCs. *)
@@ -2437,6 +2449,7 @@ let tezos_proxy =
         tezos_rpc;
         tezos_shell_services;
         tezos_context_memory;
+        uri;
       ]
 
 let tezos_proxy_rpc =
@@ -2450,6 +2463,7 @@ let tezos_proxy_rpc =
         tezos_mockup_proxy;
         tezos_rpc;
         tezos_proxy;
+        uri;
       ]
 
 let _tezos_proxy_tests =
@@ -2473,6 +2487,7 @@ let _tezos_proxy_tests =
         tezos_shell_services_test_helpers;
         qcheck_alcotest;
         alcotest_lwt;
+        uri;
       ]
 
 let tezos_proxy_server_config =
@@ -2480,7 +2495,7 @@ let tezos_proxy_server_config =
     "tezos-proxy-server-config"
     ~path:"src/lib_proxy_server_config"
     ~synopsis:"Tezos: proxy server configuration"
-    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib_unix]
+    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib_unix; uri]
 
 let _tezos_proxy_server_config_tests =
   test
@@ -2495,6 +2510,7 @@ let _tezos_proxy_server_config_tests =
         tezos_test_helpers;
         qcheck_alcotest;
         alcotest_lwt;
+        uri;
       ]
 
 let tezos_client_base_unix =
@@ -2520,6 +2536,7 @@ let tezos_client_base_unix =
         tezos_proxy_rpc;
         tezos_signer_backends_unix;
         lwt_exit;
+        uri;
       ]
     ~linkall:true
 
@@ -4728,6 +4745,7 @@ let _tezos_node =
          tls;
          prometheus_app_unix;
          lwt_exit;
+         uri;
        ]
       @ protocol_deps)
     ~linkall:true
@@ -4783,6 +4801,7 @@ let _tezos_client =
          tezos_proxy;
          tezos_client_base_unix |> open_;
          tezos_signer_backends_unix;
+         uri;
        ]
       @ protocol_deps)
     ~linkall:true
@@ -4859,6 +4878,7 @@ let _tezos_proxy_server =
          tezos_shell_services;
          tezos_shell_context;
          tezos_version;
+         uri;
        ]
       @ Protocol.all_optionally [Protocol.client; Protocol.plugin])
     ~linkall:true
@@ -4965,6 +4985,7 @@ let _tezos_tps_evaluation =
         tezt |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
         tezt_performance_regression |> open_;
+        uri;
       ]
     ~static:false
     ~release:false

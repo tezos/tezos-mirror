@@ -19,7 +19,8 @@
   tezos-protocol-alpha
   tezt
   tezt-tezos
-  tezt-performance-regression)
+  tezt-performance-regression
+  uri)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

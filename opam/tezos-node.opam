@@ -29,6 +29,7 @@ depends: [
   "tls" { >= "0.10" }
   "prometheus-app"
   "lwt-exit"
+  "uri" { >= "2.2.0" }
   "tezos-embedded-protocol-000-Ps9mPmXa"
   "tezos-embedded-protocol-012-Psithaca"
   "tezos-protocol-plugin-012-Psithaca-registerer"

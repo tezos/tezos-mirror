@@ -14,7 +14,8 @@
   tezos-p2p-services
   tezos-stdlib-unix
   tezos-signer-backends
-  data-encoding)
+  data-encoding
+  uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

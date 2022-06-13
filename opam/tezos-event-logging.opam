@@ -14,6 +14,7 @@ depends: [
   "tezos-error-monad"
   "tezos-lwt-result-stdlib"
   "lwt_log"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

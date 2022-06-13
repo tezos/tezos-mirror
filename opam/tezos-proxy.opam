@@ -17,6 +17,7 @@ depends: [
   "tezos-rpc"
   "tezos-shell-services"
   "tezos-context"
+  "uri" { >= "2.2.0" }
   "tezos-mockup-proxy"
   "tezos-stdlib-unix" {with-test}
   "tezos-base-test-helpers" {with-test}

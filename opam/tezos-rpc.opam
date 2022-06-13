@@ -13,6 +13,7 @@ depends: [
   "tezos-error-monad"
   "resto" { >= "0.8" & < "0.9" }
   "resto-directory" { >= "0.8" & < "0.9" }
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

@@ -31,6 +31,7 @@
   tls
   prometheus-app.unix
   lwt-exit
+  uri
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)
    (-> void_for_linking-tezos-embedded-protocol-genesis.empty))

@@ -11,7 +11,8 @@
   tezos-crypto
   tezos-client-base
   tezos-signer-backends
-  alcotest-lwt)
+  alcotest-lwt
+  uri)
  (flags
   (:standard)
   -open Tezos_stdlib

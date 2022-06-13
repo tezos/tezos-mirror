@@ -9,7 +9,8 @@
   data-encoding
   tezos-error-monad
   resto
-  resto-directory)
+  resto-directory
+  uri)
  (js_of_ocaml)
  (flags (:standard)
         -open Data_encoding
