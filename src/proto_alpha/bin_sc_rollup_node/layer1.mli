@@ -54,7 +54,7 @@ val start :
   Configuration.t ->
   Protocol_client_context.full ->
   Store.t ->
-  chain_event Lwt_stream.t tzresult Lwt.t
+  (chain_event Lwt_stream.t * RPC_context.stopper) tzresult Lwt.t
 
 (** [current_head_hash store] is the current hash of the head of the
    Tezos chain as far as the smart-contract rollup node knows from the
@@ -77,3 +77,11 @@ val genesis_hash : Block_hash.t
 (** [processed chain_event] emits a log event to officialize the
     processing of some layer 1 [chain_event]. *)
 val processed : chain_event -> unit Lwt.t
+
+(** [mark_process_head store head] remembers that the [head]
+    is processed. The system should not have to come back to
+    it. *)
+val mark_processed_head : Store.t -> head -> unit Lwt.t
+
+(** [shutdown store] properly shut the layer 1 down. *)
+val shutdown : Store.t -> unit Lwt.t

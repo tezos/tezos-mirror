@@ -43,6 +43,8 @@ let load configuration =
   let* repo = IStore.Repo.v (Irmin_pack.config configuration.data_dir) in
   IStore.main repo
 
+let flush store = IStore.flush (IStore.repo store)
+
 let close store = IStore.Repo.close (IStore.repo store)
 
 let info message =

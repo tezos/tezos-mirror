@@ -94,9 +94,29 @@ module State = struct
 
       let value_encoding = head_encoding
     end)
-  end
 
-  let already_seen = Store.Blocks.mem
+    module ProcessedHashes = Store.Make_append_only_map (struct
+      let path = ["tezos"; "processed_blocks"]
+
+      let keep_last_n_entries_in_memory = reorganization_window_length
+
+      type key = block_hash
+
+      let string_of_key = Block_hash.to_b58check
+
+      type value = unit
+
+      let value_encoding = Data_encoding.unit
+    end)
+
+    module LastProcessedHead = Store.Make_mutable_value (struct
+      let path = ["tezos"; "processed_head"]
+
+      type value = head
+
+      let value_encoding = head_encoding
+    end)
+  end
 
   let last_seen_head = Store.Head.find
 
@@ -105,6 +125,16 @@ module State = struct
   let store_block = Store.Blocks.add
 
   let block_of_hash = Store.Blocks.get
+
+  let mark_processed_head store (Head {hash; _} as head) =
+    let open Lwt_syntax in
+    let* () = Store.ProcessedHashes.add store hash () in
+    let* () = Store.LastProcessedHead.set store head in
+    return ()
+
+  let is_processed = Store.ProcessedHashes.mem
+
+  let last_processed_head = Store.LastProcessedHead.find
 end
 
 (**
@@ -236,7 +266,7 @@ let catch_up cctxt store chain last_seen_head new_head =
       (* We have reconnected to the last seen head. *)
       Lwt.return (ancestor_hash, [same_branch new_head heads])
     else
-      State.already_seen store ancestor_hash >>= function
+      State.is_processed store ancestor_hash >>= function
       | true ->
           (* We have reconnected to a previously known head.
              [new_head] and [last_seen_head] are not the same branch. *)
@@ -274,8 +304,10 @@ let chain_events cctxt store chain =
     let*! () = List.iter_s (store_chain_event store base) events in
     Lwt.return events
   in
-  let+ heads, _ = Tezos_shell_services.Monitor_services.heads cctxt chain in
-  Lwt_stream.map_list_s on_head heads
+  let+ heads, stopper =
+    Tezos_shell_services.Monitor_services.heads cctxt chain
+  in
+  (Lwt_stream.map_list_s on_head heads, stopper)
 
 let check_sc_rollup_address_exists sc_rollup_address
     (cctxt : Protocol_client_context.full) =
@@ -324,9 +356,9 @@ let start configuration (cctxt : Protocol_client_context.full) store =
   let* () =
     check_sc_rollup_address_exists configuration.sc_rollup_address cctxt
   in
-  let* event_stream = chain_events cctxt store `Main in
+  let* event_stream, stopper = chain_events cctxt store `Main in
   let* info = gather_info cctxt configuration.sc_rollup_address in
-  return (discard_pre_origination_blocks info event_stream)
+  return (discard_pre_origination_blocks info event_stream, stopper)
 
 let current_head_hash store =
   let open Lwt_syntax in
@@ -350,3 +382,23 @@ let processed = function
   | SameBranch {new_head; intermediate_heads} ->
       List.iter_s processed_head (intermediate_heads @ [new_head])
   | Rollback {new_head} -> processed_head new_head
+
+let mark_processed_head store head = State.mark_processed_head store head
+
+(* We forget about the last seen heads that are not processed so that
+   the rollup node can process them when restarted. Notice that this
+   does prevent skipping heads when the node is interrupted in a bad
+   way. *)
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3205
+
+   More generally, The rollup node should be able to restart properly
+   after an abnormal interruption at every point of its process.
+   Currently, the state is not persistent enough and the processing is
+   not idempotent enough to achieve that property. *)
+let shutdown store =
+  let open Lwt_syntax in
+  let* last_processed_head = State.last_processed_head store in
+  match last_processed_head with
+  | None -> return_unit
+  | Some head -> State.set_new_head store head
