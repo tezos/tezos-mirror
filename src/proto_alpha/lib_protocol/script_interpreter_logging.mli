@@ -90,22 +90,18 @@ val log_next_continuation :
   ('a, 'b, 'c, 'd) continuation ->
   ('a, 'b, 'c, 'd) continuation tzresult
 
-(** [log_next_kinstr_and_cont logger sty instr cont] instruments the
-    next instruction in [instr] with [ILog] instructions and the next
-    continuation in [cont] with [KLog] continuations to make sure they
-    will be logged.
-
-    This instrumentation has a performance cost, but importantly, it
-    is only ever paid when logging is enabled. Otherwise, the
-    possibility to instrument the script is costless. Note also that
-    [logger] value is only available when logging is enabled, so the
-    type system protects us from calling this by mistake. *)
-val log_next_kinstr_and_cont :
+(** [log_next_kinstr logger sty instr] instruments the next instruction
+    in [instr] with [ILog] instructions to make sure it will be logged.
+    This instrumentation has a performance cost, but importantly, it is
+    only ever paid when logging is enabled. Otherwise, the possibility
+    to instrument the script is costless. Note also that [logger] value
+    is only available when logging is enables, so the type system protects
+    us from calling this by mistake. *)
+val log_next_kinstr :
   logger ->
   ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) kinstr ->
-  ('c, 'd, 'e, 'f) continuation ->
-  (('a, 'b, 'c, 'd) kinstr * ('c, 'd, 'e, 'f) continuation) tzresult
+  ('a, 'b, 'c, 'd) kinstr tzresult
 
 val kinstr_final_stack_type :
   ('a, 'b) stack_ty ->

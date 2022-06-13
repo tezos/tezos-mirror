@@ -1575,8 +1575,7 @@ and log :
         sty
         accu
         stack) ;
-  Script_interpreter_logging.log_next_kinstr_and_cont logger sty k ks
-  >>?= fun (k, ks) ->
+  Script_interpreter_logging.log_next_kinstr logger sty k >>?= fun k ->
   match k with
   | IIf_none {branch_if_none; branch_if_some; k; _} -> (
       let (Item_t (_, sty_if_none)) = sty in
