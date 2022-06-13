@@ -244,6 +244,12 @@ module Validation = struct
     let size = List.length blocks in
     let* _ = Node.wait_for_validation_start node in
     Node.wait_for_validation_subparts ~repeat:size node
+
+  let replay blocks datadir =
+    let node = Node.create datadir in
+    Lwt_seq.iter_s
+      (fun range -> Node.replay_and_wait_for_termination [range] node)
+      (Lwt_seq.of_seq blocks)
 end
 
 (** Regroups the different benchmarks of the validation of blocks.
@@ -402,6 +408,64 @@ module Fixture = struct
     Lwt_result.return output
 end
 
+(** For tests focused on the semantic of replay, checking that blocks continue
+    to be valid even when changing the underlying libraries and such. *)
+module Semantic = struct
+  let max_level_available_in_data_dir = 2_500_000
+
+  (** [stitching_blocks] contains the block levels blocks in which stitching
+      between two protocols happen. *)
+  let stitching_blocks =
+    String.concat
+      " "
+      [
+        "2244608";
+        "1916928";
+        "1589247";
+        "1466367";
+        "1343488";
+        "1212416";
+        "851968";
+        "655360";
+        "458752";
+      ]
+
+  let replay ~seed ~chunk_size ~runtime () =
+    if chunk_size < 0 then invalid_arg "replay: chunk_size must be >= 0" ;
+    let datadir = Long_test.test_data_path () in
+    Log.debug "Using seed: %d" seed ;
+    let prng = Random.State.make [|seed|] in
+    let test_start = Mtime_clock.now () in
+    let blocks =
+      Seq.unfold
+        (fun () ->
+          let step_start = Mtime_clock.now () in
+          if Mtime.(Span.compare (span test_start step_start) runtime) >= 0 then (
+            Log.debug "Time limit reached: ending test" ;
+            None)
+          else
+            let starts =
+              Random.State.int
+                prng
+                (max_level_available_in_data_dir - chunk_size - 1)
+            in
+            let starts =
+              starts + 1 (* we can't replay Genesis so the min level is 1 *)
+            in
+            let ends = starts + chunk_size - 1 in
+            let range = string_of_int starts ^ ".." ^ string_of_int ends in
+            Log.debug "Blockrange: %s" range ;
+            Some (range, ()))
+        ()
+    in
+    let blocks () =
+      Log.debug "Blockrange: stitching blocks for each protocol" ;
+      Seq.Cons (stitching_blocks, blocks)
+    in
+    let* () = Validation.replay blocks datadir in
+    return ()
+end
+
 let grafana_panels =
   let step_tag = "step" in
   let simple_graph ?interval title test tags =
@@ -474,3 +538,19 @@ let register ~executors () =
   @@ Benchmark.batch_of_same_block_subparts
        ~size:30
        Benchmark.block_with_highest_gas
+
+let register_semantic_regression_test ~executors () =
+  (* we randomly generate a seed that the tests can use, for full portability we
+     generate at most a 30-bit integer*)
+  let seed =
+    let seeder = Random.State.make_self_init () in
+    Random.State.int seeder (1 lsl 30)
+  in
+
+  Long_test.register
+    ~__FILE__
+    ~title:"shell.validation.replay"
+    ~tags:["shell"; "validation"; "replay"]
+    ~timeout:(Long_test.Hours 7)
+    ~executors
+  @@ Semantic.replay ~seed ~chunk_size:500 ~runtime:Mtime.Span.(6 * hour)
