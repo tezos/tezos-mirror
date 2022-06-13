@@ -61,18 +61,27 @@ let tick_of_int_exn n =
 
 let hash_int n = Sc_rollup_repr.State_hash.hash_string [Format.sprintf "%d" n]
 
-let init_dissection ?(size = 32) start_hash =
-  let init_tick i =
-    if i = size - 1 then (None, tick_of_int_exn 10000)
-    else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
+let init_dissection ?(size = 32) ?init_tick start_hash =
+  let default_init_tick i =
+    let hash =
+      if i = size - 1 then None
+      else Some (if i = 0 then start_hash else hash_int i)
+    in
+    (hash, tick_of_int_exn i)
+  in
+  let init_tick =
+    Option.fold
+      ~none:default_init_tick
+      ~some:(fun init_tick -> init_tick size)
+      init_tick
   in
   Stdlib.List.init size init_tick
 
-let init_refutation ?size start_hash =
+let init_refutation ?size ?init_tick start_hash =
   G.
     {
       choice = Sc_rollup_tick_repr.initial;
-      step = Dissection (init_dissection ?size start_hash);
+      step = Dissection (init_dissection ?size ?init_tick start_hash);
     }
 
 let two_stakers_in_conflict () =
@@ -137,7 +146,11 @@ let two_stakers_in_conflict () =
 let test_poorly_distributed_dissection () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
   let start_hash = Sc_rollup_repr.State_hash.hash_string ["foo"] in
-  let move = init_refutation start_hash in
+  let init_tick size i =
+    if i = size - 1 then (None, tick_of_int_exn 10000)
+    else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
+  in
+  let move = init_refutation ~init_tick start_hash in
   let* outcome, _ctxt =
     T.lift
     @@ R.game_move
