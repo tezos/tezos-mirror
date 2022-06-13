@@ -180,6 +180,7 @@ in the :ref:`introduction <howtoget>`.
    developer/rpc
    developer/encodings
    developer/data_encoding
+   developer/merkle-proof-encoding-formats
    developer/gadt
    developer/error_monad
    developer/clic
