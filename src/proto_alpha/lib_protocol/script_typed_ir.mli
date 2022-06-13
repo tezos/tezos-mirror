@@ -1122,7 +1122,7 @@ and 'arg typed_destination =
 and 'arg typed_contract =
   | Typed_contract : {
       arg_ty : ('arg, _) ty;
-      destination : Destination.t;
+      destination : 'arg typed_destination;
       entrypoint : Entrypoint.t;
     }
       -> 'arg typed_contract

@@ -804,6 +804,7 @@ let test_parse_contract_data_for_unit_rollup () =
          (Destination.Sc_rollup rollup)
          ~entrypoint:Entrypoint.default
   in
+  let destination = Script_typed_ir.Typed_destination.untyped destination in
   (* Check that the destinations match. *)
   let* () =
     Assert.equal_string
@@ -839,6 +840,7 @@ let test_parse_contract_data_for_rollup_with_entrypoints () =
          (Destination.Sc_rollup rollup)
          ~entrypoint:(Entrypoint.of_string_strict_exn "add")
   in
+  let destination = Script_typed_ir.Typed_destination.untyped destination in
   (* Check that the destinations match. *)
   let* () =
     Assert.equal_string
@@ -859,6 +861,7 @@ let test_parse_contract_data_for_rollup_with_entrypoints () =
          (Destination.Sc_rollup rollup)
          ~entrypoint:(Entrypoint.of_string_strict_exn "reset")
   in
+  let destination = Script_typed_ir.Typed_destination.untyped destination in
   (* Check that the destinations match. *)
   let* () =
     Assert.equal_string
