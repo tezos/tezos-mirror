@@ -3086,9 +3086,9 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
 (** Waits for [node] to receive a notification from a peer of a mempool
     containing exactly [n_ops] valid operations. *)
 let wait_for_notify_n_valid_ops node n_ops =
-  Node.wait_for node "node_prevalidator.v0" (fun event ->
+  Node.wait_for node "request_no_errors_prevalidator.v0" (fun event ->
       let open JSON in
-      let view = event |=> 1 |-> "request_view" in
+      let view = event |-> "view" in
       match view |-> "request" |> as_string_opt with
       | Some "notify" ->
           let valid_ophs = view |-> "mempool" |-> "known_valid" |> as_list in
