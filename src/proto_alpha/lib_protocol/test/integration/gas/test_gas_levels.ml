@@ -443,12 +443,12 @@ let test_block_mixed_operations () =
   >>=? fun (_block, consumed_gas, gas_limit_total) ->
   check_consumed_gas consumed_gas gas_limit_total
 
-(** Test that emptying an account costs gas *)
+(** Test that emptying an account does not cost extra-gas *)
 let test_emptying_account_gas () =
   let open Alpha_context in
   Context.init1 ~consensus_threshold:0 () >>=? fun (b, bootstrap) ->
+  let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let {Account.pkh; pk; _} = Account.new_account () in
-  let {Account.pkh = pkh'; _} = Account.new_account () in
   let contract = Contract.Implicit pkh in
   let amount = Test_tez.of_int 10 in
   Op.transaction (B b) bootstrap contract amount >>=? fun op1 ->
@@ -460,22 +460,22 @@ let test_emptying_account_gas () =
       (Gas.Arith.integral_of_int_exn
          Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
   in
-  Op.delegation ~fee:amount ~gas_limit (B b) contract (Some pkh') >>=? fun op ->
+  Op.delegation ~fee:amount ~gas_limit (B b) contract (Some bootstrap_pkh)
+  >>=? fun op ->
   Incremental.begin_construction b >>=? fun i ->
-  (* The delegation operation should not be valid as the operation
-     effect would be to remove [contract] from the ledger and this
-     generates an extra gas cost.
-
-     This semantics is not expected: see
-     https://gitlab.com/tezos/tezos/-/issues/3188 *)
-  Incremental.add_operation
-    ~expect_failure:(function
-      | [Environment.Ecoproto_error Raw_context.Operation_quota_exceeded] ->
-          return_unit
-      | _err -> assert false)
-    i
-    op
-  >>=? fun _i -> return_unit
+  (* The delegation operation should be valid as the operation effect
+     would be to remove [contract] and should not generate any extra
+     gas cost. *)
+  let expect_apply_failure = function
+    | [Environment.Ecoproto_error (Storage_error (Raw_context.Missing_key _))]
+      ->
+        (* The delegation is expected to fail in the apply part as the
+           contract was emptied when fees were retrieved. *)
+        return_unit
+    | err -> failwith "got unexpected error: %a" pp_print_trace err
+  in
+  Incremental.add_operation ~expect_apply_failure i op >>=? fun _i ->
+  return_unit
 
 let quick (what, how) = Tztest.tztest what `Quick how
 
