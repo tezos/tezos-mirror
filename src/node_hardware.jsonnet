@@ -131,8 +131,8 @@ local prometheus = grafana.prometheus;
       reducerFunction='lastNotNull'
     ).addTarget(
       prometheus.target(
-	'node_filesystem_free_bytes{mountpoint=\"/\"}',
-	legendFormat= 'Available bytes on disk.',
+        'node_filesystem_free_bytes{mountpoint="/"}',
+        legendFormat='Available bytes on disk.',
       )
     ),
 
@@ -195,18 +195,18 @@ local prometheus = grafana.prometheus;
       legend_values=true,
     ).addTarget(
       prometheus.target(
-	"irate(node_network_receive_bytes_total[5m]) > 0",
-	legendFormat="Bytes received",
+        'irate(node_network_receive_bytes_total[5m]) > 0',
+        legendFormat='Bytes received',
       )
     ).addTarget(
       prometheus.target(
-	"irate(node_network_transmit_bytes_total[5m]) > 0",
-	legendFormat="Bytes transmitted",
+        'irate(node_network_transmit_bytes_total[5m]) > 0',
+        legendFormat='Bytes transmitted',
       )
     ).addSeriesOverride(
       {
-	alias:'/.*received/',
-	transform:'negative-Y',
+        alias: '/.*received/',
+        transform: 'negative-Y',
       }
     ),
 }

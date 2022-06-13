@@ -31,7 +31,7 @@ local node_instance = '{instance="$node_instance"}';
       valueName='max',
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_connections_private'+ node_instance,
+        namespace + '_p2p_connections_private' + node_instance,
         legendFormat='Private Connections',
       )
     ),
@@ -64,12 +64,12 @@ local node_instance = '{instance="$node_instance"}';
       )
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_peers_running' + node_instance,
+        namespace + '_p2p_peers_running' + node_instance,
         legendFormat=running,
       )
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_points_greylisted' + node_instance,
+        namespace + '_p2p_points_greylisted' + node_instance,
         legendFormat=greylisted,
       )
     ),
@@ -94,7 +94,7 @@ local node_instance = '{instance="$node_instance"}';
       },
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_points_disconnected' + node_instance,
+        namespace + '_p2p_points_disconnected' + node_instance,
         legendFormat=disconnected,
       )
     ).addTarget(

@@ -6,7 +6,7 @@ local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local heatmapPanel = grafana.heatmapPanel;
 local prometheus = grafana.prometheus;
-local namespace = "octez";
+local namespace = 'octez';
 local node_instance = '{instance="$node_instance"}';
 
 //##
@@ -22,9 +22,9 @@ local node_instance = '{instance="$node_instance"}';
       valueName='name',
     ).addTarget(
       prometheus.target(
-	namespace + '_version' + node_instance,
-	legendFormat='{{ version }}',
-	instant=true
+        namespace + '_version' + node_instance,
+        legendFormat='{{ version }}',
+        instant=true
       )
     ),
 
@@ -36,9 +36,9 @@ local node_instance = '{instance="$node_instance"}';
       valueName='name',
     ).addTarget(
       prometheus.target(
-	'(label_replace(' + namespace + '_version' + node_instance + ',"commit_hash_short" ,"$1","commit_hash","^(.{8}).*$"))',
-	legendFormat='{{ commit_hash_short }}',
-	instant=true
+        '(label_replace(' + namespace + '_version' + node_instance + ',"commit_hash_short" ,"$1","commit_hash","^(.{8}).*$"))',
+        legendFormat='{{ commit_hash_short }}',
+        instant=true
       )
     ),
 
@@ -50,9 +50,9 @@ local node_instance = '{instance="$node_instance"}';
       valueName='name',
     ).addTarget(
       prometheus.target(
-	namespace + '_version' + node_instance,
-	legendFormat='{{ chain_name }}',
-	instant=true
+        namespace + '_version' + node_instance,
+        legendFormat='{{ chain_name }}',
+        instant=true
       )
     ),
 
@@ -64,9 +64,9 @@ local node_instance = '{instance="$node_instance"}';
       valueName='name',
     ).addTarget(
       prometheus.target(
-	namespace + '_version' + node_instance,
-	legendFormat='{{ p2p_version }}',
-	instant=true
+        namespace + '_version' + node_instance,
+        legendFormat='{{ p2p_version }}',
+        instant=true
       )
     ),
 
@@ -78,9 +78,9 @@ local node_instance = '{instance="$node_instance"}';
       valueName='value',
     ).addTarget(
       prometheus.target(
-	namespace + '_version' + node_instance,
-	legendFormat='{{ distributed_db_version }}',
-	instant=true
+        namespace + '_version' + node_instance,
+        legendFormat='{{ distributed_db_version }}',
+        instant=true
       )
     ),
 
@@ -88,32 +88,33 @@ local node_instance = '{instance="$node_instance"}';
     statPanel.new(
       title='Bootstrap status',
       datasource='Prometheus',
-      ).addMappings([
-	{
-          "options": {
-            "0": {
-              "color": "red",
-              "index": 1,
-              "text": "Bootstrapping"
+    ).addMappings(
+      [
+        {
+          options: {
+            '0': {
+              color: 'red',
+              index: 1,
+              text: 'Bootstrapping',
             },
-            "1": {
-              "color": "green",
-              "index": 0,
-              "text": "Bootstrapped"
+            '1': {
+              color: 'green',
+              index: 0,
+              text: 'Bootstrapped',
             },
-            "null": {
-              "color": "yellow",
-              "index": 2,
-              "text": "Unknown"
-            }
+            'null': {
+              color: 'yellow',
+              index: 2,
+              text: 'Unknown',
+            },
           },
-          "type": "value"
-        }
+          type: 'value',
+        },
       ],
     ).addTarget(
       prometheus.target(
-	namespace + '_validator_chain_is_bootstrapped' + node_instance,
-	instant=true
+        namespace + '_validator_chain_is_bootstrapped' + node_instance,
+        instant=true
       )
     ),
 
@@ -121,54 +122,55 @@ local node_instance = '{instance="$node_instance"}';
     statPanel.new(
       title='Sync status',
       datasource='Prometheus',
-    ).addMappings([
-	{
-          "options": {
-            "0": {
-              "color": "red",
-              "index": 0,
-              "text": "Unsync"
+    ).addMappings(
+      [
+        {
+          options: {
+            '0': {
+              color: 'red',
+              index: 0,
+              text: 'Unsync',
             },
-            "1": {
-              "color": "green",
-              "index": 1,
-              "text": "Sync"
+            '1': {
+              color: 'green',
+              index: 1,
+              text: 'Sync',
             },
-	    "2": {
-              "color": "green",
-              "index": 2,
-              "text": "Stuck"
+            '2': {
+              color: 'green',
+              index: 2,
+              text: 'Stuck',
             },
-            "null": {
-              "color": "yellow",
-              "index": 3,
-              "text": "Unknow"
-            }
+            'null': {
+              color: 'yellow',
+              index: 3,
+              text: 'Unknow',
+            },
           },
-          "type": "value"
-        }
+          type: 'value',
+        },
       ],
     ).addTarget(
       prometheus.target(
-	namespace + '_validator_chain_synchronisation_status' + node_instance,
-	instant=true
+        namespace + '_validator_chain_synchronisation_status' + node_instance,
+        instant=true
       )
     ),
 
-  # Reflects the uptime of the monitoring of the job, not the uptime
-  # of the process.
+  // Reflects the uptime of the monitoring of the job, not the uptime
+  // of the process.
   uptime:
     singlestat.new(
       title='Node uptime',
       datasource='Prometheus',
       format='dtdhms',
       valueName='max',
-      description= 'Reflects the uptime of the monitoring of the job, not the uptime of the process.',
+      description='Reflects the uptime of the monitoring of the job, not the uptime of the process.',
     ).addTarget(
       prometheus.target(
-	'time()-(process_start_time_seconds' + node_instance + ')',
-	legendFormat='node uptime',
-	instant=true
+        'time()-(process_start_time_seconds' + node_instance + ')',
+        legendFormat='node uptime',
+        instant=true
       )
     ),
 
@@ -181,7 +183,7 @@ local node_instance = '{instance="$node_instance"}';
       prometheus.target(
         namespace + '_validator_chain_head_level' + node_instance,
         legendFormat='current head level',
-	instant=true
+        instant=true
       )
     ),
 
@@ -194,7 +196,7 @@ local node_instance = '{instance="$node_instance"}';
       prometheus.target(
         namespace + '_store_savepoint_level' + node_instance,
         legendFormat='current savepoint',
-	instant=true
+        instant=true
       )
     ),
 
@@ -207,7 +209,7 @@ local node_instance = '{instance="$node_instance"}';
       prometheus.target(
         namespace + '_store_checkpoint_level' + node_instance,
         legendFormat='current checkpoint',
-	instant=true
+        instant=true
       )
     ),
 
@@ -220,7 +222,7 @@ local node_instance = '{instance="$node_instance"}';
       prometheus.target(
         namespace + '_store_caboose_level',
         legendFormat='current caboose',
-	instant=true
+        instant=true
       )
     ),
 
@@ -233,7 +235,7 @@ local node_instance = '{instance="$node_instance"}';
       prometheus.target(
         namespace + '_validator_chain_head_cycle',
         legendFormat='Current cycle',
-	instant=true
+        instant=true
       )
     ),
 
@@ -251,7 +253,7 @@ local node_instance = '{instance="$node_instance"}';
     ).addTarget(
       prometheus.target(
         namespace + '_validator_chain_head_level' + node_instance,
-	legendFormat=head
+        legendFormat=head
       )
     ),
 
@@ -321,7 +323,7 @@ local node_instance = '{instance="$node_instance"}';
     ),
 
   blocksValidationTime:
-    local treatment =  namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
+    local treatment = namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
     local completion = namespace + '_validator_block_last_finished_request_completion_timestamp' + node_instance;
     local validation = 'Validation time';
     graphPanel.new(
@@ -339,9 +341,9 @@ local node_instance = '{instance="$node_instance"}';
       },
     ).addTarget(
       prometheus.target(
-	completion + ' - ' + treatment ,
-	format='time_series',
-	legendFormat=validation,
+        completion + ' - ' + treatment,
+        format='time_series',
+        legendFormat=validation,
       )
     ),
 
@@ -387,7 +389,7 @@ local node_instance = '{instance="$node_instance"}';
         legendFormat=manager,
       )
     )
-    ,
+  ,
 
   storeMergeTime:
     local mergeTime = 'Merge time';
@@ -406,10 +408,10 @@ local node_instance = '{instance="$node_instance"}';
     ).addTarget(
       prometheus.target(
         namespace + '_store_last_merge_time' + node_instance,
-	legendFormat=mergeTime,
+        legendFormat=mergeTime,
       )
     )
-    ,
+  ,
 
   writtenBlockSize:
     local writtenBlockSize = 'Written block size';
@@ -431,10 +433,10 @@ local node_instance = '{instance="$node_instance"}';
     ).addTarget(
       prometheus.target(
         namespace + '_store_last_written_block_size' + node_instance,
-	legendFormat=writtenBlockSize,
+        legendFormat=writtenBlockSize,
       )
     )
-    ,
+  ,
 
   //## GC
 
@@ -471,7 +473,7 @@ local node_instance = '{instance="$node_instance"}';
       prometheus.target(
         'ocaml_gc_compactions' + node_instance,
         legendFormat=compact,
-      )
+      ),
     ]),
 
   gcMajorHeap:
@@ -489,6 +491,7 @@ local node_instance = '{instance="$node_instance"}';
       prometheus.target(
         'ocaml_gc_heap_words' + node_instance,
         legendFormat=major,
-    ))
+      )
+    ),
 
 }
