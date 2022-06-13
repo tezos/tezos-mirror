@@ -119,13 +119,13 @@ let add_messages ctxt rollup messages =
   let*? current_messages, ctxt =
     Sc_rollup_in_memory_inbox.current_messages ctxt rollup
   in
-  let gas_cost_add_external_messages =
-    Sc_rollup_costs.cost_add_external_messages
+  let cost_add_serialized_messages =
+    Sc_rollup_costs.cost_add_serialized_messages
       ~num_messages
       ~total_messages_size
       levels
   in
-  let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_external_messages in
+  let*? ctxt = Raw_context.consume_gas ctxt cost_add_serialized_messages in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
@@ -153,12 +153,17 @@ let add_external_messages ctxt rollup external_messages =
 
 let add_internal_message ctxt rollup ~payload ~sender ~source =
   let open Lwt_result_syntax in
-  (* TODO: #2951
-     Charge gas for serializing the internal message.
-  *)
+  let internal_message =
+    {Sc_rollup_inbox_message_repr.payload; sender; source}
+  in
+  (* Pay gas for serializing an internal message. *)
+  let*? ctxt =
+    Raw_context.consume_gas
+      ctxt
+      (Sc_rollup_costs.cost_serialize_internal_inbox_message internal_message)
+  in
   let*? message =
-    Sc_rollup_inbox_message_repr.(
-      to_bytes @@ Internal {payload; sender; source})
+    Sc_rollup_inbox_message_repr.(to_bytes @@ Internal internal_message)
   in
   add_messages ctxt rollup [message]
 
