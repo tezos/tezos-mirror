@@ -64,13 +64,7 @@ let new_context_with_stakers nb_stakers =
 let initial_staker_balance = Tez_repr.of_mutez_exn 100_000_000_000L
 
 let new_context () =
-  let* b, _contract = Context.init1 () in
-  Incremental.begin_construction b >>=? fun inc ->
-  let state = Incremental.validation_state inc in
-  let ctxt = state.ctxt in
-  (* Necessary to originate rollups. *)
-  let ctxt = Alpha_context.Origination_nonce.init ctxt Operation_hash.zero in
-  let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+  let* ctxt, _stakers = new_context_with_stakers 1 in
   (* Mint some tez for staker accounts. *)
   let mint_tez_for ctxt pkh_str =
     let pkh = Signature.Public_key_hash.of_b58check_exn pkh_str in
