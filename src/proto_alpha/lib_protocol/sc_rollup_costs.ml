@@ -85,11 +85,12 @@ let cost_serialize_internal_inbox_message
     expr_cost + Constants.cost_decoding_contract_optimized
     + Constants.cost_decoding_key_hash_optimized)
 
-(** We assume that the cost of deserializing an expression of [bytes_len] is
-    greater by a notch to the real cost here.
-
-    TODO: checks if the estimated cost is close to the more precise cost: To
-    check the real cost we could traverse the list of expression in the
-    deserialized output message. *)
-let cost_deserialize_outbox_message ~bytes_len =
+(** TODO: #3212
+    Confirm gas cost model.
+    We here assume that the cost of deserializing an expression of [bytes_len]
+    is proportional to deserializing a script expression of size [bytes_len].
+    This may not be the case and in particular, the cost depends on the specific
+    structure used for the PVM. We may thus need to split the cost function.
+  *)
+let cost_deserialize_output_proof ~bytes_len =
   Script_repr.deserialization_cost_estimated_from_bytes bytes_len
