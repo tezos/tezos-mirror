@@ -14,7 +14,7 @@ end
 
 module Effect : sig
   module type S = sig
-    include Lazy_map.Effect.S
+    include Lazy_vector.Effect.S
 
     val join : unit t list -> unit t
   end

@@ -1,16 +1,16 @@
 open QCheck_alcotest
 open QCheck2
-open Lazy_map
+open Lazy_vector
 
 let gen_of_list gen_items =
   let open Gen in
   let+ list = gen_items in
-  IntMap.of_list list
+  IntVector.of_list list
 
 let gen_create gen_items =
   let open Gen in
   let+ array = gen_items in
-  IntMap.create ~produce_value:(fun i -> array.(i)) (Array.length array)
+  IntVector.create ~produce_value:(fun i -> array.(i)) (Array.length array)
 
 let gen gen_item =
   let open Gen in
@@ -19,12 +19,12 @@ let gen gen_item =
   in
   let gen_concat =
     let+ lhs = gen_create and+ rhs = gen_create in
-    IntMap.concat lhs rhs
+    IntVector.concat lhs rhs
   in
   let gen_base_or_concat = oneof [gen_create; gen_concat] in
   let gen_cons =
     let+ prefix = small_list gen_item and+ map = gen_base_or_concat in
-    List.fold_left (fun map prefix -> IntMap.cons prefix map) map prefix
+    List.fold_left (fun map prefix -> IntVector.cons prefix map) map prefix
   in
   oneof [gen_base_or_concat; gen_cons]
 
@@ -33,33 +33,36 @@ let of_list_constructs_correctly =
     ~name:"of_list creates the data structure correctly"
     Gen.(list int)
     (fun items ->
-      let map = IntMap.of_list items in
-      let checked = List.mapi (fun i v -> IntMap.get i map = v) items in
-      List.for_all Fun.id checked && IntMap.num_elements map = List.length items)
+      let map = IntVector.of_list items in
+      let checked = List.mapi (fun i v -> IntVector.get i map = v) items in
+      List.for_all Fun.id checked
+      && IntVector.num_elements map = List.length items)
 
 let create_constructs_correctly =
   Test.make ~name:"create constructs correctly" Gen.nat (fun len ->
-      let map = IntMap.create ~produce_value:Fun.id len in
-      List.init len (fun i -> IntMap.get i map = i) |> List.for_all Fun.id)
+      let map = IntVector.create ~produce_value:Fun.id len in
+      List.init len (fun i -> IntVector.get i map = i) |> List.for_all Fun.id)
 
 let grow_works =
   Test.make
     ~name:"grow works"
     Gen.(pair (gen int) nat)
     (fun (map, len) ->
-      let map2 = IntMap.grow ~produce_value:(fun x -> x * 2) len map in
+      let map2 = IntVector.grow ~produce_value:(fun x -> x * 2) len map in
       let check1 =
-        List.init (IntMap.num_elements map) (fun i ->
-            IntMap.get i map2 = IntMap.get i map)
+        List.init (IntVector.num_elements map) (fun i ->
+            IntVector.get i map2 = IntVector.get i map)
         |> List.for_all Fun.id
       in
       let check2 =
         List.init len (fun i ->
-            let key = i + IntMap.num_elements map in
-            IntMap.get key map2 = i * 2)
+            let key = i + IntVector.num_elements map in
+            IntVector.get key map2 = i * 2)
         |> List.for_all Fun.id
       in
-      let check3 = IntMap.num_elements map + len = IntMap.num_elements map2 in
+      let check3 =
+        IntVector.num_elements map + len = IntVector.num_elements map2
+      in
       check1 && check2 && check3)
 
 let cons_works =
@@ -67,39 +70,39 @@ let cons_works =
     ~name:"cons works"
     Gen.(pair (gen int) int)
     (fun (map, value) ->
-      let map2 = IntMap.cons value map in
-      let check1 = IntMap.get 0 map2 = value in
+      let map2 = IntVector.cons value map in
+      let check1 = IntVector.get 0 map2 = value in
       let check2 =
-        List.init (IntMap.num_elements map) (fun i ->
-            IntMap.get i map = IntMap.get (i + 1) map2)
+        List.init (IntVector.num_elements map) (fun i ->
+            IntVector.get i map = IntVector.get (i + 1) map2)
         |> List.for_all Fun.id
       in
       check1 && check2)
 
 let concat_works () =
   let map1 =
-    IntMap.create
+    IntVector.create
       ~produce_value:(fun x ->
         Printf.printf "> map1: %i\n%!" x ;
         Int.succ x)
       1
-    |> IntMap.cons 10
+    |> IntVector.cons 10
   in
   let map2 =
-    IntMap.create
+    IntVector.create
       ~produce_value:(fun x ->
         Printf.printf "> map2: %i\n%!" x ;
         Int.pred x)
       1
-    |> IntMap.cons 20
+    |> IntVector.cons 20
   in
-  let map = IntMap.concat map1 map2 in
+  let map = IntVector.concat map1 map2 in
   let open Alcotest in
-  check int "exact value" 4 (IntMap.num_elements map) ;
-  check int "exact value" 10 (IntMap.get 0 map) ;
-  check int "exact value" 1 (IntMap.get 1 map) ;
-  check int "exact value" 20 (IntMap.get 2 map) ;
-  check int "exact value" (-1) (IntMap.get 3 map)
+  check int "exact value" 4 (IntVector.num_elements map) ;
+  check int "exact value" 10 (IntVector.get 0 map) ;
+  check int "exact value" 1 (IntVector.get 1 map) ;
+  check int "exact value" 20 (IntVector.get 2 map) ;
+  check int "exact value" (-1) (IntVector.get 3 map)
 
 let tests =
   [

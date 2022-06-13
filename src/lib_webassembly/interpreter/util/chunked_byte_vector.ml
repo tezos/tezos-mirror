@@ -41,19 +41,19 @@ end
 
 module Effect = struct
   module type S = sig
-    include Lazy_map.Effect.S
+    include Lazy_vector.Effect.S
 
     val join : unit t list -> unit t
   end
 
   module Identity : S with type 'a t = 'a = struct
-    include Lazy_map.Effect.Identity
+    include Lazy_vector.Effect.Identity
 
     let join _ = ()
   end
 
   module Lwt : S with type 'a t = 'a Lwt.t = struct
-    include Lazy_map.Effect.Lwt
+    include Lazy_vector.Effect.Lwt
 
     let join = Lwt.join
   end
@@ -100,17 +100,17 @@ module type S = sig
 end
 
 module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
-  module Map = Lazy_map.Mutable.Make (Effect) (Int64)
+  module Vector = Lazy_vector.Mutable.Make (Effect) (Int64)
 
   type 'a effect = 'a Effect.t
 
-  type t = { mutable length : int64; chunks : Chunk.t Map.t }
+  type t = { mutable length : int64; chunks : Chunk.t Vector.t }
 
   let def_get_chunk _ = Effect.return (Chunk.alloc ())
 
   let create ?(get_chunk = def_get_chunk) length =
     let chunks =
-      Map.create
+      Vector.create
         ~produce_value:get_chunk
         (Chunk.num_needed length)
     in
@@ -120,10 +120,10 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     if Int64.compare size_delta 0L > 0 then
       let new_size = Int64.add vector.length size_delta in
       let new_chunks = Chunk.num_needed new_size in
-      let current_chunks = Map.num_elements vector.chunks in
+      let current_chunks = Vector.num_elements vector.chunks in
       let chunk_count_delta = Int64.sub new_chunks current_chunks in
       if Int64.compare chunk_count_delta 0L > 0 then
-        Map.grow chunk_count_delta vector.chunks;
+        Vector.grow chunk_count_delta vector.chunks;
       vector.length <- new_size
 
   let length vector = vector.length
@@ -131,13 +131,13 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
   let load_byte vector address =
     let open Effect in
     if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds;
-    let+ chunk = Map.get (Chunk.index address) vector.chunks in
+    let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.get chunk (Chunk.offset address)
 
   let store_byte vector address byte =
     let open Effect in
     if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds;
-    let+ chunk = Map.get (Chunk.index address) vector.chunks in
+    let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.set chunk (Chunk.offset address) byte
 
   let store_bytes vector address bytes =

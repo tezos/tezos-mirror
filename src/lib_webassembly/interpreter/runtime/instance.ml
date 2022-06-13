@@ -1,6 +1,6 @@
 open Types
 
-module IntMap = Lazy_map.IntMap
+module Vector = Lazy_vector.IntVector
 
 type module_inst =
 {
@@ -19,7 +19,7 @@ and table_inst = Table.t
 and memory_inst = Memory.t
 and global_inst = Global.t
 and export_inst = Ast.name * extern
-and elem_inst = Values.ref_ IntMap.t ref
+and elem_inst = Values.ref_ Vector.t ref
 and data_inst = Chunked_byte_vector.t ref
 
 and extern =
