@@ -503,7 +503,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IList_map :
       Script.location
       * ('a, 'c * 's, 'b, 'c * 's) kinstr
-      * ('b boxed_list, _) ty option
+      * ('b boxed_list, _) ty
       * ('b boxed_list, 'c * 's, 'r, 'f) kinstr
       -> ('a boxed_list, 'c * 's, 'r, 'f) kinstr
   | IList_iter :
@@ -765,11 +765,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IDip :
       Script.location
       * ('b, 's, 'c, 't) kinstr
-      * ('a, _) ty option
+      * ('a, _) ty
       * ('a, 'c * 't, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | IExec :
-      Script.location * ('b, 's, 'r, 'f) kinstr
+      Script.location * ('b, 's) stack_ty * ('b, 's, 'r, 'f) kinstr
       -> ('a, ('a, 'b) lambda * 's, 'r, 'f) kinstr
   | IApply :
       Script.location * ('a, _) ty * (('b, 'c) lambda, 's, 'r, 'f) kinstr
@@ -825,7 +825,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IView :
       Script.location
       * ('a, 'b) view_signature
-      * ('b, 'c * 's) stack_ty option
+      * ('b, 'c * 's) stack_ty
       * ('b option, 'c * 's, 'r, 'f) kinstr
       -> ('a, address * ('c * 's), 'r, 'f) kinstr
   | ITransfer_tokens :
@@ -1161,7 +1161,7 @@ and (_, _, _, _) continuation =
      stack of type ['s] and the continuation which expects the callee's
      result on top of the stack. *)
   | KReturn :
-      's * ('a, 's) stack_ty option * ('a, 's, 'r, 'f) continuation
+      's * ('a, 's) stack_ty * ('a, 's, 'r, 'f) continuation
       -> ('a, end_of_stack, 'r, 'f) continuation
   (* This continuation is useful when stack head requires some wrapping or
      unwrapping before it can be passed forward. For instance this continuation
@@ -1179,7 +1179,7 @@ and (_, _, _, _) continuation =
      element ['b] of the stack after having executed [i] in the substack
      of type ['a * 's]. *)
   | KUndip :
-      'b * ('b, _) ty option * ('b, 'a * 's, 'r, 'f) continuation
+      'b * ('b, _) ty * ('b, 'a * 's, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
   (* This continuation is executed at each iteration of a loop with
      a Boolean condition. *)
@@ -1204,7 +1204,7 @@ and (_, _, _, _) continuation =
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
-      * ('b boxed_list, _) ty option
+      * ('b boxed_list, _) ty
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('c, 's, 'r, 'f) continuation
@@ -1213,7 +1213,7 @@ and (_, _, _, _) continuation =
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
-      * ('b boxed_list, _) ty option
+      * ('b boxed_list, _) ty
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('b, 'c * 's, 'r, 'f) continuation
@@ -1222,7 +1222,7 @@ and (_, _, _, _) continuation =
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) map
-      * (('a, 'c) map, _) ty option
+      * (('a, 'c) map, _) ty
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('d, 's, 'r, 'f) continuation
   (* This continuation represents what is done after each step of a Map.map. *)
@@ -1231,7 +1231,7 @@ and (_, _, _, _) continuation =
       * ('a * 'b) list
       * ('a, 'c) map
       * 'a
-      * (('a, 'c) map, _) ty option
+      * (('a, 'c) map, _) ty
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('c, 'd * 's, 'r, 'f) continuation
   (* This continuation represents what is done after returning from a view.

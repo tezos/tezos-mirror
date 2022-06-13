@@ -1306,7 +1306,7 @@ let extract_ir_sized_step :
   | ILoop (_, _, _), _ -> Instructions.loop
   | ILoop_left (_, _, _), _ -> Instructions.loop_left
   | IDip (_, _, _, _), _ -> Instructions.dip
-  | IExec (_, _), _ -> Instructions.exec
+  | IExec (_, _, _), _ -> Instructions.exec
   | IApply (_, _, _), _ -> Instructions.apply
   | ILambda (_, _, _), _ -> Instructions.lambda
   | IFailwith (_, _), _ -> Instructions.failwith_

@@ -484,7 +484,7 @@ and ifailwith : ifailwith_type =
   }
 
 and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
- fun instrument logger g gas k ks accu stack ->
+ fun instrument logger g gas cont_sty k ks accu stack ->
   let arg = accu and code, stack = stack in
   let (Lam (code, _)) = code in
   let code =
@@ -493,7 +493,7 @@ and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
     | Some logger ->
         Script_interpreter_logging.log_kinstr logger code.kbef code.kinstr
   in
-  let ks = instrument @@ KReturn (stack, None, KCons (k, ks)) in
+  let ks = instrument @@ KReturn (stack, cont_sty, KCons (k, ks)) in
   (step [@ocaml.tailcall]) g gas code ks arg (EmptyCell, EmptyCell)
 
 and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
@@ -730,7 +730,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_map.empty kty and stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_map (_, ty, body, k) ->
-          (imap_map [@ocaml.tailcall]) id g gas body k ks (Some ty) accu stack
+          (imap_map [@ocaml.tailcall]) id g gas body k ks ty accu stack
       | IMap_iter (_, kvty, body, k) ->
           (imap_iter [@ocaml.tailcall]) id g gas body kvty k ks accu stack
       | IMap_mem (_, k) ->
@@ -1037,7 +1037,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let ks = KUndip (ign, ty, KCons (k, ks)) in
           let accu, stack = stack in
           (step [@ocaml.tailcall]) g gas b ks accu stack
-      | IExec (_, k) -> iexec id None g gas k ks accu stack
+      | IExec (_, sty, k) -> iexec id None g gas sty k ks accu stack
       | IApply (_, capture_ty, k) ->
           let capture = accu in
           let lam, stack = stack in
@@ -1661,16 +1661,7 @@ and log :
   | IMap_map (_, ty, body, k) ->
       let (Item_t (_, rest)) = sty in
       let instrument = Script_interpreter_logging.instrument_cont logger rest in
-      (imap_map [@ocaml.tailcall])
-        instrument
-        g
-        gas
-        body
-        k
-        ks
-        (Some ty)
-        accu
-        stack
+      (imap_map [@ocaml.tailcall]) instrument g gas body k ks ty accu stack
   | IMap_iter (_, kvty, body, k) ->
       let (Item_t (_, rest)) = sty in
       let instrument = Script_interpreter_logging.instrument_cont logger rest in
@@ -1725,11 +1716,11 @@ and log :
       in
       let accu, stack = stack in
       (step [@ocaml.tailcall]) g gas b ks accu stack
-  | IExec (_, k) ->
+  | IExec (_, stack_ty, k) ->
       let (Item_t (_, Item_t (Lambda_t (_, ret, _), _))) = sty in
       let sty' = Item_t (ret, Bot_t) in
       let instrument = Script_interpreter_logging.instrument_cont logger sty' in
-      iexec instrument (Some logger) g gas k ks accu stack
+      iexec instrument (Some logger) g gas stack_ty k ks accu stack
   | IFailwith (kloc, tv) ->
       let {ifailwith} = ifailwith in
       (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
@@ -1790,15 +1781,10 @@ and klog :
         Script_interpreter_logging.instrument_cont logger stack_ty
       in
       (kiter [@ocaml.tailcall]) instrument g gas body xty xs k accu stack
-  | KList_enter_body (body, xs, ys, ty_opt, len, k) ->
-      let instrument =
-        match ty_opt with
-        | None -> id
-        | Some (List_t (vty, _)) ->
-            let sty = Item_t (vty, stack_ty) in
-            Script_interpreter_logging.instrument_cont logger sty
-      in
-
+  | KList_enter_body (body, xs, ys, ty, len, k) ->
+      let (List_t (vty, _)) = ty in
+      let sty = Item_t (vty, stack_ty) in
+      let instrument = Script_interpreter_logging.instrument_cont logger sty in
       (klist_enter [@ocaml.tailcall])
         instrument
         g
@@ -1806,7 +1792,7 @@ and klog :
         body
         xs
         ys
-        ty_opt
+        ty
         len
         k
         accu
@@ -1826,25 +1812,11 @@ and klog :
         k
         accu
         stack
-  | KMap_enter_body (body, xs, ys, ty_opt, k) ->
-      let instrument =
-        match ty_opt with
-        | None -> id
-        | Some (Map_t (_, vty, _)) ->
-            let sty = Item_t (vty, stack_ty) in
-            Script_interpreter_logging.instrument_cont logger sty
-      in
-      (kmap_enter [@ocaml.tailcall])
-        instrument
-        g
-        gas
-        body
-        xs
-        ty_opt
-        ys
-        k
-        accu
-        stack
+  | KMap_enter_body (body, xs, ys, ty, k) ->
+      let (Map_t (_, vty, _)) = ty in
+      let sty = Item_t (vty, stack_ty) in
+      let instrument = Script_interpreter_logging.instrument_cont logger sty in
+      (kmap_enter [@ocaml.tailcall]) instrument g gas body xs ty ys k accu stack
   | KMap_exit_body (body, xs, ys, yk, ty_opt, k) ->
       let (Item_t (_, rest)) = stack_ty in
       let instrument = Script_interpreter_logging.instrument_cont logger rest in

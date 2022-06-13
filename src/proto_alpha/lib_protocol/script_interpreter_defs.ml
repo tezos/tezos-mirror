@@ -700,7 +700,7 @@ type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   local_gas_counter ->
   ('m * 'n, 'a * 'b, 'o, 'a * 'b) kinstr ->
   ('m * 'n) list ->
-  (('m, 'o) map, 'c) ty option ->
+  (('m, 'o) map, 'c) ty ->
   ('m, 'o) map ->
   'm ->
   (('m, 'o) map, 'a * 'b, 'e, 'f) continuation ->
@@ -714,7 +714,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
   local_gas_counter ->
   ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
   ('j * 'k) list ->
-  (('j, 'a) map, 'f) ty option ->
+  (('j, 'a) map, 'f) ty ->
   ('j, 'a) map ->
   (('j, 'a) map, 'b * 'c, 'd, 'e) continuation ->
   'b ->
@@ -728,7 +728,7 @@ type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
   'i list ->
   'j list ->
-  ('j boxed_list, 'e) ty option ->
+  ('j boxed_list, 'e) ty ->
   int ->
   ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
   'j ->
@@ -742,7 +742,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
   'j list ->
   'b list ->
-  ('b boxed_list, 'f) ty option ->
+  ('b boxed_list, 'f) ty ->
   int ->
   ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
   'a ->
@@ -788,7 +788,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
   ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
   ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
-  ('f boxed_list, 'i) ty option ->
+  ('f boxed_list, 'i) ty ->
   'e boxed_list ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
@@ -824,7 +824,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
   ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
   (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
   ('h, 'i, 'c, 'd) continuation ->
-  (('e, 'g) map, 'j) ty option ->
+  (('e, 'g) map, 'j) ty ->
   ('e, 'f) map ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
@@ -903,6 +903,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
+  ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   'g ->
@@ -914,7 +915,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('i, 'o) view_signature ->
-  ('o, 'a * 'b) stack_ty option ->
+  ('o, 'a * 'b) stack_ty ->
   ('o option, 'a * 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   'i ->

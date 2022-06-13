@@ -3343,15 +3343,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             ( stack_eq loc ctxt 1 rest starting_rest >>? fun (Eq, ctxt) ->
               let hloc = loc in
               let ibody = kibody.instr.apply (IHalt hloc) in
-              (match type_logger with
-              (* We want the type if logging is enabled, but we don't really care about the logger. *)
-              | Some _ -> list_t loc ret >|? Option.some
-              | None -> ok None)
-              >>? fun ret_ty ->
-              let list_map =
-                {apply = (fun k -> IList_map (loc, ibody, ret_ty, k))}
-              in
               list_t loc ret >>? fun ty ->
+              let list_map =
+                {apply = (fun k -> IList_map (loc, ibody, ty, k))}
+              in
               let stack = Item_t (ty, rest) in
               typed_no_lwt ctxt loc list_map stack )
       | Typed {aft; _} ->
@@ -3830,7 +3825,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_item_ty ctxt arg param loc I_EXEC 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let stack = Item_t (ret, rest) in
-      let instr = {apply = (fun k -> IExec (loc, k))} in
+      let instr = {apply = (fun k -> IExec (loc, stack, k))} in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, I_APPLY, [], annot),
       Item_t
@@ -3857,17 +3852,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Typed descr ->
-          let v_opt =
-            (* We only care about whether or not logger is None; it's contents is
-               irrelevant. *)
-            Option.map (fun _ -> v) type_logger
-          in
           let instr =
             {
               apply =
                 (fun k ->
                   let b = descr.instr.apply (IHalt descr.loc) in
-                  IDip (loc, b, v_opt, k));
+                  IDip (loc, b, v, k));
             }
           in
           let stack = Item_t (v, descr.aft) in
@@ -4300,14 +4290,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_ty output_ty, ctxt) ->
       option_t output_ty_loc output_ty >>?= fun res_ty ->
       check_var_annot loc annot >>?= fun () ->
-      let sty =
-        (* We only care if logger is present, not about its contents. *)
-        Option.map
-          (fun _ ->
-            let (Item_t (_, Item_t (_, rest))) = stack_ty in
-            Item_t (output_ty, rest))
-          type_logger
-      in
+      let sty = Item_t (output_ty, rest) in
       let instr =
         {
           apply =

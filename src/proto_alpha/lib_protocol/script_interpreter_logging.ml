@@ -899,14 +899,14 @@ let kinstr_split :
              aft_body_stack_transform = (fun s -> ok @@ Item_t (a, s));
              reconstruct = (fun body k -> IDip (loc, body, ty, k));
            }
-  | IExec (loc, k), Item_t (_, Item_t (Lambda_t (_, b, _meta), s)) ->
+  | IExec (loc, sty, k), Item_t (_, Item_t (Lambda_t (_, b, _meta), s)) ->
       let s = Item_t (b, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IExec (loc, k));
+             reconstruct = (fun k -> IExec (loc, sty, k));
            }
   | ( IApply (loc, ty, k),
       Item_t (_, Item_t (Lambda_t (Pair_t (_, a, _, _), b, _), s)) ) ->
@@ -1748,59 +1748,35 @@ let log_next_continuation :
   | KLoop_in (ki, k) ->
       let (Item_t (Bool_t, sty)) = stack_ty in
       ok @@ KLoop_in (enable_log sty ki, instrument_cont logger sty k)
-  | KReturn (stack, sty_opt, k) ->
-      let k' =
-        match sty_opt with
-        | None -> k
-        | Some sty -> instrument_cont logger sty k
-      in
-      ok @@ KReturn (stack, sty_opt, k')
+  | KReturn (stack, sty, k) ->
+      let k' = instrument_cont logger sty k in
+      ok @@ KReturn (stack, sty, k')
   | KLoop_in_left (ki, k) ->
       let (Item_t (Union_t (a_ty, b_ty, _, _), rest)) = stack_ty in
       let ki' = enable_log (Item_t (a_ty, rest)) ki in
       let k' = instrument_cont logger (Item_t (b_ty, rest)) k in
       ok @@ KLoop_in_left (ki', k')
-  | KUndip (x, ty_opt, k) ->
-      let k' =
-        match ty_opt with
-        | None -> k
-        | Some ty -> instrument_cont logger (Item_t (ty, stack_ty)) k
-      in
-      ok @@ KUndip (x, ty_opt, k')
+  | KUndip (x, ty, k) ->
+      let k' = instrument_cont logger (Item_t (ty, stack_ty)) k in
+      ok @@ KUndip (x, ty, k')
   | KIter (body, xty, xs, k) ->
       let body' = enable_log (Item_t (xty, stack_ty)) body in
       let k' = instrument_cont logger stack_ty k in
       ok @@ KIter (body', xty, xs, k')
-  | KList_enter_body (body, xs, ys, ty_opt, len, k) ->
-      let k' =
-        match ty_opt with
-        | None -> k
-        | Some ty -> instrument_cont logger (Item_t (ty, stack_ty)) k
-      in
-      ok @@ KList_enter_body (body, xs, ys, ty_opt, len, k')
-  | KList_exit_body (body, xs, ys, ty_opt, len, k) ->
+  | KList_enter_body (body, xs, ys, ty, len, k) ->
+      let k' = instrument_cont logger (Item_t (ty, stack_ty)) k in
+      ok @@ KList_enter_body (body, xs, ys, ty, len, k')
+  | KList_exit_body (body, xs, ys, ty, len, k) ->
       let (Item_t (_, sty)) = stack_ty in
-      let k' =
-        match ty_opt with
-        | None -> k
-        | Some ty -> instrument_cont logger (Item_t (ty, sty)) k
-      in
-      ok @@ KList_exit_body (body, xs, ys, ty_opt, len, k')
-  | KMap_enter_body (body, xs, ys, ty_opt, k) ->
-      let k' =
-        match ty_opt with
-        | None -> k
-        | Some ty -> instrument_cont logger (Item_t (ty, stack_ty)) k
-      in
-      ok @@ KMap_enter_body (body, xs, ys, ty_opt, k')
-  | KMap_exit_body (body, xs, ys, yk, ty_opt, k) ->
+      let k' = instrument_cont logger (Item_t (ty, sty)) k in
+      ok @@ KList_exit_body (body, xs, ys, ty, len, k')
+  | KMap_enter_body (body, xs, ys, ty, k) ->
+      let k' = instrument_cont logger (Item_t (ty, stack_ty)) k in
+      ok @@ KMap_enter_body (body, xs, ys, ty, k')
+  | KMap_exit_body (body, xs, ys, yk, ty, k) ->
       let (Item_t (_, sty)) = stack_ty in
-      let k' =
-        match ty_opt with
-        | None -> k
-        | Some ty -> instrument_cont logger (Item_t (ty, sty)) k
-      in
-      ok @@ KMap_exit_body (body, xs, ys, yk, ty_opt, k')
+      let k' = instrument_cont logger (Item_t (ty, sty)) k in
+      ok @@ KMap_exit_body (body, xs, ys, yk, ty, k')
   | KMap_head (_, _)
   | KView_exit (_, _)
   | KLog _ (* This case should never happen. *) | KNil ->
