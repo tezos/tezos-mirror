@@ -69,6 +69,7 @@ let () =
       Unit_test.spec "saturation arithmetic" Test_saturation.tests;
       Unit_test.spec "gas monad" Test_gas_monad.tests;
       Unit_test.spec "Sc_rollup_storage.ml" Test_sc_rollup_storage.tests;
+      Unit_test.spec "sc rollup game" Test_sc_rollup_game.tests;
       Unit_test.spec "tx rollup l2" Test_tx_rollup_l2.tests;
       Unit_test.spec "tx rollup l2 apply" Test_tx_rollup_l2_apply.tests;
       Unit_test.spec "liquidity baking" Test_liquidity_baking_repr.tests;

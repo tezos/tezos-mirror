@@ -410,7 +410,13 @@ let check_dissection start start_tick stop stop_tick dissection =
         game_error "Cannot return to a Some state after being at a None state"
     | (_, tick) :: (next_state, next_tick) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
-          traverse ((next_state, next_tick) :: others)
+          let incr = Sc_rollup_tick_repr.distance tick next_tick in
+          if Z.(leq incr (div dist (of_int 2))) then
+            traverse ((next_state, next_tick) :: others)
+          else
+            game_error
+              "Maximum tick increment in dissection must be less than half \
+               total dissection length"
         else game_error "Ticks should only increase in dissection"
     | _ -> return ()
   in

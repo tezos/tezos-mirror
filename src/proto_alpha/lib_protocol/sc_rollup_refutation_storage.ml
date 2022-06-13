@@ -200,10 +200,16 @@ let init_game ctxt rollup ~refuter ~defender =
         | Some refuter, Some defender ->
             fail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
       in
-      let* ( ( {hash = _parent; commitment = parent_info},
-               {hash = _child; commitment = child_info} ),
+      let* ( ( {hash = _refuter_commit; commitment = _info},
+               {hash = _defender_commit; commitment = child_info} ),
              ctxt ) =
         get_conflict_point ctxt rollup refuter defender
+      in
+      let* parent_info, ctxt =
+        Commitment_storage.get_commitment_unsafe
+          ctxt
+          rollup
+          child_info.predecessor
       in
       let* ctxt, inbox = Store.Inbox.get ctxt rollup in
       let* kind = Store.PVM_kind.get ctxt rollup in

@@ -106,7 +106,7 @@ let random_dissection start_at start_hash stop_at stop_hash :
   let stop_int = tick_to_int_exn stop_at in
   let dist = stop_int - start_int in
   let branch = min (dist + 1) 32 in
-  let size = (dist + 1) / branch in
+  let size = (dist + 1) / (branch - 1) in
 
   if dist = 1 then return None
   else
@@ -505,7 +505,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     if dist = 1 then return None
     else
       let branch = min (dist + 1) 32 in
-      let size = (dist + 1) / branch in
+      let size = (dist + 1) / (branch - 1) in
       let tick_list =
         Result.to_option
         @@ List.init branch ~when_negative_length:"error" (fun i ->
@@ -902,25 +902,20 @@ let testDissection =
   [
     Test.make
       ~name:"randomVPN"
-      (Gen.quad
-         (Gen.list_size Gen.small_int (Gen.int_range 0 100))
-         Gen.small_int
-         Gen.small_int
-         Gen.small_int)
-      (fun (initial_prog, start_at, length, branching) ->
+      Gen.(triple (list_size small_int (int_range 0 100)) small_int small_int)
+      (fun (initial_prog, start_at, length) ->
         assume
           (start_at >= 0 && length > 1
-          && List.length initial_prog > start_at + length
-          && 1 < branching) ;
+          && List.length initial_prog > start_at + length) ;
         let module P = MakeRandomPVM (struct
           let initial_prog = initial_prog
         end) in
         Lwt_main.run @@ test_random_dissection (module P) start_at length);
     Test.make
       ~name:"count"
-      (Gen.quad Gen.small_int Gen.small_int Gen.small_int Gen.small_int)
-      (fun (target, start_at, length, branching) ->
-        assume (start_at >= 0 && length > 1 && 1 < branching) ;
+      Gen.(triple small_int small_int small_int)
+      (fun (target, start_at, length) ->
+        assume (start_at >= 0 && length > 1) ;
         let module P = MakeCountingPVM (struct
           let target = target
         end) in
@@ -932,7 +927,7 @@ let testRandomDissection =
   [
     Test.make
       ~name:"randomdissection"
-      (Gen.pair Gen.small_int Gen.small_int)
+      Gen.(pair small_int small_int)
       (fun (start_int, length) ->
         assume (start_int > 0 && length >= 10) ;
         let testing_lwt =
@@ -970,7 +965,7 @@ let () =
     "Refutation Game"
     [
       ("Dissection tests", qcheck_wrap testDissection);
-      ("Random disection", qcheck_wrap testRandomDissection);
+      ("Random dissection", qcheck_wrap testRandomDissection);
       ( "RandomPVM",
         qcheck_wrap
           [
