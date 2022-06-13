@@ -62,6 +62,8 @@ let n_transactions n b ?fee source dest amount =
   List.fold_left_es
     (fun b _ ->
       transfer_and_check_balances ~loc:__LOC__ b ?fee source dest amount
-      >|=? fun (b, _) -> b)
+      >>=? fun (i, _) ->
+      Incremental.finalize_block i >>=? fun b ->
+      Incremental.begin_construction b)
     b
     (1 -- n)

@@ -436,7 +436,8 @@ let test_no_reveal_when_gas_exhausted () =
      {! Protocol.Raw_context.Operation_quota_exceeded} error *)
   let expect_failure = function
     | [
-        Environment.Ecoproto_error Apply.Insufficient_gas_for_manager;
+        Environment.Ecoproto_error
+          Validate_operation.Manager.Insufficient_gas_for_manager;
         Environment.Ecoproto_error Raw_context.Operation_quota_exceeded;
       ] ->
         return_unit
@@ -499,7 +500,10 @@ let test_reveal_incorrect_position_in_batch () =
     [op_transfer; op_reveal]
   >>=? fun batched_operation ->
   let expect_failure = function
-    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+    | [
+        Environment.Ecoproto_error
+          Validate_operation.Manager.Incorrect_reveal_position;
+      ] ->
         return_unit
     | _ -> assert false
   in
@@ -535,7 +539,10 @@ let test_duplicate_valid_reveals () =
     [op_rev1; op_rev2]
   >>=? fun batched_operation ->
   let expect_failure = function
-    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+    | [
+        Environment.Ecoproto_error
+          Validate_operation.Manager.Incorrect_reveal_position;
+      ] ->
         return_unit
     | _ -> assert false
   in
@@ -575,7 +582,10 @@ let test_valid_reveal_after_gas_exhausted_one () =
     [bad_reveal; good_reveal]
   >>=? fun batched_operation ->
   let expect_failure = function
-    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+    | [
+        Environment.Ecoproto_error
+          Validate_operation.Manager.Incorrect_reveal_position;
+      ] ->
         return_unit
     | _ -> assert false
   in
@@ -619,7 +629,10 @@ let test_valid_reveal_after_insolvent_one () =
     [bad_reveal; good_reveal; transfer]
   >>=? fun batched_operation ->
   let expect_failure = function
-    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+    | [
+        Environment.Ecoproto_error
+          Validate_operation.Manager.Incorrect_reveal_position;
+      ] ->
         return_unit
     | _ -> assert false
   in
@@ -659,7 +672,10 @@ let test_valid_reveal_after_emptying_balance () =
     [bad_reveal; good_reveal]
   >>=? fun batched_operation ->
   let expect_failure = function
-    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+    | [
+        Environment.Ecoproto_error
+          Validate_operation.Manager.Incorrect_reveal_position;
+      ] ->
         return_unit
     | _ -> assert false
   in

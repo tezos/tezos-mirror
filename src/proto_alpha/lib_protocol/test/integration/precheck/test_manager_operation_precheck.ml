@@ -119,7 +119,8 @@ let low_gas_limit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
     | [
-     Environment.Ecoproto_error Apply.Gas_quota_exceeded_init_deserialize;
+     Environment.Ecoproto_error
+       Validate_operation.Manager.Gas_quota_exceeded_init_deserialize;
      Environment.Ecoproto_error Raw_context.Operation_quota_exceeded;
     ] ->
         return_unit

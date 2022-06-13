@@ -263,43 +263,43 @@ let test_failing_operation_in_the_middle_with_fees () =
   return_unit
 
 let test_wrong_signature_in_the_middle () =
-  Context.init2 () >>=? fun (blk, (c1, c2)) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (blk, (c1, c2)) ->
   Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
   Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one >>=? fun op2 ->
-  Incremental.begin_construction blk >>=? fun inc ->
   (* Make legit transfers, performing reveals *)
-  Incremental.add_operation inc op1 >>=? fun inc ->
-  Incremental.add_operation inc op2 >>=? fun inc ->
+  Block.bake ~operations:[op1; op2] blk >>=? fun b ->
   (* Make c2 reach counter 5 *)
-  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one >>=? fun op ->
-  Incremental.add_operation inc op >>=? fun inc ->
-  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one >>=? fun op ->
-  Incremental.add_operation inc op >>=? fun inc ->
-  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one >>=? fun op ->
-  Incremental.add_operation inc op >>=? fun inc ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c2 c1 Tez.one
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c2 c1 Tez.one
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c2 c1 Tez.one
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   (* Cook transactions for actual test *)
-  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one >>=? fun op1 ->
-  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one >>=? fun op2 ->
-  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one >>=? fun op3 ->
-  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c1 c2 Tez.one >>=? fun op1 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c1 c2 Tez.one >>=? fun op2 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c1 c2 Tez.one >>=? fun op3 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c2 c1 Tez.one
   >>=? fun spurious_operation ->
   let operations = [op1; op2; op3] in
-  Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
+
+  Op.combine_operations ~spurious_operation ~source:c1 (B b) operations
   >>=? fun operation ->
   let expect_failure = function
-    | Environment.Ecoproto_error err :: _ ->
+    | Environment.Ecoproto_error
+        (Validate_operation.Manager.Inconsistent_sources as err)
+      :: _ ->
         Assert.test_error_encodings err ;
-        let error_info =
-          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-        in
-        if error_info.title = "Inconsistent sources in operation pack" then
-          return_unit
-        else failwith "unexpected error"
+        return_unit
     | _ ->
         failwith
           "Packed operation has invalid source in the middle : operation \
            expected to fail."
   in
+  Incremental.begin_construction b >>=? fun inc ->
   Incremental.add_operation ~expect_failure inc operation >>=? fun _inc ->
   return_unit
 
@@ -307,7 +307,9 @@ let expect_inconsistent_counters list =
   if
     List.exists
       (function
-        | Environment.Ecoproto_error Apply.Inconsistent_counters -> true
+        | Environment.Ecoproto_error
+            Validate_operation.Manager.Inconsistent_counters ->
+            true
         | _ -> false)
       list
   then return_unit
@@ -322,17 +324,15 @@ let test_inconsistent_counters () =
   Context.init2 () >>=? fun (blk, (c1, c2)) ->
   Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
   Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one >>=? fun op2 ->
-  Incremental.begin_construction blk >>=? fun inc ->
   (* Make legit transfers, performing reveals *)
-  Incremental.add_operation inc op1 >>=? fun inc ->
-  Incremental.add_operation inc op2 >>=? fun inc ->
+  Block.bake ~operations:[op1; op2] blk >>=? fun b ->
   (* Now, counter c1 = counter c2 = 1, Op.transaction builds with counter + 1 *)
-  Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 ~counter:Z.one Tez.one
+  Op.transaction ~gas_limit ~fee:Tez.one (B b) c1 c2 ~counter:Z.one Tez.one
   >>=? fun op1 ->
   Op.transaction
     ~gas_limit
     ~fee:Tez.one
-    (B blk)
+    (B b)
     c1
     c2
     ~counter:(Z.of_int 2)
@@ -341,7 +341,7 @@ let test_inconsistent_counters () =
   Op.transaction
     ~gas_limit
     ~fee:Tez.one
-    (B blk)
+    (B b)
     c1
     c2
     ~counter:(Z.of_int 2)
@@ -350,7 +350,7 @@ let test_inconsistent_counters () =
   Op.transaction
     ~gas_limit
     ~fee:Tez.one
-    (B blk)
+    (B b)
     c1
     c2
     ~counter:(Z.of_int 3)
@@ -359,21 +359,22 @@ let test_inconsistent_counters () =
   Op.transaction
     ~gas_limit
     ~fee:Tez.one
-    (B blk)
+    (B b)
     c1
     c2
     ~counter:(Z.of_int 4)
     Tez.one
   >>=? fun op4 ->
   (* Canari: Check counters are ok *)
-  Op.batch_operations ~source:c1 (I inc) [op1; op2; op3; op4] >>=? fun op ->
+  Op.batch_operations ~source:c1 (B b) [op1; op2; op3; op4] >>=? fun op ->
+  Incremental.begin_construction b >>=? fun inc ->
   Incremental.add_operation inc op >>=? fun _ ->
   (* Gap in counter in the following op *)
-  Op.batch_operations ~source:c1 (I inc) [op1; op2; op4] >>=? fun op ->
+  Op.batch_operations ~source:c1 (B b) [op1; op2; op4] >>=? fun op ->
   Incremental.add_operation ~expect_failure:expect_inconsistent_counters inc op
   >>=? fun _ ->
   (* Same counter used twice in the following op *)
-  Op.batch_operations ~source:c1 (I inc) [op1; op2; op2'] >>=? fun op ->
+  Op.batch_operations ~source:c1 (B b) [op1; op2; op2'] >>=? fun op ->
   Incremental.add_operation ~expect_failure:expect_inconsistent_counters inc op
   >>=? fun _ -> return_unit
 
