@@ -184,21 +184,10 @@ let originate_rollup_and_deposit_with_two_stakers () =
 (** Originate a rollup with three stakers and make a deposit to the initial LCC.
 *)
 let originate_rollup_and_deposit_with_three_stakers () =
-  let* ctxt = new_context () in
-  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
-  let staker1 =
-    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-  in
-  let staker2 =
-    Sc_rollup_repr.Staker.of_b58check_exn "tz1RikjCkrEde1QQmuesp796jCxeiyE6t3Vo"
-  in
-  let staker3 =
-    Sc_rollup_repr.Staker.of_b58check_exn "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
-  in
-  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker1 in
-  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker2 in
-  let+ ctxt = deposit_stake_and_check_balances ctxt rollup staker3 in
-  (ctxt, rollup, staker1, staker2, staker3)
+  let+ ctxt, rollup, stakers = originate_rollup_and_deposit_with_n_stakers 3 in
+  match stakers with
+  | [staker1; staker2; staker3] -> (ctxt, rollup, staker1, staker2, staker3)
+  | _ -> assert false
 
 (** Trivial assertion.
 
@@ -254,8 +243,7 @@ let test_deposit_to_missing_rollup () =
         Sc_rollup_repr.Staker.zero)
 
 let test_deposit_by_underfunded_staker () =
-  let* ctxt = new_context () in
-  let* sc_rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let* ctxt, sc_rollup = new_context_with_rollup () in
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1hhNZvjed6McQQLWtR7MRzPHpgSFZTXxdW"
   in
@@ -291,21 +279,16 @@ let test_deposit_by_underfunded_staker () =
        {staker; sc_rollup; staker_balance; min_expected_balance = stake})
 
 let test_initial_state_is_pre_boot () =
-  let* ctxt = new_context () in
-  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let* ctxt, rollup = new_context_with_rollup () in
   let* lcc, ctxt =
     lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt lcc Commitment_repr.Hash.zero
 
 let test_deposit_to_existing_rollup () =
-  let* ctxt = new_context () in
-  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
-  let staker =
-    Signature.Public_key_hash.of_b58check_exn
-      "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  let* ctxt, _rollup, _staker =
+    originate_rollup_and_deposit_with_one_staker ()
   in
-  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
   assert_true ctxt
 
 let assert_balance_unchanged ctxt ctxt' account =
@@ -331,13 +314,7 @@ let remove_staker_and_check_balances ctxt rollup staker =
       ctxt')
 
 let test_removing_staker_from_lcc_fails () =
-  let* ctxt = new_context () in
-  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
-  let staker =
-    Signature.Public_key_hash.of_b58check_exn
-      "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-  in
-  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
+  let* ctxt, rollup, staker = originate_rollup_and_deposit_with_one_staker () in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
