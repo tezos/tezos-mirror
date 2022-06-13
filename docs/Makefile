@@ -111,14 +111,6 @@ scriptsindoccheck:
 	scripts/test_doc_scripts.sh compile-sources-buster
 	#scripts/test_doc_scripts.sh use-docker # returns 1 (and eats alot of disk)
 
-sanitycheck:
-	@make clean
-	@if grep -Rq alpha $(NAMED_PROTOS); then					\
-		echo "'alpha' occurs in the docs for released protocols:";	\
-                grep -R alpha $(NAMED_PROTOS);                                               \
-		exit 1;								\
-	fi
-
 # build dune targets together to avoid concurrent dunes
 docexes: main
 	cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe docs/$(DOCGENDIR)/rpc_doc.exe docs/$(DOCGENDIR)/p2p_doc.exe
