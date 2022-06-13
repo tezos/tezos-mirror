@@ -815,6 +815,8 @@ let close ?(wait = false) st =
   Lwt.return_unit
 
 module Internal_for_tests = struct
+  let raw_write_sync = raw_write_sync
+
   let mock_authenticated_connection default_metadata =
     let secret_key, public_key, _pkh = Crypto_box.random_keypair () in
     let cryptobox_data =

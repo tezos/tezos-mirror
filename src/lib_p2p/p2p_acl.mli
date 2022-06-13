@@ -142,8 +142,10 @@ module PeerGreylist : sig
   val list : t -> P2p_peer.Id.t list
 end
 
-(** / *)
+(**/*)
 
-module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t
+module Internal_for_tests : sig
+  module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t
 
-module IpTable : Hashtbl.S with type key = Ipaddr.V6.t
+  module IpTable : Hashtbl.S with type key = Ipaddr.V6.t
+end

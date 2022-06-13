@@ -108,6 +108,6 @@ val close : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (**/**)
 
-val raw_write_sync : ('msg, 'peer, 'conn) t -> Bytes.t -> unit tzresult Lwt.t
-
-(**/**)
+module Internal_for_tests : sig
+  val raw_write_sync : ('msg, 'peer, 'conn) t -> Bytes.t -> unit tzresult Lwt.t
+end
