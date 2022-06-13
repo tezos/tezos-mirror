@@ -140,7 +140,7 @@ let dedup_canonicalize uf =
       (Binary_schema.toplevel_encoding, Binary_schema.description) Hashtbl.t =
     Hashtbl.create 100
   in
-  let rec help prev_len acc l =
+  let rec help prev_len l =
     Hashtbl.clear tbl ;
     let acc =
       List.fold_left
@@ -153,7 +153,7 @@ let dedup_canonicalize uf =
           | Some original_desc ->
               UF.union uf ~new_canonical:original_desc ~existing:name ;
               acc)
-        acc
+        []
         l
     in
     let fixedup =
@@ -161,9 +161,9 @@ let dedup_canonicalize uf =
     in
     if List.compare_length_with fixedup prev_len = 0 then
       List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
-    else help (List.length fixedup) [] fixedup
+    else help (List.length fixedup) fixedup
   in
-  help 0 []
+  help 0
 
 type pdesc = P : 'x Encoding.desc -> pdesc
 
