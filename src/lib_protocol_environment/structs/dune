@@ -9,5 +9,6 @@
   tezos-stdlib
   tezos-crypto
   tezos-lwt-result-stdlib
+  tezos-scoru-wasm
   data-encoding
   bls12-381))

@@ -88,12 +88,14 @@ module V2_0_0 : sig
 
   val proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t
 
+  (** Build a WebAssembly PVM using the given proof-supporting context. *)
   module Make (Context : P) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
        and type proof = Context.proof proof
 
+  (** This PVM is used for verification in the Protocol. [produce_proof] always returns [None]. *)
   module ProtocolImplementation :
     S
       with type context = Context.t

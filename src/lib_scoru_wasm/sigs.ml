@@ -23,21 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(*
+open Tezos_context_sigs
 
-  This library acts as a dependency to the protocol environment. Everything that
-  must be exposed to the protocol via the environment shall be added here.
-
-*)
-
-open Sigs
-
-module Make (T : TreeS) : sig
-  val step : T.tree -> T.tree Lwt.t
-end = struct
-  module Tree = struct
-    include T
-  end
-
-  let step = Lwt.return
-end
+module type TreeS =
+  Context.TREE with type key = string list and type value = bytes
