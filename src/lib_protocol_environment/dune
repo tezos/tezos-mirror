@@ -17,6 +17,7 @@
   tezos-protocol-environment.structs
   tezos-micheline
   tezos-context.memory
+  tezos-scoru-wasm
   tezos-event-logging)
  (flags (:standard)
         -open Tezos_base.TzPervasives

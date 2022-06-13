@@ -539,7 +539,7 @@ opam:tezos-client-base-unix:
 opam:tezos-client-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-client-commands
 
@@ -910,7 +910,7 @@ opam:tezos-protocol-007-PsDELPH1:
 opam:tezos-protocol-008-PtEdo2Zk:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-008-PtEdo2Zk
 
@@ -1232,7 +1232,7 @@ opam:tezos-sc-rollup-node-alpha:
 opam:tezos-scoru-wasm:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-scoru-wasm
 
@@ -1435,7 +1435,7 @@ opam:tezt-performance-regression:
 opam:tezt-self-tests:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezt-self-tests
 

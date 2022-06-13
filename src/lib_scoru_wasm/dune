@@ -6,4 +6,7 @@
  (public_name tezos-scoru-wasm)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-webassembly-interpreter))
+  tezos-webassembly-interpreter
+  tezos-context.sigs
+  tezos-lwt-result-stdlib
+  data-encoding))

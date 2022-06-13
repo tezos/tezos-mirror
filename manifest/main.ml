@@ -528,6 +528,38 @@ let tezos_error_monad =
       ]
     ~js_compatible:true
 
+let tezos_webassembly_interpreter =
+  public_lib
+    "tezos-webassembly-interpreter"
+    ~path:"src/lib_webassembly/interpreter"
+    ~license:"Apache License 2.0"
+    ~extra_authors:["WebAssembly Authors"]
+    ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
+    ~all_modules_except:["main"]
+    ~dune:Dune.[[S "include"; S "dune.inc"]]
+    ~deps:[tezos_lwt_result_stdlib]
+
+let _tezos_webassembly_repl =
+  private_exe
+    "main"
+    ~path:"src/lib_webassembly/interpreter"
+    ~modules:["main"]
+    ~opam:""
+    ~deps:[tezos_webassembly_interpreter |> open_]
+
+let _tezos_webassembly_test =
+  test
+    "main"
+    ~path:"src/lib_webassembly/test"
+    ~opam:"tezos-webassembly-interpreter"
+    ~deps:
+      [
+        tezos_webassembly_interpreter |> open_;
+        qcheck_core;
+        qcheck_alcotest;
+        alcotest;
+      ]
+
 let tezos_hacl =
   let js_stubs = ["random.js"; "evercrypt.js"] in
   let js_generated = "runtime-generated.js" in
@@ -1400,6 +1432,20 @@ let tezos_context_sigs =
     ~path:"src/lib_context/sigs"
     ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib |> open_]
 
+let tezos_scoru_wasm =
+  public_lib
+    "tezos-scoru-wasm"
+    ~path:"src/lib_scoru_wasm"
+    ~synopsis:
+      "Protocol environment dependency providing WASM functionality for SCORU"
+    ~deps:
+      [
+        tezos_webassembly_interpreter;
+        tezos_context_sigs;
+        tezos_lwt_result_stdlib;
+        data_encoding;
+      ]
+
 let tezos_context_encoding =
   public_lib
     "tezos-context.encoding"
@@ -1634,6 +1680,7 @@ let tezos_protocol_environment_structs =
         tezos_stdlib;
         tezos_crypto;
         tezos_lwt_result_stdlib;
+        tezos_scoru_wasm;
         data_encoding;
         bls12_381;
       ]
@@ -1668,6 +1715,7 @@ protocols.|}
         tezos_protocol_environment_structs;
         tezos_micheline |> open_;
         tezos_context_memory;
+        tezos_scoru_wasm;
         tezos_event_logging;
       ]
     ~wrapped:false
@@ -2586,46 +2634,6 @@ let tezos_openapi =
       "Tezos: a library for querying RPCs and converting into the OpenAPI \
        format"
     ~deps:[ezjsonm; json_data_encoding; tezt]
-
-let tezos_webassembly_interpreter =
-  public_lib
-    "tezos-webassembly-interpreter"
-    ~path:"src/lib_webassembly/interpreter"
-    ~license:"Apache License 2.0"
-    ~extra_authors:["WebAssembly Authors"]
-    ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
-    ~all_modules_except:["main"]
-    ~dune:Dune.[[S "include"; S "dune.inc"]]
-    ~deps:[tezos_lwt_result_stdlib]
-
-let _tezos_webassembly_repl =
-  private_exe
-    "main"
-    ~path:"src/lib_webassembly/interpreter"
-    ~modules:["main"]
-    ~opam:""
-    ~deps:[tezos_webassembly_interpreter |> open_]
-
-let _tezos_webassembly_test =
-  test
-    "main"
-    ~path:"src/lib_webassembly/test"
-    ~opam:"tezos-webassembly-interpreter"
-    ~deps:
-      [
-        tezos_webassembly_interpreter |> open_;
-        qcheck_core;
-        qcheck_alcotest;
-        alcotest;
-      ]
-
-let _tezos_scoru_wasm =
-  public_lib
-    "tezos-scoru-wasm"
-    ~path:"src/lib_scoru_wasm"
-    ~synopsis:
-      "Protocol environment dependency providing WASM functionality for SCORU"
-    ~deps:[tezos_webassembly_interpreter]
 
 let _tezos_protocol_compiler_bin =
   public_exe
