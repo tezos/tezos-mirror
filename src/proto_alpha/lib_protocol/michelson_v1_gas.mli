@@ -362,6 +362,9 @@ module Cost_of : sig
     val open_chest :
       chest:Script_typed_ir.Script_timelock.chest -> time:Z.t -> Gas.cost
 
+    (** cost to generate one event emission internal operation *)
+    val emit : Gas.cost
+
     module Control : sig
       val nil : Gas.cost
 
