@@ -105,14 +105,12 @@ def package_role(
             )
         ):
             lib = lib + '/' + lib.replace('-', '_').capitalize()
-        url = "api/odoc/_html/" + lib + '/index.html'
-        for _ in range(1, rel_lvl):
-            url = '../' + url
     elif os.path.isdir('_build/api/odoc/_html/'):
         # odoc was run but did not generate the page
         raise ValueError('package_role: no API for package ', lib)
-    else:
-        url = src_url
+    url = "api/odoc/_html/" + lib + '/index.html'
+    for _ in range(1, rel_lvl):
+        url = '../' + url
     node = nodes.reference(rawtext, text, refuri=url, **options)
     return [node], []
 
