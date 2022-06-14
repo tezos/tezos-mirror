@@ -174,7 +174,7 @@ module type Dump_interface = sig
   val save_inode : index -> import -> Snapshot.t -> tree option Lwt.t
 
   (** [close importer] close the [importer] instance.*)
-  val close_import : import -> unit
+  val close_import : import -> index -> unit
 end
 
 module type S = sig

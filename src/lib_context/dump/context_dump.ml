@@ -539,7 +539,7 @@ module Make (I : Dump_interface) = struct
         let* e = get_command rbuf in
         match e with
         | Eof ->
-            I.close_import import_t ;
+            I.close_import import_t index ;
             return_unit
         | _ -> tzfail Inconsistent_context_dump
       in
