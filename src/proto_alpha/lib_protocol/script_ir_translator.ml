@@ -2480,7 +2480,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             arg_ty
             address.destination
             ~entrypoint:address.entrypoint
-          >|=? fun (ctxt, _) -> (Typed_contract {arg_ty; address}, ctxt) )
+          >|=? fun (ctxt, typed_contract) -> (typed_contract, ctxt) )
   (* Pairs *)
   | Pair_t (tl, tr, _, _), expr ->
       let r_witness = comb_witness1 tr in
