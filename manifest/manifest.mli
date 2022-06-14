@@ -210,8 +210,13 @@ module Dune : sig
       (rule
         (targets <targets>)
         (deps <deps>)
-        (action <action>)) *)
-  val targets_rule : ?deps:s_expr list -> string list -> action:s_expr -> s_expr
+        (action <action>))
+
+      Set the optional argument [~promote] to true to generate
+      a [(mode promote)] stanza.
+  *)
+  val targets_rule :
+    ?promote:bool -> ?deps:s_expr list -> string list -> action:s_expr -> s_expr
 
   (** Makes an [install] stanza.
 

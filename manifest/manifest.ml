@@ -349,10 +349,11 @@ module Dune = struct
 
   let include_ name = [S "include"; S name]
 
-  let targets_rule ?deps targets ~action =
+  let targets_rule ?(promote = false) ?deps targets ~action =
     [
       S "rule";
       [S "targets"; G (of_atom_list targets)];
+      (if promote then [S "mode"; S "promote"] else E);
       (match deps with None -> E | Some deps -> [S "deps"; G (of_list deps)]);
       [S "action"; action];
     ]

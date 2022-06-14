@@ -1,7 +1,11 @@
+(* This file was automatically generated, do not edit.*)
+(* Edit file v4.in.ml instead. *)
+# 1 "v4.in.ml"
 open Tezos_protocol_environment_sigs_stdlib_compat.V_all
+
 module type T = sig
-module Pervasives : sig
-# 1 "../lib_protocol_environment/sigs/v4/pervasives.mli"
+  module Pervasives : sig
+# 1 "v4/pervasives.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -485,10 +489,13 @@ val ( ^^ ) :
   Right-associative operator, see {!Ocaml_operators} for more information.
 *)
 end
-[@@coq_plain_module]
-open Pervasives
-module String : sig
-# 1 "../lib_protocol_environment/sigs/v4/string.mli"
+# 4 "v4.in.ml"
+ [@@coq_plain_module]
+
+  open Pervasives
+
+  module String : sig
+# 1 "v4/string.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -732,9 +739,11 @@ val split_on_char: char -> string -> string list
     @since 4.04.0
 *)
 end
-[@@coq_plain_module]
-module Char : sig
-# 1 "../lib_protocol_environment/sigs/v4/char.mli"
+# 8 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Char : sig
+# 1 "v4/char.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -790,9 +799,11 @@ val equal: t -> t -> bool
 (** The equal function for chars.
     @since 4.03.0 *)
 end
-[@@coq_plain_module]
-module Bytes : sig
-# 1 "../lib_protocol_environment/sigs/v4/bytes.mli"
+# 10 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Bytes : sig
+# 1 "v4/bytes.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -1054,9 +1065,11 @@ val equal: t -> t -> bool
 (** The equality function for byte sequences.
     @since 4.03.0 *)
 end
-[@@coq_plain_module]
-module Int32 : sig
-# 1 "../lib_protocol_environment/sigs/v4/int32.mli"
+# 12 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Int32 : sig
+# 1 "v4/int32.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -1202,9 +1215,11 @@ val equal: t -> t -> bool
 (** The equal function for int32s.
     @since 4.03.0 *)
 end
-[@@coq_plain_module]
-module Int64 : sig
-# 1 "../lib_protocol_environment/sigs/v4/int64.mli"
+# 14 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Int64 : sig
+# 1 "v4/int64.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -1358,9 +1373,11 @@ val equal: t -> t -> bool
 (** The equal function for int64s.
     @since 4.03.0 *)
 end
-[@@coq_plain_module]
-module Format : sig
-# 1 "../lib_protocol_environment/sigs/v4/format.mli"
+# 16 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Format : sig
+# 1 "v4/format.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -2109,9 +2126,11 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
   @since 4.03
 *)
 end
-[@@coq_plain_module]
-module Logging : sig
-# 1 "../lib_protocol_environment/sigs/v4/logging.mli"
+# 18 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Logging : sig
+# 1 "v4/logging.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -2157,9 +2176,11 @@ val log : level -> ('a, Format.formatter, unit, unit) format4 -> 'a
 (** Same as [log] but more efficient with a simpler interface. *)
 val log_string : level -> string -> unit
 end
-[@@coq_plain_module]
-module Hex : sig
-# 1 "../lib_protocol_environment/sigs/v4/hex.mli"
+# 20 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Hex : sig
+# 1 "v4/hex.mli"
 (*
  * Copyright (c) 2015 Trevor Summers Smith <trevorsummerssmith@gmail.com>
  * Copyright (c) 2014 Thomas Gazagnaire <thomas@gazagnaire.org>
@@ -2243,9 +2264,11 @@ val show : t -> string
 (** [show t] will return a human-readable hex representation of [t] as
     a string. *)
 end
-[@@coq_plain_module]
-module Z : sig
-# 1 "../lib_protocol_environment/sigs/v4/z.mli"
+# 22 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Z : sig
+# 1 "v4/z.mli"
 (**
    Integers.
 
@@ -2715,9 +2738,11 @@ external of_bits: string -> t = "ml_z_of_bits"
     trailing zeros in s.
  *)
 end
-[@@coq_plain_module]
-module Lwt : sig
-# 1 "../lib_protocol_environment/sigs/v4/lwt.mli"
+# 24 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Lwt : sig
+# 1 "v4/lwt.mli"
 (* This file is part of Lwt, released under the MIT license. See LICENSE.md for
    details, or visit https://github.com/ocsigen/lwt/blob/master/LICENSE.md. *)
 
@@ -2984,9 +3009,11 @@ val return_false : bool t
 (** [Lwt.return_false] is like {!Lwt.return_unit}, but for
     {!Lwt.return}[ false]. *)
 end
-[@@coq_plain_module]
-module Data_encoding : sig
-# 1 "../lib_protocol_environment/sigs/v4/data_encoding.mli"
+# 26 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Data_encoding : sig
+# 1 "v4/data_encoding.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3433,9 +3460,11 @@ end
     the JSON encoding. *)
 val check_size : int -> 'a encoding -> 'a encoding
 end
-[@@coq_plain_module]
-module Raw_hashes : sig
-# 1 "../lib_protocol_environment/sigs/v4/raw_hashes.mli"
+# 28 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Raw_hashes : sig
+# 1 "v4/raw_hashes.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3473,9 +3502,11 @@ val sha3_256 : bytes -> bytes
 
 val sha3_512 : bytes -> bytes
 end
-[@@coq_plain_module]
-module Compare : sig
-# 1 "../lib_protocol_environment/sigs/v4/compare.mli"
+# 30 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Compare : sig
+# 1 "v4/compare.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3593,9 +3624,11 @@ module List_lengths : sig
   val equal : 'a list -> 'b list -> bool
 end
 end
-[@@coq_plain_module]
-module Time : sig
-# 1 "../lib_protocol_environment/sigs/v4/time.mli"
+# 32 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Time : sig
+# 1 "v4/time.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3645,9 +3678,11 @@ val rfc_encoding : t Data_encoding.t
 
 val pp_hum : Format.formatter -> t -> unit
 end
-[@@coq_plain_module]
-module TzEndian : sig
-# 1 "../lib_protocol_environment/sigs/v4/tzEndian.mli"
+# 34 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module TzEndian : sig
+# 1 "v4/tzEndian.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3709,9 +3744,11 @@ val get_uint16_string : string -> int -> int
 
 val set_uint16 : bytes -> int -> int -> unit
 end
-[@@coq_plain_module]
-module Bits : sig
-# 1 "../lib_protocol_environment/sigs/v4/bits.mli"
+# 36 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Bits : sig
+# 1 "v4/bits.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3742,9 +3779,11 @@ module Bits : sig
    <= x < 2^k] if [x > 0] and [0] otherwise. *)
 val numbits : int -> int
 end
-[@@coq_plain_module]
-module Equality_witness : sig
-# 1 "../lib_protocol_environment/sigs/v4/equality_witness.mli"
+# 38 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Equality_witness : sig
+# 1 "v4/equality_witness.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3808,9 +3847,12 @@ val eq : 'a t -> 'b t -> ('a, 'b) eq option
 (** [hash id] returns a hash for [id]. *)
 val hash : 'a t -> int
 end
-[@@coq_plain_module]
-module FallbackArray : sig
-# 1 "../lib_protocol_environment/sigs/v4/fallbackArray.mli"
+# 40 "v4.in.ml"
+
+  [@@coq_plain_module]
+
+  module FallbackArray : sig
+# 1 "v4/fallbackArray.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -3882,9 +3924,11 @@ val map : ('a -> 'b) -> 'a t -> 'b t
    [init] on the first iteration. *)
 val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
 end
-[@@coq_plain_module]
-module Error_monad : sig
-# 1 "../lib_protocol_environment/sigs/v4/error_monad.mli"
+# 43 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Error_monad : sig
+# 1 "v4/error_monad.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -4110,10 +4154,13 @@ type shell_tztrace
 
 type 'a shell_tzresult = ('a, shell_tztrace) result
 end
-[@@coq_plain_module]
-open Error_monad
-module Seq : sig
-# 1 "../lib_protocol_environment/sigs/v4/seq.mli"
+# 45 "v4.in.ml"
+ [@@coq_plain_module]
+
+  open Error_monad
+
+  module Seq : sig
+# 1 "v4/seq.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -4236,9 +4283,11 @@ val iter_ep :
     them is. *)
 val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 end
-[@@coq_plain_module]
-module List : sig
-# 1 "../lib_protocol_environment/sigs/v4/list.mli"
+# 49 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module List : sig
+# 1 "v4/list.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5178,9 +5227,11 @@ val exists_ep :
   'a list ->
   (bool, 'error Error_monad.trace) result Lwt.t
 end
-[@@coq_plain_module]
-module Set : sig
-# 1 "../lib_protocol_environment/sigs/v4/set.mli"
+# 51 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Set : sig
+# 1 "v4/set.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5309,9 +5360,11 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t
 end
-[@@coq_plain_module]
-module Map : sig
-# 1 "../lib_protocol_environment/sigs/v4/map.mli"
+# 53 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Map : sig
+# 1 "v4/map.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5461,9 +5514,11 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t
 end
-[@@coq_plain_module]
-module Option : sig
-# 1 "../lib_protocol_environment/sigs/v4/option.mli"
+# 55 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Option : sig
+# 1 "v4/option.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5607,9 +5662,11 @@ val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
 end
-[@@coq_plain_module]
-module Result : sig
-# 1 "../lib_protocol_environment/sigs/v4/result.mli"
+# 57 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Result : sig
+# 1 "v4/result.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5771,9 +5828,11 @@ val catch_f :
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
 end
-[@@coq_plain_module]
-module RPC_arg : sig
-# 1 "../lib_protocol_environment/sigs/v4/RPC_arg.mli"
+# 59 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module RPC_arg : sig
+# 1 "v4/RPC_arg.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5839,9 +5898,11 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-[@@coq_plain_module]
-module RPC_path : sig
-# 1 "../lib_protocol_environment/sigs/v4/RPC_path.mli"
+# 61 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module RPC_path : sig
+# 1 "v4/RPC_path.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5893,9 +5954,11 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-[@@coq_plain_module]
-module RPC_query : sig
-# 1 "../lib_protocol_environment/sigs/v4/RPC_query.mli"
+# 63 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module RPC_query : sig
+# 1 "v4/RPC_query.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -5963,9 +6026,11 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-[@@coq_plain_module]
-module RPC_service : sig
-# 1 "../lib_protocol_environment/sigs/v4/RPC_service.mli"
+# 65 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module RPC_service : sig
+# 1 "v4/RPC_service.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -6038,9 +6103,11 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-[@@coq_plain_module]
-module RPC_answer : sig
-# 1 "../lib_protocol_environment/sigs/v4/RPC_answer.mli"
+# 67 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module RPC_answer : sig
+# 1 "v4/RPC_answer.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -6097,9 +6164,11 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-[@@coq_plain_module]
-module RPC_directory : sig
-# 1 "../lib_protocol_environment/sigs/v4/RPC_directory.mli"
+# 69 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module RPC_directory : sig
+# 1 "v4/RPC_directory.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -6360,9 +6429,11 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-[@@coq_plain_module]
-module Base58 : sig
-# 1 "../lib_protocol_environment/sigs/v4/base58.mli"
+# 71 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Base58 : sig
+# 1 "v4/base58.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -6408,9 +6479,11 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
 
 val decode : string -> data option
 end
-[@@coq_plain_module]
-module S : sig
-# 1 "../lib_protocol_environment/sigs/v4/s.mli"
+# 73 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module S : sig
+# 1 "v4/s.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -6818,9 +6891,11 @@ module type PVSS = sig
   val reconstruct : Clear_share.t list -> int list -> Public_key.t
 end
 end
-[@@coq_plain_module]
-module Blake2B : sig
-# 1 "../lib_protocol_environment/sigs/v4/blake2B.mli"
+# 75 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Blake2B : sig
+# 1 "v4/blake2B.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -6880,9 +6955,11 @@ end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
 end
-[@@coq_plain_module]
-module Bls12_381 : sig
-# 1 "../lib_protocol_environment/sigs/v4/bls12_381.mli"
+# 77 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Bls12_381 : sig
+# 1 "v4/bls12_381.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -6916,9 +6993,11 @@ module G2 : S.CURVE with type Scalar.t = Fr.t
 
 val pairing_check : (G1.t * G2.t) list -> bool
 end
-[@@coq_plain_module]
-module Bls_signature : sig
-# 1 "../lib_protocol_environment/sigs/v4/bls_signature.mli"
+# 79 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Bls_signature : sig
+# 1 "v4/bls_signature.mli"
 (* MIT License
 *
 * Copyright (c) 2020 Danny Willems <be.danny.willems@gmail.com>
@@ -6982,9 +7061,11 @@ val verify : pk -> Bytes.t -> signature -> bool
 
 val aggregate_verify : (pk * Bytes.t) list -> signature -> bool
 end
-[@@coq_plain_module]
-module Ed25519 : sig
-# 1 "../lib_protocol_environment/sigs/v4/ed25519.mli"
+# 81 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Ed25519 : sig
+# 1 "v4/ed25519.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7014,9 +7095,11 @@ module Ed25519 : sig
 
 include S.SIGNATURE with type watermark := bytes
 end
-[@@coq_plain_module]
-module Secp256k1 : sig
-# 1 "../lib_protocol_environment/sigs/v4/secp256k1.mli"
+# 83 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Secp256k1 : sig
+# 1 "v4/secp256k1.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7046,9 +7129,11 @@ module Secp256k1 : sig
 
 include S.SIGNATURE with type watermark := bytes
 end
-[@@coq_plain_module]
-module P256 : sig
-# 1 "../lib_protocol_environment/sigs/v4/p256.mli"
+# 85 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module P256 : sig
+# 1 "v4/p256.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7078,9 +7163,11 @@ module P256 : sig
 
 include S.SIGNATURE with type watermark := bytes
 end
-[@@coq_plain_module]
-module Chain_id : sig
-# 1 "../lib_protocol_environment/sigs/v4/chain_id.mli"
+# 87 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Chain_id : sig
+# 1 "v4/chain_id.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7108,9 +7195,11 @@ module Chain_id : sig
 
 include S.HASH
 end
-[@@coq_plain_module]
-module Signature : sig
-# 1 "../lib_protocol_environment/sigs/v4/signature.mli"
+# 89 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Signature : sig
+# 1 "v4/signature.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7158,9 +7247,11 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-[@@coq_plain_module]
-module Block_hash : sig
-# 1 "../lib_protocol_environment/sigs/v4/block_hash.mli"
+# 91 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Block_hash : sig
+# 1 "v4/block_hash.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7189,9 +7280,11 @@ module Block_hash : sig
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-[@@coq_plain_module]
-module Operation_hash : sig
-# 1 "../lib_protocol_environment/sigs/v4/operation_hash.mli"
+# 93 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Operation_hash : sig
+# 1 "v4/operation_hash.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7220,9 +7313,11 @@ module Operation_hash : sig
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-[@@coq_plain_module]
-module Operation_list_hash : sig
-# 1 "../lib_protocol_environment/sigs/v4/operation_list_hash.mli"
+# 95 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Operation_list_hash : sig
+# 1 "v4/operation_list_hash.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7251,9 +7346,12 @@ module Operation_list_hash : sig
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-[@@coq_plain_module]
-module Operation_list_list_hash : sig
-# 1 "../lib_protocol_environment/sigs/v4/operation_list_list_hash.mli"
+# 97 "v4.in.ml"
+
+  [@@coq_plain_module]
+
+  module Operation_list_list_hash : sig
+# 1 "v4/operation_list_list_hash.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7282,9 +7380,12 @@ module Operation_list_list_hash : sig
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-[@@coq_plain_module]
-module Protocol_hash : sig
-# 1 "../lib_protocol_environment/sigs/v4/protocol_hash.mli"
+# 100 "v4.in.ml"
+
+  [@@coq_plain_module]
+
+  module Protocol_hash : sig
+# 1 "v4/protocol_hash.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7313,9 +7414,11 @@ module Protocol_hash : sig
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-[@@coq_plain_module]
-module Context_hash : sig
-# 1 "../lib_protocol_environment/sigs/v4/context_hash.mli"
+# 103 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Context_hash : sig
+# 1 "v4/context_hash.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7364,9 +7467,11 @@ end
 
 type version = Version.t
 end
-[@@coq_plain_module]
-module Pvss_secp256k1 : sig
-# 1 "../lib_protocol_environment/sigs/v4/pvss_secp256k1.mli"
+# 105 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Pvss_secp256k1 : sig
+# 1 "v4/pvss_secp256k1.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7396,9 +7501,11 @@ module Pvss_secp256k1 : sig
 
 include S.PVSS
 end
-[@@coq_plain_module]
-module Sapling : sig
-# 1 "../lib_protocol_environment/sigs/v4/sapling.mli"
+# 107 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Sapling : sig
+# 1 "v4/sapling.mli"
 (* The MIT License (MIT)
  *
  * Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>
@@ -7525,9 +7632,11 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-[@@coq_plain_module]
-module Timelock : sig
-# 1 "../lib_protocol_environment/sigs/v4/timelock.mli"
+# 109 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Timelock : sig
+# 1 "v4/timelock.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7582,9 +7691,11 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-[@@coq_plain_module]
-module Micheline : sig
-# 1 "../lib_protocol_environment/sigs/v4/micheline.mli"
+# 111 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Micheline : sig
+# 1 "v4/micheline.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7640,9 +7751,11 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-[@@coq_plain_module]
-module Block_header : sig
-# 1 "../lib_protocol_environment/sigs/v4/block_header.mli"
+# 113 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Block_header : sig
+# 1 "v4/block_header.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7689,9 +7802,11 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-[@@coq_plain_module]
-module Fitness : sig
-# 1 "../lib_protocol_environment/sigs/v4/fitness.mli"
+# 115 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Fitness : sig
+# 1 "v4/fitness.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7721,9 +7836,11 @@ module Fitness : sig
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-[@@coq_plain_module]
-module Operation : sig
-# 1 "../lib_protocol_environment/sigs/v4/operation.mli"
+# 117 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Operation : sig
+# 1 "v4/operation.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -7763,9 +7880,11 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-[@@coq_plain_module]
-module Context : sig
-# 1 "../lib_protocol_environment/sigs/v4/context.mli"
+# 119 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Context : sig
+# 1 "v4/context.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -8091,9 +8210,11 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-[@@coq_plain_module]
-module Updater : sig
-# 1 "../lib_protocol_environment/sigs/v4/updater.mli"
+# 121 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module Updater : sig
+# 1 "v4/updater.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -8390,9 +8511,11 @@ end
    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-[@@coq_plain_module]
-module RPC_context : sig
-# 1 "../lib_protocol_environment/sigs/v4/RPC_context.mli"
+# 123 "v4.in.ml"
+ [@@coq_plain_module]
+
+  module RPC_context : sig
+# 1 "v4/RPC_context.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
@@ -8543,5 +8666,6 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-[@@coq_plain_module]
+# 125 "v4.in.ml"
+ [@@coq_plain_module]
 end

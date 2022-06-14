@@ -1749,16 +1749,29 @@ let tezos_protocol_environment_sigs =
     ~deps:[tezos_protocol_environment_sigs_stdlib_compat]
     ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ())
     ~dune:
-      Dune.
-        [
-          include_ "v0.dune.inc";
-          include_ "v1.dune.inc";
-          include_ "v2.dune.inc";
-          include_ "v3.dune.inc";
-          include_ "v4.dune.inc";
-          include_ "v5.dune.inc";
-          include_ "v6.dune.inc";
-        ]
+      (let gen n =
+         Dune.(
+           targets_rule
+             [sf "v%d.ml" n]
+             ~deps:
+               [
+                 Dune.(S (sf "v%d.in.ml" n));
+                 Dune.(H [[S "glob_files"; S (sf "v%n/*.mli" n)]]);
+               ]
+             ~promote:true
+             ~action:
+               [
+                 S "with-stdout-to";
+                 S "%{targets}";
+                 [
+                   S "run";
+                   S "%{dep:../ppinclude/ppinclude.exe}";
+                   S (sf "v%d.in.ml" n);
+                 ];
+               ])
+       in
+       let latest_environment_number = 6 in
+       List.init (latest_environment_number + 1) gen |> Dune.of_list)
 
 let tezos_protocol_environment_structs =
   public_lib
@@ -4726,20 +4739,13 @@ let _get_contracts =
             None);
     ]
 
-let _s_packer =
+let _ppinclude =
   private_exe
-    "s_packer"
-    ~path:"src/lib_protocol_environment/s_packer"
+    "ppinclude"
+    ~path:"src/lib_protocol_environment/ppinclude"
     ~opam:"tezos-protocol-environment"
     ~bisect_ppx:false
-    ~dune:
-      Dune.
-        [
-          install
-            [as_ "s_packer.exe" "s_packer"]
-            ~package:"tezos-protocol-environment"
-            ~section:"libexec";
-        ]
+    ~deps:[compiler_libs_common]
 
 let _tezos_validator_bin =
   public_exe

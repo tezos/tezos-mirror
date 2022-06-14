@@ -12,16 +12,51 @@
   -nostdlib
   -nopervasives))
 
-(include v0.dune.inc)
+(rule
+ (targets v0.ml)
+ (mode promote)
+ (deps v0.in.ml (glob_files v0/*.mli))
+ (action
+  (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v0.in.ml))))
 
-(include v1.dune.inc)
+(rule
+ (targets v1.ml)
+ (mode promote)
+ (deps v1.in.ml (glob_files v1/*.mli))
+ (action
+  (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v1.in.ml))))
 
-(include v2.dune.inc)
+(rule
+ (targets v2.ml)
+ (mode promote)
+ (deps v2.in.ml (glob_files v2/*.mli))
+ (action
+  (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v2.in.ml))))
 
-(include v3.dune.inc)
+(rule
+ (targets v3.ml)
+ (mode promote)
+ (deps v3.in.ml (glob_files v3/*.mli))
+ (action
+  (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v3.in.ml))))
 
-(include v4.dune.inc)
+(rule
+ (targets v4.ml)
+ (mode promote)
+ (deps v4.in.ml (glob_files v4/*.mli))
+ (action
+  (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v4.in.ml))))
 
-(include v5.dune.inc)
+(rule
+ (targets v5.ml)
+ (mode promote)
+ (deps v5.in.ml (glob_files v5/*.mli))
+ (action
+  (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v5.in.ml))))
 
-(include v6.dune.inc)
+(rule
+ (targets v6.ml)
+ (mode promote)
+ (deps v6.in.ml (glob_files v6/*.mli))
+ (action
+  (with-stdout-to %{targets} (run %{dep:../ppinclude/ppinclude.exe} v6.in.ml))))
