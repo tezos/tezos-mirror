@@ -763,8 +763,8 @@ val private_exes : string list maker
 
 (** Register and return an internal test.
 
-    - [runtest]: if true, setup runtest aliases for the given
-      test. If unspecified, [runtest] is set true.
+    - [alias]: if non-empty, an alias is set up for the given test, named [alias].
+      Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
 
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.
@@ -775,17 +775,44 @@ val private_exes : string list maker
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
 val test :
+  ?alias:string ->
   ?dep_files:string list ->
   ?dep_globs:string list ->
-  ?runtest:bool ->
   string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
 val tests :
+  ?alias:string ->
   ?dep_files:string list ->
   ?dep_globs:string list ->
-  ?runtest:bool ->
   string list maker
+
+(** Register a Tezt test.
+
+    Usage: [tezt module_names]
+
+    This declares:
+    - a library [PACKAGE_tezt_lib] in [path] where [PACKAGE] is the name of the
+      opam package denoted by [opam];
+    - an executable [main] in [path] that links with [PACKAGE_tezt_lib]
+      and runs [Tezt.Test.run].
+
+    [module_names] is the list of modules to link in [PACKAGE_tezt_lib].
+    Those should be files in [path] that call [Tezt.Test.register].
+
+    Note that a wrapper in [main.ml] adds a dependency to the [tezt] library
+    and [-open]s modules [Tezt] and [Tezt.Base] when compiling [module_names].
+
+    Additionally, the library [PACKAGE_tezt_lib] is also linked in [tezt/tests/main.exe]
+    so that this executable can be used to run all tests with auto-balancing
+    and other Tezt features. *)
+val tezt :
+  opam:string ->
+  path:string ->
+  ?deps:target list ->
+  ?dep_globs:string list ->
+  string list ->
+  unit
 
 (** Make an external vendored library, for use in internal target dependencies.
 
@@ -796,9 +823,9 @@ val tests :
 
     [npm_deps]: npm dependencies used when targeting JavaScript.
 
-    [released_on_opam]: whether the library is available on the upstream opam-repository (default true).
-    In case the lib is not available on opam, tezos packages depending on it won't be installable on opam. 
- *)
+    [released_on_opam]: whether the library is available on the upstream opam-repository
+    (default true). In case the lib is not available on opam, tezos packages depending
+    on it won't be installable on opam. *)
 val vendored_lib :
   ?released_on_opam:bool ->
   ?main_module:string ->
@@ -952,8 +979,11 @@ val name_for_errors : target -> string
 (** Generate dune and opam files.
 
     Call this after you declared all your targets with functions such as
-    [public_lib], [test], etc. *)
-val generate : unit -> unit
+    [public_lib], [test], etc.
+
+    [make_tezt_exe] is given the list of libraries that register Tezt tests
+    and shall create a test executable that links all of them. *)
+val generate : make_tezt_exe:(target list -> target) -> unit
 
 (** Run various checks.
 

@@ -158,7 +158,11 @@ let test_context () =
 let run_script {filename; amount; storage; parameter} () =
   let get_log, logger = logger () in
   let script =
-    Contract_helpers.read_file @@ Base.(("contracts" // filename) ^ ".tz")
+    let filename =
+      project_root // Filename.dirname __FILE__ // "contracts"
+      // (filename ^ ".tz")
+    in
+    Contract_helpers.read_file filename
   in
   let* ctxt = test_context () in
   let step_constants =
@@ -195,11 +199,22 @@ let fail_on_error f () =
   | Ok () -> return ()
   | Error e -> Test.fail "%a" Error_monad.pp_print_trace e
 
+(* Make sure that after a snapshot the snapshotted version of the test
+   has a different [~title], because all tests are linked in [tezt/tests/main.exe]. *)
+let protocol =
+  match __FILE__ =~* rex "^src/proto_([0-9a-zA-Z_]*)/" with
+  | None ->
+      Stdlib.failwith ("failed to extract protocol name from path: " ^ __FILE__)
+  | Some name -> name
+
 let register_script contract =
+  (* [~title] must be unique across the codebase, so we prefix it with the protocol name.
+     [~file] however is better kept the same across protocols to simplify snapshotting. *)
   Regression.register
     ~__FILE__
-    ~title:contract.filename
+    ~title:(protocol ^ ": " ^ contract.filename)
     ~tags:["protocol"; "regression"; "logging"]
+    ~file:contract.filename
     (fail_on_error @@ run_script contract)
 
 (* These tests should always cover:
@@ -210,7 +225,7 @@ let register_script contract =
       what is being logged and what is not.
    We are not concerned with gas, because that's kept track of by regular regression
    tests. Actually, gas is unaccounted for in all the tests in this module. *)
-let register () =
+let () =
   Array.iter
     register_script
     [|

@@ -315,10 +315,10 @@ module Dune = struct
 
   let run_exe exe_name args = run ("%{exe:" ^ exe_name ^ ".exe}") args
 
-  let runtest_js ~package ~dep_files name =
+  let runtest_js ?(alias = "runtest_js") ?package ~dep_files name =
     alias_rule
-      "runtest_js"
-      ~package
+      alias
+      ?package
       ~deps:dep_files
       ~action:[S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")]
 
@@ -326,15 +326,15 @@ module Dune = struct
 
   let glob_files expr = [S "glob_files"; S expr]
 
-  let runtest ~package ~dep_files ~dep_globs name =
+  let runtest ?(alias = "runtest") ?package ~dep_files ~dep_globs name =
     let deps_dune =
       let files = List.map (fun s -> S s) dep_files in
       let globs = List.map glob_files dep_globs in
       match files @ globs with [] -> None | deps -> Some (of_list deps)
     in
     alias_rule
-      "runtest"
-      ~package
+      alias
+      ?package
       ?deps_dune
       ~action:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")]
 
@@ -875,7 +875,10 @@ module Target = struct
     | Private_library of string
     | Public_executable of full_name Ne_list.t
     | Private_executable of string Ne_list.t
-    | Test_executable of {names : string Ne_list.t; run : bool}
+    | Test_executable of {
+        names : string Ne_list.t;
+        runtest_alias : string option;
+      }
 
   type preprocessor_dep = File of string
 
@@ -1150,7 +1153,7 @@ module Target = struct
       match opam with
       | Some "" -> (
           match kind with
-          | Test_executable {names = name, _; run = true; _} ->
+          | Test_executable {names = name, _; runtest_alias = Some _; _} ->
               invalid_argf
                 "for targets which provide test executables such as %S, you \
                  must specify a non-empty ~opam or have it not run by default \
@@ -1165,7 +1168,7 @@ module Target = struct
                 "for targets which provide public executables such as %S, you \
                  cannot have ~opam set to empty string (\"\")"
                 public_name
-          | Test_executable {run = false; _}
+          | Test_executable {runtest_alias = None; _}
           | Private_library _ | Private_executable _ ->
               None)
       | Some opam as x ->
@@ -1287,27 +1290,33 @@ module Target = struct
         | Some modes -> List.mem Dune.Native modes
       in
       match (kind, opam, dep_files) with
-      | Test_executable {names; run = true}, Some package, _ ->
+      | Test_executable {names; runtest_alias = Some alias}, package, _ ->
           let runtest_js_rules =
             if run_js then
               List.map
-                (fun name -> Dune.(runtest_js ~dep_files ~package name))
+                (fun name ->
+                  Dune.runtest_js
+                    ~alias:(alias ^ "_js")
+                    ~dep_files
+                    ?package
+                    name)
                 (Ne_list.to_list names)
             else []
           in
           let runtest_rules =
             if run_native then
               List.map
-                (fun name -> Dune.(runtest ~dep_files ~dep_globs ~package name))
+                (fun name ->
+                  Dune.runtest ~alias ~dep_files ~dep_globs ?package name)
                 (Ne_list.to_list names)
             else []
           in
           runtest_rules @ runtest_js_rules
-      | Test_executable {names = name, _; run = false; _}, _, _ :: _ ->
+      | Test_executable {names = name, _; runtest_alias = None}, _, _ :: _ ->
           invalid_argf
-            "for targets which provide test executables such as %S, \
-             [~dep_files] is only meaningful for runtest alias. It cannot be \
-             used together with [runtest:false]"
+            "for targets which provide test executables such as %S, ~dep_files \
+             is only meaningful for the runtest alias. It cannot be used with \
+             no alias, i.e. ~alias:\"\"."
             name
       | _, _, _ :: _ -> assert false
       | _ -> []
@@ -1406,15 +1415,17 @@ module Target = struct
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?dep_files ?dep_globs ?(runtest = true) =
+  let test ?(alias = "runtest") ?dep_files ?dep_globs =
+    let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs @@ fun test_name ->
-    Test_executable {names = (test_name, []); run = runtest}
+    Test_executable {names = (test_name, []); runtest_alias}
 
-  let tests ?dep_files ?dep_globs ?(runtest = true) =
+  let tests ?(alias = "runtest") ?dep_files ?dep_globs =
+    let runtest_alias = if alias = "" then None else Some alias in
     internal ?dep_files ?dep_globs @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
-    | head :: tail -> Test_executable {names = (head, tail); run = runtest}
+    | head :: tail -> Test_executable {names = (head, tail); runtest_alias}
 
   let vendored_lib ?(released_on_opam = true) ?main_module
       ?(js_compatible = false) ?(npm_deps = []) name =
@@ -1524,6 +1535,71 @@ let if_some = function None -> None | Some x -> x
 let if_ condition target = if condition then target else None
 
 type release = {version : string; url : Opam.url}
+
+type tezt_target = {
+  opam : string;
+  deps : target list;
+  dep_globs : string list;
+  modules : string list;
+}
+
+let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
+
+let tezt ~opam ~path ?(deps = []) ?(dep_globs = []) modules =
+  if String_map.mem path !tezt_targets_by_path then
+    invalid_arg
+      ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
+  let tezt_target = {opam; deps; dep_globs; modules} in
+  tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
+
+let register_tezt_targets ~make_tezt_exe =
+  let tezt_test_libs = ref [] in
+  let register_path path {opam; deps; dep_globs; modules} =
+    let path_with_underscores =
+      String.map (function '-' | '/' -> '_' | c -> c) path
+    in
+    let lib =
+      (* [linkall] is used to ensure that the test executable is linked with
+         [module_name] and [tezt]. *)
+      Target.private_lib
+        (path_with_underscores ^ "_tezt_lib")
+        ~path
+        ~opam:""
+        ~deps
+        ~modules
+        ~linkall:true
+    in
+    tezt_test_libs := lib :: !tezt_test_libs ;
+    let exe_name = "main" in
+    let _exe =
+      (* Alias is "runtezt" and not "runtest" to make sure that the test is
+         not run in the CI twice (once with [dune @src/.../runtest] and once
+         with [dune exec tezt/tests/main.exe]). *)
+      Target.test
+        exe_name
+        ~alias:"runtezt"
+        ~path
+        ~opam
+        ~deps:[lib]
+        ~dep_globs
+        ~modules:[exe_name]
+        ~dune:
+          Dune.
+            [
+              targets_rule
+                [exe_name ^ ".ml"]
+                ~action:
+                  [
+                    S "with-stdout-to";
+                    S "%{targets}";
+                    [S "echo"; S "let () = Tezt.Test.run ()"];
+                  ];
+            ]
+    in
+    ()
+  in
+  String_map.iter register_path !tezt_targets_by_path ;
+  make_tezt_exe !tezt_test_libs
 
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
@@ -1720,8 +1796,8 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     | Test_executable _, Some _ ->
         (* private executable can't have a package stanza, but we still want the manifest to know about the package *)
         None
-    | Test_executable {run = false; _}, None -> None
-    | Test_executable {run = true; _}, None ->
+    | Test_executable {runtest_alias = None; _}, None -> None
+    | Test_executable {runtest_alias = Some _; _}, None ->
         (* Prevented by [Target.internal]. *)
         assert false
   in
@@ -2033,23 +2109,55 @@ let generate_opam ?release for_package (internals : Target.internal list) :
         with_test = Never;
       }
     in
-    let runtest with_test : Opam.build_instruction list =
-      match with_test with
-      | Never -> []
-      | _ ->
-          [
-            {
-              command =
-                [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
-              with_test;
-            };
-          ]
-    in
     let with_test =
       match internals with [] -> Never | head :: _ -> head.opam_with_test
     in
-    [{Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = Never}; build]
-    @ runtest with_test
+    let runtests =
+      let get_alias (internal : Target.internal) =
+        match internal.kind with
+        | Test_executable {runtest_alias; _} -> runtest_alias
+        | Public_library _ | Private_library _ | Public_executable _
+        | Private_executable _ ->
+            None
+      in
+      let make_runtest alias : Opam.build_instruction list =
+        match (with_test, alias) with
+        | Never, _ -> []
+        | _, "runtest" ->
+            (* Special case: Dune has a special command to run this alias. *)
+            [
+              {
+                command =
+                  [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
+                with_test;
+              };
+            ]
+        | _ ->
+            [
+              {
+                command =
+                  [
+                    S "dune";
+                    S "build";
+                    S ("@" ^ alias);
+                    S "-p";
+                    A "name";
+                    S "-j";
+                    A "jobs";
+                  ];
+                with_test;
+              };
+            ]
+      in
+      internals |> List.filter_map get_alias
+      (* We have to add [runtest] because some targets define the [runtest]
+         alias manually and use [~alias:""]. *)
+      |> (fun l -> "runtest" :: l)
+      |> String_set.of_list |> String_set.elements
+      |> List.concat_map make_runtest
+    in
+    {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = Never}
+    :: build :: runtests
   in
   let licenses =
     match
@@ -2678,9 +2786,10 @@ let generate_opam_ci () =
            delayed_by
            package_name)
 
-let generate () =
+let generate ~make_tezt_exe =
   Printexc.record_backtrace true ;
   try
+    register_tezt_targets ~make_tezt_exe ;
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;

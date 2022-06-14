@@ -207,3 +207,16 @@ module String_set = struct
            (fun fmt -> Format.fprintf fmt "%S"))
         (elements set)
 end
+
+let project_root =
+  match Sys.getenv_opt "DUNE_SOURCEROOT" with
+  | Some x -> x
+  | None -> (
+      match Sys.getenv_opt "PWD" with
+      | Some x -> x
+      | None ->
+          (* For some reason, under [dune runtest], [PWD] and
+             [getcwd] have different values. [getcwd] is in
+             [_build/default], and [PWD] is where [dune runtest] was
+             executed, which is closer to what we want. *)
+          Sys.getcwd ())

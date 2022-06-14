@@ -24,6 +24,12 @@
 (*****************************************************************************)
 
 open Manifest
+
+let tezt_without_tezt_lib_dependency = tezt
+
+(* Prevent using [tezt] until we define [tezt_lib]. *)
+let tezt = () [@@warning "-unused-value-declaration"]
+
 module V = Version
 
 let sf = Printf.sprintf
@@ -1276,7 +1282,7 @@ let _tezos_tooling_opam_file_format =
 let _tezos_tooling_opam_lint =
   test
     "opam_lint"
-    ~runtest:false
+    ~alias:""
     ~path:"src/tooling/opam-lint"
     ~opam:"tezos-tooling"
     ~deps:[_tezos_tooling_opam_file_format; unix]
@@ -1332,7 +1338,7 @@ let _tezos_p2p_tests =
         astring;
       ]
     ~linkall:true
-    ~runtest:false
+    ~alias:""
     ~dune:
       Dune.(
         (* At the termination of the tests, or if an unexpected
@@ -2645,7 +2651,7 @@ let tezos_shell_benchmarks =
       ]
     ~linkall:true
 
-let tezt =
+let tezt_lib =
   public_lib
     "tezt"
     ~path:"tezt/lib"
@@ -2655,13 +2661,21 @@ let tezt =
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm]
 
+let tezt ~opam ~path ?(deps = []) ?dep_globs l =
+  tezt_without_tezt_lib_dependency
+    ~opam
+    ~path
+    ~deps:((tezt_lib |> open_ |> open_ ~m:"Base") :: deps)
+    ?dep_globs
+    l
+
 let tezt_performance_regression =
   public_lib
     "tezt-performance-regression"
     ~path:"tezt/lib_performance_regression"
     ~synopsis:"Performance regression test framework based on Tezt"
     ~bisect_ppx:false
-    ~deps:[tezt |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
+    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
 
 let tezt_tezos =
   public_lib
@@ -2671,7 +2685,7 @@ let tezt_tezos =
     ~bisect_ppx:false
     ~deps:
       [
-        tezt |> open_ |> open_ ~m:"Base";
+        tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         uri;
         hex;
@@ -2689,7 +2703,7 @@ let _tezt_self_tests =
     ~synopsis:"Tests for the Tezos test framework based on Tezt"
     ~bisect_ppx:false
     ~static:false
-    ~deps:[tezt |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
+    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
     ~cram:true
     ~dune:
       Dune.
@@ -2708,7 +2722,7 @@ let tezos_openapi =
     ~synopsis:
       "Tezos: a library for querying RPCs and converting into the OpenAPI \
        format"
-    ~deps:[ezjsonm; json_data_encoding; tezt]
+    ~deps:[ezjsonm; json_data_encoding; tezt_lib]
 
 let _tezos_protocol_compiler_bin =
   public_exe
@@ -3167,7 +3181,7 @@ end = struct
           "main"
           ~path:(path // "lib_protocol/test/unit")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
-          ~runtest:false
+          ~alias:""
           ~deps:
             [
               tezos_base |> open_ ~m:"TzPervasives"
@@ -3196,23 +3210,28 @@ end = struct
       in
       let _regresssion =
         if N.(number >= 014) then
-          Some
-            (test
-               "main"
-               ~path:(path // "lib_protocol/test/regression")
-               ~opam:(sf "tezos-protocol-%s-tests" name_dash)
-               ~deps:
-                 [
-                   tezt;
-                   tezos_base |> open_ ~m:"TzPervasives";
-                   main |> open_;
-                   client |> if_some |> open_;
-                   plugin |> if_some |> open_;
-                   test_helpers |> if_some |> open_;
-                   tezos_micheline |> open_;
-                 ]
-               ~dep_globs:["contracts/*"; "tezt/_regressions/*"])
-        else None
+          (* About [~dep_globs]: this is only needed so that dune re-runs the tests
+             if those files are modified. Dune will also copy those files in [_build],
+             but the test uses absolute paths to find those files
+             (thanks to [DUNE_SOURCEROOT] and [Filename.dirname __FILE__]),
+             so those copies are not actually used. This is needed so that the test
+             can be run either with [dune build @runtezt],
+             with [dune exec src/proto_alpha/lib_protocol/test/regression/main.exe],
+             or with [dune exec tezt/tests/main.exe -- -f test_logging.ml]. *)
+          tezt
+            ["test_logging"]
+            ~path:(path // "lib_protocol/test/regression")
+            ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+            ~deps:
+              [
+                tezos_base |> open_ ~m:"TzPervasives";
+                main |> open_;
+                client |> if_some |> open_;
+                plugin |> if_some |> open_;
+                test_helpers |> if_some |> open_;
+                tezos_micheline |> open_;
+              ]
+            ~dep_globs:["contracts/*.tz"; "expected/test_logging.ml/*.out"]
       in
       ()
 
@@ -3936,7 +3955,7 @@ include Tezos_raw_protocol_%s.Main
       some_if (active && N.(number >= 013)) @@ fun () ->
       test
         "tenderbrute_main"
-        ~runtest:false
+        ~alias:""
         ~path:(path // "lib_delegate/test/tenderbrute")
         ~opam:(sf "tezos-baking-%s" name_dash)
         ~deps:
@@ -4347,7 +4366,7 @@ include Tezos_raw_protocol_%s.Main
             alcotest_lwt;
             prbnmcn_stats;
           ]
-        ~runtest:false
+        ~alias:""
         ~dune:
           Dune.
             [
@@ -4519,7 +4538,7 @@ let _tezos_store_tests =
         tezos_test_helpers;
         tezos_test_helpers_extra;
       ]
-    ~runtest:false
+    ~alias:""
     ~dune:
       (* [test_slow_manual] is a very long test, running a huge
          combination of tests that are useful for local testing for a
@@ -4990,7 +5009,7 @@ let _tezos_tps_evaluation =
         Protocol.(client_commands_exn alpha);
         tezos_client_base_unix;
         Protocol.(main alpha);
-        tezt |> open_ |> open_ ~m:"Base";
+        tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
         tezt_performance_regression |> open_;
         uri;
@@ -5056,12 +5075,29 @@ let exclude filename =
   | "tezt" :: "records" :: _ -> true
   | "tezt" :: "remote_tests" :: _ -> true
   | "tezt" :: "snoop" :: _ -> true
-  | "tezt" :: "tests" :: _ -> true
   | "tezt" :: "vesting_contract_test" :: _ -> true
   | _ -> false
 
-(* Generate dune and opam files. *)
-let () = generate ()
+let () =
+  (* [make_tezt_exe] makes the global executable that contains all tests.
+     [generate] gives it the list of libraries that register Tezt tests
+     so that it can link all of them. *)
+  let make_tezt_exe test_libs =
+    let deps =
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        str;
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        data_encoding;
+        tezos_base;
+        tezos_base_unix;
+        tezos_stdlib_unix;
+        Protocol.(main alpha);
+      ]
+    in
+    test "main" ~alias:"" ~path:"tezt/tests" ~opam:"" ~deps:(deps @ test_libs)
+  in
+  generate ~make_tezt_exe
 
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =

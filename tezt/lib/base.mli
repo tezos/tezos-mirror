@@ -176,3 +176,10 @@ module String_set : sig
       and the result is surrounded by braces. *)
   val pp : Format.formatter -> t -> unit
 end
+
+(** {2 Environment} *)
+
+(** Path to the root of the project.
+
+    This is [DUNE_SOURCEROOT] is defined, [PWD] otherwise. *)
+val project_root : string
