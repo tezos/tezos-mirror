@@ -7,10 +7,10 @@ BRANCH ?= master
 		-J vendors/grafonnet-lib/grafonnet \
 		--ext-str branch="$(BRANCH)" \
 		src/$@ \
-			> output/$*.generated
+			> output/$*.json
 
 clean:
-	rm output/*.generated
+	rm output/*.json
 
 fmt:
 	jsonnetfmt -i src/*.jsonnet

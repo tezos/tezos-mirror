@@ -6,34 +6,48 @@ It relies on the metrics exposed by the Octez Tezos node, see http://tezos.gitla
 
 To reflect the fact that various networks or protocol may expose different metrics, the branches are structured such that:
 
-- master: compatible with mainnet and its current protocol
-- master-PROTO_NAME: (not always available) compatible with the aforementioned protocol, such as master-ithaca.
+- `master`: compatible with mainnet and its current protocol
+- `master-<proto_name>`: (not always available) compatible with the aforementioned protocol, such as master-ithaca
 
-To maintain the backward compatibility with the `tezos-metrics` tool previously used to query metrics, a legacy branch is proposed. However, this branch is deprecated and not maintained anymore:
+To maintain the backward compatibility with the `tezos-metrics` tool previously used to query metrics,
+a legacy branch is proposed. However, this branch is deprecated and not maintained anymore:
+
 - legacy-tezos-metrics-ithaca: compatible with the former version of Grafazos which was based on `tezos-metrics`
 
-### Resources:
+### Resources
 
 - Grafonnet: https://github.com/grafana/grafonnet-lib
 
 - Jsonnet: https://jsonnet.org/
 
-### Tools:
+### Tools
 
 - Emacs mode: https://github.com/mgyucht/jsonnet-mode
 
-### Run:
+### Build
 
-First, run
-```
+Initialize the git submodule `grafonnet-lib`
+
+```sh
 git submodule init
 git submodule update
 ```
 
-To create a dashboard with for branch "master" in the title (default)
+To create a dashboard for branch `master` in the title (default)
 
-    make
+```sh
+make
+```
 
 To create a dashboard for a different branch
 
-    BRANCH=foo make
+```sh
+BRANCH=foo make
+```
+
+### Distribution
+
+Grafana dashboards (JSON files) are automatically released on git tags to [GitLab packages of this project](https://gitlab.com/nomadic-labs/grafazos/-/packages).
+
+They are also manually released to [Grafana.com](https://grafana.com/grafana/dashboards/)
+so they can insealy imported via ID.

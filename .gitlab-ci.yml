@@ -1,0 +1,37 @@
+---
+image: alpine:3.16
+
+default:
+  interruptible: true
+
+stages:
+  - build
+  - release
+
+build:
+  stage: build
+  before_script:
+    - apk add git make jsonnet
+    - git submodule init
+    - git submodule update
+  script:
+    - make
+  artifacts:
+    paths:
+      - "output/*.json"
+    expire_in: 2 weeks
+    when: always
+  only:
+    - master
+    - merge_requests
+    - tags
+
+release:
+  stage: release
+  dependencies: [build]
+  before_script:
+    - apk add curl
+  script:
+    - ./.gitlab/create_gitlab_package.sh
+  only:
+    - tags
