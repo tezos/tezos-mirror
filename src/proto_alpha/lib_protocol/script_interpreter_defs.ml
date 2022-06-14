@@ -561,18 +561,8 @@ let transfer (type t tc) (ctxt, sc) gas amount location
   | Typed_implicit destination ->
       let Unit_t = parameters_ty in
       let () = parameters in
-      let unparsed_parameters = Script.unit in
       return
-        ( Transaction_to_implicit
-            {
-              destination;
-              amount;
-              entrypoint;
-              location;
-              parameters_ty;
-              parameters;
-              unparsed_parameters;
-            },
+        ( Transaction_to_implicit {destination; amount; entrypoint; location},
           ctxt )
   | Typed_originated destination ->
       unparse_data ctxt Optimized parameters_ty parameters

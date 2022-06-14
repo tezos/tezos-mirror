@@ -1352,9 +1352,6 @@ and 'kind internal_operation_contents =
       amount : Tez.tez;
       entrypoint : Entrypoint.t;
       location : Script.location;
-      parameters_ty : ('a, _) ty;
-      parameters : 'a;
-      unparsed_parameters : Script.expr;
     }
       -> Kind.transaction internal_operation_contents
   | Transaction_to_smart_contract : {

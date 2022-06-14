@@ -1479,18 +1479,10 @@ and ('input, 'output) view_signature =
 
 and 'kind internal_operation_contents =
   | Transaction_to_implicit : {
-      (* The [unparsed_parameters] field may seem useless since we have
-         access to a typed version of the field (with [parameters_ty] and
-         [parameters]), but we keep it so that we do not have to unparse the
-         typed version in order to produce the receipt
-         ([Apply_internal_results.internal_operation_contents]). *)
       destination : Signature.Public_key_hash.t;
       amount : Tez.tez;
       entrypoint : Entrypoint.t;
       location : Script.location;
-      parameters_ty : ('a, _) ty;
-      parameters : 'a;
-      unparsed_parameters : Script.expr;
     }
       -> Kind.transaction internal_operation_contents
   | Transaction_to_smart_contract : {
