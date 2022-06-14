@@ -194,9 +194,10 @@ module Dune = struct
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
-      ?(virtual_modules = Stdlib.List.[]) ?implements ?(wrapped = true) ?modules
-      ?modules_without_implementation ?modes ?foreign_stubs ?c_library_flags
-      ?(private_modules = Stdlib.List.[]) ?js_of_ocaml (names : string list) =
+      ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
+      ?(wrapped = true) ?modules ?modules_without_implementation ?modes
+      ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
+      ?js_of_ocaml (names : string list) =
     [
       V
         [
@@ -263,6 +264,8 @@ module Dune = struct
           (match virtual_modules with
           | [] -> E
           | _ -> S "virtual_modules" :: of_atom_list virtual_modules);
+          opt default_implementation (fun x ->
+              [S "default_implementation"; S x]);
           opt modules (fun x -> S "modules" :: x);
           opt modules_without_implementation (fun x ->
               S "modules_without_implementation" :: x);
@@ -935,6 +938,7 @@ module Target = struct
     synopsis : string option;
     description : string option;
     virtual_modules : string list;
+    default_implementation : string option;
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
@@ -1085,6 +1089,23 @@ module Target = struct
     ?description:string ->
     ?time_measurement_ppx:bool ->
     ?virtual_modules:string list ->
+    (* A note on [default_implementation]. In the .mli,  this argument is
+       given type [string] instead of [target]. This is because one can't
+       have mutually recursive target definitions, as in:
+
+       let rec virtual_package =
+          ... ~virtual_modules:"Foo" ~default_implementation:implem
+       and implem = ... ~implements:virtual_package
+
+       A solution would be to declare the [default_implementation] in the
+       in [default]:
+
+       let virtual_package = ... ~virtual_modules:"Foo"
+       let implem = ... ~implements_default:virtual_package
+
+       But that would be more complex to implement.
+    *)
+    ?default_implementation:string ->
     ?wrapped:bool ->
     ?cram:bool ->
     ?license:string ->
@@ -1134,8 +1155,8 @@ module Target = struct
       ?opam ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(virtual_modules = []) ?(wrapped = true) ?(cram = false) ?license
-      ?(extra_authors = []) ~path names =
+      ?(virtual_modules = []) ?default_implementation ?(wrapped = true)
+      ?(cram = false) ?license ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1384,6 +1405,7 @@ module Target = struct
         description;
         npm_deps;
         virtual_modules;
+        default_implementation;
         wrapped;
         cram;
         license;
@@ -1880,6 +1902,7 @@ let generate_dune (internal : Target.internal) =
       ~preprocess
       ~preprocessor_deps
       ~virtual_modules:internal.virtual_modules
+      ?default_implementation:internal.default_implementation
       ?implements:(Option.map get_virtual_target_name internal.implements)
       ~wrapped:internal.wrapped
       ?modules

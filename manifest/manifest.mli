@@ -631,6 +631,11 @@ type with_test = Always | Never | Only_on_64_arch
       with an [.mli]. This turns the target into a virtual target.
       Other targets can declare that they implement those modules with [implements].
 
+    - [default_implementation] specifies a [(default_implementation)] stanza for the
+      [dune] target. Note that this argument has type [string] instead of type [target].
+      The user should give the name of e.g. the public library that serves as default
+      implementation.
+
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -674,6 +679,7 @@ type 'a maker =
   ?description:string ->
   ?time_measurement_ppx:bool ->
   ?virtual_modules:string list ->
+  ?default_implementation:string ->
   ?wrapped:bool ->
   ?cram:bool ->
   ?license:string ->
