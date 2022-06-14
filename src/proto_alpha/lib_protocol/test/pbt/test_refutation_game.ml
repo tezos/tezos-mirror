@@ -574,25 +574,16 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     in
     let* outcome =
       let rec loop game refuter_move =
-        let player = if refuter_move then "refuter" else "defender" in
         let* move =
           if refuter_move then refuter_client.next_move game
           else defender_client.next_move game
         in
         match move with
-        | None ->
-            Printf.eprintf "@[No move from %s@]" player ;
-            return (if refuter_move then Defender_wins else Refuter_wins)
+        | None -> return (if refuter_move then Defender_wins else Refuter_wins)
         | Some move -> (
-            Format.eprintf
-              "@[Move from %s is %a@]@."
-              player
-              Game.pp_refutation
-              move ;
             let* game_result = Game.play game move in
             match game_result with
             | Either.Left outcome ->
-                Format.eprintf "@[%a@]@." Game.pp_outcome outcome ;
                 return
                   (loser_to_outcome_for_tests outcome.loser alice_is_refuter)
             | Either.Right game -> loop game (not refuter_move))
