@@ -46,6 +46,7 @@ class TestContractOpcodes:
                 '{ 1 ; 2 ; 3 ; 0 }',
                 '{ 1 ; 3 ; 5 ; 3 }',
             ),
+            ('emit.tz', 'Unit', 'Unit', 'Unit'),
             # Reverse a list
             ('reverse.tz', '{""}', '{}', '{}'),
             (

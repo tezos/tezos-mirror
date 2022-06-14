@@ -128,6 +128,7 @@ let () =
   Client_run_view.register ~protocols:[Alpha; Jakarta] ;
   Multinode_snapshot.register ~protocols:[Alpha] ;
   Config.register () ;
+  Events.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since K. *)
   Op_validation.register ~protocols ;
   (* Test.run () should be the last statement, don't register afterwards! *)

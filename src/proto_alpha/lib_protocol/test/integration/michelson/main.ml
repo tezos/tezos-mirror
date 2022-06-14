@@ -53,5 +53,6 @@ let () =
       ("script cache", Test_script_cache.tests);
       ("block time instructions", Test_block_time_instructions.tests);
       ("annotations", Test_annotations.tests);
+      ("event logging", Test_contract_event.tests);
     ]
   |> Lwt_main.run
