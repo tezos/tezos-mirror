@@ -150,16 +150,12 @@ let test_poorly_distributed_dissection () =
     if i = size - 1 then (None, tick_of_int_exn 10000)
     else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
   in
+  let* ctxt =
+    T.lift @@ R.start_game ctxt rollup ~player:refuter ~opponent:defender
+  in
   let move = init_refutation ~init_tick start_hash in
   let* outcome, _ctxt =
-    T.lift
-    @@ R.game_move
-         ctxt
-         rollup
-         ~player:refuter
-         ~opponent:defender
-         move
-         ~is_opening_move:true
+    T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move
   in
   let expected_reason =
     "Maximum tick increment in dissection must be less than half total \
@@ -176,19 +172,15 @@ let test_single_valid_game_move () =
         else if i = 31 then (None, tick_of_int_exn 10000)
         else (Some (hash_int i), tick_of_int_exn (i * 200)))
   in
+  let* ctxt =
+    T.lift @@ R.start_game ctxt rollup ~player:refuter ~opponent:defender
+  in
   let move =
     Sc_rollup_game_repr.
       {choice = Sc_rollup_tick_repr.initial; step = Dissection dissection}
   in
   let* outcome, _ctxt =
-    T.lift
-    @@ R.game_move
-         ctxt
-         rollup
-         ~player:refuter
-         ~opponent:defender
-         move
-         ~is_opening_move:true
+    T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move
   in
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_outcome outcome
 
@@ -271,15 +263,9 @@ let staker_injectivity_gen ~refuter2_plays =
     let* ctxt = publish_commitment ctxt refuter2 commit4 in
     (* Start the games. [refuter2] plays only if [refuter2_plays] is [true]. *)
     let game_move ctxt ~player ~opponent =
+      let* ctxt = T.lift @@ R.start_game ctxt rollup ~player ~opponent in
       let+ _, ctxt =
-        T.lift
-        @@ R.game_move
-             ctxt
-             rollup
-             ~player
-             ~opponent
-             refutation
-             ~is_opening_move:true
+        T.lift @@ R.game_move ctxt rollup ~player ~opponent refutation
       in
       ctxt
     in

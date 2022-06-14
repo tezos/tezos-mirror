@@ -422,8 +422,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup_repr.t;
       opponent : Sc_rollup_repr.Staker.t;
-      refutation : Sc_rollup_game_repr.refutation;
-      is_opening_move : bool;
+      refutation : Sc_rollup_game_repr.refutation option;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {
@@ -1074,22 +1073,22 @@ module Encoding = struct
           tag = sc_rollup_operation_refute_tag;
           name = "sc_rollup_refute";
           encoding =
-            obj4
+            obj3
               (req "rollup" Sc_rollup_repr.encoding)
               (req "opponent" Sc_rollup_repr.Staker.encoding)
-              (req "refutation" Sc_rollup_game_repr.refutation_encoding)
-              (req "is_opening_move" bool);
+              (req
+                 "refutation"
+                 (option Sc_rollup_game_repr.refutation_encoding));
           select =
             (function
             | Manager (Sc_rollup_refute _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Sc_rollup_refute {rollup; opponent; refutation; is_opening_move}
-              ->
-                (rollup, opponent, refutation, is_opening_move));
+            | Sc_rollup_refute {rollup; opponent; refutation} ->
+                (rollup, opponent, refutation));
           inj =
-            (fun (rollup, opponent, refutation, is_opening_move) ->
-              Sc_rollup_refute {rollup; opponent; refutation; is_opening_move});
+            (fun (rollup, opponent, refutation) ->
+              Sc_rollup_refute {rollup; opponent; refutation});
         }
 
     let[@coq_axiom_with_reason "gadt"] sc_rollup_timeout_case =

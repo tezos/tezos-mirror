@@ -69,10 +69,18 @@ val conflicting_stakers_uncarbonated :
   Sc_rollup_repr.Staker.t ->
   conflict list tzresult Lwt.t
 
-(** [game_move ctxt rollup player opponent refutation is_opening_move]
+(** [start_game ctxt rollup ~player ~opponent] initiates a refutation
+    game between [player] and [opponent] in the given [rollup]. *)
+val start_game :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  player:Signature.public_key_hash ->
+  opponent:Signature.public_key_hash ->
+  Raw_context.t tzresult Lwt.t
+
+(** [game_move ctxt rollup player opponent refutation]
     handles the storage-side logic for when one of the players makes a
-    move in the game. It initializes the game if [is_opening_move] is
-    [true]. Otherwise, it checks the game already exists. Then it checks
+    move in the game. It checks the game already exists. Then it checks
     that [player] is the player whose turn it is; if so, it applies
     [refutation] using the [play] function.
 
@@ -112,7 +120,6 @@ val game_move :
   player:Sc_rollup_repr.Staker.t ->
   opponent:Sc_rollup_repr.Staker.t ->
   Sc_rollup_game_repr.refutation ->
-  is_opening_move:bool ->
   (Sc_rollup_game_repr.outcome option * Raw_context.t) tzresult Lwt.t
 
 (* TODO: #2902 update reference to timeout period in doc-string *)

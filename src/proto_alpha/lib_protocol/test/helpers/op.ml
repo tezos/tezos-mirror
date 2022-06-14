@@ -856,7 +856,7 @@ let sc_rollup_add_messages ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   sign account.sk ctxt to_sign_op
 
 let sc_rollup_refute ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
-    (src : Contract.t) rollup opponent refutation is_opening_move =
+    (src : Contract.t) rollup opponent refutation =
   manager_operation
     ?force_reveal
     ?counter
@@ -865,7 +865,7 @@ let sc_rollup_refute ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     ?storage_limit
     ~source:src
     ctxt
-    (Sc_rollup_refute {rollup; opponent; refutation; is_opening_move})
+    (Sc_rollup_refute {rollup; opponent; refutation})
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk ctxt to_sign_op

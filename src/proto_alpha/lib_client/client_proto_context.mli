@@ -896,9 +896,8 @@ val sc_rollup_refute :
   ?counter:counter ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
-  refutation:Alpha_context.Sc_rollup.Game.refutation ->
+  refutation:Alpha_context.Sc_rollup.Game.refutation option ->
   opponent:Alpha_context.Sc_rollup.Staker.t ->
-  is_opening_move:bool ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->

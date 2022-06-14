@@ -1813,14 +1813,14 @@ let apply_external_manager_operation_content :
           {staked_hash; consumed_gas; published_at_level; balance_updates}
       in
       return (ctxt, result, [])
-  | Sc_rollup_refute {rollup; opponent; refutation; is_opening_move} ->
-      Sc_rollup.Refutation_storage.game_move
-        ctxt
-        rollup
-        ~player:source
-        ~opponent
-        refutation
-        ~is_opening_move
+  | Sc_rollup_refute {rollup; opponent; refutation} ->
+      let open Sc_rollup.Refutation_storage in
+      let player = source in
+      (match refutation with
+      | None ->
+          start_game ctxt rollup ~player ~opponent >>=? fun ctxt ->
+          return (None, ctxt)
+      | Some refutation -> game_move ctxt rollup ~player ~opponent refutation)
       >>=? fun (outcome, ctxt) ->
       (match outcome with
       | None -> return (Sc_rollup.Game.Ongoing, ctxt, [])
