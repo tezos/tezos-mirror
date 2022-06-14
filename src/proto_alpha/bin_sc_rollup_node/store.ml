@@ -109,15 +109,25 @@ struct
 
   let add store key value =
     let open Lwt_syntax in
-    let* already_exists = mem store key in
+    let* existing_value = find store key in
     let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
-    if already_exists then
-      Stdlib.failwith (Printf.sprintf "Key %s already exists" full_path) ;
-    let encoded_value =
-      Data_encoding.Binary.to_bytes_exn P.value_encoding value
-    in
-    let info () = info full_path in
-    IStore.set_exn ~info store (make_key key) encoded_value
+    let encode v = Data_encoding.Binary.to_bytes_exn P.value_encoding v in
+    let encoded_value = encode value in
+    match existing_value with
+    | None ->
+        let info () = info full_path in
+        IStore.set_exn ~info store (make_key key) encoded_value
+    | Some existing_value ->
+        (* To be robust to interruption in the middle of processes,
+           we accept to redo some work when we restart the node.
+           Hence, it is fine to insert twice the same value for a
+           given value. *)
+        if not (Bytes.equal (encode existing_value) encoded_value) then
+          Stdlib.failwith
+            (Printf.sprintf
+               "Key %s already exists with a different value"
+               full_path)
+        else return_unit
 end
 
 module Make_mutable_value (P : sig
