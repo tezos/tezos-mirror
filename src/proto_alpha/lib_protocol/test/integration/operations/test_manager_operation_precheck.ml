@@ -457,12 +457,26 @@ let emptying_undelegated_implicit_diagnostic (infos : infos) op =
   in
   apply_ko_diagnostic infos op expect_failure
 
+(* Minimum gas cost to pass the precheck:
+   - cost_of_manager_operation for the generic part
+   - 100 (empiric) for the specific part (script decoding or hash costs) *)
+let empiric_minimal_gas_cost_for_precheck =
+  Gas.Arith.integral_of_int_exn
+    (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100)
+
 let test_emptying_undelegated_implicit kind () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
   let fee = Tez.one in
+  let gas_limit = Op.Custom_gas empiric_minimal_gas_cost_for_precheck in
   let* op =
-    select_op ~fee ~force_reveal:true ~source:infos.contract1 kind infos
+    select_op
+      ~fee
+      ~gas_limit
+      ~force_reveal:true
+      ~source:infos.contract1
+      kind
+      infos
   in
   emptying_undelegated_implicit_diagnostic infos op
 

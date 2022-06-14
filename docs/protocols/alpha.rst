@@ -63,6 +63,9 @@ Bug Fixes
   precheck even though they obviously do not have enough gas to apply
   the external operation, e.g. when `gas_limit = 0`. (MR :gl:`!5506`)
 
+- Emptying an implicit account does not cost extra-gas anymore. (MR
+  :gl:`!5566`)
+
 Minor Changes
 -------------
 
