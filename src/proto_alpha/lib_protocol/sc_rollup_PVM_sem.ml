@@ -75,7 +75,7 @@ let input_request_encoding =
       case
         ~title:"First_after"
         (Tag 2)
-        (tup2 Raw_level_repr.encoding n)
+        (obj2 (req "level" Raw_level_repr.encoding) (req "counter" n))
         (function
           | First_after (level, counter) -> Some (level, counter) | _ -> None)
         (fun (level, counter) -> First_after (level, counter));
