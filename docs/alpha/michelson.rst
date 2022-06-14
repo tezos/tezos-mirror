@@ -2339,6 +2339,20 @@ Operations on timelock
    ::  chest_key : chest : nat : 'S -> or bytes bool : 'S
 
 
+Events
+~~~~~~
+
+- ``EMIT %tag 'ty``: constructs an operation that will write an event into
+  the transaction receipt after the successful execution of this contract.
+  It accepts as arguments an annotation as a tag to the emitted event and
+  the type of data attachment.
+
+  See :doc:`Event <event>` for more information.
+
+::
+    
+    :: 'ty : 'S -> operation : 'S
+
 
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
