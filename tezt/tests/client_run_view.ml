@@ -251,35 +251,27 @@ let test_run_view_loop_unlimited_gas ~protocol =
     ~expected:"Unit"
     ~unlimited_gas:true
 
-let make_for ~name ~protocol () =
-  List.iter
-    (fun (title, f) ->
-      let title = sf "%s : %s" name title in
-      Test.register ~__FILE__ ~title ~tags:["client"; "michelson"; "view"] f)
-    [
-      ("Run view `add_v` with 10", test_run_view_add_v_10 ~protocol);
-      ("Run view `mul_v` with 10", test_run_view_mul_v_10 ~protocol);
-      ("Run view `value` without input", test_run_view_value ~protocol);
-      ("Run view `v_entrypoint` with 10", test_run_view_v_entrypoint ~protocol);
-      ( "Run view `my_external_view` with 10",
-        test_run_view_my_external_view ~protocol );
-      ( "Run view calling another contract",
-        test_run_external_nested_view ~protocol );
-      ("Run view on implicit account", test_run_view_implicit_account ~protocol);
-      ( "Run view on non existing contract",
-        test_run_view_unknown_contract ~protocol );
-      ( "Run on non existing view `unknown`",
-        test_run_view_unknown_view ~protocol );
-      ( "Run view `loop` with default gas limit",
-        test_run_view_loop_default_limit ~protocol );
-      ( "Run view `loop` with unlimited gas",
-        test_run_view_loop_unlimited_gas ~protocol );
-    ]
-
 let register ~protocols =
   List.iter
-    (function
-      | Protocol.Alpha as protocol -> make_for ~name:"Alpha" ~protocol ()
-      | Protocol.Jakarta as protocol -> make_for ~name:"Jakarta" ~protocol ()
-      | Protocol.Ithaca -> ())
-    protocols
+    (fun (title, test_function) ->
+      Protocol.register_test
+        ~__FILE__
+        ~title
+        ~supports:Protocol.(From_protocol (number Jakarta))
+        ~tags:["client"; "michelson"; "view"]
+        (fun protocol -> test_function ~protocol ())
+        protocols)
+    [
+      ("Run view `add_v` with 10", test_run_view_add_v_10);
+      ("Run view `mul_v` with 10", test_run_view_mul_v_10);
+      ("Run view `value` without input", test_run_view_value);
+      ("Run view `v_entrypoint` with 10", test_run_view_v_entrypoint);
+      ("Run view `my_external_view` with 10", test_run_view_my_external_view);
+      ("Run view calling another contract", test_run_external_nested_view);
+      ("Run view on implicit account", test_run_view_implicit_account);
+      ("Run view on non existing contract", test_run_view_unknown_contract);
+      ("Run on non existing view `unknown`", test_run_view_unknown_view);
+      ( "Run view `loop` with default gas limit",
+        test_run_view_loop_default_limit );
+      ("Run view `loop` with unlimited gas", test_run_view_loop_unlimited_gas);
+    ]
