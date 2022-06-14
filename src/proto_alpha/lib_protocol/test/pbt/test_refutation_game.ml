@@ -409,7 +409,7 @@ module TestArith (P : sig
 end) : TestPVM = struct
   include ContextPVM
 
-  let init_context = Tezos_context_memory.Context.empty
+  let init_context = Tezos_context_memory.make_empty_context ()
 
   module Utils = struct
     let default_state =

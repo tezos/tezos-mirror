@@ -26,6 +26,8 @@
 
 include Tezos_context_memory.Context
 
+let empty = Tezos_context_memory.make_empty_context ()
+
 let store_empty = empty
 
 let shallow_of_tree repo tree =

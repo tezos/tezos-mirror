@@ -336,7 +336,8 @@ let input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple =
 let init_ctxt input =
   let open Prover_context in
   let open Syntax in
-  let empty_store = Irmin_context.empty in
+  let* index = Irmin_context.init "/tmp" in
+  let empty_store = Irmin_context.empty index in
   let empty_tree = Irmin_context.Tree.empty empty_store in
   let qty = Tx_rollup_l2_qty.of_int64_exn 1_000_000L in
   let* tree =

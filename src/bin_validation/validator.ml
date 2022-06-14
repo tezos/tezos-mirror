@@ -253,13 +253,13 @@ let run input output =
                 in
                 let*! o = Context.checkout context_index pred_context_hash in
                 match o with
-                | Some context -> return context
+                | Some c -> return (Shell_context.wrap_disk_context c)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          pred_context_hash))
           in
-          let*! protocol_hash = Context.get_protocol predecessor_context in
+          let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
           let env =
             {
@@ -331,13 +331,14 @@ let run input output =
                   Context.checkout context_index pred_context_hash
                 in
                 match context with
-                | Some context -> return context
+                | Some context ->
+                    return (Shell_context.wrap_disk_context context)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          pred_context_hash))
           in
-          let*! protocol_hash = Context.get_protocol predecessor_context in
+          let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
           with_retry_to_load_protocol protocol_root (fun () ->
               Block_validation.preapply
@@ -398,7 +399,8 @@ let run input output =
                     predecessor_block_header.shell.context
                 in
                 match o with
-                | Some context -> return context
+                | Some context ->
+                    return (Shell_context.wrap_disk_context context)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
@@ -433,6 +435,7 @@ let run input output =
         let*! () =
           match context_opt with
           | Some ctxt ->
+              let ctxt = Shell_context.wrap_disk_context ctxt in
               let*! test_chain_init_result =
                 with_retry_to_load_protocol protocol_root (fun () ->
                     Block_validation.init_test_chain chain_id ctxt forked_header)

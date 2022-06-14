@@ -2,34 +2,29 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_store)
- (public_name tezos-store)
+ (name tezos_context_disk)
+ (public_name tezos-context.disk)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-shell-services
   tezos-base
-  tezos-version
-  index
+  bigstringaf
+  fmt
+  logs.fmt
+  digestif.c
+  irmin
   irmin-pack
-  tezos-context
-  tezos-shell-context
-  tezos-validation
-  tezos-protocol-updater
+  irmin-pack.unix
   tezos-stdlib-unix
   tezos-stdlib
-  lwt-watcher
-  ringo-lwt
-  camlzip
-  tar
-  tar-unix
-  prometheus)
+  tezos-context.sigs
+  tezos-context.helpers
+  tezos-context.encoding
+  tezos-context.memory
+  tezos-context.dump)
  (flags
   (:standard)
   -open Tezos_shell_services
-  -open Tezos_base
   -open Tezos_base.TzPervasives
-  -open Tezos_context
-  -open Tezos_validation
-  -open Tezos_protocol_updater
   -open Tezos_stdlib_unix
   -open Tezos_stdlib))

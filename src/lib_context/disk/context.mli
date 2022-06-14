@@ -1,8 +1,10 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2018-2020 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,24 +26,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type TEZOS_CONTEXT_MEMORY = sig
-  type tree
+module type TEZOS_CONTEXT_UNIX = sig
+  type error +=
+    | Cannot_create_file of string
+    | Cannot_open_file of string
+    | Cannot_find_protocol
+    | Suspicious_file of int
 
   include
     Tezos_context_sigs.Context.TEZOS_CONTEXT
-      with type memory_context_tree := tree
-       and type tree := tree
-       and type value_key = Context_hash.t
-       and type node_key = Context_hash.t
+      with type memory_context_tree := Tezos_context_memory.Context.tree
 
-  (** Exception raised by [find_tree] and [add_tree] when applied to shallow
-    trees. It is exposed so that it can be catched by the proxy where such
-    operations on shallow trees are expected. *)
-  exception Context_dangling_hash of string
+  (** Sync the context with disk. Only useful for read-only instances.
+      Does not fail when the context is not in read-only mode. *)
+  val sync : index -> unit Lwt.t
 
-  val encoding : t Data_encoding.t
+  (** An Irmin context corresponds to an in-memory overlay (corresponding
+      to the type {!tree}) over some on-disk data. Writes are buffered in
+      the overlay temporarily. Calling [flush] performs these writes on
+      disk and returns a context with an empty overlay. *)
+  val flush : t -> t Lwt.t
+
+  (** {2 Context dumping} *)
+
+  (** [dump_context] is used to export snapshots of the context at given hashes. *)
+  val dump_context :
+    index ->
+    Context_hash.t ->
+    fd:Lwt_unix.file_descr ->
+    on_disk:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
+    int tzresult Lwt.t
+
+  (** Rebuild a context from a given snapshot. *)
+  val restore_context :
+    index ->
+    expected_context_hash:Context_hash.t ->
+    nb_context_elements:int ->
+    fd:Lwt_unix.file_descr ->
+    legacy:bool ->
+    in_memory:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
+    unit tzresult Lwt.t
+
+  (** Offline integrity checking and statistics for contexts. *)
+  module Checks : sig
+    module Pack : Irmin_pack_unix.Checks.S
+
+    module Index : Index.Checks.S
+  end
 end
 
-(** Implementation of Tezos context fully in memory. *)
+(** Tezos - Versioned, block indexed (key x value) store *)
 module Make (Encoding : module type of Tezos_context_encoding.Context) :
-  TEZOS_CONTEXT_MEMORY
+  TEZOS_CONTEXT_UNIX

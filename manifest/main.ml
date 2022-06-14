@@ -1430,7 +1430,13 @@ let tezos_context_sigs =
   public_lib
     "tezos-context.sigs"
     ~path:"src/lib_context/sigs"
-    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib |> open_]
+    ~opam:"tezos-context"
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_stdlib |> open_;
+        tezos_shell_services |> open_;
+      ]
 
 let tezos_scoru_wasm =
   public_lib
@@ -1472,6 +1478,14 @@ let tezos_context_helpers =
         irmin_pack;
       ]
 
+let tezos_context_dump =
+  public_lib
+    "tezos-context.dump"
+    ~path:"src/lib_context/dump"
+    ~opam:"tezos-context"
+    ~deps:
+      [tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib_unix |> open_; fmt]
+
 let tezos_context_memory =
   public_lib
     "tezos-context.memory"
@@ -1480,6 +1494,7 @@ let tezos_context_memory =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_stdlib |> open_;
+        tezos_shell_services |> open_;
         irmin_pack;
         irmin_pack_mem;
         tezos_context_sigs;
@@ -1487,11 +1502,11 @@ let tezos_context_memory =
         tezos_context_helpers;
       ]
 
-let tezos_context =
+let tezos_context_disk =
   public_lib
-    "tezos-context"
-    ~path:"src/lib_context"
-    ~synopsis:"Tezos: on-disk context abstraction for `tezos-node`"
+    "tezos-context.disk"
+    ~path:"src/lib_context/disk"
+    ~opam:"tezos-context"
     ~deps:
       [
         tezos_shell_services |> open_;
@@ -1509,7 +1524,15 @@ let tezos_context =
         tezos_context_helpers;
         tezos_context_encoding;
         tezos_context_memory;
+        tezos_context_dump;
       ]
+
+let tezos_context =
+  public_lib
+    "tezos-context"
+    ~path:"src/lib_context"
+    ~synopsis:"Tezos: on-disk context abstraction for `tezos-node`"
+    ~deps:[tezos_context_disk; tezos_context_memory]
 
 let _tezos_context_tests =
   test
@@ -1520,7 +1543,9 @@ let _tezos_context_tests =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
-        tezos_context |> open_;
+        tezos_context_sigs;
+        tezos_context_disk;
+        tezos_context_memory;
         tezos_stdlib_unix |> open_;
         tezos_test_helpers;
         tezos_test_helpers_extra;
@@ -1537,7 +1562,7 @@ let _tezos_context_memory_tests =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
-        tezos_context;
+        tezos_context_disk;
         tezos_context_memory;
         tezos_stdlib_unix |> open_;
         alcotest_lwt;
@@ -1773,6 +1798,21 @@ let _tezos_protocol_environment_tests =
         lwt_unix;
       ]
 
+let tezos_context_ops =
+  public_lib
+    "tezos-context-ops"
+    ~path:"src/lib_protocol_environment"
+    ~synopsis:"Tezos: backend-agnostic operations on contexts"
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_error_monad |> open_;
+        tezos_protocol_environment;
+        tezos_context |> open_;
+        tezos_shell_context |> open_;
+      ]
+    ~modules:["Context_ops"]
+
 let _tezos_protocol_shell_context_tests =
   tests
     ["test_proxy_context"]
@@ -1919,7 +1959,7 @@ let tezos_validation =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_context |> open_;
-        tezos_shell_context |> open_;
+        tezos_context_ops |> open_;
         tezos_shell_services |> open_;
         tezos_protocol_updater |> open_;
         tezos_stdlib_unix |> open_;
@@ -1938,6 +1978,7 @@ let tezos_store =
         index;
         irmin_pack;
         tezos_context |> open_;
+        tezos_shell_context;
         tezos_validation |> open_;
         tezos_protocol_updater |> open_;
         tezos_stdlib_unix |> open_;
@@ -2090,13 +2131,14 @@ let _tezos_context_merkle_proof_tests =
       [
         tezos_base;
         tezos_base_unix;
-        tezos_context;
+        tezos_context_disk;
         tezos_context_encoding;
         tezos_stdlib_unix;
         qcheck_alcotest;
         tezos_test_helpers;
       ]
-    ~opens:["Tezos_base__TzPervasives"; "Tezos_context"; "Tezos_stdlib_unix"]
+    ~opens:
+      ["Tezos_base__TzPervasives"; "Tezos_context_disk"; "Tezos_stdlib_unix"]
     ~modules:["test_merkle_proof"]
 
 let tezos_validator_lib =
@@ -2110,6 +2152,7 @@ let tezos_validator_lib =
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
         tezos_context |> open_;
+        tezos_context_ops |> open_;
         tezos_stdlib_unix |> open_;
         tezos_protocol_environment;
         tezos_shell |> open_;
@@ -3822,6 +3865,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_context |> open_;
             tezos_context_memory |> if_ N.(number >= 012);
             tezos_rpc_http_client_unix |> if_ N.(number >= 011);
+            tezos_context_ops |> if_ N.(number >= 011) |> open_;
             tezos_rpc |> open_;
             tezos_rpc_http |> open_;
             lwt_canceler;

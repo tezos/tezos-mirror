@@ -2235,7 +2235,8 @@ module Rejection = struct
   *)
   let init_l2_store () =
     let open Context.Syntax in
-    let store = C.empty in
+    let* index = C.init "/tmp" in
+    let store = C.empty index in
     let time = time () in
     let tree = C.Tree.empty store in
     let* tree = Prover_context.Address_index.init_counter tree in

@@ -101,7 +101,8 @@ open FullArithPVM
 
 let setup boot_sector f =
   let open Lwt_syntax in
-  let ctxt = Context_binary.empty in
+  let* index = Context_binary.init "/tmp" in
+  let ctxt = Context_binary.empty index in
   let* state = initial_state ctxt boot_sector in
   f ctxt state
 

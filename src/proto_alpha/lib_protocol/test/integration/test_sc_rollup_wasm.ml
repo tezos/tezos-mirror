@@ -111,7 +111,8 @@ module Prover = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make (WASM_P)
 
 let should_boot () =
   let open Lwt_result_syntax in
-  let context = Context_binary.empty in
+  let*! index = Context_binary.init "/tmp" in
+  let context = Context_binary.empty index in
   let*! s = Prover.initial_state context "" in
   let*! s = Prover.eval s in
   let*! p_res = Prover.produce_proof context None s in

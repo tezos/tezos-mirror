@@ -1,20 +1,14 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test)
+(library
+ (name tezos_context_dump)
+ (public_name tezos-context.dump)
+ (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-base.unix
-  tezos-context.disk
-  tezos-context.memory
   tezos-stdlib-unix
-  alcotest-lwt)
+  fmt)
  (flags (:standard)
         -open Tezos_base.TzPervasives
         -open Tezos_stdlib_unix))
-
-(rule
- (alias runtest)
- (package tezos-context)
- (action (run %{dep:./test.exe})))

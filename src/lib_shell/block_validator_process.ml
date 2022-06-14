@@ -153,7 +153,8 @@ module Internal_validator_process = struct
        of caches passed from one block to the next one here.
     *)
     mutable cache : Environment_context.Context.block_cache option;
-    mutable preapply_result : (Block_validation.apply_result * Context.t) option;
+    mutable preapply_result :
+      (Block_validation.apply_result * Environment_context.Context.t) option;
   }
 
   let init
@@ -198,7 +199,7 @@ module Internal_validator_process = struct
       | None ->
           tzfail
             (Block_validator_errors.Failed_to_checkout_context context_hash)
-      | Some ctx -> return ctx
+      | Some ctx -> return (Shell_context.wrap_disk_context ctx)
     in
     let predecessor_block_metadata_hash =
       Store.Block.block_metadata_hash predecessor
@@ -270,7 +271,7 @@ module Internal_validator_process = struct
       | None ->
           tzfail
             (Block_validator_errors.Failed_to_checkout_context context_hash)
-      | Some ctx -> return ctx
+      | Some ctx -> return (Shell_context.wrap_disk_context ctx)
     in
     let user_activated_upgrades = validator.user_activated_upgrades in
     let user_activated_protocol_overrides =
@@ -315,7 +316,7 @@ module Internal_validator_process = struct
       | None ->
           tzfail
             (Block_validator_errors.Failed_to_checkout_context context_hash)
-      | Some ctx -> return ctx
+      | Some ctx -> return (Shell_context.wrap_disk_context ctx)
     in
     let cache =
       match validator.cache with
@@ -346,6 +347,7 @@ module Internal_validator_process = struct
     let open Lwt_result_syntax in
     let forked_header = Store.Block.header forking_block in
     let* context = Store.Block.context validator.chain_store forking_block in
+    let context = Shell_context.wrap_disk_context context in
     Block_validation.init_test_chain chain_id context forked_header
 
   let reconfigure_event_logging _ _ = Lwt_result_syntax.return_unit

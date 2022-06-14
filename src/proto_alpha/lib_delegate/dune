@@ -21,6 +21,7 @@
   tezos-context
   tezos-context.memory
   tezos-rpc-http-client-unix
+  tezos-context-ops
   tezos-rpc
   tezos-rpc-http
   lwt-canceler
@@ -40,6 +41,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_shell_context
   -open Tezos_context
+  -open Tezos_context_ops
   -open Tezos_rpc
   -open Tezos_rpc_http)
  (modules (:standard \ Baking_commands Baking_commands_registration)))

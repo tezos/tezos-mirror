@@ -571,6 +571,13 @@ opam:tezos-context:
   variables:
     package: tezos-context
 
+opam:tezos-context-ops:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_4
+  variables:
+    package: tezos-context-ops
+
 opam:tezos-crypto:
   extends:
     - .opam_template
@@ -910,7 +917,7 @@ opam:tezos-protocol-007-PsDELPH1:
 opam:tezos-protocol-008-PtEdo2Zk:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-008-PtEdo2Zk
 
@@ -1414,7 +1421,7 @@ opam:tezos-webassembly-interpreter:
 opam:tezos-workers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-workers
 

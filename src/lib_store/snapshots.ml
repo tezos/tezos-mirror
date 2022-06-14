@@ -3540,6 +3540,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | Some ch -> return ch
       | None -> tzfail (Inconsistent_context pred_context_hash)
     in
+    let predecessor_context =
+      Tezos_shell_context.Shell_context.wrap_disk_context predecessor_context
+    in
     let apply_environment =
       {
         Block_validation.max_operations_ttl =

@@ -23,6 +23,7 @@ depends: [
   "tezos-shell-context"
   "tezos-context"
   "tezos-rpc-http-client-unix"
+  "tezos-context-ops"
   "tezos-rpc"
   "tezos-rpc-http"
   "lwt-canceler" { >= "0.3" & < "0.4" }

@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "tezos-context"
+  "tezos-context-ops"
   "tezos-stdlib-unix"
   "tezos-protocol-environment"
   "tezos-shell"

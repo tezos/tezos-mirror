@@ -10,23 +10,14 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "tezos-stdlib"
-  "tezos-shell-services"
-  "irmin" { >= "3.2.2" & < "3.3.0" }
-  "irmin-pack" { >= "3.2.2" & < "3.3.0" }
-  "tezos-stdlib-unix"
-  "fmt" { >= "0.8.7" }
-  "bigstringaf" { >= "0.2.0" }
-  "logs"
-  "digestif" { >= "0.7.3" }
-  "tezos-test-helpers" {with-test}
-  "tezos-test-helpers-extra" {with-test}
-  "alcotest-lwt" { with-test & >= "1.5.0" }
-  "qcheck-alcotest" { with-test & >= "0.15" }
+  "tezos-error-monad"
+  "tezos-protocol-environment"
+  "tezos-context"
+  "tezos-shell-context"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: on-disk context abstraction for `tezos-node`"
+synopsis: "Tezos: backend-agnostic operations on contexts"

@@ -288,7 +288,9 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           (Context.index context)
           (Store.Block.context_hash predecessor_block)
       in
-      match ctxt with Some c -> return c | None -> fail_with_exn Not_found
+      match ctxt with
+      | Some c -> return (Shell_context.wrap_disk_context c)
+      | None -> fail_with_exn Not_found
     in
     let predecessor_block_metadata_hash =
       Store.Block.block_metadata_hash predecessor_block

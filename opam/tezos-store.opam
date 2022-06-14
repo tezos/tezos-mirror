@@ -15,6 +15,7 @@ depends: [
   "index" { >= "1.6.0" & < "1.7.0" }
   "irmin-pack" { >= "3.2.2" & < "3.3.0" }
   "tezos-context"
+  "tezos-shell-context"
   "tezos-validation"
   "tezos-protocol-updater"
   "tezos-stdlib-unix"
