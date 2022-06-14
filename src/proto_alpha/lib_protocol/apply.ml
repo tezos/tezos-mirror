@@ -787,7 +787,7 @@ type 'loc execution_arg =
   | Untyped_arg : Script.expr -> _ execution_arg
 
 let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~untyped_parameter
-    ~entrypoint ~before_operation =
+    ~external_entrypoint ~before_operation =
   let contract = Contract.Implicit pkh in
   (* Transfers of zero to implicit accounts are forbidden. *)
   error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
@@ -804,8 +804,11 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~untyped_parameter
       | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
       | _ -> error (Script_interpreter.Bad_contract_parameter contract)))
   >>?= fun () ->
-  (if Entrypoint.is_default entrypoint then Result.return_unit
-  else error (Script_tc_errors.No_such_entrypoint entrypoint))
+  (match external_entrypoint with
+  | None -> Result.return_unit
+  | Some entrypoint ->
+      if Entrypoint.is_default entrypoint then Result.return_unit
+      else error (Script_tc_errors.No_such_entrypoint entrypoint))
   >>?= fun () ->
   let result =
     Transaction_to_contract_result
@@ -1098,7 +1101,7 @@ let apply_internal_operation_contents :
         ~amount
         ~pkh
         ~untyped_parameter:None
-        ~entrypoint:Entrypoint.default
+        ~external_entrypoint:None
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
@@ -1270,7 +1273,7 @@ let apply_manager_operation :
         ~amount
         ~pkh
         ~untyped_parameter:(Some parameters)
-        ~entrypoint
+        ~external_entrypoint:(Some entrypoint)
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
