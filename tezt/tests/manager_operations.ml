@@ -1600,10 +1600,11 @@ module Simple_transfers = struct
     in
     unit
 
-  let test_simple_transfers_successive_wrong_counters =
+  let test_simple_transfers_successive_wrong_counters ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Test succesive injections with same manager"
+      ~supports
       ~tags:["transaction"; "transfer"; "counters"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1655,13 +1656,7 @@ module Simple_transfers = struct
         nodes.main.client
     in
     let* _ =
-      Memchecks.with_branch_delayed_checks
-        ~__LOC__
-        nodes
-        ~classification_after_flush:`Absent
-        ~should_include:true
-      (* applied after flush *)
-      @@ fun () ->
+      decide_error nodes @@ fun () ->
       Operation.inject_transfer
         ~protocol
         ~source:Constant.bootstrap2
@@ -1671,6 +1666,22 @@ module Simple_transfers = struct
         nodes.main.client
     in
     unit
+
+  let test_simple_transfers_successive_wrong_counters protocols =
+    test_simple_transfers_successive_wrong_counters
+      ~supports:(Protocol.Until_protocol 13)
+      (Memchecks.with_branch_delayed_checks
+         ~__LOC__
+         ~classification_after_flush:`Absent
+         ~should_include:true (* applied after flush *))
+      protocols ;
+    test_simple_transfers_successive_wrong_counters
+      ~supports:(Protocol.From_protocol 14)
+      (Memchecks.with_branch_delayed_checks
+         ~__LOC__ (* ~classification_after_flush:`Branch_delayed *)
+         ~classification_after_flush:`Applied
+         ~should_include:false (* applied after flush *))
+      protocols
 
   let test_simple_transfers_successive_wrong_counters_no_op_pre =
     Protocol.register_test
