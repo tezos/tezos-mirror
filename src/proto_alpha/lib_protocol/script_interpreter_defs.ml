@@ -552,8 +552,9 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
    creates an operation that transfers an amount of [tez] to a destination and
    an entrypoint instantiated with argument [parameters] of type
    [parameters_ty]. *)
-let transfer (ctxt, sc) gas amount location parameters_ty parameters
-    (destination : Destination.t) entrypoint =
+let transfer (type t tc) (ctxt, sc) gas amount location
+    (parameters_ty : (t, tc) ty) (parameters : t)
+    (destination : t typed_destination) entrypoint =
   let ctxt = update_context gas ctxt in
   collect_lazy_storage ctxt parameters_ty parameters
   >>?= fun (to_duplicate, ctxt) ->
@@ -568,7 +569,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
     ~temporary:true
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
   (match destination with
-  | Contract (Implicit destination) ->
+  | Typed_implicit destination ->
       unparse_data ctxt Optimized parameters_ty parameters
       >>=? fun (unparsed_parameters, ctxt) ->
       Lwt.return
@@ -588,7 +589,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
                 unparsed_parameters;
               },
             ctxt ) )
-  | Contract (Originated destination) ->
+  | Typed_originated destination ->
       unparse_data ctxt Optimized parameters_ty parameters
       >>=? fun (unparsed_parameters, ctxt) ->
       Lwt.return
@@ -608,7 +609,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
                 unparsed_parameters;
               },
             ctxt ) )
-  | Tx_rollup destination ->
+  | Typed_tx_rollup destination ->
       make_transaction_to_tx_rollup
         ctxt
         ~destination
@@ -616,7 +617,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~entrypoint
         ~parameters_ty
         ~parameters
-  | Sc_rollup destination ->
+  | Typed_sc_rollup destination ->
       make_transaction_to_sc_rollup
         ctxt
         ~destination

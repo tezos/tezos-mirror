@@ -1132,7 +1132,6 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               =
             stack
           in
-          let destination = Typed_destination.untyped destination in
           transfer (ctxt, sc) gas amount loc arg_ty p destination entrypoint
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
