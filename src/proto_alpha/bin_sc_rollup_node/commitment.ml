@@ -282,7 +282,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
                 commitment.predecessor
                 lcc_hash
             in
-            exit 1
+            Lwt_exit.exit_and_raise 1
         else Lwt.return ()
       in
       let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
