@@ -1188,7 +1188,13 @@ let apply_internal_manager_operation_content :
         Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
       in
       (ctxt, ITransaction_result result, [])
-  | Transaction_to_event _ -> failwith "TODO"
+  | Transaction_to_event {addr = _; unparsed_data = _; tag = _} ->
+      return
+        ( ctxt,
+          ITransaction_result
+            (Transaction_to_event_result
+               {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt}),
+          [] )
   | Origination
       {
         delegate;
@@ -1955,6 +1961,8 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
+  | Transaction_to_event_result {consumed_gas} ->
+      return (ctxt, storage_limit, Transaction_to_event_result {consumed_gas})
 
 let burn_origination_storage_fees ctxt
     {

@@ -533,6 +533,9 @@ let pp_transaction_result ppf = function
   | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
       pp_consumed_gas ppf consumed_gas ;
       pp_inbox_after ppf inbox_after
+  | Transaction_to_event_result {consumed_gas} ->
+      pp_consumed_gas ppf consumed_gas ;
+      Format.fprintf ppf "@,@[<v 2>Event Applied]"
 
 let pp_operation_result ~operation_name pp_operation_result ppf = function
   | Skipped _ -> Format.fprintf ppf "This operation was skipped."
