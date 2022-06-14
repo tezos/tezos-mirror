@@ -86,27 +86,28 @@ let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
 let spawn_command sc_node =
   Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
 
-let spawn_config_init sc_node rollup_address =
+let spawn_config_init sc_node ?loser_mode rollup_address =
   spawn_command
     sc_node
-    [
-      "config";
-      "init";
-      "on";
-      rollup_address;
-      "with";
-      "operator";
-      operator_pkh sc_node;
-      "--data-dir";
-      data_dir sc_node;
-      "--rpc-addr";
-      rpc_host sc_node;
-      "--rpc-port";
-      string_of_int @@ rpc_port sc_node;
-    ]
+    ([
+       "config";
+       "init";
+       "on";
+       rollup_address;
+       "with";
+       "operator";
+       operator_pkh sc_node;
+       "--data-dir";
+       data_dir sc_node;
+       "--rpc-addr";
+       rpc_host sc_node;
+       "--rpc-port";
+       string_of_int @@ rpc_port sc_node;
+     ]
+    @ match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
 
-let config_init sc_node rollup_address =
-  let process = spawn_config_init sc_node rollup_address in
+let config_init sc_node ?loser_mode rollup_address =
+  let process = spawn_config_init sc_node ?loser_mode rollup_address in
   let* output = Process.check_and_read_stdout process in
   match
     output

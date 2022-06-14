@@ -114,8 +114,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let generate_proof node_ctxt store game start_state =
     let open Lwt_result_syntax in
     let*! hash = Layer1.hash_of_level store (Raw_level.to_int32 game.level) in
-    let* history = Inbox.history_of_hash node_ctxt store hash in
-    let* inbox = Inbox.inbox_of_hash node_ctxt store hash in
+    let*! history = Inbox.history_of_hash store hash in
+    let*! inbox = Inbox.inbox_of_hash node_ctxt store hash in
     let*! messages_tree = Inbox.find_message_tree store hash in
     let*! history, history_proof =
       Store.Inbox.form_history_proof store history inbox messages_tree

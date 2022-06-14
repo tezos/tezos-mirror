@@ -36,6 +36,7 @@ type t = {
   kind : Sc_rollup.Kind.t;
   fee_parameter : Injection.fee_parameter;
   protocol_constants : Constants.t;
+  loser_mode : Loser_mode.t;
 }
 
 let get_operator_keys node_ctxt =
@@ -53,7 +54,7 @@ let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
 let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address
-    genesis_info kind operator fee_parameter =
+    genesis_info kind operator fee_parameter ~loser_mode =
   let open Lwt_result_syntax in
   let+ protocol_constants = retrieve_constants cctxt in
   {
@@ -66,4 +67,5 @@ let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address
     block_finality_time = 2;
     fee_parameter;
     protocol_constants;
+    loser_mode;
   }

@@ -240,20 +240,18 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
   let*! () = Event.starting_node () in
   let* configuration = Configuration.load ~data_dir in
   let open Configuration in
-  let {sc_rollup_address; sc_rollup_node_operator; fee_parameter; _} =
-    configuration
-  in
   let*! store = Store.load configuration in
   let* l1_ctxt, genesis_info, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init
       cctxt
       l1_ctxt
-      sc_rollup_address
+      configuration.sc_rollup_address
       genesis_info
       kind
-      sc_rollup_node_operator
-      fee_parameter
+      configuration.sc_rollup_node_operator
+      configuration.fee_parameter
+      ~loser_mode:configuration.loser_mode
   in
   let* _pkh, _pk, _skh = Node_context.get_operator_keys node_ctxt in
   (* Check that the public key hash is valid. *)
