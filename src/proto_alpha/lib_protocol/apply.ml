@@ -782,11 +782,9 @@ let apply_delegation ~ctxt ~source ~delegate ~before_operation =
   Delegate.set ctxt source delegate >|=? fun ctxt ->
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
 
-type execution_arg =
-  | Typed_arg :
-      Script.location * ('a, _) Script_typed_ir.ty * 'a
-      -> execution_arg
-  | Untyped_arg : Script.expr -> execution_arg
+type 'loc execution_arg =
+  | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg
+  | Untyped_arg : Script.expr -> _ execution_arg
 
 let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
     ~entrypoint ~before_operation =
