@@ -1159,7 +1159,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
      (Check.option Check.int)
      ~error_msg:
        "Number of messages processed by commitment is different from the \
-        number of messages expected (%L = %R)") ;
+        number of messages expected (%L expected <> %R processed)") ;
   let* published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
