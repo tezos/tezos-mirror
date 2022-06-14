@@ -319,6 +319,7 @@ variables:
         path: _coverage_report/cobertura.xml
     paths:
       - _coverage_report/
+      - $BISECT_FILE
     expire_in: 15 days
     when: always
 
