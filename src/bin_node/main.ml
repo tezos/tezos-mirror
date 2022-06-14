@@ -24,6 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let warn_if_argv0_name_not_octez () =
+  let executable_name = Filename.basename Sys.argv.(0) in
+  let prefix = "tezos-" in
+  if TzString.has_prefix executable_name ~prefix then
+    let expected_name =
+      let len_prefix = String.length prefix in
+      "octez-"
+      ^ String.sub
+          executable_name
+          len_prefix
+          (String.length executable_name - len_prefix)
+    in
+    Format.eprintf
+      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+       The executable with name %s has been renamed to %s. The name %s is now@,\
+       deprecated, and it will be removed in a future release. Please update@,\
+       your scripts to use the new name.@]@\n\
+       @."
+      executable_name
+      expected_name
+      executable_name
+  else ()
+
 let () =
   Printexc.register_printer @@ function
   | Unix.Unix_error (code, "", _) -> Some (Unix.error_message code)
@@ -62,6 +85,8 @@ let () =
   if Sys.word_size <> 64 then (
     prerr_endline "Non-64 bit architectures are not supported." ;
     exit 1)
+
+let () = warn_if_argv0_name_not_octez ()
 
 let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then (

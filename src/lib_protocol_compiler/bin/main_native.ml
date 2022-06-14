@@ -24,6 +24,31 @@
 (*****************************************************************************)
 
 let () =
+  (* warn_if_argv0_name_not_octez *)
+  let executable_name = Filename.basename Sys.argv.(0) in
+  let prefix = "tezos-" in
+  if String.equal (String.sub executable_name 0 (String.length prefix)) prefix
+  then
+    let expected_name =
+      let len_prefix = String.length prefix in
+      "octez-"
+      ^ String.sub
+          executable_name
+          len_prefix
+          (String.length executable_name - len_prefix)
+    in
+    Format.eprintf
+      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+       The executable with name %s has been renamed to %s. The name %s is now@,\
+       deprecated, and it will be removed in a future release. Please update@,\
+       your scripts to use the new name.@]@\n\
+       @."
+      executable_name
+      expected_name
+      executable_name
+  else ()
+
+let () =
   try
     Octez_protocol_compiler.Compiler.main
       Octez_protocol_compiler_native.Native.driver ;
