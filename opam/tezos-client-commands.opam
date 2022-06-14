@@ -18,6 +18,7 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-signer-backends"
   "data-encoding" { >= "0.5.3" & < "0.6" }
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

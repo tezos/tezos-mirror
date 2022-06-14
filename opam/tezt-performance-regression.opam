@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezt"
-  "uri"
+  "uri" { >= "2.2.0" }
   "cohttp-lwt-unix" { >= "2.2.0" }
 ]
 build: [

@@ -457,17 +457,24 @@ end
 (*                                  OPAM                                     *)
 (*****************************************************************************)
 
+type with_test = Always | Never | Only_on_64_arch
+
+let show_with_test = function
+  | Always -> "Always"
+  | Never -> "Never"
+  | Only_on_64_arch -> "Only_on_64_arch"
+
 module Opam = struct
   type dependency = {
     package : string;
     version : Version.constraints;
-    with_test : bool;
+    with_test : with_test;
     optional : bool;
   }
 
   type command_item = A of string | S of string
 
-  type build_instruction = {command : command_item list; with_test : bool}
+  type build_instruction = {command : command_item list; with_test : with_test}
 
   type url = {url : string; sha256 : string option; sha512 : string option}
 
@@ -624,26 +631,41 @@ module Opam = struct
             b
             (if in_and then ")" else "")
     in
+    let condition_of_with_test = function
+      | Always -> ["with-test"]
+      | Never -> []
+      | Only_on_64_arch ->
+          ["with-test"; "arch != \"arm32\""; "arch != \"x86_32\""]
+    in
+    let pp_condition fmt = function
+      | [] -> ()
+      | ["with-test"] -> Format.pp_print_string fmt " {with-test}"
+      | items ->
+          Format.fprintf
+            fmt
+            " { %a }"
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt " & ")
+               Format.pp_print_string)
+            items
+    in
     let pp_dependency fmt {package; version; with_test; _} =
-      match (version, with_test) with
-      | True, false -> pp_string fmt package
-      | True, true -> Format.fprintf fmt "@[%a {with-test}@]" pp_string package
-      | version, false ->
-          Format.fprintf
-            fmt
-            "@[%a { %a }@]"
-            pp_string
-            package
-            (pp_version_constraint ~in_and:false)
-            version
-      | version, true ->
-          Format.fprintf
-            fmt
-            "@[%a { with-test & %a }@]"
-            pp_string
-            package
-            (pp_version_constraint ~in_and:false)
-            version
+      let condition =
+        let with_test = condition_of_with_test with_test in
+        let version =
+          match version with
+          | True -> []
+          | _ ->
+              [
+                Format.asprintf
+                  "%a"
+                  (pp_version_constraint ~in_and:false)
+                  version;
+              ]
+        in
+        List.concat [with_test; version]
+      in
+      Format.fprintf fmt "@[%a%a@]" pp_string package pp_condition condition
     in
     let pp_command_item fmt = function
       | A atom -> Format.pp_print_string fmt atom
@@ -652,10 +674,11 @@ module Opam = struct
     let pp_build_instruction fmt {command; with_test} =
       Format.fprintf
         fmt
-        "%a%s"
+        "%a%a"
         (pp_list pp_command_item)
         command
-        (if with_test then " {with-test}" else "")
+        pp_condition
+        (condition_of_with_test with_test)
     in
     let pp_url {url; sha256; sha512} =
       pp_line "url {" ;
@@ -876,6 +899,7 @@ module Target = struct
     modules_without_implementation : string list;
     ocaml : Version.constraints option;
     opam : string option;
+    opam_with_test : with_test;
     opens : string list;
     path : string;
     preprocess : preprocessor list;
@@ -1024,6 +1048,7 @@ module Target = struct
     ?npm_deps:Npm.t list ->
     ?ocaml:Version.constraints ->
     ?opam:string ->
+    ?opam_with_test:with_test ->
     ?opens:string list ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
@@ -1081,11 +1106,11 @@ module Target = struct
       ?(dune = Dune.[]) ?flags ?foreign_stubs ?inline_tests ?js_compatible
       ?js_of_ocaml ?documentation ?(linkall = false) ?modes ?modules
       ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml ?opam
-      ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
-      ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
-      ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(wrapped = true) ?(cram = false) ?license ?(extra_authors = []) ~path
-      names =
+      ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
+      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
+      ?release ?static ?static_cclibs ?synopsis ?description
+      ?(time_measurement_ppx = false) ?(wrapped = true) ?(cram = false) ?license
+      ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1311,6 +1336,7 @@ module Target = struct
         modules_without_implementation;
         ocaml;
         opam;
+        opam_with_test;
         opens;
         path;
         preprocess;
@@ -1909,7 +1935,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     List.split @@ map internals
     @@ fun internal ->
     let with_test =
-      match internal.kind with Test_executable _ -> true | _ -> false
+      match internal.kind with Test_executable _ -> Always | _ -> Never
     in
     let deps = Target.all_internal_deps internal in
     let x_opam_monorepo_opam_provided =
@@ -1937,7 +1963,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
         {
           Opam.package = "ocaml";
           version = Version.and_list versions;
-          with_test = false;
+          with_test = Never;
           optional = false;
         }
         :: depends
@@ -1946,7 +1972,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     {
       Opam.package = "dune";
       version = Version.at_least "3.0";
-      with_test = false;
+      with_test = Never;
       optional = false;
     }
     :: depends
@@ -1954,8 +1980,20 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   let depends =
     (* Remove duplicate dependencies but when one occurs twice,
        only keep {with-test} if both dependencies had it. *)
+    let merge_with_tests a b =
+      match (a, b) with
+      | Never, _ | _, Never -> Never
+      | Always, Always -> Always
+      | Only_on_64_arch, Only_on_64_arch -> Only_on_64_arch
+      | Only_on_64_arch, Always | Always, Only_on_64_arch ->
+          (* Example: a test A depends on a lib L (this is an Always),
+             and another test B that can only be ran on 64-bit also depends on lib L
+             (this is an Only_on_64_arch). In that case we return Always since the
+             dependency is needed for A even on 32-bit. *)
+          Always
+    in
     let merge (a : Opam.dependency) (b : Opam.dependency) =
-      {a with with_test = a.with_test && b.with_test}
+      {a with with_test = merge_with_tests a.with_test b.with_test}
     in
     deduplicate_list ~merge (fun {Opam.package; _} -> package) depends
   in
@@ -1963,7 +2001,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     List.flatten @@ map internals
     @@ fun internal ->
     List.concat_map
-      (as_opam_dependency ~fix_version:false ~for_package ~with_test:false)
+      (as_opam_dependency ~fix_version:false ~for_package ~with_test:Never)
       internal.conflicts
   in
   let synopsis =
@@ -1992,20 +2030,26 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     let build : Opam.build_instruction =
       {
         command = [S "dune"; S "build"; S "-p"; A "name"; S "-j"; A "jobs"];
-        with_test = false;
+        with_test = Never;
       }
     in
-    let runtest : Opam.build_instruction =
-      {
-        command = [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
-        with_test = true;
-      }
+    let runtest with_test : Opam.build_instruction list =
+      match with_test with
+      | Never -> []
+      | _ ->
+          [
+            {
+              command =
+                [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
+              with_test;
+            };
+          ]
     in
-    [
-      {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = false};
-      build;
-      runtest;
-    ]
+    let with_test =
+      match internals with [] -> Never | head :: _ -> head.opam_with_test
+    in
+    [{Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = Never}; build]
+    @ runtest with_test
   in
   let licenses =
     match
@@ -2386,6 +2430,26 @@ let check_circular_opam_deps () =
           else Queue.push dep to_visit))
   done
 
+let check_opam_with_test_consistency () =
+  Target.iter_internal_by_opam @@ fun this_package internals ->
+  match internals with
+  | [] -> ()
+  | {opam_with_test = expected; _} :: tail -> (
+      match
+        List.find_map
+          (fun ({opam_with_test; _} : Target.internal) ->
+            if opam_with_test <> expected then Some opam_with_test else None)
+          tail
+      with
+      | None -> ()
+      | Some bad ->
+          error
+            "Opam package %s contains targets with different values for \
+             ~opam_with_test: %s and %s.\n"
+            this_package
+            (show_with_test expected)
+            (show_with_test bad))
+
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
 let packages_dir, release, remove_extra_files =
@@ -2490,7 +2554,7 @@ let generate_opam_ci () =
                     (as_opam_dependency
                        ~fix_version:false
                        ~for_package:package_name
-                       ~with_test:false))
+                       ~with_test:Never))
         |> deduplicate_list
              ~merge:(fun a _b -> a)
              (fun {Opam.package; _} -> package)
@@ -2637,6 +2701,7 @@ let check ?exclude () =
     check_circular_opam_deps () ;
     check_for_non_generated_files ~remove_extra_files ?exclude () ;
     check_js_of_ocaml () ;
+    check_opam_with_test_consistency () ;
     if !has_error then exit 1
   with exn ->
     Printexc.print_backtrace stderr ;

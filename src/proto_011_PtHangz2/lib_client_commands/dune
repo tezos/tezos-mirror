@@ -19,7 +19,8 @@
   tezos-client-commands
   tezos-rpc
   tezos-client-base-unix
-  tezos-protocol-plugin-011-PtHangz2)
+  tezos-protocol-plugin-011-PtHangz2
+  uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

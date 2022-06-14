@@ -7,7 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  resto-cohttp)
+  resto-cohttp
+  uri)
  (flags (:standard)
         -open Tezos_base.TzPervasives)
  (modules RPC_client_errors media_type))

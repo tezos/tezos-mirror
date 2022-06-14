@@ -10,6 +10,7 @@
   tezos-client-base
   tezos-mockup-proxy
   tezos-rpc
-  tezos-proxy)
+  tezos-proxy
+  uri)
  (flags (:standard)
         -open Tezos_base.TzPervasives))

@@ -15,6 +15,7 @@ depends: [
   "tezos-client-base-unix"
   "tezos-stdlib-unix"
   "tezos-tx-rollup-alpha"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

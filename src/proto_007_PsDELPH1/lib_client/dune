@@ -11,7 +11,8 @@
   tezos-protocol-007-PsDELPH1
   tezos-signer-backends
   tezos-protocol-plugin-007-PsDELPH1
-  tezos-rpc)
+  tezos-rpc
+  uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

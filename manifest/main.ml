@@ -231,7 +231,7 @@ let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.4")
 
 let pringo = external_lib "pringo" V.(at_least "1.3" && less_than "1.4")
 
-let prometheus = external_lib "prometheus" V.True
+let prometheus = external_lib "prometheus" V.(at_least "0.5")
 
 let prometheus_app = external_lib "prometheus-app" V.True
 
@@ -240,7 +240,7 @@ let prometheus_app_unix = external_sublib prometheus_app "prometheus-app.unix"
 let pyml = external_lib "pyml" V.True
 
 let qcheck_alcotest =
-  external_lib ~js_compatible:true "qcheck-alcotest" V.(at_least "0.15")
+  external_lib ~js_compatible:true "qcheck-alcotest" V.(at_least "0.18")
 
 let qcheck_core = external_lib "qcheck-core" V.True
 
@@ -289,7 +289,7 @@ let tls = external_lib "tls" V.(at_least "0.10")
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
 
-let uri = external_lib ~js_compatible:true "uri" V.True
+let uri = external_lib ~js_compatible:true "uri" V.(at_least "2.2.0")
 
 let utop = external_lib "utop" V.(at_least "2.8")
 
@@ -321,7 +321,7 @@ let tezos_test_helpers =
     ~deps:
       [uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix; data_encoding]
     ~js_compatible:true
-    ~ocaml:V.(at_least "4.08")
+    ~ocaml:V.(at_least "4.12")
     ~linkall:true
     ~dune:
       Dune.
@@ -348,7 +348,7 @@ let tezos_stdlib =
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
-    ~ocaml:V.(at_least "4.08")
+    ~ocaml:V.(at_least "4.12")
     ~js_compatible:true
     ~inline_tests:ppx_inline_test
 
@@ -405,6 +405,7 @@ let tezos_lwt_result_stdlib_bare_functor_outputs =
     ~internal_name:"bare_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_bare_sigs =
   public_lib
@@ -413,6 +414,7 @@ let tezos_lwt_result_stdlib_bare_sigs =
     ~internal_name:"bare_sigs"
     ~js_compatible:true
     ~deps:[lwt; tezos_lwt_result_stdlib_bare_functor_outputs]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_bare_structs =
   public_lib
@@ -421,6 +423,7 @@ let tezos_lwt_result_stdlib_bare_structs =
     ~internal_name:"bare_structs"
     ~js_compatible:true
     ~deps:[lwt; tezos_lwt_result_stdlib_bare_sigs]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_traced_functor_outputs =
   public_lib
@@ -429,6 +432,7 @@ let tezos_lwt_result_stdlib_traced_functor_outputs =
     ~internal_name:"traced_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt; tezos_lwt_result_stdlib_bare_sigs]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_traced_sigs =
   public_lib
@@ -443,6 +447,7 @@ let tezos_lwt_result_stdlib_traced_sigs =
         tezos_lwt_result_stdlib_bare_structs;
         tezos_lwt_result_stdlib_traced_functor_outputs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_traced_structs =
   public_lib
@@ -456,6 +461,7 @@ let tezos_lwt_result_stdlib_traced_structs =
         tezos_lwt_result_stdlib_traced_sigs;
         tezos_lwt_result_stdlib_bare_structs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib =
   public_lib
@@ -473,6 +479,7 @@ let tezos_lwt_result_stdlib =
         tezos_lwt_result_stdlib_traced_sigs;
         tezos_lwt_result_stdlib_traced_structs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_lwt_result_stdlib_examples_traces =
   public_lib
@@ -485,6 +492,7 @@ let tezos_lwt_result_stdlib_examples_traces =
         tezos_lwt_result_stdlib_bare_structs;
         tezos_lwt_result_stdlib_traced_sigs;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let _tezos_lwt_result_stdlib_tests =
   tests
@@ -511,6 +519,7 @@ let _tezos_lwt_result_stdlib_tests =
         qcheck_alcotest;
         tezos_test_helpers;
       ]
+    ~opam_with_test:Only_on_64_arch
 
 let tezos_error_monad =
   public_lib
@@ -701,6 +710,7 @@ let tezos_rpc =
         tezos_error_monad |> open_;
         resto;
         resto_directory;
+        uri;
       ]
     ~js_compatible:true
 
@@ -836,6 +846,7 @@ let tezos_event_logging =
         tezos_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_lwt_result_stdlib;
         lwt_log_core;
+        uri;
       ]
     ~js_compatible:true
 
@@ -882,6 +893,7 @@ let tezos_stdlib_unix =
         mtime_clock_os;
         lwt_log;
         conf_libev;
+        uri;
       ]
 
 let tezos_clic =
@@ -975,6 +987,7 @@ let tezos_base =
         ezjsonm;
         lwt;
         ipaddr;
+        uri;
       ]
     ~js_compatible:true
     ~js_of_ocaml:[[S "javascript_files"; S "ptime.js"]]
@@ -1005,6 +1018,7 @@ let tezos_base_unix =
         tezos_stdlib |> open_;
         tezos_stdlib_unix |> open_;
         data_encoding |> open_;
+        uri;
       ]
 
 let lib_base_tests ?dep_files names =
@@ -1569,7 +1583,9 @@ let _tezos_context_memory_tests =
       ]
 
 (* This binding assumes that librustzcash.a is installed in the system default
-   directories or in: $OPAM_SWITCH_PREFIX/lib *)
+   directories or in: $OPAM_SWITCH_PREFIX/lib
+
+   Tests are disabled in the .opam because the tests require zcash parameter files. *)
 let tezos_sapling =
   public_lib
     "tezos-sapling"
@@ -1603,6 +1619,7 @@ let tezos_sapling =
         "-lrustzcash";
         "-lpthread";
       ]
+    ~opam_with_test:Never
     ~dune:
       Dune.
         [
@@ -1648,6 +1665,7 @@ let _tezos_sapling_tests =
         alcotest_lwt;
       ]
     ~all_modules_except:["test_js"]
+    ~opam_with_test:Never
 
 let _tezos_sapling_js_tests =
   test
@@ -1659,6 +1677,7 @@ let _tezos_sapling_js_tests =
     ~linkall:true
     ~modes:[JS]
     ~js_compatible:true
+    ~opam_with_test:Never
 
 let _tezos_sapling_ctypes_gen =
   private_exes
@@ -1669,6 +1688,7 @@ let _tezos_sapling_ctypes_gen =
     ~deps:[ctypes_stubs; ctypes]
     ~modules:
       ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
+    ~opam_with_test:Never
 
 let tezos_protocol_environment_sigs_stdlib_compat =
   public_lib
@@ -2056,7 +2076,7 @@ let tezos_rpc_http =
     "tezos-rpc-http"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Tezos: library of auto-documented RPCs (http server and client)"
-    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; resto_cohttp]
+    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; resto_cohttp; uri]
     ~modules:["RPC_client_errors"; "media_type"]
 
 let tezos_rpc_http_client =
@@ -2173,6 +2193,7 @@ let tezos_client_base =
         tezos_rpc |> open_;
         tezos_shell_services |> open_;
         tezos_sapling;
+        uri;
       ]
     ~modules:[":standard"; "bip39_english"]
     ~linkall:true
@@ -2234,6 +2255,7 @@ let tezos_signer_backends =
         tezos_rpc_http_client |> open_;
         tezos_signer_services |> open_;
         tezos_shell_services |> open_;
+        uri;
       ]
 
 let _tezos_signer_backends_tests =
@@ -2251,6 +2273,7 @@ let _tezos_signer_backends_tests =
         tezos_client_base |> open_;
         tezos_signer_backends |> open_;
         alcotest_lwt;
+        uri;
       ]
 
 let tezos_signer_backends_unix =
@@ -2273,6 +2296,7 @@ let tezos_signer_backends_unix =
         tezos_signer_services |> open_;
         tezos_signer_backends |> open_;
         tezos_shell_services |> open_;
+        uri;
         select
           ~package:ledgerwallet_tezos
           ~source_if_present:"ledger.available.ml"
@@ -2311,6 +2335,7 @@ let tezos_client_commands =
         tezos_stdlib_unix;
         tezos_signer_backends;
         data_encoding |> open_;
+        uri;
       ]
     ~linkall:true
 
@@ -2325,6 +2350,7 @@ let tezos_mockup_registration =
         tezos_client_base;
         tezos_shell_services;
         tezos_protocol_environment;
+        uri;
       ]
     ~modules:["registration"; "registration_intf"; "mockup_args"]
 
@@ -2342,6 +2368,7 @@ let tezos_mockup_proxy =
         resto_cohttp_self_serving_client;
         tezos_rpc_http_client;
         tezos_shell_services;
+        uri;
       ]
 
 (* Depends on tezos_p2p to register the relevant RPCs. *)
@@ -2422,6 +2449,7 @@ let tezos_proxy =
         tezos_rpc;
         tezos_shell_services;
         tezos_context_memory;
+        uri;
       ]
 
 let tezos_proxy_rpc =
@@ -2435,6 +2463,7 @@ let tezos_proxy_rpc =
         tezos_mockup_proxy;
         tezos_rpc;
         tezos_proxy;
+        uri;
       ]
 
 let _tezos_proxy_tests =
@@ -2458,6 +2487,7 @@ let _tezos_proxy_tests =
         tezos_shell_services_test_helpers;
         qcheck_alcotest;
         alcotest_lwt;
+        uri;
       ]
 
 let tezos_proxy_server_config =
@@ -2465,7 +2495,7 @@ let tezos_proxy_server_config =
     "tezos-proxy-server-config"
     ~path:"src/lib_proxy_server_config"
     ~synopsis:"Tezos: proxy server configuration"
-    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib_unix]
+    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib_unix; uri]
 
 let _tezos_proxy_server_config_tests =
   test
@@ -2480,6 +2510,7 @@ let _tezos_proxy_server_config_tests =
         tezos_test_helpers;
         qcheck_alcotest;
         alcotest_lwt;
+        uri;
       ]
 
 let tezos_client_base_unix =
@@ -2505,6 +2536,7 @@ let tezos_client_base_unix =
         tezos_proxy_rpc;
         tezos_signer_backends_unix;
         lwt_exit;
+        uri;
       ]
     ~linkall:true
 
@@ -3676,6 +3708,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc |> if_ N.(number >= 001) |> open_;
             tezos_client_commands |> if_ N.(number == 000) |> open_;
             tezos_stdlib_unix |> if_ N.(number == 000);
+            uri |> if_ N.(number >= 001);
           ]
         ~bisect_ppx:N.(number >= 008)
         ?inline_tests:(if N.(number >= 009) then Some ppx_inline_test else None)
@@ -3785,6 +3818,8 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc |> open_;
             tezos_client_base_unix |> if_ N.(number >= 009) |> open_;
             plugin |> if_some |> if_ N.(number >= 008) |> open_;
+            (* uri used by the stresstest command introduced in 011 *)
+            uri |> if_ N.(number >= 011);
           ]
         ~bisect_ppx:N.(number >= 008)
         ~linkall:true
@@ -3870,6 +3905,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc_http |> open_;
             lwt_canceler;
             lwt_exit;
+            uri;
           ]
         ~linkall:true
         ~all_modules_except:
@@ -3965,6 +4001,7 @@ include Tezos_raw_protocol_%s.Main
             parameters |> if_some |> if_ N.(number >= 012);
             tezos_crypto |> if_ N.(number >= 012);
             alcotest_lwt;
+            uri;
           ]
     in
     let baking_commands =
@@ -3986,6 +4023,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_client_commands |> open_;
             baking |> if_some |> open_;
             tezos_rpc |> open_;
+            uri;
           ]
         ~linkall:true
         ~modules:
@@ -4102,6 +4140,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_rpc_http_client_unix |> open_;
             main |> open_;
             sc_rollup |> if_some |> open_;
+            uri;
           ]
     in
     let _sc_rollup_node =
@@ -4193,6 +4232,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_stdlib_unix |> open_;
             tx_rollup |> if_some |> open_;
             raw_protocol |> open_;
+            uri;
           ]
     in
     let _tx_rollup_node =
@@ -4713,6 +4753,7 @@ let _tezos_node =
          tls;
          prometheus_app_unix;
          lwt_exit;
+         uri;
        ]
       @ protocol_deps)
     ~linkall:true
@@ -4768,6 +4809,7 @@ let _tezos_client =
          tezos_proxy;
          tezos_client_base_unix |> open_;
          tezos_signer_backends_unix;
+         uri;
        ]
       @ protocol_deps)
     ~linkall:true
@@ -4844,6 +4886,7 @@ let _tezos_proxy_server =
          tezos_shell_services;
          tezos_shell_context;
          tezos_version;
+         uri;
        ]
       @ Protocol.all_optionally [Protocol.client; Protocol.plugin])
     ~linkall:true
@@ -4950,6 +4993,7 @@ let _tezos_tps_evaluation =
         tezt |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
         tezt_performance_regression |> open_;
+        uri;
       ]
     ~static:false
     ~release:false

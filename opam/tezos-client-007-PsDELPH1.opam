@@ -16,6 +16,7 @@ depends: [
   "tezos-signer-backends"
   "tezos-protocol-plugin-007-PsDELPH1"
   "tezos-rpc"
+  "uri" { >= "2.2.0" }
   "tezos-stdlib-unix"
   "tezos-protocol-environment"
   "tezos-client-commands"

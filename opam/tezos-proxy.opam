@@ -17,12 +17,13 @@ depends: [
   "tezos-rpc"
   "tezos-shell-services"
   "tezos-context"
+  "uri" { >= "2.2.0" }
   "tezos-mockup-proxy"
   "tezos-stdlib-unix" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
   "tezos-shell-services-test-helpers" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.15" }
+  "qcheck-alcotest" { with-test & >= "0.18" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [

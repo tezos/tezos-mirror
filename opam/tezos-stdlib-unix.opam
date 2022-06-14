@@ -23,6 +23,7 @@ depends: [
   "mtime" { >= "1.0.0" }
   "lwt_log"
   "conf-libev"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

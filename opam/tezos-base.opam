@@ -21,9 +21,10 @@ depends: [
   "ezjsonm" { >= "1.1.0" }
   "lwt" { >= "5.4.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
+  "uri" { >= "2.2.0" }
   "tezos-hacl"
   "tezos-stdlib-unix"
-  "qcheck-alcotest" { with-test & >= "0.15" }
+  "qcheck-alcotest" { with-test & >= "0.18" }
   "tezos-test-helpers" {with-test}
 ]
 build: [

@@ -20,7 +20,8 @@
   tezos-proxy
   tezos-proxy.rpc
   tezos-signer-backends.unix
-  lwt-exit)
+  lwt-exit
+  uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

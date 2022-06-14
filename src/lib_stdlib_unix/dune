@@ -19,7 +19,8 @@
   ptime
   mtime
   mtime.clock.os
-  lwt_log)
+  lwt_log
+  uri)
  (flags
   (:standard)
   -open Tezos_error_monad

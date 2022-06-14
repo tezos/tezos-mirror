@@ -16,7 +16,8 @@
   tezos-client-base-unix
   tezos-stdlib-unix
   tezos-tx-rollup-013-PtJakart
-  tezos-protocol-013-PtJakart.raw)
+  tezos-protocol-013-PtJakart.raw
+  uri)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

@@ -13,6 +13,7 @@ depends: [
   "tezos-client-base"
   "tezos-shell-services"
   "tezos-protocol-environment"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

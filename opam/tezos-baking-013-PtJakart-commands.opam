@@ -19,6 +19,7 @@ depends: [
   "tezos-client-commands"
   "tezos-baking-013-PtJakart"
   "tezos-rpc"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

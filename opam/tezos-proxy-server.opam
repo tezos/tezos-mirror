@@ -21,6 +21,7 @@ depends: [
   "tezos-shell-services"
   "tezos-shell-context"
   "tezos-version"
+  "uri" { >= "2.2.0" }
 ]
 depopts: [
   "tezos-client-genesis"

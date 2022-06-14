@@ -509,6 +509,14 @@ type inline_tests
 (** Declare an inline_tests backend. *)
 val inline_tests_backend : target -> inline_tests
 
+(** Whether to add the [dune runtest] command in the [.opam] file.
+
+    - [Never]: do not add it.
+    - [Always]: add it with [{with-test}].
+    - [Only_on_64_arch]: add it with [{with-test & ARCH}]
+      where [ARCH] is a condition that only holds on 64-bit architectures. *)
+type with_test = Always | Never | Only_on_64_arch
+
 (** Functions that build internal targets.
 
     The ['a] argument is instantiated by the relevant type for the name(s)
@@ -588,6 +596,9 @@ val inline_tests_backend : target -> inline_tests
       For private libraries, private executables and tests, you must specify
       this argument (you can explicitely set it to [""] to generate no [.opam] file).
 
+    - [opam_with_test]: whether to add the [dune runtest] command.
+      Note that for a given package all targets must have the same value of [opam_with_test].
+
     - [opens]: list of module names to open when compiling.
       They are passed as [-open] flags to the OCaml compiler (in the [(flags ...)] stanza).
 
@@ -651,6 +662,7 @@ type 'a maker =
   ?npm_deps:Npm.t list ->
   ?ocaml:Version.constraints ->
   ?opam:string ->
+  ?opam_with_test:with_test ->
   ?opens:string list ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->

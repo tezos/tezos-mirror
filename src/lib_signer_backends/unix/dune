@@ -19,6 +19,7 @@
   tezos-signer-services
   tezos-signer-backends
   tezos-shell-services
+  uri
   (select ledger.ml from
    (ledgerwallet-tezos -> ledger.available.ml)
    (-> ledger.none.ml)))
