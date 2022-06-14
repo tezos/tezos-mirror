@@ -51,6 +51,11 @@ module type Mutable_level_store =
    node, as only finalized heads are processed to build commitments.
 *)
 
+(* FIXME: #3203
+
+   Using these global variables is fragile considering chain
+   reorganizations and interruptions. We should use a more persistent
+   representations for this piece of information. *)
 module Mutable_counter = struct
   module Make () = struct
     let x = ref Z.zero
