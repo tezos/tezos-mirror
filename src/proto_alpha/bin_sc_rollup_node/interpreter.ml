@@ -36,8 +36,6 @@ module type S = sig
 end
 
 module Make (PVM : Pvm.S) : S = struct
-  module PVM = PVM
-
   (** [eval_until_input state] advances a PVM [state] until it wants more inputs. *)
   let eval_until_input state =
     let open Lwt_syntax in
