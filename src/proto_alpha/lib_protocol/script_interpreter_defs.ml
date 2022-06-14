@@ -545,26 +545,27 @@ let transfer (type t tc) (ctxt, sc) gas amount location
     (parameters_ty : (t, tc) ty) (parameters : t)
     (destination : t typed_destination) entrypoint =
   let ctxt = update_context gas ctxt in
-  collect_lazy_storage ctxt parameters_ty parameters
-  >>?= fun (to_duplicate, ctxt) ->
-  let to_update = no_lazy_storage_id in
-  extract_lazy_storage_diff
-    ctxt
-    Optimized
-    parameters_ty
-    parameters
-    ~to_duplicate
-    ~to_update
-    ~temporary:true
-  >>=? fun (parameters, lazy_storage_diff, ctxt) ->
   (match destination with
   | Typed_implicit destination ->
       let Unit_t = parameters_ty in
       let () = parameters in
       (if Entrypoint.is_default entrypoint then Result.return_unit
       else error (Script_tc_errors.No_such_entrypoint entrypoint))
-      >>?= fun () -> return (Transaction_to_implicit {destination; amount}, ctxt)
+      >>?= fun () ->
+      return (Transaction_to_implicit {destination; amount}, None, ctxt)
   | Typed_originated destination ->
+      collect_lazy_storage ctxt parameters_ty parameters
+      >>?= fun (to_duplicate, ctxt) ->
+      let to_update = no_lazy_storage_id in
+      extract_lazy_storage_diff
+        ctxt
+        Optimized
+        parameters_ty
+        parameters
+        ~to_duplicate
+        ~to_update
+        ~temporary:true
+      >>=? fun (parameters, lazy_storage_diff, ctxt) ->
       unparse_data ctxt Optimized parameters_ty parameters
       >>=? fun (unparsed_parameters, ctxt) ->
       Lwt.return
@@ -583,6 +584,7 @@ let transfer (type t tc) (ctxt, sc) gas amount location
                 parameters;
                 unparsed_parameters;
               },
+            lazy_storage_diff,
             ctxt ) )
   | Typed_tx_rollup destination ->
       make_transaction_to_tx_rollup
@@ -592,6 +594,7 @@ let transfer (type t tc) (ctxt, sc) gas amount location
         ~entrypoint
         ~parameters_ty
         ~parameters
+      >|=? fun (operation, ctxt) -> (operation, None, ctxt)
   | Typed_sc_rollup destination ->
       make_transaction_to_sc_rollup
         ctxt
@@ -599,8 +602,9 @@ let transfer (type t tc) (ctxt, sc) gas amount location
         ~amount
         ~entrypoint
         ~parameters_ty
-        ~parameters)
-  >>=? fun (operation, ctxt) ->
+        ~parameters
+      >|=? fun (operation, ctxt) -> (operation, None, ctxt))
+  >>=? fun (operation, lazy_storage_diff, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
