@@ -739,6 +739,16 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.Hash.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
+  (** [stakers ctxt rollup] returns all the stakers over [rollup] with
+      their related commitment. *)
+  val stakers :
+    Raw_context.t ->
+    Sc_rollup_repr.t ->
+    (Raw_context.t
+    * (Signature.Public_key_hash.t * Sc_rollup_commitment_repr.Hash.t) list)
+    tzresult
+    Lwt.t
+
   (** Cache: This should always be the number of entries in [Stakers].
 
       Combined with {!Commitment_stake_count} (see below), this ensures we can

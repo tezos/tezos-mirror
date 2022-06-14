@@ -3208,6 +3208,8 @@ module Sc_rollup : sig
       val make : Staker.t -> Staker.t -> t
     end
 
+    val encoding : t Data_encoding.t
+
     val opponent : player -> player
 
     type step =
@@ -3283,6 +3285,24 @@ module Sc_rollup : sig
     type point = {commitment : Commitment.t; hash : Commitment.Hash.t}
 
     type conflict_point = point * point
+
+    type conflict = {
+      other : Staker.t;
+      their_commitment : Commitment.t;
+      our_commitment : Commitment.t;
+      parent_commitment : Commitment.Hash.t;
+    }
+
+    val conflict_encoding : conflict Data_encoding.t
+
+    val conflicting_stakers_uncarbonated :
+      context -> t -> Staker.t -> conflict list tzresult Lwt.t
+
+    val get_ongoing_game_for_staker :
+      context ->
+      t ->
+      Staker.t ->
+      ((Game.t * Game.Index.t) option * context) tzresult Lwt.t
 
     val game_move :
       context ->

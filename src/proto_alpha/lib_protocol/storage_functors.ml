@@ -500,7 +500,7 @@ module Make_indexed_carbonated_data_storage_INTERNAL
               | None -> assert false
               | Some key ->
                   get_unprojected s key >|=? fun (s, value) ->
-                  (s, value :: rev_values, 0, pred length))
+                  (s, (key, value) :: rev_values, 0, pred length))
         | _ -> Lwt.return acc)
     >|=? fun (s, rev_values, _offset, _length) ->
     (C.project s, List.rev rev_values)
