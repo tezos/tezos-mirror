@@ -256,7 +256,12 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
   let amount =
     match balance -? origination_burn with Ok r -> r | Error _ -> assert false
   in
-  Op.transaction (B b) deactivated_contract sink_contract amount
+  Op.transaction
+    ~force_reveal:true
+    (B b)
+    deactivated_contract
+    sink_contract
+    amount
   >>=? fun empty_contract ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b
   >>=? fun b0 ->
@@ -270,7 +275,12 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
   (* the account is still deactivated *)
   check_no_stake ~loc:__LOC__ b deactivated_account >>=? fun () ->
   (**** recredit *)
-  Op.transaction (B b1) sink_contract deactivated_contract amount
+  Op.transaction
+    ~force_reveal:true
+    (B b1)
+    sink_contract
+    deactivated_contract
+    amount
   >>=? fun recredit_contract ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:recredit_contract b1
   >>=? fun b2 ->
@@ -304,12 +314,12 @@ let test_delegation () =
   | Some pkh -> assert (Signature.Public_key_hash.equal pkh m1.pkh)) ;
   let constants = Default_parameters.constants_test in
   let one_roll = constants.tokens_per_roll in
-  Op.transaction (B b) a1 a3 one_roll >>=? fun transact ->
+  Op.transaction ~force_reveal:true (B b) a1 a3 one_roll >>=? fun transact ->
   Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->
   Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
   (match delegate with None -> () | Some _ -> assert false) ;
   check_no_stake ~loc:__LOC__ b m3 >>=? fun () ->
-  Op.delegation (B b) a3 (Some m3.pkh) >>=? fun delegation ->
+  Op.delegation ~force_reveal:true (B b) a3 (Some m3.pkh) >>=? fun delegation ->
   Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation >>=? fun b ->
   Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
   (match delegate with

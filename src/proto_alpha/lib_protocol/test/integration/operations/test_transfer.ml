@@ -186,11 +186,13 @@ let test_transfer_zero_implicit_with_bal_src_as_fee () =
   let src_pkh = account.Account.pkh in
   Incremental.begin_construction b >>=? fun i ->
   let src = Contract.Implicit src_pkh in
-  Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
+  Op.transaction ~force_reveal:true (I i) dest src (Tez.of_mutez_exn 100L)
+  >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) src >>=? fun bal_src ->
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
-  Op.transaction (I i) ~fee:bal_src src dest Tez.zero >>=? fun op ->
+  Op.transaction ~force_reveal:true (I i) ~fee:bal_src src dest Tez.zero
+  >>=? fun op ->
   (* Transferring zero tez should result in an application failure as
      the implicit contract has been depleted. *)
   let expect_apply_failure = function
@@ -307,7 +309,11 @@ let test_transfer_from_implicit_to_originated_contract () =
     amount1
   >>=? fun (b, _) ->
   (* originated contract *)
-  Op.contract_origination (I b) contract ~script:Op.dummy_script
+  Op.contract_origination
+    ~force_reveal:true
+    (I b)
+    contract
+    ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   two_over_n_of_balance b bootstrap_contract 4L >>=? fun amount2 ->
@@ -668,7 +674,7 @@ let tests =
     Tztest.tztest "missing transaction" `Quick test_missing_transaction;
     (* transfer from/to implicit/originated contracts*)
     Tztest.tztest
-      "transfer from an implicit to implicit contract "
+      "transfer from an implicit to implicit contract"
       `Quick
       test_transfer_from_implicit_to_implicit_contract;
     Tztest.tztest

@@ -35,6 +35,7 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
   let* bal_dst = Context.Contract.balance (I b) dst in
   let* op =
     Op.transaction
+      ~force_reveal:true
       ~gas_limit:(Custom_gas (Alpha_context.Gas.Arith.integral_of_int_exn 3000))
       (I b)
       ~fee

@@ -68,6 +68,7 @@ let init_context ?hard_gas_limit_per_block () =
   let counter = Z.zero in
   let* fund_rollup_account =
     Op.transaction
+      ~force_reveal:true
       ~counter
       ~gas_limit
       (B b)
@@ -78,7 +79,12 @@ let init_context ?hard_gas_limit_per_block () =
   let* b = Block.bake ~operation:fund_rollup_account b in
   let counter2 = Z.succ counter in
   let* rollup_origination, tx_rollup =
-    Op.tx_rollup_origination ~counter:counter2 ~gas_limit (B b) rollup_contract
+    Op.tx_rollup_origination
+      ~force_reveal:true
+      ~counter:counter2
+      ~gas_limit
+      (B b)
+      rollup_contract
   in
   let* _, sc_rollup =
     Op.sc_rollup_origination
@@ -162,13 +168,18 @@ let init_delegated_implicit () =
   in
   let* operation =
     Op.delegation
+      ~force_reveal:true
       (B infos.block)
       infos.contract2
       (Some (Context.Contract.pkh infos.contract2))
   in
   let* block = Block.bake infos.block ~operation in
   let* operation =
-    Op.delegation (B block) infos.contract1 (Some infos.account2.pkh)
+    Op.delegation
+      ~force_reveal:true
+      (B block)
+      infos.contract1
+      (Some infos.account2.pkh)
   in
   let* block = Block.bake block ~operation in
   let* del_opt_new = Context.Contract.delegate_opt (B block) infos.contract1 in
@@ -190,7 +201,11 @@ let init_self_delegated_implicit () =
       del_opt
   in
   let* operation =
-    Op.delegation (B infos.block) infos.contract1 (Some infos.account1.pkh)
+    Op.delegation
+      ~force_reveal:true
+      (B infos.block)
+      infos.contract1
+      (Some infos.account1.pkh)
   in
   let* block = Block.bake infos.block ~operation in
   let* del_opt_new = Context.Contract.delegate_opt (B block) infos.contract1 in
