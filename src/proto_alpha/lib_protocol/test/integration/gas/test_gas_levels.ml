@@ -254,17 +254,20 @@ let originate_contract block source script =
   prepare_origination block source script >>=? fun (operation, dst) ->
   Block.bake ~operation block >>=? fun block -> return (block, dst)
 
-let init_block to_originate =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (block, src) ->
-  (*** originate contracts ***)
-  let rec full_originate block originated = function
-    | [] -> return (block, List.rev originated)
-    | h :: t ->
-        originate_contract block src h >>=? fun (block, ct) ->
-        full_originate block (ct :: originated) t
-  in
-  full_originate block [] to_originate >>=? fun (block, originated) ->
-  return (block, src, originated)
+let init_block n to_originate =
+  Context.init_n n ~consensus_threshold:0 () >>=? fun (block, src_list) ->
+  match src_list with
+  | [] -> assert false
+  | src :: _ ->
+      (*** originate contracts ***)
+      let rec full_originate block originated = function
+        | [] -> return (block, List.rev originated)
+        | h :: t ->
+            originate_contract block src h >>=? fun (block, ct) ->
+            full_originate block (ct :: originated) t
+      in
+      full_originate block [] to_originate >>=? fun (block, originated) ->
+      return (block, src_list, originated)
 
 let nil_contract =
   "parameter unit;\n\
@@ -292,24 +295,24 @@ let loop_contract =
   \       UNIT; NIL operation; PAIR\n\
   \     }\n"
 
-let block_with_one_origination contract =
-  init_block [contract] >>=? fun (block, src, originated) ->
-  match originated with [dst] -> return (block, src, dst) | _ -> assert false
+let block_with_one_origination n contract =
+  init_block n [contract] >>=? fun (block, srcs, originated) ->
+  match originated with [dst] -> return (block, srcs, dst) | _ -> assert false
 
-let full_block () =
-  init_block [nil_contract; fail_contract; loop_contract]
-  >>=? fun (block, src, originated) ->
+let full_block n () =
+  init_block n [nil_contract; fail_contract; loop_contract]
+  >>=? fun (block, src_list, originated) ->
   let dst_nil, dst_fail, dst_loop =
     match originated with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
   in
-  return (block, src, dst_nil, dst_fail, dst_loop)
+  return (block, src_list, dst_nil, dst_fail, dst_loop)
 
 (** Combine a list of operations into an operation list. Also returns
     the sum of their gas limits.*)
-let combine_operations_with_gas ?counter block src list_dst =
-  let rec make_op_list full_gas op_list = function
-    | [] -> return (full_gas, List.rev op_list)
-    | (dst, gas_limit) :: t ->
+let combine_operations_with_gas block list_dst =
+  let rec make_op_list src full_gas op_list = function
+    | [] -> return (src, full_gas, List.rev op_list)
+    | (src, dst, gas_limit) :: t ->
         Op.transaction
           ~gas_limit:(Custom_gas gas_limit)
           (B block)
@@ -318,32 +321,29 @@ let combine_operations_with_gas ?counter block src list_dst =
           Alpha_context.Tez.zero
         >>=? fun op ->
         make_op_list
+          (Some src)
           (Alpha_context.Gas.Arith.add full_gas gas_limit)
           (op :: op_list)
           t
   in
-  make_op_list Alpha_context.Gas.Arith.zero [] list_dst
-  >>=? fun (full_gas, op_list) ->
-  Op.combine_operations ?counter ~source:src (B block) op_list
-  >>=? fun operation -> return (operation, full_gas)
+  make_op_list None Alpha_context.Gas.Arith.zero [] list_dst
+  >>=? fun (src, full_gas, op_list) ->
+  match src with
+  | None -> assert false
+  | Some source ->
+      Op.batch_operations ~recompute_counters:true ~source (B block) op_list
+      >>=? fun operation -> return (operation, full_gas)
 
 (** Applies [combine_operations_with_gas] to lists in a list, then bake a block
     with this list of operations. Also returns the sum of all gas limits *)
-let bake_operations_with_gas ?counter block src list_list_dst =
-  let counter = Option.value ~default:Z.zero counter in
-  let rec make_list full_gas op_list counter = function
+let bake_operations_with_gas block list_list_dst =
+  let rec make_list full_gas op_list = function
     | [] -> return (full_gas, List.rev op_list)
     | list_dst :: t ->
-        let n = Z.of_int (List.length list_dst) in
-        combine_operations_with_gas ~counter block src list_dst
-        >>=? fun (op, gas) ->
-        make_list
-          (Alpha_context.Gas.Arith.add full_gas gas)
-          (op :: op_list)
-          (Z.add counter n)
-          t
+        combine_operations_with_gas block list_dst >>=? fun (op, gas) ->
+        make_list (Alpha_context.Gas.Arith.add full_gas gas) (op :: op_list) t
   in
-  make_list Alpha_context.Gas.Arith.zero [] counter list_list_dst
+  make_list Alpha_context.Gas.Arith.zero [] list_list_dst
   >>=? fun (gas_limit_total, operations) ->
   bake_with_gas ~operations block >>=? fun (block, consumed_gas) ->
   return (block, consumed_gas, gas_limit_total)
@@ -354,9 +354,18 @@ let basic_gas_sampler () =
    + Random.int 900)
 
 let generic_test_block_one_origination contract gas_sampler structure =
-  block_with_one_origination contract >>=? fun (block, src, dst) ->
-  let lld = List.map (List.map (fun _ -> (dst, gas_sampler ()))) structure in
-  bake_operations_with_gas ~counter:Z.one block src lld
+  let sources_number = List.length structure in
+  block_with_one_origination sources_number contract
+  >>=? fun (block, src_list, dst) ->
+  let lld =
+    List.mapi
+      (fun i t ->
+        match List.nth src_list i with
+        | None -> assert false
+        | Some src -> (List.map (fun _ -> (src, dst, gas_sampler ()))) t)
+      structure
+  in
+  bake_operations_with_gas block lld
   >>=? fun (_block, consumed_gas, gas_limit_total) ->
   check_consumed_gas consumed_gas gas_limit_total
 
@@ -377,33 +386,43 @@ let make_batch_test_block_one_origination name contract gas_sampler =
 
 (** Tests the consumption of all gas in a block, should pass *)
 let test_consume_exactly_all_block_gas () =
-  block_with_one_origination nil_contract >>=? fun (block, src, dst) ->
+  let number_of_ops = 5 in
+  block_with_one_origination number_of_ops nil_contract
+  >>=? fun (block, src_list, dst) ->
   (* assumptions:
      hard gas limit per operation = 1040000
      hard gas limit per block = 5200000
   *)
   let lld =
     List.map
-      (fun _ -> [(dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
-      [1; 1; 1; 1; 1]
+      (fun src ->
+        [(src, dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
+      src_list
   in
-  bake_operations_with_gas ~counter:Z.one block src lld >>=? fun _ -> return ()
+  bake_operations_with_gas block lld >>=? fun _ -> return ()
 
 (** Tests the consumption of more than the block gas level with many single
     operations, should fail *)
 let test_malformed_block_max_limit_reached () =
-  block_with_one_origination nil_contract >>=? fun (block, src, dst) ->
+  let number_of_ops = 6 in
+  block_with_one_origination number_of_ops nil_contract
+  >>=? fun (block, src_list, dst) ->
   (* assumptions:
      hard gas limit per operation = 1040000
      hard gas limit per block = 5200000
   *)
   let lld =
-    [(dst, Alpha_context.Gas.Arith.integral_of_int_exn 1)]
-    :: List.map
-         (fun _ -> [(dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
-         [1; 1; 1; 1; 1]
+    List.mapi
+      (fun i src ->
+        [
+          ( src,
+            dst,
+            Alpha_context.Gas.Arith.integral_of_int_exn
+              (if i = number_of_ops - 1 then 1 else 1040000) );
+        ])
+      src_list
   in
-  bake_operations_with_gas ~counter:Z.one block src lld >>= function
+  bake_operations_with_gas block lld >>= function
   | Error _ -> return_unit
   | Ok _ ->
       fail
@@ -414,20 +433,25 @@ let test_malformed_block_max_limit_reached () =
 (** Tests the consumption of more than the block gas level with one big
     operation list, should fail *)
 let test_malformed_block_max_limit_reached' () =
-  block_with_one_origination nil_contract >>=? fun (block, src, dst) ->
+  let number_of_ops = 6 in
+  block_with_one_origination number_of_ops nil_contract
+  >>=? fun (block, src_list, dst) ->
   (* assumptions:
      hard gas limit per operation = 1040000
      hard gas limit per block = 5200000
   *)
   let lld =
-    [
-      (dst, Alpha_context.Gas.Arith.integral_of_int_exn 1)
-      :: List.map
-           (fun _ -> (dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000))
-           [1; 1; 1; 1; 1];
-    ]
+    List.mapi
+      (fun i src ->
+        [
+          ( src,
+            dst,
+            Alpha_context.Gas.Arith.integral_of_int_exn
+              (if i = number_of_ops - 1 then 1 else 1040000) );
+        ])
+      src_list
   in
-  bake_operations_with_gas ~counter:Z.one block src lld >>= function
+  bake_operations_with_gas block lld >>= function
   | Error _ -> return_unit
   | Ok _ ->
       fail
@@ -436,10 +460,17 @@ let test_malformed_block_max_limit_reached' () =
             gas limit per block")
 
 let test_block_mixed_operations () =
-  full_block () >>=? fun (block, src, dst_nil, dst_fail, dst_loop) ->
+  let number_of_ops = 4 in
+  full_block number_of_ops ()
+  >>=? fun (block, src_list, dst_nil, dst_fail, dst_loop) ->
   let l = [[dst_nil]; [dst_nil; dst_fail; dst_nil]; [dst_loop]; [dst_nil]] in
-  let lld = List.map (List.map (fun x -> (x, basic_gas_sampler ()))) l in
-  bake_operations_with_gas ~counter:(Z.of_int 3) block src lld
+  List.map2
+    ~when_different_lengths:[]
+    (fun src l -> (List.map (fun x -> (src, x, basic_gas_sampler ()))) l)
+    src_list
+    l
+  >>?= fun lld ->
+  bake_operations_with_gas block lld
   >>=? fun (_block, consumed_gas, gas_limit_total) ->
   check_consumed_gas consumed_gas gas_limit_total
 
