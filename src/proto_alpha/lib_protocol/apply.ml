@@ -798,7 +798,7 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
   >>=? fun (ctxt, balance_updates) ->
   let is_unit =
     match parameter with
-    | Typed_arg (_, Unit_t, ()) -> true
+    | Typed_arg ((), Unit_t, ()) -> true
     | Typed_arg _ -> false
     | Untyped_arg parameter -> (
         match Micheline.root parameter with
@@ -1098,13 +1098,14 @@ let apply_internal_operation_contents :
      comparing it with the [ctxt] we will have at the end of the
      application). *)
   match operation with
-  | Transaction_to_implicit {destination = pkh; amount; entrypoint; location} ->
+  | Transaction_to_implicit
+      {destination = pkh; amount; entrypoint; location = _} ->
       apply_transaction_to_implicit
         ~ctxt
         ~source
         ~amount
         ~pkh
-        ~parameter:(Typed_arg (location, Unit_t, ()))
+        ~parameter:(Typed_arg ((), Unit_t, ()))
         ~entrypoint
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
