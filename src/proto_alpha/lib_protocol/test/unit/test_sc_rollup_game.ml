@@ -37,6 +37,7 @@ open Lwt_result_syntax
 module Commitment_repr = Sc_rollup_commitment_repr
 module T = Test_sc_rollup_storage
 module R = Sc_rollup_refutation_storage
+module G = Sc_rollup_game_repr
 module Tick = Sc_rollup_tick_repr
 
 let check_reason ~loc (outcome : Sc_rollup_game_repr.outcome option) s =
@@ -59,6 +60,29 @@ let tick_of_int_exn n =
   match Tick.of_int n with None -> assert false | Some t -> t
 
 let hash_int n = Sc_rollup_repr.State_hash.hash_string [Format.sprintf "%d" n]
+
+let init_dissection ?(size = 32) ?init_tick start_hash =
+  let default_init_tick i =
+    let hash =
+      if i = size - 1 then None
+      else Some (if i = 0 then start_hash else hash_int i)
+    in
+    (hash, tick_of_int_exn i)
+  in
+  let init_tick =
+    Option.fold
+      ~none:default_init_tick
+      ~some:(fun init_tick -> init_tick size)
+      init_tick
+  in
+  Stdlib.List.init size init_tick
+
+let init_refutation ?size ?init_tick start_hash =
+  G.
+    {
+      choice = Sc_rollup_tick_repr.initial;
+      step = Dissection (init_dissection ?size ?init_tick start_hash);
+    }
 
 let two_stakers_in_conflict () =
   let* ctxt, rollup, refuter, defender =
@@ -122,16 +146,11 @@ let two_stakers_in_conflict () =
 let test_poorly_distributed_dissection () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
   let start_hash = Sc_rollup_repr.State_hash.hash_string ["foo"] in
-  let dissection =
-    Stdlib.List.init 32 (fun i ->
-        if i = 0 then (Some start_hash, tick_of_int_exn 0)
-        else if i = 31 then (None, tick_of_int_exn 10000)
-        else (Some (hash_int i), tick_of_int_exn i))
+  let init_tick size i =
+    if i = size - 1 then (None, tick_of_int_exn 10000)
+    else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
   in
-  let move =
-    Sc_rollup_game_repr.
-      {choice = Sc_rollup_tick_repr.initial; step = Dissection dissection}
-  in
+  let move = init_refutation ~init_tick start_hash in
   let* outcome, _ctxt =
     T.lift
     @@ R.game_move
@@ -173,14 +192,133 @@ let test_single_valid_game_move () =
   in
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_outcome outcome
 
+(* In order to test that a staker cannot play two refutation games at once (see
+   {!Sc_rollup_refutation_storage}), we first create a situation where a
+   defender is up against a refuter. This test should pass.
+   Then we initiate the same configuration, but with another refuter playing
+   against the same defender. This test should fail.
+   Note that the first test where everything goes right is not mandatory: we
+   will check that the error raised in the second test is exactly
+   [Sc_rollup_staker_in_game], so this should be enough to verify the property.
+   However, having a successful test can help us understand what went wrong if
+   the tests don't pass after some code modifications.
+
+   First, the function below creates a context with three stakers: one
+   defender and two refuters. But the second refuter will play only if the
+   [refuter2_plays] boolean parameter below is [true].
+   Then, the function is instantiated twice (with [refuter2_plays] set to
+   [false] and then to [true]) in order to create the tests described above. *)
+let staker_injectivity_gen ~refuter2_plays =
+  (* Create the defender and the two refuters. *)
+  let+ ctxt, rollup, refuter1, refuter2, defender =
+    T.originate_rollup_and_deposit_with_three_stakers ()
+  in
+  let res =
+    (* Create and publish four commits:
+       * [commit1]: the base commit published by [defender] and that everybody
+         agrees on;
+       and then three commits whose [commit1] is the predecessor and that will
+       be challenged in the refutation game:
+       * [commit2]: published by [defender];
+       * [commit3]: published by [refuter1];
+       * [commit4]: published by [refuter2]. *)
+    let hash1 = Sc_rollup_repr.State_hash.hash_string ["foo"] in
+    let hash2 = Sc_rollup_repr.State_hash.hash_string ["bar"] in
+    let hash3 = Sc_rollup_repr.State_hash.hash_string ["xyz"] in
+    let hash4 = Sc_rollup_repr.State_hash.hash_string ["abc"] in
+    let refutation = init_refutation hash1 in
+    let commit1 =
+      Commitment_repr.
+        {
+          predecessor = Commitment_repr.Hash.zero;
+          inbox_level = T.valid_inbox_level ctxt 1l;
+          number_of_messages = T.number_of_messages_exn 5l;
+          number_of_ticks = T.number_of_ticks_exn 152231l;
+          compressed_state = hash1;
+        }
+    in
+    let* c1hash, _, ctxt =
+      T.lift
+      @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+           ctxt
+           rollup
+           defender
+           commit1
+    in
+    let challenging_commit compressed_state =
+      Commitment_repr.
+        {
+          predecessor = c1hash;
+          inbox_level = T.valid_inbox_level ctxt 2l;
+          number_of_messages = T.number_of_messages_exn 4l;
+          number_of_ticks = T.number_of_ticks_exn 10000l;
+          compressed_state;
+        }
+    in
+    let commit2 = challenging_commit hash2 in
+    let commit3 = challenging_commit hash3 in
+    let commit4 = challenging_commit hash4 in
+    (* Publish the commits. *)
+    let publish_commitment ctxt staker commit =
+      let+ _, _, ctxt, _ =
+        T.lift
+        @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup staker commit
+      in
+      ctxt
+    in
+    let* ctxt = publish_commitment ctxt defender commit2 in
+    let* ctxt = publish_commitment ctxt refuter1 commit3 in
+    let* ctxt = publish_commitment ctxt refuter2 commit4 in
+    (* Start the games. [refuter2] plays only if [refuter2_plays] is [true]. *)
+    let game_move ctxt ~player ~opponent =
+      let+ _, ctxt =
+        T.lift
+        @@ R.game_move
+             ctxt
+             rollup
+             ~player
+             ~opponent
+             refutation
+             ~is_opening_move:true
+      in
+      ctxt
+    in
+    let* ctxt = game_move ctxt ~player:refuter1 ~opponent:defender in
+    let+ _ctxt =
+      if refuter2_plays then game_move ctxt ~player:refuter2 ~opponent:defender
+      else return ctxt
+    in
+    ()
+  in
+  (refuter1, refuter2, defender, res)
+
+(** Test that a staker can be part of at most one refutation game. *)
+let test_staker_injectivity () =
+  (* Test that it's OK to have three stakers where only two of them are
+     playing. *)
+  let* _ = staker_injectivity_gen ~refuter2_plays:false in
+  (* Test that an error is triggered if a defender plays against two refuters at
+     once. *)
+  let* _, _, defender, res = staker_injectivity_gen ~refuter2_plays:true in
+  let open Lwt_syntax in
+  let* res = res in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (( = ) (Sc_rollup_errors.Sc_rollup_staker_in_game (`Defender defender)))
+
 let tests =
   [
     Tztest.tztest
-      "A badly distributed dissection is an invalid move"
+      "A badly distributed dissection is an invalid move."
       `Quick
       test_poorly_distributed_dissection;
     Tztest.tztest
       "A single game move with a valid dissection"
       `Quick
       test_single_valid_game_move;
+    Tztest.tztest
+      "Staker can be in at most one game (injectivity)."
+      `Quick
+      test_staker_injectivity;
   ]

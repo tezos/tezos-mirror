@@ -193,11 +193,11 @@ let init_game ctxt rollup ~refuter ~defender =
       let* _ =
         match (opp_1, opp_2) with
         | None, None -> return ()
-        | Some refuter, None ->
+        | Some _refuter_opponent, None ->
             fail (Sc_rollup_staker_in_game (`Refuter refuter))
-        | None, Some defender ->
+        | None, Some _defender_opponent ->
             fail (Sc_rollup_staker_in_game (`Defender defender))
-        | Some refuter, Some defender ->
+        | Some _refuter_opponent, Some _defender_opponent ->
             fail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
       in
       let* ( ( {hash = _refuter_commit; commitment = _info},
