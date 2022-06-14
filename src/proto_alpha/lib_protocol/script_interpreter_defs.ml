@@ -464,40 +464,6 @@ let apply ctxt gas capture_ty capture lam =
       let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
-let make_transaction_to_contract ctxt ~(destination : Contract.t) ~amount
-    ~entrypoint ~location ~parameters_ty ~parameters =
-  unparse_data ctxt Optimized parameters_ty parameters
-  >>=? fun (unparsed_parameters, ctxt) ->
-  Lwt.return
-    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-    >|? fun ctxt ->
-      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-      match destination with
-      | Implicit destination ->
-          ( Transaction_to_implicit
-              {
-                destination;
-                amount;
-                entrypoint;
-                location;
-                parameters_ty;
-                parameters;
-                unparsed_parameters;
-              },
-            ctxt )
-      | Originated destination ->
-          ( Transaction_to_smart_contract
-              {
-                destination;
-                amount;
-                entrypoint;
-                location;
-                parameters_ty;
-                parameters;
-                unparsed_parameters;
-              },
-            ctxt ) )
-
 let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
     ~entrypoint ~(parameters_ty : (t, tc) ty) ~parameters =
   (* The entrypoints of a transaction rollup are polymorphic wrt. the
@@ -602,15 +568,46 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
     ~temporary:true
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
   (match destination with
-  | Contract destination ->
-      make_transaction_to_contract
-        ctxt
-        ~destination
-        ~amount
-        ~entrypoint
-        ~location
-        ~parameters_ty
-        ~parameters
+  | Contract (Implicit destination) ->
+      unparse_data ctxt Optimized parameters_ty parameters
+      >>=? fun (unparsed_parameters, ctxt) ->
+      Lwt.return
+        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+        >|? fun ctxt ->
+          let unparsed_parameters =
+            Micheline.strip_locations unparsed_parameters
+          in
+          ( Transaction_to_implicit
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            ctxt ) )
+  | Contract (Originated destination) ->
+      unparse_data ctxt Optimized parameters_ty parameters
+      >>=? fun (unparsed_parameters, ctxt) ->
+      Lwt.return
+        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+        >|? fun ctxt ->
+          let unparsed_parameters =
+            Micheline.strip_locations unparsed_parameters
+          in
+          ( Transaction_to_smart_contract
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            ctxt ) )
   | Tx_rollup destination ->
       make_transaction_to_tx_rollup
         ctxt
