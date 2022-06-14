@@ -33,8 +33,12 @@ type t
 (** The initial tick. *)
 val initial : t
 
-(** [next tick] returns the counter successor of [tick]. No overflow can happen. *)
+(** [next tick] returns the counter successor of [tick]. *)
 val next : t -> t
+
+(** [jump tick k] moves [tick] by [k] (possibly negative) steps.
+    The move stops at [initial] when going back in time. *)
+val jump : t -> Z.t -> t
 
 (** [distance t1 t2] is the absolute value of the difference between [t1] and [t2]. *)
 val distance : t -> t -> Z.t

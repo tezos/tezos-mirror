@@ -30,6 +30,8 @@ let initial = zero
 
 let next = succ
 
+let jump tick z = max initial (add tick z)
+
 let pp = pp_print
 
 let encoding = Data_encoding.n
