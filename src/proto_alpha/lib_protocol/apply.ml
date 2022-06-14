@@ -796,37 +796,31 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~untyped_parameter
   Contract.allocated ctxt contract >>= fun already_allocated ->
   Token.transfer ctxt (`Contract source) (`Contract contract) amount
   >>=? fun (ctxt, balance_updates) ->
-  let is_unit =
-    match untyped_parameter with
-    | None -> true
-    | Some parameter -> (
-        match Micheline.root parameter with
-        | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> true
-        | _ -> false)
+  (* Only allow [Unit] parameter to implicit accounts. *)
+  (match untyped_parameter with
+  | None -> Result.return_unit
+  | Some parameter -> (
+      match Micheline.root parameter with
+      | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
+      | _ -> error (Script_interpreter.Bad_contract_parameter contract)))
+  >>?= fun () ->
+  (if Entrypoint.is_default entrypoint then Result.return_unit
+  else error (Script_tc_errors.No_such_entrypoint entrypoint))
+  >>?= fun () ->
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates;
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract = not already_allocated;
+      }
   in
-  Lwt.return
-    ( ( (if Entrypoint.is_default entrypoint then Result.return_unit
-        else error (Script_tc_errors.No_such_entrypoint entrypoint))
-      >>? fun () ->
-        if is_unit then
-          (* Only allow [Unit] parameter to implicit accounts. *)
-          ok ctxt
-        else error (Script_interpreter.Bad_contract_parameter contract) )
-    >|? fun ctxt ->
-      let result =
-        Transaction_to_contract_result
-          {
-            storage = None;
-            lazy_storage_diff = None;
-            balance_updates;
-            originated_contracts = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            storage_size = Z.zero;
-            paid_storage_size_diff = Z.zero;
-            allocated_destination_contract = not already_allocated;
-          }
-      in
-      (ctxt, result, []) )
+  return (ctxt, result, [])
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
