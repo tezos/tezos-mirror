@@ -74,7 +74,12 @@ def download_artifacts_from_job(
     with open(zip_file_fd, "wb") as zip_file:
         job.artifacts(streamed=True, action=zip_file.write)
 
-    cmd = ["unzip", "-b", zip_file_name]
+    cmd = [
+        "unzip",
+        "-b", # treat all files as binary
+        "-o", # overwrite any existing with no prompts
+        zip_file_name
+    ]
     if outdir:
         cmd += ["-d", outdir]
     subprocess.run(cmd, check=True)
@@ -249,7 +254,7 @@ def main() -> None:
     if coverage_job is not None:
         print(f"Coverage: {coverage_job.coverage}%")
         download_artifacts_from_job(project, coverage_job.id)
-        print("Succesfully retrieved and extracted artifacts")
+        print("Successfully retrieved and extracted artifacts")
 
     else:
         print("Coverage: None")
