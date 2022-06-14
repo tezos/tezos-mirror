@@ -322,9 +322,16 @@ let test_backtracked_reveal_in_batch () =
     [op_reveal; op_transfer]
   >>=? fun batched_operation ->
   let expect_apply_failure = function
-    | [Environment.Ecoproto_error (Contract_storage.Balance_too_low _)] ->
+    | [
+        Environment.Ecoproto_error (Contract_storage.Balance_too_low _);
+        Environment.Ecoproto_error (Tez_repr.Subtraction_underflow _);
+      ] ->
         return_unit
-    | _ -> assert false
+    | err ->
+        failwith
+          "Error trace:@, %a does not match the expected one"
+          Error_monad.pp_print_trace
+          err
   in
   Incremental.add_operation ~expect_apply_failure inc batched_operation
   >>=? fun inc ->

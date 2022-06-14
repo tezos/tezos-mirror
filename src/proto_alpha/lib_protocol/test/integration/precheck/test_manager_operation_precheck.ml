@@ -347,7 +347,10 @@ let generate_unrevealed_key () =
 let high_fee_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
-    | [Environment.Ecoproto_error (Contract_storage.Balance_too_low _)] ->
+    | [
+     Environment.Ecoproto_error (Contract_storage.Balance_too_low _);
+     Environment.Ecoproto_error (Tez_repr.Subtraction_underflow _);
+    ] ->
         return_unit
     | err ->
         failwith
