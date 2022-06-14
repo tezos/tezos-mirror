@@ -70,12 +70,12 @@ let internal_operation (type kind)
     kind internal_operation =
   let operation : kind internal_operation_contents =
     match operation with
-    | Transaction_to_implicit {destination; amount; entrypoint} ->
+    | Transaction_to_implicit {destination; amount} ->
         Transaction
           {
             destination = Contract (Implicit destination);
             amount;
-            entrypoint;
+            entrypoint = Entrypoint.default;
             parameters = Script.unit_parameter;
           }
     | Transaction_to_smart_contract

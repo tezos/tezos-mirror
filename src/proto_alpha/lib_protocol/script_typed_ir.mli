@@ -1481,7 +1481,6 @@ and 'kind internal_operation_contents =
   | Transaction_to_implicit : {
       destination : Signature.Public_key_hash.t;
       amount : Tez.tez;
-      entrypoint : Entrypoint.t;
     }
       -> Kind.transaction internal_operation_contents
   | Transaction_to_smart_contract : {

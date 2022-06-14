@@ -1091,14 +1091,14 @@ let apply_internal_operation_contents :
      comparing it with the [ctxt] we will have at the end of the
      application). *)
   match operation with
-  | Transaction_to_implicit {destination = pkh; amount; entrypoint} ->
+  | Transaction_to_implicit {destination = pkh; amount} ->
       apply_transaction_to_implicit
         ~ctxt
         ~source
         ~amount
         ~pkh
         ~untyped_parameter:None
-        ~entrypoint
+        ~entrypoint:Entrypoint.default
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,

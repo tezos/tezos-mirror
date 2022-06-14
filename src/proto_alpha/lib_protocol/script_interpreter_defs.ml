@@ -561,7 +561,9 @@ let transfer (type t tc) (ctxt, sc) gas amount location
   | Typed_implicit destination ->
       let Unit_t = parameters_ty in
       let () = parameters in
-      return (Transaction_to_implicit {destination; amount; entrypoint}, ctxt)
+      (if Entrypoint.is_default entrypoint then Result.return_unit
+      else error (Script_tc_errors.No_such_entrypoint entrypoint))
+      >>?= fun () -> return (Transaction_to_implicit {destination; amount}, ctxt)
   | Typed_originated destination ->
       unparse_data ctxt Optimized parameters_ty parameters
       >>=? fun (unparsed_parameters, ctxt) ->
