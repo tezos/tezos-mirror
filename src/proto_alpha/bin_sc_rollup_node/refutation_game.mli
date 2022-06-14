@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,27 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module implements the refutation game logic of the rollup
+    node. *)
 module type S = sig
   module PVM : Pvm.S
 
-  module Interpreter : Interpreter.S
-
-  module Commitment : Commitment_sig.S with module PVM = PVM
-
-  module RPC_server : RPC_server.S with module PVM = PVM
-
-  module Refutation_game : Refutation_game.S with module PVM = PVM
+  val process :
+    Layer1.head -> Node_context.t -> PVM.context -> unit tzresult Lwt.t
 end
 
-module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module RPC_server = RPC_server.Make (PVM)
-  module Refutation_game = Refutation_game.Make (PVM)
-end
-
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+module Make (PVM : Pvm.S) : S with module PVM = PVM
