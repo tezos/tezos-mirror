@@ -108,34 +108,31 @@ let () =
         busy
         staker)
     Data_encoding.(
-      obj1
-        (req
-           "staker_in_game"
-           (union
-              [
-                case
-                  (Tag 0)
-                  ~title:"Refuter"
-                  Signature.Public_key_hash.encoding
-                  (function `Refuter sc -> Some sc | _ -> None)
-                  (fun sc -> `Refuter sc);
-                case
-                  (Tag 1)
-                  ~title:"Defender"
-                  Signature.Public_key_hash.encoding
-                  (function `Defender sc -> Some sc | _ -> None)
-                  (fun sc -> `Defender sc);
-                case
-                  (Tag 2)
-                  ~title:"Both"
-                  (obj2
-                     (req "refuter" Signature.Public_key_hash.encoding)
-                     (req "defender" Signature.Public_key_hash.encoding))
-                  (function
-                    | `Both (refuter, defender) -> Some (refuter, defender)
-                    | _ -> None)
-                  (fun (refuter, defender) -> `Both (refuter, defender));
-              ])))
+      union
+        [
+          case
+            (Tag 0)
+            ~title:"Refuter"
+            (obj1 (req "refuter" Signature.Public_key_hash.encoding))
+            (function `Refuter sc -> Some sc | _ -> None)
+            (fun sc -> `Refuter sc);
+          case
+            (Tag 1)
+            ~title:"Defender"
+            (obj1 (req "defender" Signature.Public_key_hash.encoding))
+            (function `Defender sc -> Some sc | _ -> None)
+            (fun sc -> `Defender sc);
+          case
+            (Tag 2)
+            ~title:"Both"
+            (obj2
+               (req "refuter" Signature.Public_key_hash.encoding)
+               (req "defender" Signature.Public_key_hash.encoding))
+            (function
+              | `Both (refuter, defender) -> Some (refuter, defender)
+              | _ -> None)
+            (fun (refuter, defender) -> `Both (refuter, defender));
+        ])
     (function Sc_rollup_staker_in_game x -> Some x | _ -> None)
     (fun x -> Sc_rollup_staker_in_game x) ;
   register_error_kind
