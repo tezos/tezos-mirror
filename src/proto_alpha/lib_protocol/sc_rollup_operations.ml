@@ -155,8 +155,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
   in
   ({address; size}, ctxt)
 
-let execute_outbox_message _ctx _rollup _last_cemented_commitment
-    ~outbox_level:_ ~message_index:_ ~inclusion_proof:_ ~message:_ =
+let execute_outbox_message _ctx _rollup _cemented_commitment ~output_proof:_ =
   (* TODO: 3106
      Implement business logic.
      Involves validate inclusion proofs, transferring tickets  and outputting

@@ -492,10 +492,7 @@ let test_atomic_batch_fails () =
       contract
       rollup
       hash
-      ~outbox_level:(Raw_level.of_int32_exn 0l)
-      ~message_index:0
-      ~inclusion_proof:"xyz"
-      ~message:"xyz"
+      ~output_proof:"xyz"
   in
   let expect_apply_failure = function
     | Environment.Ecoproto_error

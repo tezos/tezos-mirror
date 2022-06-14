@@ -434,10 +434,7 @@ and _ manager_operation =
   | Sc_rollup_execute_outbox_message : {
       rollup : Sc_rollup_repr.t;
       cemented_commitment : Sc_rollup_commitment_repr.Hash.t;
-      outbox_level : Raw_level_repr.t;
-      message_index : int;
-      inclusion_proof : string;
-      message : string;
+      output_proof : string;
     }
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
@@ -1119,15 +1116,12 @@ module Encoding = struct
           tag = sc_rollup_execute_outbox_message_tag;
           name = "sc_rollup_execute_outbox_message";
           encoding =
-            obj6
+            obj3
               (req "rollup" Sc_rollup_repr.encoding)
               (req
                  "cemented_commitment"
                  Sc_rollup_commitment_repr.Hash.encoding)
-              (req "outbox_level" Raw_level_repr.encoding)
-              (req "message_index" Data_encoding.int31)
-              (req "inclusion proof" Data_encoding.string)
-              (req "message" Data_encoding.string);
+              (req "output_proof" Data_encoding.string);
           select =
             (function
             | Manager (Sc_rollup_execute_outbox_message _ as op) -> Some op
@@ -1135,36 +1129,12 @@ module Encoding = struct
           proj =
             (function
             | Sc_rollup_execute_outbox_message
-                {
-                  rollup;
-                  cemented_commitment;
-                  outbox_level;
-                  message_index;
-                  inclusion_proof;
-                  message;
-                } ->
-                ( rollup,
-                  cemented_commitment,
-                  outbox_level,
-                  message_index,
-                  inclusion_proof,
-                  message ));
+                {rollup; cemented_commitment; output_proof} ->
+                (rollup, cemented_commitment, output_proof));
           inj =
-            (fun ( rollup,
-                   cemented_commitment,
-                   outbox_level,
-                   message_index,
-                   inclusion_proof,
-                   message ) ->
+            (fun (rollup, cemented_commitment, output_proof) ->
               Sc_rollup_execute_outbox_message
-                {
-                  rollup;
-                  cemented_commitment;
-                  outbox_level;
-                  message_index;
-                  inclusion_proof;
-                  message;
-                });
+                {rollup; cemented_commitment; output_proof});
         }
 
     let[@coq_axiom_with_reason "gadt"] sc_rollup_recover_bond_case =

@@ -307,15 +307,8 @@ let pp_manager_operation_content (type kind) source ppf
         bob
         Sc_rollup.Address.pp
         rollup
-  | Sc_rollup_execute_outbox_message
-      {
-        rollup;
-        cemented_commitment;
-        outbox_level;
-        message_index;
-        inclusion_proof;
-        message;
-      } ->
+  | Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
+    ->
       (* TODO #3125
          Improve pretty-printing of this content and sc operations above.
          Should avoid printing on a single line and use indentation.
@@ -323,17 +316,12 @@ let pp_manager_operation_content (type kind) source ppf
       Format.fprintf
         ppf
         "Execute the outbox message of the smart contract rollup at address \
-         %a, with cemented commit %a, outbox level %a, message index %d, \
-         inclusion proof %s and message %s"
+         %a, with cemented commit %a and output proof %s"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Commitment.Hash.pp
         cemented_commitment
-        Raw_level.pp
-        outbox_level
-        message_index
-        inclusion_proof
-        message
+        output_proof
   | Sc_rollup_recover_bond {sc_rollup} ->
       Format.fprintf
         ppf

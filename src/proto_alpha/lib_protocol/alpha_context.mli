@@ -3802,10 +3802,7 @@ and _ manager_operation =
   | Sc_rollup_execute_outbox_message : {
       rollup : Sc_rollup.t;
       cemented_commitment : Sc_rollup.Commitment.Hash.t;
-      outbox_level : Raw_level.t;
-      message_index : int;
-      inclusion_proof : string;
-      message : string;
+      output_proof : string;
     }
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {

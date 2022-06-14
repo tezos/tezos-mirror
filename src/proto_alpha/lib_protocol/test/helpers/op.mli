@@ -566,10 +566,7 @@ val sc_rollup_execute_outbox_message :
   Contract.t ->
   Sc_rollup.t ->
   Sc_rollup.Commitment.Hash.t ->
-  outbox_level:Raw_level.t ->
-  message_index:int ->
-  inclusion_proof:string ->
-  message:string ->
+  output_proof:string ->
   (packed_operation, tztrace) result Lwt.t
 
 (** [sc_rollup_recover_bond ctxt source sc_rollup] returns a commitment bond. *)

@@ -1843,23 +1843,13 @@ let apply_external_manager_operation_content :
         Sc_rollup_timeout_result {status; consumed_gas; balance_updates}
       in
       return (ctxt, result, [])
-  | Sc_rollup_execute_outbox_message
-      {
-        rollup;
-        cemented_commitment;
-        outbox_level;
-        message_index;
-        inclusion_proof;
-        message;
-      } ->
+  | Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
+    ->
       Sc_rollup_operations.execute_outbox_message
         ctxt
         rollup
         cemented_commitment
-        ~outbox_level
-        ~message_index
-        ~inclusion_proof
-        ~message
+        ~output_proof
       >>=? fun _ctxt ->
       failwith
         "Sc_rollup_execute_outbox_message operation is not yet supported."

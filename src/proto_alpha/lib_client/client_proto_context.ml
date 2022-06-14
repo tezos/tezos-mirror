@@ -1270,8 +1270,8 @@ let sc_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
     ?confirmations ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit
-    ?storage_limit ?counter ~source ~rollup ~cemented_commitment ~outbox_level
-    ~message_index ~inclusion_proof ~message ~src_pk ~src_sk ~fee_parameter () =
+    ?storage_limit ?counter ~source ~rollup ~cemented_commitment ~output_proof
+    ~src_pk ~src_sk ~fee_parameter () =
   let op =
     Annotated_manager_operation.Single_manager
       (Injection.prepare_manager_operation
@@ -1279,14 +1279,7 @@ let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
          (Sc_rollup_execute_outbox_message
-            {
-              rollup;
-              cemented_commitment;
-              outbox_level;
-              message_index;
-              inclusion_proof;
-              message;
-            }))
+            {rollup; cemented_commitment; output_proof}))
   in
   Injection.inject_manager_operation
     cctxt
