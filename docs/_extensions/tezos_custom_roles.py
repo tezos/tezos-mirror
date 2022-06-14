@@ -16,6 +16,7 @@ OPAM_CACHE = None
 
 def setup(app):
     app.add_role('package', package_role)
+    app.add_role('package-api', package_role)
     app.add_role('package-name', package_role)
     app.add_role('package-src', package_role)
     app.add_role('opam', opam_role)
@@ -63,6 +64,21 @@ def package_role(
         '/'
     )
     (text, lib) = parse_role(text)
+    if name == 'package-api':
+        file = lib.rsplit('#', maxsplit=1)[0] # remove eventual section marker
+        if (os.path.isdir('_build/api/odoc/_html/') and
+            not os.path.isfile('_build/api/odoc/_html/' + file)):
+            # odoc was run but did not generate the page
+            raise ValueError('package_role: no API ', lib)
+        url = "api/odoc/_html/" + lib
+        for _ in range(1, rel_lvl):
+            url = '../' + url
+        node = nodes.reference(rawtext, text, refuri=url, **options)
+        return [node], []
+    # no '/' allowed in all the other package roles:
+    parts = lib.split('/', maxsplit=1)
+    if len(parts) > 1:
+        raise ValueError('package_role: garbage found in package name  ', lib)
     src = find_dot_opam(lib)
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     if name == 'package-name':
