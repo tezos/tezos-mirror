@@ -30,14 +30,18 @@ FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as debug
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
-LABEL maintainer="contact@nomadic-labs.com" \
-      org.label-schema.name="Tezos" \
-      org.label-schema.docker.schema-version="1.0" \
-      org.label-schema.description="Tezos node" \
-      org.label-schema.url="https://www.nomadic-labs.com" \
-      org.label-schema.vcs-url="https://gitlab.com/tezos/tezos" \
-      org.label-schema.vcs-ref="${COMMIT_SHORT_SHA}" \
-      org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
+
+# Open Container Initiative
+# https://github.com/opencontainers/image-spec/blob/main/annotations.md
+LABEL org.opencontainers.image.authors="contact@nomadic-labs.com" \
+      org.opencontainers.image.base.name="alpine:3.14" \
+      org.opencontainers.image.description="Tezos node" \
+      org.opencontainers.image.documentation="https://tezos.gitlab.io/" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://gitlab.com/tezos/tezos" \
+      org.opencontainers.image.title="tezos-debug" \
+      org.opencontainers.image.url="https://gitlab.com/tezos/tezos" \
+      org.opencontainers.image.vendor="Nomadic Labs"
 
 USER root
 # hadolint ignore=DL3018
@@ -59,14 +63,19 @@ FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as bare
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
-LABEL maintainer="contact@nomadic-labs.com" \
-      org.label-schema.name="Tezos" \
-      org.label-schema.docker.schema-version="1.0" \
-      org.label-schema.description="Tezos node" \
-      org.label-schema.url="https://www.nomadic-labs.com" \
-      org.label-schema.vcs-url="https://gitlab.com/tezos/tezos" \
-      org.label-schema.vcs-ref="${COMMIT_SHORT_SHA}" \
-      org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
+
+# Open Container Initiative
+# https://github.com/opencontainers/image-spec/blob/main/annotations.md
+LABEL org.opencontainers.image.authors="contact@nomadic-labs.com" \
+      org.opencontainers.image.base.name="alpine:3.14" \
+      org.opencontainers.image.description="Tezos node" \
+      org.opencontainers.image.documentation="https://tezos.gitlab.io/" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://gitlab.com/tezos/tezos" \
+      org.opencontainers.image.title="tezos-bare" \
+      org.opencontainers.image.url="https://gitlab.com/tezos/tezos" \
+      org.opencontainers.image.vendor="Nomadic Labs"
+
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin/ /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
 
@@ -75,14 +84,18 @@ FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as minimal
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
-LABEL maintainer="contact@nomadic-labs.com" \
-      org.label-schema.name="Tezos" \
-      org.label-schema.docker.schema-version="1.0" \
-      org.label-schema.description="Tezos node" \
-      org.label-schema.url="https://www.nomadic-labs.com" \
-      org.label-schema.vcs-url="https://gitlab.com/tezos/tezos" \
-      org.label-schema.vcs-ref="${COMMIT_SHORT_SHA}" \
-      org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
+
+# Open Container Initiative
+# https://github.com/opencontainers/image-spec/blob/main/annotations.md
+LABEL org.opencontainers.image.authors="contact@nomadic-labs.com" \
+      org.opencontainers.image.base.name="alpine:3.14" \
+      org.opencontainers.image.description="Tezos node" \
+      org.opencontainers.image.documentation="https://tezos.gitlab.io/" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://gitlab.com/tezos/tezos" \
+      org.opencontainers.image.title="tezos" \
+      org.opencontainers.image.url="https://gitlab.com/tezos/tezos" \
+      org.opencontainers.image.vendor="Nomadic Labs"
 
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin/ /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/entrypoint.* /usr/local/bin/
