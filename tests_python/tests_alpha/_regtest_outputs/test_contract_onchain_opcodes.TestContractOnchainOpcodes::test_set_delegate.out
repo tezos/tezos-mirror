@@ -1,7 +1,7 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_set_delegate
 
 Node is bootstrapped.
-Estimated gas: 1411.989 units (will add 100 for safety)
+Estimated gas: 1411.674 units (will add 100 for safety)
 Estimated storage: 308 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -33,7 +33,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 51 bytes
         Paid storage size diff: 51 bytes
-        Consumed gas: 1411.989
+        Consumed gas: 1411.674
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.01275
           storage fees ........................... +ꜩ0.01275
@@ -48,7 +48,7 @@ Injected block at minimal timestamp
 Injected block at minimal timestamp
 none
 Node is bootstrapped.
-Estimated gas: 3115.714 units (will add 100 for safety)
+Estimated gas: 3115.285 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -74,7 +74,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 2115.714
+      Consumed gas: 2115.285
       Internal operations:
         Internal Delegation:
           Contract: [CONTRACT_HASH]
@@ -85,7 +85,7 @@ This sequence of operations was run:
 Injected block at minimal timestamp
 [CONTRACT_HASH] (known as bootstrap5)
 Node is bootstrapped.
-Estimated gas: 2202.968 units (will add 100 for safety)
+Estimated gas: 2202.911 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -111,7 +111,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 1202.968
+      Consumed gas: 1202.911
       Internal operations:
         Internal Delegation:
           Contract: [CONTRACT_HASH]
