@@ -736,6 +736,8 @@ module Script : sig
       called with [consume_deserialization_gas:Always]. *)
   val consume_decoding_gas : Gas.Arith.fp -> lazy_expr -> Gas.Arith.fp tzresult
 
+  val unit : expr
+
   val unit_parameter : lazy_expr
 
   val strip_locations_cost : _ michelson_node -> Gas.cost
