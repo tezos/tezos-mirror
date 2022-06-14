@@ -1279,6 +1279,56 @@ module Target = struct
                 name)
     in
     let () =
+      (* Sanity checks around virtual packages.
+         - If a target [X] [implements] another target [Y], [X] must specify its opam file
+         - [Y] must be an internal target
+         - [Y] must be virtual, ie specify virtual modules
+         - [Y] must specify an opam package
+         - If [Y] specifies [X] as default implementation, [X] and [Y] must live in the
+           same package.
+      *)
+      match (implements, opam) with
+      | None, _ -> ()
+      | Some _, None ->
+          error
+            "Targets implementing virtual targets must specify their opam \
+             package"
+      | Some target, Some opam -> (
+          match get_internal target with
+          | None ->
+              error
+                "`implements` directive specifies %s which is a non-internal \
+                 target"
+                (name_for_errors target)
+          | Some internal -> (
+              (match internal.virtual_modules with
+              | [] ->
+                  error
+                    "A target can only implement a virtual internal target, \
+                     but %s declares no virtual modules"
+                    (name_for_errors target)
+              | _ -> ()) ;
+              match internal.opam with
+              | None ->
+                  error
+                    "Virtual target %s must specify its opam package"
+                    (name_for_errors target)
+              | Some internal_opam -> (
+                  match (internal.default_implementation, kind) with
+                  | None, _ -> ()
+                  | Some default_impl, Public_library {public_name; _}
+                    when default_impl = public_name ->
+                      if not (String.equal opam internal_opam) then
+                        let name = name_for_errors target in
+                        error
+                          "%s specifies %s as default implementation but these \
+                           do not live in the same package"
+                          name
+                          public_name
+                      else ()
+                  | _ -> ())))
+    in
+    let () =
       match kind with
       | Public_library {public_name; _} -> (
           match
