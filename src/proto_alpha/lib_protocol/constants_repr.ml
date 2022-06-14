@@ -59,43 +59,69 @@ let michelson_maximum_type_size = 2001
    mechanism (see {Context.Cache}). *)
 let cache_layout_size = 3
 
+(* The {!Sc_rollups.wrapped_proof_encoding} uses unbounded sub-encodings.
+   To avoid attacks through too large proofs and long decoding times on public
+   nodes, we put another layer of security by restricting the maximum_size
+   to [30Kb].
+
+   Even if the operation size limit is currently [32Kb] (see
+   {!Constants_repr.max_operation_data_length}) the node's mempool can still
+   be spammed with larger proofs before detecting that the operations are
+   indeed larger than the limit.
+
+   By design, the proofs should be created and verified for a single tick
+   which should limit the number of read/writes in the Merkle tree, and thefore,
+   limit the total size of a proof. Thus, [30Kb] can be lowered once we
+   have empirically observed that a valid proof can not be that large.
+
+   Note that an encoded proof that is [30Kb] might still be not included
+   in a valid L1 operation. The refutation operation also contains other
+   information such as an inbox proof. We only put here an upper bound
+   for the size.
+*)
+let sc_max_wrapped_proof_binary_size = 30_000
+
 type fixed = unit
 
 let fixed_encoding =
   let open Data_encoding in
   conv
     (fun () ->
-      ( proof_of_work_nonce_size,
-        nonce_length,
-        max_anon_ops_per_block,
-        max_operation_data_length,
-        max_proposals_per_delegate,
-        max_micheline_node_count,
-        max_micheline_bytes_limit,
-        max_allowed_global_constant_depth,
-        cache_layout_size,
-        michelson_maximum_type_size ))
-    (fun ( _proof_of_work_nonce_size,
-           _nonce_length,
-           _max_anon_ops_per_block,
-           _max_operation_data_length,
-           _max_proposals_per_delegate,
-           _max_micheline_node_count,
-           _max_micheline_bytes_limit,
-           _max_allowed_global_constant_depth,
-           _cache_layout_size,
-           _michelson_maximum_type_size ) -> ())
-    (obj10
-       (req "proof_of_work_nonce_size" uint8)
-       (req "nonce_length" uint8)
-       (req "max_anon_ops_per_block" uint8)
-       (req "max_operation_data_length" int31)
-       (req "max_proposals_per_delegate" uint8)
-       (req "max_micheline_node_count" int31)
-       (req "max_micheline_bytes_limit" int31)
-       (req "max_allowed_global_constants_depth" int31)
-       (req "cache_layout_size" uint8)
-       (req "michelson_maximum_type_size" uint16))
+      ( ( proof_of_work_nonce_size,
+          nonce_length,
+          max_anon_ops_per_block,
+          max_operation_data_length,
+          max_proposals_per_delegate,
+          max_micheline_node_count,
+          max_micheline_bytes_limit,
+          max_allowed_global_constant_depth,
+          cache_layout_size,
+          michelson_maximum_type_size ),
+        sc_max_wrapped_proof_binary_size ))
+    (fun ( ( _proof_of_work_nonce_size,
+             _nonce_length,
+             _max_anon_ops_per_block,
+             _max_operation_data_length,
+             _max_proposals_per_delegate,
+             _max_micheline_node_count,
+             _max_micheline_bytes_limit,
+             _max_allowed_global_constant_depth,
+             _cache_layout_size,
+             _michelson_maximum_type_size ),
+           _max_wrapped_proof_binary_size ) -> ())
+    (merge_objs
+       (obj10
+          (req "proof_of_work_nonce_size" uint8)
+          (req "nonce_length" uint8)
+          (req "max_anon_ops_per_block" uint8)
+          (req "max_operation_data_length" int31)
+          (req "max_proposals_per_delegate" uint8)
+          (req "max_micheline_node_count" int31)
+          (req "max_micheline_bytes_limit" int31)
+          (req "max_allowed_global_constants_depth" int31)
+          (req "cache_layout_size" uint8)
+          (req "michelson_maximum_type_size" uint16))
+       (obj1 (req "max_wrapped_proof_binary_size" int31)))
 
 let fixed = ()
 
