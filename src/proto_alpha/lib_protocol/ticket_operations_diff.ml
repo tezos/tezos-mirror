@@ -210,6 +210,8 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
         parameters;
         unparsed_parameters = _;
       } ->
+      (* Note that zero-amount tickets to a rollup is not permitted. *)
+      let allow_zero_amount_tickets = false in
       tickets_of_transaction
         ctxt
         ~allow_zero_amount_tickets
