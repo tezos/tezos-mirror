@@ -2607,7 +2607,8 @@ let get_predecessor_level = function
   | Partial_construction {predecessor_level; _} ->
       predecessor_level
 
-let record_operation (type kind) ctxt (operation : kind operation) : context =
+let record_operation (type kind) ctxt hash (operation : kind operation) :
+    context =
   match operation.protocol_data.contents with
   | Single (Preendorsement _) -> ctxt
   | Single (Endorsement _) -> ctxt
@@ -2617,7 +2618,6 @@ let record_operation (type kind) ctxt (operation : kind operation) : context =
       | Double_endorsement_evidence _ | Double_preendorsement_evidence _
       | Double_baking_evidence _ | Activate_account _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
-      let hash = Operation.hash operation in
       record_non_consensus_operation_hash ctxt hash
 
 type 'consensus_op_kind expected_consensus_content = {
@@ -3195,7 +3195,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
 let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
     ~payload_producer hash operation =
   let ctxt = Origination_nonce.init ctxt hash in
-  let ctxt = record_operation ctxt operation in
+  let ctxt = record_operation ctxt hash operation in
   apply_contents_list
     ctxt
     chain_id
