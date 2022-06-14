@@ -549,6 +549,8 @@ type with_test = Always | Never | Only_on_64_arch
 
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
+    - [implements]: specifies an [(implements)] stanza for the [dune] target.
+
     - [inline_tests]: specifies an inline_tests backend. Can only be used when constructing a library.
       If used, will add [(inline_tests)] and the corresponding preprocessor in the dune stanza.
 
@@ -624,6 +626,11 @@ type with_test = Always | Never | Only_on_64_arch
 
     - [description]: long description for the [.opam] file.
 
+    - [virtual_modules]: similar to [modules], but for modules that should have an
+      implementation (an [.ml] file) but that have not. Those modules only come
+      with an [.mli]. This turns the target into a virtual target.
+      Other targets can declare that they implement those modules with [implements].
+
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -643,6 +650,7 @@ type 'a maker =
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
   ?foreign_stubs:Dune.foreign_stubs ->
+  ?implements:target ->
   ?inline_tests:inline_tests ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
@@ -665,6 +673,7 @@ type 'a maker =
   ?synopsis:string ->
   ?description:string ->
   ?time_measurement_ppx:bool ->
+  ?virtual_modules:string list ->
   ?wrapped:bool ->
   ?cram:bool ->
   ?license:string ->

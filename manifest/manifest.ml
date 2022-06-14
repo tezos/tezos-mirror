@@ -194,9 +194,9 @@ module Dune = struct
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
-      ?(wrapped = true) ?modules ?modules_without_implementation ?modes
-      ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
-      ?js_of_ocaml (names : string list) =
+      ?(virtual_modules = Stdlib.List.[]) ?implements ?(wrapped = true) ?modules
+      ?modules_without_implementation ?modes ?foreign_stubs ?c_library_flags
+      ?(private_modules = Stdlib.List.[]) ?js_of_ocaml (names : string list) =
     [
       V
         [
@@ -214,6 +214,7 @@ module Dune = struct
           | [name] -> [S "public_name"; S name]
           | _ :: _ -> S "public_names" :: of_atom_list public_names);
           opt package (fun x -> [S "package"; S x]);
+          opt implements (fun x -> [S "implements"; S x]);
           (match instrumentation with
           | [] -> E
           | _ ->
@@ -259,6 +260,9 @@ module Dune = struct
           opt link_flags (fun l -> [V (of_list (List.cons (S "link_flags") l))]);
           opt flags (fun l -> [V (of_list (List.cons (S "flags") l))]);
           (if not wrapped then [S "wrapped"; S "false"] else E);
+          (match virtual_modules with
+          | [] -> E
+          | _ -> S "virtual_modules" :: of_atom_list virtual_modules);
           opt modules (fun x -> S "modules" :: x);
           opt modules_without_implementation (fun x ->
               S "modules_without_implementation" :: x);
@@ -907,6 +911,7 @@ module Target = struct
     dune : Dune.s_expr;
     flags : Flags.t option;
     foreign_stubs : Dune.foreign_stubs option;
+    implements : t option;
     inline_tests : bool;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
@@ -929,6 +934,7 @@ module Target = struct
     static : bool;
     synopsis : string option;
     description : string option;
+    virtual_modules : string list;
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
@@ -1055,6 +1061,7 @@ module Target = struct
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
     ?foreign_stubs:Dune.foreign_stubs ->
+    ?implements:t option ->
     ?inline_tests:inline_tests ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
@@ -1077,6 +1084,7 @@ module Target = struct
     ?synopsis:string ->
     ?description:string ->
     ?time_measurement_ppx:bool ->
+    ?virtual_modules:string list ->
     ?wrapped:bool ->
     ?cram:bool ->
     ?license:string ->
@@ -1120,17 +1128,24 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
-      ?(dune = Dune.[]) ?flags ?foreign_stubs ?inline_tests ?js_compatible
-      ?js_of_ocaml ?documentation ?(linkall = false) ?modes ?modules
-      ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml ?opam
-      ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
+      ?(dune = Dune.[]) ?flags ?foreign_stubs ?implements ?inline_tests
+      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
+      ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
+      ?opam ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(wrapped = true) ?(cram = false) ?license ?(extra_authors = []) ~path
-      names =
+      ?(virtual_modules = []) ?(wrapped = true) ?(cram = false) ?license
+      ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
+    let implements =
+      match implements with
+      | None -> None
+      | Some None ->
+          invalid_arg "Target.internal: cannot pass no_target to ~implements"
+      | Some (Some _ as x) -> x
+    in
     let opens =
       let rec get_opens acc = function
         | Internal _ | Vendored _ | External _ | Opam_only _ -> acc
@@ -1344,6 +1359,7 @@ module Target = struct
         dune;
         flags;
         foreign_stubs;
+        implements;
         inline_tests;
         js_compatible;
         js_of_ocaml;
@@ -1367,6 +1383,7 @@ module Target = struct
         synopsis;
         description;
         npm_deps;
+        virtual_modules;
         wrapped;
         cram;
         license;
@@ -1835,6 +1852,14 @@ let generate_dune (internal : Target.internal) =
     | Private_executable (head, tail) -> (Executable, head :: tail, [])
     | Test_executable {names = head, tail; _} -> (Executable, head :: tail, [])
   in
+  let get_virtual_target_name target =
+    match Target.library_name_for_dune target with
+    | Ok name -> name
+    | Error name ->
+        invalid_arg
+          ("unsupported: ~implements on a target that is not a library (" ^ name
+         ^ ")")
+  in
   let documentation =
     match internal.documentation with
     | None -> Dune.E
@@ -1854,6 +1879,8 @@ let generate_dune (internal : Target.internal) =
       ~inline_tests:internal.inline_tests
       ~preprocess
       ~preprocessor_deps
+      ~virtual_modules:internal.virtual_modules
+      ?implements:(Option.map get_virtual_target_name internal.implements)
       ~wrapped:internal.wrapped
       ?modules
       ?modules_without_implementation
