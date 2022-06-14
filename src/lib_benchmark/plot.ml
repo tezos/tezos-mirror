@@ -681,7 +681,7 @@ end = struct
 
   let set_title t = sf "set title \"%s\"" t
 
-  let tics_spec (tics : Tics.t) =
+  let tics_spec ~with_logscale (tics : Tics.t) =
     let {border; mirror; in_; rotate_by; position; logscale} = tics in
     let border = if border then "border" else "axis" in
     let mirror = if mirror then "mirror" else "nomirror" in
@@ -704,14 +704,28 @@ end = struct
           | None -> sf "%s, %s" (pp_float start) (pp_float incr)
           | Some stop -> sf "%s, %s, %f" (pp_float start) (pp_float incr) stop)
     in
-    let logscale = if logscale then "logscale" else "nologscale" in
+    let logscale =
+      if with_logscale then if logscale then "logscale" else "nologscale"
+      else ""
+    in
     sf "%s %s %s %s %s %s" border mirror in_ rotate_by position logscale
 
-  let set_xtics (tics : Tics.t) = sf "set xtics %s" (tics_spec tics)
+  let branch_version_check version script_passed script_failed =
+    concat
+      ([sf "if (GPVAL_VERSION >= %s) {" version]
+      @ script_passed @ ["} else {"] @ script_failed @ ["}"])
 
-  let set_ytics (tics : Tics.t) = sf "set ytics %s" (tics_spec tics)
+  let set_tics tics_kind (tics : Tics.t) =
+    branch_version_check
+      "5.2"
+      [sf "set %s %s" tics_kind (tics_spec ~with_logscale:true tics)]
+      [sf "set %s %s" tics_kind (tics_spec ~with_logscale:false tics)]
 
-  let set_ztics (tics : Tics.t) = sf "set ztics %s" (tics_spec tics)
+  let set_xtics (tics : Tics.t) = set_tics "xtics" tics
+
+  let set_ytics (tics : Tics.t) = set_tics "ytics" tics
+
+  let set_ztics (tics : Tics.t) = set_tics "ztics" tics
 
   let namegen =
     let x = ref (-1) in
