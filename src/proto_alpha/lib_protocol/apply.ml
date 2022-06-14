@@ -963,8 +963,9 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
      returned using the L2 withdrawal mechanism: a failing
      deposit emits a withdrawal that can be executed by
      [payer]. *)
-  Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
-  >>?= fun {ex_ticket; l2_destination} ->
+  let Tx_rollup_parameters.{ex_ticket; l2_destination} =
+    Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
+  in
   ex_ticket_size ctxt ex_ticket >>=? fun (ctxt, ticket_size) ->
   let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
   fail_when

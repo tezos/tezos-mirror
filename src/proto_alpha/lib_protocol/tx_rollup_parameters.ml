@@ -36,7 +36,7 @@ let get_deposit_parameters :
     type a comparable.
     ((a ticket, tx_rollup_l2_address) pair, comparable) ty ->
     (a ticket, tx_rollup_l2_address) pair ->
-    deposit_parameters tzresult =
+    deposit_parameters =
  fun (Pair_t (Ticket_t (ty, _), Tx_rollup_l2_address_t, _, _))
      (ticket, l2_destination) ->
-  ok {ex_ticket = Ticket_scanner.Ex_ticket (ty, ticket); l2_destination}
+  {ex_ticket = Ticket_scanner.Ex_ticket (ty, ticket); l2_destination}

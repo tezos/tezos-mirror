@@ -48,4 +48,4 @@ type deposit_parameters = {
 val get_deposit_parameters :
   (('a ticket, tx_rollup_l2_address) pair, 'comparable) ty ->
   ('a ticket, tx_rollup_l2_address) pair ->
-  deposit_parameters tzresult
+  deposit_parameters
