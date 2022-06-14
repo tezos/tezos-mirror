@@ -58,6 +58,7 @@
         "Sc_rollup_commitment_repr",
         "Sc_rollup_proof_repr",
         "Sc_rollup_game_repr",
+        "Contract_event_repr",
         "Tx_rollup_level_repr",
         "Tx_rollup_l2_proof",
         "Tx_rollup_l2_address",

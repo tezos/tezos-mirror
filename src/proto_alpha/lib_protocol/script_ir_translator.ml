@@ -2538,7 +2538,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         >>=? fun (({destination; entrypoint = _}, (contents, amount)), ctxt) ->
         match destination with
         | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
-        | Tx_rollup _ | Sc_rollup _ ->
+        | Tx_rollup _ | Sc_rollup _ | Event _ ->
             fail (Unexpected_ticket_owner destination)
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
@@ -4993,6 +4993,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               entrypoint_arg >|? fun (entrypoint, arg_ty) ->
               let address = {destination; entrypoint} in
               Typed_contract {arg_ty; address} ))
+  | Event _ ->
+      return (error ctxt (fun (_ : location) -> No_such_entrypoint entrypoint))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is

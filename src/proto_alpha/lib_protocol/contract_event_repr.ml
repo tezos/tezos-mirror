@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,40 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of the [destination] argument of the
-    {!Operation_repr.Transaction} manager operation.
+type error += (* `Permanent *) Invalid_event_notation of string
 
-    The introduction of this type allows to interact with emerging
-    layer-2 solutions using the API Tezos users and tooling
-    are already used to: contract calls to entrypoint. These solutions
-    cannot be integrated to {!Contract_repr.t} directly, because
-    values of this type are given a balance, which has an impact on
-    the delegation system. *)
+module Hash = struct
+  let prefix = "\058\017\082" (* "ev1" (32) *)
 
-(** This type is a superset of the set of contracts ({!Contract_repr.t}).
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "Event"
 
-    {b Note:} It is of key importance that the encoding of this type
-    remains compatible with {!Contract_repr.encoding}, for the
-    introduction to this type to remain transparent from the existing
-    tooling perspective.  *)
-type t =
-  | Contract of Contract_repr.t
-  | Tx_rollup of Tx_rollup_repr.t
-  | Sc_rollup of Sc_rollup_repr.t
-  | Event of Contract_event_repr.t
+        let title = "Event sink"
 
-include Compare.S with type t := t
+        let b58check_prefix = prefix
 
-val to_b58check : t -> string
+        let size = None
+      end)
 
-val of_b58check : string -> t tzresult
+  include H
 
-val encoding : t Data_encoding.t
+  let () = Base58.check_encoded_prefix b58check_encoding "ev1" 53
 
-val pp : Format.formatter -> t -> unit
+  include Path_encoding.Make_hex (H)
+end
 
-(** [in_memory_size contract] returns the number of bytes that are
-    allocated in the RAM for [contract]. *)
-val in_memory_size : t -> Cache_memory_helpers.sint
+type t = Hash.t
 
-type error += Invalid_destination_b58check of string
+let of_b58data = function Hash.Data hash -> Some hash | _ -> None
+
+let pp = Hash.pp
+
+let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
+
+let of_b58check s =
+  match of_b58check_opt s with
+  | Some hash -> ok hash
+  | None -> error (Invalid_event_notation s)
+
+let to_b58check hash = Hash.to_b58check hash
+
+let in_memory_size _ =
+  let open Cache_memory_helpers in
+  h1w +! string_size_gen Hash.size

@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,40 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of the [destination] argument of the
-    {!Operation_repr.Transaction} manager operation.
+module Hash : sig
+  val prefix : string
 
-    The introduction of this type allows to interact with emerging
-    layer-2 solutions using the API Tezos users and tooling
-    are already used to: contract calls to entrypoint. These solutions
-    cannot be integrated to {!Contract_repr.t} directly, because
-    values of this type are given a balance, which has an impact on
-    the delegation system. *)
+  include S.HASH
+end
 
-(** This type is a superset of the set of contracts ({!Contract_repr.t}).
+type t = Hash.t
 
-    {b Note:} It is of key importance that the encoding of this type
-    remains compatible with {!Contract_repr.encoding}, for the
-    introduction to this type to remain transparent from the existing
-    tooling perspective.  *)
-type t =
-  | Contract of Contract_repr.t
-  | Tx_rollup of Tx_rollup_repr.t
-  | Sc_rollup of Sc_rollup_repr.t
-  | Event of Contract_event_repr.t
-
-include Compare.S with type t := t
-
-val to_b58check : t -> string
-
-val of_b58check : string -> t tzresult
-
-val encoding : t Data_encoding.t
-
-val pp : Format.formatter -> t -> unit
-
-(** [in_memory_size contract] returns the number of bytes that are
-    allocated in the RAM for [contract]. *)
+(** [in_memory_size event_addr] returns the number of bytes [event_addr]
+    uses in RAM. *)
 val in_memory_size : t -> Cache_memory_helpers.sint
 
-type error += Invalid_destination_b58check of string
+(** [to_b58check addr] converts the event address [addr] to the Base58Check string representation *)
+val to_b58check : t -> string
+
+(** Pretty printer for contract events *)
+val pp : Format.formatter -> t -> unit
+
+(** [of_b58data data] tries to decode a contract event from a Base58 [data] and
+    return [None] if conversion fails *)
+val of_b58data : Base58.data -> t option
+
+(** [of_b58check addr] tries to decode a contract event from a Base58Check string [addr] *)
+val of_b58check : string -> t tzresult
+
+(** [of_b58check_opt addr] tries to
+    decode a contract event from a Base58Check string [addr]
+    and return [None] if conversion fails *)
+val of_b58check_opt : string -> t option

@@ -29,6 +29,7 @@ type t =
   | Contract of Contract_repr.t
   | Tx_rollup of Tx_rollup_repr.t
   | Sc_rollup of Sc_rollup_repr.t
+  | Event of Contract_event_repr.t
 (* If you add more cases to this type, please update the
    [test_compare_destination] test in
    [test/unit/test_destination_repr.ml] to ensure that the compare
@@ -43,6 +44,7 @@ include Compare.Make (struct
     | Contract k1, Contract k2 -> Contract_repr.compare k1 k2
     | Tx_rollup k1, Tx_rollup k2 -> Tx_rollup_repr.compare k1 k2
     | Sc_rollup k1, Sc_rollup k2 -> Sc_rollup_repr.Address.compare k1 k2
+    | Event k1, Event k2 -> Contract_event_repr.Hash.compare k1 k2
     (* This function is used by the Michelson interpreter to compare
        addresses. It is of significant importance to remember that in
        Michelson, address comparison is used to distinguish between
@@ -52,14 +54,17 @@ include Compare.Make (struct
        modified when new constructors are added to [t]. *)
     | Contract _, _ -> -1
     | _, Contract _ -> 1
-    | Tx_rollup _, Sc_rollup _ -> -1
-    | Sc_rollup _, Tx_rollup _ -> 1
+    | Tx_rollup _, _ -> -1
+    | _, Tx_rollup _ -> 1
+    | Sc_rollup _, _ -> -1
+    | _, Sc_rollup _ -> 1
 end)
 
 let to_b58check = function
   | Contract k -> Contract_repr.to_b58check k
   | Tx_rollup k -> Tx_rollup_repr.to_b58check k
   | Sc_rollup k -> Sc_rollup_repr.Address.to_b58check k
+  | Event k -> Contract_event_repr.to_b58check k
 
 type error += Invalid_destination_b58check of string
 
@@ -81,9 +86,12 @@ let of_b58data data =
   | None -> (
       match Tx_rollup_repr.of_b58data data with
       | Some tx_rollup -> Some (Tx_rollup tx_rollup)
-      | None ->
-          Sc_rollup_repr.Address.of_b58data data
-          |> Option.map (fun sc_rollup -> Sc_rollup sc_rollup))
+      | None -> (
+          match Sc_rollup_repr.Address.of_b58data data with
+          | Some sc_rollup -> Some (Sc_rollup sc_rollup)
+          | None ->
+              Contract_event_repr.of_b58data data
+              |> Option.map (fun c -> Event c)))
 
 let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
 
@@ -122,6 +130,12 @@ let encoding =
                   ~title:"Sc_rollup"
                   (function Sc_rollup k -> Some k | _ -> None)
                   (fun k -> Sc_rollup k);
+                case
+                  (Tag 4)
+                  (Fixed.add_padding Contract_event_repr.Hash.encoding 1)
+                  ~title:"Event sink"
+                  (function Event k -> Some k | _ -> None)
+                  (fun k -> Event k);
               ]))
        ~json:
          (conv
@@ -139,6 +153,7 @@ let pp : Format.formatter -> t -> unit =
   | Contract k -> Contract_repr.pp fmt k
   | Tx_rollup k -> Tx_rollup_repr.pp fmt k
   | Sc_rollup k -> Sc_rollup_repr.pp fmt k
+  | Event k -> Contract_event_repr.pp fmt k
 
 let in_memory_size =
   let open Cache_memory_helpers in
@@ -146,3 +161,4 @@ let in_memory_size =
   | Contract k -> h1w +! Contract_repr.in_memory_size k
   | Tx_rollup k -> h1w +! Tx_rollup_repr.in_memory_size k
   | Sc_rollup k -> h1w +! Sc_rollup_repr.in_memory_size k
+  | Event k -> h1w +! Contract_event_repr.in_memory_size k
