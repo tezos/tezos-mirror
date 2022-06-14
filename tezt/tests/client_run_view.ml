@@ -198,7 +198,11 @@ let test_run_view_fail_generic ~protocol ~view ~contract ~input ~msg () =
 
 (* Runs view `add_v` on an implicit account and fails *)
 let test_run_view_implicit_account ~protocol () =
-  let msg = rex "Erroneous command line argument 6 \\(tz1" in
+  let msg =
+    if protocol = Protocol.Jakarta then
+      rex "A view was called on a contract with no script."
+    else rex "Erroneous command line argument 6 \\(tz1"
+  in
   test_run_view_fail_generic
     ~protocol
     ~view:"add_v"
@@ -247,9 +251,10 @@ let test_run_view_loop_unlimited_gas ~protocol =
     ~expected:"Unit"
     ~unlimited_gas:true
 
-let make_for ~protocol () =
+let make_for ~name ~protocol () =
   List.iter
     (fun (title, f) ->
+      let title = sf "%s : %s" name title in
       Test.register ~__FILE__ ~title ~tags:["client"; "michelson"; "view"] f)
     [
       ("Run view `add_v` with 10", test_run_view_add_v_10 ~protocol);
@@ -274,6 +279,7 @@ let make_for ~protocol () =
 let register ~protocols =
   List.iter
     (function
-      | Protocol.Alpha as protocol -> make_for ~protocol ()
-      | Protocol.Jakarta | Protocol.Ithaca -> ())
+      | Protocol.Alpha as protocol -> make_for ~name:"Alpha" ~protocol ()
+      | Protocol.Jakarta as protocol -> make_for ~name:"Jakarta" ~protocol ()
+      | Protocol.Ithaca -> ())
     protocols
