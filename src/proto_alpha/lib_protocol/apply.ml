@@ -786,7 +786,7 @@ type 'loc execution_arg =
   | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg
   | Untyped_arg : Script.expr -> _ execution_arg
 
-let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
+let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~untyped_parameter
     ~entrypoint ~before_operation =
   let contract = Contract.Implicit pkh in
   (* Transfers of zero to implicit accounts are forbidden. *)
@@ -797,10 +797,9 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
   Token.transfer ctxt (`Contract source) (`Contract contract) amount
   >>=? fun (ctxt, balance_updates) ->
   let is_unit =
-    match parameter with
-    | Typed_arg ((), Unit_t, ()) -> true
-    | Typed_arg _ -> false
-    | Untyped_arg parameter -> (
+    match untyped_parameter with
+    | None -> true
+    | Some parameter -> (
         match Micheline.root parameter with
         | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> true
         | _ -> false)
@@ -1104,7 +1103,7 @@ let apply_internal_operation_contents :
         ~source
         ~amount
         ~pkh
-        ~parameter:(Typed_arg ((), Unit_t, ()))
+        ~untyped_parameter:None
         ~entrypoint
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
@@ -1276,7 +1275,7 @@ let apply_manager_operation :
         ~source:source_contract
         ~amount
         ~pkh
-        ~parameter:(Untyped_arg parameters)
+        ~untyped_parameter:(Some parameters)
         ~entrypoint
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
