@@ -1049,4 +1049,23 @@ let commands () =
             unlimited_gas;
           }
         >>= fun res -> print_view_result cctxt res);
+    command
+      ~group
+      ~desc:"Compute the event address associated with a tag and a data type."
+      no_options
+      (prefixes ["get"; "event"; "address"]
+      @@ param ~name:"type" ~desc:"the type of the event data" data_parameter
+      @@ stop)
+      (fun () ty cctxt ->
+        Client_proto_programs.get_event_address
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~ty:ty.expanded
+        >>=? fun addr ->
+        cctxt#message
+          "@[<v 2>Event address: @,%a@]@."
+          Contract_event_repr.pp
+          addr
+        >|= ok);
   ]
