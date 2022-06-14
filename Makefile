@@ -34,16 +34,19 @@ CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-OCTEZ_BIN=octez-node octez-validator octez-client octez-admin-client octez-signer octez-codec octez-protocol-compiler octez-snoop octez-proxy-server \
-    $(foreach p, $(active_protocol_versions), octez-baker-$(p)) \
-    $(foreach p, $(active_protocol_versions), octez-accuser-$(p)) \
+RAW_BIN=node validator client admin-client signer codec protocol-compiler snoop proxy-server \
+    $(foreach p, $(active_protocol_versions), baker-$(p)) \
+    $(foreach p, $(active_protocol_versions), accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
-		             echo octez-endorser-$(p); fi)) \
-    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
-    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
-    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
-    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
+		             echo endorser-$(p); fi)) \
+    $(foreach p, $(tx_rollup_protocol_versions), tx-rollup-node-$p) \
+    $(foreach p, $(tx_rollup_protocol_versions), tx-rollup-client-$p) \
+    $(foreach p, $(sc_rollup_protocol_versions), sc-rollup-node-$p) \
+    $(foreach p, $(sc_rollup_protocol_versions), sc-rollup-client-$p)
+
+OCTEZ_BIN=$(shell echo "$(RAW_BIN)" | sed 's/[^ ]* */octez-&/g')
+TEZOS_BIN=$(shell echo "$(RAW_BIN)" | sed 's/[^ ]* */tezos-&/g')
 
 UNRELEASED_OCTEZ_BIN=octez-dal-node
 
@@ -96,6 +99,7 @@ endif
 		$(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
 	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
+	@$(foreach b, $(RAW_BIN), if [ ! -f ./tezos-${b} ]; then ln -s octez-${b} tezos-${b}; fi;)
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
@@ -402,7 +406,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f ${OCTEZ_BIN} ${UNRELEASED_OCTEZ_BIN}
+	@-rm -f ${OCTEZ_BIN} ${TEZOS_BIN} ${UNRELEASED_OCTEZ_BIN}
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
