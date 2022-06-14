@@ -50,6 +50,7 @@ type error += Cannot_serialize_storage
 
 type error += Michelson_too_many_recursive_calls
 
+(** The result from script interpretation. *)
 type execution_result = {
   script : Script_ir_translator.ex_script;
   code_size : int;

@@ -151,6 +151,7 @@ type prim =
   | I_SPLIT_TICKET
   | I_JOIN_TICKETS
   | I_OPEN_CHEST
+  | I_EMIT
   | T_bool
   | T_contract
   | T_int
@@ -216,7 +217,8 @@ let namespace = function
   | I_SENDER | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE
   | I_SOME | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ
   | I_SWAP | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT
-  | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST ->
+  | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST
+  | I_EMIT ->
       Instr_namespace
   | T_address | T_tx_rollup_l2_address | T_big_map | T_bool | T_bytes
   | T_chain_id | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list
@@ -357,6 +359,7 @@ let string_of_prim = function
   | I_SPLIT_TICKET -> "SPLIT_TICKET"
   | I_JOIN_TICKETS -> "JOIN_TICKETS"
   | I_OPEN_CHEST -> "OPEN_CHEST"
+  | I_EMIT -> "EMIT"
   | I_VIEW -> "VIEW"
   | T_bool -> "bool"
   | T_contract -> "contract"
@@ -511,6 +514,7 @@ let prim_of_string = function
   | "SPLIT_TICKET" -> ok I_SPLIT_TICKET
   | "JOIN_TICKETS" -> ok I_JOIN_TICKETS
   | "OPEN_CHEST" -> ok I_OPEN_CHEST
+  | "EMIT" -> ok I_EMIT
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -760,7 +764,10 @@ let prim_encoding =
          (* Alpha_013 addition *)
          ("tx_rollup_l2_address", T_tx_rollup_l2_address);
          ("MIN_BLOCK_TIME", I_MIN_BLOCK_TIME);
-         ("sapling_transaction", T_sapling_transaction)
+         ("sapling_transaction", T_sapling_transaction);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         (* Alpha_014 addition *)
+         ("EMIT", I_EMIT)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *);
        ]

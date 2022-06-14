@@ -593,6 +593,11 @@ let hash_comparable_data ctxt ty data =
   pack_comparable_data ctxt ty data >>=? fun (bytes, ctxt) ->
   Lwt.return @@ hash_bytes ctxt bytes
 
+let hash_event_ty ctxt unparsed =
+  pack_node unparsed ctxt >>? fun (bytes, ctxt) ->
+  Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
+  >|? fun ctxt -> (Contract_event.Hash.hash_bytes [bytes], ctxt)
+
 (* ---- Tickets ------------------------------------------------------------ *)
 
 (*
@@ -1489,6 +1494,7 @@ let parse_storage_ty :
           (Ex_ty ty, ctxt))
   | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
+(* check_packable: determine if a `ty` is packable into Michelson *)
 let check_packable ~legacy loc root =
   let rec check : type t tc. (t, tc) ty -> unit tzresult = function
     (* /!\ When adding new lazy storage kinds, be sure to return an error. /!\
@@ -4639,6 +4645,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
       let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
       typed ctxt loc instr (Item_t (union_bytes_bool_t, rest))
+  | Prim (loc, I_EMIT, [ty_node], annot), Item_t (data, rest) ->
+      parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty_node
+      >>?= fun (Ex_ty ty, ctxt) ->
+      check_item_ty ctxt ty data loc I_EMIT 1 2 >>?= fun (Eq, ctxt) ->
+      parse_entrypoint_annot_strict loc annot >>?= fun tag ->
+      hash_event_ty ctxt ty_node >>?= fun (addr, ctxt) ->
+      let instr = {apply = (fun k -> IEmit {loc; tag; ty = data; addr; k})} in
+      typed ctxt loc instr (Item_t (Operation_t, rest))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -4663,7 +4677,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( loc,
           (( I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER | I_EMPTY_SET
            | I_LOOP | I_LOOP_LEFT | I_CONTRACT | I_CAST | I_UNPACK
-           | I_CREATE_CONTRACT ) as name),
+           | I_CREATE_CONTRACT | I_EMIT ) as name),
           (([] | _ :: _ :: _) as l),
           _ ),
       _ ) ->
@@ -4993,8 +5007,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               entrypoint_arg >|? fun (entrypoint, arg_ty) ->
               let address = {destination; entrypoint} in
               Typed_contract {arg_ty; address} ))
-  | Event _ ->
-      return (error ctxt (fun (_ : location) -> No_such_entrypoint entrypoint))
+  | Event _ -> return (error ctxt (fun _ -> No_such_entrypoint entrypoint))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is

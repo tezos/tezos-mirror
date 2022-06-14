@@ -1188,6 +1188,7 @@ let apply_internal_manager_operation_content :
         Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
       in
       (ctxt, ITransaction_result result, [])
+  | Transaction_to_event _ -> failwith "TODO"
   | Origination
       {
         delegate;

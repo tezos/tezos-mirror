@@ -805,6 +805,7 @@ module Scripts = struct
       | ISplit_ticket _ -> pp_print_string fmt "SPLIT_TICKET"
       | IJoin_tickets _ -> pp_print_string fmt "JOIN_TICKETS"
       | IOpen_chest _ -> pp_print_string fmt "OPEN_CHEST"
+      | IEmit _ -> pp_print_string fmt "EMIT"
       | IHalt _ -> pp_print_string fmt "[halt]"
       | ILog (_, _, _, _, instr) ->
           Format.fprintf fmt "log/%a" pp_instr_name instr

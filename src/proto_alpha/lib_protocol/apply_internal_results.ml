@@ -91,6 +91,7 @@ let contents_of_internal_operation (type kind)
             entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
+    | Transaction_to_event _ -> failwith "TODO"
     | Origination {delegate; code; unparsed_storage; credit; _} ->
         let script =
           {

@@ -1425,6 +1425,7 @@ let extract_ir_sized_step :
       let log_time = Z.log2 Z.(one + Script_int.to_zint time) |> Size.of_int in
       Instructions.open_chest log_time plaintext_size
   | IMin_block_time _, _ -> Instructions.min_block_time
+  | IEmit _, _ -> Stdlib.failwith "TODO"
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =

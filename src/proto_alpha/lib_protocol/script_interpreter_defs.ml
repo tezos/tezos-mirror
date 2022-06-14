@@ -60,8 +60,8 @@ let () =
     ~title:"Event sinks are invalid transaction destinations"
     ~description:
       "Event sinks are not real transaction destinations, and therefore \
-       operations targeting an event sink are invalid. To emit events, use EMIT \
-       instead."
+       operations targeting an event sink are invalid. To emit events, use \
+       EMIT instead."
     ~pp:(fun ppf () ->
       Format.pp_print_string
         ppf
@@ -366,6 +366,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IOpen_chest _ ->
       let _chest_key = accu and chest, (time, _) = stack in
       Interp_costs.open_chest ~chest ~time:(Script_int.to_zint time)
+  | IEmit _ -> Interp_costs.transfer_tokens
   | ILog _ -> Gas.free
  [@@ocaml.inline always]
  [@@coq_axiom_with_reason "unreachable expression `.` not handled"]
@@ -563,6 +564,26 @@ let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
             unparsed_parameters;
           },
         ctxt ) )
+
+(** [emit_event] generates an internal operation that will effect an event emission
+    if the contract code returns this successfully. *)
+let emit_event (type t tc) (ctxt, sc) gas ~event_address
+    ~(event_type : (t, tc) ty) ~tag ~(event_data : t) =
+  let ctxt = update_context gas ctxt in
+  (* No need to take care of lazy storage as only packable types are allowed *)
+  let lazy_storage_diff = None in
+  unparse_data ctxt Optimized event_type event_data
+  >>=? fun (unparsed_data, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost unparsed_data) >>?= fun ctxt ->
+  let unparsed_data = Micheline.strip_locations unparsed_data in
+  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let operation =
+    Transaction_to_event {addr = event_address; tag; unparsed_data}
+  in
+  let iop = {source = Contract.Originated sc.self; operation; nonce} in
+  let res = {piop = Internal_operation iop; lazy_storage_diff} in
+  let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
+  return (res, ctxt, gas)
 
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to a destination and

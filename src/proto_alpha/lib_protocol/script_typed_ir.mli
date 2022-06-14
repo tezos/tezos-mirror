@@ -1080,6 +1080,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
            'r,
            'f )
          kinstr
+  | IEmit : {
+      loc : Script.location;
+      addr : Contract_event.t;
+      tag : Entrypoint.t;
+      ty : ('a, _) ty;
+      k : (operation, 's, 'r, 'f) kinstr;
+    }
+      -> ('a, 's, 'r, 'f) kinstr
   (*
 
      Internal control instructions
@@ -1491,6 +1499,12 @@ and 'kind manager_operation =
       parameters_ty : ('a, _) ty;
       parameters : 'a;
       unparsed_parameters : Script.expr;
+    }
+      -> Kind.transaction manager_operation
+  | Transaction_to_event : {
+      addr : Contract_event.t;
+      tag : Entrypoint.t;
+      unparsed_data : Script.expr;
     }
       -> Kind.transaction manager_operation
   | Origination : {
