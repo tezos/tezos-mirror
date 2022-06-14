@@ -818,7 +818,13 @@ end = struct
       names ;
     if String_map.is_empty names then Dune.E
     else
-      let compare_key ((a : string), _) (b, _) = compare a b in
+      let compare_key ((a : string), _) (b, _) =
+        match (a, b) with
+        | "_", "_" -> 0
+        | "_", _ -> 1
+        | _, "_" -> -1
+        | _ -> compare a b
+      in
       let l : Dune.s_expr list =
         List.map
           (fun (name, entries) ->
