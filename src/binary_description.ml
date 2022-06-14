@@ -140,8 +140,9 @@ let dedup_canonicalize uf l =
       (Binary_schema.toplevel_encoding, Binary_schema.description) Hashtbl.t =
     Hashtbl.create 100
   in
-  let rec run prev_len l =
+  let rec run l =
     Hashtbl.clear tbl ;
+    let new_union = ref false in
     let fixedup =
       l
       |> List.filter_map (fun (name, layout) ->
@@ -151,16 +152,15 @@ let dedup_canonicalize uf l =
                  Hashtbl.add tbl layout desc ;
                  Some (desc.title, layout)
              | Some original_desc ->
+                 new_union := true ;
                  UF.union uf ~new_canonical:original_desc ~existing:name ;
                  None)
       |> List.map (fun (desc, layout) -> (desc, fixup_references uf layout))
     in
-    let len = List.length fixedup in
-    if len = prev_len then
-      List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
-    else run len fixedup
+    if !new_union then run fixedup
+    else List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
   in
-  run (List.length l) l
+  run l
 
 type pdesc = P : 'x Encoding.desc -> pdesc
 
