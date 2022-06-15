@@ -625,6 +625,7 @@ let check_elem_mode (c : context) (t : ref_type) (mode : segment_mode) =
 
 let check_elem (c : context) (seg : elem_segment) =
   let {etype; einit; emode} = seg.it in
+  let einit = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings einit) in
   List.iter (fun const -> check_const c const (RefType etype)) einit ;
   check_elem_mode c etype emode
 

@@ -581,6 +581,7 @@ let segment_mode category mode =
 
 let elem i seg =
   let {etype; einit; emode} = seg.it in
+  let einit = lazy_vector Fun.id einit in
   Node
     ( "elem $" ^ nat i,
       segment_mode "table" emode

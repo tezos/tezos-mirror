@@ -76,15 +76,18 @@ let list free xs = List.fold_left union empty (List.map free xs)
 
 let opt free xo = Lib.Option.get (Lib.Option.map free xo) empty
 
-let lazy_vector free xs =
+let lazy_vector_s free xs =
+  let open Lwt.Syntax in
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare in
-  (* [Free] module is used only during the validation of the AST, no mutation
-     can happen at this time, and is only used during tests. It is then safe to
-     simply use the list. *)
+  let* xs = Lazy_vector.LwtInt32Vector.to_list xs in
   List.fold_left_s
-    (fun acc (_, s) -> Lwt.return (union acc (free s)))
+    (fun acc s ->
+      let+ f = free s in
+      union acc f)
     empty
-    (Lazy_vector.LwtInt32Vector.loaded_bindings xs)
+    xs
+
+let lazy_vector free xs = lazy_vector_s (fun x -> Lwt.return (free x)) xs
 
 let block_type = function
   | VarBlockType x -> types (var x)
@@ -141,7 +144,7 @@ let segment_mode f (m : segment_mode) =
   | Active {index; offset} -> f (var index) ++ const offset
 
 let elem (s : elem_segment) =
-  list const s.it.einit ++ segment_mode tables s.it.emode
+  lazy_vector const s.it.einit ++* (segment_mode tables s.it.emode |> Lwt.return)
 
 let data (s : data_segment) = segment_mode memories s.it.dmode
 
@@ -174,7 +177,7 @@ let module_ (m : module_) =
   ++* lazy_vector memory m.it.memories
   ++* lazy_vector func m.it.funcs
   ++* Lwt.return (opt start m.it.start)
-  ++* lazy_vector elem m.it.elems
+  ++* lazy_vector_s elem m.it.elems
   ++* lazy_vector data m.it.datas
   ++* lazy_vector import m.it.imports
   ++* lazy_vector export m.it.exports

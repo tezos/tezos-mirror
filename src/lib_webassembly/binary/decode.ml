@@ -950,8 +950,6 @@ type ('a, 'b) vec_map_kont =
   | Collect of int * 'a list
   | Rev of 'a list * 'b list * int
 
-type 'a vec_kont = ('a, 'a) vec_map_kont
-
 type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
 
 let is_end_of_vec (Lazy_vec {offset; vector}) =
@@ -1226,13 +1224,13 @@ type elem_kont =
   | EKInitIndexed of {
       mode : segment_mode;
       ref_type : ref_type;
-      einit_vec : const vec_kont;
+      einit_vec : const lazy_vec_kont;
     }
       (** Element segment initialization code parsing step for referenced values. *)
   | EKInitConst of {
       mode : segment_mode;
       ref_type : ref_type;
-      einit_vec : const vec_kont;
+      einit_vec : const lazy_vec_kont;
       einit_kont : pos * instr_block_kont list;
     }
       (** Element segment initialization code parsing step for constant values. *)
@@ -1259,7 +1257,7 @@ let ek_start s =
       let ref_type = elem_kind s in
       let n = len32 s in
       let mode = Source.(Passive @@ region s mode_pos mode_pos) in
-      EKInitIndexed {mode; ref_type; einit_vec = Collect (n, [])}
+      EKInitIndexed {mode; ref_type; einit_vec = init_lazy_vec (Int32.of_int n)}
   | 0x02l ->
       (* active *)
       let left = pos s in
@@ -1279,7 +1277,7 @@ let ek_start s =
       let mode = Source.(Declarative @@ region s mode_pos mode_pos) in
       let ref_type = elem_kind s in
       let n = len32 s in
-      EKInitIndexed {mode; ref_type; einit_vec = Collect (n, [])}
+      EKInitIndexed {mode; ref_type; einit_vec = init_lazy_vec (Int32.of_int n)}
   | 0x04l ->
       (* active_zero *)
       let index = Source.(0l @@ Source.no_region) in
@@ -1303,7 +1301,7 @@ let ek_start s =
         {
           mode;
           ref_type;
-          einit_vec = Collect (n, []);
+          einit_vec = init_lazy_vec (Int32.of_int n);
           einit_kont = (left, [IKNext []]);
         }
   | 0x06l ->
@@ -1330,7 +1328,7 @@ let ek_start s =
         {
           mode;
           ref_type;
-          einit_vec = Collect (n, []);
+          einit_vec = init_lazy_vec (Int32.of_int n);
           einit_kont = (left, [IKNext []]);
         }
   | _ -> error s (pos s - 1) "malformed elements segment kind"
@@ -1357,14 +1355,15 @@ let elem_step s = function
       (* `vec` size *)
       let n = len32 s in
       if index_kind = Indexed then
-        EKInitIndexed {mode; ref_type; einit_vec = Collect (n, [])}
+        EKInitIndexed
+          {mode; ref_type; einit_vec = init_lazy_vec (Int32.of_int n)}
       else
         let left = pos s in
         EKInitConst
           {
             mode;
             ref_type;
-            einit_vec = Collect (n, []);
+            einit_vec = init_lazy_vec (Int32.of_int n);
             einit_kont = (left, [IKNext []]);
           }
   | EKMode
@@ -1378,25 +1377,21 @@ let elem_step s = function
           early_ref_type;
           offset_kont = (left_offset, k');
         }
-  (* COLLECT Indexed *)
-  | EKInitIndexed {mode; ref_type; einit_vec = Collect (0, l)} ->
-      EKInitIndexed {mode; ref_type; einit_vec = Rev (l, [], 0)}
-  | EKInitIndexed {mode; ref_type; einit_vec = Collect (n, l)} ->
+  (* End of initialization parsing *)
+  | EKInitConst
+      {mode; ref_type; einit_vec = Lazy_vec {vector = einit; _} as einit_vec; _}
+  | EKInitIndexed
+      {mode; ref_type; einit_vec = Lazy_vec {vector = einit; _} as einit_vec}
+    when is_end_of_vec einit_vec ->
+      EKStop {etype = ref_type; einit; emode = mode}
+  (* Indexed *)
+  | EKInitIndexed {mode; ref_type; einit_vec} ->
       let elem_index = at elem_index s in
       EKInitIndexed
-        {mode; ref_type; einit_vec = Collect (n - 1, elem_index :: l)}
-  (* COLLECT CONST *)
-  | EKInitConst
-      {mode; ref_type; einit_vec = Collect (0, l); einit_kont = left, _} ->
-      EKInitConst
-        {mode; ref_type; einit_vec = Rev (l, [], 0); einit_kont = (left, [])}
-  | EKInitConst
-      {
-        mode;
-        ref_type;
-        einit_vec = Collect (n, l);
-        einit_kont = left, [IKStop einit];
-      } ->
+        {mode; ref_type; einit_vec = lazy_vec_step elem_index einit_vec}
+  (* Const *)
+  | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, [IKStop einit]}
+    ->
       end_ s ;
       let right = pos s in
       let einit = Source.(einit @@ region s left right) in
@@ -1404,24 +1399,12 @@ let elem_step s = function
         {
           mode;
           ref_type;
-          einit_vec = Collect (n - 1, einit :: l);
+          einit_vec = lazy_vec_step einit einit_vec;
           einit_kont = (right, [IKNext []]);
         }
-  | EKInitConst
-      {mode; ref_type; einit_vec = Collect (n, l); einit_kont = left, k} ->
+  | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, k} ->
       let k' = instr_block_step s k in
-      EKInitConst
-        {mode; ref_type; einit_vec = Collect (n, l); einit_kont = (left, k')}
-  (* REV *)
-  | EKInitConst {mode; ref_type; einit_vec = Rev ([], einit, _len); _}
-  | EKInitIndexed {mode; ref_type; einit_vec = Rev ([], einit, _len)} ->
-      EKStop {etype = ref_type; einit; emode = mode}
-  | EKInitConst {mode; ref_type; einit_vec = Rev (c :: l, l', len); einit_kont}
-    ->
-      EKInitConst
-        {mode; ref_type; einit_vec = Rev (l, c :: l', len + 1); einit_kont}
-  | EKInitIndexed {mode; ref_type; einit_vec = Rev (c :: l, l', len)} ->
-      EKInitIndexed {mode; ref_type; einit_vec = Rev (l, c :: l', len + 1)}
+      EKInitConst {mode; ref_type; einit_vec; einit_kont = (left, k')}
   | EKStop _ -> assert false (* Final step, cannot reduce *)
 
 (* Data section *)

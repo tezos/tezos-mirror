@@ -357,7 +357,11 @@ and segment_mode' =
 
 type elem_segment = elem_segment' Source.phrase
 
-and elem_segment' = {etype : ref_type; einit : const list; emode : segment_mode}
+and elem_segment' = {
+  etype : ref_type;
+  einit : const Vector.t;
+  emode : segment_mode;
+}
 
 type data_segment = data_segment' Source.phrase
 

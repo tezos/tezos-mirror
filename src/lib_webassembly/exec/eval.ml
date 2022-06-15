@@ -858,6 +858,7 @@ let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst Lwt.t =
   (* TODO: #3076
      [einit] should be changed to a lazy structure. We want to avoid traversing
      it whole. *)
+  let* einit = Lazy_vector.LwtInt32Vector.to_list einit in
   let+ init =
     TzStdLib.List.map_s
       (fun v ->
@@ -910,7 +911,9 @@ let run_elem i elem =
       offset.it
       @ [
           Const (I32 0l @@ at) @@ at;
-          Const (I32 (Lib.List32.length elem.it.einit) @@ at) @@ at;
+          Const
+            (I32 (Lazy_vector.LwtInt32Vector.num_elements elem.it.einit) @@ at)
+          @@ at;
           TableInit (index, x) @@ at;
           ElemDrop x @@ at;
         ]

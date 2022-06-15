@@ -1049,6 +1049,9 @@ struct
 
   let elem seg =
     let {etype; einit; emode} = seg.it in
+    let einit =
+      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings einit)
+    in
     if is_elem_kind etype && List.for_all is_elem_index einit then (
       match emode.it with
       | Passive ->

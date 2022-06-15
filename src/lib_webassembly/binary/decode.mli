@@ -25,9 +25,6 @@ type ('a, 'b) vec_map_kont =
   | Collect of int * 'a list
   | Rev of 'a list * 'b list * int
 
-(** Vector accumulator without mapping. *)
-type 'a vec_kont = ('a, 'a) vec_map_kont
-
 (** Lazy vector accumulator, with the current offset to write the next value in
     the vector. *)
 type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
@@ -98,13 +95,13 @@ type elem_kont =
   | EKInitIndexed of {
       mode : Ast.segment_mode;
       ref_type : Types.ref_type;
-      einit_vec : Ast.const vec_kont;
+      einit_vec : Ast.const lazy_vec_kont;
     }
       (** Element segment initialization code parsing step for referenced values. *)
   | EKInitConst of {
       mode : Ast.segment_mode;
       ref_type : Types.ref_type;
-      einit_vec : Ast.const vec_kont;
+      einit_vec : Ast.const lazy_vec_kont;
       einit_kont : pos * instr_block_kont list;
     }
       (** Element segment initialization code parsing step for constant values. *)

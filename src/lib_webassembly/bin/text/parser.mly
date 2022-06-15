@@ -873,29 +873,29 @@ elem :
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $4); einit = (snd $4) c; emode = Passive @@ at } @@ at }
+      { etype = (fst $4); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $4) c); emode = Passive @@ at } @@ at }
   | LPAR ELEM bind_var_opt table_use offset elem_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $6); einit = (snd $6) c;
+      { etype = (fst $6); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $6) c);
         emode = Active {index = $4 c table; offset = $5 c} @@ at } @@ at }
   | LPAR ELEM bind_var_opt DECLARE elem_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $5); einit = (snd $5) c; emode = Declarative @@ at } @@ at }
+      { etype = (fst $5); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $5) c); emode = Declarative @@ at } @@ at }
   | LPAR ELEM bind_var_opt offset elem_list RPAR  /* Sugar */
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $5); einit = (snd $5) c;
+      { etype = (fst $5); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $5) c);
         emode = Active {index = 0l @@ at; offset = $4 c} @@ at } @@ at }
   | LPAR ELEM bind_var_opt offset elem_var_list RPAR  /* Sugar */
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = FuncRefType; einit = $5 c func;
+      { etype = FuncRefType; einit = Lazy_vector.LwtInt32Vector.of_list ($5 c func);
         emode = Active {index = 0l @@ at; offset = $4 c} @@ at } @@ at }
 
 table :
@@ -918,8 +918,8 @@ table_fields :
   | ref_type LPAR ELEM elem_var_list RPAR  /* Sugar */
     { fun c x at ->
       let offset = [i32_const (0l @@ at) @@ at] @@ at in
-      let einit = $4 c func in
-      let size = Lib.List32.length einit in
+      let einit = Lazy_vector.LwtInt32Vector.of_list ($4 c func) in
+      let size = Lazy_vector.LwtInt32Vector.num_elements einit in
       let emode = Active {index = x; offset} @@ at in
       [{ttype = TableType ({min = size; max = Some size}, $1)} @@ at],
       [{etype = FuncRefType; einit; emode} @@ at],
@@ -927,8 +927,8 @@ table_fields :
   | ref_type LPAR ELEM elem_expr elem_expr_list RPAR  /* Sugar */
     { fun c x at ->
       let offset = [i32_const (0l @@ at) @@ at] @@ at in
-      let einit = (fun c -> $4 c :: $5 c) c in
-      let size = Lib.List32.length einit in
+      let einit = Lazy_vector.LwtInt32Vector.of_list ((fun c -> $4 c :: $5 c) c) in
+      let size = Lazy_vector.LwtInt32Vector.num_elements einit in
       let emode = Active {index = x; offset} @@ at in
       [{ttype = TableType ({min = size; max = Some size}, $1)} @@ at],
       [{etype = FuncRefType; einit; emode} @@ at],
