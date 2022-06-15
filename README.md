@@ -26,13 +26,6 @@ a legacy branch is proposed. However, this branch is deprecated and not maintain
 
 ### Build
 
-Initialize the git submodule `grafonnet-lib`
-
-```sh
-git submodule init
-git submodule update
-```
-
 To create a dashboard for branch `master` in the title (default)
 
 ```sh
