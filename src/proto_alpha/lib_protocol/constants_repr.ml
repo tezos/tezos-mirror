@@ -83,6 +83,14 @@ let cache_layout_size = 3
 *)
 let sc_max_wrapped_proof_binary_size = 30_000
 
+(* A limit on the size of the binary encoding of sc rollup messages. This limit
+   depends on the assumed overhead of the proof and metadata in a manager
+   operation justifying the existence of some chunk of data in the rollup state.
+   The value of this constant reflects the global constant of 4KB in the WASM
+   PVM specification chosen for the limit of chunks that are embedded in proofs.
+*)
+let sc_rollup_message_size_limit = 4_096
+
 type fixed = unit
 
 let fixed_encoding =
@@ -99,7 +107,7 @@ let fixed_encoding =
           max_allowed_global_constant_depth,
           cache_layout_size,
           michelson_maximum_type_size ),
-        sc_max_wrapped_proof_binary_size ))
+        (sc_max_wrapped_proof_binary_size, sc_rollup_message_size_limit) ))
     (fun ( ( _proof_of_work_nonce_size,
              _nonce_length,
              _max_anon_ops_per_block,
@@ -110,7 +118,8 @@ let fixed_encoding =
              _max_allowed_global_constant_depth,
              _cache_layout_size,
              _michelson_maximum_type_size ),
-           _max_wrapped_proof_binary_size ) -> ())
+           (_max_wrapped_proof_binary_size, _sc_rollup_message_size_limit) ) ->
+      ())
     (merge_objs
        (obj10
           (req "proof_of_work_nonce_size" uint8)
@@ -123,7 +132,9 @@ let fixed_encoding =
           (req "max_allowed_global_constants_depth" int31)
           (req "cache_layout_size" uint8)
           (req "michelson_maximum_type_size" uint16))
-       (obj1 (req "max_wrapped_proof_binary_size" int31)))
+       (obj2
+          (req "max_wrapped_proof_binary_size" int31)
+          (req "sc_rollup_message_size_limit" int31)))
 
 let fixed = ()
 

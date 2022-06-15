@@ -64,10 +64,6 @@ type t = Atomic_transaction_batch of {transactions : transaction list}
 
 let transaction_encoding =
   let open Data_encoding in
-  (* TODO: #3116
-     Add size limit to constrain the maximum size of the encoded message.
-     The exact limit is yet to be decided. Could be added as a constant.
-  *)
   conv
     (fun {unparsed_parameters; destination; entrypoint} ->
       (unparsed_parameters, destination, entrypoint))
@@ -80,10 +76,12 @@ let transaction_encoding =
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun (Atomic_transaction_batch {transactions}) -> transactions)
-    (fun transactions -> Atomic_transaction_batch {transactions})
-    (obj1 (req "transactions" (list transaction_encoding)))
+  check_size
+    Constants_repr.sc_rollup_message_size_limit
+    (conv
+       (fun (Atomic_transaction_batch {transactions}) -> transactions)
+       (fun transactions -> Atomic_transaction_batch {transactions})
+       (obj1 (req "transactions" (list transaction_encoding))))
 
 let pp_transaction fmt {destination; entrypoint; unparsed_parameters = _} =
   Format.fprintf

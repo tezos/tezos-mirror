@@ -198,24 +198,26 @@ let test_inclusion_proof_verification (list_of_payloads, n) =
             given inboxes.")
 
 let tests =
+  let msg_size = QCheck2.Gen.(0 -- 100) in
+  let bounded_string = QCheck2.Gen.string_size msg_size in
   [
     Tztest.tztest "Empty inbox" `Quick test_empty;
     Tztest.tztest_qcheck2
       ~name:"Added messages are available."
-      QCheck2.Gen.(list string)
+      QCheck2.Gen.(list bounded_string)
       test_add_messages;
     Tztest.tztest_qcheck2
       ~name:"Get message."
-      QCheck2.Gen.(list string)
+      QCheck2.Gen.(list bounded_string)
       test_get_message;
     Tztest.tztest_qcheck2
       ~name:"Get message payload."
-      QCheck2.Gen.(list string)
+      QCheck2.Gen.(list bounded_string)
       test_get_message_payload;
     Tztest.tztest_qcheck2
       ~name:"Consume only available messages."
       QCheck2.Gen.(
-        let* l = list_size small_int string in
+        let* l = list_size small_int bounded_string in
         let* n = 0 -- ((List.length l * 2) + 1) in
         return (l, Int32.of_int n))
       test_consume_messages;
@@ -224,21 +226,19 @@ let tests =
   let gen_inclusion_proof_inputs =
     QCheck2.Gen.(
       let small = 2 -- 10 in
-      let* a = list_size small string in
-      let* b = list_size small string in
-      let* l = list_size small (list_size small string) in
+      let* a = list_size small bounded_string in
+      let* b = list_size small bounded_string in
+      let* l = list_size small (list_size small bounded_string) in
       let l = a :: b :: l in
       let* n = 0 -- (List.length l - 2) in
       return (l, n))
   in
   [
     Tztest.tztest_qcheck2
-      ~count:10
       ~name:"Produce inclusion proof between two related inboxes."
       gen_inclusion_proof_inputs
       test_inclusion_proof_production;
     Tztest.tztest_qcheck2
-      ~count:10
       ~name:"Verify inclusion proofs."
       gen_inclusion_proof_inputs
       test_inclusion_proof_verification;
