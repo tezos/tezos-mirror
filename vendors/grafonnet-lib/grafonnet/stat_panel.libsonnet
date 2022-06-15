@@ -40,6 +40,8 @@
    * @method addMappings(mappings) Adds an array of value mappings.
    * @method addDataLink(link) Adds a data link.
    * @method addDataLinks(links) Adds an array of data links.
+   * @method addTransformation(transformation) Adds a transformation object
+   * @method addTransformations(transformations) Adds an array of transformations
    */
   new(
     title,
@@ -218,5 +220,10 @@
     addThresholds(steps):: std.foldl(function(p, s) p.addThreshold(s), steps, self),
     addMappings(mappings):: std.foldl(function(p, m) p.addMapping(m), mappings, self),
     addDataLinks(links):: std.foldl(function(p, l) p.addDataLink(l), links, self),
+    addTransformation(transformation):: self {
+      transformations+: [transformation],
+    },
+    addTransformations(transformations)::
+      std.foldl(function(p, t) p.addTransformation(t), transformations, self),
   },
 }
