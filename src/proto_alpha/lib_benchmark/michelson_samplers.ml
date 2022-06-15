@@ -519,14 +519,37 @@ end)
         let entrypoint = entrypoint rng_state in
         {destination; entrypoint}
 
+    let generate_originated_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* c = originated in
+      let* entrypoint = entrypoint in
+      let destination = Alpha_context.Destination.Contract (Originated c) in
+      let address = {destination; entrypoint} in
+      return (Typed_contract {arg_ty; address})
+
     let generate_contract :
         type arg argc.
         (arg, argc) Script_typed_ir.ty ->
         arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
       let open M in
-      let* address = address in
-      return (Typed_contract {arg_ty; address})
+      match arg_ty with
+      | Unit_t ->
+          let* b = Base_samplers.uniform_bool in
+          if b then
+            let* pkh = implicit in
+            let destination =
+              Alpha_context.Destination.Contract (Implicit pkh)
+            in
+            let entrypoint = Alpha_context.Entrypoint.default in
+            let address = {destination; entrypoint} in
+            return (Typed_contract {arg_ty; address})
+          else generate_originated_contract arg_ty
+      | _ -> generate_originated_contract arg_ty
 
     let tx_rollup_l2_address rng_state =
       let seed =
