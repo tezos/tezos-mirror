@@ -463,7 +463,7 @@ let apply ctxt gas capture_ty capture lam =
       let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
-let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount ~entrypoint
+let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
     ~(parameters_ty : ((t ticket, tx_rollup_l2_address) pair, _) ty) ~parameters
     =
   (* The entrypoints of a transaction rollup are polymorphic wrt. the
@@ -478,10 +478,6 @@ let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount ~entrypoint
      the smart contract. This allows the transaction rollup to extract
      the type of the ticket. *)
   error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
-  >>?= fun () ->
-  error_unless
-    Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint)
-    (Script_tc_errors.No_such_entrypoint entrypoint)
   >>?= fun () ->
   let (Pair_t (Ticket_t (tp, _), _, _, _)) = parameters_ty in
   unparse_data ctxt Optimized parameters_ty parameters
@@ -541,19 +537,15 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
    creates an operation that transfers an amount of [tez] to a destination and
    an entrypoint instantiated with argument [parameters] of type
    [parameters_ty]. *)
-let transfer (type t tc) (ctxt, sc) gas amount location
-    (parameters_ty : (t, tc) ty) (parameters : t)
-    (destination : t typed_destination) entrypoint =
+let transfer (type t) (ctxt, sc) gas amount location
+    (typed_contract : t typed_contract) (parameters : t) =
   let ctxt = update_context gas ctxt in
-  (match destination with
+  (match typed_contract with
   | Typed_implicit destination ->
-      let Unit_t = parameters_ty in
       let () = parameters in
-      (if Entrypoint.is_default entrypoint then Result.return_unit
-      else error (Script_tc_errors.No_such_entrypoint entrypoint))
-      >>?= fun () ->
       return (Transaction_to_implicit {destination; amount}, None, ctxt)
-  | Typed_originated destination ->
+  | Typed_originated
+      {arg_ty = parameters_ty; contract_hash = destination; entrypoint} ->
       collect_lazy_storage ctxt parameters_ty parameters
       >>?= fun (to_duplicate, ctxt) ->
       let to_update = no_lazy_storage_id in
@@ -586,16 +578,16 @@ let transfer (type t tc) (ctxt, sc) gas amount location
               },
             lazy_storage_diff,
             ctxt ) )
-  | Typed_tx_rollup destination ->
+  | Typed_tx_rollup {arg_ty = parameters_ty; tx_rollup = destination} ->
       make_transaction_to_tx_rollup
         ctxt
         ~destination
         ~amount
-        ~entrypoint
         ~parameters_ty
         ~parameters
       >|=? fun (operation, ctxt) -> (operation, None, ctxt)
-  | Typed_sc_rollup destination ->
+  | Typed_sc_rollup
+      {arg_ty = parameters_ty; sc_rollup = destination; entrypoint} ->
       make_transaction_to_sc_rollup
         ctxt
         ~destination
