@@ -893,8 +893,6 @@
   tezos-protocol-updater
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (flags
-  (:standard))
  (modules Registerer))
 
 (rule

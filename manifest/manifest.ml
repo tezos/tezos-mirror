@@ -721,7 +721,7 @@ end
 module Flags = struct
   type t = {standard : bool; rest : Dune.s_expr list}
 
-  let if_true b name = if b then Dune.S name else Dune.E
+  let if_true b name = if b then Some (Dune.S name) else None
 
   let disable_warnings_to_string ws =
     let int_ranges l =
@@ -747,17 +747,19 @@ module Flags = struct
     {
       standard = true;
       rest =
-        [
-          (match disable_warnings with
-          | None | Some Stdlib.List.[] -> E
-          | Some l ->
-              if List.exists (fun x -> x <= 0) l then
-                invalid_arg "Warning number must be positive" ;
-              H [S "-w"; S (disable_warnings_to_string l)]);
-          if_true nostdlib "-nostdlib";
-          if_true nopervasives "-nopervasives";
-          if_true opaque "-opaque";
-        ];
+        List.filter_map
+          (fun x -> x)
+          [
+            (match disable_warnings with
+            | None | Some Stdlib.List.[] -> None
+            | Some l ->
+                if List.exists (fun x -> x <= 0) l then
+                  invalid_arg "Warning number must be positive" ;
+                Some Dune.(H [S "-w"; S (disable_warnings_to_string l)]));
+            if_true nostdlib "-nostdlib";
+            if_true nopervasives "-nopervasives";
+            if_true opaque "-opaque";
+          ];
     }
 
   let include_ f = {standard = false; rest = Dune.[S ":include"; S f]}
@@ -1725,7 +1727,7 @@ let generate_dune (internal : Target.internal) =
   in
   let flags =
     match (internal.flags, open_flags) with
-    | None, [] -> None
+    | None, [] | Some {standard = true; rest = []}, [] -> None
     | flags, _ ->
         let flags =
           match flags with None -> Flags.standard () | Some flags -> flags
