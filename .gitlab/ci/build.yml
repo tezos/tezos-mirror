@@ -42,7 +42,7 @@
 build_x86_64:
   extends:
     - .build
-    - .rules_template__development
+    - .rules_template__development_and_extended
   variables:
     ARCH: "x86_64"
 
