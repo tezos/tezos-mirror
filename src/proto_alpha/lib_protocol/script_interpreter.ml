@@ -1883,17 +1883,6 @@ let interp logger g (Lam (code, _)) arg =
   step_descr ~log_now:true logger g code arg (EmptyCell, EmptyCell)
   >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
 
-let kstep logger ctxt step_constants sty kinstr accu stack =
-  let kinstr =
-    match logger with
-    | None -> kinstr
-    | Some logger -> ILog (kinstr_location kinstr, sty, LogEntry, logger, kinstr)
-  in
-  let gas, outdated_ctxt = local_gas_counter_and_outdated_context ctxt in
-  step (outdated_ctxt, step_constants) gas kinstr KNil accu stack
-  >>=? fun (accu, stack, ctxt, gas) ->
-  return (accu, stack, update_context gas ctxt)
-
 (*
 
    High-level functions
@@ -2093,11 +2082,21 @@ module Internals = struct
     in
     next g gas ks accu stack
 
+  let kstep logger ctxt step_constants sty kinstr accu stack =
+    let kinstr =
+      match logger with
+      | None -> kinstr
+      | Some logger ->
+          ILog (kinstr_location kinstr, sty, LogEntry, logger, kinstr)
+    in
+    let gas, outdated_ctxt = local_gas_counter_and_outdated_context ctxt in
+    step (outdated_ctxt, step_constants) gas kinstr KNil accu stack
+    >>=? fun (accu, stack, ctxt, gas) ->
+    return (accu, stack, update_context gas ctxt)
+
   let step (ctxt, step_constants) gas ks accu stack =
     step (ctxt, step_constants) gas ks KNil accu stack
 
   let step_descr logger ctxt step_constants descr stack =
     step_descr ~log_now:false logger (ctxt, step_constants) descr stack
-
-  let kstep = kstep
 end
