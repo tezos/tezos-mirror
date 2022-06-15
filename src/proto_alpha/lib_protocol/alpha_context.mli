@@ -3537,6 +3537,8 @@ module Kind : sig
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
+  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -3566,6 +3568,8 @@ module Kind : sig
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
+    | Sc_rollup_dal_slot_subscribe_manager_kind
+        : sc_rollup_dal_slot_subscribe manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -3796,6 +3800,11 @@ and _ manager_operation =
       sc_rollup : Sc_rollup.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
+  | Sc_rollup_dal_slot_subscribe : {
+      rollup : Sc_rollup.t;
+      slot_index : Dal.Slot_index.t;
+    }
+      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
 
 and counter = Z.t
 
@@ -3976,6 +3985,9 @@ module Operation : sig
     val sc_rollup_recover_bond_case :
       Kind.sc_rollup_recover_bond Kind.manager case
 
+    val sc_rollup_dal_slot_subscribe_case :
+      Kind.sc_rollup_dal_slot_subscribe Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -4038,6 +4050,9 @@ module Operation : sig
         Kind.sc_rollup_execute_outbox_message case
 
       val sc_rollup_recover_bond_case : Kind.sc_rollup_recover_bond case
+
+      val sc_rollup_dal_slot_subscribe_case :
+        Kind.sc_rollup_dal_slot_subscribe case
     end
   end
 

@@ -548,7 +548,6 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Sc_rollup_feature_disabled) ;
-
   register_error_kind
     `Temporary
     ~id:"operation.wrong_voting_period"
@@ -1875,6 +1874,16 @@ let apply_external_manager_operation_content :
           }
       in
       return (ctxt, result, [])
+  | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
+      let open Lwt_tzresult_syntax in
+      let+ slot_index, level, ctxt =
+        Sc_rollup.Dal_slot.subscribe ctxt rollup ~slot_index
+      in
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
+      let result =
+        Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}
+      in
+      (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 
@@ -2099,6 +2108,7 @@ let burn_manager_storage_fees :
         Sc_rollup_execute_outbox_message_result {payload with balance_updates}
       )
   | Sc_rollup_recover_bond_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_dal_slot_subscribe_result _ -> return (ctxt, storage_limit, smopr)
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].
