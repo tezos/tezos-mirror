@@ -1871,6 +1871,17 @@ module Sc_rollup = struct
           path /: Sc_rollup.Address.rpc_arg / "commitment"
           /: Sc_rollup.Commitment.Hash.rpc_arg)
 
+    let dal_slot_subscriptions =
+      RPC_service.get_service
+        ~description:
+          "List of slot indices to which a rollup is subscribed to at a given \
+           level"
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.list Dal.Slot_index.encoding)
+        RPC_path.(
+          path /: Sc_rollup.Address.rpc_arg / "dal_slot_subscriptions"
+          /: Raw_level.rpc_arg)
+
     let root =
       RPC_service.get_service
         ~description:"List of all originated smart contract rollups"
@@ -1932,6 +1943,11 @@ module Sc_rollup = struct
     in
     commitment
 
+  let register_dal_slot_subscriptions () =
+    Registration.register2 ~chunked:false S.dal_slot_subscriptions
+    @@ fun ctxt address level () () ->
+    Alpha_context.Sc_rollup.Dal_slot.subscribed_slot_indices ctxt address level
+
   let register_root () =
     Registration.register0 ~chunked:true S.root (fun context () () ->
         Sc_rollup.list context)
@@ -1943,6 +1959,7 @@ module Sc_rollup = struct
     register_boot_sector () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_commitment () ;
+    register_dal_slot_subscriptions () ;
     register_root ()
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
@@ -1956,6 +1973,16 @@ module Sc_rollup = struct
       ctxt
       block
       sc_rollup_address
+      ()
+      ()
+
+  let dal_slot_subscriptions ctxt block sc_rollup_address level =
+    RPC_context.make_call2
+      S.dal_slot_subscriptions
+      ctxt
+      block
+      sc_rollup_address
+      level
       ()
       ()
 
