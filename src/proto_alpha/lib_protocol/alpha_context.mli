@@ -843,6 +843,7 @@ module Constants : sig
       frozen_deposits_percentage : int;
       double_baking_punishment : Tez.t;
       ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t;
+      governance_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
       cache_stake_distribution_cycles : int;
@@ -942,6 +943,8 @@ module Constants : sig
 
   val ratio_of_frozen_deposits_slashed_per_double_endorsement :
     context -> Ratio.t
+
+  val governance_dictator : context -> public_key_hash option
 
   val tx_rollup_enable : context -> bool
 

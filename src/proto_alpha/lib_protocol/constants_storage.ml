@@ -222,6 +222,10 @@ let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
   constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
 
+let governance_dictator c =
+  let constants = Raw_context.constants c in
+  constants.governance_dictator
+
 let sc_rollup_enable c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.enable

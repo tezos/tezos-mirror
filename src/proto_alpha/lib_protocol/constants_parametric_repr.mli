@@ -142,6 +142,7 @@ type t = {
   (* that is, (100 * delegated tz / own tz) *)
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
+  governance_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;
   (* in bytes *)
