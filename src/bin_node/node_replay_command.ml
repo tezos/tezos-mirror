@@ -212,11 +212,11 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
     (fun () ->
       List.iter_es
         (fun block ->
-          let block_alias =
+          let* block_alias =
             match block with
-            | `Head _ | `Genesis | `Alias _ ->
-                Some (Block_services.to_string block)
-            | _ -> None
+            | `Head _ | `Alias _ -> return_some (Block_services.to_string block)
+            | `Genesis -> tzfail Cannot_replay_orphan
+            | _ -> return_none
           in
           let* block =
             protect
