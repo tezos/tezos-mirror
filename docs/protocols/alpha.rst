@@ -51,6 +51,8 @@ Operation receipts
 
 - Remove field ``consumed_gas``, deprecated in Jakarta. Use field ``consumed_milligas`` instead. (:gl:`!5536`)
 
+- Operations that are both manager operations and internal operations returned by Michelson scripts now have different names for receipt encodings. This concerns transations, originations and delegations, where the word "internal" explicitly appears in the case of internal operation receipts. (:gl:`!5149`)
+
 Bug Fixes
 ---------
 
