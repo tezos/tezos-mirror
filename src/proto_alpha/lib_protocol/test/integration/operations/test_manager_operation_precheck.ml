@@ -531,6 +531,18 @@ let generate_tests_emptying_undelegated_implicit () =
     "passes precheck and empties an undelegated source."
     subjects
 
+(* Fee payment.*)
+let test_precheck kind () =
+  let open Lwt_result_syntax in
+  let* infos = init_context () in
+  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
+  let source = infos.contract1 in
+  let* operation = select_op ~counter ~force_reveal:true ~source kind infos in
+  precheck_diagnostic infos operation
+
+let generate_tests_precheck () =
+  create_Tztest test_precheck "passes precheck." subjects
+
 let tests =
   (test_ensure_manager_operation_coverage () :: generate_low_gas_limit ())
   @ generate_high_gas_limit ()
@@ -543,3 +555,4 @@ let tests =
   @ generate_tests_emptying_self_delegated_implicit ()
   @ generate_unrevealed_key ()
   @ generate_tests_emptying_undelegated_implicit ()
+  @ generate_tests_precheck ()
