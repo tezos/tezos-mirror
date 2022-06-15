@@ -40,7 +40,7 @@ type error += Reject of Script.location * Script.expr * execution_trace option
 
 type error += Overflow of Script.location * execution_trace option
 
-type error += Runtime_contract_error of Contract.t
+type error += Runtime_contract_error of Contract_hash.t
 
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 

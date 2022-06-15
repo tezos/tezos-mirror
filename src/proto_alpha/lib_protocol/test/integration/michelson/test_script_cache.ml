@@ -166,8 +166,7 @@ let test_find_correctly_looks_up () =
     *)
     Script_cache.find ctxt addr >|= Environment.wrap_tzresult
     >>=? fun (_, _, result) ->
-    Contract.get_script ctxt (Contract.Originated addr)
-    >|= Environment.wrap_tzresult
+    Contract.get_script ctxt addr >|= Environment.wrap_tzresult
     >>=? fun (ctxt, script) ->
     (match (result, script) with
     | None, _ -> ok false

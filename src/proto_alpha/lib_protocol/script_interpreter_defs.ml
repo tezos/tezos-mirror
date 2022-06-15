@@ -649,19 +649,20 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
   >>=? fun (init, lazy_storage_diff, ctxt) ->
   unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
-  let storage = Micheline.strip_locations storage in
+  let unparsed_storage = Micheline.strip_locations storage in
   Contract.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, preorigination) ->
-  let origination =
-    {
-      credit;
-      delegate;
-      script =
-        {code = Script.lazy_expr code; storage = Script.lazy_expr storage};
-    }
-  in
   let operation =
-    Origination {origination; preorigination; storage_type; storage = init}
+    Origination
+      {
+        credit;
+        delegate;
+        code;
+        unparsed_storage;
+        preorigination;
+        storage_type;
+        storage = init;
+      }
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let source = Contract.Originated sc.self in

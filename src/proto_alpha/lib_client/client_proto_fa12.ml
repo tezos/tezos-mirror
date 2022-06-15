@@ -28,7 +28,7 @@ open Protocol
 open Alpha_context
 open Tezos_micheline
 
-type error += Contract_has_no_script of Contract.t
+type error += Contract_has_no_script of Contract_hash.t
 
 type error += Contract_has_no_storage of Contract.t
 
@@ -71,9 +71,9 @@ let () =
       Format.fprintf
         ppf
         "Contract %a is not a smart contract, it has no script."
-        Contract.pp
+        Contract_hash.pp
         contract)
-    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    Data_encoding.(obj1 (req "contract" Contract.originated_encoding))
     (function Contract_has_no_script c -> Some c | _ -> None)
     (fun c -> Contract_has_no_script c) ;
   register_error_kind

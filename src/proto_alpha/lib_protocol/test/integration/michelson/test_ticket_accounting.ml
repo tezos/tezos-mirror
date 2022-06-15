@@ -326,6 +326,7 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
 let origination_operation ctxt ~src ~script:(code, storage) ~orig_contract =
   let open Lwt_result_syntax in
   let script = Script.{code = lazy_expr code; storage = lazy_expr storage} in
+  let unparsed_storage = storage in
   let* ( Script_ir_translator.Ex_script
            (Script
              {
@@ -352,7 +353,10 @@ let origination_operation ctxt ~src ~script:(code, storage) ~orig_contract =
         operation =
           Origination
             {
-              origination = {delegate = None; script; credit = Tez.one};
+              delegate = None;
+              code;
+              unparsed_storage;
+              credit = Tez.one;
               preorigination = orig_contract;
               storage_type;
               storage;

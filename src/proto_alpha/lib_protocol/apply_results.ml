@@ -55,7 +55,12 @@ type 'kind internal_manager_operation =
       destination : Destination.t;
     }
       -> Kind.transaction internal_manager_operation
-  | Origination : origination -> Kind.origination internal_manager_operation
+  | Origination : {
+      delegate : Signature.Public_key_hash.t option;
+      script : Script.t;
+      credit : Tez.tez;
+    }
+      -> Kind.origination internal_manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation internal_manager_operation
@@ -97,7 +102,14 @@ let contents_of_internal_operation (type kind)
             entrypoint = Tx_rollup.deposit_entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
-    | Origination {origination; _} -> Origination origination
+    | Origination {delegate; code; unparsed_storage; credit; _} ->
+        let script =
+          {
+            Script.code = Script.lazy_expr code;
+            storage = Script.lazy_expr unparsed_storage;
+          }
+        in
+        Origination {delegate; script; credit}
     | Delegation delegate -> Delegation delegate
   in
   {source; operation; nonce}

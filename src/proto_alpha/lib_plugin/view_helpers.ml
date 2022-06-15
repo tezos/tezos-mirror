@@ -37,12 +37,12 @@ type Environment.Error_monad.error +=
   | Illformed_view_type of Entrypoint.t * Script.expr
 
 type Environment.Error_monad.error +=
-  | View_never_returns of Entrypoint.t * Contract.t
+  | View_never_returns of Entrypoint.t * Contract_hash.t
 
 type Environment.Error_monad.error +=
-  | View_unexpected_return of Entrypoint.t * Contract.t
+  | View_unexpected_return of Entrypoint.t * Contract_hash.t
 
-type Environment.Error_monad.error += View_not_found of Contract.t * string
+type Environment.Error_monad.error += View_not_found of Contract_hash.t * string
 
 type Environment.Error_monad.error += Viewer_unexpected_storage
 
@@ -101,12 +101,12 @@ let () =
          contract %a."
         Entrypoint.pp
         entrypoint
-        Contract.pp
+        Contract_hash.pp
         callback)
     Data_encoding.(
       obj2
         (req "entrypoint" Entrypoint.simple_encoding)
-        (req "callback" Contract.encoding))
+        (req "callback" Contract.originated_encoding))
     (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
     (fun (e, c) -> View_never_returns (e, c)) ;
   Environment.Error_monad.register_error_kind
@@ -123,12 +123,12 @@ let () =
          expects only a transaction to the given callback contract %a."
         Entrypoint.pp
         entrypoint
-        Contract.pp
+        Contract_hash.pp
         callback)
     Data_encoding.(
       obj2
         (req "entrypoint" Entrypoint.simple_encoding)
-        (req "callback" Contract.encoding))
+        (req "callback" Contract.originated_encoding))
     (function View_unexpected_return (e, c) -> Some (e, c) | _ -> None)
     (fun (e, c) -> View_unexpected_return (e, c)) ;
   Environment.Error_monad.register_error_kind
@@ -140,10 +140,11 @@ let () =
       Format.fprintf
         ppf
         "The contract %a does not have a view named `%s`."
-        Contract.pp
+        Contract_hash.pp
         contract
         name)
-    Data_encoding.(obj2 (req "contract" Contract.encoding) (req "view" string))
+    Data_encoding.(
+      obj2 (req "contract" Contract.originated_encoding) (req "view" string))
     (function View_not_found (k, n) -> Some (k, n) | _ -> None)
     (fun (k, n) -> View_not_found (k, n)) ;
   Environment.Error_monad.register_error_kind
@@ -221,7 +222,7 @@ let extract_parameter_from_operations entrypoint operations callback =
        operation =
          Transaction_to_contract
            {
-             destination;
+             destination = Originated destination;
              unparsed_parameters;
              entrypoint = _;
              amount = _;
@@ -233,7 +234,7 @@ let extract_parameter_from_operations entrypoint operations callback =
        nonce = _;
      };
   ]
-    when Contract.equal destination callback ->
+    when Contract_hash.equal destination callback ->
       ok unparsed_parameters
   | [] ->
       Environment.Error_monad.error (View_never_returns (entrypoint, callback))

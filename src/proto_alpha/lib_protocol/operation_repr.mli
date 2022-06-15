@@ -206,12 +206,6 @@ type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t
 
-type origination = {
-  delegate : Signature.Public_key_hash.t option;
-  script : Script_repr.t;
-  credit : Tez_repr.tez;
-}
-
 (** An [operation] contains the operation header information in [shell]
     and all data related to the operation itself in [protocol_data]. *)
 type 'kind operation = {
@@ -345,7 +339,12 @@ and _ manager_operation =
       -> Kind.transaction manager_operation
   (* [Origination] of a contract using a smart-contract [script] and
      initially credited with the amount [credit]. *)
-  | Origination : origination -> Kind.origination manager_operation
+  | Origination : {
+      delegate : Signature.Public_key_hash.t option;
+      script : Script_repr.t;
+      credit : Tez_repr.tez;
+    }
+      -> Kind.origination manager_operation
   (* [Delegation] to some staking contract (designated by its public
      key hash). When this value is None, delegation is reverted as it
      is set to nobody. *)

@@ -271,7 +271,7 @@ module S = struct
         fun ctxt contract_id q () ->
           match (contract_id : Contract.t) with
           | Implicit _ -> return_none
-          | Originated _ ->
+          | Originated contract_id ->
               single_sapling_get_id ctxt contract_id
               >>=? fun (sapling_id, ctxt) ->
               Option.map_es (fun sapling_id -> f ctxt sapling_id q) sapling_id
@@ -295,33 +295,33 @@ let[@coq_axiom_with_reason "gadt"] register () =
   register0 ~chunked:true S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
   let register_field_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract () () ->
-        filter_contract contract @@ fun () ->
+        filter_contract contract @@ fun filtered_contract ->
         Contract.exists ctxt contract >>= function
-        | true -> f ctxt contract |> wrap_result
+        | true -> f ctxt filtered_contract |> wrap_result
         | false -> return_none)
   in
   let register_field_with_query_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract query () ->
-        filter_contract contract @@ fun () ->
+        filter_contract contract @@ fun filtered_contract ->
         Contract.exists ctxt contract >>= function
-        | true -> f ctxt contract query |> wrap_result
+        | true -> f ctxt filtered_contract query |> wrap_result
         | false -> return_none)
   in
   let register_field s =
     register_field_gen
-      ~filter_contract:(fun _c k -> k ())
+      ~filter_contract:(fun c k -> k c)
       ~wrap_result:(fun res -> res >|=? Option.some)
       s
   in
   let register_field_with_query s =
     register_field_with_query_gen
-      ~filter_contract:(fun _c k -> k ())
+      ~filter_contract:(fun c k -> k c)
       ~wrap_result:(fun res -> res >|=? Option.some)
       s
   in
   let register_opt_field s =
     register_field_gen
-      ~filter_contract:(fun _c k -> k ())
+      ~filter_contract:(fun c k -> k c)
       ~wrap_result:(fun res -> res)
       s
   in
@@ -330,7 +330,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
       ~filter_contract:(fun c k ->
         match (c : Contract.t) with
         | Implicit _ -> return_none
-        | Originated _ -> k ())
+        | Originated c -> k c)
       ~wrap_result:(fun res -> res)
       s
   in
@@ -504,7 +504,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
     (fun ctxt contract () (key, key_type) ->
       match (contract : Contract.t) with
       | Implicit _ -> return_none
-      | Originated _ -> (
+      | Originated contract -> (
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           let key_type_node = Micheline.root key_type in
           Script_ir_translator.parse_comparable_ty ctxt key_type_node
@@ -545,26 +545,25 @@ let[@coq_axiom_with_reason "gadt"] register () =
     (fun ctxt contract {normalize_types} ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.find ctxt contract >>=? fun delegate ->
-      (match contract with
+      match contract with
       | Implicit manager ->
-          Contract.get_counter ctxt manager >>=? fun counter ->
-          return_some counter
-      | Originated _ -> return_none)
-      >>=? fun counter ->
-      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-      (match script with
-      | None -> return (None, ctxt)
-      | Some script ->
-          let ctxt = Gas.set_unlimited ctxt in
-          Script_ir_translator.parse_and_unparse_script_unaccounted
-            ctxt
-            ~legacy:true
-            ~allow_forged_in_storage:true
-            Readable
-            ~normalize_types
-            script
-          >|=? fun (script, ctxt) -> (Some script, ctxt))
-      >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
+          Contract.get_counter ctxt manager >|=? fun counter ->
+          {balance; delegate; script = None; counter = Some counter}
+      | Originated contract -> (
+          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+          match script with
+          | None -> return {balance; delegate; script = None; counter = None}
+          | Some script ->
+              let ctxt = Gas.set_unlimited ctxt in
+              Script_ir_translator.parse_and_unparse_script_unaccounted
+                ctxt
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                Readable
+                ~normalize_types
+                script
+              >|=? fun (script, _ctxt) ->
+              {balance; delegate; script = Some script; counter = None})) ;
   S.Sapling.register ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()

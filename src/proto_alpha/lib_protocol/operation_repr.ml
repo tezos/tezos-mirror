@@ -230,12 +230,6 @@ type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 let raw_encoding = Operation.encoding
 
-type origination = {
-  delegate : Signature.Public_key_hash.t option;
-  script : Script_repr.t;
-  credit : Tez_repr.tez;
-}
-
 type 'kind operation = {
   shell : Operation.shell_header;
   protocol_data : 'kind protocol_data;
@@ -316,7 +310,12 @@ and _ manager_operation =
       destination : Contract_repr.t;
     }
       -> Kind.transaction manager_operation
-  | Origination : origination -> Kind.origination manager_operation
+  | Origination : {
+      delegate : Signature.Public_key_hash.t option;
+      script : Script_repr.t;
+      credit : Tez_repr.tez;
+    }
+      -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation

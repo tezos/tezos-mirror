@@ -84,7 +84,7 @@ val get_script :
   block:Shell_services.block ->
   unparsing_mode:Script_ir_translator.unparsing_mode ->
   normalize_types:bool ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.t option tzresult Lwt.t
 
 val get_script_hash :

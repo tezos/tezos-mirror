@@ -1561,7 +1561,8 @@ module Contract : sig
   val get_script_code :
     context -> t -> (context * Script.lazy_expr option) tzresult Lwt.t
 
-  val get_script : context -> t -> (context * Script.t option) tzresult Lwt.t
+  val get_script :
+    context -> Contract_hash.t -> (context * Script.t option) tzresult Lwt.t
 
   val get_storage :
     context -> t -> (context * Script.expr option) tzresult Lwt.t
@@ -3369,12 +3370,6 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
-type origination = {
-  delegate : Signature.Public_key_hash.t option;
-  script : Script.t;
-  credit : Tez.tez;
-}
-
 type 'kind operation = {
   shell : Operation.shell_header;
   protocol_data : 'kind protocol_data;
@@ -3455,7 +3450,12 @@ and _ manager_operation =
       destination : Contract.t;
     }
       -> Kind.transaction manager_operation
-  | Origination : origination -> Kind.origination manager_operation
+  | Origination : {
+      delegate : Signature.Public_key_hash.t option;
+      script : Script.t;
+      credit : Tez.tez;
+    }
+      -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation

@@ -37,7 +37,6 @@ let contract_of_identifier identifier =
 type cached_contract = Script.t * Script_ir_translator.ex_script
 
 let load_and_elaborate ctxt addr =
-  let addr = Contract.Originated addr in
   Contract.get_script ctxt addr >>=? fun (ctxt, script) ->
   match script with
   | None -> return (ctxt, None)

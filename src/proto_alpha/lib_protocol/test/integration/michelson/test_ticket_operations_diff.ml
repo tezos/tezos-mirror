@@ -249,6 +249,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
+  let unparsed_storage = storage in
   let* ( Script_ir_translator.Ex_script
            (Script
              {
@@ -275,7 +276,10 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
         operation =
           Origination
             {
-              origination = {delegate = None; script; credit = Tez.one};
+              delegate = None;
+              code;
+              unparsed_storage;
+              credit = Tez.one;
               preorigination = orig_contract;
               storage_type;
               storage;

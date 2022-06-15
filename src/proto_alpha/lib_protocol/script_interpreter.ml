@@ -106,7 +106,7 @@ type error += Reject of Script.location * Script.expr * execution_trace option
 
 type error += Overflow of Script.location * execution_trace option
 
-type error += Runtime_contract_error of Contract.t
+type error += Runtime_contract_error of Contract_hash.t
 
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
@@ -156,7 +156,7 @@ let () =
     ~title:"Script runtime error"
     ~description:"Toplevel error for all runtime script errors"
     (obj2
-       (req "contract_handle" Contract.encoding)
+       (req "contract_handle" Contract.originated_encoding)
        (req "contract_code" (constant "Deprecated")))
     (function
       | Runtime_contract_error contract -> Some (contract, ()) | _ -> None)
@@ -1041,7 +1041,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ ->
               (return_none [@ocaml.tailcall]) ctxt
           | Contract (Originated contract_hash as c) -> (
-              Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
+              Contract.get_script ctxt contract_hash
+              >>=? fun (ctxt, script_opt) ->
               match script_opt with
               | None -> (return_none [@ocaml.tailcall]) ctxt
               | Some script -> (
@@ -1745,7 +1746,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
   >>?= fun (to_update, ctxt) ->
   trace
-    (Runtime_contract_error self_contract)
+    (Runtime_contract_error step_constants.self)
     (interp logger (ctxt, step_constants) code (arg, old_storage))
   >>=? fun ((ops, new_storage), ctxt) ->
   Script_ir_translator.extract_lazy_storage_diff

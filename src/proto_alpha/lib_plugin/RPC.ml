@@ -1133,8 +1133,7 @@ module Scripts = struct
           now,
           level )
       ->
-        let contract = Contract.Originated contract_hash in
-        Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
+        Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
         Option.fold
           ~some:ok
           ~none:(error View_helpers.Viewed_contract_has_no_script)
@@ -1144,6 +1143,7 @@ module Scripts = struct
         script_entrypoint_type ctxt decoded_script entrypoint
         >>=? fun view_ty ->
         View_helpers.extract_view_output_type entrypoint view_ty >>?= fun ty ->
+        let contract = Contract.Originated contract_hash in
         Contract.get_balance ctxt contract >>=? fun balance ->
         Error_monad.trace View_helpers.View_callback_origination_failed
         @@ originate_dummy_contract
@@ -1214,7 +1214,7 @@ module Scripts = struct
           (View_helpers.extract_parameter_from_operations
              entrypoint
              operations
-             (Contract.Originated viewer_contract))) ;
+             viewer_contract)) ;
     Registration.register0
       ~chunked:true
       S.run_script_view
@@ -1233,15 +1233,15 @@ module Scripts = struct
             now ),
           level )
       ->
-        let contract = Contract.Originated contract_hash in
-        Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
+        Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
         Option.fold
           ~some:ok
           ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
           script_opt
         >>?= fun script ->
         Script_repr.(force_decode script.code) >>?= fun decoded_script ->
-        script_view_type ctxt contract decoded_script view
+        let contract = Contract.Originated contract_hash in
+        script_view_type ctxt contract_hash decoded_script view
         >>=? fun (input_ty, output_ty) ->
         Contract.get_balance ctxt contract >>=? fun balance ->
         let source, payer =
@@ -1660,35 +1660,46 @@ module Contract = struct
       ~chunked:true
       S.get_storage_normalized
       (fun ctxt contract () unparsing_mode ->
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-        match script with
-        | None -> return_none
-        | Some script ->
-            let ctxt = Gas.set_unlimited ctxt in
-            let open Script_ir_translator in
-            parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-            >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
-            unparse_data ctxt unparsing_mode storage_type storage
-            >|=? fun (storage, _ctxt) ->
-            Some (Micheline.strip_locations storage)) ;
+        match contract with
+        | Implicit _ -> return_none
+        | Originated contract -> (
+            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+            match script with
+            | None -> return_none
+            | Some script ->
+                let ctxt = Gas.set_unlimited ctxt in
+                let open Script_ir_translator in
+                parse_script
+                  ctxt
+                  ~legacy:true
+                  ~allow_forged_in_storage:true
+                  script
+                >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt)
+                  ->
+                unparse_data ctxt unparsing_mode storage_type storage
+                >|=? fun (storage, _ctxt) ->
+                Some (Micheline.strip_locations storage))) ;
     (* Patched RPC: get_script *)
     Registration.register1
       ~chunked:true
       S.get_script_normalized
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-        match script with
-        | None -> return_none
-        | Some script ->
-            let ctxt = Gas.set_unlimited ctxt in
-            Script_ir_translator.parse_and_unparse_script_unaccounted
-              ctxt
-              ~legacy:true
-              ~allow_forged_in_storage:true
-              unparsing_mode
-              ~normalize_types
-              script
-            >>=? fun (script, _ctxt) -> return_some script)
+        match contract with
+        | Implicit _ -> return_none
+        | Originated contract -> (
+            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+            match script with
+            | None -> return_none
+            | Some script ->
+                let ctxt = Gas.set_unlimited ctxt in
+                Script_ir_translator.parse_and_unparse_script_unaccounted
+                  ctxt
+                  ~legacy:true
+                  ~allow_forged_in_storage:true
+                  unparsing_mode
+                  ~normalize_types
+                  script
+                >>=? fun (script, _ctxt) -> return_some script))
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
@@ -1705,7 +1716,7 @@ module Contract = struct
       S.get_script_normalized
       ctxt
       block
-      contract
+      (Contract.Originated contract)
       ()
       (unparsing_mode, normalize_types)
 end

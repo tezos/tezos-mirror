@@ -499,7 +499,8 @@ let increment_counter c manager =
 
 let get_script_code c contract = Storage.Contract.Code.find c contract
 
-let get_script c contract =
+let get_script c contract_hash =
+  let contract = Contract_repr.Originated contract_hash in
   Storage.Contract.Code.find c contract >>=? fun (c, code) ->
   Storage.Contract.Storage.find c contract >>=? fun (c, storage) ->
   match (code, storage) with

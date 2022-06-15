@@ -76,7 +76,7 @@ val convert_wrapped_parameter_into_action :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.node ->
   action tzresult Lwt.t
 
