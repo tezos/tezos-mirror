@@ -490,31 +490,34 @@ end)
 
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
+    let implicit = Crypto_samplers.pkh
+
+    let originated rng_state =
+      (* For a description of the format, see
+         tezos-codec describe alpha.contract binary encoding *)
+      let string =
+        "\001" ^ Base_samplers.uniform_string ~nbytes:20 rng_state ^ "\000"
+      in
+      Data_encoding.Binary.of_string_exn
+        Alpha_context.Contract.originated_encoding
+        string
+
+    let entrypoint rng_state =
+      Alpha_context.Entrypoint.of_string_strict_exn
+      @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
+
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
-        let contract =
-          Alpha_context.Contract.Implicit (Crypto_samplers.pkh rng_state)
+        let destination =
+          Alpha_context.Destination.Contract (Implicit (implicit rng_state))
         in
-        {
-          destination = Contract contract;
-          entrypoint = Alpha_context.Entrypoint.default;
-        }
+        {destination; entrypoint = Alpha_context.Entrypoint.default}
       else
-        (* For a description of the format, see
-           tezos-codec describe alpha.contract binary encoding *)
-        let string =
-          "\001" ^ Base_samplers.uniform_string ~nbytes:20 rng_state ^ "\000"
+        let destination =
+          Alpha_context.Destination.Contract (Originated (originated rng_state))
         in
-        let contract =
-          Data_encoding.Binary.of_string_exn
-            Alpha_context.Contract.encoding
-            string
-        in
-        let ep =
-          Alpha_context.Entrypoint.of_string_strict_exn
-          @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
-        in
-        {destination = Contract contract; entrypoint = ep}
+        let entrypoint = entrypoint rng_state in
+        {destination; entrypoint}
 
     let tx_rollup_l2_address rng_state =
       let seed =
