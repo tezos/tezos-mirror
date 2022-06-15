@@ -3171,6 +3171,25 @@ end = struct
               tezos_base_test_helpers |> open_;
             ]
       in
+      let _integration_precheck =
+        if N.(number >= 014) then
+          Some
+            (test
+               "main"
+               ~path:(path // "lib_protocol/test/integration/precheck")
+               ~opam:(sf "tezos-protocol-%s-tests" name_dash)
+               ~deps:
+                 [
+                   alcotest_lwt;
+                   tezos_base |> open_ ~m:"TzPervasives"
+                   |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+                   main |> open_;
+                   client |> if_some |> open_;
+                   test_helpers |> if_some |> open_;
+                   tezos_base_test_helpers |> open_;
+                 ])
+        else None
+      in
       let _integration =
         test
           "main"

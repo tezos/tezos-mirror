@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,22 +26,15 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
+    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/precheck
+    Subject:      Integration > Precheck
 *)
 
 let () =
   Alcotest_lwt.run
-    "protocol > integration > operations"
+    "protocol > integration > precheck"
     [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
+      ("precheck manager", Test_manager_operation_precheck.tests);
+      ("precheck batched manager", Test_batched_manager_operation_precheck.tests);
     ]
   |> Lwt_main.run
