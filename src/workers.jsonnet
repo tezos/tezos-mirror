@@ -3,6 +3,7 @@ local singlestat = grafana.singlestat;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
+local node_instance = '{instance="$node_instance"}';
 
 //##
 // Workers
@@ -24,11 +25,11 @@ local namespace = 'octez';
       },
     ).addTargets([
       prometheus.target(
-        namespace + '_validator_block_pending_requests',
+        namespace + '_validator_block_pending_requests' + node_instance,
         legendFormat=blockvalidator,
       ),
       prometheus.target(
-        namespace + '_validator_chain_pending_requests',
+        namespace + '_validator_chain_pending_requests' + node_instance,
         legendFormat=chainvalidators,
       )
     ]),
@@ -58,27 +59,27 @@ local namespace = 'octez';
       },
     ).addTargets([
       prometheus.target(
-        namespace + '_distributed_db_requester_table_length{requester_kind="block_header"}',
+        namespace + '_distributed_db_requester_table_length{requester_kind="block_header",instance="$node_instance"}',
         legendFormat=headers_table,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header"}',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header",instance="$node_instance"}',
         legendFormat=headers_scheduler,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_table_length{requester_kind="operations"}',
+        namespace + '_distributed_db_requester_table_length{requester_kind="operations",instance="$node_instance"}',
         legendFormat=operations_table,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operations"}',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operations",instance="$node_instance"}',
         legendFormat=operations_scheduler,
       ),
       prometheus.target(
-	namespace + '_distributed_db_requester_table_length{requester_kind="operation"}',
+	namespace + '_distributed_db_requester_table_length{requester_kind="operation",instance="$node_instance"}',
         legendFormat=operation_table,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operation"}',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operation",instance="$node_instance"}',
         legendFormat=operation_scheduler,
       )
     ]),
@@ -122,59 +123,59 @@ local namespace = 'octez';
       },
     ).addTargets(
       [prometheus.target(
-        namespace + '_validator_peer_connections',
+        namespace + '_validator_peer_connections' + node_instance,
         legendFormat=connections,
       ),
       prometheus.target(
-        namespace + '_validator_peer_invalid_block',
+        namespace + '_validator_peer_invalid_block' + node_instance,
         legendFormat=invalid_blocks,
       ),
       prometheus.target(
-        namespace + '_validator_peer_invalid_locator',
+        namespace + '_validator_peer_invalid_locator' + node_instance,
         legendFormat=invalid_locator
       ),
       prometheus.target(
-        namespace + '_validator_peer_new_branch_completed',
+        namespace + '_validator_peer_new_branch_completed' + node_instance,
         legendFormat=new_branch_completed,
       ),
       prometheus.target(
-        namespace + '_validator_peer_new_head_completed',
+        namespace + '_validator_peer_new_head_completed' + node_instance,
         legendFormat=new_head_completed,
       ),
       prometheus.target(
-        namespace + '_validator_peer_on_no_request_count',
+        namespace + '_validator_peer_on_no_request_count' + node_instance,
         legendFormat=on_no_request,
       ),
       prometheus.target(
-        namespace + '_validator_peer_operations_fetching_canceled_new_branch',
+        namespace + '_validator_peer_operations_fetching_canceled_new_branch' + node_instance,
         legendFormat=new_branch,
       ),
       prometheus.target(
-        namespace + '_validator_peer_operations_fetching_canceled_new_known_valid_head',
+        namespace + '_validator_peer_operations_fetching_canceled_new_known_valid_head' + node_instance,
         legendFormat=new_known_valid_head,
       ),
       prometheus.target(
-        namespace + '_validator_peer_operations_fetching_canceled_new_unknown_head',
+        namespace + '_validator_peer_operations_fetching_canceled_new_unknown_head' + node_instance,
         legendFormat=new_unknown_head,
       ),
       prometheus.target(
-        namespace + '_validator_peer_system_error',
+        namespace + '_validator_peer_system_error' + node_instance,
         legendFormat=system_error,
       ),
       prometheus.target(
-        namespace + '_validator_peer_too_short_locator',
+        namespace + '_validator_peer_too_short_locator' + node_instance,
         legendFormat=too_short_locator,
       ),
       prometheus.target(
-        namespace + '_validator_peer_unavailable_protocol',
+        namespace + '_validator_peer_unavailable_protocol' + node_instance,
         legendFormat=unavailable_protocol,
       ),
       prometheus.target(
-        namespace + '_validator_peer_unknown_ancestor',
+        namespace + '_validator_peer_unknown_ancestor' + node_instance,
         legendFormat=unknown_ancestor,
       ),
       prometheus.target(
-        namespace + '_validator_peer_unknown_error',
+        namespace + '_validator_peer_unknown_error' + node_instance,
         legendFormat=unknown_error,
       )]
     )
@@ -182,10 +183,10 @@ local namespace = 'octez';
 
 
   validatorTreatmentRequests:
-    local chainPush = namespace + '_validator_chain_last_finished_request_push_timestamp';
-    local chainTreatment = namespace + '_validator_chain_last_finished_request_treatment_timestamp';
-    local blockPush = namespace + '_validator_block_last_finished_request_push_timestamp';
-    local blockTreatment = namespace + '_validator_block_last_finished_request_treatment_timestamp';
+    local chainPush = namespace + '_validator_chain_last_finished_request_push_timestamp' + node_instance;
+    local chainTreatment = namespace + '_validator_chain_last_finished_request_treatment_timestamp' + node_instance;
+    local blockPush = namespace + '_validator_block_last_finished_request_push_timestamp' + node_instance;
+    local blockTreatment = namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
     local chainTreatmentTime = chainTreatment + ' - ' + chainPush;
     local blockTreatmentTime = blockTreatment + ' - ' + blockPush;
     local chain = 'chain validator';
@@ -217,10 +218,10 @@ local namespace = 'octez';
     ]),
 
   validatorCompletionRequests:
-    local chainTreatment = namespace + '_validator_chain_last_finished_request_treatment_timestamp';
-    local chainCompletion = namespace + '_validator_chain_last_finished_request_completion_timestamp';
-    local blockTreatment = namespace + '_validator_block_last_finished_request_treatment_timestamp';
-    local blockCompletion = namespace + '_validator_block_last_finished_request_completion_timestamp';
+    local chainTreatment = namespace + '_validator_chain_last_finished_request_treatment_timestamp' + node_instance;
+    local chainCompletion = namespace + '_validator_chain_last_finished_request_completion_timestamp' + node_instance;
+    local blockTreatment = namespace + '_validator_block_last_finished_request_treatment_timestamp' + node_instance;
+    local blockCompletion = namespace + '_validator_block_last_finished_request_completion_timestamp' + node_instance;
     local chainCompletionTime = chainCompletion + ' - ' + chainTreatment;
     local blockCompletionTime = blockCompletion + ' - ' + blockTreatment;
     local chain = 'chain validator';

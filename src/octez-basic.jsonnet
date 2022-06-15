@@ -6,7 +6,6 @@ local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local row = grafana.row;
 
-
 local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
 local node_hardware = import './node_hardware.jsonnet';
@@ -34,6 +33,16 @@ dashboard.new(
   refresh='',
 )
 
+.addTemplate(
+  template.new(
+    name='node_instance',
+    datasource='Prometheus',
+    query='label_values(octez_version,instance)',
+    refresh='load',
+    label='Node instance'
+  )
+)
+
 #Node a grid is 24 slots wide
 .addPanels(
   [
@@ -42,7 +51,7 @@ dashboard.new(
       title='Node stats',
       repeat='',
       showTitle=true,
-    ) ,
+    ),
     node.bootstrapStatus     + {gridPos: {h: 3, w: 2, x: 0, y: 1}},
     node.syncStatus          + {gridPos: {h: 3, w: 2, x: 2, y: 1}},
     node.chainNameInfo       + {gridPos: {h: 3, w: 4, x: 4, y: 1}},

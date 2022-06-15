@@ -3,6 +3,7 @@ local singlestat = grafana.singlestat;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
+local node_instance = '{instance="$node_instance"}';
 
 //##
 // P2P
@@ -30,7 +31,7 @@ local namespace = 'octez';
       valueName='max',
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_connections_private',
+        namespace + '_p2p_connections_private'+ node_instance,
         legendFormat='Private Connections',
       )
     ),
@@ -58,17 +59,17 @@ local namespace = 'octez';
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_peers_disconnected',
+        namespace + '_p2p_peers_disconnected' + node_instance,
         legendFormat=disconnected,
       )
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_peers_running',
+        namespace +  '_p2p_peers_running' + node_instance,
         legendFormat=running,
       )
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_points_greylisted',
+        namespace +  '_p2p_points_greylisted' + node_instance,
         legendFormat=greylisted,
       )
     ),
@@ -93,12 +94,12 @@ local namespace = 'octez';
       },
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_points_disconnected',
+        namespace +  '_p2p_points_disconnected' + node_instance,
         legendFormat=disconnected,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_points_running',
+        namespace + '_p2p_points_running' + node_instance,
         legendFormat=running,
       )
     ),
@@ -123,12 +124,12 @@ local namespace = 'octez';
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_connections_outgoing',
+        namespace + '_p2p_connections_outgoing' + node_instance,
         legendFormat=outgoing,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_connections_incoming',
+        namespace + '_p2p_connections_incoming' + node_instance,
         legendFormat=incoming,
       )
     ),
@@ -166,32 +167,32 @@ local namespace = 'octez';
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_applied',
+        namespace + '_mempool_pending_applied' + node_instance,
         legendFormat=applied,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_refused',
+        namespace + '_mempool_pending_refused' + node_instance,
         legendFormat=refused,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_outdated',
+        namespace + '_mempool_pending_outdated' + node_instance,
         legendFormat=outdated,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_branch_refused',
+        namespace + '_mempool_pending_branch_refused' + node_instance,
         legendFormat=branch_refused,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_branch_delayed',
+        namespace + '_mempool_pending_branch_delayed' + node_instance,
         legendFormat=branch_delayed,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_mempool_pending_unprocessed',
+        namespace + '_mempool_pending_unprocessed' + node_instance,
         legendFormat=unprocessed,
       )
     ),

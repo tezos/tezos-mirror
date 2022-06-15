@@ -13,8 +13,6 @@ local prometheus = grafana.prometheus;
     local writes_accuser = 'writes accuser';
     local reads_baker = 'reads baker';
     local writes_baker = 'writes baker';
-    local reads_endorser = 'reads endorser';
-    local writes_endorser = 'writes endorser';
     graphPanel.new(
       title='IOs',
       datasource='Prometheus',
@@ -31,8 +29,6 @@ local prometheus = grafana.prometheus;
         [writes_accuser]: 'light-yellow',
         [reads_baker]: 'dark-red',
         [writes_baker]: 'light-red',
-        [reads_endorser]: 'dark-green',
-        [writes_endorser]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
@@ -54,22 +50,11 @@ local prometheus = grafana.prometheus;
         'netdata_apps_lweads_KiB_persec_average{dimension="tezos-baker"}',
         legendFormat=writes_baker,
       )
-    ).addTarget(
-      prometheus.target(
-        'netdata_apps_lreads_KiB_persec_average{dimension="tezos-endorser"}',
-        legendFormat=reads_endorser,
-      )
-    ).addTarget(
-      prometheus.target(
-        'netdata_apps_lweads_KiB_persec_average{dimension="tezos-endorser"}',
-        legendFormat=writes_endorser,
-      )
     ),
 
   cpu:
     local load_accuser = 'Cpu load accuser';
     local load_baker = 'Cpu load baker';
-    local load_endorser = 'Cpu load endorser';
     graphPanel.new(
       title='Cpu actitvity',
       datasource='Prometheus',
@@ -78,7 +63,6 @@ local prometheus = grafana.prometheus;
       aliasColors={
         [load_accuser]: 'light-yellow',
         [load_baker]: 'light-red',
-        [load_endorser]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
@@ -90,11 +74,6 @@ local prometheus = grafana.prometheus;
         'netdata_apps_cpu_percentage_average{dimension="tezos-baker"}',
         legendFormat=load_baker,
       )
-    ).addTarget(
-      prometheus.target(
-        'netdata_apps_cpu_percentage_average{dimension="tezos-endorser"}',
-        legendFormat=load_endorser,
-      )
     ),
 
   memory:
@@ -102,8 +81,6 @@ local prometheus = grafana.prometheus;
     local swap_accuser = 'Swap usage accuser';
     local ram_baker = 'Memory usage baker';
     local swap_baker = 'Swap usage baker';
-    local ram_endorser = 'Memory usage endorser';
-    local swap_endorser = 'Swap usage endorser';
     graphPanel.new(
       title='Memory usage',
       datasource='Prometheus',
@@ -120,8 +97,6 @@ local prometheus = grafana.prometheus;
         [swap_accuser]: 'light-yellow',
 	[ram_baker]: 'dark-red',
         [swap_baker]: 'light-red',
-	[ram_endorser]: 'dark-green',
-        [swap_endorser]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
@@ -143,16 +118,5 @@ local prometheus = grafana.prometheus;
         'netdata_apps_swap_MiB_average{dimension="tezos-baker"}',
         legendFormat=swap_baker,
       )
-    ).addTarget(
-      prometheus.target(
-        'netdata_apps_mem_MiB_average{dimension="tezos-endorser"}',
-        legendFormat=ram_endorser,
-      )
-    ).addTarget(
-      prometheus.target(
-        'netdata_apps_swap_MiB_average{dimension="tezos-endorser"}',
-        legendFormat=swap_endorser,
-      )
     ),
-
 }
