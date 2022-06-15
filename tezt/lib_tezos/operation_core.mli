@@ -45,7 +45,7 @@
 
     Anyone is free to add support for new operations.
 
-        
+
     {2 Manager operations}
 
     Manager operations represent most of the operations used by the
@@ -184,6 +184,11 @@ module Manager : sig
      operation for the data-availability layer that publishes a
      slot. *)
   val dal_publish_slot_header : level:int -> index:int -> header:int -> payload
+
+  (** [sc_rollup_dal_slot_subscribe ~rollup ~slot_index] builds an
+     operation for the sc rollup [rollup] to subscribe to the data
+     availability layer slot with index [slot_index]. *)
+  val sc_rollup_dal_slot_subscribe : rollup:string -> slot_index:int -> payload
 
   (** [delegation ?(delegate=Constant.bootstrap2) ()] builds a
      delegation operation. *)

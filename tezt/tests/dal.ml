@@ -30,7 +30,115 @@
    Subject: Integration tests related to the data-availability layer
 *)
 
-let test_feature_flag =
+let hooks = Tezos_regression.hooks
+
+(* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
+   The functions below are duplicated from sc_rollup.ml.
+   They should be moved to a common submodule. *)
+let make_int_parameter name value =
+  Option.map (fun v -> (name, Option.some @@ Int.to_string v)) value
+  |> Option.to_list
+
+let make_bool_parameter name value =
+  Option.map (fun v -> (name, Option.some @@ Bool.to_string v)) value
+  |> Option.to_list
+
+let test ~__FILE__ ?(tags = []) title f =
+  let tags = "dal" :: tags in
+  Protocol.register_test ~__FILE__ ~title ~tags f
+
+let regression_test ~__FILE__ ?(tags = []) title f =
+  let tags = "dal" :: tags in
+  Protocol.register_regression_test ~__FILE__ ~title ~tags f
+
+let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
+  let parameters =
+    make_int_parameter
+      ["sc_rollup_commitment_period_in_blocks"]
+      commitment_period
+    @ make_int_parameter
+        ["sc_rollup_challenge_window_in_blocks"]
+        challenge_window
+    (* this will produce the empty list if dal_enable is not passed to the function invocation,
+       hence the value from the protocol constants will be used. *)
+    @ make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
+    @ [(["sc_rollup_enable"], Some "true")]
+  in
+  let base = Either.right (protocol, None) in
+  let* parameter_file = Protocol.write_parameter_file ~base parameters in
+  let nodes_args =
+    Node.
+      [
+        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
+  in
+  let bootstrap1_key = Constant.bootstrap1.public_key_hash in
+  f node client bootstrap1_key
+
+type test = {variant : string; tags : string list; description : string}
+
+let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
+  let* rollup_address =
+    Client.Sc_rollup.originate
+      ~hooks
+      ~burn_cap:Tez.(of_int 9999999)
+      ~src:bootstrap1_key
+      ~kind:"arith"
+      ~boot_sector:""
+      ~parameters_ty:"unit"
+      tezos_client
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create tezos_node tezos_client ~operator_pkh:bootstrap1_key
+  in
+  let* configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node rollup_address
+  in
+  let* () = Client.bake_for tezos_client in
+  f rollup_address sc_rollup_node configuration_filename
+
+let test_scenario ?commitment_period ?challenge_window ?dal_enable
+    {variant; tags; description} scenario =
+  let tags = tags @ [variant] in
+  regression_test
+    ~__FILE__
+    ~tags
+    (Printf.sprintf "%s (%s)" description variant)
+    (fun protocol ->
+      setup ?commitment_period ?challenge_window ~protocol ?dal_enable
+      @@ fun node client ->
+      ( with_fresh_rollup @@ fun sc_rollup_address sc_rollup_node _filename ->
+        scenario protocol sc_rollup_node sc_rollup_address node client )
+        node
+        client)
+
+let test_dal_scenario ?dal_enable variant =
+  test_scenario
+    ?dal_enable
+    {
+      tags = ["dal"];
+      variant;
+      description = "Testing data availability layer functionality ";
+    }
+
+let subscribe_to_dal_slot client ~sc_rollup_address ~slot_index =
+  let* op_hash =
+    Operation.Manager.(
+      inject
+        ~force:true
+        [
+          make
+          @@ sc_rollup_dal_slot_subscribe ~rollup:sc_rollup_address ~slot_index;
+        ]
+        client)
+  in
+  let* () = Client.bake_for_and_wait client in
+  return op_hash
+
+let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
   (* This test ensures the feature flag works:
 
      - 1. It checks the feature flag is not enabled by default
@@ -38,14 +146,6 @@ let test_feature_flag =
      - 2. It checks the new operations added by the feature flag
      cannot be propagated by checking their classification in the
      mempool. *)
-  let open Tezt_tezos in
-  Protocol.register_test
-    ~__FILE__
-    ~title:"dal feature flag"
-    ~tags:["dal"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
-  @@ fun protocol ->
-  let* node, client = Client.init_with_protocol `Client ~protocol () in
   let* protocol_parameters = RPC_legacy.get_constants client in
   let feature_flag =
     JSON.(
@@ -74,8 +174,11 @@ let test_feature_flag =
         [make @@ dal_publish_slot_header ~index:0 ~level:1 ~header:0]
         client)
   in
+  let* (`OpHash oph3) =
+    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:0
+  in
   let* mempool = Mempool.get_mempool client in
-  let expected_mempool = Mempool.{empty with refused = [oph1; oph2]} in
+  let expected_mempool = Mempool.{empty with refused = [oph1; oph2; oph3]} in
   Check.(
     (mempool = expected_mempool)
       Mempool.classified_typ
@@ -219,6 +322,65 @@ let test_slot_management_logic =
        anymore." ;
   unit
 
+(* Tests for integration between Dal and Scoru *)
+let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node
+    sc_rollup_address _node client =
+  (* Steps in this integration test:
+
+     1. Run rollup node for an originated rollup
+     2. Fetch the list of subscribed slots, determine that it's empty
+     3. Execute a client command to subscribe the rollup to dal slot 0, bake one level
+     4. Fetch the list of subscribed slots, determine that it contains slot 0
+     5. Execute a client command to subscribe the rollup to dal slot 1, bake one level
+     6. Fetch the list of subscribed slots, determine that it contains slots 0 and 1
+  *)
+  let* init_level =
+    RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
+  in
+  let init_level = init_level |> JSON.as_int in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  Check.(level = init_level)
+    Check.int
+    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+  let* subscribed_slots =
+    Sc_rollup_client.dal_slot_subscriptions ~hooks sc_rollup_client
+  in
+  Check.(subscribed_slots = [])
+    (Check.list Check.int)
+    ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
+  let* (`OpHash _) =
+    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:0
+  in
+  let* first_subscription_level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
+  in
+  let* subscribed_slots =
+    Sc_rollup_client.dal_slot_subscriptions ~hooks sc_rollup_client
+  in
+  Check.(subscribed_slots = [0])
+    (Check.list Check.int)
+    ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
+  let* (`OpHash _) =
+    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:1
+  in
+  let* _second_subscription_level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (first_subscription_level + 1)
+  in
+  let* subscribed_slots =
+    Sc_rollup_client.dal_slot_subscriptions ~hooks sc_rollup_client
+  in
+  Check.(subscribed_slots = [0; 1])
+    (Check.list Check.int)
+    ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
+  return ()
+
 let register ~protocols =
-  test_feature_flag protocols ;
+  test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
+  test_dal_scenario
+    ~dal_enable:true
+    "rollup_node_dal_subscriptions"
+    rollup_node_subscribes_to_dal_slots
+    protocols ;
   test_slot_management_logic protocols

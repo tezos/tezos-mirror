@@ -79,10 +79,13 @@ val commitment_with_hash_and_level_from_json :
 val last_stored_commitment :
   ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
 
-(** [last_published_commitment client] gets the last commitment published by the rollup node, 
+(** [last_published_commitment client] gets the last commitment published by the rollup node,
 with its hash and level when the commitment was first published. *)
 val last_published_commitment :
   ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
+
+(** [dal_slot_subscriptions client] gets the slots to which the rollup node is subscribed to *)
+val dal_slot_subscriptions : ?hooks:Process.hooks -> t -> int list Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :

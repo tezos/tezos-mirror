@@ -193,6 +193,7 @@ module Manager = struct
   type payload =
     | Transfer of {amount : int; dest : Account.key}
     | Dal_publish_slot_header of {level : int; index : int; header : int}
+    | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}
 
   let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
@@ -200,6 +201,9 @@ module Manager = struct
 
   let dal_publish_slot_header ~level ~index ~header =
     Dal_publish_slot_header {level; index; header}
+
+  let sc_rollup_dal_slot_subscribe ~rollup ~slot_index =
+    Sc_rollup_dal_slot_subscribe {rollup; slot_index}
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
@@ -245,6 +249,12 @@ module Manager = struct
             ]
         in
         [("kind", `String "dal_publish_slot_header"); ("slot", slot)]
+    | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
+        [
+          ("kind", `String "sc_rollup_dal_slot_subscribe");
+          ("rollup", `String rollup);
+          ("slot_index", json_of_int slot_index);
+        ]
     | Delegation {delegate} ->
         [("kind", `String "delegation"); ("delegate", json_of_account delegate)]
 
@@ -298,7 +308,8 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Dal_publish_slot_header _ | Delegation _ ->
+    | Dal_publish_slot_header _ | Delegation _ | Sc_rollup_dal_slot_subscribe _
+      ->
         let fee = Option.value fee ~default:1_000 in
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:0 in
