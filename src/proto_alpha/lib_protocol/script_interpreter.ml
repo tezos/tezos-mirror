@@ -1542,14 +1542,15 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
 
 (*
 
-   The following functions insert a logging instruction and modify the
-   continuation to continue the logging process in the next execution
-   steps.
+   The following functions insert a logging instruction to continue
+   the logging process in the next execution steps.
 
    There is a special treatment of instructions that generate fresh
    continuations: we pass a constructor as argument to their
    evaluation rules so that they can instrument these fresh
-   continuations by themselves.
+   continuations by themselves. Instructions that create continuations
+   without calling specialised functions have their branches from [step]
+   function duplicated and adjusted here.
 
    This on-the-fly instrumentation of the execution allows zero-cost
    logging since logging instructions are only introduced if an
@@ -1576,6 +1577,10 @@ and log :
         accu
         stack) ;
   Script_interpreter_logging.log_next_kinstr logger sty k >>?= fun k ->
+  (* We need to match on instructions that create continuations so
+     that we can instrument those continuations with [KLog] (see
+     comment above).  For functions that don't do this, we simply call
+     [step], as they don't require any special treatment. *)
   match k with
   | IIf_none {branch_if_none; branch_if_some; k; _} -> (
       let (Item_t (Option_t (ty, _, _), rest)) = sty in
