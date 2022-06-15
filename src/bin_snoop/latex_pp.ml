@@ -61,6 +61,8 @@ and pp_preamble fmtr title =
      \\usepackage{float}\n\
      \\usepackage[export]{adjustbox}\n\
      \\usepackage{libertine}\n\n\
+     \\graphicspath{ {inference_results/} {../inference_results/} \
+     {_snoop/inference_results/} }\n\n\
      \\title{%s}\n\n\
      \\begin{document}\n\n\
      \\maketitle"
