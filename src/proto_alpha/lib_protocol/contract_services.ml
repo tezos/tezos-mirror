@@ -84,7 +84,7 @@ module S = struct
 
   let manager_key =
     RPC_service.get_service
-      ~description:"Access the manager of a contract."
+      ~description:"Access the manager of an implicit contract."
       ~query:RPC_query.empty
       ~output:(option Signature.Public_key.encoding)
       RPC_path.(custom_root /: Contract.rpc_arg / "manager_key")

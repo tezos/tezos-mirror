@@ -26,18 +26,15 @@ documentation:linkcheck:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development_manual
-  stage: manual
-  needs:
-    - job: documentation:build_all
-      artifacts: true
+    - .rules_template__development_documentation
+  stage: doc
+  needs: []
   before_script:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
   script:
     - make -C docs redirectcheck
     - make -C docs linkcheck
-    - make -C docs sanitycheck
   allow_failure: true
 
 # here we use this hack to publish the tezos documentation on

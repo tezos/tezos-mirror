@@ -23,14 +23,18 @@ the new protocol. So every time a new protocol is proposed on Mainnet,
 a new test network is spawned. This also makes synchronization much
 faster than with a long-lived network.
 
-Get Free Funds
-==============
+.. _faucet:
+
+Faucets
+=======
 
 Test networks have a list of built-in accounts with some funds. You
 can obtain the key to these accounts from a faucet to claim the funds.
 Faucets can be accessed from https://teztnets.xyz/. Each of the test
 network listed there, including the active test networks described
 below, have independent faucets.
+
+See :ref:`using_faucet` for detailed instructions on using a faucet.
 
 Jakartanet
 ==========

@@ -13,7 +13,8 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-PROTOCOLS     = ithaca jakarta alpha
+NAMED_PROTOS  = ithaca jakarta
+PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
@@ -82,11 +83,11 @@ odoc-lite: main docexes
 	@mkdir -p _build/api
 	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
 
-linkcheck:
-	$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)"
+linkcheck: html
+	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
 .PHONY: redirectcheck
-redirectcheck:
+redirectcheck: html
 	@cd $$(pwd)/.. ; ./scripts/lint.sh --check-redirects
 
 # xrefs should be checked:
@@ -109,13 +110,6 @@ scriptsindoccheck:
 	scripts/test_doc_scripts.sh install-opam-focal
 	scripts/test_doc_scripts.sh compile-sources-buster
 	#scripts/test_doc_scripts.sh use-docker # returns 1 (and eats alot of disk)
-
-sanitycheck:
-	@if grep -Rq alpha 0*; then					\
-		echo "'alpha' occurs in the docs for released protocols:";	\
-                grep -R alpha 0*;                                               \
-		exit 1;								\
-	fi
 
 # build dune targets together to avoid concurrent dunes
 docexes: main

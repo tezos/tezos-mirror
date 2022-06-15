@@ -47,7 +47,7 @@ in order to provide more accurate results.
 
 The formula was further modified in order to make it more resistant
 to certain types of attacks. A full explanation can be found
-`here <https://blog.nomadic-labs.com/a-new-reward-formula-for-carthage.html>`_.
+`here <https://research-development.nomadic-labs.com/a-new-reward-formula-for-carthage.html>`_.
 
 Accounts
 --------

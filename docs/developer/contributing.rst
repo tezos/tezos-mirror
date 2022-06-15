@@ -572,7 +572,7 @@ painful for everybody. The reviewer is your ally, not your enemy.
 - Testing: Are the tests thoughtful? Do they cover the failure conditions? Are
   they easy to read? How fragile are they? How big are the tests? Are they slow?
 
-- Are your commit messages meaningful? (see https://chris.beams.io/posts/git-commit/)
+- Are your commit messages meaningful? (see https://cbea.ms/git-commit/)
 
 Review your own code before calling for a peer review from a colleague.
 

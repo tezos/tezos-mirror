@@ -221,7 +221,7 @@ variables is to stand in for variables to be inferred during the inference
 process (corresponding to :math:`\theta_i` in the previous section).
 The language is defined in tagless final style. If this does not
 ring a bell, we **strongly** recommend you take a look at
-http://okmij.org/ftp/tagless-final/index.html in order to make sense of the
+https://okmij.org/ftp/tagless-final/index.html in order to make sense of the
 rest of this section. The syntax is specified by the ``Costlang.S`` module
 type:
 

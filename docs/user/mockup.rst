@@ -429,6 +429,4 @@ A command is provided to do the same on the persistent mockup state:
 
 The protocol corresponding to the hash must know how to migrate from the current protocol.
 
-This is mostly useful for protocol developers, but also eg for developers
-wanting to check the robustness of their application against new features
-or breaking changes to the protocol.
+This is mostly useful for protocol developers, but also for other developers, e.g., wanting to check the robustness of their application with respect to protocol changes, including new features or breaking changes.
