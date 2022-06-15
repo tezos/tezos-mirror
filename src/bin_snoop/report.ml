@@ -351,7 +351,8 @@ let report ~(measure : Measure.packed_measurement)
       (fun figs_file ->
         Figure
           ( [normal_text Bench.name],
-            {filename = figs_file; size = Some (Width_cm 17)} ))
+            {filename = Filename.basename figs_file; size = Some (Width_cm 17)}
+          ))
       figs_files
   in
   let model_table : section_content = Table (model_table (module Bench)) in
