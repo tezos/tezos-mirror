@@ -686,7 +686,7 @@ end)
         arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
       let open M in
-      let* address = value address_t in
+      let* address = address in
       return (Typed_contract {arg_ty; address})
 
     and generate_operation : Script_typed_ir.operation sampler =
