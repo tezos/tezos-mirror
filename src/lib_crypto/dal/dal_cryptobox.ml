@@ -426,11 +426,11 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
                   let z_i = (Params.shards_amount * j) + z_i in
                   let x_i = Scalar.pow w (Z.of_int z_i) in
                   let tmp = Evaluations.get eval_a' z_i in
-                  Scalar.mul_inplace tmp x_i ;
-                  match Scalar.inverse_exn_inplace tmp with
+                  Scalar.mul_inplace tmp tmp x_i ;
+                  match Scalar.inverse_exn_inplace tmp tmp with
                   | exception _ -> Error (`Invert_zero "can't inverse element")
                   | () ->
-                      Scalar.mul_inplace tmp c_i ;
+                      Scalar.mul_inplace tmp tmp c_i ;
                       n_poly.(z_i) <- tmp ;
                       c := !c + 1 ;
                       loop (j + 1))
