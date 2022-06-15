@@ -310,12 +310,32 @@ module Config_file = struct
     in
     JSON.put ("network", network) old_config
 
-  let set_ghostnet_sandbox_network old_config =
+  let set_ghostnet_sandbox_network ?user_activated_upgrades () old_config =
+    let may_patch_user_activated_upgrades =
+      match user_activated_upgrades with
+      | None -> Fun.id
+      | Some upgrade_points ->
+          JSON.put
+            ( "user_activated_upgrades",
+              JSON.annotate ~origin:"user_activated_upgrades"
+              @@ `A
+                   (List.map
+                      (fun (level, protocol) ->
+                        `O
+                          [
+                            ("level", `Float (float level));
+                            ( "replacement_protocol",
+                              `String (Protocol.hash protocol) );
+                          ])
+                      upgrade_points) )
+    in
+
     JSON.put
       ( "network",
         JSON.annotate
           ~origin:"set_ghostnet_sandbox_network"
-          ghostnet_sandbox_network_config )
+          ghostnet_sandbox_network_config
+        |> may_patch_user_activated_upgrades )
       old_config
 end
 
