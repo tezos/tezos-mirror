@@ -519,6 +519,15 @@ end)
         let entrypoint = entrypoint rng_state in
         {destination; entrypoint}
 
+    let generate_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* address = address in
+      return (Typed_contract {arg_ty; address})
+
     let tx_rollup_l2_address rng_state =
       let seed =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
@@ -679,15 +688,6 @@ end)
               (Error_monad.TzTrace.pp_print Error_monad.pp)
               e ;
             fail_sampling "raise_if_error"
-
-    and generate_contract :
-        type arg argc.
-        (arg, argc) Script_typed_ir.ty ->
-        arg Script_typed_ir.typed_contract sampler =
-     fun arg_ty ->
-      let open M in
-      let* address = address in
-      return (Typed_contract {arg_ty; address})
 
     and generate_operation : Script_typed_ir.operation sampler =
      fun rng_state ->
