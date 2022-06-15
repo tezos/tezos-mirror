@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70
+  -w -51
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_013_PtJakart.Environment
@@ -223,7 +223,7 @@
   tezos-protocol-013-PtJakart.raw)
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70
+  -w -51
   -nopervasives)
  (modules Protocol))
 
@@ -614,7 +614,7 @@
   tezos-protocol-013-PtJakart.raw)
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70
+  -w -51
   -nopervasives)
  (modules Functor))
 
@@ -819,7 +819,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70)
+  -w -51)
  (modules Registerer))
 
 (rule

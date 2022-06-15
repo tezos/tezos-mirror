@@ -3292,20 +3292,16 @@ end = struct
         Dune.V s_expr
       in
       let disable_warnings =
-        let disabled_by_default = [4; 40; 41; 42; 44; 45; 48; 70] in
-        let disabled_extra =
-          match number with
-          (* [Other] and [Alpha] protocols can be edited and should be
-             fixed whenever a warning that we care about triggers. We
-             only want to disable a limited set of warnings *)
-          | Other | Alpha -> []
-          (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
-          | V _ as number ->
-              if N.(number >= 014) then []
-              else if N.(number >= 011) then [51]
-              else [6; 7; 9; 16; 29; 32; 51; 60; 67; 68]
-        in
-        disabled_by_default @ disabled_extra
+        match number with
+        (* [Other] and [Alpha] protocols can be edited and should be
+           fixed whenever a warning that we care about triggers. We
+           only want to disable a limited set of warnings *)
+        | Other | Alpha -> []
+        (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
+        | V _ as number ->
+            if N.(number >= 014) then []
+            else if N.(number >= 011) then [51]
+            else [6; 7; 9; 16; 29; 32; 51; 60; 67; 68]
       in
       let environment =
         public_lib

@@ -26,7 +26,6 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-70
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_alpha.Environment
@@ -242,7 +241,6 @@
   tezos-protocol-alpha.raw)
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-70
   -nopervasives)
  (modules Protocol))
 
@@ -673,7 +671,6 @@
   tezos-protocol-alpha.raw)
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-70
   -nopervasives)
  (modules Functor))
 
@@ -897,8 +894,7 @@
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
-  (:standard)
-  -w -4-40..42-44-45-48-70)
+  (:standard))
  (modules Registerer))
 
 (rule

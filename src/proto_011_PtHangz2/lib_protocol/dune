@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70
+  -w -51
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_011_PtHangz2.Environment
@@ -141,7 +141,7 @@
   tezos-protocol-011-PtHangz2.raw)
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70
+  -w -51
   -nopervasives)
  (modules Protocol))
 
@@ -366,7 +366,7 @@
   tezos-protocol-011-PtHangz2.raw)
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70
+  -w -51
   -nopervasives)
  (modules Functor))
 
@@ -488,7 +488,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -4-40..42-44-45-48-51-70)
+  -w -51)
  (modules Registerer))
 
 (rule
