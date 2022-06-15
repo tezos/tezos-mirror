@@ -17,6 +17,11 @@ It also includes tutorials for testing more specific parts such as protocol code
 .. toctree::
    :maxdepth: 2
 
+   ppx_expect
+
+.. toctree::
+   :maxdepth: 2
+
    flextesa
 
 .. toctree::

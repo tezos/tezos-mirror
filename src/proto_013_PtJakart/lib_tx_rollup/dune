@@ -29,7 +29,7 @@
   tezos-protocol-plugin-013-PtJakart
   tezos-injector-013-PtJakart)
  (inline_tests (flags -verbose) (modes native))
- (preprocess (pps ppx_inline_test))
+ (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
   (:standard)

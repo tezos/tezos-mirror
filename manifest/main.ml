@@ -212,8 +212,7 @@ let ocplib_ocamlres =
 
 let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
-let ppx_inline_test =
-  inline_tests_backend (external_lib "ppx_inline_test" V.True)
+let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
@@ -348,6 +347,20 @@ let tezos_test_helpers =
         "testable";
       ]
 
+let tezos_expect_helper =
+  public_lib
+    "tezos-expect-helper"
+    ~path:"src/lib_expect_helper"
+    ~synopsis:"Tezos: helper for writing expect tests for Tezos"
+
+let _tezos_expect_helper_test =
+  private_lib
+    "tezos_expect_helper_test"
+    ~opam:"tezos-expect-helper"
+    ~path:"src/lib_expect_helper/test"
+    ~deps:[tezos_expect_helper]
+    ~inline_tests:ppx_expect
+
 let tezos_stdlib =
   public_lib
     "tezos-stdlib"
@@ -356,7 +369,7 @@ let tezos_stdlib =
     ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
     ~ocaml:V.(at_least "4.12")
     ~js_compatible:true
-    ~inline_tests:ppx_inline_test
+    ~inline_tests:ppx_expect
 
 let _tezos_stdlib_tests =
   tests
@@ -962,15 +975,26 @@ let tezos_micheline =
         data_encoding |> open_;
       ]
     ~js_compatible:true
-    ~inline_tests:ppx_inline_test
+    ~inline_tests:ppx_expect
 
 let _tezos_micheline_tests =
-  tests
-    ["test_parser"; "test_diff"]
+  private_lib
+    "test_parser"
     ~path:"src/lib_micheline/test"
     ~opam:"tezos-micheline"
-    ~modes:[Native; JS]
-    ~deps:[tezos_micheline |> open_; alcotest]
+    ~inline_tests:ppx_expect
+    ~modules:["test_parser"]
+    ~deps:[tezos_micheline |> open_]
+    ~js_compatible:true
+
+let _tezos_micheline_tests =
+  private_lib
+    "test_diff"
+    ~path:"src/lib_micheline/test"
+    ~opam:"tezos-micheline"
+    ~inline_tests:ppx_expect
+    ~modules:["test_diff"]
+    ~deps:[tezos_micheline |> open_]
     ~js_compatible:true
 
 let tezos_base =
@@ -3730,7 +3754,7 @@ include Tezos_raw_protocol_%s.Main
             uri |> if_ N.(number >= 001);
           ]
         ~bisect_ppx:N.(number >= 008)
-        ?inline_tests:(if N.(number >= 009) then Some ppx_inline_test else None)
+        ?inline_tests:(if N.(number >= 009) then Some ppx_expect else None)
         ~linkall:true
     in
     let test_helpers =
@@ -4118,7 +4142,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_workers |> open_;
             tezos_shell;
           ]
-        ~inline_tests:ppx_inline_test
+        ~inline_tests:ppx_expect
         ~linkall:true
     in
     let sc_rollup =
@@ -4136,7 +4160,7 @@ include Tezos_raw_protocol_%s.Main
             parameters |> if_some |> open_;
             tezos_rpc |> open_;
           ]
-        ~inline_tests:ppx_inline_test
+        ~inline_tests:ppx_expect
         ~linkall:true
     in
     let _sc_rollup_client =
@@ -4230,7 +4254,7 @@ include Tezos_raw_protocol_%s.Main
             plugin |> if_some |> open_;
             injector |> if_some |> open_;
           ]
-        ~inline_tests:ppx_inline_test
+        ~inline_tests:ppx_expect
         ~linkall:true
     in
     let _tx_rollup_client =

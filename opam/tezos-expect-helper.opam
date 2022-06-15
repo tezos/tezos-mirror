@@ -10,22 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ppx_expect"
-  "tezos-base"
-  "tezos-shell-services"
-  "tezos-client-base"
-  "tezos-protocol-009-PsFLoren"
-  "tezos-signer-backends"
-  "tezos-protocol-plugin-009-PsFLoren"
-  "tezos-rpc"
-  "uri" { >= "2.2.0" }
-  "tezos-stdlib-unix"
-  "tezos-protocol-environment"
-  "tezos-client-commands"
-  "tezos-client-base-unix"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol specific library for `tezos-client`"
+synopsis: "Tezos: helper for writing expect tests for Tezos"

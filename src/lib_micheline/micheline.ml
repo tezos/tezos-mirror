@@ -413,47 +413,52 @@ let%test_module "semantics_preservation" =
 
     let rng_state = Random.State.make [|0x1337; 0x533D|]
 
-    let rec sample_and_check_n_times n f g =
+    let rec sample_and_check_n_times' ~map_term n f g =
       if n <= 0 then ()
       else
         let term = Sampler.sample rng_state in
+        let term = map_term term in
         (* Is this a legit use of polymorphic equality? *)
+        (* It would be better to print the two terms instead of the
+           assert as it would give more information in case of failure *)
         assert (f term = g term) ;
-        sample_and_check_n_times (n - 1) f g
+        sample_and_check_n_times' ~map_term (n - 1) f g
 
-    let rec sample_and_check_n_times_canon n f g =
-      if n <= 0 then ()
-      else
-        let term = Sampler.sample rng_state in
-        let term = strip_locations term in
-        (* Is this a legit use of polymorphic equality? *)
-        assert (f term = g term) ;
-        sample_and_check_n_times_canon (n - 1) f g
+    let sample_and_check_n_times_canon n =
+      sample_and_check_n_times' ~map_term:strip_locations n
 
-    let%test_unit "strip_locations" =
-      sample_and_check_n_times 1_000 Original.strip_locations strip_locations
+    let sample_and_check_n_times n =
+      sample_and_check_n_times' ~map_term:(fun x -> x) n
 
-    let%test_unit "extract_locations" =
+    let%expect_test "strip_locations" =
+      sample_and_check_n_times 1_000 Original.strip_locations strip_locations ;
+      [%expect {||}]
+
+    let%expect_test "extract_locations" =
       sample_and_check_n_times
         1_000
         Original.extract_locations
-        extract_locations
+        extract_locations ;
+      [%expect {||}]
 
-    let%test_unit "inject_locations" =
+    let%expect_test "inject_locations" =
       sample_and_check_n_times_canon
         1_000
         (Original.inject_locations (fun i -> i))
-        (inject_locations (fun i -> i))
+        (inject_locations (fun i -> i)) ;
+      [%expect {||}]
 
-    let%test_unit "map" =
+    let%expect_test "map" =
       sample_and_check_n_times_canon
         1_000
         (Original.map (fun _i -> ()))
-        (map (fun _i -> ()))
+        (map (fun _i -> ())) ;
+      [%expect {||}]
 
-    let%test_unit "map_node" =
+    let%expect_test "map_node" =
       sample_and_check_n_times
         1_000
         (Original.map_node (fun _i -> ()) (fun _i -> ()))
-        (map_node (fun _i -> ()) (fun _i -> ()))
+        (map_node (fun _i -> ()) (fun _i -> ())) ;
+      [%expect {||}]
   end)

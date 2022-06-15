@@ -80,6 +80,7 @@
 (package (name tezos-error-monad))
 (package (name tezos-event-logging))
 (package (name tezos-event-logging-test-helpers))
+(package (name tezos-expect-helper))
 (package (name tezos-hacl))
 (package (name tezos-injector-013-PtJakart))
 (package (name tezos-injector-alpha))

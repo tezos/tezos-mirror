@@ -41,23 +41,43 @@ let join (type a) ~where eq (l1 : a t) (l2 : a t) =
       if eq x y then Result.return_some x
       else error_with "Limit.join: error (%s)" where
 
-let%test "join" =
-  let check res y =
-    match res with Ok x -> Option.equal Bool.equal x y | Error _ -> false
+let%expect_test "join" =
+  let pp_print_err fmt = function
+    | Result.Error _ -> Format.pp_print_string fmt "error"
+    | Ok x ->
+        Format.(
+          pp_print_option
+            ~none:(fun fmt () -> pp_print_string fmt "None")
+            pp_print_bool)
+          fmt
+          x
   in
-  check (join ~where:__LOC__ Bool.equal (Some true) (Some true)) (Some true)
-  && check (join ~where:__LOC__ Bool.equal None None) None
-  && check (join ~where:__LOC__ Bool.equal None (Some true)) (Some true)
-  && check (join ~where:__LOC__ Bool.equal (Some true) None) (Some true)
-  && not
-       (Result.is_ok (join ~where:__LOC__ Bool.equal (Some true) (Some false)))
+  let print x = Format.fprintf Format.std_formatter "%a" pp_print_err x in
+  print (join ~where:__LOC__ Bool.equal (Some true) (Some true)) ;
+  [%expect {| true |}] ;
+  print (join ~where:__LOC__ Bool.equal None None) ;
+  [%expect {| None |}] ;
+  print (join ~where:__LOC__ Bool.equal None (Some true)) ;
+  [%expect {| true |}] ;
+  print (join ~where:__LOC__ Bool.equal (Some true) None) ;
+  [%expect {| true |}] ;
+  print (join ~where:__LOC__ Bool.equal (Some true) (Some false)) ;
+  [%expect {| error |}]
 
 let get ~when_unknown = function
   | None -> error_with "Limit.get: %s" when_unknown
   | Some x -> ok x
 
-let%test "get" =
-  match get ~when_unknown:"" (Some true) with Ok true -> true | _ -> false
+let%expect_test "get" =
+  let pp_print_err fmt = function
+    | Result.Error _ -> Format.fprintf fmt "error"
+    | Ok b -> Format.pp_print_bool fmt b
+  in
+  let print x = Format.fprintf Format.std_formatter "%a" pp_print_err x in
+  print (get ~when_unknown:"" (Some true)) ;
+  [%expect {| true |}] ;
+  print (get ~when_unknown:"" None) ;
+  [%expect {| error |}]
 
 let fold ~unknown ~known x = match x with None -> unknown | Some x -> known x
 
