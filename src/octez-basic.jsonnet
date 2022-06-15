@@ -8,15 +8,12 @@ local row = grafana.row;
 
 local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
-local node_hardware = import './node_hardware.jsonnet';
-local delegate_hardware = import './delegate_hardware.jsonnet';
 local workers = import './workers.jsonnet';
-local logs = import './logs.jsonnet';
 
 local boardtitle = 'Tezos basic dashboard - branch: ' + std.extVar('branch');
 
 
-#Position variables
+//Position variables
 local p2p_y = 39;
 local worker_y = 56;
 local misc_y = 81;
@@ -26,7 +23,7 @@ local misc_y = 81;
 //##
 dashboard.new(
   title=boardtitle,
-  tags=['tezos','octez'],
+  tags=['tezos', 'octez'],
   schemaVersion=18,
   editable=true,
   time_from='now-3h',
@@ -52,29 +49,29 @@ dashboard.new(
       repeat='',
       showTitle=true,
     ),
-    node.bootstrapStatus     + {gridPos: {h: 3, w: 2, x: 0, y: 1}},
-    node.syncStatus          + {gridPos: {h: 3, w: 2, x: 2, y: 1}},
-    node.chainNameInfo       + {gridPos: {h: 3, w: 4, x: 4, y: 1}},
-    node.releaseVersionInfo  + {gridPos: {h: 3, w: 3, x: 8, y: 1}},
-    node.releaseCommitInfo   + {gridPos: {h: 3, w: 3, x: 11, y: 1}},
-    node.uptime              + {gridPos: {h: 3, w: 4, x: 0, y: 4}},
-    node.headLevel           + {gridPos: {h: 3, w: 4, x: 0, y: 7}},
-    node.p2pVersion          + {gridPos: {h: 3, w: 2, x: 0, y: 10}},
-    node.distributedDbVersion+ {gridPos: {h: 3, w: 2, x: 2, y: 10}},
-    node.savepointLevel      + {gridPos: {h: 3, w: 2, x: 0, y: 13}},
-    node.checkpointLevel     + {gridPos: {h: 3, w: 2, x: 2, y: 13}},
-    node.cabooseLevel        + {gridPos: {h: 3, w: 2, x: 0, y: 16}},
-    node.headCycleLevel      + {gridPos: {h: 3, w: 2, x: 2, y: 16}},
-    p2p.trustedPoints        + {gridPos: {h: 3, w: 2, x: 0, y: 19}},
-    p2p.privateConnections   + {gridPos: {h: 3, w: 2, x: 2, y: 19}},
-    node.headHistory         + {gridPos: {h: 10, w: 10, x: 4, y: 4}},
-    node.blocksValidationTime+ {gridPos: {h: 8, w: 10, x: 4, y: 14 }},
-    node.headOperations      + {gridPos: {h: 8, w: 14, x: 0, y: 22 }},
-    node.gasConsumedHistory  + {gridPos: {h: 8, w: 14, x: 0, y: 30 }},
-    node.invalidBlocksHistory+ {gridPos: {h: 9, w: 10, x: 14, y: 1}},
-    node.roundHistory        + {gridPos: {h: 9, w: 10, x: 14, y: 10}},
-    node.writtenBlockSize    + {gridPos: {h: 10, w: 10, x: 14, y: 19}},
-    node.storeMergeTime      + {gridPos: {h: 9, w: 10, x: 14, y: 29}},
+    node.bootstrapStatus { gridPos: { h: 3, w: 2, x: 0, y: 1 } },
+    node.syncStatus { gridPos: { h: 3, w: 2, x: 2, y: 1 } },
+    node.chainNameInfo { gridPos: { h: 3, w: 4, x: 4, y: 1 } },
+    node.releaseVersionInfo { gridPos: { h: 3, w: 3, x: 8, y: 1 } },
+    node.releaseCommitInfo { gridPos: { h: 3, w: 3, x: 11, y: 1 } },
+    node.uptime { gridPos: { h: 3, w: 4, x: 0, y: 4 } },
+    node.headLevel { gridPos: { h: 3, w: 4, x: 0, y: 7 } },
+    node.p2pVersion { gridPos: { h: 3, w: 2, x: 0, y: 10 } },
+    node.distributedDbVersion { gridPos: { h: 3, w: 2, x: 2, y: 10 } },
+    node.savepointLevel { gridPos: { h: 3, w: 2, x: 0, y: 13 } },
+    node.checkpointLevel { gridPos: { h: 3, w: 2, x: 2, y: 13 } },
+    node.cabooseLevel { gridPos: { h: 3, w: 2, x: 0, y: 16 } },
+    node.headCycleLevel { gridPos: { h: 3, w: 2, x: 2, y: 16 } },
+    p2p.trustedPoints { gridPos: { h: 3, w: 2, x: 0, y: 19 } },
+    p2p.privateConnections { gridPos: { h: 3, w: 2, x: 2, y: 19 } },
+    node.headHistory { gridPos: { h: 10, w: 10, x: 4, y: 4 } },
+    node.blocksValidationTime { gridPos: { h: 8, w: 10, x: 4, y: 14 } },
+    node.headOperations { gridPos: { h: 8, w: 14, x: 0, y: 22 } },
+    node.gasConsumedHistory { gridPos: { h: 8, w: 14, x: 0, y: 30 } },
+    node.invalidBlocksHistory { gridPos: { h: 9, w: 10, x: 14, y: 1 } },
+    node.roundHistory { gridPos: { h: 9, w: 10, x: 14, y: 10 } },
+    node.writtenBlockSize { gridPos: { h: 10, w: 10, x: 14, y: 19 } },
+    node.storeMergeTime { gridPos: { h: 9, w: 10, x: 14, y: 29 } },
 
     //#######
     row.new(
@@ -96,8 +93,8 @@ dashboard.new(
     ) + { gridPos: { h: 0, w: 8, x: 0, y: worker_y } },
     workers.requests { gridPos: { h: 8, w: 12, x: 0, y: worker_y } },
     workers.distributedDB { gridPos: { h: 8, w: 12, x: 12, y: worker_y } },
-    workers.validatorTreatmentRequests{ gridPos: { h: 8, w: 12, x: 0, y: worker_y + 16} },
-    workers.validatorCompletionRequests{ gridPos: { h: 8, w: 12, x: 12, y: worker_y + 16 } },
+    workers.validatorTreatmentRequests { gridPos: { h: 8, w: 12, x: 0, y: worker_y + 16 } },
+    workers.validatorCompletionRequests { gridPos: { h: 8, w: 12, x: 12, y: worker_y + 16 } },
     workers.peerValidators { gridPos: { h: 8, w: 12, x: 0, y: worker_y + 24 } },
 
     //#######

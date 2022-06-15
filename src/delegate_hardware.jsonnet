@@ -95,7 +95,7 @@ local prometheus = grafana.prometheus;
       aliasColors={
         [ram_accuser]: 'dark-yellow',
         [swap_accuser]: 'light-yellow',
-	[ram_baker]: 'dark-red',
+        [ram_baker]: 'dark-red',
         [swap_baker]: 'light-red',
       },
     ).addTarget(

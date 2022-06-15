@@ -1,4 +1,4 @@
-all: octez-basic.jsonnet octez-full.jsonnet
+all: basic full compact
 
 BRANCH ?= master
 
@@ -14,3 +14,9 @@ clean:
 
 fmt:
 	jsonnetfmt -i src/*.jsonnet
+
+basic: octez-basic.jsonnet
+
+full: octez-full.jsonnet
+
+compact: octez-compact.jsonnet

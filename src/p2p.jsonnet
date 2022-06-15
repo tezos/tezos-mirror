@@ -1,5 +1,6 @@
 local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local singlestat = grafana.singlestat;
+local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
@@ -31,7 +32,7 @@ local node_instance = '{instance="$node_instance"}';
       valueName='max',
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_connections_private'+ node_instance,
+        namespace + '_p2p_connections_private' + node_instance,
         legendFormat='Private Connections',
       )
     ),
@@ -64,12 +65,12 @@ local node_instance = '{instance="$node_instance"}';
       )
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_peers_running' + node_instance,
+        namespace + '_p2p_peers_running' + node_instance,
         legendFormat=running,
       )
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_points_greylisted' + node_instance,
+        namespace + '_p2p_points_greylisted' + node_instance,
         legendFormat=greylisted,
       )
     ),
@@ -94,7 +95,7 @@ local node_instance = '{instance="$node_instance"}';
       },
     ).addTarget(
       prometheus.target(
-        namespace +  '_p2p_points_disconnected' + node_instance,
+        namespace + '_p2p_points_disconnected' + node_instance,
         legendFormat=disconnected,
       )
     ).addTarget(
@@ -133,6 +134,25 @@ local node_instance = '{instance="$node_instance"}';
         legendFormat=incoming,
       )
     ),
+
+  incomingConnectionsMean:
+    statPanel.new(
+      title='Incoming connections mean',
+      datasource='Prometheus',
+    ).addTarget(
+      prometheus.target(
+        namespace + '_p2p_connections_incoming' + node_instance
+      )
+    ).addThresholds([
+      {
+        color: 'green',
+        value: 0,
+      },
+      {
+        color: 'red',
+        value: 1,
+      },
+    ]),
 
   mempoolPending:
     local applied = 'Applied';
