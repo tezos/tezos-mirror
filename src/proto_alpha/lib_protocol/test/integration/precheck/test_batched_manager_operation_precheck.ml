@@ -27,8 +27,8 @@
     -------
     Component:  Protocol (precheck manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^precheck batched manager$"
+                src/proto_alpha/lib_protocol/test/integration/precheck/main.exe \
+                -- test "^Batched"
     Subject:    Precheck manager operation.
 *)
 
@@ -465,18 +465,22 @@ let test_batch_reveal_transaction_ok () =
   let* _i = Incremental.begin_construction infos.block in
   precheck_diagnostic infos batch
 
-let tests =
+let contract_tests =
   generate_batches_reveal_in_the_middle ()
   @ generate_tests_batches_two_reveals ()
   @ generate_batches_two_sources ()
   @ generate_batches_inconsistent_counters ()
-  @ generate_batches_emptying_balance_in_the_middle ()
-  @ generate_batches_exceeding_block_gas ()
-  @ generate_batches_exceeding_block_gas_mp_mode ()
-  @ generate_batches_balance_just_enough ()
   @ [
       Tztest.tztest
         "Prechecked a batch with a reveal and a transaction."
         `Quick
         test_batch_reveal_transaction_ok;
     ]
+
+let gas_tests =
+  generate_batches_exceeding_block_gas ()
+  @ generate_batches_exceeding_block_gas_mp_mode ()
+
+let fee_tests =
+  generate_batches_emptying_balance_in_the_middle ()
+  @ generate_batches_balance_just_enough ()

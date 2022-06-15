@@ -34,7 +34,14 @@ let () =
   Alcotest_lwt.run
     "protocol > integration > precheck"
     [
-      ("precheck manager", Test_manager_operation_precheck.tests);
-      ("precheck batched manager", Test_batched_manager_operation_precheck.tests);
+      ("sanity checks", Test_manager_operation_precheck.sanity_tests);
+      ("Single: gas checks", Test_manager_operation_precheck.gas_tests);
+      ("Single: storage checks", Test_manager_operation_precheck.storage_tests);
+      ("Single: fees checks", Test_manager_operation_precheck.fee_tests);
+      ("Single: contract checks", Test_manager_operation_precheck.contract_tests);
+      ( "Batched: contract checks",
+        Test_batched_manager_operation_precheck.contract_tests );
+      ("Batched: gas checks", Test_batched_manager_operation_precheck.gas_tests);
+      ("Batched: fees checks", Test_batched_manager_operation_precheck.fee_tests);
     ]
   |> Lwt_main.run

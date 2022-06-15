@@ -27,8 +27,8 @@
     -------
     Component:  Protocol (precheck manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^precheck manager$"
+                src/proto_alpha/lib_protocol/test/integration/precheck/main.exe \
+                -- test "^Single$"
     Subject:    Precheck manager operation.
 *)
 
@@ -543,16 +543,22 @@ let test_precheck kind () =
 let generate_tests_precheck () =
   create_Tztest test_precheck "passes precheck." subjects
 
-let tests =
-  (test_ensure_manager_operation_coverage () :: generate_low_gas_limit ())
-  @ generate_high_gas_limit ()
+let sanity_tests =
+  test_ensure_manager_operation_coverage () :: generate_tests_precheck ()
+
+let gas_tests =
+  generate_low_gas_limit () @ generate_high_gas_limit ()
   @ generate_tests_exceeding_block_gas ()
   @ generate_tests_exceeding_block_gas_mp_mode ()
-  @ generate_high_storage_limit ()
-  @ generate_high_counter () @ generate_low_counter ()
-  @ generate_not_allocated () @ generate_tests_high_fee ()
+
+let storage_tests = generate_high_storage_limit ()
+
+let fee_tests =
+  generate_tests_high_fee ()
   @ generate_tests_emptying_delegated_implicit ()
   @ generate_tests_emptying_self_delegated_implicit ()
-  @ generate_unrevealed_key ()
   @ generate_tests_emptying_undelegated_implicit ()
-  @ generate_tests_precheck ()
+
+let contract_tests =
+  generate_high_counter () @ generate_low_counter () @ generate_not_allocated ()
+  @ generate_unrevealed_key ()
