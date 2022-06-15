@@ -363,3 +363,17 @@ module Commitments_published_at_level = Make_append_only_map (struct
 
   let value_encoding = Raw_level.encoding
 end)
+
+module Dal_slot_subscriptions = Make_append_only_map (struct
+  let path = ["dal"; "slot_subscriptions"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = Dal.Slot_index.t list
+
+  let value_encoding = Data_encoding.list Dal.Slot_index.encoding
+end)

@@ -44,6 +44,14 @@ let get_state_info_exn store =
   let*! state = Store.StateInfo.get store head in
   return state
 
+let get_dal_slot_subscriptions_exn store =
+  let open Lwt_result_syntax in
+  let* head = get_head_exn store in
+  let*! slot_subscriptions = Store.Dal_slot_subscriptions.find store head in
+  match slot_subscriptions with
+  | None -> failwith "No slot subscriptions"
+  | Some slot_subscriptions -> return slot_subscriptions
+
 let commitment_with_hash commitment =
   (Protocol.Alpha_context.Sc_rollup.Commitment.hash commitment, commitment)
 
@@ -202,6 +210,12 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let*! status = PVM.get_status state in
         return (PVM.string_of_status status))
 
+  let register_dal_slot_subscriptions store dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.dal_slot_subscriptions ())
+      (fun () () -> get_dal_slot_subscriptions_exn store)
+
   let register node_ctxt store configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
@@ -214,6 +228,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_current_status store
     |> register_last_stored_commitment store
     |> register_last_published_commitment store
+    |> register_dal_slot_subscriptions store
 
   let start node_ctxt store configuration =
     Common.start configuration (register node_ctxt store configuration)
