@@ -15,8 +15,10 @@
  (libraries
   tezos-version
   tezos-base.unix)
- (link_flags (:standard)
-             (:include %{workspace_root}/static-link-flags.sexp))
- (flags (:standard)
-        -open Tezos_version)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_version)
  (modules tezos_print_version))

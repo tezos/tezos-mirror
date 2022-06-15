@@ -222,9 +222,10 @@
   tezos-protocol-environment
   tezos-protocol-environment.sigs
   tezos-protocol-013-PtJakart.raw)
- (flags -w +a-4-40..42-44-45-48-51-70
-        -warn-error +a
-        -nopervasives)
+ (flags
+  -w +a-4-40..42-44-45-48-51-70
+  -warn-error +a
+  -nopervasives)
  (modules Protocol))
 
 (install
@@ -624,9 +625,10 @@
   tezos-protocol-environment
   tezos-protocol-environment.sigs
   tezos-protocol-013-PtJakart.raw)
- (flags -w +a-4-40..42-44-45-48-51-70
-        -warn-error +a
-        -nopervasives)
+ (flags
+  -w +a-4-40..42-44-45-48-51-70
+  -warn-error +a
+  -nopervasives)
  (modules Functor))
 
 (rule
@@ -828,9 +830,10 @@
   tezos-protocol-updater
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (flags (:standard)
-        -w +a-4-40..42-44-45-48-51-70
-        -warn-error +a)
+ (flags
+  (:standard)
+  -w +a-4-40..42-44-45-48-51-70
+  -warn-error +a)
  (modules Registerer))
 
 (rule

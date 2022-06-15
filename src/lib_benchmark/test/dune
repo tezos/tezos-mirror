@@ -12,8 +12,9 @@
   tezos-crypto
   tezos-benchmark
   tezos-benchmark-examples)
- (flags (:standard)
-        -open Tezos_base.TzPervasives))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))
 
 (rule
  (alias runtest)

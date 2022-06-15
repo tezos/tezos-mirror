@@ -18,8 +18,9 @@
   tezos-protocol-alpha
   tezos-sc-rollup-alpha
   uri)
- (link_flags (:standard)
-             (:include %{workspace_root}/static-link-flags.sexp))
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

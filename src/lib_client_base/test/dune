@@ -11,8 +11,9 @@
   tezos-client-base
   alcotest)
  (js_of_ocaml)
- (flags (:standard)
-        -open Tezos_client_base))
+ (flags
+  (:standard)
+  -open Tezos_client_base))
 
 (rule
  (alias runtest)

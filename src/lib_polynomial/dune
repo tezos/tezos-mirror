@@ -9,8 +9,9 @@
   data-encoding
   bls12-381)
  (library_flags (:standard -linkall))
- (flags (:standard)
-        -open Data_encoding)
+ (flags
+  (:standard)
+  -open Data_encoding)
  (modules
   Carray
   Fr_generation

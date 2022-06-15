@@ -18,8 +18,9 @@
   tezos-test-helpers
   qcheck-alcotest)
  (js_of_ocaml)
- (flags (:standard)
-        -open Tezos_stdlib))
+ (flags
+  (:standard)
+  -open Tezos_stdlib))
 
 (rule
  (alias runtest)

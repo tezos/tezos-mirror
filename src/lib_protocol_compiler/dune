@@ -8,9 +8,10 @@
  (libraries
   tezos-base
   tezos-protocol-environment.sigs)
- (flags (:standard)
-        -opaque
-        -open Tezos_base.TzPervasives)
+ (flags
+  (:standard)
+  -opaque
+  -open Tezos_base.TzPervasives)
  (modules Registerer))
 
 (rule

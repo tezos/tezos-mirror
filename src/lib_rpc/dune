@@ -12,6 +12,7 @@
   resto-directory
   uri)
  (js_of_ocaml)
- (flags (:standard)
-        -open Data_encoding
-        -open Tezos_error_monad))
+ (flags
+  (:standard)
+  -open Data_encoding
+  -open Tezos_error_monad))

@@ -62,7 +62,8 @@
   tezos-sapling
   tezos-hacl)
  (js_of_ocaml)
- (link_flags (:standard -linkall))
+ (link_flags
+  (:standard -linkall))
  (modules test_js))
 
 (rule
