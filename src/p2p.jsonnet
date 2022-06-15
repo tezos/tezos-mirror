@@ -4,7 +4,7 @@ local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
-local node_instance = '{instance="$node_instance"}';
+local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
 
 //##
 // P2P
@@ -19,7 +19,7 @@ local node_instance = '{instance="$node_instance"}';
       valueName='max',
     ).addTarget(
       prometheus.target(
-        namespace + '_p2p_points_trusted',
+        namespace + '_p2p_points_trusted' + node_instance,
         legendFormat='trusted points',
       )
     ),

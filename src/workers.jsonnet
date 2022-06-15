@@ -4,7 +4,7 @@ local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
-local node_instance = '{instance="$node_instance"}';
+local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
 
 //##
 // Workers
@@ -60,27 +60,27 @@ local node_instance = '{instance="$node_instance"}';
       },
     ).addTargets([
       prometheus.target(
-        namespace + '_distributed_db_requester_table_length{requester_kind="block_header",instance="$node_instance"}',
+        namespace + '_distributed_db_requester_table_length{requester_kind="block_header",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=headers_table,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header",instance="$node_instance"}',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=headers_scheduler,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_table_length{requester_kind="operations",instance="$node_instance"}',
+        namespace + '_distributed_db_requester_table_length{requester_kind="operations",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=operations_table,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operations",instance="$node_instance"}',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operations",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=operations_scheduler,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_table_length{requester_kind="operation",instance="$node_instance"}',
+        namespace + '_distributed_db_requester_table_length{requester_kind="operation",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=operation_table,
       ),
       prometheus.target(
-        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operation",instance="$node_instance"}',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operation",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=operation_scheduler,
       ),
     ]),

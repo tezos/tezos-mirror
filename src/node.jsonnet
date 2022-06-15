@@ -7,7 +7,7 @@ local graphPanel = grafana.graphPanel;
 local heatmapPanel = grafana.heatmapPanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
-local node_instance = '{instance="$node_instance"}';
+local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
 
 //##
 // Octez related stats
@@ -220,7 +220,7 @@ local node_instance = '{instance="$node_instance"}';
       format='none'
     ).addTarget(
       prometheus.target(
-        namespace + '_store_caboose_level',
+        namespace + '_store_caboose_level' + node_instance,
         legendFormat='current caboose',
         instant=true
       )
@@ -233,7 +233,7 @@ local node_instance = '{instance="$node_instance"}';
       format='none'
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_chain_head_cycle',
+        namespace + '_validator_chain_head_cycle' + node_instance,
         legendFormat='Current cycle',
         instant=true
       )
@@ -428,22 +428,22 @@ local node_instance = '{instance="$node_instance"}';
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="0",instance="$node_instance"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="0",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=consensus,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="1",instance="$node_instance"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="1",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=vote,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="2",instance="$node_instance"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="2",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=anonymous,
       )
     ).addTarget(
       prometheus.target(
-        namespace + '_validator_block_operations_per_pass{pass_id="3",instance="$node_instance"}',
+        namespace + '_validator_block_operations_per_pass{pass_id="3",' + std.extVar('node_instance_label') + '="$node_instance"}',
         legendFormat=manager,
       )
     )
