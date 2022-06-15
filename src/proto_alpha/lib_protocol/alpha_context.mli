@@ -988,6 +988,10 @@ module Constants : sig
 
   val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32
 
+  val sc_rollup_max_active_outbox_levels : context -> int32
+
+  val sc_rollup_max_outbox_messages_per_level : context -> int
+
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
 
