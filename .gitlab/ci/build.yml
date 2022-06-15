@@ -29,7 +29,6 @@
     key: "$CI_COMMIT_REF_SLUG"
     paths:
       - _build
-      - tezos-*
   artifacts:
     name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
