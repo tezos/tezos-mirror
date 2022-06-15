@@ -71,7 +71,7 @@ This sequence of operations was run:
     
 
 
-./tezos-sc-rollup-client-alpha rpc get /state_hash
+./tezos-sc-rollup-client-alpha rpc get /global/state_hash
 "scs11s5nfonT2qW9aBhmo3pv3oUiG9X35qDNkSUxQNFANSZUrrAvX8"
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with 31 --burn-cap 9999999
@@ -146,5 +146,5 @@ This sequence of operations was run:
     
 
 
-./tezos-sc-rollup-client-alpha rpc get /state_hash
+./tezos-sc-rollup-client-alpha rpc get /global/state_hash
 "scs12mzqZwgkUZNNSQZk6HQ1sN8VubcgPHMHNj1ARrpYnc2oLpo5SC"

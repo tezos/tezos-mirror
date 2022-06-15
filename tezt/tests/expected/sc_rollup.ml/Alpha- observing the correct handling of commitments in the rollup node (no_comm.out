@@ -32,7 +32,7 @@ This sequence of operations was run:
 ./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/initial_level'
 2
 
-./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
+./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
         "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",
@@ -41,7 +41,7 @@ This sequence of operations was run:
       "number_of_messages": 0, "number_of_ticks": 0 },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
         "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",
@@ -236,10 +236,10 @@ This sequence of operations was run:
       Consumed gas: 3205.160
 
 
-./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 null
 
-./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
+./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
         "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",
@@ -248,7 +248,7 @@ null
       "number_of_messages": 0, "number_of_ticks": 0 },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
         "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",

@@ -323,7 +323,7 @@ let test_rollup_node_running =
       @@ fun rollup_address sc_rollup_node _filename ->
       let* () = Sc_rollup_node.run sc_rollup_node in
       let* rollup_address_from_rpc =
-        sc_rollup_node_rpc sc_rollup_node "sc_rollup_address"
+        sc_rollup_node_rpc sc_rollup_node "global/sc_rollup_address"
       in
       match rollup_address_from_rpc with
       | None ->
@@ -512,7 +512,7 @@ let get_inbox_from_tezos_node sc_rollup_address client =
   parse_inbox inbox
 
 let get_inbox_from_sc_rollup_node sc_rollup_node =
-  let* inbox = sc_rollup_node_rpc sc_rollup_node "inbox" in
+  let* inbox = sc_rollup_node_rpc sc_rollup_node "global/inbox" in
   match inbox with
   | None -> failwith "Unable to retrieve inbox from sc rollup node"
   | Some inbox -> parse_inbox inbox
@@ -1479,8 +1479,8 @@ let attempt_withdraw_stake =
    Do not pass an explicit value for `?commitment_period until
    https://gitlab.com/tezos/tezos/-/merge_requests/5212 has been merged. *)
 (* Test that nodes do not publish commitments before the last cemented commitment. *)
-let commitment_before_lcc_not_stored _protocol sc_rollup_node sc_rollup_address
-    node client =
+let commitment_before_lcc_not_published _protocol sc_rollup_node
+    sc_rollup_address node client =
   let* constants = get_sc_rollup_constants client in
   let commitment_period = constants.commitment_period_in_blocks in
   let challenge_window = constants.challenge_window_in_blocks in
@@ -1950,7 +1950,7 @@ let register ~protocols =
     "no_commitment_publish_before_lcc"
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2976
        change tests so that we do not need to repeat custom parameters. *)
-    commitment_before_lcc_not_stored
+    commitment_before_lcc_not_published
     protocols ;
   test_commitment_scenario
     "first_published_at_level_global"

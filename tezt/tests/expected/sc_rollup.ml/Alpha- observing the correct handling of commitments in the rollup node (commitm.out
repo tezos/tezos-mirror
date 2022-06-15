@@ -1296,7 +1296,7 @@ This sequence of operations was run:
     
 
 
-./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
+./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
         "scs12x8QREtVeFDNLugdWQ8ChxZfQye7upbuTwsZYp65QEUN1UX6Cw",
@@ -1305,7 +1305,7 @@ This sequence of operations was run:
       "number_of_messages": 465, "number_of_ticks": 1396 },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
         "scs12x8QREtVeFDNLugdWQ8ChxZfQye7upbuTwsZYp65QEUN1UX6Cw",

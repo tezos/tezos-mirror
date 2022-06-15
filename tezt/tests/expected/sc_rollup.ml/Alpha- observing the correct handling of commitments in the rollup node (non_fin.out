@@ -1296,8 +1296,8 @@ This sequence of operations was run:
     
 
 
-./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
+./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 null
 
-./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 null
