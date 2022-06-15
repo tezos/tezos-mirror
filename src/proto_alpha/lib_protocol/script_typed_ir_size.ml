@@ -144,9 +144,19 @@ let peano_shape_proof =
   let scale = header_size +! h1w in
   fun k -> scale *? k
 
-let stack_prefix_preservation_witness_size =
-  let scale = header_size +! h2w in
-  fun k -> scale *? k
+(* Note: this function is NOT tail-recursive, but that's okay, since
+   the recursion is bound by the size of the witness, which is an
+   11-bit unsigned integer, i.e. at most 2048. This is enough to
+   guarantee there will be no stack overflow. *)
+let rec stack_prefix_preservation_witness_size :
+    type a b c d e f g h.
+    (a, b, c, d, e, f, g, h) stack_prefix_preservation_witness -> nodes_and_size
+    = function
+  | KPrefix (_loc, ty, w) ->
+      ret_succ_adding
+        (ty_size ty ++ stack_prefix_preservation_witness_size w)
+        h3w
+  | KRest -> zero
 
 let comb_gadt_witness_size = peano_shape_proof
 
@@ -509,22 +519,22 @@ and kinstr_size :
         ret_succ_adding accu (base +! word_size +! sapling_memo_size_size)
     | ISapling_verify_update (_, _) -> ret_succ_adding accu base
     | ISapling_verify_update_deprecated (_, _) -> ret_succ_adding accu base
-    | IDig (_, n, _, _) ->
+    | IDig (_loc, _n, w, _k) ->
         ret_succ_adding
-          accu
-          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
-    | IDug (_, n, _, _) ->
+          (accu ++ stack_prefix_preservation_witness_size w)
+          (base +! (word_size *? 2))
+    | IDug (_loc, _n, w, _k) ->
         ret_succ_adding
-          accu
-          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
-    | IDipn (_, n, _, _, _) ->
+          (accu ++ stack_prefix_preservation_witness_size w)
+          (base +! (word_size *? 2))
+    | IDipn (_loc, _n, w, _k1, _k2) ->
         ret_succ_adding
-          accu
-          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
-    | IDropn (_, n, _, _) ->
+          (accu ++ stack_prefix_preservation_witness_size w)
+          (base +! (word_size *? 3))
+    | IDropn (_loc, _n, w, _k) ->
         ret_succ_adding
-          accu
-          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
+          (accu ++ stack_prefix_preservation_witness_size w)
+          (base +! (word_size *? 2))
     | IChainId (_, _) -> ret_succ_adding accu base
     | INever _loc -> ret_succ_adding accu h1w
     | IVoting_power (_, _) -> ret_succ_adding accu base
