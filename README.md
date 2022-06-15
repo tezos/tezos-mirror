@@ -45,6 +45,13 @@ To create a dashboard for a different branch
 BRANCH=foo make
 ```
 
+By default, the instance names label is set to `instance`. If you are
+using a particular label for the instance names, you can use
+
+```sh
+NODE_INSTANCE_LABEL=my_instance_label
+```
+
 ### Distribution
 
 Grafana dashboards (JSON files) are automatically released on git tags to [GitLab packages of this project](https://gitlab.com/nomadic-labs/grafazos/-/packages).
