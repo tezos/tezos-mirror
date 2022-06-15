@@ -305,6 +305,8 @@ and 'arg nested_entrypoints =
 (** [no_entrypoints] is [{at_node = None; nested = Entrypoints_None}] *)
 val no_entrypoints : _ entrypoints_node
 
+type logging_event = LogEntry | LogExit of Script.location
+
 type 'arg entrypoints = {
   root : 'arg entrypoints_node;
   original_type_expr : Script.node;
@@ -1094,10 +1096,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * logger
       * ('a, 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
-
-and logging_event =
-  | LogEntry : logging_event
-  | LogExit : Script.location -> logging_event
 
 and ('arg, 'ret) lambda =
   | Lam :
