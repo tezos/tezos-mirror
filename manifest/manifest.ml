@@ -256,8 +256,8 @@ module Dune = struct
           | None -> E
           | Some flags -> S "js_of_ocaml" :: flags);
           opt library_flags (fun x -> [S "library_flags"; x]);
-          opt link_flags (fun x -> [S "link_flags"; x]);
-          opt flags (fun x -> [S "flags"; x]);
+          opt link_flags (fun l -> [V (of_list (List.cons (S "link_flags") l))]);
+          opt flags (fun l -> [V (of_list (List.cons (S "flags") l))]);
           (if not wrapped then [S "wrapped"; S "false"] else E);
           opt modules (fun x -> S "modules" :: x);
           opt modules_without_implementation (fun x ->
@@ -1708,9 +1708,9 @@ let generate_dune (internal : Target.internal) =
     in
     match (linkall, static) with
     | false, None -> None
-    | true, None -> Some Dune.[S ":standard"; S "-linkall"]
-    | false, Some a -> Some Dune.(V [[S ":standard"]; a])
-    | true, Some static -> Some Dune.(V [[S ":standard"; S "-linkall"]; static])
+    | true, None -> Some [Dune.[S ":standard"; S "-linkall"]]
+    | false, Some static -> Some [[S ":standard"]; static]
+    | true, Some static -> Some [[S ":standard"; S "-linkall"]; static]
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
@@ -1727,7 +1727,7 @@ let generate_dune (internal : Target.internal) =
           | false -> flags.rest
           | true -> Dune.[S ":standard"] :: flags.rest
         in
-        Some Dune.(V [V (of_list flags); V (of_list open_flags)])
+        Some (flags @ open_flags)
   in
 
   let preprocess =
