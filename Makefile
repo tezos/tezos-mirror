@@ -320,8 +320,18 @@ build-tps: lift-protocol-limits-patch build build-tezt
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-estimate-average-block .
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-gas-tps .
 
+# Note: this target is an extended copy-paste of the target 'build'
+# and must be kept in sync with it, so that 'build-unreleased' builds
+# a superset of 'build'.
 .PHONY: build-unreleased
-build-unreleased: build $(UNRELEASED_TEZOS_BIN)
+build-unreleased:
+ifneq (${current_ocaml_version},${ocaml_version})
+	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
+endif
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
+		$(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) \
+		@copy-parameters
+	@cp -f $(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) ./
 
 .PHONY: docker-image-build
 docker-image-build:
