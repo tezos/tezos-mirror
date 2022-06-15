@@ -1,11 +1,13 @@
 all: basic full compact
 
 BRANCH ?= master
+NODE_INSTANCE_LABEL ?= instance
 
 %.jsonnet:
 	jsonnet \
 		-J vendors/grafonnet-lib/grafonnet \
 		--ext-str branch="$(BRANCH)" \
+		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
 		src/$@ \
 			> output/$*.json
 
