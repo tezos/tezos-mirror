@@ -32,8 +32,8 @@ This sequence of operations was run:
 ./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/initial_level'
 2
 
-./tezos-sc-rollup-client-alpha rpc get /total_ticks
+./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "0"
 
-./tezos-sc-rollup-client-alpha rpc get /status
+./tezos-sc-rollup-client-alpha rpc get /global/status
 "Halted"

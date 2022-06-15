@@ -119,32 +119,32 @@ let rpc_get ?hooks sc_client path =
 
 let ticks ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["ticks"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "ticks"] in
   JSON.as_int res
 
 let total_ticks ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["total_ticks"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "total_ticks"] in
   JSON.as_int res
 
 let state_hash ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["state_hash"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "state_hash"] in
   JSON.as_string res
 
 let status ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["status"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "status"] in
   JSON.as_string res
 
 let last_stored_commitment ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["last_stored_commitment"] in
+  let+ json = rpc_get ?hooks sc_client ["global"; "last_stored_commitment"] in
   commitment_with_hash_and_level_from_json json
 
 let last_published_commitment ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["last_published_commitment"] in
+  let+ json = rpc_get ?hooks sc_client ["local"; "last_published_commitment"] in
   commitment_with_hash_and_level_from_json json
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =

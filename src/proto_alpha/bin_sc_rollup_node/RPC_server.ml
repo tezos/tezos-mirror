@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3001
-   Distinguish between local and global endpoints in endpoint paths. *)
-
 open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
@@ -54,7 +51,7 @@ module Common = struct
   let register_current_num_messages store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_num_messages ())
+      (Sc_rollup_services.Global.current_num_messages ())
       (fun () () ->
         let open Lwt_result_syntax in
         let* state_info = get_state_info_exn store in
@@ -63,26 +60,26 @@ module Common = struct
   let register_sc_rollup_address configuration dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.sc_rollup_address ())
+      (Sc_rollup_services.Global.sc_rollup_address ())
       (fun () () -> return @@ configuration.Configuration.sc_rollup_address)
 
   let register_current_tezos_head store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_tezos_head ())
+      (Sc_rollup_services.Global.current_tezos_head ())
       (fun () () -> Layer1.current_head_hash store >>= return)
 
   let register_current_tezos_level store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_tezos_level ())
+      (Sc_rollup_services.Global.current_tezos_level ())
       (fun () () -> Layer1.current_level store >>= return)
 
   let register_current_inbox node_ctxt store dir =
     let open Lwt_result_syntax in
     RPC_directory.opt_register0
       dir
-      (Sc_rollup_services.current_inbox ())
+      (Sc_rollup_services.Global.current_inbox ())
       (fun () () ->
         Layer1.current_head_hash store >>= function
         | Some head_hash ->
@@ -93,7 +90,7 @@ module Common = struct
   let register_current_ticks store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_ticks ())
+      (Sc_rollup_services.Global.current_ticks ())
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state_info_exn store in
@@ -141,7 +138,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_total_ticks store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_total_ticks ())
+      (Sc_rollup_services.Global.current_total_ticks ())
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state_exn store in
@@ -151,7 +148,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_state_hash store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_state_hash ())
+      (Sc_rollup_services.Global.current_state_hash ())
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state_exn store in
@@ -161,7 +158,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_last_stored_commitment store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.last_stored_commitment ())
+      (Sc_rollup_services.Global.last_stored_commitment ())
       (fun () () ->
         let open Lwt_result_syntax in
         let*! commitment_with_hash =
@@ -176,7 +173,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_last_published_commitment store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.last_published_commitment ())
+      (Sc_rollup_services.Local.last_published_commitment ())
       (fun () () ->
         let open Lwt_result_syntax in
         let*! result =
@@ -198,7 +195,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_status store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_status ())
+      (Sc_rollup_services.Global.current_status ())
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state_exn store in
