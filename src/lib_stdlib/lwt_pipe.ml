@@ -90,8 +90,8 @@ module Bounded = struct
 
   let is_empty {queue; _} = Queue.is_empty queue
 
-  let rec push ({closed; queue; current_size; max_size; compute_size; _} as q)
-      elt =
+  let rec push q elt =
+    let {closed; queue; current_size; max_size; compute_size; _} = q in
     if closed then Lwt.fail Closed
     else
       let elt_size = compute_size elt in
@@ -104,8 +104,8 @@ module Bounded = struct
         let* () = wait_pop q in
         push q elt
 
-  let push_now ({closed; queue; compute_size; current_size; max_size; _} as q)
-      elt =
+  let push_now q elt =
+    let {closed; queue; compute_size; current_size; max_size; _} = q in
     if closed then raise Closed ;
     let elt_size = compute_size elt in
     (current_size + elt_size < max_size || Queue.is_empty queue)
@@ -235,7 +235,8 @@ module Unbounded = struct
 
   let is_empty {queue; _} = Queue.is_empty queue
 
-  let push ({closed; queue; _} as q) elt =
+  let push q elt =
+    let {closed; queue; _} = q in
     if closed then raise Closed
     else (
       Queue.push elt queue ;

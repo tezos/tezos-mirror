@@ -31,10 +31,13 @@ module Shared = struct
 
   let create data = {data; lock = Lwt_idle_waiter.create ()}
 
-  let use {data; lock} f = Lwt_idle_waiter.task lock (fun () -> f data)
+  let use t f =
+    let {data; lock} = t in
+    Lwt_idle_waiter.task lock (fun () -> f data)
 
   (* Causes a deadlock if [use] or [update_with] is called inside [f] *)
-  let locked_use {data; lock} f =
+  let locked_use t f =
+    let {data; lock} = t in
     Lwt_idle_waiter.force_idle lock (fun () -> f data)
 
   (* Updates the shared data [v] only when a new value is provided by

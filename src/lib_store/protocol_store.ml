@@ -28,8 +28,7 @@ type t = {
   mutable protocols : Protocol_hash.Set.t;
 }
 
-let mem {protocols; _} protocol_hash =
-  Protocol_hash.Set.mem protocol_hash protocols
+let mem t protocol_hash = Protocol_hash.Set.mem protocol_hash t.protocols
 
 let all {protocols; _} = protocols
 

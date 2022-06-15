@@ -234,9 +234,8 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
         nonces
 
 (** [reveal_potential_nonces] reveal registered nonces *)
-let reveal_potential_nonces
-    ({cctxt; chain; nonces_location; last_predecessor; _} as state) new_proposal
-    =
+let reveal_potential_nonces state new_proposal =
+  let {cctxt; chain; nonces_location; last_predecessor; _} = state in
   let new_predecessor_hash = new_proposal.Baking_state.predecessor.hash in
   if
     Block_hash.(last_predecessor <> new_predecessor_hash)
