@@ -13,9 +13,10 @@
   tezos-test-helpers
   tezos-test-helpers-extra
   alcotest-lwt)
- (flags (:standard)
-        -open Tezos_base.TzPervasives
-        -open Tezos_stdlib_unix)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix)
  (modules test_context test))
 
 (rule

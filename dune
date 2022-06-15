@@ -17,3 +17,13 @@
 ;;  70 [missing-mli]
  (_
   (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
+
+; This file is included in the link_flags stanza of binaries for which
+; we want a static build.
+; If the current dune profile is "static", it contains the flag
+; telling the compiler to compile static executables.
+; Else it contains no flags.
+(rule
+ (target static-link-flags.sexp)
+ (action (with-stdout-to %{target}
+  (system "[ '%{profile}' = 'static' ] && echo '(-ccopt -static)' || echo '()'"))))

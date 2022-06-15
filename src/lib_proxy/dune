@@ -15,5 +15,6 @@
   tezos-shell-services
   tezos-context.memory
   uri)
- (flags (:standard)
-        -open Tezos_base.TzPervasives))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

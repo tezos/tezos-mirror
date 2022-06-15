@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (static (flags (:standard -ccopt -static))))
-
 (executable
  (name main_snoop)
  (public_name tezos-snoop)
@@ -21,7 +19,9 @@
   ocamlgraph
   pyml
   prbnmcn-stats)
- (link_flags (:standard -linkall))
+ (link_flags
+  (:standard -linkall)
+  (:include %{workspace_root}/static-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

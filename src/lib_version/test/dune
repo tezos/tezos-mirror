@@ -11,8 +11,9 @@
   tezos-version.parser
   alcotest)
  (js_of_ocaml)
- (flags (:standard)
-        -open Tezos_version))
+ (flags
+  (:standard)
+  -open Tezos_version))
 
 (rule
  (alias runtest)

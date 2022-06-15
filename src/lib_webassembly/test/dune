@@ -8,8 +8,9 @@
   qcheck-core
   qcheck-alcotest
   alcotest)
- (flags (:standard)
-        -open Tezos_webassembly_interpreter))
+ (flags
+  (:standard)
+  -open Tezos_webassembly_interpreter))
 
 (rule
  (alias runtest)

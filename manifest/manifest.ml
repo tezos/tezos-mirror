@@ -256,8 +256,8 @@ module Dune = struct
           | None -> E
           | Some flags -> S "js_of_ocaml" :: flags);
           opt library_flags (fun x -> [S "library_flags"; x]);
-          opt link_flags (fun x -> [S "link_flags"; x]);
-          opt flags (fun x -> [S "flags"; x]);
+          opt link_flags (fun l -> [V (of_list (List.cons (S "link_flags") l))]);
+          opt flags (fun l -> [V (of_list (List.cons (S "flags") l))]);
           (if not wrapped then [S "wrapped"; S "false"] else E);
           opt modules (fun x -> S "modules" :: x);
           opt modules_without_implementation (fun x ->
@@ -917,7 +917,6 @@ module Target = struct
     opam_only_deps : t list;
     release : bool;
     static : bool;
-    static_cclibs : string list;
     synopsis : string option;
     description : string option;
     wrapped : bool;
@@ -1065,7 +1064,6 @@ module Target = struct
     ?opam_only_deps:t option list ->
     ?release:bool ->
     ?static:bool ->
-    ?static_cclibs:string list ->
     ?synopsis:string ->
     ?description:string ->
     ?time_measurement_ppx:bool ->
@@ -1117,9 +1115,9 @@ module Target = struct
       ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml ?opam
       ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?release ?static ?static_cclibs ?synopsis ?description
-      ?(time_measurement_ppx = false) ?(wrapped = true) ?(cram = false) ?license
-      ?(extra_authors = []) ~path names =
+      ?release ?static ?synopsis ?description ?(time_measurement_ppx = false)
+      ?(wrapped = true) ?(cram = false) ?license ?(extra_authors = []) ~path
+      names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1261,15 +1259,11 @@ module Target = struct
       | None -> ( match kind with Public_executable _ -> true | _ -> false)
     in
     let static =
-      match static with
-      | Some static -> static
-      | None -> (
-          match static_cclibs with
-          | Some _ -> true
-          | None -> (
-              match kind with Public_executable _ -> true | _ -> false))
+      match (static, kind) with
+      | Some static, _ -> static
+      | None, Public_executable _ -> true
+      | None, _ -> false
     in
-    let static_cclibs = Option.value static_cclibs ~default:[] in
     let modules =
       match (modules, all_modules_except) with
       | None, None -> All
@@ -1360,7 +1354,6 @@ module Target = struct
         opam_only_deps;
         release;
         static;
-        static_cclibs;
         synopsis;
         description;
         npm_deps;
@@ -1651,7 +1644,7 @@ let write filename f =
   generated_files := String_set.add filename !generated_files ;
   write_raw filename f
 
-let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
+let generate_dune (internal : Target.internal) =
   let libraries, empty_files_to_create =
     let empty_files_to_create = ref [] in
     let rec get_library (dep : Target.t) =
@@ -1707,35 +1700,34 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     else None
   in
   let link_flags =
-    if internal.linkall && not is_lib then
-      Some Dune.[S ":standard"; S "-linkall"]
-    else None
+    let linkall = internal.linkall && not is_lib in
+    let static =
+      if internal.static then
+        Some Dune.[S ":include"; S "%{workspace_root}/static-link-flags.sexp"]
+      else None
+    in
+    match (linkall, static) with
+    | false, None -> None
+    | true, None -> Some [Dune.[S ":standard"; S "-linkall"]]
+    | false, Some static -> Some [[S ":standard"]; static]
+    | true, Some static -> Some [[S ":standard"; S "-linkall"]; static]
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
   in
-  let minus_flags : Dune.s_expr =
-    if dune_file_has_static_profile && not internal.static then
-      (* Disable static compilation for this particular target
-         (the static profile is global for the dune file).
-         This must be at the end of the flag list. *)
-      Dune.(H [S "\\"; S "-ccopt"; S "-static"])
-    else Dune.E
-  in
   let flags =
-    match (internal.flags, minus_flags, open_flags) with
-    | None, Dune.E, [] -> None
-    | flags, _, _ ->
+    match (internal.flags, open_flags) with
+    | None, [] -> None
+    | flags, _ ->
         let flags =
           match flags with None -> Flags.standard () | Some flags -> flags
         in
         let flags =
-          match (flags.standard, minus_flags) with
-          | false, _ -> flags.rest
-          | true, E -> Dune.[S ":standard"] :: flags.rest
-          | true, minus_flags -> Dune.[S ":standard"; minus_flags] :: flags.rest
+          match flags.standard with
+          | false -> flags.rest
+          | true -> Dune.[S ":standard"] :: flags.rest
         in
-        Some Dune.(V [V (of_list flags); V (of_list open_flags)])
+        Some (flags @ open_flags)
   in
 
   let preprocess =
@@ -1862,23 +1854,6 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       ?js_of_ocaml:internal.js_of_ocaml
     :: documentation :: create_empty_files :: internal.dune)
 
-let static_profile (cclibs : string list) =
-  Env.add
-    (Profile "static")
-    ~key:"flags"
-    Dune.
-      [
-        S ":standard";
-        G [S "-ccopt"; S "-static"];
-        (match cclibs with
-        | [] -> E
-        | _ :: _ ->
-            let arg =
-              List.map (fun lib -> "-l" ^ lib) cclibs |> String.concat " "
-            in
-            G [S "-cclib"; S arg]);
-      ]
-
 (* Remove duplicates from a list.
    Items that are not removed are kept in their original order.
    In case of duplicates, the first occurrence is kept.
@@ -1905,9 +1880,6 @@ let deduplicate_list ?merge get_key list =
 
 let generate_dune_files () =
   Target.iter_internal_by_path @@ fun path internals ->
-  let has_static =
-    List.exists (fun (internal : Target.internal) -> internal.static) internals
-  in
   let node_preload =
     List.concat_map
       (fun (internal : Target.internal) ->
@@ -1915,26 +1887,13 @@ let generate_dune_files () =
       internals
     |> List.sort_uniq compare
   in
-  let dunes =
-    List.map (generate_dune ~dune_file_has_static_profile:has_static) internals
-  in
+  let dunes = List.map generate_dune internals in
   write (path // "dune") @@ fun fmt ->
   Format.fprintf
     fmt
     "; This file was automatically generated, do not edit.@.; Edit file \
      manifest/main.ml instead.@.@." ;
   let env = Env.empty in
-  let env =
-    if has_static then
-      let cclibs =
-        List.map
-          (fun (internal : Target.internal) -> internal.static_cclibs)
-          internals
-        |> List.flatten |> deduplicate_list Fun.id
-      in
-      static_profile cclibs env
-    else env
-  in
   let env =
     match node_preload with
     | [] -> env
