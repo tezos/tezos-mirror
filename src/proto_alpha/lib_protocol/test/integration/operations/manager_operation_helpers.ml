@@ -769,7 +769,13 @@ let rec create_Tztest_batches test tests_msg operations =
       aux (hdmsg kop) (test kop) ops @ create_Tztest_batches test tests_msg kops
 
 (* Diagnostic helpers. *)
+(* The purpose of diagnostic helpers is to state the correct observation
+   according to the precheck result of a test. *)
 
+(* For a manager operation a [probes] contains the values required for observing
+   its precheck success. Its source, fees (sum for a batch), gas_limit
+   (sum of gas_limit of the batch), and the increment of the counters aka 1 for
+   a single operation, n for a batch of n manager operations. *)
 type probes = {
   source : Signature.Public_key_hash.t;
   fee : Tez.tez;
@@ -792,6 +798,7 @@ let rec contents_infos :
       let _ = Assert.equal_pkh ~loc:__LOC__ manop.source probes.source in
       return {fee; source = probes.source; gas_limit; nb_counter}
 
+(* Computes a [probes] from a list of manager contents. *)
 let manager_content_infos op =
   let (Operation_data {contents; _}) = op.protocol_data in
   match contents with
@@ -799,13 +806,31 @@ let manager_content_infos op =
   | Cons (Manager_operation _, _) as op -> contents_infos op
   | _ -> assert false
 
-let observe ?g_in contract b_in c_in probes i =
+(* [observe] asserts the success of precheck only.
+   Given on one side, a [contract], its initial balance [b_in], its initial
+   counter [c_in] and potentially the initial gas [g_in] before its prechecking;
+   and, on the other side, its [probes] and the context after its precheck [i];
+   if precheck succeeds then we observe in [i] that:
+   - [contract] balance decreases by [probes.fee] when [only_precheck] marks that only the precheck
+     succeeds
+   - [contract] balance decreases at least by [probes.fee] when ![only_precheck] marks
+     that the application has succeeded,
+   - its counter [c_in] increases by [probes.nb_counter], and
+   - the available gas in the block in [i] decreases by [g_in].*)
+let observe ~only_precheck contract b_in c_in g_in probes i =
   let open Lwt_result_syntax in
   let* b_out = Context.Contract.balance (I i) contract in
   let g_out = Gas.block_level (Incremental.alpha_ctxt i) in
   let* c_out = Context.Contract.counter (I i) contract in
   let*? b_expected = b_in -? probes.fee in
-  let* _ = Assert.equal_tez ~loc:__LOC__ b_out b_expected in
+  let b_cmp =
+    Assert.equal
+      ~loc:__LOC__
+      (if only_precheck then Tez.( = ) else Tez.( <= ))
+      "Balance update"
+      Tez.pp
+  in
+  let* _ = b_cmp b_out b_expected in
   let c_expected = Z.add c_in probes.nb_counter in
   let _ =
     Assert.equal
@@ -816,26 +841,16 @@ let observe ?g_in contract b_in c_in probes i =
       c_out
       c_expected
   in
-  match g_in with
-  | Some g_in ->
-      let g_expected = Gas.Arith.sub g_in (Gas.Arith.fp probes.gas_limit) in
-      Assert.equal
-        ~loc:__LOC__
-        Gas.Arith.equal
-        "Gas consumption"
-        Gas.Arith.pp
-        g_out
-        g_expected
-  | None -> return_unit
+  let g_expected = Gas.Arith.sub g_in (Gas.Arith.fp probes.gas_limit) in
+  Assert.equal
+    ~loc:__LOC__
+    Gas.Arith.equal
+    "Gas consumption"
+    Gas.Arith.pp
+    g_out
+    g_expected
 
-let precheck_ko_diagnostic ?(mempool_mode = false) (infos : infos) op
-    expect_failure =
-  let open Lwt_result_syntax in
-  let* i = Incremental.begin_construction infos.block ~mempool_mode in
-  let* _ = Incremental.add_operation ~expect_failure i op in
-  return_unit
-
-let apply_with_diagnostic ?expect_apply_failure (infos : infos) op =
+let precheck_with_diagnostic ~only_precheck (infos : infos) op =
   let open Lwt_result_syntax in
   let* i = Incremental.begin_construction infos.block in
   let* prbs = manager_content_infos op in
@@ -843,18 +858,36 @@ let apply_with_diagnostic ?expect_apply_failure (infos : infos) op =
   let* b_in = Context.Contract.balance (I i) contract in
   let* c_in = Context.Contract.counter (I i) contract in
   let g_in = Gas.block_level (Incremental.alpha_ctxt i) in
-  let* i = Incremental.add_operation ?expect_apply_failure i op in
-  observe ~g_in contract b_in c_in prbs i
+  let* i = Incremental.precheck_operation i op in
+  let* _ = Incremental.finalize_block i in
+  observe ~only_precheck contract b_in c_in g_in prbs i
 
-(* If the precheck of an operation succeed, whether the application
-   fail or not, the fees must be paid, the block gas consumption
-   should be decreased and the counter of operation should be
-   incremented. *)
-let apply_ko_diagnostic (infos : infos) op expect_apply_failure =
-  apply_with_diagnostic ~expect_apply_failure (infos : infos) op
+(* If only the precheck of an operation succeed; e.g. the rest
+   of the application failed:
+   - the fees must be paid,
+   - the block gas consumption should be decreased, and
+   - the counter of operation should be incremented
+   as defined by [observe] with [only_precheck]. *)
+let only_precheck_diagnostic (infos : infos) op =
+  precheck_with_diagnostic ~only_precheck:true infos op
 
-let apply_ok_diagnostic (infos : infos) op =
-  apply_with_diagnostic (infos : infos) op
+(* If an manager operation application succeed, the precheck
+   effects must be observed:
+   - the fees must be paid,
+   - the block gas consumption should be decreased, and
+   - the counter of operation should be incremented
+   as defined by [observe] with ![only_precheck]. *)
+let precheck_diagnostic (infos : infos) op =
+  precheck_with_diagnostic ~only_precheck:false infos op
+
+(* [precheck_ko_diagnostic] wraps the [expect_failure] when [op] precheck
+   failed. It is used in test that expects precheck [op] to fail. *)
+let precheck_ko_diagnostic ?(mempool_mode = false) (infos : infos) op
+    expect_failure =
+  let open Lwt_result_syntax in
+  let* i = Incremental.begin_construction infos.block ~mempool_mode in
+  let* _ = Incremental.add_operation ~expect_failure i op in
+  return_unit
 
 (* List of operation kind that must run on generic tests. This list
    should be extended for each new manager_operation kind. *)
@@ -888,45 +921,22 @@ let subjects =
     K_Dal_publish_slot_header;
   ]
 
-let except_not_consumer_in_precheck_subjects =
-  List.filter
-    (function
-      | K_Set_deposits_limit | K_Reveal | K_Self_delegation | K_Delegation
-      | K_Undelegation | K_Tx_rollup_origination | K_Tx_rollup_submit_batch
-      | K_Tx_rollup_finalize | K_Tx_rollup_commit | K_Tx_rollup_return_bond
-      | K_Tx_rollup_remove_commitment | K_Tx_rollup_reject
-      | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
-      | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
-      | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
-      | K_Dal_publish_slot_header ->
-          false
-      | _ -> true)
-    subjects
+let is_consumer = function
+  | K_Set_deposits_limit | K_Reveal | K_Self_delegation | K_Delegation
+  | K_Undelegation | K_Tx_rollup_origination | K_Tx_rollup_submit_batch
+  | K_Tx_rollup_finalize | K_Tx_rollup_commit | K_Tx_rollup_return_bond
+  | K_Tx_rollup_remove_commitment | K_Tx_rollup_reject
+  | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
+  | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
+  | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
+  | K_Dal_publish_slot_header ->
+      false
+  | K_Transaction | K_Origination | K_Register_global_constant
+  | K_Tx_rollup_dispatch_tickets | K_Transfer_ticket ->
+      true
 
-let except_self_delegated_and_revelation_subjects =
-  List.filter
-    (function K_Self_delegation | K_Reveal -> false | _ -> true)
-    subjects
-
-let revealed_except_set_deposits_limit_and_submit_batch_subjects =
-  List.filter
-    (function
-      | K_Set_deposits_limit | K_Tx_rollup_submit_batch | K_Reveal
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/3210 *)
-      | K_Dal_publish_slot_header ->
-          false
-      | _ -> true)
-    subjects
-
-let revealed_only_set_deposits_limit_and_submit_batch_subjects =
-  List.filter
-    (function
-      | K_Set_deposits_limit | K_Tx_rollup_submit_batch
-      (* FIXME https://gitlab.com/tezos/tezos/-/issues/3210 *)
-      | K_Dal_publish_slot_header ->
-          true
-      | _ -> false)
-    subjects
+let gas_consumer_in_precheck_subjects, not_gas_consumer_in_precheck_subjects =
+  List.partition is_consumer subjects
 
 let revealed_subjects =
   List.filter (function K_Reveal -> false | _ -> true) subjects
