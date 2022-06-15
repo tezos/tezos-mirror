@@ -502,6 +502,10 @@ end)
         Alpha_context.Contract.originated_encoding
         string
 
+    let tx_rollup rng_state =
+      let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
+      Data_encoding.Binary.of_string_exn Alpha_context.Tx_rollup.encoding string
+
     let entrypoint rng_state =
       Alpha_context.Entrypoint.of_string_strict_exn
       @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
@@ -546,6 +550,15 @@ end)
               Alpha_context.Destination.Contract (Implicit pkh)
             in
             let entrypoint = Alpha_context.Entrypoint.default in
+            let address = {destination; entrypoint} in
+            return (Typed_contract {arg_ty; address})
+          else generate_originated_contract arg_ty
+      | Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _) ->
+          let* b = Base_samplers.uniform_bool in
+          if b then
+            let* tx_rollup = tx_rollup in
+            let destination = Alpha_context.Destination.Tx_rollup tx_rollup in
+            let entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint in
             let address = {destination; entrypoint} in
             return (Typed_contract {arg_ty; address})
           else generate_originated_contract arg_ty
