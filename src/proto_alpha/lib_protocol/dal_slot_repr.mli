@@ -52,27 +52,47 @@ module Header : sig
   val encoding : t Data_encoding.t
 end
 
+(** An `Index.t` is a possible value for a slot index. We assume this value
+    to be a positive 8-bit integer. Note that this is a hard constraint,
+    which is independent of protocol constants. If a choice is ever made to
+    increase the size of available slots in the protocol, we also need
+    to change this module to accommodate for higher values.
+*)
+module Index : sig
+  type t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val zero : t
+
+  val max_value : t
+
+  (** [of_int n] constructs a`Slot_index.t`
+      May fail with:
+     {ul
+       {li [Dal_invalid_slot_header n] if [n] is either negative or greater than [max_slot_value].}
+     }
+    *)
+  val of_int : int -> t option
+
+  val to_int : t -> int
+
+  val compare : t -> t -> int
+end
+
 type header = Header.t
 
-(** A non-negative number which encodes the position of a slot from
-   the list of slots provided by the L1. We expect this index to be
-   below [256] (see {!val:encoding}). *)
-type index = int
-
-(** DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3145
-
-Consider using the `Bounded` module. *)
-type t = private {level : Raw_level_repr.t; index : index; header : header}
+type t = private {level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
 
-(** [make ~level ~index ~header] builds a slot.
+(** [make ~level ~index ~header] builds a slot. *)
 
-    @raise Invalid_arg if [index] is a non-positive number *)
-val make : level:Raw_level_repr.t -> index:index -> header:header -> t
+val make : level:Raw_level_repr.t -> index:Index.t -> header:header -> t
 
-(** The encoding ensures the slot index is always a non-negative
-   number below strictly below 256. *)
+(** The encoding ensures the slot is always a non-negative number. *)
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

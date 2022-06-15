@@ -257,3 +257,11 @@ let sc_rollup_max_active_outbox_levels c =
 let sc_rollup_max_outbox_messages_per_level c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.max_outbox_messages_per_level
+
+let dal_number_of_slots c =
+  let constants = Raw_context.constants c in
+  constants.dal.number_of_slots
+
+let dal_enable c =
+  let constants = Raw_context.constants c in
+  constants.dal.feature_enable

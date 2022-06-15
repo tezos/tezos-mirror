@@ -82,3 +82,41 @@ module Outbox : sig
     message_index:int ->
     (Z.t * Raw_context.t) tzresult Lwt.t
 end
+
+module Dal_slot : sig
+  (** [subscribe ctxt rollup slot_index] marks the [rollup] as subscribed to
+      [slot_index] at the level indicated by [Raw_context.current_level ctxt].
+
+      May fail with:
+     {ul
+       {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+       {li [Dal_subscribe_rollup_invalid_slot_index of {given=slot_index; maximum}] if
+         the slot_index is either negative or above [maximum], which is the maximum
+       slot index (inclusive) allowed}
+       {li [Sc_rollup_dal_slot_already_registered slot_index] if [rollup] is
+         already subscribed to [slot_index]}
+     }
+  *)
+  val subscribe :
+    Raw_context.t ->
+    Sc_rollup_repr.t ->
+    slot_index:Dal_slot_repr.Index.t ->
+    (Dal_slot_repr.Index.t * Raw_level_repr.t * Raw_context.t) tzresult Lwt.t
+
+  (** [subscribed_slot_indices ctxt rollup level] returns the slots to
+      which [rollup] was subscribed at level [level].
+
+      May fail with:
+     {ul
+       {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+       {li [Sc_rollup_requested_dal_slot_subscriptions_of_future_level (current, level)]
+       if [level] is above the current elvel, i.e.
+       [current] = [Raw_context.current_level ctxt] and [level] > [current]}
+     }
+  *)
+  val subscribed_slot_indices :
+    Raw_context.t ->
+    Sc_rollup_repr.t ->
+    Raw_level_repr.t ->
+    Dal_slot_repr.Index.t list tzresult Lwt.t
+end

@@ -26,22 +26,7 @@
 (* Every function of this file should check the feature flag. *)
 
 open Alpha_context
-
-type error += Dal_feature_disabled
-
-let () =
-  let description =
-    "Data-availability layer will be enabled in a future proposal."
-  in
-  register_error_kind
-    `Permanent
-    ~id:"operation.dal_disabled"
-    ~title:"DAL is disabled"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.unit
-    (function Dal_feature_disabled -> Some () | _ -> None)
-    (fun () -> Dal_feature_disabled)
+open Dal_errors
 
 let assert_dal_feature_enabled ctxt =
   let open Constants in
@@ -53,39 +38,19 @@ let only_if_dal_feature_enabled ctxt ~default f =
   let Parametric.{dal = {feature_enable; _}; _} = parametric ctxt in
   if feature_enable then f ctxt else default ctxt
 
-type error +=
-  | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
-
-let () =
-  let open Data_encoding in
-  let description = "The endorsement for data availability is a too big" in
-  register_error_kind
-    `Permanent
-    ~id:"dal_endorsement_size_limit_exceeded"
-    ~title:"DAL endorsement exceeded the limit"
-    ~description
-    ~pp:(fun ppf (maximum_size, got) ->
-      Format.fprintf
-        ppf
-        "%s: Maximum is %d. Got %d."
-        description
-        maximum_size
-        got)
-    (obj2 (req "maximum_size" int31) (req "got" int31))
-    (function
-      | Dal_endorsement_size_limit_exceeded {maximum_size; got} ->
-          Some (maximum_size, got)
-      | _ -> None)
-    (fun (maximum_size, got) ->
-      Dal_endorsement_size_limit_exceeded {maximum_size; got})
+let slot_of_int_e n =
+  let open Tzresult_syntax in
+  match Dal.Slot_index.of_int n with
+  | None -> fail Dal_errors.Dal_slot_index_above_hard_limit
+  | Some slot_index -> return slot_index
 
 let validate_data_availability ctxt data_availability =
   assert_dal_feature_enabled ctxt >>? fun () ->
-  let open Constants in
-  let Parametric.{dal = {number_of_slots; _}; _} = parametric ctxt in
-  let maximum_size =
-    Dal.Endorsement.expected_size_in_bits ~max_index:(number_of_slots - 1)
+  let open Tzresult_syntax in
+  let* max_index =
+    slot_of_int_e @@ ((Constants.parametric ctxt).dal.number_of_slots - 1)
   in
+  let maximum_size = Dal.Endorsement.expected_size_in_bits ~max_index in
   let size = Dal.Endorsement.occupied_size_in_bits data_availability in
   error_unless
     Compare.Int.(size <= maximum_size)
@@ -97,54 +62,18 @@ let apply_data_availability ctxt data_availability ~endorser =
   Dal.Endorsement.record_available_shards ctxt data_availability shards
   |> return
 
-type error +=
-  | Dal_publish_slot_header_invalid_index of {given : int; maximum : int}
-
-let () =
-  let open Data_encoding in
-  let description = "Bad index for slot header" in
-  register_error_kind
-    `Permanent
-    ~id:"dal_publish_slot_header_invalid_index"
-    ~title:"DAL slot header invalid index"
-    ~description
-    ~pp:(fun ppf (given, maximum) ->
-      Format.fprintf ppf "%s: Given %d. Maximum %d." description given maximum)
-    (obj2 (req "given" int31) (req "got" int31))
-    (function
-      | Dal_publish_slot_header_invalid_index {given; maximum} ->
-          Some (given, maximum)
-      | _ -> None)
-    (fun (given, maximum) ->
-      Dal_publish_slot_header_invalid_index {given; maximum})
-
 let validate_publish_slot_header ctxt Dal.Slot.{index; _} =
   assert_dal_feature_enabled ctxt >>? fun () ->
+  let open Tzresult_syntax in
   let open Constants in
   let Parametric.{dal = {number_of_slots; _}; _} = parametric ctxt in
+  let* number_of_slots = slot_of_int_e (number_of_slots - 1) in
   error_unless
-    Compare.Int.(0 <= index && index < number_of_slots)
+    Compare.Int.(
+      Dal.Slot_index.compare index number_of_slots <= 0
+      || Dal.Slot_index.compare index Dal.Slot_index.zero >= 0)
     (Dal_publish_slot_header_invalid_index
-       {given = index; maximum = number_of_slots - 1})
-
-type error += Dal_publish_slot_header_duplicate of {slot : Dal.Slot.t}
-
-(* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3114
-
-   Better error message *)
-let () =
-  let open Data_encoding in
-  let description = "A slot header for this slot was already proposed" in
-  register_error_kind
-    `Permanent
-    ~id:"dal_publish_slot_heade_duplicate"
-    ~title:"DAL publish slot header duplicate"
-    ~description
-    ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
-    (obj1 (req "proposed" Dal.Slot.encoding))
-    (function
-      | Dal_publish_slot_header_duplicate {slot} -> Some slot | _ -> None)
-    (fun slot -> Dal_publish_slot_header_duplicate {slot})
+       {given = index; maximum = number_of_slots})
 
 let apply_publish_slot_header ctxt slot =
   assert_dal_feature_enabled ctxt >>? fun () ->

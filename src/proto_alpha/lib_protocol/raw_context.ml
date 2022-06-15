@@ -1472,8 +1472,9 @@ module Dal = struct
         Format.fprintf
           ppf
           "The slot provided is invalid. Slot index should be between 0 and \
-           %d. Found: %d."
+           %d. Found: %a."
           length
+          Dal_slot_repr.Index.pp
           slot.Dal_slot_repr.index)
       Data_encoding.(
         obj2 (req "length" int31) (req "slot" Dal_slot_repr.encoding))

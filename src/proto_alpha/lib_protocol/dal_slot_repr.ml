@@ -35,18 +35,34 @@ module Header = struct
   let pp = Format.pp_print_int
 end
 
-type index = int
+module Index = struct
+  type t = int
+
+  let max_value = 255
+
+  let encoding = Data_encoding.uint8
+
+  let pp = Format.pp_print_int
+
+  let zero = 0
+
+  let of_int slot_index =
+    if Compare.Int.(slot_index <= max_value && slot_index >= zero) then
+      Some slot_index
+    else None
+
+  let to_int slot_index = slot_index [@@ocaml.inline always]
+
+  let compare = Compare.Int.compare
+end
 
 type header = Header.t
 
-type t = {level : Raw_level_repr.t; index : index; header : header}
+type t = {level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
 
-let make ~level ~index ~header =
-  if Compare.Int.(index < 0) then
-    invalid_arg "dal_slot_repr.make: index should be a non-negative number" ;
-  {level; index; header}
+let make ~level ~index ~header = {level; index; header}
 
 let encoding =
   let open Data_encoding in
@@ -75,14 +91,14 @@ module Slot_market = struct
      Think harder about this data structure and whether it can be
      optimized. *)
 
-  module IntMap = Map.Make (Compare.Int)
+  module Slot_index_map = Map.Make (Index)
 
-  type t = {length : int; slots : slot IntMap.t}
+  type t = {length : int; slots : slot Slot_index_map.t}
 
   let init ~length =
     if Compare.Int.(length < 0) then
       invalid_arg "Dal_slot_repr.Slot_market.init: length cannot be negative" ;
-    let slots = IntMap.empty in
+    let slots = Slot_index_map.empty in
     {length; slots}
 
   let length {length; _} = length
@@ -98,9 +114,10 @@ module Slot_market = struct
             Some new_slot
         | Some x -> Some x
       in
-      let slots = IntMap.update new_slot.index update t.slots in
+      let slots = Slot_index_map.update new_slot.index update t.slots in
       let t = {t with slots} in
       Some (t, !has_changed)
 
-  let candidates t = t.slots |> IntMap.to_seq |> Seq.map snd |> List.of_seq
+  let candidates t =
+    t.slots |> Slot_index_map.to_seq |> Seq.map snd |> List.of_seq
 end

@@ -406,7 +406,7 @@ module Dal : sig
      [slot_index] is declared available by the protocol. [false]
      otherwise. If the [index] is out of the interval
      [0;number_of_slots - 1], returns [false]. *)
-  val is_slot_available : t -> Dal_slot_repr.index -> bool
+  val is_slot_available : t -> Dal_slot_repr.Index.t -> bool
 
   (** [shards ctxt ~endorser] returns the shard assignment for the
      [endorser] for the current level. *)

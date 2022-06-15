@@ -840,6 +840,20 @@ module Sc_rollup : sig
       with type t = Raw_context.t * Sc_rollup_repr.t
        and type key = int32
        and type value = Raw_level_repr.t * Bitset.t
+
+  (** An indexed data storage for keeping track of dal slots to which
+      a rollup is subscribed to a given level.
+
+      The [key] is a pair [(rollup, level)], and the [value] is a [Bitset.t]
+      representation of all the slot indices to which [rollup] has subscribed
+      to, as of level [level]. Only entries at levels for which there is a
+      change in the dal slot subscriptions are kept in this map.
+    *)
+  module Slot_subscriptions :
+    Indexed_data_storage
+      with type t = Raw_context.t * Sc_rollup_repr.t
+       and type key = Raw_level_repr.t
+       and type value = Bitset.t
 end
 
 module Dal : sig

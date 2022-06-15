@@ -88,6 +88,10 @@ module Sc_rollup = struct
 end
 
 module Dal = struct
+  module Slot_index = struct
+    include Dal_slot_repr.Index
+  end
+
   module Endorsement = struct
     include Dal_endorsement_repr
     include Raw_context.Dal
@@ -100,6 +104,7 @@ module Dal = struct
   end
 end
 
+module Dal_errors = Dal_errors_repr
 module Entrypoint = Entrypoint_repr
 include Operation_repr
 
