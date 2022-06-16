@@ -764,7 +764,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_cement_result _ -> "smart contract rollup commitment cementing"
     | Sc_rollup_publish_result _ ->
         "smart contract rollup commitment publishing"
-    | Sc_rollup_refute_result _ -> "smart contract rollup refutation start"
+    | Sc_rollup_refute_result _ -> "smart contract rollup refutation move"
     | Sc_rollup_timeout_result _ -> "smart contract rollup refutation timeout"
     | Sc_rollup_execute_outbox_message_result _ ->
         "smart contract output message execution"
