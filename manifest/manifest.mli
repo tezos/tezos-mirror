@@ -480,6 +480,12 @@ module Flags : sig
 
   (** [include_ file] will use the flags defined in the file [file]. *)
   val include_ : string -> t
+
+  (** Helper function to compute the string that correspond to
+      disabling warnings given as a list of integers. It deduplicates
+      warnings, sorts them, and collapses ranges using the [n..m]
+      syntax. *)
+  val disabled_warnings_to_string : int list -> string
 end
 
 (** Preprocessors. *)
