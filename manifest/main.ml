@@ -3101,6 +3101,11 @@ end = struct
     let ( == ) a b = compare_asymmetric a b == 0
   end
 
+  let some_if condition make = if condition then Some (make ()) else None
+
+  let conditional_list =
+    List.filter_map (fun (x, b) -> if b then Some x else None)
+
   module Lib_protocol = struct
     type t = {
       main : target;
@@ -3114,8 +3119,6 @@ end = struct
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
-
-      let some_if condition make = if condition then Some make else None in
       let _integration_consensus =
         test
           "main"
@@ -3154,11 +3157,10 @@ end = struct
           ~path:(path // "lib_protocol/test/integration/michelson")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~dep_globs:
-            (List.filter_map
-               Fun.id
+            (conditional_list
                [
-                 Some "contracts/*";
-                 "patched_contracts/*" |> some_if N.(number >= 013);
+                 ("contracts/*", true);
+                 ("patched_contracts/*", N.(number >= 013));
                ])
           ~deps:
             [
@@ -3182,7 +3184,7 @@ end = struct
           "main"
           ~path:(path // "lib_protocol/test/integration/operations")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
-          ?dep_globs:(["contracts/*"] |> some_if N.(number >= 013))
+          ~dep_globs:(conditional_list [("contracts/*", N.(number >= 013))])
           ~deps:
             [
               alcotest_lwt;
@@ -3234,23 +3236,22 @@ end = struct
       in
       let _pbt =
         tests
-          (List.filter_map
-             Fun.id
+          (conditional_list
              [
-               Some "liquidity_baking_pbt";
-               Some "saturation_fuzzing";
-               "test_merkle_list" |> some_if N.(number >= 013);
-               Some "test_gas_properties";
-               "test_sampler" |> some_if N.(number >= 012);
-               Some "test_script_comparison";
-               Some "test_tez_repr";
-               "test_tx_rollup_l2_encoding" |> some_if N.(number >= 013);
-               "test_tx_rollup_l2_withdraw_storage" |> some_if N.(number <= 010);
-               "test_bitset" |> some_if N.(number >= 013);
-               "test_sc_rollup_tick_repr" |> some_if N.(number >= 013);
-               "refutation_game_pbt" |> some_if N.(number == 013);
-               "test_refutation_game" |> some_if N.(number >= 014);
-               "test_carbonated_map" |> some_if N.(number >= 013);
+               ("liquidity_baking_pbt", true);
+               ("saturation_fuzzing", true);
+               ("test_merkle_list", N.(number >= 013));
+               ("test_gas_properties", true);
+               ("test_sampler", N.(number >= 012));
+               ("test_script_comparison", true);
+               ("test_tez_repr", true);
+               ("test_tx_rollup_l2_encoding", N.(number >= 013));
+               ("test_tx_rollup_l2_withdraw_storage", N.(number <= 010));
+               ("test_bitset", N.(number >= 013));
+               ("test_sc_rollup_tick_repr", N.(number >= 013));
+               ("refutation_game_pbt", N.(number == 013));
+               ("test_refutation_game", N.(number >= 014));
+               ("test_carbonated_map", N.(number >= 013));
              ])
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
           ~path:(path // "lib_protocol/test/pbt")
@@ -3667,7 +3668,6 @@ include Tezos_raw_protocol_%s.Main
     let name_underscore = Name.name_underscore name in
     let number = Name.number name in
     let path = Name.base_path name in
-    let some_if condition make = if condition then Some (make ()) else None in
     let active =
       match status with
       | Frozen | Overridden | Not_mainnet -> false
