@@ -3206,6 +3206,8 @@ module Sc_rollup : sig
       dissection : (State_hash.t option * Tick.t) list;
     }
 
+    val pp : Format.formatter -> t -> unit
+
     module Index : sig
       type t = private {alice : Staker.t; bob : Staker.t}
 
