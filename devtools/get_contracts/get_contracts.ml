@@ -449,27 +449,39 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty))
     in
     print_endline "Writing contract files..." ;
-    ExprMap.iter
-      (fun hash (script, contracts, storages) ->
-        let hash_string = P.Script.Hash.to_b58check hash in
-        File_helpers.print_expr_file
-          ~dirname:output_dir
-          ~ext:".tz"
-          ~hash_string
-          script ;
-        let filename =
-          Filename.concat output_dir (hash_string ^ ".addresses")
-        in
-        File_helpers.print_to_file
-          filename
-          "%a"
-          (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
-          contracts ;
-        if Config.collect_storage then
-          let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
-          File_helpers.print_expr_dir ~dirname ~ext:".storage" storages
-        else ())
-      contract_map ;
+    let* () =
+      ExprMap.iter_es
+        (fun hash (script, contracts, storages) ->
+          let hash_string = P.Script.Hash.to_b58check hash in
+          let* script_code =
+            P.Translator.parse_code ctxt ~legacy:true
+            @@ P.Script.lazy_expr script
+          in
+          let size = Obj.(reachable_words @@ repr script_code) in
+          File_helpers.print_expr_file
+            ~dirname:output_dir
+            ~ext:".tz"
+            ~hash_string
+            script ;
+          let filename ~ext =
+            Filename.concat output_dir (Format.sprintf "%s.%s" hash_string ext)
+          in
+          File_helpers.print_to_file
+            (filename ~ext:"address")
+            "%a"
+            (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
+            contracts ;
+          File_helpers.print_to_file (filename ~ext:"size") "%d words" size ;
+          return
+          @@
+          if Config.collect_storage then
+            let dirname =
+              Filename.concat output_dir (hash_string ^ ".storage")
+            in
+            File_helpers.print_expr_dir ~dirname ~ext:".storage" storages
+          else ())
+        contract_map
+    in
     print_endline "Done writing contract files." ;
     let () =
       if not (ExprMap.is_empty lambda_map) then (
