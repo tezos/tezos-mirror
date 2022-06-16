@@ -123,16 +123,34 @@ let qcheck_cond ?pp ~cond e () =
     | Some pp ->
         QCheck.Test.fail_reportf "@[<v 2>The condition check failed!@,%a@]" pp e
 
-let int64_range_gen a b =
+let intX_range_gen ~sub ~add ~gen ~shrink a b =
   let gen a b st =
-    let range = Int64.sub b a in
-    let raw_val = Random.State.int64 st range in
-    let res = Int64.add a raw_val in
+    let range = sub b a in
+    let raw_val = gen st range in
+    let res = add a raw_val in
     assert (a <= res && res <= b) ;
     res
   in
-  let shrink b () = QCheck2.Shrink.int64_towards a b () in
+  let shrink b () = shrink a b () in
   QCheck2.Gen.make_primitive ~gen:(gen a b) ~shrink
+
+let int64_range_gen a b =
+  intX_range_gen
+    ~sub:Int64.sub
+    ~add:Int64.add
+    ~gen:Random.State.int64
+    ~shrink:QCheck2.Shrink.int64_towards
+    a
+    b
+
+let int32_range_gen a b =
+  intX_range_gen
+    ~sub:Int32.sub
+    ~add:Int32.add
+    ~gen:Random.State.int32
+    ~shrink:QCheck2.Shrink.int32_towards
+    a
+    b
 
 let int64_strictly_positive_gen = int64_range_gen 1L
 
