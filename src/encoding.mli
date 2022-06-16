@@ -33,7 +33,7 @@
     read on if you need access to the concrete definition of the
     {!Data_encoding.encoding} type. *)
 
-type limit = No_limit | At_most of int | Exactly of int
+type limit = No_limit | At_most of int | Exactly of int [@@deriving hash]
 
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
@@ -45,7 +45,7 @@ module Kind : sig
       field followed by the the value in the number of specified bytes.
       [`Variable] indicates that the binary representation of the value is
       neither statically known nor encoded. *)
-  type t = [`Fixed of int | `Dynamic | `Variable]
+  type t = [`Fixed of int | `Dynamic | `Variable] [@@deriving hash]
 
   type length = [`Fixed of int | `Variable]
 

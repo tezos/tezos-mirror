@@ -62,6 +62,7 @@ and toplevel_encoding =
   | Int_enum of {size : Binary_size.integer; cases : (int * string) list}
 
 and description = {title : string; description : string option}
+[@@deriving hash]
 
 type t = {
   toplevel : toplevel_encoding;
