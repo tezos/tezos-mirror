@@ -71,8 +71,6 @@ end = struct
   let hash : type a. a t -> int = fun (module A) -> Hashtbl.hash A.Eq
 end
 
-module Int64Map = Map.Make (Int64)
-
 module Context = struct
   type key = string list
 
