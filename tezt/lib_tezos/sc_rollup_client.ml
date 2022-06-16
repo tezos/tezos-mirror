@@ -110,6 +110,13 @@ let sc_rollup_address sc_client =
   in
   return (String.trim out)
 
+let state_value ?hooks sc_client ~key =
+  let* out =
+    spawn_command ?hooks sc_client ["get"; "state"; "value"; "for"; key]
+    |> Process.check_and_read_stdout
+  in
+  return (Scanf.sscanf (String.trim out) "%S" (fun s -> s) |> String.to_bytes)
+
 let rpc_get ?hooks sc_client path =
   let process =
     spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]

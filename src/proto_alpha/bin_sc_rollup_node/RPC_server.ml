@@ -166,7 +166,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_state_value store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.current_state_value ())
+      (Sc_rollup_services.Local.current_state_value ())
       (fun {key} () ->
         let open Lwt_result_syntax in
         let* state = get_state_exn store in
