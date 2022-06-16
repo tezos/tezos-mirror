@@ -94,6 +94,7 @@ type error +=
     }
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
+  | Error_while_taking_fees
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
@@ -467,6 +468,22 @@ let () =
       | Set_deposits_limit_too_high {limit; max_limit} -> Some (limit, max_limit)
       | _ -> None)
     (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit}) ;
+
+  let error_while_taking_fees_description =
+    "There was an error while taking the fees, which should not happen and \
+     means that the operation's validation was faulty."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operation.error_while_taking_fees"
+    ~title:"Error while taking the fees of a manager operation"
+    ~description:error_while_taking_fees_description
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "%s" error_while_taking_fees_description)
+    Data_encoding.unit
+    (function Error_while_taking_fees -> Some () | _ -> None)
+    (fun () -> Error_while_taking_fees) ;
+
   register_error_kind
     `Branch
     ~id:"contract.empty_transaction"
@@ -2183,15 +2200,32 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   | Error errors ->
       Lwt.return (Failure, Failed (manager_kind operation, errors), [])
 
+(** An individual manager operation (either standalone or inside a
+    batch) together with the balance update corresponding to the
+    transfer of its fee. *)
+type 'kind fees_updated_contents = {
+  contents : 'kind contents;
+  balance_updates : Receipt.balance_updates;
+}
+
+type _ fees_updated_contents_list =
+  | FeesUpdatedSingle :
+      'kind fees_updated_contents
+      -> 'kind fees_updated_contents_list
+  | FeesUpdatedCons :
+      'kind Kind.manager fees_updated_contents
+      * 'rest Kind.manager fees_updated_contents_list
+      -> ('kind * 'rest) Kind.manager fees_updated_contents_list
+
 let rec mark_skipped :
     type kind.
     payload_producer:Signature.Public_key_hash.t ->
     Level.t ->
-    kind Kind.manager prechecked_contents_list ->
+    kind Kind.manager fees_updated_contents_list ->
     kind Kind.manager contents_result_list =
- fun ~payload_producer level prechecked_contents_list ->
-  match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle
+ fun ~payload_producer level fees_updated_contents_list ->
+  match[@coq_match_with_default] fees_updated_contents_list with
+  | FeesUpdatedSingle
       {contents = Manager_operation {operation; _}; balance_updates} ->
       Single_result
         (Manager_operation_result
@@ -2200,7 +2234,7 @@ let rec mark_skipped :
              operation_result = Skipped (manager_kind operation);
              internal_operation_results = [];
            })
-  | PrecheckedCons
+  | FeesUpdatedCons
       ({contents = Manager_operation {operation; _}; balance_updates}, rest) ->
       Cons_result
         ( Manager_operation_result
@@ -2211,37 +2245,50 @@ let rec mark_skipped :
             },
           mark_skipped ~payload_producer level rest )
 
-(** Return balance updates for fees and an updated context that accounts for:
-    - fees spending
-    - counter incrementation
-    - consumption of each operation's [gas_limit] from the available block gas
+(** Return balance updates for fees, and an updated context that
+    accounts for:
 
-    This function should never return an error when called after
-    {!precheck_checks}. *)
-let rec precheck_effects :
-    type kind.
-    context ->
-    kind Kind.manager contents_list ->
-    (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
- fun ctxt contents_list ->
+    - fees spending,
+
+    - counter incrementation,
+
+    - consumption of each operation's [gas_limit] from the available
+      block gas.
+
+    This function should never return an error when the operation has
+    passed {!Validate_operation.validate_operation}. *)
+let take_fees ctxt contents_list =
   let open Lwt_result_syntax in
-  let contents_effects contents =
-    let (Manager_operation {source; fee; gas_limit; _}) = contents in
-    let*? ctxt = Gas.consume_limit_in_block ctxt gas_limit in
-    let* ctxt = Contract.increment_counter ctxt source in
-    let+ ctxt, balance_updates =
-      Token.transfer ctxt (`Contract (Contract.Implicit source)) `Block_fees fee
+  let rec take_fees_rec :
+      type kind.
+      context ->
+      kind Kind.manager contents_list ->
+      (context * kind Kind.manager fees_updated_contents_list) tzresult Lwt.t =
+   fun ctxt contents_list ->
+    let contents_effects contents =
+      let (Manager_operation {source; fee; gas_limit; _}) = contents in
+      let*? ctxt = Gas.consume_limit_in_block ctxt gas_limit in
+      let* ctxt = Contract.increment_counter ctxt source in
+      let+ ctxt, balance_updates =
+        Token.transfer
+          ctxt
+          (`Contract (Contract.Implicit source))
+          `Block_fees
+          fee
+      in
+      (ctxt, {contents; balance_updates})
     in
-    (ctxt, {contents; balance_updates})
+    match contents_list with
+    | Single contents ->
+        let+ ctxt, fees_updated_contents = contents_effects contents in
+        (ctxt, FeesUpdatedSingle fees_updated_contents)
+    | Cons (contents, rest) ->
+        let* ctxt, fees_updated_contents = contents_effects contents in
+        let+ ctxt, result_rest = take_fees_rec ctxt rest in
+        (ctxt, FeesUpdatedCons (fees_updated_contents, result_rest))
   in
-  match contents_list with
-  | Single contents ->
-      let+ ctxt, prechecked_contents = contents_effects contents in
-      (ctxt, PrecheckedSingle prechecked_contents)
-  | Cons (contents, rest) ->
-      let* ctxt, prechecked_contents = contents_effects contents in
-      let+ ctxt, result_rest = precheck_effects ctxt rest in
-      (ctxt, PrecheckedCons (prechecked_contents, result_rest))
+  let*! result = take_fees_rec ctxt contents_list in
+  Lwt.return (record_trace Error_while_taking_fees result)
 
 let rec apply_manager_contents_list_rec :
     type kind.
@@ -2249,12 +2296,12 @@ let rec apply_manager_contents_list_rec :
     Script_ir_translator.unparsing_mode ->
     payload_producer:public_key_hash ->
     Chain_id.t ->
-    kind Kind.manager prechecked_contents_list ->
+    kind Kind.manager fees_updated_contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
- fun ctxt mode ~payload_producer chain_id prechecked_contents_list ->
+ fun ctxt mode ~payload_producer chain_id fees_updated_contents_list ->
   let level = Level.current ctxt in
-  match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle {contents = Manager_operation _ as op; balance_updates} ->
+  match[@coq_match_with_default] fees_updated_contents_list with
+  | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates} ->
       apply_manager_contents ctxt mode chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
@@ -2262,7 +2309,7 @@ let rec apply_manager_contents_list_rec :
           {balance_updates; operation_result; internal_operation_results}
       in
       (ctxt_result, Single_result result)
-  | PrecheckedCons
+  | FeesUpdatedCons
       ({contents = Manager_operation _ as op; balance_updates}, rest) -> (
       apply_manager_contents ctxt mode chain_id op >>= function
       | Failure, operation_result, internal_operation_results ->
@@ -2586,13 +2633,13 @@ let validate_consensus_contents (type kind) ctxt chain_id
       return (ctxt, delegate_pkh, voting_power)
 
 let apply_manager_contents_list ctxt mode ~payload_producer chain_id
-    prechecked_contents_list =
+    fees_updated_contents_list =
   apply_manager_contents_list_rec
     ctxt
     mode
     ~payload_producer
     chain_id
-    prechecked_contents_list
+    fees_updated_contents_list
   >>= fun (ctxt_result, results) ->
   match ctxt_result with
   | Failure -> Lwt.return (ctxt (* backtracked *), mark_backtracked results)
@@ -2603,14 +2650,14 @@ let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
     contents_list =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  let* ctxt, prechecked_contents_list = precheck_effects ctxt contents_list in
+  let* ctxt, fees_updated_contents_list = take_fees ctxt contents_list in
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
       ctxt
       mode
       ~payload_producer
       chain_id
-      prechecked_contents_list
+      fees_updated_contents_list
   in
   return (ctxt, contents_result_list)
 

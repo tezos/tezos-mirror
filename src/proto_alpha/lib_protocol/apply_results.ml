@@ -2681,17 +2681,3 @@ let block_metadata_encoding =
                 flag. This should be replaced by a required field once
                 the feature flag will be activated. *)
              (varopt "dal_slot_availability" Dal.Endorsement.encoding)))
-
-type 'kind prechecked_contents = {
-  contents : 'kind contents;
-  balance_updates : Receipt.balance_updates;
-}
-
-type _ prechecked_contents_list =
-  | PrecheckedSingle :
-      'kind prechecked_contents
-      -> 'kind prechecked_contents_list
-  | PrecheckedCons :
-      'kind Kind.manager prechecked_contents
-      * 'rest Kind.manager prechecked_contents_list
-      -> ('kind * 'rest) Kind.manager prechecked_contents_list

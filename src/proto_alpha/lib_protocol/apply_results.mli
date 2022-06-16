@@ -323,17 +323,3 @@ type block_metadata = {
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding
-
-type 'kind prechecked_contents = {
-  contents : 'kind contents;
-  balance_updates : Receipt.balance_updates;
-}
-
-type _ prechecked_contents_list =
-  | PrecheckedSingle :
-      'kind prechecked_contents
-      -> 'kind prechecked_contents_list
-  | PrecheckedCons :
-      'kind Kind.manager prechecked_contents
-      * 'rest Kind.manager prechecked_contents_list
-      -> ('kind * 'rest) Kind.manager prechecked_contents_list

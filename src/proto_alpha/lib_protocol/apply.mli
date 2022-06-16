@@ -164,7 +164,7 @@ val apply_contents_list :
 
     These updates are mandatory. In particular, taking the fees is
     critically important. That's why [apply_manager_operation] **should
-    only be called after {!precheck_manager_contents_list}**,
+    only be called after {!Validate_operation.validate_operation}**,
     which is responsible for ensuring that the operation is solvable,
     i.e. this first stage of [apply_manager_operation] will not
     fail. If this stage fails nevertheless, the function returns an
