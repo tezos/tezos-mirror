@@ -117,7 +117,6 @@ struct
   module Bytes = struct
     include Bytes
     include EndianBytes.BigEndian
-    module LE = EndianBytes.LittleEndian
   end
 
   module String = struct
@@ -130,8 +129,6 @@ struct
   module Map = Stdlib.Map
   module Int32 = Int32
   module Int64 = Int64
-  module Nativeint = Nativeint
-  module Buffer = Buffer
   module Format = Format
   module Option = Option
   module MBytes = MBytes
@@ -161,10 +158,8 @@ struct
     let of_bits bytes = of_bits (MBytes.to_string bytes)
   end
 
-  module Lwt_sequence = Lwt_sequence
   module Lwt = Lwt
   module Lwt_list = Lwt_list
-  module Uri = Uri
 
   module Data_encoding = struct
     include Data_encoding

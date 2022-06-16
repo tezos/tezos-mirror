@@ -202,7 +202,6 @@ struct
 
   module Int32 = Int32
   module Int64 = Int64
-  module Buffer = Buffer
   module Format = Format
   module FallbackArray = FallbackArray
 
@@ -254,7 +253,6 @@ struct
 
   module Z = Z
   module Lwt = Lwt
-  module Uri = Uri
 
   module Data_encoding = struct
     include Data_encoding

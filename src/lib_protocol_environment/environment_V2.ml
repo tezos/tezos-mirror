@@ -135,7 +135,6 @@ struct
   module Map = Stdlib.Map
   module Int32 = Int32
   module Int64 = Int64
-  module Buffer = Buffer
   module Format = Format
   module Option = Tezos_error_monad.TzLwtreslib.Option
 
@@ -156,7 +155,6 @@ struct
   module Z = Z
   module Lwt = Lwt
   module Lwt_list = Lwt_list
-  module Uri = Uri
 
   module Data_encoding = struct
     include Data_encoding
