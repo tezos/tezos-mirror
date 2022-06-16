@@ -1132,17 +1132,25 @@ let local s =
 (** Code section parsing. *)
 type code_kont =
   | CKStart  (** Starting point of a function parsing. *)
-  | CKLocals of {
+  | CKLocalsParse of {
       left : pos;
       size : size;
       pos : pos;
-      vec_kont : (int32 * value_type, value_type) vec_map_kont;
+      vec_kont : (int32 * value_type) lazy_vec_kont;
       locals_size : Int64.t;
-    }  (** Parsing step of local values of a function. *)
+    }  (** Parse a local value with its number of occurences. *)
+  | CKLocalsAccumulate of {
+      left : pos;
+      size : size;
+      pos : pos;
+      type_vec : (int32 * value_type) lazy_vec_kont;
+      curr_type : (int32 * value_type) option;
+      vec_kont : value_type lazy_vec_kont;
+    }  (** Accumulate local values. *)
   | CKBody of {
       left : pos;
       size : size;
-      locals : value_type list;
+      locals : value_type Vector.t;
       const_kont : instr_block_kont list;
     }  (** Parsing step of the body of a function. *)
   | CKStop of func  (** Final step of a parsed function, irreducible. *)
@@ -1151,7 +1159,9 @@ let at' left s x =
   let right = pos s in
   Source.(x @@ region s left right)
 
-let code_step s = function
+let code_step s =
+  let open Lwt.Syntax in
+  function
   | CKStart ->
       (* `at` left *)
       let left = pos s in
@@ -1159,44 +1169,92 @@ let code_step s = function
       let pos = pos s in
       (* `vec` size *)
       let n = len32 s in
-      CKLocals {left; size; pos; vec_kont = Collect (n, []); locals_size = 0L}
-  | CKLocals {left; size; pos; vec_kont = Collect (0, l); locals_size} ->
+      CKLocalsParse
+        {
+          left;
+          size;
+          pos;
+          locals_size = 0L;
+          vec_kont = init_lazy_vec (Int32.of_int n);
+        }
+      |> Lwt.return
+  | CKLocalsParse
+      {
+        left;
+        size;
+        pos;
+        vec_kont = Lazy_vec {vector = types; _} as vec_kont;
+        locals_size;
+      }
+    when is_end_of_vec vec_kont ->
       require (I64.lt_u locals_size 0x1_0000_0000L) s pos "too many locals" ;
-      CKLocals {left; size; pos; vec_kont = Rev (l, [], 0); locals_size}
-  | CKLocals {left; size; pos; vec_kont = Collect (n, l); locals_size} ->
+      let vec_kont = init_lazy_vec (Int64.to_int32 locals_size) in
+      CKLocalsAccumulate
+        {
+          left;
+          size;
+          pos;
+          vec_kont;
+          type_vec = Lazy_vec {offset = 0l; vector = types};
+          curr_type = None;
+        }
+      |> Lwt.return
+  | CKLocalsParse {left; size; pos; vec_kont; locals_size} ->
       let local = local s in
       (* small enough to fit in a tick *)
       let locals_size =
         I64.add locals_size (I64_convert.extend_i32_u (fst local))
       in
-      CKLocals
-        {left; size; pos; vec_kont = Collect (n - 1, local :: l); locals_size}
-  | CKLocals {left; size; pos; vec_kont = Rev ([], locals, _len); locals_size}
-    ->
-      CKBody {left; size; locals; const_kont = [IKNext []]}
-  | CKLocals
-      {left; size; pos; vec_kont = Rev ((0l, t) :: l, l', len); locals_size} ->
-      CKLocals {left; size; pos; vec_kont = Rev (l, l', len); locals_size}
-  | CKLocals
-      {left; size; pos; vec_kont = Rev ((n, t) :: l, l', len); locals_size} ->
-      let n' = I32.sub n 1l in
-      CKLocals
+      CKLocalsParse
+        {left; size; pos; vec_kont = lazy_vec_step local vec_kont; locals_size}
+      |> Lwt.return
+  | CKLocalsAccumulate
+      {left; size; pos; vec_kont = Lazy_vec {vector = locals; _} as vec_kont; _}
+    when is_end_of_vec vec_kont ->
+      CKBody {left; size; locals; const_kont = [IKNext []]} |> Lwt.return
+  | CKLocalsAccumulate
+      {
+        left;
+        size;
+        pos;
+        vec_kont;
+        curr_type = None | Some (0l, _);
+        type_vec = Lazy_vec {offset = n; vector = types};
+      } ->
+      let+ next_type = Vector.get n types in
+      CKLocalsAccumulate
         {
           left;
           size;
           pos;
-          vec_kont = Rev ((n', t) :: l, t :: l', len + 1);
-          locals_size;
+          vec_kont;
+          curr_type = Some next_type;
+          type_vec = Lazy_vec {offset = Int32.succ n; vector = types};
         }
+  | CKLocalsAccumulate
+      {left; size; pos; vec_kont; curr_type = Some (occurences, ty); type_vec}
+    ->
+      let remaining_occurences = Int32.pred occurences in
+      CKLocalsAccumulate
+        {
+          left;
+          size;
+          pos;
+          vec_kont = lazy_vec_step ty vec_kont;
+          curr_type = Some (remaining_occurences, ty);
+          type_vec;
+        }
+      |> Lwt.return
   | CKBody {left; size; locals; const_kont = [IKStop body]} ->
       end_ s ;
       check_size size s ;
       let func =
         at' left s @@ {locals; body; ftype = Source.(-1l @@ Source.no_region)}
       in
-      CKStop func
+      CKStop func |> Lwt.return
   | CKBody {left; size; locals; const_kont} ->
       CKBody {left; size; locals; const_kont = instr_block_step s const_kont}
+      |> Lwt.return
   | CKStop _ -> assert false (* final step, cannot reduce *)
 
 (* Element section *)
@@ -1810,7 +1868,8 @@ let module_step state =
   | MKCode (CKStop func, left, size, vec) ->
       next @@ MKField (CodeField, size, lazy_vec_step func vec)
   | MKCode (code_kont, pos, size, curr_vec) ->
-      next @@ MKCode (code_step s code_kont, pos, size, curr_vec)
+      let* code_kont = code_step s code_kont in
+      next @@ MKCode (code_kont, pos, size, curr_vec)
   | MKElaborateFunc
       (ft, fb, (Lazy_vec {vector = func_types; _} as vec), no_datas_in_func)
     when is_end_of_vec vec ->

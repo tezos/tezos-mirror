@@ -762,12 +762,18 @@ let rec step (c : config) : config Lwt.t =
         let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
         match func with
         | Func.AstFunc (t, inst', f) ->
-            let locals' = List.rev args @ List.map default_value f.it.locals in
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3366 &
+               https://gitlab.com/tezos/tezos/-/issues/3082
+
+               This conversion to list can probably be avoided by using
+               Lazy_vector in the config for local variables. *)
+            let+ locals = Lazy_vector.LwtInt32Vector.to_list f.it.locals in
+            let locals' = List.rev args @ List.map default_value locals in
             let frame' = {inst = !inst'; locals = List.map ref locals'} in
             let instr' =
               [Label (n2, [], ([], List.map plain f.it.body)) @@ f.at]
             in
-            Lwt.return (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
+            (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
         | Func.HostFunc (t, f) ->
             let inst = ref frame.inst in
             Lwt.catch

@@ -1027,6 +1027,9 @@ struct
 
   let code f =
     let {locals; body; _} = f.it in
+    let locals =
+      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings locals)
+    in
     let g = gap32 () in
     let p = pos s in
     vec local (compress locals) ;

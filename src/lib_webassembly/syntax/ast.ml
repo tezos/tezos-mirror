@@ -336,7 +336,7 @@ and global' = {gtype : global_type; ginit : const}
 
 type func = func' Source.phrase
 
-and func' = {ftype : var; locals : value_type list; body : instr list}
+and func' = {ftype : var; locals : value_type Vector.t; body : instr list}
 
 (* Tables & Memories *)
 

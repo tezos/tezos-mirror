@@ -542,6 +542,7 @@ let const head c =
 
 let func_with_name name f =
   let {ftype; locals; body} = f.it in
+  let locals = lazy_vector Fun.id locals in
   Node
     ( "func" ^ name,
       [Node ("type " ^ var ftype, [])] @ decls "local" locals @ list instr body

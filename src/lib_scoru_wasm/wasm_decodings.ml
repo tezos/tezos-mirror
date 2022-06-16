@@ -421,7 +421,9 @@ module Make (T : Tree.S) = struct
       in
       let* ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in
       let* locals =
-        value ["locals"] Interpreter_encodings.Types.result_type_encoding
+        lazy_vector_decoding
+          "locals"
+          (value [] Interpreter_encodings.Types.value_type_encoding)
       in
       let+ body = instruction_list_decoding () in
       let func = Ast.{ftype; locals; body} in

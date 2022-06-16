@@ -300,7 +300,7 @@ let invoke ft vs at =
 
 let get t at = ([], GlobalImport t @@ at, [GlobalGet (subject_idx @@ at) @@ at])
 
-let run ts at = ([], [])
+let run ts at = (Lazy_vector.LwtInt32Vector.create 0l, [])
 
 let assert_return ress ts at =
   let test res =
@@ -419,7 +419,7 @@ let assert_return ress ts at =
           BrIf (0l @@ at) @@ at;
         ]
   in
-  ([], List.flatten (List.rev_map test ress))
+  (Lazy_vector.LwtInt32Vector.create 0l, List.flatten (List.rev_map test ress))
 
 let wrap item_name wrap_action wrap_assertion at =
   let itypes, idesc, action = wrap_action at in

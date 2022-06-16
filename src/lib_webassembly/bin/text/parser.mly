@@ -179,6 +179,10 @@ let anon_locals (c : context) lazy_ts =
   let f () =
     ignore (anon "local" c.locals (Lib.List32.length (Lazy.force lazy_ts)))
   in c.deferred_locals := f :: !(c.deferred_locals)
+let anon_locals_vector (c : context) lazy_ts =
+  let f () =
+    ignore (anon "local" c.locals (Lazy_vector.LwtInt32Vector.num_elements (Lazy.force lazy_ts)))
+  in c.deferred_locals := f :: !(c.deferred_locals)
 let anon_global (c : context) = anon "global" c.globals 1l
 let anon_table (c : context) = anon "table" c.tables 1l
 let anon_memory (c : context) = anon "memory" c.memories 1l
@@ -361,6 +365,10 @@ value_type :
 value_type_list :
   | /* empty */ { [] }
   | value_type value_type_list { $1 :: $2 }
+
+value_type_vector :
+  | /* empty */ { Lazy_vector.LwtInt32Vector.create 0l }
+  | value_type value_type_vector { Lazy_vector.LwtInt32Vector.cons $1 $2 }
 
 global_type :
   | value_type { GlobalType ($1, Immutable) }
@@ -824,13 +832,13 @@ func_result_body :
 func_body :
   | instr_list
     { fun c -> let c' = anon_label c in
-      {ftype = -1l @@ at(); locals = []; body = $1 c'} }
-  | LPAR LOCAL value_type_list RPAR func_body
-    { fun c -> anon_locals c (lazy $3); let f = $5 c in
-      {f with locals = $3 @ f.locals} }
+      {ftype = -1l @@ at(); locals = Lazy_vector.LwtInt32Vector.create 0l; body = $1 c'} }
+  | LPAR LOCAL value_type_vector RPAR func_body
+    { fun c -> anon_locals_vector c (lazy $3); let f = $5 c in
+      {f with locals = Lazy_vector.LwtInt32Vector.concat $3 f.locals} }
   | LPAR LOCAL bind_var value_type RPAR func_body  /* Sugar */
     { fun c -> ignore (bind_local c $3); let f = $6 c in
-      {f with locals = $4 :: f.locals} }
+      {f with locals = Lazy_vector.LwtInt32Vector.cons $4 f.locals} }
 
 
 /* Tables, Memories & Globals */

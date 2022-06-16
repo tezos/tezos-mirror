@@ -66,17 +66,25 @@ type export_kont =
 (** Code section parsing. *)
 type code_kont =
   | CKStart  (** Starting point of a function parsing. *)
-  | CKLocals of {
+  | CKLocalsParse of {
       left : pos;
       size : size;
       pos : pos;
-      vec_kont : (int32 * Types.value_type, Types.value_type) vec_map_kont;
+      vec_kont : (int32 * Types.value_type) lazy_vec_kont;
       locals_size : Int64.t;
-    }  (** Parsing step of local values of a function. *)
+    }  (** Parse a local value with its number of occurences. *)
+  | CKLocalsAccumulate of {
+      left : pos;
+      size : size;
+      pos : pos;
+      type_vec : (int32 * Types.value_type) lazy_vec_kont;
+      curr_type : (int32 * Types.value_type) option;
+      vec_kont : Types.value_type lazy_vec_kont;
+    }  (** Accumulate local values. *)
   | CKBody of {
       left : pos;
       size : size;
-      locals : Types.value_type list;
+      locals : Types.value_type Vector.t;
       const_kont : instr_block_kont list;
     }  (** Parsing step of the body of a function. *)
   | CKStop of Ast.func  (** Final step of a parsed function, irreducible. *)

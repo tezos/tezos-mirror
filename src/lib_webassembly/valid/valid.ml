@@ -581,6 +581,9 @@ let check_type (t : type_) = check_func_type t.it t.at
 
 let check_func (c : context) (f : func) =
   let {ftype; locals; body} = f.it in
+  let locals =
+    List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings locals)
+  in
   let (FuncType (ts1, ts2)) = type_ c ftype in
   let c' = {c with locals = ts1 @ locals; results = ts2; labels = [ts2]} in
   check_block c' body (FuncType ([], ts2)) f.at
