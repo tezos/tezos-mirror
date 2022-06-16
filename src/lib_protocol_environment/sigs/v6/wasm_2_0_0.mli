@@ -23,7 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type input = {inbox_level : Bounded.Int32.NonNegative.t; message_counter : Z.t}
+
+type output = {outbox_level : Bounded.Int32.NonNegative.t; message_index : Z.t}
+
+type input_request = No_input_required | Input_required
+
+type info = {
+  current_tick : Z.t;
+  last_input_read : input option;
+  input_request : input_request;
+}
+
 module Make
     (Tree : Context.TREE with type key = string list and type value = bytes) : sig
-  val step : Tree.tree -> Tree.tree Lwt.t
+  val compute_step : Tree.tree -> Tree.tree Lwt.t
+
+  val set_input_step : input -> string -> Tree.tree -> Tree.tree Lwt.t
+
+  val get_output : output -> Tree.tree -> string Lwt.t
+
+  val get_info : Tree.tree -> info Lwt.t
 end

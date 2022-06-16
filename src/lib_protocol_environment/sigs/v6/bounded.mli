@@ -67,4 +67,6 @@ module Int32 : sig
       redundant bytes to each message.
    *)
   module Make (_ : BOUNDS) : S
+
+  module NonNegative : S
 end

@@ -1101,15 +1101,60 @@ struct
   end
 
   module Wasm_2_0_0 = struct
+    type input = {
+      inbox_level : Bounded.Int32.NonNegative.t;
+      message_counter : Z.t;
+    }
+
+    type output = {
+      outbox_level : Bounded.Int32.NonNegative.t;
+      message_index : Z.t;
+    }
+
+    type input_request = No_input_required | Input_required
+
+    type info = {
+      current_tick : Z.t;
+      last_input_read : input option;
+      input_request : input_request;
+    }
+
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
     struct
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3090
-         The expected implementation of this function is the step
-         function implemented in `lib_webassembly'. *)
       module Wasm = Tezos_scoru_wasm.Make (Tree)
 
-      let step (t : Tree.tree) = Wasm.step t
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3214
+         The rest of the module is pure boilerplate converting between
+         the types of [Tezos_scoru_wasm] and [Environment_V6.Wasm_2_0_0].
+      *)
+
+      let compute_step (tree : Tree.tree) = Wasm.compute_step tree
+
+      let set_input_step {inbox_level; message_counter} payload
+          (tree : Tree.tree) =
+        Wasm.set_input_step {inbox_level; message_counter} payload tree
+
+      let get_output {outbox_level; message_index} (tree : Tree.tree) =
+        Wasm.get_output {outbox_level; message_index} tree
+
+      let convert_input : Tezos_scoru_wasm.input -> input = function
+        | {inbox_level; message_counter} -> {inbox_level; message_counter}
+
+      let get_info (tree : Tree.tree) =
+        let open Lwt_syntax in
+        let* info = Wasm.get_info tree in
+        match info with
+        | {current_tick; last_input_read; input_request} ->
+            Lwt.return
+              {
+                current_tick;
+                last_input_read = Option.map convert_input last_input_read;
+                input_request =
+                  (match input_request with
+                  | No_input_required -> No_input_required
+                  | Input_required -> Input_required);
+              }
     end
   end
 
