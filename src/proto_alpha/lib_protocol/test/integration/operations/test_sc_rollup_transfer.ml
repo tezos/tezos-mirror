@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,24 +25,11 @@
 
 (** Testing
     -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
+    Component:  Sc rollup L1/L2 communication
+    Invocation: dune exec \
+                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                -- test "^sc rollup transfer$"
+    Subject:    Test transfers from Michelson to smart contract rollups
 *)
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-    ]
-  |> Lwt_main.run
+let tests = []
