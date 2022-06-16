@@ -128,7 +128,7 @@ val get_finalized :
 
 (** [pending_bonded_commitments ctxt tx_rollup contract] returns the
     number of commitments that [contract] has made that are still
-    pending (that is, still subject to rejection). *)
+    in the storage. *)
 val pending_bonded_commitments :
   Raw_context.t ->
   Tx_rollup_repr.t ->
@@ -148,6 +148,10 @@ val has_bond :
     the oldest inbox as final, if the commitment exists and if it is
     old enough. Otherwise, this function returns the error
     [No_commitment_to_finalize].
+
+    The number of {!pending_bonded_commitments} is not updated, it
+    is decremented when the commitment is removed (see {!remove_commitment}).
+    It is done to force the rollup operators to clean up the commitment storage.
 
     The state of the rollup is adjusted accordingly, and the finalized
     level is returned. Besides, the inbox at said level is removed
