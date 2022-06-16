@@ -1011,19 +1011,21 @@ module Target = struct
     registered := internal :: !registered ;
     Some (Internal internal)
 
+  let kind_name_for_errors kind =
+    match kind with
+    | Public_library {public_name = name; _}
+    | Private_library name
+    | Public_executable ({public_name = name; _}, _)
+    | Private_executable (name, _)
+    | Test_executable {names = name, _; _} ->
+        name
+
   (* Note: this function is redefined below for the version with optional targets. *)
   let rec name_for_errors = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
     | Optional target | Select {package = target; _} | Open (target, _) ->
         name_for_errors target
-    | Internal {kind; _} -> (
-        match kind with
-        | Public_library {public_name = name; _}
-        | Private_library name
-        | Public_executable ({public_name = name; _}, _)
-        | Private_executable (name, _)
-        | Test_executable {names = name, _; _} ->
-            name)
+    | Internal {kind; _} -> kind_name_for_errors kind
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
@@ -1097,8 +1099,8 @@ module Target = struct
           ... ~virtual_modules:"Foo" ~default_implementation:implem
        and implem = ... ~implements:virtual_package
 
-       A solution would be to declare the [default_implementation] in the
-       in [default]:
+       A solution would be to declare [default_implementation]
+       in [implem]:
 
        let virtual_package = ... ~virtual_modules:"Foo"
        let implem = ... ~implements_default:virtual_package
@@ -1291,27 +1293,33 @@ module Target = struct
       | None, _ -> ()
       | Some _, None ->
           error
-            "Targets implementing virtual targets must specify their opam \
+            "Target %s implements a virtual target, it must specify its opam \
              package"
+            (kind_name_for_errors kind)
       | Some target, Some opam -> (
           match get_internal target with
           | None ->
               error
-                "`implements` directive specifies %s which is a non-internal \
-                 target"
+                "The `implements` directive of %s specifies %s which is a \
+                 non-internal target"
+                (kind_name_for_errors kind)
                 (name_for_errors target)
           | Some internal -> (
               (match internal.virtual_modules with
               | [] ->
                   error
                     "A target can only implement a virtual internal target, \
-                     but %s declares no virtual modules"
+                     but %s claims to implement %s which declares no virtual \
+                     modules"
+                    (kind_name_for_errors kind)
                     (name_for_errors target)
               | _ -> ()) ;
               match internal.opam with
               | None ->
                   error
-                    "Virtual target %s must specify its opam package"
+                    "While processing %s: virtual target %s must specify its \
+                     opam package"
+                    (kind_name_for_errors kind)
                     (name_for_errors target)
               | Some internal_opam -> (
                   match (internal.default_implementation, kind) with
