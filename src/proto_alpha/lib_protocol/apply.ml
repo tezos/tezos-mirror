@@ -1246,14 +1246,13 @@ let apply_external_manager_operation_content :
     Script_ir_translator.unparsing_mode ->
     source:public_key_hash ->
     chain_id:Chain_id.t ->
-    fee:Tez.t ->
     kind manager_operation ->
     (context
     * kind successful_manager_operation_result
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt_before_op mode ~source ~chain_id ~fee operation ->
+ fun ctxt_before_op mode ~source ~chain_id operation ->
   let source_contract = Contract.Implicit source in
   Contract.must_exist ctxt_before_op source_contract >>=? fun () ->
   Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
@@ -1799,7 +1798,7 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [])
   | Dal_publish_slot_header {slot} ->
-      Dal_apply.apply_publish_slot_header ctxt slot fee >>?= fun ctxt ->
+      Dal_apply.apply_publish_slot_header ctxt slot >>?= fun ctxt ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Dal_publish_slot_header_result {consumed_gas} in
       return (ctxt, result, [])
@@ -2303,7 +2302,6 @@ let apply_manager_contents (type kind) ctxt mode chain_id
                                    operation;
                                    gas_limit;
                                    storage_limit;
-                                   fee;
                                    _;
                                  }) =
     op
@@ -2311,13 +2309,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
-  apply_external_manager_operation_content
-    ctxt
-    mode
-    ~source
-    ~chain_id
-    ~fee
-    operation
+  apply_external_manager_operation_content ctxt mode ~source ~chain_id operation
   >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (
       apply_internal_manager_operations

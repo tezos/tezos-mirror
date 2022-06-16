@@ -383,16 +383,13 @@ module Dal : sig
      no-op. *)
   val record_available_shards : t -> Dal_endorsement_repr.t -> int list -> t
 
-  (** [current_slot_fees ctxt slot fees] computes the current fees
-     associated to the slot [slot]. *)
-  val current_slot_fees : t -> Dal_slot_repr.t -> Tez_repr.t option
-
-  (** [update_slot_fees ctxt slot fees] returns a new context where
-     the new candidate [(slot,fees)] have been taken into
-     account. Returns [(ctxt,updated)] where [updated=true] if the
-     candidate if better (fee-wise) than the current
-     candidate. [update=false] otherwise. *)
-  val update_slot_fees : t -> Dal_slot_repr.t -> Tez_repr.t -> t * bool
+  (** [register_slot ctxt slot] returns a new context where the new
+     candidate [slot] have been taken into account. Returns [Some
+     (ctxt,updated)] where [updated=true] if the candidate is
+     registered. [Some (ctxt,false)] if another candidate was already
+     registered previously. Returns an error if the slot is
+     invalid. *)
+  val register_slot : t -> Dal_slot_repr.t -> (t * bool) tzresult
 
   (** [candidates ctxt] returns the current list of slot for which
      there is at least one candidate. *)

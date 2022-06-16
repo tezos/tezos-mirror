@@ -49,10 +49,10 @@ val apply_data_availability :
    is not valid. *)
 val validate_publish_slot_header : t -> Dal.Slot.t -> unit tzresult
 
-(** [apply_publish_slot_header ctxt slot fees] applies the publication
-   of [slot] on top of [ctxt] assuming the operation that issued
-   contains [fees] tez. *)
-val apply_publish_slot_header : t -> Dal.Slot.t -> Tez.t -> t tzresult
+(** [apply_publish_slot_header ctxt slot] applies the publication of
+   slot header [slot] on top of [ctxt]. Fails if the slot contains
+   already a slot header. *)
+val apply_publish_slot_header : t -> Dal.Slot.t -> t tzresult
 
 (** [dal_finalisation ctxt] should be executed at block finalisation
    time. A set of slots available at level [ctxt.current_level - lag]

@@ -1468,6 +1468,31 @@ module Sc_rollup_in_memory_inbox = struct
 end
 
 module Dal = struct
+  type error +=
+    | Dal_register_invalid_slot of {length : int; slot : Dal_slot_repr.t}
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal_register_invalid_slot"
+      ~title:"Dal register invalid slot"
+      ~description:
+        "Attempt to register a slot which is invalid (the index is out of \
+         bounds)."
+      ~pp:(fun ppf (length, slot) ->
+        Format.fprintf
+          ppf
+          "The slot provided is invalid. Slot index should be between 0 and \
+           %d. Found: %d."
+          length
+          slot.Dal_slot_repr.index)
+      Data_encoding.(
+        obj2 (req "length" int31) (req "slot" Dal_slot_repr.encoding))
+      (function
+        | Dal_register_invalid_slot {length; slot} -> Some (length, slot)
+        | _ -> None)
+      (fun (length, slot) -> Dal_register_invalid_slot {length; slot})
+
   let record_available_shards ctxt slots shards =
     let dal_endorsement_slot_accountability =
       Dal_endorsement_repr.Accountability.record_shards_availability
@@ -1477,14 +1502,17 @@ module Dal = struct
     in
     {ctxt with back = {ctxt.back with dal_endorsement_slot_accountability}}
 
-  let current_slot_fees ctxt Dal_slot_repr.{index; _} =
-    Dal_slot_repr.Slot_market.current_fees ctxt.back.dal_slot_fee_market index
-
-  let update_slot_fees ctxt slot fees =
-    let dal_slot_fee_market, updated =
-      Dal_slot_repr.Slot_market.update ctxt.back.dal_slot_fee_market slot fees
-    in
-    ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
+  let register_slot ctxt slot =
+    match
+      Dal_slot_repr.Slot_market.register ctxt.back.dal_slot_fee_market slot
+    with
+    | None ->
+        let length =
+          Dal_slot_repr.Slot_market.length ctxt.back.dal_slot_fee_market
+        in
+        error (Dal_register_invalid_slot {length; slot})
+    | Some (dal_slot_fee_market, updated) ->
+        ok ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
 
   let candidates ctxt =
     Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
