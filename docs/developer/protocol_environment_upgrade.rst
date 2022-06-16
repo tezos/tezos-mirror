@@ -19,19 +19,17 @@ The following steps are roughly the steps taken in the `V6 bootstrap MR <https:/
 
    * Copy the directory ``src/lib_protocol_environment/sigs/v<N-1>`` into ``src/lib_protocol_environment/sigs/v<N>``
 
-   * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.dune.inc`` into ``src/lib_protocol_environment/sigs/v<N>.dune.inc`` and adapt the version number in it
+   * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.in.ml`` into ``src/lib_protocol_environment/sigs/v<N>.in.ml``
 
 2. Make the new environment buildable by updating ``manifest/main.ml``:
 
-   * Add ``include_ "v<N>.dune.inc";`` (twice in the file)
-
-   * Add the new version to ``~modules: ["V0"; "V1" ...`` (twice in the file)
+   * Bump the ``latest_environment_number`` in ``manifest/main.ml``.
 
    * Run ``make -C manifest``
 
 3. Copy the existing compatibility layer if any (see details in `Struct compatibility layer <#struct-compatibility-layer>`__).
 
-   * If the file exists, copy ``src/lib_protocol_environment/structs/v<N-1>.dune.inc`` into ``src/lib_protocol_environment/structs/v<N>.dune.inc`` and do not change its content
+   * Update  ``src/lib_protocol_environment/structs/tezos_protocol_environment_structs.ml`` to add a new submodule ``V<N>`` by copying the submodule ``V<N-1>``.
 
 4. Copy and adapt the environment functor:
 
@@ -70,9 +68,9 @@ It is recommended that you test your work more comprehensively offline. To that 
 Struct compatibility layer
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The struct compatibility layer is for providing compatibility between a signature of the protocol environment (which is set in stone) and the interface of an external library that provides it (which might change from version to version). E.g., at the time of the V0 environment the OCaml Stdlib did not include an ``Option`` module and so a custom one was provided in the whole of the Tezos project including the protocol environment; later, when the Tezos project switched to the now available and standard ``Stdlib.Option`` module, the struct compatibility module ``src/lib_protocol_environment/structs/v0/option.ml`` was added.
+The struct compatibility layer is for providing compatibility between a signature of the protocol environment (which is set in stone) and the interface of an external library that provides it (which might change from version to version). E.g., at the time of the V0 environment the OCaml Stdlib did not include an ``Option`` module and so a custom one was provided in the whole of the Tezos project including the protocol environment; later, when the Tezos project switched to the now available and standard ``Stdlib.Option`` module, the struct compatibility module ``src/lib_protocol_environment/structs/v0_option.ml`` was added.
 
-More recent protocol environments generally need less struct compatibility modules. Occasionally, the most recent environment needs no compatibility layer at all. You can know if this is the case by checking the file ``src/lib_protocol_environment/structs/v<N-1>.dune.inc``: if it exists then there is a compatibility layer, if it doesn't then there isn't.
+More recent protocol environments generally need less struct compatibility modules. Occasionally, the most recent environment needs no compatibility layer at all. You can know if this is the case by checking the file ``src/lib_protocol_environment/structs/tezos_protocol_environment_structs.ml``: if the submodule ``V<N>`` exists and is not empty then there is a compatibility layer, otherwise there isn't.
 
 Either way, the instructions in the list above are sufficient for creating the new environment.
 
@@ -119,7 +117,7 @@ You can make changes to the newly created environment until it is released. For 
 
   * Add the interface file ``src/lib_protocol_environment/sigs/v3/result.mli``
 
-  * Add a reference to the file in ``src/lib_protocol_environment/sigs/v3.dune.inc``
+  * Add a reference to the file in ``src/lib_protocol_environment/sigs/v3.in.ml``
 
   * Declare the ``Result`` module in the functor in ``src/lib_protocol_environment/environment_V3.ml``
 
