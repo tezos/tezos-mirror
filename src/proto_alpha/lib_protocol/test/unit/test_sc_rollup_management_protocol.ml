@@ -48,7 +48,6 @@ let check_encode_decode_inbox_message message =
   let*? bytes' =
     Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.to_bytes message'
   in
-  let bytes' = (bytes' :> string) in
   Assert.equal_string ~loc:__LOC__ (bytes :> string) (bytes' :> string)
 
 let check_encode_decode_outbox_message ctxt message =
