@@ -229,3 +229,30 @@ struct
   let gen (key_gen : Map.key Gen.t) (val_gen : 'v Gen.t) : 'v Map.t Gen.t =
     gen_of_size Gen.small_nat key_gen val_gen
 end
+
+let test_roundtrip ~count ~title ~gen ~eq encoding =
+  let pp fmt x =
+    Data_encoding.Json.construct encoding x
+    |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
+  in
+  let test rdt input =
+    let output = Roundtrip.make encoding rdt input in
+    let success = eq input output in
+    if not success then
+      QCheck2.Test.fail_reportf
+        "%s %s roundtrip error: %a became %a"
+        title
+        (Roundtrip.target rdt)
+        pp
+        input
+        pp
+        output
+  in
+  QCheck2.Test.make
+    ~count
+    ~name:(Format.asprintf "roundtrip %s" title)
+    gen
+    (fun input ->
+      test Roundtrip.binary input ;
+      test Roundtrip.json input ;
+      true)

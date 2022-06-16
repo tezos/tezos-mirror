@@ -179,3 +179,12 @@ end) : sig
       are generated with [key_gen] and the values with [val_gen]. *)
   val gen : Map.key QCheck2.Gen.t -> 'v QCheck2.Gen.t -> 'v Map.t QCheck2.Gen.t
 end
+
+(** Test the roundtripness of an encoding both in JSON and binary formats. *)
+val test_roundtrip :
+  count:int ->
+  title:string ->
+  gen:'a QCheck2.Gen.t ->
+  eq:('a -> 'a -> bool) ->
+  'a Data_encoding.t ->
+  QCheck2.Test.t
