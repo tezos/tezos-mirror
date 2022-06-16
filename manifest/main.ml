@@ -25,6 +25,21 @@
 
 open Manifest
 
+let warnings_disabled_by_default = [4; 40; 41; 42; 44; 45; 48; 60; 67; 69; 70]
+(*
+   4 [fragile-match]
+  40 [name-out-of-scope]
+  41 [ambiguous-name]
+  42 [disambiguated-name]
+  44 [open-shadow-identifier]
+  45 [open-shadow-label-constructor]
+  48 [eliminated-optional-arguments]
+  60 [unused-module]
+  67 [unused-functor-parameter]
+  69 [unused-field]
+  70 [missing-mli]
+*)
+
 let tezt_without_tezt_lib_dependency = tezt
 
 (* Prevent using [tezt] until we define [tezt_lib]. *)
@@ -1955,7 +1970,24 @@ let tezos_protocol_compiler_lib =
         unix;
       ]
     ~opam_only_deps:[tezos_protocol_environment]
-    ~modules:["Embedded_cmis"; "Packer"; "Compiler"]
+    ~modules:["Embedded_cmis"; "Packer"; "Compiler"; "Defaults"]
+    ~dune:
+      Dune.
+        [
+          targets_rule
+            ["defaults.ml"]
+            ~action:
+              [
+                S "write-file";
+                S "%{targets}";
+                S
+                  (sf
+                     "let warnings = %S"
+                     ("+a"
+                     ^ Flags.disabled_warnings_to_string
+                         warnings_disabled_by_default));
+              ];
+        ]
 
 let tezos_protocol_compiler_native =
   public_lib
@@ -3301,7 +3333,7 @@ end = struct
         | V _ as number ->
             if N.(number >= 014) then []
             else if N.(number >= 011) then [51]
-            else [6; 7; 9; 16; 29; 32; 51; 60; 67; 68]
+            else [6; 7; 9; 16; 29; 32; 51; 68]
       in
       let environment =
         public_lib
@@ -5073,12 +5105,22 @@ let () =
 
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =
+  let p_dev = Env.Profile "dev" in
   let p_static = Env.Profile "static" in
   let p_release = Env.Profile "release" in
+  let warnings_for_dev =
+    (* We mark all warnings as error and disable the few ones we don't want *)
+    (* The last warning number 72 should be revisited when we move from OCaml.4.14 *)
+    "@1..72" ^ Flags.disabled_warnings_to_string warnings_disabled_by_default
+  in
   let env =
     Env.empty
     |> Env.add p_static ~key:"ocamlopt_flags" Dune.[S ":standard"; S "-O3"]
     |> Env.add p_release ~key:"ocamlopt_flags" Dune.[S ":standard"; S "-O3"]
+    |> Env.add
+         p_dev
+         ~key:"flags"
+         Dune.[S ":standard"; S "-w"; S warnings_for_dev]
     |> Env.add
          Env.Any
          ~key:"js_of_ocaml"

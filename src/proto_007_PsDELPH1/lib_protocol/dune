@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-60-67-68
+  -w -6-7-9-16-29-32-51-68
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_007_PsDELPH1.Environment
@@ -115,7 +115,7 @@
   tezos-protocol-007-PsDELPH1.raw)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-60-67-68
+  -w -6-7-9-16-29-32-51-68
   -nopervasives)
  (modules Protocol))
 
@@ -288,7 +288,7 @@
   tezos-protocol-007-PsDELPH1.raw)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-60-67-68
+  -w -6-7-9-16-29-32-51-68
   -nopervasives)
  (modules Functor))
 
@@ -384,7 +384,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-60-67-68)
+  -w -6-7-9-16-29-32-51-68)
  (modules Registerer))
 
 (rule

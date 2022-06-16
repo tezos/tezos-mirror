@@ -1,20 +1,6 @@
 (vendored_dirs vendors)
 (data_only_dirs _opam-repo-for-release)
 (env
- (dev
-  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))
-  (flags (:standard -w +a@1..72-4-40..42-44-45-48-60-67-69-70)))
-;;   4 [fragile-match]
-;;  40 [name-out-of-scope]
-;;  41 [ambiguous-name]
-;;  42 [disambiguated-name]
-;;  44 [open-shadow-identifier]
-;;  45 [open-shadow-label-constructor]
-;;  48 [eliminated-optional-arguments]
-;;  60 [unused-module]
-;;  67 [unused-functor-parameter]
-;;  69 [unused-field]
-;;  70 [missing-mli]
  (_
   (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
 

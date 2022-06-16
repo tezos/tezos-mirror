@@ -54,7 +54,14 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base_unix
   -open Tezos_stdlib_unix)
- (modules Embedded_cmis Packer Compiler))
+ (modules Embedded_cmis Packer Compiler Defaults))
+
+(rule
+ (targets defaults.ml)
+ (action
+  (write-file
+   %{targets}
+   "let warnings = \"+a-4-40..42-44-45-48-60-67-69-70\"")))
 
 (library
  (name tezos_protocol_compiler_native)

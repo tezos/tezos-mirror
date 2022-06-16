@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let warnings = "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+let warnings = Defaults.warnings
+
+let extra_warnings = "-6-7-9-29"
 
 let warn_error = "-a+8"
 
@@ -283,6 +285,7 @@ let main {compile_ml; pack_objects; link_shared} =
     Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
   in
   parse_options false warnings ;
+  parse_options false extra_warnings ;
   parse_options true warn_error ;
   load_embedded_cmis tezos_protocol_env ;
   let packed_protocol_object = compile_ml ~for_pack functor_file in
