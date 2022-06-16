@@ -41,7 +41,7 @@ module Make (E : Set.OrderedType) = struct
 
   let create bound =
     if bound < 0 || bound > Sys.max_array_length then
-      invalid_arg "Bounded_heap.Make(_).create" ;
+      invalid_arg (Format.sprintf "Bounded_heap.Make(_).create. bound %d" bound) ;
     {size = 0; data = Array.make bound None}
 
   let peek {size; data} = if size = 0 then None else data.(0)
