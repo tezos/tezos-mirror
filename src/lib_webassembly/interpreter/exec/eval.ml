@@ -920,7 +920,7 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
       globals = inst1.globals @ new_globals;
     }
   in
-  let+ new_elems = TzStdLib.List.map_s (create_elem inst2) elems in
+  let* new_elems = TzStdLib.List.map_s (create_elem inst2) elems in
   let inst =
     { inst2 with
       exports = List.map (create_export inst2) exports;
@@ -932,5 +932,5 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
   let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
   let es_data = List.concat (Lib.List32.mapi run_data datas) in
   let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
-  ignore (eval (config inst [] (List.map plain (es_elem @ es_data @ es_start))));
+  let+ (_ : Values.value stack) = eval (config inst [] (List.map plain (es_elem @ es_data @ es_start))) in
   inst

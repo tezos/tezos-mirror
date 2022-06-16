@@ -4,6 +4,6 @@ exception IO of Source.region * string
 
 val trace : string -> unit
 
-val run_string : string -> bool
-val run_file : string -> bool
-val run_stdin : unit -> unit
+val run_string : string -> bool Lwt.t
+val run_file : string -> bool Lwt.t
+val run_stdin : unit -> unit Lwt.t

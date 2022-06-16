@@ -10,6 +10,7 @@ license: "Apache License 2.0"
 depends: [
   "dune" { >= "3.0" }
   "tezos-lwt-result-stdlib"
+  "lwt" { >= "5.4.0" }
   "qcheck-core" {with-test}
   "qcheck-alcotest" { with-test & >= "0.18" }
   "alcotest" { with-test & >= "1.5.0" }
