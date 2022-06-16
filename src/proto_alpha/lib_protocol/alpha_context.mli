@@ -2758,6 +2758,134 @@ module Sc_rollup : sig
 
   module State_hash : S.HASH
 
+  module Inbox : sig
+    type t
+
+    (** See {!Sc_rollup_inbox_message_repr}. *)
+    module Message : sig
+      type internal_inbox_message = {
+        payload : Script.expr;
+        sender : Contract_hash.t;
+        source : Signature.public_key_hash;
+      }
+
+      type t = Internal of internal_inbox_message | External of string
+
+      type serialized = private string
+
+      val to_bytes : t -> serialized tzresult
+
+      (** This module discloses definitions that are only useful for tests and
+          must not be used otherwise. *)
+      module Internal_for_tests : sig
+        val of_bytes : string -> t tzresult
+      end
+    end
+
+    val pp : Format.formatter -> t -> unit
+
+    val encoding : t Data_encoding.t
+
+    val empty : Address.t -> Raw_level.t -> t
+
+    val inbox_level : t -> Raw_level.t
+
+    val number_of_available_messages : t -> Z.t
+
+    val consume_n_messages : int32 -> t -> t option tzresult
+
+    module Hash : S.HASH
+
+    module type MerkelizedOperations = sig
+      type tree
+
+      type message = tree
+
+      type messages = tree
+
+      type history
+
+      val history_encoding : history Data_encoding.t
+
+      val pp_history : Format.formatter -> history -> unit
+
+      val history_at_genesis : bound:int64 -> history
+
+      val add_external_messages :
+        history ->
+        t ->
+        Raw_level.t ->
+        string list ->
+        messages ->
+        (messages * history * t) tzresult Lwt.t
+
+      val add_messages_no_history :
+        t ->
+        Raw_level.t ->
+        Message.serialized list ->
+        messages ->
+        (messages * t, error trace) result Lwt.t
+
+      val get_message : messages -> Z.t -> message option Lwt.t
+
+      val get_message_payload : messages -> Z.t -> string option Lwt.t
+
+      type inclusion_proof
+
+      val inclusion_proof_encoding : inclusion_proof Data_encoding.t
+
+      val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
+
+      val number_of_proof_steps : inclusion_proof -> int
+
+      val produce_inclusion_proof : history -> t -> t -> inclusion_proof option
+
+      val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
+    end
+
+    include MerkelizedOperations with type tree = Context.tree
+
+    module type TREE = sig
+      type t
+
+      type tree
+
+      type key = string list
+
+      type value = bytes
+
+      val find : tree -> key -> value option Lwt.t
+
+      val find_tree : tree -> key -> tree option Lwt.t
+
+      val add : tree -> key -> value -> tree Lwt.t
+
+      val is_empty : tree -> bool
+
+      val hash : tree -> Context_hash.t
+    end
+
+    module MakeHashingScheme (Tree : TREE) :
+      MerkelizedOperations with type tree = Tree.tree
+
+    val add_external_messages :
+      context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
+
+    val add_internal_message :
+      context ->
+      rollup ->
+      payload:Script.expr ->
+      sender:Contract_hash.t ->
+      source:Signature.public_key_hash ->
+      (t * Z.t * context) tzresult Lwt.t
+
+    val inbox : context -> rollup -> (t * context) tzresult Lwt.t
+
+    module Proof : sig
+      type t
+    end
+  end
+
   type input = {
     inbox_level : Raw_level.t;
     message_counter : Z.t;
@@ -3021,134 +3149,6 @@ module Sc_rollup : sig
     context -> t -> (Script.lazy_expr option * context) tzresult Lwt.t
 
   val kind : context -> t -> Kind.t option tzresult Lwt.t
-
-  module Inbox : sig
-    type t
-
-    (** See {!Sc_rollup_inbox_message_repr}. *)
-    module Message : sig
-      type internal_inbox_message = {
-        payload : Script.expr;
-        sender : Contract_hash.t;
-        source : Signature.public_key_hash;
-      }
-
-      type t = Internal of internal_inbox_message | External of string
-
-      type serialized = private string
-
-      val to_bytes : t -> serialized tzresult
-
-      (** This module discloses definitions that are only useful for tests and
-          must not be used otherwise. *)
-      module Internal_for_tests : sig
-        val of_bytes : string -> t tzresult
-      end
-    end
-
-    val pp : Format.formatter -> t -> unit
-
-    val encoding : t Data_encoding.t
-
-    val empty : Address.t -> Raw_level.t -> t
-
-    val inbox_level : t -> Raw_level.t
-
-    val number_of_available_messages : t -> Z.t
-
-    val consume_n_messages : int32 -> t -> t option tzresult
-
-    module Hash : S.HASH
-
-    module type MerkelizedOperations = sig
-      type tree
-
-      type message = tree
-
-      type messages = tree
-
-      type history
-
-      val history_encoding : history Data_encoding.t
-
-      val pp_history : Format.formatter -> history -> unit
-
-      val history_at_genesis : bound:int64 -> history
-
-      val add_external_messages :
-        history ->
-        t ->
-        Raw_level.t ->
-        string list ->
-        messages ->
-        (messages * history * t) tzresult Lwt.t
-
-      val add_messages_no_history :
-        t ->
-        Raw_level.t ->
-        Message.serialized list ->
-        messages ->
-        (messages * t, error trace) result Lwt.t
-
-      val get_message : messages -> Z.t -> message option Lwt.t
-
-      val get_message_payload : messages -> Z.t -> string option Lwt.t
-
-      type inclusion_proof
-
-      val inclusion_proof_encoding : inclusion_proof Data_encoding.t
-
-      val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
-
-      val number_of_proof_steps : inclusion_proof -> int
-
-      val produce_inclusion_proof : history -> t -> t -> inclusion_proof option
-
-      val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
-    end
-
-    include MerkelizedOperations with type tree = Context.tree
-
-    module type TREE = sig
-      type t
-
-      type tree
-
-      type key = string list
-
-      type value = bytes
-
-      val find : tree -> key -> value option Lwt.t
-
-      val find_tree : tree -> key -> tree option Lwt.t
-
-      val add : tree -> key -> value -> tree Lwt.t
-
-      val is_empty : tree -> bool
-
-      val hash : tree -> Context_hash.t
-    end
-
-    module MakeHashingScheme (Tree : TREE) :
-      MerkelizedOperations with type tree = Tree.tree
-
-    val add_external_messages :
-      context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
-
-    val add_internal_message :
-      context ->
-      rollup ->
-      payload:Script.expr ->
-      sender:Contract_hash.t ->
-      source:Signature.public_key_hash ->
-      (t * Z.t * context) tzresult Lwt.t
-
-    val inbox : context -> rollup -> (t * context) tzresult Lwt.t
-
-    module Proof : sig
-      type t
-    end
-  end
 
   module Errors : sig
     type error += Sc_rollup_does_not_exist of t
