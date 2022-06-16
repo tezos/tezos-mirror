@@ -97,10 +97,10 @@ let to_bytes msg =
   | None -> fail Error_encode_inbox_message
   | Some str -> return str
 
-module Internal_for_tests = struct
-  let of_bytes bytes =
-    let open Tzresult_syntax in
-    match Data_encoding.Binary.of_string_opt encoding bytes with
-    | None -> fail Error_decode_inbox_message
-    | Some msg -> return msg
-end
+let of_bytes bytes =
+  let open Tzresult_syntax in
+  match Data_encoding.Binary.of_string_opt encoding bytes with
+  | None -> fail Error_decode_inbox_message
+  | Some msg -> return msg
+
+let unsafe_of_string s = s

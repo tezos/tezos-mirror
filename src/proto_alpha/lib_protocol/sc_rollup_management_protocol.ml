@@ -172,6 +172,5 @@ module Internal_for_tests = struct
     in
     Sc_rollup.Outbox.Message.Internal_for_tests.to_bytes output_message_internal
 
-  let inbox_message_of_bytes =
-    Sc_rollup.Inbox.Message.Internal_for_tests.of_bytes
+  let inbox_message_of_bytes = Sc_rollup.Inbox.Message.of_bytes
 end
