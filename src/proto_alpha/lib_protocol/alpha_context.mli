@@ -754,6 +754,8 @@ module Constants : sig
 
   val fixed_encoding : fixed Data_encoding.t
 
+  val mainnet_id : Chain_id.t
+
   val proof_of_work_nonce_size : int
 
   val nonce_length : int
