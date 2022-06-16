@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,45 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-open Test_tez
+(** Testing
+    -------
+    Component:    Protocol
+    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/precheck
+    Subject:      Integration > Precheck
+*)
 
-let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
-    ?expect_apply_failure src dst amount =
-  let open Lwt_result_syntax in
-  let*? amount_fee = fee +? amount in
-  let* bal_src = Context.Contract.balance (I b) src in
-  let* bal_dst = Context.Contract.balance (I b) dst in
-  let* op =
-    Op.transaction
-      ~force_reveal:true
-      ~gas_limit:(Custom_gas (Alpha_context.Gas.Arith.integral_of_int_exn 3000))
-      (I b)
-      ~fee
-      src
-      dst
-      amount
-  in
-  let* b = Incremental.add_operation ?expect_apply_failure b op in
-  let* {parametric = {origination_size; cost_per_byte; _}; _} =
-    Context.get_constants (I b)
-  in
-  let*? origination_burn = cost_per_byte *? Int64.of_int origination_size in
-  let*? amount_fee_burn = amount_fee +? origination_burn in
-  let amount_fee_maybe_burn =
-    if with_burn then amount_fee_burn else amount_fee
-  in
-  let* () =
-    Assert.balance_was_debited ~loc (I b) src bal_src amount_fee_maybe_burn
-  in
-  let+ () = Assert.balance_was_credited ~loc (I b) dst bal_dst amount in
-  (b, op)
-
-let n_transactions n b ?fee source dest amount =
-  List.fold_left_es
-    (fun b _ ->
-      transfer_and_check_balances ~loc:__LOC__ b ?fee source dest amount
-      >|=? fun (b, _) -> b)
-    b
-    (1 -- n)
+let () =
+  Alcotest_lwt.run
+    "protocol > integration > precheck"
+    [
+      ("sanity checks", Test_manager_operation_precheck.sanity_tests);
+      ("Single: gas checks", Test_manager_operation_precheck.gas_tests);
+      ("Single: storage checks", Test_manager_operation_precheck.storage_tests);
+      ("Single: fees checks", Test_manager_operation_precheck.fee_tests);
+      ("Single: contract checks", Test_manager_operation_precheck.contract_tests);
+      ( "Batched: contract checks",
+        Test_batched_manager_operation_precheck.contract_tests );
+      ("Batched: gas checks", Test_batched_manager_operation_precheck.gas_tests);
+      ("Batched: fees checks", Test_batched_manager_operation_precheck.fee_tests);
+    ]
+  |> Lwt_main.run

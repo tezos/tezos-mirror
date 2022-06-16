@@ -27,8 +27,8 @@
     -------
     Component:  Protocol (precheck manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^precheck batched manager$"
+                src/proto_alpha/lib_protocol/test/integration/precheck/main.exe \
+                -- test "^Batched"
     Subject:    Precheck manager operation.
 *)
 
@@ -38,7 +38,8 @@ open Manager_operation_helpers
 
 (* Tests on operation batches. *)
 
-(* Reveal in the middle: reveal should be in first position. *)
+(* Revelation should not occur elsewhere than in first position
+   in a batch.*)
 let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -83,7 +84,7 @@ let generate_batches_reveal_in_the_middle () =
     "reveal should occur only at the beginning of a batch."
     revealed_subjects
 
-(* 2 Reveals in a batch: only one reveal per batch. *)
+(* A batch of manager operation contains at most one Revelation.*)
 let batch_two_reveals_diagnostic (infos : infos) op =
   let expected_failure errs =
     match errs with
@@ -126,7 +127,7 @@ let generate_tests_batches_two_reveals () =
     "Only one revelation per batch."
     revealed_subjects
 
-(* 2 sources in a batch: only one source per batch. *)
+(* Every manager operation in a batch concerns the same source.*)
 let batch_two_sources_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -159,17 +160,14 @@ let test_batch_two_sources kind1 kind2 () =
   in
   batch_two_sources_diagnostic infos batch
 
-let revealed_except_self_delegation_subjects =
-  List.filter (function K_Reveal -> false | _ -> true) subjects
-
-(* With self_delegation, the occurred error is counter inconsistency. *)
 let generate_batches_two_sources () =
   create_Tztest_batches
     test_batch_two_sources
     "Only one source per batch."
-    revealed_except_self_delegation_subjects
+    revealed_subjects
 
-(* Counters in a batch should be a sequence. *)
+(* Counters in a batch should be a sequence from the successor of
+   the stored counter associated to source in the initial context. *)
 let test_batch_inconsistent_counters kind1 kind2 () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
@@ -304,7 +302,7 @@ let generate_batches_emptying_balance_in_the_middle () =
     "Fee payment emptying balance should occurs at the end of the batch."
     revealed_subjects
 
-(* Exceeding block gas by a batch. *)
+(* A batch of manager operation must not exceed the initial available gas in the block. *)
 let test_batch_exceeding_block_gas ~mempool_mode kind1 kind2 () =
   let open Lwt_result_syntax in
   let* infos = init_context ~hard_gas_limit_per_block:gb_limit () in
@@ -398,7 +396,8 @@ let generate_batches_exceeding_block_gas_mp_mode () =
     "Too much gas consumption in mempool mode."
     revealed_subjects
 
-(* Emptying balance at the end of a batch. *)
+(* A batch that consumes all the balance for fees only at the end of
+   the batch passes precheck.*)
 let test_batch_balance_just_enough kind1 kind2 () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
@@ -434,8 +433,8 @@ let test_batch_balance_just_enough kind1 kind2 () =
       (Context.B infos.block)
       [reveal; op_case2; op2_case2]
   in
-  let* _ = apply_ko_diagnostic infos case2 (fun _ -> return_unit) in
-  apply_ko_diagnostic infos case3 (fun _ -> return_unit)
+  let* _ = precheck_diagnostic infos case2 in
+  precheck_diagnostic infos case3
 
 let generate_batches_balance_just_enough () =
   create_Tztest_batches
@@ -464,20 +463,24 @@ let test_batch_reveal_transaction_ok () =
       [reveal; transaction]
   in
   let* _i = Incremental.begin_construction infos.block in
-  apply_ko_diagnostic infos batch (fun _ -> return_unit)
+  precheck_diagnostic infos batch
 
-let tests =
+let contract_tests =
   generate_batches_reveal_in_the_middle ()
   @ generate_tests_batches_two_reveals ()
   @ generate_batches_two_sources ()
   @ generate_batches_inconsistent_counters ()
-  @ generate_batches_emptying_balance_in_the_middle ()
-  @ generate_batches_exceeding_block_gas ()
-  @ generate_batches_exceeding_block_gas_mp_mode ()
-  @ generate_batches_balance_just_enough ()
   @ [
       Tztest.tztest
-        "Prechecked batch with a reveal and a transaction."
+        "Prechecked a batch with a reveal and a transaction."
         `Quick
         test_batch_reveal_transaction_ok;
     ]
+
+let gas_tests =
+  generate_batches_exceeding_block_gas ()
+  @ generate_batches_exceeding_block_gas_mp_mode ()
+
+let fee_tests =
+  generate_batches_emptying_balance_in_the_middle ()
+  @ generate_batches_balance_just_enough ()

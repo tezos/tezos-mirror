@@ -27,8 +27,8 @@
     -------
     Component:  Protocol (precheck manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
-                -- test "^precheck manager$"
+                src/proto_alpha/lib_protocol/test/integration/precheck/main.exe \
+                -- test "^Single$"
     Subject:    Precheck manager operation.
 *)
 
@@ -106,7 +106,15 @@ let test_ensure_manager_operation_coverage () =
     `Quick
     (fun () -> ensure_manager_operation_coverage ())
 
-(* Too low gas limit. *)
+(* Negative tests assert the case where precheck must fail. *)
+
+(* Precheck fails if the gas limit is too low.
+
+   This test asserts that the precheck of a manager's operation
+   with a too low gas limit fails at precheck with an
+   [Gas_quota_exceeded_init_deserialize] error.
+   This test applies on manager operations that do not
+   consume gas in their specific part of precheck. *)
 let low_gas_limit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -136,9 +144,13 @@ let generate_low_gas_limit () =
   create_Tztest
     test_low_gas_limit
     "Gas_limit too low."
-    except_not_consumer_in_precheck_subjects
+    gas_consumer_in_precheck_subjects
 
-(* Too high gas limit. *)
+(* Precheck fails if the gas limit is too high.
+
+   This test asserts that the precheck of a manager operation with
+   a gas limit too high fails at precheck with an [Gas_limit_too_high]
+   error. It applies on every kind of manager operation. *)
 let high_gas_limit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -163,7 +175,11 @@ let test_high_gas_limit kind () =
 let generate_high_gas_limit () =
   create_Tztest test_high_gas_limit "Gas_limit too high." subjects
 
-(* Too high storage limit. *)
+(* Precheck fails if the storage limit is too high.
+
+   This test asserts that a manager operation with a storage limit
+   too high fails at precheck with [Storage_limit_too_high] error.
+   It applies to every kind of manager operation. *)
 let high_storage_limit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -194,7 +210,12 @@ let test_high_storage_limit kind () =
 let generate_high_storage_limit () =
   create_Tztest test_high_gas_limit "Storage_limit too high." subjects
 
-(* Counter in the future. *)
+(* Precheck fails if the counter is in the future.
+
+   This test asserts that a manager operation with a counter in the
+   future -- aka greater than the successor of the manager's counter
+   stored in the current context -- fails with [Counter_in_the_future] error.
+   It applies to every kind of manager operation. *)
 let high_counter_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -220,7 +241,12 @@ let test_high_counter kind () =
 let generate_high_counter () =
   create_Tztest test_high_counter "Counter too high." subjects
 
-(* Counter in the past. *)
+(* Precheck fails if the counter is in the past.
+
+   This test asserts that a manager operation with a counter in the past -- aka
+   smaller than the successor of the manager's counter stored in the current
+   context -- fails with [Counter_in_the_past] error.
+   It applies to every kind of manager operation. *)
 let low_counter_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -249,7 +275,11 @@ let test_low_counter kind () =
 let generate_low_counter () =
   create_Tztest test_low_counter "Counter too low." subjects
 
-(* Not allocated source. *)
+(* Precheck fails if the source is not allocated.
+
+   This test asserts that a manager operation which manager's contract
+   is not allocated fails with [Empty_implicit_contract] error.
+   It applies on every kind of manager operation. *)
 let not_allocated_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -275,7 +305,11 @@ let test_not_allocated kind () =
 let generate_not_allocated () =
   create_Tztest test_not_allocated "not allocated source." subjects
 
-(* Unrevealed source. *)
+(* Precheck fails if the source is unrevealed.
+
+   This test asserts that a manager operation with an unrevealed source's
+   contract fails at precheck with [Unrevealed_manager_key].
+   It applies on every kind of manager operation except [Revelation]. *)
 let unrevealed_key_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -304,7 +338,11 @@ let generate_unrevealed_key () =
     "unrevealed source (find_manager_public_key)."
     revealed_subjects
 
-(* Not enough balance to pay fees. *)
+(* Precheck fails if the source's balance is not enough to pay the fees.
+
+   This test asserts that precheck of a manager operation fails if the
+   source's balance is lesser than the manager operation's fee.
+   It applies on every kind of manager operation. *)
 let high_fee_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -330,7 +368,14 @@ let test_high_fee kind () =
 let generate_tests_high_fee () =
   create_Tztest test_high_fee "not enough for fee payment." subjects
 
-(* Emptying delegated implicit contract. *)
+(* Precheck fails if the fee payment empties the balance of a
+   delegated implicit contract.
+
+   This test asserts that in case that:
+   - the source is a delegated implicit contract, and
+   - the fee is the exact balance of source.
+   then, precheck fails with [Empty_implicit_delegated_contract] error.
+   It applies to every kind of manager operation except [Revelation].*)
 let emptying_delegated_implicit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -350,7 +395,7 @@ let emptying_delegated_implicit_diagnostic (infos : infos) op =
 let test_emptying_delegated_implicit kind () =
   let open Lwt_result_syntax in
   let* infos = init_delegated_implicit () in
-  let fee = Tez.one in
+  let* fee = Context.Contract.balance (B infos.block) infos.contract1 in
   let* op =
     select_op ~fee ~force_reveal:false ~source:infos.contract1 kind infos
   in
@@ -359,10 +404,16 @@ let test_emptying_delegated_implicit kind () =
 let generate_tests_emptying_delegated_implicit () =
   create_Tztest
     test_emptying_delegated_implicit
-    "just enough to empty a delegated source."
+    "just enough funds to empty a delegated source."
     revealed_subjects
 
-(* Exceeding block gas. *)
+(* Precheck fails if there is not enough available gas in the block.
+
+   This test asserts that precheck fails with:
+    - [Gas_limit_too_high;Block_quota_exceeded] in mempool mode,
+    | [Block_quota_exceeded] in other mode
+   with gas limit exceeds the available gas in the block.
+   It applies to every kind of manager operation. *)
 let exceeding_block_gas_diagnostic ~mempool_mode (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -411,51 +462,45 @@ let generate_tests_exceeding_block_gas_mp_mode () =
     "too much gas consumption in mempool mode."
     subjects
 
-(* Positive tests. *)
+(* Positive tests.
 
-(* Fee payment but emptying an self_delegated implicit. *)
+   Tests that precheck succeeds when:
+   - it empties the balance of a self_delegated implicit source,
+   - it empties the balance of an undelegated implicit source, and
+   - in case:
+         - the counter is the successor of the one stored in the context,
+         - the fee is lesser than the balance,
+         - the storage limit is lesser than the maximum authorized storage,
+         - the gas limit is:
+                - lesser than the available gas in the block,
+                - less than the maximum gas consumable by an operation, and
+                - greater than the minimum gas consumable by an operation.
+   Notice that the first two only precheck succeeds while in the last case,
+   the full application also succeeds.
+   In the first 2 case, we observe in the output context that:
+     - the counter is the successor of the one stored in the initial context,
+     - the balance decreased by fee,
+     - the available gas in the block decreased by gas limit.
+   In the last case, we observe in the output context that:
+     - the counter is the successor of the one stored in the initial context,
+     - the balance is at least decreased by fee,
+     - the available gas in the block decreased by gas limit. *)
+
+(* Fee payment that emptying a self_delegated implicit. *)
 let test_emptying_self_delegated_implicit kind () =
   let open Lwt_result_syntax in
   let* infos = init_self_delegated_implicit () in
-  let fee = Tez.one in
+  let* fee = Context.Contract.balance (B infos.block) infos.contract1 in
   let* op =
     select_op ~fee ~force_reveal:false ~source:infos.contract1 kind infos
   in
-  apply_ko_diagnostic infos op (fun _ -> return_unit)
-
-let test_emptying_self_delegated_implicit2 kind () =
-  let open Lwt_result_syntax in
-  let* infos = init_self_delegated_implicit () in
-  let fee = Tez.one in
-  let* op =
-    select_op ~fee ~force_reveal:false ~source:infos.contract1 kind infos
-  in
-  apply_ok_diagnostic infos op
+  only_precheck_diagnostic infos op
 
 let generate_tests_emptying_self_delegated_implicit () =
   create_Tztest
     test_emptying_self_delegated_implicit
-    "fee payment and just enough to empty a self-delegated source."
-    revealed_except_set_deposits_limit_and_submit_batch_subjects
-  @ create_Tztest
-      test_emptying_self_delegated_implicit2
-      "fee payment and just enough to empty a self-delegated source."
-      revealed_only_set_deposits_limit_and_submit_batch_subjects
-
-(* Fee payment but emptying an undelegated implicit, test positive. *)
-let emptying_undelegated_implicit_diagnostic (infos : infos) op =
-  let expect_failure errs =
-    match errs with
-    | [Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract _)]
-      ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
-  apply_ko_diagnostic infos op expect_failure
+    "passes precheck and empties a self-delegated source."
+    subjects
 
 (* Minimum gas cost to pass the precheck:
    - cost_of_manager_operation for the generic part
@@ -467,8 +512,8 @@ let empiric_minimal_gas_cost_for_precheck =
 let test_emptying_undelegated_implicit kind () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
-  let fee = Tez.one in
   let gas_limit = Op.Custom_gas empiric_minimal_gas_cost_for_precheck in
+  let* fee = Context.Contract.balance (B infos.block) infos.contract1 in
   let* op =
     select_op
       ~fee
@@ -478,24 +523,42 @@ let test_emptying_undelegated_implicit kind () =
       kind
       infos
   in
-  emptying_undelegated_implicit_diagnostic infos op
+  only_precheck_diagnostic infos op
 
 let generate_tests_emptying_undelegated_implicit () =
   create_Tztest
     test_emptying_undelegated_implicit
-    "(Positive test) fee payment and just enough to empty an undelegated \
-     source."
+    "passes precheck and empties an undelegated source."
     subjects
 
-let tests =
-  (test_ensure_manager_operation_coverage () :: generate_low_gas_limit ())
-  @ generate_high_gas_limit ()
+(* Fee payment.*)
+let test_precheck kind () =
+  let open Lwt_result_syntax in
+  let* infos = init_context () in
+  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
+  let source = infos.contract1 in
+  let* operation = select_op ~counter ~force_reveal:true ~source kind infos in
+  precheck_diagnostic infos operation
+
+let generate_tests_precheck () =
+  create_Tztest test_precheck "passes precheck." subjects
+
+let sanity_tests =
+  test_ensure_manager_operation_coverage () :: generate_tests_precheck ()
+
+let gas_tests =
+  generate_low_gas_limit () @ generate_high_gas_limit ()
   @ generate_tests_exceeding_block_gas ()
   @ generate_tests_exceeding_block_gas_mp_mode ()
-  @ generate_high_storage_limit ()
-  @ generate_high_counter () @ generate_low_counter ()
-  @ generate_not_allocated () @ generate_tests_high_fee ()
+
+let storage_tests = generate_high_storage_limit ()
+
+let fee_tests =
+  generate_tests_high_fee ()
   @ generate_tests_emptying_delegated_implicit ()
   @ generate_tests_emptying_self_delegated_implicit ()
-  @ generate_unrevealed_key ()
   @ generate_tests_emptying_undelegated_implicit ()
+
+let contract_tests =
+  generate_high_counter () @ generate_low_counter () @ generate_not_allocated ()
+  @ generate_unrevealed_key ()

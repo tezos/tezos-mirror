@@ -94,7 +94,7 @@ val transaction :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val unsafe_transaction :
   ?force_reveal:bool ->
   ?counter:counter ->
@@ -174,7 +174,7 @@ val failing_noop :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val contract_origination :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -309,7 +309,7 @@ val tx_rollup_origination :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_submit_batch :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -330,7 +330,7 @@ val tx_rollup_submit_batch :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_commit :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -350,7 +350,7 @@ val tx_rollup_commit :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default..}} *)
 val tx_rollup_return_bond :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -369,7 +369,7 @@ val tx_rollup_return_bond :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_finalize :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -404,7 +404,7 @@ val tx_rollup_remove_commitment :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}} *)
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_dispatch_tickets :
   ?force_reveal:bool ->
   ?counter:counter ->
@@ -444,7 +444,7 @@ val tx_rollup_dispatch_tickets :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val transfer_ticket :
   ?force_reveal:bool ->
   ?counter:counter ->
@@ -468,7 +468,7 @@ val transfer_ticket :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_reject :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -498,7 +498,7 @@ val tx_rollup_reject :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_origination :
   ?force_reveal:bool ->
   ?counter:counter ->
@@ -520,7 +520,7 @@ val sc_rollup_origination :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}} *)
+    yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_publish :
   ?force_reveal:bool ->
   ?counter:Z.t ->
@@ -540,7 +540,7 @@ val sc_rollup_publish :
 
     {ul {li [?force_reveal:bool]: prepend the operation to reveal
     [source]'s public key if the latter has not been revealed
-    yet. Enabled (set to [true]) by default.}}*)
+    yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_cement :
   ?force_reveal:bool ->
   ?counter:Z.t ->

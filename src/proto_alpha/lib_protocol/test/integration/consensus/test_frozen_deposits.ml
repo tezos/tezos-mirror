@@ -91,13 +91,19 @@ let test_invariants () =
   let new_account = (Account.new_account ()).pkh in
   let new_contract = Contract.Implicit new_account in
   (* we first put some money in new_account *)
-  Op.transaction (B genesis) contract2 new_contract spendable_balance2
+  Op.transaction
+    ~force_reveal:true
+    (B genesis)
+    contract2
+    new_contract
+    spendable_balance2
   >>=? fun transfer ->
   Block.bake ~operation:transfer genesis >>=? fun b ->
   Context.Contract.balance (B b) new_contract >>=? fun new_account_balance ->
   Assert.equal_tez ~loc:__LOC__ new_account_balance spendable_balance2
   >>=? fun () ->
-  Op.delegation (B b) new_contract (Some account1) >>=? fun delegation ->
+  Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
+  >>=? fun delegation ->
   Block.bake ~operation:delegation b >>=? fun b1 ->
   Block.bake_until_n_cycle_end constants.preserved_cycles b1 >>=? fun b2 ->
   Context.Delegate.staking_balance (B b2) account1
@@ -420,7 +426,12 @@ let test_frozen_deposits_with_delegation () =
   Context.Contract.balance (B genesis) contract2 >>=? fun delegated_amount ->
   let new_account = Account.new_account () in
   let new_contract = Contract.Implicit new_account.pkh in
-  Op.transaction (B genesis) contract2 new_contract delegated_amount
+  Op.transaction
+    ~force_reveal:true
+    (B genesis)
+    contract2
+    new_contract
+    delegated_amount
   >>=? fun transfer ->
   Block.bake ~operation:transfer genesis >>=? fun b ->
   Context.Delegate.staking_balance (B b) account2
@@ -430,7 +441,8 @@ let test_frozen_deposits_with_delegation () =
   in
   Assert.equal_tez ~loc:__LOC__ new_staking_balance expected_new_staking_balance
   >>=? fun () ->
-  Op.delegation (B b) new_contract (Some account1) >>=? fun delegation ->
+  Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
+  >>=? fun delegation ->
   Block.bake ~operation:delegation b >>=? fun b ->
   let expected_new_staking_balance =
     Test_tez.(initial_staking_balance +! delegated_amount)
@@ -485,8 +497,9 @@ let test_frozen_deposits_with_overdelegation () =
   Context.Contract.balance (B genesis) contract2 >>=? fun amount' ->
   let new_account = (Account.new_account ()).pkh in
   let new_contract = Contract.Implicit new_account in
-  Op.transaction (B genesis) contract1 new_contract amount >>=? fun transfer1 ->
-  Op.transaction (B genesis) contract2 new_contract amount'
+  Op.transaction ~force_reveal:true (B genesis) contract1 new_contract amount
+  >>=? fun transfer1 ->
+  Op.transaction ~force_reveal:true (B genesis) contract2 new_contract amount'
   >>=? fun transfer2 ->
   Block.bake ~operations:[transfer1; transfer2] genesis >>=? fun b ->
   let expected_new_staking_balance =
@@ -506,7 +519,8 @@ let test_frozen_deposits_with_overdelegation () =
     new_staking_balance'
     expected_new_staking_balance'
   >>=? fun () ->
-  Op.delegation (B b) new_contract (Some account1) >>=? fun delegation ->
+  Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
+  >>=? fun delegation ->
   Block.bake ~operation:delegation b >>=? fun b ->
   Context.Delegate.staking_balance (B b) account1
   >>=? fun new_staking_balance ->
@@ -565,8 +579,9 @@ let test_set_limit_with_overdelegation () =
   let limit = Test_tez.(initial_staking_balance *! 15L /! 100L) in
   let new_account = (Account.new_account ()).pkh in
   let new_contract = Contract.Implicit new_account in
-  Op.transaction (B genesis) contract1 new_contract amount >>=? fun transfer1 ->
-  Op.transaction (B genesis) contract2 new_contract amount'
+  Op.transaction ~force_reveal:true (B genesis) contract1 new_contract amount
+  >>=? fun transfer1 ->
+  Op.transaction ~force_reveal:true (B genesis) contract2 new_contract amount'
   >>=? fun transfer2 ->
   Block.bake ~operations:[transfer1; transfer2] genesis >>=? fun b ->
   Op.set_deposits_limit (B b) contract1 (Some limit) >>=? fun set_deposits ->
@@ -588,7 +603,8 @@ let test_set_limit_with_overdelegation () =
     new_staking_balance'
     expected_new_staking_balance'
   >>=? fun () ->
-  Op.delegation (B b) new_contract (Some account1) >>=? fun delegation ->
+  Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
+  >>=? fun delegation ->
   Block.bake ~operation:delegation b >>=? fun b ->
   (* Finish the cycle to update the frozen deposits *)
   Block.bake_until_cycle_end b >>=? fun b ->
@@ -628,16 +644,23 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
   Context.Contract.balance (B genesis) contract2 >>=? fun delegated_amount ->
   let new_account = Account.new_account () in
   let new_contract = Contract.Implicit new_account.pkh in
-  Op.transaction (B genesis) contract2 new_contract delegated_amount
+  Op.transaction
+    ~force_reveal:true
+    (B genesis)
+    contract2
+    new_contract
+    delegated_amount
   >>=? fun transfer ->
   Block.bake ~operation:transfer genesis >>=? fun b ->
-  Op.delegation (B b) new_contract (Some account1) >>=? fun delegation ->
+  Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
+  >>=? fun delegation ->
   Block.bake ~operation:delegation b >>=? fun b ->
   Block.bake_until_cycle_end b >>=? fun b ->
   (* After 1 cycle, namely, at cycle 2, [account1] transfers all its spendable
      balance. *)
   Context.Contract.balance (B b) contract1 >>=? fun balance1 ->
-  Op.transaction (B b) contract1 contract2 balance1 >>=? fun operation ->
+  Op.transaction ~force_reveal:true (B b) contract1 contract2 balance1
+  >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
   Block.bake_until_n_cycle_end constants.preserved_cycles b >>=? fun _ ->
   (* By this time, after [preserved_cycles] passed after [account1] has emptied

@@ -156,9 +156,7 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let add_operation ?expect_failure ?expect_apply_failure ?(check_size = true) st
-    op =
-  let open Apply_results in
+let apply_operation ?(check_size = true) st op =
   (if check_size then
    let operation_size = Data_encoding.Binary.length Operation.encoding op in
    if operation_size > Constants_repr.max_operation_data_length then
@@ -168,7 +166,27 @@ let add_operation ?expect_failure ?expect_apply_failure ?(check_size = true) st
              "The operation size is %d, it exceeds the constant maximum size %d"
              operation_size
              Constants_repr.max_operation_data_length))) ;
-  apply_operation st.state op >|= Environment.wrap_tzresult >>= fun result ->
+  apply_operation st.state op >|= Environment.wrap_tzresult
+
+let precheck_operation ?expect_failure ?check_size st op =
+  apply_operation ?check_size st op >>= fun result ->
+  match (expect_failure, result) with
+  | Some _, Ok _ -> failwith "Error expected while prechecking operation"
+  | Some f, Error err -> f err >|=? fun () -> st
+  | None, Error err -> failwith "Error %a was not expected" pp_print_trace err
+  | None, Ok (state, (Operation_metadata _ as metadata))
+  | None, Ok (state, (No_operation_metadata as metadata)) ->
+      return
+        {
+          st with
+          state;
+          rev_operations = op :: st.rev_operations;
+          rev_tickets = metadata :: st.rev_tickets;
+        }
+
+let add_operation ?expect_failure ?expect_apply_failure ?check_size st op =
+  let open Apply_results in
+  apply_operation ?check_size st op >>= fun result ->
   match (expect_failure, result) with
   | Some _, Ok _ -> failwith "Error expected while adding operation"
   | Some f, Error err -> f err >|=? fun () -> st

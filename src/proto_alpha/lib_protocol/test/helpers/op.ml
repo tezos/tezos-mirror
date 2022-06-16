@@ -255,13 +255,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   Environment.wrap_tzresult @@ Operation.of_list operations
   >>?= fun operations -> return @@ sign account.sk ctxt operations
 
-(* FIXME tezos/tezos#2979
-
-   The [force_reveal] option should default to false, but this
-   requires going over nearly all existing protocol operation
-   integration tests. Instead, we went for the minimal interference
-   path and left original behaviour as default. *)
-let manager_operation ?(force_reveal = true) ?counter ?(fee = Tez.zero)
+let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
     ?(gas_limit = High) ?storage_limit ?public_key ~source ctxt operation =
   (match counter with
   | Some counter -> return counter
