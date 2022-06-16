@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -200,15 +200,15 @@ let create_connection t p2p_conn id_point point_info peer_info
         (fun point_info -> P2p_pool.Points.remove_connected t.pool point_info)
         point_info ;
       P2p_pool.Peers.remove_connected t.pool peer_id ;
-      if t.config.max_connections <= P2p_pool.active_connections t.pool then (
-        P2p_trigger.broadcast_too_many_connections t.triggers ;
-        t.log Too_many_connections) ;
+      if P2p_pool.active_connections t.pool < t.config.min_connections then (
+        P2p_trigger.broadcast_too_few_connections t.triggers ;
+        t.log Too_few_connections) ;
       Lwt_pipe.Maybe_bounded.close messages ;
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
-  if P2p_pool.active_connections t.pool < t.config.min_connections then (
-    P2p_trigger.broadcast_too_few_connections t.triggers ;
-    t.log Too_few_connections) ;
+  if t.config.max_connections <= P2p_pool.active_connections t.pool then (
+    P2p_trigger.broadcast_too_many_connections t.triggers ;
+    t.log Too_many_connections) ;
   conn
 
 let is_acceptable t connection_point_info peer_info incoming version =
