@@ -272,18 +272,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} .)))
 
-(rule
- (alias runtest_sandbox)
- (deps
-  .tezos_protocol_004_Pt24m4xi.objs/native/tezos_protocol_004_Pt24m4xi.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-004-Pt24m4xi)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_004_Pt24m4xi_functor)
  (libraries

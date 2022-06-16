@@ -20,7 +20,6 @@ unified_coverage:
     - "integration:pytest 7/9"
     - "integration:pytest 8/9"
     - "integration:pytest 9/9"
-    - "integration:sandboxes:acc-endorsement"
     - "test-liquidity-baking-scripts"
     - "tezt 1/9"
     - "tezt 2/9"

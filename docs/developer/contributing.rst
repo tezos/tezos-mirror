@@ -324,7 +324,6 @@ any subitems represent the longer description of that commit)::
 
   * Doc: mark bug #13 as fixed
   * Test_python: add test for p2p bug #13
-  * Flextesa: add test for p2p bug #13
   * Shell: fix p2p bug #13
     - fix bug in the shell
     - fix relative unit test

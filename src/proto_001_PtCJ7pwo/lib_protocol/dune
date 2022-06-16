@@ -269,18 +269,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} .)))
 
-(rule
- (alias runtest_sandbox)
- (deps
-  .tezos_protocol_001_PtCJ7pwo.objs/native/tezos_protocol_001_PtCJ7pwo.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-001-PtCJ7pwo)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_001_PtCJ7pwo_functor)
  (libraries

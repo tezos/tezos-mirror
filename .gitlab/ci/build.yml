@@ -18,7 +18,7 @@
     - diff poetry.lock /home/tezos/poetry.lock
     - diff pyproject.toml /home/tezos/pyproject.toml
     # 2. Actually build
-    - make all build-sandbox build-unreleased
+    - make all build-unreleased
     # 3. Also build the tps evaluation tool which is not part of the default build.
     #    NOTE: We add $COVERAGE_OPTIONS to all dune build commands to enable reuse of
     #    build artifacts.

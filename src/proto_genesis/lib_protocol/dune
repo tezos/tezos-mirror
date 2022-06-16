@@ -71,17 +71,6 @@
        main.ml main.mli (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(rule
- (alias runtest_sandbox)
- (deps .tezos_protocol_genesis.objs/native/tezos_protocol_genesis.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-genesis)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_genesis_functor)
  (libraries

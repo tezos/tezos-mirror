@@ -311,8 +311,6 @@ let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
 (* VENDORED LIBS *)
 
-let flextesa = vendored_lib "flextesa"
-
 let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos"
 
 (* INTERNAL LIBS *)
@@ -3446,20 +3444,6 @@ include Tezos_raw_protocol_%s.Main
                       else S "-no-hash-check");
                       S ".";
                     ];
-                alias_rule
-                  "runtest_sandbox"
-                  ~deps:
-                    [
-                      sf
-                        ".tezos_protocol_%s.objs/native/tezos_protocol_%s.cmx"
-                        name_underscore
-                        name_underscore;
-                    ]
-                  ~action:[S "progn"];
-                alias_rule
-                  "runtest"
-                  ~package:(sf "tezos-protocol-%s" name_dash)
-                  ~alias_deps:["runtest_sandbox"];
               ]
       in
       let _functor =
@@ -4899,14 +4883,6 @@ let _tezos_codec =
              if link then Protocol.client protocol else None);
          ])
     ~linkall:true
-
-let _tezos_sandbox =
-  private_exe
-    "main"
-    ~path:"src/bin_sandbox"
-    ~opam:""
-    ~bisect_ppx:false
-    ~deps:[tezos_base; tezos_base_unix; fmt; flextesa]
 
 let _tezos_proxy_server =
   public_exe

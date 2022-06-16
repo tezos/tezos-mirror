@@ -1,11 +1,6 @@
-# integration:proto:sandbox and integration:compiler-rejections do not
+# integration:compiler-rejections does not
 # require access to the binaries like the "true" integration tests
-# below. Therefore, they do not extend the .integration_template.
-
-integration:proto:sandbox:
-  extends: .test_template
-  script:
-    - dune build @runtest_sandbox
+# below. Therefore, it does not extend the .integration_template.
 
 integration:compiler-rejections:
   extends: .test_template
@@ -61,21 +56,6 @@ script:test_release_versions:
     - ./scripts/test_release_version.sh
 
 ############################################################
-## Stage: run OCaml integration tests                     ##
-############################################################
-
-integration:sandboxes:acc-endorsement:
-  extends: .integration_template
-  script:
-    - TMP=$PWD make -f sandbox.Makefile accusations_simple_double_endorsing
-  artifacts:
-    paths:
-      - flextesa-acc-sde
-      - $BISECT_FILE
-    expire_in: 1 day
-    when: always
-
-############################################################
 ## Stage: run python integration tests                    ##
 ############################################################
 
@@ -84,10 +64,10 @@ integration:sandboxes:acc-endorsement:
 .pytest_template:
   extends:
     - .test_template
-  needs:
-    - build_x86_64
-  dependencies:
-    - build_x86_64
+  dependencies: ["build_x86_64"]
+  # Start immediately after 'build_x86_64' and don't wait for
+  # intermediate stages to succeed
+  needs: ["build_x86_64"]
   before_script:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables

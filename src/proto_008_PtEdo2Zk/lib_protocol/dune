@@ -296,18 +296,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} .)))
 
-(rule
- (alias runtest_sandbox)
- (deps
-  .tezos_protocol_008_PtEdo2Zk.objs/native/tezos_protocol_008_PtEdo2Zk.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-008-PtEdo2Zk)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_008_PtEdo2Zk_functor)
  (libraries

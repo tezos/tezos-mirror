@@ -305,18 +305,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} .)))
 
-(rule
- (alias runtest_sandbox)
- (deps
-  .tezos_protocol_009_PsFLoren.objs/native/tezos_protocol_009_PsFLoren.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-009-PsFLoren)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_009_PsFLoren_functor)
  (libraries

@@ -281,18 +281,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} .)))
 
-(rule
- (alias runtest_sandbox)
- (deps
-  .tezos_protocol_007_PsDELPH1.objs/native/tezos_protocol_007_PsDELPH1.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-007-PsDELPH1)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_007_PsDELPH1_functor)
  (libraries

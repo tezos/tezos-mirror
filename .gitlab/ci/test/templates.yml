@@ -28,4 +28,4 @@
   # intermediate stages to succeed
   needs: ["build_x86_64"]
   before_script:
-    - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make all build-unreleased; fi
+    - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ]; then make all build-unreleased; fi

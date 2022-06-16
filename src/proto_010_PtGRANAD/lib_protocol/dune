@@ -320,18 +320,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} .)))
 
-(rule
- (alias runtest_sandbox)
- (deps
-  .tezos_protocol_010_PtGRANAD.objs/native/tezos_protocol_010_PtGRANAD.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-010-PtGRANAD)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_010_PtGRANAD_functor)
  (libraries
