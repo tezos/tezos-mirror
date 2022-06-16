@@ -249,8 +249,8 @@ module V2_0_0 = struct
 
     let set_input_state input =
       let open PS in
-      let {inbox_level; message_counter; payload} = input in
       let open Monad.Syntax in
+      let {inbox_level; message_counter; payload} = input in
       let* s = get in
       let* s =
         lift
@@ -259,7 +259,7 @@ module V2_0_0 = struct
                inbox_level = Raw_level_repr.to_int32_non_negative inbox_level;
                message_counter;
              }
-             payload
+             (payload :> string)
              s)
       in
       set s

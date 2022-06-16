@@ -2773,13 +2773,11 @@ module Sc_rollup : sig
 
       type serialized = private string
 
+      val unsafe_of_string : string -> serialized
+
       val to_bytes : t -> serialized tzresult
 
-      (** This module discloses definitions that are only useful for tests and
-          must not be used otherwise. *)
-      module Internal_for_tests : sig
-        val of_bytes : string -> t tzresult
-      end
+      val of_bytes : serialized -> t tzresult
     end
 
     val pp : Format.formatter -> t -> unit
@@ -2889,7 +2887,7 @@ module Sc_rollup : sig
   type input = {
     inbox_level : Raw_level.t;
     message_counter : Z.t;
-    payload : string;
+    payload : Inbox.Message.serialized;
   }
 
   val input_equal : input -> input -> bool

@@ -94,14 +94,19 @@ module Make (PVM : Pvm.S) : S = struct
     let*! messages = Store.Messages.get store hash in
 
     (* Iterate the PVM state with all the messages for this level. *)
-    let*! state =
-      List.fold_left_i_s
-        (fun message_counter state payload ->
+    let* state =
+      List.fold_left_i_es
+        (fun message_counter state external_message ->
+          let message = Sc_rollup.Inbox.Message.External external_message in
+          let*? payload =
+            Environment.wrap_tzresult (Sc_rollup.Inbox.Message.to_bytes message)
+          in
           let input =
             Sc_rollup.
               {inbox_level; message_counter = Z.of_int message_counter; payload}
           in
-          feed_input state input)
+          let*! state = feed_input state input in
+          return state)
         predecessor_state
         messages
     in

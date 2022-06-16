@@ -862,10 +862,11 @@ module Proof = struct
               if equal proof.level inbox then return None
               else proof_error "payload is None, inbox proof.level not top"
           | Some msg ->
+              let payload = Sc_rollup_inbox_message_repr.unsafe_of_string msg in
               return
               @@ Some
                    Sc_rollup_PVM_sem.
-                     {inbox_level = l; message_counter = n; payload = msg}
+                     {inbox_level = l; message_counter = n; payload}
         else proof_error "Inbox proof parameters don't match (message level)"
     | Some (level, inc, remaining_proof) ->
         if

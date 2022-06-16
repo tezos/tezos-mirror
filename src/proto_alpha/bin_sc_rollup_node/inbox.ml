@@ -68,6 +68,9 @@ module State = struct
   let set_message_tree = Store.MessageTrees.set
 end
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3233
+   For the moment, the rollup node ignores L1 to L2 messages.
+*)
 let get_messages cctxt head rollup =
   let open Lwt_result_syntax in
   let open Block_services in
