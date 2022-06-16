@@ -118,7 +118,7 @@ let fixed_encoding =
              _max_allowed_global_constant_depth,
              _cache_layout_size,
              _michelson_maximum_type_size ),
-           (_max_wrapped_proof_binary_size, _sc_rollup_message_size_limit) ) ->
+           (_sc_max_wrapped_proof_binary_size, _sc_rollup_message_size_limit) ) ->
       ())
     (merge_objs
        (obj10
@@ -133,7 +133,7 @@ let fixed_encoding =
           (req "cache_layout_size" uint8)
           (req "michelson_maximum_type_size" uint16))
        (obj2
-          (req "max_wrapped_proof_binary_size" int31)
+          (req "sc_max_wrapped_proof_binary_size" int31)
           (req "sc_rollup_message_size_limit" int31)))
 
 let fixed = ()
