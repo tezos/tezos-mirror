@@ -32,4 +32,126 @@
     Subject:    Test transfers from Michelson to smart contract rollups
 *)
 
-let tests = []
+open Protocol
+open Alpha_context
+open Lwt_result_syntax
+
+(* Helpers *)
+
+exception Unexpected_error
+
+let check_proto_error ~loc ~exp f trace =
+  let*? proto_trace =
+    List.map_e
+      (function
+        | Environment.Ecoproto_error e -> ok e
+        | e ->
+            error_with
+              "At %s, expected protocol error %s, got non-protocol error %a in \
+               trace %a"
+              loc
+              exp
+              Error_monad.pp
+              e
+              Error_monad.pp_print_trace
+              trace)
+      trace
+  in
+  try f proto_trace
+  with Unexpected_error ->
+    failwith
+      "At %s, expected error %s, got %a"
+      loc
+      exp
+      Error_monad.pp_print_trace
+      trace
+
+(* A contract with one entrypoint:
+    - [transfer_non_zero] takes a [contract int] and attempts to transfer with a
+      non-zero amount to it. Expected to fail.
+*)
+let contract_originate block account =
+  let script =
+    {|
+        parameter (or (contract %transfer_non_zero int) never);
+        storage unit;
+        code {
+          UNPAIR;
+          IF_LEFT {
+            # transfer_non_zero
+            PUSH mutez 1;
+            PUSH int 42;
+          } {
+            NEVER
+          };
+          TRANSFER_TOKENS;
+          NIL operation;
+          SWAP;
+          CONS;
+          PAIR }
+|}
+  in
+  Contract_helpers.originate_contract_from_string_hash
+    ~baker:(Context.Contract.pkh account)
+    ~source_contract:account
+    ~script
+    ~storage:"Unit"
+    block
+
+let context_init () =
+  let* b, c = Test_sc_rollup.context_init T1 in
+  let* contract, _script, b = contract_originate b c in
+  return (b, c, contract)
+
+let transfer ?expect_apply_failure b ~from ~to_ ~param ~entrypoint =
+  let parameters = Script.lazy_expr (Expr.from_string param) in
+  let* op =
+    Op.transaction
+      (B b)
+      from
+      (Contract.Originated to_)
+      Tez.zero
+      ~parameters
+      ~entrypoint:(Entrypoint.of_string_strict_exn entrypoint)
+      ~gas_limit:High
+  in
+  let* inc = Incremental.begin_construction b in
+  let* inc = Incremental.add_operation ?expect_apply_failure inc op in
+  Incremental.finalize_block inc
+
+(* Tests *)
+
+(* Test parsing a [contract] with a badly formatted scr1 address. *)
+let test_transfer_to_bad_sc_rollup_address () =
+  let* b, c, contract = context_init () in
+  let not_an_sc_rollup_address = {|"scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyL"|} in
+  let* _b =
+    transfer
+      b
+      ~from:c
+      ~to_:contract
+      ~param:not_an_sc_rollup_address
+      ~entrypoint:"transfer_non_zero"
+      ~expect_apply_failure:
+        (check_proto_error ~loc:__LOC__ ~exp:"Invalid_destination_b58check"
+         @@ function
+         | [
+             Script_interpreter.Bad_contract_parameter _;
+             Script_tc_errors.Invalid_constant (_loc, _expr, ty);
+             Destination_repr.Invalid_destination_b58check _;
+           ] ->
+             Assert.equal_string
+               ~loc:__LOC__
+               "(contract int)"
+               (Expr.to_string ty)
+         | _ -> raise Unexpected_error)
+  in
+  return_unit
+
+let tests =
+  [
+    Tztest.tztest
+      "Transfer to a bad sc rollup address"
+      `Quick
+      test_transfer_to_bad_sc_rollup_address;
+  ]
