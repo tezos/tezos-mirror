@@ -182,7 +182,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       Store.StateHistory.insert store event
     in
     (* Produce events. *)
-    let*! () = Interpreter_event.transitioned_pvm state num_messages in
+    let*! () = Interpreter_event.transitioned_pvm level state num_messages in
 
     return_unit
 

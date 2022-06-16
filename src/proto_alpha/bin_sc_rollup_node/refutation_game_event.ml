@@ -128,3 +128,20 @@ let timeout_failed players = Simple.(emit timeout_failed players)
 let timeout_backtracked players = Simple.(emit timeout_backtracked players)
 
 let timeout_skipped players = Simple.(emit timeout_skipped players)
+
+let conflict_detected (conflict : Sc_rollup.Refutation_storage.conflict) =
+  let our_commitment_hash = Sc_rollup.Commitment.hash conflict.our_commitment in
+  let their_commitment_hash =
+    Sc_rollup.Commitment.hash conflict.their_commitment
+  in
+  let parent_commitment_hash = conflict.parent_commitment in
+  let other = conflict.other in
+  let level = conflict.our_commitment.inbox_level in
+  Simple.(
+    emit
+      conflict_detected
+      ( our_commitment_hash,
+        level,
+        other,
+        their_commitment_hash,
+        parent_commitment_hash ))
