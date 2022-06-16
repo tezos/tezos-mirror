@@ -1189,6 +1189,30 @@ let apply_internal_manager_operation_content :
         ~payer
         ~dst_rollup:destination
         ~since:ctxt_before_op
+  | Transaction_to_sc_rollup
+      {
+        destination;
+        entrypoint = _;
+        parameters_ty = _;
+        parameters = _;
+        unparsed_parameters = payload;
+      } ->
+      assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
+      (* Adding the message to the inbox. Note that it is safe to ignore the
+         size diff since only its hash and meta data are stored in the context.
+         See #3232. *)
+      Sc_rollup.Inbox.add_internal_message
+        ctxt
+        destination
+        ~payload
+        ~sender:source
+        ~source:payer
+      >|=? fun (inbox_after, _size, ctxt) ->
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
+      let result =
+        Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
+      in
+      (ctxt, ITransaction_result result, [])
   | Origination
       {
         delegate;
@@ -2095,6 +2119,7 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
         ( ctxt,
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
+  | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
 
 let burn_origination_storage_fees ctxt
     {

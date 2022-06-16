@@ -1517,6 +1517,14 @@ and 'kind manager_operation =
       unparsed_parameters : Script.expr;
     }
       -> Kind.transaction manager_operation
+  | Transaction_to_sc_rollup : {
+      destination : Sc_rollup.t;
+      entrypoint : Entrypoint.t;
+      parameters_ty : ('a, _) ty;
+      parameters : 'a;
+      unparsed_parameters : Script.expr;
+    }
+      -> Kind.transaction manager_operation
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
