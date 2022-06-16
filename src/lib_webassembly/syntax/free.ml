@@ -99,14 +99,15 @@ let block_type = function
   | VarBlockType x -> types (var x)
   | ValBlockType _ -> empty
 
-let rec instr (e : instr) =
+let rec instr lookup_block (e : instr) =
   match e.it with
   | Unreachable | Nop | Drop | Select _ -> empty
   | RefNull _ | RefIsNull -> empty
   | RefFunc x -> funcs (var x)
   | Const _ | Test _ | Compare _ | Unary _ | Binary _ | Convert _ -> empty
-  | Block (bt, es) | Loop (bt, es) -> block_type bt ++ block es
-  | If (bt, es1, es2) -> block_type bt ++ block es1 ++ block es2
+  | Block (bt, es) | Loop (bt, es) -> block_type bt ++ block lookup_block es
+  | If (bt, es1, es2) ->
+      block_type bt ++ block lookup_block es1 ++ block lookup_block es2
   | Br x | BrIf x -> labels (var x)
   | BrTable (xs, x) -> list (fun x -> labels (var x)) (x :: xs)
   | Return -> empty
@@ -130,29 +131,32 @@ let rec instr (e : instr) =
   | MemoryInit x -> memories zero ++ datas (var x)
   | DataDrop x -> datas (var x)
 
-and block (es : instr list) =
-  let free = list instr es in
+and block lookup_block (es : block_label) =
+  let free = list (instr lookup_block) (lookup_block es) in
   {free with labels = shift free.labels}
 
-let const (c : const) = block c.it
+let const lookup_block (c : const) = block lookup_block c.it
 
-let global (g : global) = const g.it.ginit
+let global lookup_block (g : global) = const lookup_block g.it.ginit
 
-let func (f : func) = {(block f.it.body) with locals = Set.empty}
+let func lookup_block (f : func) =
+  {(block lookup_block f.it.body) with locals = Set.empty}
 
 let table (t : table) = empty
 
 let memory (m : memory) = empty
 
-let segment_mode f (m : segment_mode) =
+let segment_mode lookup_block f (m : segment_mode) =
   match m.it with
   | Passive | Declarative -> empty
-  | Active {index; offset} -> f (var index) ++ const offset
+  | Active {index; offset} -> f (var index) ++ const lookup_block offset
 
-let elem (s : elem_segment) =
-  lazy_vector const s.it.einit ++* (segment_mode tables s.it.emode |> Lwt.return)
+let elem lookup_block (s : elem_segment) =
+  lazy_vector (const lookup_block) s.it.einit
+  ++* (segment_mode lookup_block tables s.it.emode |> Lwt.return)
 
-let data (s : data_segment) = segment_mode memories s.it.dmode
+let data lookup_block (s : data_segment) =
+  segment_mode lookup_block memories s.it.dmode
 
 let type_ (t : type_) = empty
 
@@ -177,13 +181,14 @@ let import (i : import) = import_desc i.it.idesc
 let start (s : start) = funcs (var s.it.sfunc)
 
 let module_ (m : module_) =
+  let lookup_block (Block_label b) = Array.to_list m.it.blocks.(b) in
   lazy_vector type_ m.it.types
-  ++* lazy_vector global m.it.globals
+  ++* lazy_vector (global lookup_block) m.it.globals
   ++* lazy_vector table m.it.tables
   ++* lazy_vector memory m.it.memories
-  ++* lazy_vector func m.it.funcs
+  ++* lazy_vector (func lookup_block) m.it.funcs
   ++* Lwt.return (opt start m.it.start)
-  ++* lazy_vector_s elem m.it.elems
-  ++* lazy_vector data m.it.datas
+  ++* lazy_vector_s (elem lookup_block) m.it.elems
+  ++* lazy_vector (data lookup_block) m.it.datas
   ++* lazy_vector import m.it.imports
   ++* lazy_vector export m.it.exports

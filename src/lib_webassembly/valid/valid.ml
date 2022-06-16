@@ -26,6 +26,7 @@ type context = {
   results : value_type list;
   labels : result_type list;
   refs : Free.t;
+  lookup_block : Ast.block_label -> Ast.instr list;
 }
 
 let empty_context =
@@ -41,6 +42,7 @@ let empty_context =
     results = [];
     labels = [];
     refs = Free.empty;
+    lookup_block = (fun _ -> raise Not_found);
   }
 
 let lookup category list x =
@@ -536,11 +538,11 @@ and check_seq (c : context) (s : infer_result_type) (es : instr list) :
       let {ins; outs} = check_instr c e s' in
       push outs (pop ins s' e.at)
 
-and check_block (c : context) (es : instr list) (ft : func_type) at =
+and check_block (c : context) (es : block_label) (ft : func_type) at =
   let (FuncType (ts1, ts2)) = ft in
   let ts1_l = vec_to_list ts1 in
   let ts2_l = vec_to_list ts2 in
-  let s = check_seq c (stack ts1_l) es in
+  let s = check_seq c (stack ts1_l) (c.lookup_block es) in
   let s' = pop (stack ts2_l) s at in
   require
     (snd s' = [])
@@ -633,7 +635,7 @@ let is_const (c : context) (e : instr) =
 
 let check_const (c : context) (const : const) (t : value_type) =
   require
-    (List.for_all (is_const c) const.it)
+    (List.for_all (is_const c) (c.lookup_block const.it))
     const.at
     "constant expression required" ;
   check_block
@@ -740,6 +742,7 @@ let check_module (m : module_) =
     elems;
     datas;
     exports;
+    blocks;
   } =
     m.it
   in
@@ -757,11 +760,17 @@ let check_module (m : module_) =
       ({m.it with funcs = Lazy_vector.LwtInt32Vector.create 0l; start = None}
       @@ m.at)
   in
+  let lookup_block (Block_label b) = Array.to_list blocks.(b) in
   let c0 =
     List.fold_right
       check_import
       imports
-      {empty_context with refs; types = List.map (fun ty -> ty.it) types}
+      {
+        empty_context with
+        refs;
+        types = List.map (fun ty -> ty.it) types;
+        lookup_block;
+      }
   in
   let c1 =
     {

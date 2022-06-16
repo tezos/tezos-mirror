@@ -21,6 +21,7 @@ type module_inst = {
   exports : extern NameMap.t;
   elems : elem_inst Vector.t;
   datas : data_inst Vector.t;
+  blocks : Ast.instr array array;
 }
 
 and func_inst = (input_inst, module_inst ref) Func.t
@@ -79,6 +80,7 @@ let empty_module_inst =
     exports = NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ();
     elems = Vector.create 0l;
     datas = Vector.create 0l;
+    blocks = [||];
   }
 
 let extern_type_of = function

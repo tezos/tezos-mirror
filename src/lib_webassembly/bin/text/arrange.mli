@@ -1,8 +1,8 @@
 open Sexpr
 
-val instr : Ast.instr -> sexpr
+val instr : (Ast.block_label -> Ast.instr list) -> Ast.instr -> sexpr
 
-val func : Ast.func -> sexpr
+val func : (Ast.block_label -> Ast.instr list) -> Ast.func -> sexpr
 
 val module_ : Ast.module_ -> sexpr Lwt.t
 

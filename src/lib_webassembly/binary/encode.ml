@@ -38,9 +38,13 @@ let to_string s =
 
 module E (S : sig
   val stream : stream
+
+  val lookup_block : int -> Ast.instr array
 end) =
 struct
   let s = S.stream
+
+  let lookup_block (Ast.Block_label l) = Array.to_list (S.lookup_block l)
 
   (* Generic values *)
 
@@ -217,19 +221,19 @@ struct
     | Block (bt, es) ->
         op 0x02 ;
         block_type bt ;
-        list instr es ;
+        list instr (lookup_block es) ;
         end_ ()
     | Loop (bt, es) ->
         op 0x03 ;
         block_type bt ;
-        list instr es ;
+        list instr (lookup_block es) ;
         end_ ()
     | If (bt, es1, es2) ->
         op 0x04 ;
         block_type bt ;
-        list instr es1 ;
-        if es2 <> [] then op 0x05 ;
-        list instr es2 ;
+        list instr (lookup_block es1) ;
+        if lookup_block es2 <> [] then op 0x05 ;
+        list instr (lookup_block es2) ;
         end_ ()
     | Br x ->
         op 0x0c ;
@@ -930,7 +934,7 @@ struct
         u8 i
 
   let const c =
-    list instr c.it ;
+    list instr (lookup_block c.it) ;
     end_ ()
 
   (* Sections *)
@@ -1059,7 +1063,7 @@ struct
     let g = gap32 () in
     let p = pos s in
     vec local (compress locals) ;
-    list instr body ;
+    list instr (lookup_block body) ;
     end_ () ;
     patch_gap32 g (pos s - p)
 
@@ -1071,10 +1075,12 @@ struct
   let elem_kind = function FuncRefType -> u8 0x00 | _ -> assert false
 
   let is_elem_index e =
-    match e.it with [{it = RefFunc _; _}] -> true | _ -> false
+    match lookup_block e.it with [{it = RefFunc _; _}] -> true | _ -> false
 
   let elem_index e =
-    match e.it with [{it = RefFunc x; _}] -> var x | _ -> assert false
+    match lookup_block e.it with
+    | [{it = RefFunc x; _}] -> var x
+    | _ -> assert false
 
   let elem seg =
     let {etype; einit; emode} = seg.it in
@@ -1152,13 +1158,6 @@ struct
     let+ modl = Free.module_ m in
     section 12 len (List.length datas) Free.(modl.datas <> Set.empty)
 
-  (* Custom section *)
-  let custom (n, bs) =
-    name n ;
-    put_string s bs
-
-  let custom_section n bs = section 0 custom (n, bs) true
-
   (* Module *)
   let module_ m =
     let open Lwt.Syntax in
@@ -1185,13 +1184,8 @@ let encode m =
   let open Lwt.Syntax in
   let module E = E (struct
     let stream = stream ()
+
+    let lookup_block b = m.Source.it.Ast.blocks.(b)
   end) in
   let+ () = E.module_ m in
-  to_string E.s
-
-let encode_custom name content =
-  let module E = E (struct
-    let stream = stream ()
-  end) in
-  E.custom_section name content ;
   to_string E.s

@@ -262,16 +262,16 @@ type name_list = int list
 
 type block_type = VarBlockType of var | ValBlockType of value_type option
 
-type instr = instr' Source.phrase
+type block_label = Block_label of int
 
-and instr' =
+type nonrec instr' =
   | Unreachable (* trap unconditionally *)
   | Nop (* do nothing *)
   | Drop (* forget a value *)
   | Select of value_type list option (* branchless conditional *)
-  | Block of block_type * instr list (* execute in sequence *)
-  | Loop of block_type * instr list (* loop header *)
-  | If of block_type * instr list * instr list (* conditional *)
+  | Block of block_type * block_label (* execute in sequence *)
+  | Loop of block_type * block_label (* loop header *)
+  | If of block_type * block_label * block_label (* conditional *)
   | Br of var (* break to n-th surrounding label *)
   | BrIf of var (* conditional break *)
   | BrTable of var list * var (* indexed break *)
@@ -328,9 +328,11 @@ and instr' =
   | VecExtract of vec_extractop (* extract lane from vector *)
   | VecReplace of vec_replaceop (* replace lane in vector *)
 
+type instr = instr' Source.phrase
+
 (* Globals & Functions *)
 
-type const = instr list Source.phrase
+type const = block_label Source.phrase
 
 type global = global' Source.phrase
 
@@ -338,7 +340,7 @@ and global' = {gtype : global_type; ginit : const}
 
 type func = func' Source.phrase
 
-and func' = {ftype : var; locals : value_type Vector.t; body : instr list}
+and func' = {ftype : var; locals : value_type Vector.t; body : block_label}
 
 (* Tables & Memories *)
 
@@ -414,6 +416,7 @@ and module_' = {
   datas : data_segment Vector.t;
   imports : import Vector.t;
   exports : export Vector.t;
+  blocks : instr array array;
 }
 
 (* Auxiliary functions *)
@@ -430,6 +433,7 @@ let empty_module =
     datas = Vector.create 0l;
     imports = Vector.create 0l;
     exports = Vector.create 0l;
+    blocks = [||];
   }
 
 open Source

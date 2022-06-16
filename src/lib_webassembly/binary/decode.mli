@@ -216,16 +216,26 @@ type module_kont =
 (** Parsed bytes with the current reading position. *)
 type stream = {name : string; bytes : string; pos : pos ref}
 
+(** Allocation state of basic blocks. *)
+type block_state = {
+  blocks : (int, Ast.instr array) Hashtbl.t;
+  next_block : int ref;
+}
+
 (** Decoding continuation step. *)
 type decode_kont = {
   building_state : field Vector.t;
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
   stream : stream;  (** Parsed stream. *)
+  block_state : block_state;  (** Basic blocks allocated. *)
 }
 
 (** [make_stream filename bytes] returns a new stream to decode. *)
 val make_stream : name:string -> bytes:string -> stream
+
+(** [make_block_state ()] returns a new block allocation state. *)
+val make_block_state : unit -> block_state
 
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]

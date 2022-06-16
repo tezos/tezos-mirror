@@ -7,6 +7,33 @@ type stream = {name : string; bytes : string; pos : int ref}
 
 let make_stream ~name ~bytes = {name; bytes; pos = ref 0}
 
+type block_state = {
+  blocks : (int, Ast.instr array) Hashtbl.t;
+  next_block : int ref;
+}
+
+let make_block_state () =
+  {
+    blocks =
+      (let init = Hashtbl.create 10 in
+       Hashtbl.add init 0 [||] ;
+       init);
+    next_block = ref 1;
+  }
+
+let alloc_block s es =
+  let es = Array.of_list es in
+  let b = !(s.next_block) in
+  Hashtbl.add s.blocks b es ;
+  incr s.next_block ;
+  assert (!(s.next_block) >= 0) ;
+  Ast.Block_label b
+
+let lookup_block bs (Ast.Block_label b) =
+  Array.to_list (Hashtbl.find bs.blocks b)
+
+let empty_block = Ast.Block_label 0
+
 let len s = String.length s.bytes
 
 let pos s = !(s.pos)
@@ -880,16 +907,16 @@ let instr s pos tag =
       | n -> illegal s pos (I32.to_int_u n))
   | b -> illegal s pos b
 
-let instr_block_step s cont =
+let instr_block_step s bs cont =
   match cont with
   | [IKStop res] -> invalid_arg "instr_block"
   | IKStop res :: IKBlock (bt, pos) :: IKNext es :: rest ->
       end_ s ;
-      let e = Source.(block bt res @@ region s pos pos) in
+      let e = Source.(block bt (alloc_block bs res) @@ region s pos pos) in
       IKNext (e :: es) :: rest
   | IKStop res :: IKLoop (bt, pos) :: IKNext es :: rest ->
       end_ s ;
-      let e = Source.(loop bt res @@ region s pos pos) in
+      let e = Source.(loop bt (alloc_block bs res) @@ region s pos pos) in
       IKNext (e :: es) :: rest
   | IKStop res :: IKIf1 (bt, pos) :: IKNext es :: rest ->
       if peek s = Some 0x05 then (
@@ -897,11 +924,16 @@ let instr_block_step s cont =
         IKNext [] :: IKIf2 (bt, pos, res) :: IKNext es :: rest)
       else (
         end_ s ;
-        let e = Source.(if_ bt res [] @@ region s pos pos) in
+        let e =
+          Source.(if_ bt (alloc_block bs res) empty_block @@ region s pos pos)
+        in
         IKNext (e :: es) :: rest)
   | IKStop res2 :: IKIf2 (bt, pos, res1) :: IKNext es :: rest ->
       end_ s ;
-      let e = Source.(if_ bt res1 res2 @@ region s pos pos) in
+      let e =
+        Source.(
+          if_ bt (alloc_block bs res1) (alloc_block bs res2) @@ region s pos pos)
+      in
       IKNext (e :: es) :: rest
   | IKRev ([], es) :: ks -> IKStop es :: ks
   | IKRev (e :: rest, es) :: ks -> IKRev (rest, e :: es) :: ks
@@ -1175,7 +1207,7 @@ let at' left s x =
   let right = pos s in
   Source.(x @@ region s left right)
 
-let code_step s =
+let code_step s bs =
   let open Lwt.Syntax in
   function
   | CKStart ->
@@ -1265,19 +1297,24 @@ let code_step s =
       end_ s ;
       check_size size s ;
       let func =
-        at' left s @@ {locals; body; ftype = Source.(-1l @@ Source.no_region)}
+        at' left s
+        @@ {
+             locals;
+             body = alloc_block bs body;
+             ftype = Source.(-1l @@ Source.no_region);
+           }
       in
       CKStop func |> Lwt.return
   | CKBody {left; size; locals; const_kont} ->
-      CKBody {left; size; locals; const_kont = instr_block_step s const_kont}
+      CKBody {left; size; locals; const_kont = instr_block_step s bs const_kont}
       |> Lwt.return
   | CKStop _ -> assert false (* final step, cannot reduce *)
 
 (* Element section *)
 
-let elem_index s =
+let elem_index bs s =
   let x = at var s in
-  [Source.(ref_func x @@ x.at)]
+  alloc_block bs [Source.(ref_func x @@ x.at)]
 
 let elem_kind s =
   match u8 s with
@@ -1407,7 +1444,7 @@ let ek_start s =
         }
   | _ -> error s (pos s - 1) "malformed elements segment kind"
 
-let elem_step s = function
+let elem_step s bs = function
   | EKStart -> ek_start s
   | EKMode
       {
@@ -1419,7 +1456,9 @@ let elem_step s = function
       } ->
       end_ s ;
       let right = pos s in
-      let offset = Source.(offset @@ region s left_offset right) in
+      let offset =
+        Source.(alloc_block bs offset @@ region s left_offset right)
+      in
       let mode = Source.(Active {index; offset} @@ region s left right) in
       let ref_type =
         match early_ref_type with
@@ -1442,7 +1481,7 @@ let elem_step s = function
           }
   | EKMode
       {left; index; index_kind; early_ref_type; offset_kont = left_offset, k} ->
-      let k' = instr_block_step s k in
+      let k' = instr_block_step s bs k in
       EKMode
         {
           left;
@@ -1460,7 +1499,7 @@ let elem_step s = function
       EKStop {etype = ref_type; einit; emode = mode}
   (* Indexed *)
   | EKInitIndexed {mode; ref_type; einit_vec} ->
-      let elem_index = at elem_index s in
+      let elem_index = at (elem_index bs) s in
       EKInitIndexed
         {mode; ref_type; einit_vec = lazy_vec_step elem_index einit_vec}
   (* Const *)
@@ -1468,7 +1507,7 @@ let elem_step s = function
     ->
       end_ s ;
       let right = pos s in
-      let einit = Source.(einit @@ region s left right) in
+      let einit = Source.(alloc_block bs einit @@ region s left right) in
       EKInitConst
         {
           mode;
@@ -1477,7 +1516,7 @@ let elem_step s = function
           einit_kont = (right, [IKNext []]);
         }
   | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, k} ->
-      let k' = instr_block_step s k in
+      let k' = instr_block_step s bs k in
       EKInitConst {mode; ref_type; einit_vec; einit_kont = (left, k')}
   | EKStop _ -> assert false (* Final step, cannot reduce *)
 
@@ -1513,18 +1552,20 @@ let data_start s =
       DKMode {left; index; offset_kont = (left_offset, [IKNext []])}
   | _ -> error s (pos s - 1) "malformed data segment kind"
 
-let data_step s =
+let data_step s bs =
   let open Lwt.Syntax in
   function
   | DKStart -> data_start s |> Lwt.return
   | DKMode {left; index; offset_kont = left_offset, [IKStop offset]} ->
       end_ s ;
       let right = pos s in
-      let offset = Source.(offset @@ region s left_offset right) in
+      let offset =
+        Source.(alloc_block bs offset @@ region s left_offset right)
+      in
       let dmode = Source.(Active {index; offset} @@ region s left right) in
       DKInit {dmode; init_kont = VKStart} |> Lwt.return
   | DKMode {left; index; offset_kont = left_offset, k} ->
-      let k' = instr_block_step s k in
+      let k' = instr_block_step s bs k in
       DKMode {left; index; offset_kont = (left_offset, k')} |> Lwt.return
   | DKInit {dmode; init_kont = VKStop dinit} ->
       DKStop {dmode; dinit} |> Lwt.return
@@ -1631,6 +1672,7 @@ type decode_kont = {
   building_state : field Vector.t;  (** Accumulated parsed sections. *)
   module_kont : module_kont;
   stream : stream;
+  block_state : block_state;
 }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3366
@@ -1713,6 +1755,7 @@ let module_step state =
       }
   in
   let s = state.stream in
+  let bs = state.block_state in
   match state.module_kont with
   | MKStart ->
       (* Module header *)
@@ -1875,26 +1918,26 @@ let module_step state =
       next @@ MKExport (export_step s k, pos, size, curr_vec)
   | MKGlobal (gtype, left, [IKStop res], size, vec) ->
       end_ s ;
-      let ginit = Source.(res @@ region s left (pos s)) in
+      let ginit = Source.(alloc_block bs res @@ region s left (pos s)) in
       let f = Source.({gtype; ginit} @@ region s left (pos s)) in
       next @@ MKField (GlobalField, size, lazy_vec_step f vec)
   | MKGlobal (ty, pos, k, size, curr_vec) ->
-      next @@ MKGlobal (ty, pos, instr_block_step s k, size, curr_vec)
+      next @@ MKGlobal (ty, pos, instr_block_step s bs k, size, curr_vec)
   | MKElem (EKStop elem, left, size, vec) ->
       let elem = Source.(elem @@ region s left (pos s)) in
       next @@ MKField (ElemField, size, lazy_vec_step elem vec)
   | MKElem (elem_kont, pos, size, curr_vec) ->
-      next @@ MKElem (elem_step s elem_kont, pos, size, curr_vec)
+      next @@ MKElem (elem_step s bs elem_kont, pos, size, curr_vec)
   | MKData (DKStop data, left, size, vec) ->
       let data = Source.(data @@ region s left (pos s)) in
       next @@ MKField (DataField, size, lazy_vec_step data vec)
   | MKData (data_kont, pos, size, curr_vec) ->
-      let* data_kont = data_step s data_kont in
+      let* data_kont = data_step s bs data_kont in
       next @@ MKData (data_kont, pos, size, curr_vec)
   | MKCode (CKStop func, left, size, vec) ->
       next @@ MKField (CodeField, size, lazy_vec_step func vec)
   | MKCode (code_kont, pos, size, curr_vec) ->
-      let* code_kont = code_step s code_kont in
+      let* code_kont = code_step s bs code_kont in
       next @@ MKCode (code_kont, pos, size, curr_vec)
   | MKElaborateFunc
       (ft, fb, (Lazy_vec {vector = func_types; _} as vec), no_datas_in_func)
@@ -1913,7 +1956,8 @@ let module_step state =
              (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
 
                 `Free` shouldn't be part of the PVM.*)
-             no_datas_in_func && Free.((func fb').datas = Set.empty) )
+             no_datas_in_func
+             && Free.((func (lookup_block bs) fb').datas = Set.empty) )
   | MKBuild (funcs, no_datas_in_func) ->
       let fields = state.building_state in
       let* types = find_vec TypeField fields in
@@ -1965,6 +2009,8 @@ let module_step state =
               elems;
               datas;
               start;
+              blocks =
+                Array.init !(bs.next_block) (fun i -> Hashtbl.find bs.blocks i);
             };
       }
       |> Lwt.return
@@ -1978,7 +2024,13 @@ let module_ stream =
         let* next_state = module_step k in
         loop next_state
   in
-  loop {building_state = Vector.create 0l; module_kont = MKStart; stream}
+  loop
+    {
+      building_state = Vector.create 0l;
+      module_kont = MKStart;
+      stream;
+      block_state = make_block_state ();
+    }
 
 let decode ~name ~bytes =
   let open Lwt.Syntax in
