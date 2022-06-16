@@ -2781,7 +2781,7 @@ module Sc_rollup : sig
     module Message : sig
       type internal_inbox_message = {
         payload : Script.expr;
-        sender : Contract.t;
+        sender : Contract_hash.t;
         source : Signature.public_key_hash;
       }
 
@@ -2889,7 +2889,7 @@ module Sc_rollup : sig
       context ->
       rollup ->
       payload:Script.expr ->
-      sender:Contract.t ->
+      sender:Contract_hash.t ->
       source:Signature.public_key_hash ->
       (t * Z.t * context) tzresult Lwt.t
 
