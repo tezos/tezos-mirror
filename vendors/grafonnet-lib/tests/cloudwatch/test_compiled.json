@@ -1,0 +1,29 @@
+{
+   "advanced": {
+      "alias": "ELB requests per instance",
+      "datasource": "CloudWatch",
+      "dimensions": {
+         "LoadBalancer": "app/lb",
+         "TargetGroup": "targetgroup/tg"
+      },
+      "highResolution": false,
+      "metricName": "RequestCountPerTarget",
+      "namespace": "AWS/ApplicationELB",
+      "period": "auto",
+      "region": "eu-west-1",
+      "statistics": [
+         "Sum"
+      ]
+   },
+   "basic": {
+      "dimensions": { },
+      "highResolution": false,
+      "metricName": "RequestCountPerTarget",
+      "namespace": "AWS/ApplicationELB",
+      "period": "auto",
+      "region": "eu-west-1",
+      "statistics": [
+         "Average"
+      ]
+   }
+}

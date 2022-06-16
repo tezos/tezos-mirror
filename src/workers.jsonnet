@@ -3,6 +3,7 @@ local singlestat = grafana.singlestat;
 local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
+local transformation = grafana.transformation;
 local namespace = 'octez';
 local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
 
@@ -193,10 +194,24 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     statPanel.new(
       title='Peer validators errors',
       datasource='Prometheus',
-    ).addTarget(
-      prometheus.target(
-        system_error + ' + ' + too_short_locator + ' + ' + unavailable_protocol + ' + ' + unknown_ancestor + ' + ' + unknown_error
-      )
+    ).addTargets(
+      [
+        prometheus.target(
+          system_error
+        ),
+        prometheus.target(
+          too_short_locator
+        ),
+        prometheus.target(
+          unavailable_protocol
+        ),
+        prometheus.target(
+          unknown_ancestor
+        ),
+        prometheus.target(
+          unknown_error
+        ),
+      ],
     ).addThresholds([
       {
         color: 'green',
@@ -206,8 +221,12 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
         color: 'red',
         value: 1,
       },
-    ]),
-
+    ])
+    .addTransformation(transformation.new('calculateField', options={
+      mode: 'reduceRow',
+      replaceFields: true,
+      reducer: { reducer: 'sum' },
+    })),
 
   validatorTreatmentRequests:
     local chainPush = namespace + '_validator_chain_last_finished_request_push_timestamp' + node_instance;
