@@ -2997,7 +2997,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         Compare.Int32.(current_period = period)
         (Wrong_voting_period {expected = current_period; provided = period})
       >>?= fun () ->
-      Amendment.record_proposals ctxt source proposals >|=? fun ctxt ->
+      Amendment.record_proposals ctxt chain_id source proposals >|=? fun ctxt ->
       (ctxt, Single_result Proposals_result)
   | Single (Ballot {source; period; proposal; ballot}) ->
       Delegate.pubkey ctxt source >>=? fun delegate ->

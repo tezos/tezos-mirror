@@ -2555,6 +2555,11 @@ module Voting_period : sig
   val get_rpc_current_info : context -> info tzresult Lwt.t
 
   val get_rpc_succ_info : context -> info tzresult Lwt.t
+
+  module Governance_dictator : sig
+    val overwrite_current_kind :
+      context -> Chain_id.t -> Voting_period_repr.kind -> context tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Vote_repr} and {!Vote_storage}. *)

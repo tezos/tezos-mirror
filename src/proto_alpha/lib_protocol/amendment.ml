@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -113,6 +114,8 @@ let get_approval_and_update_participation_ema ctxt =
    the end of each voting period. This state-machine prepare the voting_period
    for the next block. *)
 let start_new_voting_period ctxt =
+  (* any change related to the storage in this function must probably
+     be replicated in `record_governance_dictator_proposals` *)
   Voting_period.get_current_kind ctxt >>=? fun kind ->
   (match kind with
   | Proposal -> (
@@ -151,6 +154,8 @@ type error +=
   | Unexpected_ballot
   | Unauthorized_ballot
   | Duplicate_ballot
+  | (* `Permanent *)
+      Invalid_dictator_proposal
 
 let () =
   let open Data_encoding in
@@ -235,9 +240,23 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Empty proposal")
     empty
     (function Empty_proposal -> Some () | _ -> None)
-    (fun () -> Empty_proposal)
+    (fun () -> Empty_proposal) ;
+  (* Invalid dictator proposal *)
+  register_error_kind
+    `Permanent
+    ~id:"invalid_dictator_proposal"
+    ~title:"Invalid dictator proposal"
+    ~description:"A governance dictator can only submit one proposal at a time."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "A governance dictator can only submit one proposal at a time. There \
+         is no governance dictator on mainnet.")
+    empty
+    (function Invalid_dictator_proposal -> Some () | _ -> None)
+    (fun () -> Invalid_dictator_proposal)
 
-let record_proposals ctxt delegate proposals =
+let record_delegate_proposals ctxt delegate proposals =
   (match proposals with
   | [] -> error Empty_proposal
   | _ :: _ -> Result.return_unit)
@@ -263,6 +282,36 @@ let record_proposals ctxt delegate proposals =
           proposals)
       else fail Unauthorized_proposal
   | Exploration | Cooldown | Promotion | Adoption -> fail Unexpected_proposal
+
+let record_governance_dictator_proposals ctxt chain_id proposals =
+  Vote.clear_ballots ctxt >>= fun ctxt ->
+  Vote.clear_proposals ctxt >>= fun ctxt ->
+  Vote.clear_current_proposal ctxt >>=? fun ctxt ->
+  match proposals with
+  | [] ->
+      Voting_period.Governance_dictator.overwrite_current_kind
+        ctxt
+        chain_id
+        Proposal
+  | [proposal] ->
+      Vote.init_current_proposal ctxt proposal >>=? fun ctxt ->
+      Voting_period.Governance_dictator.overwrite_current_kind
+        ctxt
+        chain_id
+        Adoption
+  | _ :: _ :: _ -> fail Invalid_dictator_proposal
+
+let is_governance_dictator ctxt chain_id delegate =
+  (* This function should always, ALWAYS, return false on mainnet!!!! *)
+  match Constants.governance_dictator ctxt with
+  | Some pkh when Chain_id.(chain_id <> Constants_repr.mainnet_id) ->
+      Signature.Public_key_hash.equal pkh delegate
+  | _ -> false
+
+let record_proposals ctxt chain_id delegate proposals =
+  if is_governance_dictator ctxt chain_id delegate then
+    record_governance_dictator_proposals ctxt chain_id proposals
+  else record_delegate_proposals ctxt delegate proposals
 
 let record_ballot ctxt delegate proposal ballot =
   Voting_period.get_current_kind ctxt >>=? function

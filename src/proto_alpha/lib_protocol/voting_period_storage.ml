@@ -192,3 +192,16 @@ let get_rpc_succ_info ctxt =
       ~blocks_per_voting_period
   in
   Voting_period_repr.{voting_period; position; remaining}
+
+module Governance_dictator = struct
+  type error += Forbidden_on_mainnet
+
+  let overwrite_current_kind ctxt chain_id kind =
+    error_when
+      Chain_id.(chain_id = Constants_repr.mainnet_id)
+      Forbidden_on_mainnet
+    >>?= fun () ->
+    get_current ctxt >>=? fun current_period ->
+    let new_period = {current_period with kind} in
+    set_current ctxt new_period
+end

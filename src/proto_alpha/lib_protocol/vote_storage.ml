@@ -246,7 +246,8 @@ let find_current_proposal = Storage.Vote.Current_proposal.find
 
 let init_current_proposal = Storage.Vote.Current_proposal.init
 
-let clear_current_proposal = Storage.Vote.Current_proposal.remove_existing
+let clear_current_proposal ctxt =
+  Storage.Vote.Current_proposal.remove ctxt >|= ok
 
 let init ctxt ~start_position =
   (* participation EMA is in centile of a percentage *)
