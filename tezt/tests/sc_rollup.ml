@@ -502,10 +502,7 @@ let send_messages ?batch_size n sc_rollup client =
   Lwt_list.iter_s (fun msg -> send_message client sc_rollup msg) messages
 
 let to_text_messages_arg msgs =
-  let text_messages =
-    List.map (fun msg -> Hex.of_string msg |> Hex.show) msgs
-  in
-  let json = Ezjsonm.list Ezjsonm.string text_messages in
+  let json = Ezjsonm.list Ezjsonm.string msgs in
   "text:" ^ Ezjsonm.to_string ~minify:true json
 
 let send_text_messages client sc_rollup msgs =
@@ -1973,6 +1970,104 @@ let test_consecutive_commitments =
       in
       unit)
 
+(* Refutation game scenarios
+   -------------------------
+*)
+
+(*
+
+   To check the refutation game logic, we evaluate a scenario with one
+   honest rollup node and one dishonest rollup node configured as with
+   a given [loser_mode].
+
+   For a given sequence of [inputs], distributed amongst several
+   levels, with some possible [empty_levels]. We check that at some
+   [final_level], the crime does not pay: the dishonest node has losen
+   its deposit while the honest one has not.
+
+*)
+let test_refutation_scenario ?commitment_period ?challenge_window variant
+    (loser_mode, inputs, final_level, empty_levels) =
+  test_scenario
+    ?commitment_period
+    ?challenge_window
+    {
+      tags = ["refutation"; "node"];
+      variant;
+      description = "observing the winning strategy of refutation games";
+    }
+  @@ fun _protocol sc_rollup_node sc_rollup_address node client ->
+  let bootstrap1_key = Constant.bootstrap1.public_key_hash in
+  let bootstrap2_key = Constant.bootstrap2.public_key_hash in
+
+  let sc_rollup_node2 =
+    Sc_rollup_node.create node client ~operator_pkh:bootstrap2_key
+  in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init ~loser_mode sc_rollup_node2 sc_rollup_address
+  in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node2 in
+
+  let* start_level = Client.level client in
+
+  let rec consume_inputs i = function
+    | [] -> return ()
+    | inputs :: next_batches as all ->
+        let level = start_level + i in
+        if List.mem level empty_levels then
+          let* () = Client.bake_for_and_wait client in
+          consume_inputs (i + 1) all
+        else
+          let* () =
+            Lwt_list.iter_s (send_text_messages client sc_rollup_address) inputs
+          in
+          let* () = Client.bake_for_and_wait client in
+          consume_inputs (i + 1) next_batches
+  in
+  let* () = consume_inputs 0 inputs in
+  let* () = bake_levels (final_level - List.length inputs) client in
+
+  let*! honest_deposit =
+    RPC.Contracts.get_frozen_bonds ~contract_id:bootstrap1_key client
+  in
+  let*! loser_deposit =
+    RPC.Contracts.get_frozen_bonds ~contract_id:bootstrap2_key client
+  in
+  let* {stake_amount; _} = get_sc_rollup_constants client in
+
+  Check.(
+    (JSON.as_int honest_deposit = Tez.to_mutez stake_amount)
+      int
+      ~error_msg:"expecting deposit for honest participant = %R, got %L") ;
+  Check.(
+    (JSON.as_int loser_deposit = 0)
+      int
+      ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
+  return ()
+
+let rec swap i l =
+  if i <= 0 then l
+  else match l with [_] | [] -> l | x :: y :: l -> y :: swap (i - 1) (x :: l)
+
+let inputs_for n =
+  List.init n @@ fun i ->
+  [swap i ["3 3 +"; "1"; "1 1 x"; "3 7 8 + * y"; "2 2 out"]]
+
+let test_refutation protocols =
+  let challenge_window = 100 in
+  [
+    ("inbox_proof", ("5 0 0", inputs_for 10, 30, []));
+    ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 40, [2]));
+    ("inbox_proof_many_empty_levels", ("9 0 0", inputs_for 10, 40, [2; 3; 4]));
+    ("pvm_proof_0", ("5 0 1", inputs_for 10, 30, []));
+    ("pvm_proof_1", ("7 1 2", inputs_for 10, 30, []));
+    ("pvm_proof_2", ("7 2 5", inputs_for 7, 30, []));
+    ("pvm_proof_3", ("9 2 5", inputs_for 7, 30, [4; 5]));
+  ]
+  |> List.iter (fun (variant, inputs) ->
+         test_refutation_scenario ~challenge_window variant inputs protocols)
+
 let register ~protocols =
   test_origination protocols ;
   test_rollup_node_configuration protocols ;
@@ -2023,4 +2118,5 @@ let register ~protocols =
   test_rollup_node_uses_boot_sector protocols ;
   test_rollup_client_show_address protocols ;
   test_rollup_client_generate_keys protocols ;
-  test_rollup_client_list_keys protocols
+  test_rollup_client_list_keys protocols ;
+  test_refutation protocols
