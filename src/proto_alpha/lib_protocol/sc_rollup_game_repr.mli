@@ -129,8 +129,8 @@ open Sc_rollup_repr
     represent the first and second player in the pair respectively. *)
 type player = Alice | Bob
 
-(**
-   A game state is characterized by:
+module V1 : sig
+  (** A game state is characterized by:
 
     - [turn], the player that must provide the next move.
 
@@ -158,26 +158,32 @@ type player = Alice | Bob
     - [dissection] must contain at least 3 values
     - the first state hash value in [dissection] must not be [None]
     - [inbox_snapshot] never changes once the game is created
-*)
-type t = {
-  turn : player;
-  inbox_snapshot : Sc_rollup_inbox_repr.t;
-  level : Raw_level_repr.t;
-  pvm_name : string;
-  dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
-}
+  *)
+  type t = {
+    turn : player;
+    inbox_snapshot : Sc_rollup_inbox_repr.t;
+    level : Raw_level_repr.t;
+    pvm_name : string;
+    dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
+  }
 
-(** Return the other player *)
-val opponent : player -> player
+  (** Return the other player *)
+  val opponent : player -> player
 
-val encoding : t Data_encoding.t
+  val encoding : t Data_encoding.t
 
-val pp_dissection :
-  Format.formatter ->
-  (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
-  unit
+  val pp_dissection :
+    Format.formatter ->
+    (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
+    unit
 
-val pp : Format.formatter -> t -> unit
+  val pp : Format.formatter -> t -> unit
+end
+
+(** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
+include Sc_rollup_data_version_sig.S with type t = V1.t
+
+include module type of V1 with type t = V1.t
 
 module Index : sig
   type t = private {alice : Staker.t; bob : Staker.t}

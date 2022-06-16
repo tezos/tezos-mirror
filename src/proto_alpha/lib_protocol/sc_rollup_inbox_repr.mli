@@ -117,49 +117,56 @@
 
 *)
 
-(** The type of the inbox for a smart-contract rollup as stored
+module V1 : sig
+  (** The type of the inbox for a smart-contract rollup as stored
     by the protocol in the context. Values that inhabit this type
     only act as fingerprint for inboxes.
 
     Inbox contents is represented using {!Raw_context.TREE.tree}s.
     (See below.) *)
-type t
+  type t
 
-val pp : Format.formatter -> t -> unit
+  val pp : Format.formatter -> t -> unit
 
-val equal : t -> t -> bool
+  val equal : t -> t -> bool
 
-val encoding : t Data_encoding.t
+  val encoding : t Data_encoding.t
 
-(** [empty level] is an inbox started at some given [level] with no
+  (** [empty level] is an inbox started at some given [level] with no
     message at all. *)
-val empty : Sc_rollup_repr.t -> Raw_level_repr.t -> t
+  val empty : Sc_rollup_repr.t -> Raw_level_repr.t -> t
 
-(** [inbox_level inbox] returns the maximum level of message insertion in
+  (** [inbox_level inbox] returns the maximum level of message insertion in
     [inbox] or its initial level. *)
-val inbox_level : t -> Raw_level_repr.t
+  val inbox_level : t -> Raw_level_repr.t
 
-(** [number_of_available_messages inbox] returns the number of
+  (** [number_of_available_messages inbox] returns the number of
     messages that can be consumed in [inbox]. *)
-val number_of_available_messages : t -> Z.t
+  val number_of_available_messages : t -> Z.t
 
-(** [number_of_messages_during_commitment_period inbox] returns the
+  (** [number_of_messages_during_commitment_period inbox] returns the
     number of messages added in the inbox since the beginning of
     the current commitment period. *)
-val number_of_messages_during_commitment_period : t -> int64
+  val number_of_messages_during_commitment_period : t -> int64
 
-(** [start_new_commitment_period inbox level] marks the beginning of a
+  (** [start_new_commitment_period inbox level] marks the beginning of a
     new commitment period at some [level]. *)
-val start_new_commitment_period : t -> Raw_level_repr.t -> t
+  val start_new_commitment_period : t -> Raw_level_repr.t -> t
 
-(** [starting_level_of_current_commitment_period inbox] returns the
+  (** [starting_level_of_current_commitment_period inbox] returns the
     level at the beginning of a current commitment period. *)
-val starting_level_of_current_commitment_period : t -> Raw_level_repr.t
+  val starting_level_of_current_commitment_period : t -> Raw_level_repr.t
 
-(** [consume_n_messages n inbox] returns an inbox where [n] messages have
-    been consumed, or [None] if there are strictly less than [n] messages
-    available in [inbox]. *)
-val consume_n_messages : int32 -> t -> t option tzresult
+  (** [consume_n_messages n inbox] returns an inbox where [n] messages have
+      been consumed, or [None] if there are strictly less than [n] messages
+      available in [inbox]. *)
+  val consume_n_messages : int32 -> t -> t option tzresult
+end
+
+(** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
+include Sc_rollup_data_version_sig.S with type t = V1.t
+
+include module type of V1 with type t = V1.t
 
 module Hash : S.HASH
 

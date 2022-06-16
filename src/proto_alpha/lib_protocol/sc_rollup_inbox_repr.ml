@@ -149,7 +149,8 @@ let pp_history_proof fmt cell =
     (Format.pp_print_list Hash.pp)
     (Skip_list.back_pointers cell)
 
-(*
+module V1 = struct
+  (*
 
    At a given level, an inbox is composed of metadata of type [t] and
    [current_messages], a [tree] representing the messages of the current level
@@ -186,49 +187,21 @@ let pp_history_proof fmt cell =
      messages.
 
 *)
-type t = {
-  rollup : Sc_rollup_repr.t;
-  level : Raw_level_repr.t;
-  nb_available_messages : int64;
-  nb_messages_in_commitment_period : int64;
-  starting_level_of_current_commitment_period : Raw_level_repr.t;
-  message_counter : Z.t;
-  (* Lazy to avoid hashing O(n^2) time in [add_external_messages] *)
-  current_messages_hash : unit -> Hash.t;
-  old_levels_messages : history_proof;
-}
+  type t = {
+    rollup : Sc_rollup_repr.t;
+    level : Raw_level_repr.t;
+    nb_available_messages : int64;
+    nb_messages_in_commitment_period : int64;
+    starting_level_of_current_commitment_period : Raw_level_repr.t;
+    message_counter : Z.t;
+    (* Lazy to avoid hashing O(n^2) time in [add_external_messages] *)
+    current_messages_hash : unit -> Hash.t;
+    old_levels_messages : history_proof;
+  }
 
-let equal inbox1 inbox2 =
-  (* To be robust to addition of fields in [t]. *)
-  let {
-    rollup;
-    level;
-    nb_available_messages;
-    nb_messages_in_commitment_period;
-    starting_level_of_current_commitment_period;
-    message_counter;
-    current_messages_hash;
-    old_levels_messages;
-  } =
-    inbox1
-  in
-  Sc_rollup_repr.Address.equal rollup inbox2.rollup
-  && Raw_level_repr.equal level inbox2.level
-  && Compare.Int64.(equal nb_available_messages inbox2.nb_available_messages)
-  && Compare.Int64.(
-       equal
-         nb_messages_in_commitment_period
-         inbox2.nb_messages_in_commitment_period)
-  && Raw_level_repr.(
-       equal
-         starting_level_of_current_commitment_period
-         inbox2.starting_level_of_current_commitment_period)
-  && Z.equal message_counter inbox2.message_counter
-  && Hash.equal (current_messages_hash ()) (inbox2.current_messages_hash ())
-  && equal_history_proof old_levels_messages inbox2.old_levels_messages
-
-let pp fmt
-    {
+  let equal inbox1 inbox2 =
+    (* To be robust to addition of fields in [t]. *)
+    let {
       rollup;
       level;
       nb_available_messages;
@@ -238,9 +211,37 @@ let pp fmt
       current_messages_hash;
       old_levels_messages;
     } =
-  Format.fprintf
-    fmt
-    {|
+      inbox1
+    in
+    Sc_rollup_repr.Address.equal rollup inbox2.rollup
+    && Raw_level_repr.equal level inbox2.level
+    && Compare.Int64.(equal nb_available_messages inbox2.nb_available_messages)
+    && Compare.Int64.(
+         equal
+           nb_messages_in_commitment_period
+           inbox2.nb_messages_in_commitment_period)
+    && Raw_level_repr.(
+         equal
+           starting_level_of_current_commitment_period
+           inbox2.starting_level_of_current_commitment_period)
+    && Z.equal message_counter inbox2.message_counter
+    && Hash.equal (current_messages_hash ()) (inbox2.current_messages_hash ())
+    && equal_history_proof old_levels_messages inbox2.old_levels_messages
+
+  let pp fmt
+      {
+        rollup;
+        level;
+        nb_available_messages;
+        nb_messages_in_commitment_period;
+        starting_level_of_current_commitment_period;
+        message_counter;
+        current_messages_hash;
+        old_levels_messages;
+      } =
+    Format.fprintf
+      fmt
+      {|
          rollup = %a
          level = %a
          current messages hash  = %a
@@ -250,114 +251,137 @@ let pp fmt
          message_counter = %a
          old_levels_messages = %a
     |}
-    Sc_rollup_repr.Address.pp
-    rollup
-    Raw_level_repr.pp
-    level
-    Hash.pp
-    (current_messages_hash ())
-    nb_available_messages
-    (Int64.to_string nb_messages_in_commitment_period)
-    Raw_level_repr.pp
-    starting_level_of_current_commitment_period
-    Z.pp_print
-    message_counter
-    pp_history_proof
-    old_levels_messages
+      Sc_rollup_repr.Address.pp
+      rollup
+      Raw_level_repr.pp
+      level
+      Hash.pp
+      (current_messages_hash ())
+      nb_available_messages
+      (Int64.to_string nb_messages_in_commitment_period)
+      Raw_level_repr.pp
+      starting_level_of_current_commitment_period
+      Z.pp_print
+      message_counter
+      pp_history_proof
+      old_levels_messages
 
-let inbox_level inbox = inbox.level
+  let inbox_level inbox = inbox.level
 
-let old_levels_messages_encoding =
-  Skip_list.encoding Hash.encoding Hash.encoding
+  let old_levels_messages_encoding =
+    Skip_list.encoding Hash.encoding Hash.encoding
 
-let encoding =
-  Data_encoding.(
-    conv
-      (fun {
-             rollup;
-             message_counter;
-             nb_available_messages;
-             nb_messages_in_commitment_period;
-             starting_level_of_current_commitment_period;
-             level;
-             current_messages_hash;
-             old_levels_messages;
-           } ->
-        ( rollup,
-          message_counter,
-          nb_available_messages,
-          nb_messages_in_commitment_period,
-          starting_level_of_current_commitment_period,
-          level,
-          current_messages_hash (),
-          old_levels_messages ))
-      (fun ( rollup,
-             message_counter,
-             nb_available_messages,
-             nb_messages_in_commitment_period,
-             starting_level_of_current_commitment_period,
-             level,
-             current_messages_hash,
-             old_levels_messages ) ->
-        {
-          rollup;
-          message_counter;
-          nb_available_messages;
-          nb_messages_in_commitment_period;
-          starting_level_of_current_commitment_period;
-          level;
-          current_messages_hash = (fun () -> current_messages_hash);
-          old_levels_messages;
-        })
-      (obj8
-         (req "rollup" Sc_rollup_repr.encoding)
-         (req "message_counter" n)
-         (req "nb_available_messages" int64)
-         (req "nb_messages_in_commitment_period" int64)
-         (req
-            "starting_level_of_current_commitment_period"
-            Raw_level_repr.encoding)
-         (req "level" Raw_level_repr.encoding)
-         (req "current_messages_hash" Hash.encoding)
-         (req "old_levels_messages" old_levels_messages_encoding)))
+  let encoding =
+    Data_encoding.(
+      conv
+        (fun {
+               rollup;
+               message_counter;
+               nb_available_messages;
+               nb_messages_in_commitment_period;
+               starting_level_of_current_commitment_period;
+               level;
+               current_messages_hash;
+               old_levels_messages;
+             } ->
+          ( rollup,
+            message_counter,
+            nb_available_messages,
+            nb_messages_in_commitment_period,
+            starting_level_of_current_commitment_period,
+            level,
+            current_messages_hash (),
+            old_levels_messages ))
+        (fun ( rollup,
+               message_counter,
+               nb_available_messages,
+               nb_messages_in_commitment_period,
+               starting_level_of_current_commitment_period,
+               level,
+               current_messages_hash,
+               old_levels_messages ) ->
+          {
+            rollup;
+            message_counter;
+            nb_available_messages;
+            nb_messages_in_commitment_period;
+            starting_level_of_current_commitment_period;
+            level;
+            current_messages_hash = (fun () -> current_messages_hash);
+            old_levels_messages;
+          })
+        (obj8
+           (req "rollup" Sc_rollup_repr.encoding)
+           (req "message_counter" n)
+           (req "nb_available_messages" int64)
+           (req "nb_messages_in_commitment_period" int64)
+           (req
+              "starting_level_of_current_commitment_period"
+              Raw_level_repr.encoding)
+           (req "level" Raw_level_repr.encoding)
+           (req "current_messages_hash" Hash.encoding)
+           (req "old_levels_messages" old_levels_messages_encoding)))
 
-let number_of_available_messages inbox = Z.of_int64 inbox.nb_available_messages
+  let number_of_available_messages inbox =
+    Z.of_int64 inbox.nb_available_messages
 
-let number_of_messages_during_commitment_period inbox =
-  inbox.nb_messages_in_commitment_period
+  let number_of_messages_during_commitment_period inbox =
+    inbox.nb_messages_in_commitment_period
 
-let start_new_commitment_period inbox level =
-  {
-    inbox with
-    starting_level_of_current_commitment_period = level;
-    nb_messages_in_commitment_period = 0L;
-  }
+  let start_new_commitment_period inbox level =
+    {
+      inbox with
+      starting_level_of_current_commitment_period = level;
+      nb_messages_in_commitment_period = 0L;
+    }
 
-let starting_level_of_current_commitment_period inbox =
-  inbox.starting_level_of_current_commitment_period
+  let starting_level_of_current_commitment_period inbox =
+    inbox.starting_level_of_current_commitment_period
 
-let no_messages_hash = Hash.hash_bytes [Bytes.empty]
+  let no_messages_hash = Hash.hash_bytes [Bytes.empty]
 
-let empty rollup level =
-  {
-    rollup;
-    level;
-    message_counter = Z.zero;
-    nb_available_messages = 0L;
-    nb_messages_in_commitment_period = 0L;
-    starting_level_of_current_commitment_period = level;
-    current_messages_hash = (fun () -> no_messages_hash);
-    old_levels_messages = Skip_list.genesis no_messages_hash;
-  }
+  let empty rollup level =
+    {
+      rollup;
+      level;
+      message_counter = Z.zero;
+      nb_available_messages = 0L;
+      nb_messages_in_commitment_period = 0L;
+      starting_level_of_current_commitment_period = level;
+      current_messages_hash = (fun () -> no_messages_hash);
+      old_levels_messages = Skip_list.genesis no_messages_hash;
+    }
 
-let consume_n_messages n ({nb_available_messages; _} as inbox) :
-    t option tzresult =
-  let n = Int64.of_int32 n in
-  if Compare.Int64.(n < 0L) then error (Invalid_number_of_messages_to_consume n)
-  else if Compare.Int64.(n > nb_available_messages) then ok None
-  else
-    let nb_available_messages = Int64.(sub nb_available_messages n) in
-    ok (Some {inbox with nb_available_messages})
+  let consume_n_messages n ({nb_available_messages; _} as inbox) :
+      t option tzresult =
+    let n = Int64.of_int32 n in
+    if Compare.Int64.(n < 0L) then
+      error (Invalid_number_of_messages_to_consume n)
+    else if Compare.Int64.(n > nb_available_messages) then ok None
+    else
+      let nb_available_messages = Int64.(sub nb_available_messages n) in
+      ok (Some {inbox with nb_available_messages})
+end
+
+type versioned = V1 of V1.t
+
+let versioned_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"V1"
+        (Tag 0)
+        V1.encoding
+        (function V1 inbox -> Some inbox)
+        (fun inbox -> V1 inbox);
+    ]
+
+include V1
+
+let of_versioned = function V1 inbox -> inbox [@@inline]
+
+let to_versioned inbox = V1 inbox [@@inline]
 
 let key_of_message = Data_encoding.Binary.to_string_exn Data_encoding.z
 
