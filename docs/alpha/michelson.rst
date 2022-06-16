@@ -2740,7 +2740,7 @@ readable one in a string and an optimized.
 -  ``mutez`` amounts are written as naturals.
 -  ``timestamp``\ s are written either using ``RFC3339`` notation
    in a string (readable), or as the number of seconds since Epoch
-   in a natural (optimized).
+   (when positive) or before Epoch (when negative) (optimized).
 -  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
    are written as strings, in their usual Base58 encoded versions
    (readable), or as their raw bytes (optimized).
