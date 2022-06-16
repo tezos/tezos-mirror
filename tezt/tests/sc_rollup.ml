@@ -996,7 +996,7 @@ let test_rollup_node_advances_pvm_state =
         | Error error ->
             failwith
               (Format.asprintf
-                 "The arithmetic PVM has an expected state: %a"
+                 "The arithmetic PVM has an unexpected state: %a"
                  Data_encoding.Binary.pp_read_error
                  error)
         | Ok x -> x
