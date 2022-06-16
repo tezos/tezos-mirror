@@ -94,9 +94,6 @@ integration:sandboxes:acc-endorsement:
     - . $HOME/.venv/bin/activate
     - mkdir tests_python/tmp
     - cd tests_python
-  # python scripts don't need the _build directory
-  # but only the binaries in the artifacts
-  cache: {}
 
 integration:static-binaries:
   extends:
