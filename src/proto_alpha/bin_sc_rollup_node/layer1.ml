@@ -129,8 +129,7 @@ module State = struct
   let mark_processed_head store (Head {hash; _} as head) =
     let open Lwt_syntax in
     let* () = Store.ProcessedHashes.add store hash () in
-    let* () = Store.LastProcessedHead.set store head in
-    return ()
+    Store.LastProcessedHead.set store head
 
   let is_processed = Store.ProcessedHashes.mem
 
