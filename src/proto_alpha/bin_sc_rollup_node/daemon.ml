@@ -89,7 +89,12 @@ module Make (PVM : Pvm.S) = struct
        the current head, but we still need to ensure that the node only published
        one commitment per block. *)
     let* () = Components.Commitment.publish_commitment node_ctxt store in
-    Components.Commitment.cement_commitment_if_possible node_ctxt store head
+    let* () =
+      Components.Commitment.cement_commitment_if_possible node_ctxt store head
+    in
+    when_ finalized (fun () ->
+        let*! () = Layer1.mark_processed_head store head in
+        return ())
 
   (* [on_layer_1_chain_event node_ctxt store chain_event old_heads] processes a
      list of heads, coming from either a list of [old_heads] or from the current
@@ -187,9 +192,12 @@ module Make (PVM : Pvm.S) = struct
     @@ iter_stream layer_1_chain_events
     @@ on_layer_1_chain_event node_ctxt store
 
-  let install_finalizer store rpc_server =
+  let install_finalizer store rpc_server heads stopper =
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+    stopper () ;
+    let* () = Lwt_stream.closed heads in
+    let* () = Layer1.shutdown store in
     let* () = Components.RPC_server.shutdown rpc_server in
     let* () = Store.close store in
     let* () = Event.shutdown_node exit_status in
@@ -201,13 +209,13 @@ module Make (PVM : Pvm.S) = struct
       let* rpc_server =
         Components.RPC_server.start node_ctxt store configuration
       in
-      let* tezos_heads =
+      let* tezos_heads, stopper =
         Layer1.start configuration node_ctxt.Node_context.cctxt store
       in
       let*! () = Inbox.start () in
       let*! () = Components.Commitment.start () in
 
-      let _ = install_finalizer store rpc_server in
+      let _ = install_finalizer store rpc_server tezos_heads stopper in
       let*! () =
         Event.node_is_ready
           ~rpc_addr:configuration.rpc_addr
