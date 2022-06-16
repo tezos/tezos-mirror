@@ -26,6 +26,22 @@
 (** This module defines functions that emit the events used when running a PVM
     transition (see {!Interpreter}). *)
 
-(** [transition_pvm hash n] emits the event that a PVM transition is leading to
-    the state of the given [hash] by processing [n] messages. *)
-val transitioned_pvm : Arith_pvm.state -> Z.t -> unit Lwt.t
+(** [transition_pvm inbox_level hash n] emits the event that a PVM
+   transition is leading to the state of the given [hash] by
+   processing [n] messages. *)
+val transitioned_pvm :
+  Protocol.Alpha_context.Raw_level.t -> Arith_pvm.state -> Z.t -> unit Lwt.t
+
+(** [intended_failure level message_index message_tick internal] emits
+   the event that an intended failure has been injected at some given
+   [level], during the processing of a given [message_index] and at
+   tick [message_tick] during this message processing. [internal] is
+   [true] if the failure is injected in a PVM internal
+   step. [internal] is [false] if the failure is injected in the input
+   to the PVM. *)
+val intended_failure :
+  level:int ->
+  message_index:int ->
+  message_tick:int ->
+  internal:bool ->
+  unit Lwt.t
