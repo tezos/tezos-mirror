@@ -213,3 +213,9 @@ module Tx_rollup : sig
     val parameter_file : ?parameters:t -> Protocol.t -> string Lwt.t
   end
 end
+
+module Dal : sig
+  module Parameters : sig
+    val parameter_file : Protocol.t -> string Lwt.t
+  end
+end

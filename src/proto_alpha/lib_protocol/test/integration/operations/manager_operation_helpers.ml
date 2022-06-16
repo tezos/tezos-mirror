@@ -896,14 +896,21 @@ let except_self_delegated_and_revelation_subjects =
 let revealed_except_set_deposits_limit_and_submit_batch_subjects =
   List.filter
     (function
-      | K_Set_deposits_limit | K_Tx_rollup_submit_batch | K_Reveal -> false
+      | K_Set_deposits_limit | K_Tx_rollup_submit_batch | K_Reveal
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/3210 *)
+      | K_Dal_publish_slot_header ->
+          false
       | _ -> true)
     subjects
 
 let revealed_only_set_deposits_limit_and_submit_batch_subjects =
   List.filter
     (function
-      | K_Set_deposits_limit | K_Tx_rollup_submit_batch -> true | _ -> false)
+      | K_Set_deposits_limit | K_Tx_rollup_submit_batch
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/3210 *)
+      | K_Dal_publish_slot_header ->
+          true
+      | _ -> false)
     subjects
 
 let revealed_subjects =

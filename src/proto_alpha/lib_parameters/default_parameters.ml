@@ -48,14 +48,16 @@ let sc_rollup_max_active_outbox_levels =
     pay for at origination time. *)
 let sc_rollup_max_outbox_messages_per_level = 100
 
-(* DAL/FIXME: Think harder about those values. *)
+(* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
+
+   Think harder about those values. *)
 let default_dal =
   Constants.Parametric.
     {
       feature_enable = false;
       number_of_slots = 256;
       number_of_shards = 2048;
-      endorsement_lag = 2;
+      endorsement_lag = 1;
       availability_threshold = 50;
     }
 
@@ -201,6 +203,16 @@ let constants_mainnet =
       };
   }
 
+let default_dal_sandbox =
+  Constants.Parametric.
+    {
+      feature_enable = false;
+      number_of_slots = 16;
+      number_of_shards = 256;
+      endorsement_lag = 1;
+      availability_threshold = 50;
+    }
+
 let constants_sandbox =
   let consensus_committee_size = 256 in
   let block_time = 1 in
@@ -217,6 +229,7 @@ let constants_sandbox =
   in
   {
     constants_mainnet with
+    dal = default_dal_sandbox;
     Constants.Parametric.preserved_cycles = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;

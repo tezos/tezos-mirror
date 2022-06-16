@@ -114,17 +114,17 @@ module Accountability = struct
             else bitset)
       shard_bitset_per_slot
 
-  let is_slot_available shard_bitset_per_slot ~threshold index =
+  let is_slot_available shard_bitset_per_slot ~threshold ~number_of_shards index
+      =
     match List.nth shard_bitset_per_slot index with
     | None -> false
     | Some bitset ->
         let acc = ref 0 in
-        let max = Bitset.occupied_size_in_bits bitset in
         List.iter
           (fun x ->
             match Bitset.mem bitset x with
             | Error _ | Ok false -> ()
             | Ok true -> incr acc)
-          Misc.(0 --> max) ;
-        Compare.Int.(!acc >= threshold)
+          Misc.(0 --> (number_of_shards - 1)) ;
+        Compare.Int.(!acc >= threshold * number_of_shards / 100)
 end

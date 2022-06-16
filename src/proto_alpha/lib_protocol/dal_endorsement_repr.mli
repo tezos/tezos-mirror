@@ -100,10 +100,12 @@ module Accountability : sig
      ignored. *)
   val record_shards_availability : t -> available_slots -> shard list -> t
 
-  (** [is_slot_available t ~threshold slot] returns [true] if the
-     number of shards recorded in [t] for the [slot] is above the
-     [threshold]. Returns [false] otherwise or if the [index] is out
-     of the interval [0;length] where [length] is the value provided
-     to the [init] function. *)
-  val is_slot_available : t -> threshold:int -> Dal_slot_repr.index -> bool
+  (** [is_slot_available t ~threshold ~number_of_shards slot] returns
+     [true] if the number of shards recorded in [t] for the [slot] is
+     above the [threshold] with respect to the total number of shards
+     specified by [number_of_shards]. Returns [false] otherwise or if
+     the [index] is out of the interval [0;length] where [length] is
+     the value provided to the [init] function. *)
+  val is_slot_available :
+    t -> threshold:int -> number_of_shards:int -> Dal_slot_repr.index -> bool
 end

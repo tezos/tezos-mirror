@@ -95,8 +95,8 @@ This sequence of operations was run:
   "tx_rollup_rejection_max_proof_size": 30000,
   "tx_rollup_sunset_level": 3473409,
   "dal_parametric":
-    { "feature_enable": false, "number_of_slots": 256,
-      "number_of_shards": 2048, "endorsement_lag": 2,
+    { "feature_enable": false, "number_of_slots": 16,
+      "number_of_shards": 256, "endorsement_lag": 1,
       "availability_threshold": 50 }, "sc_rollup_enable": true,
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 1,
@@ -195,8 +195,8 @@ This sequence of operations was run:
   "tx_rollup_rejection_max_proof_size": 30000,
   "tx_rollup_sunset_level": 3473409,
   "dal_parametric":
-    { "feature_enable": false, "number_of_slots": 256,
-      "number_of_shards": 2048, "endorsement_lag": 2,
+    { "feature_enable": false, "number_of_slots": 16,
+      "number_of_shards": 256, "endorsement_lag": 1,
       "availability_threshold": 50 }, "sc_rollup_enable": true,
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 1,

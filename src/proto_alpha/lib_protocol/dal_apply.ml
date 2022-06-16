@@ -53,37 +53,43 @@ let only_if_dal_feature_enabled ctxt ~default f =
   let Parametric.{dal = {feature_enable; _}; _} = parametric ctxt in
   if feature_enable then f ctxt else default ctxt
 
-type error += Dal_endorsement_unexpected_size of {expected : int; got : int}
+type error +=
+  | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
 
 let () =
   let open Data_encoding in
-  let description =
-    "The endorsement for data availability has a different size"
-  in
+  let description = "The endorsement for data availability is a too big" in
   register_error_kind
     `Permanent
-    ~id:"dal_endorsement_unexpected_size"
-    ~title:"DAL endorsement unexpected size"
+    ~id:"dal_endorsement_size_limit_exceeded"
+    ~title:"DAL endorsement exceeded the limit"
     ~description
-    ~pp:(fun ppf (expected, got) ->
-      Format.fprintf ppf "%s: Expected %d. Got %d." description expected got)
-    (obj2 (req "expected_size" int31) (req "got" int31))
+    ~pp:(fun ppf (maximum_size, got) ->
+      Format.fprintf
+        ppf
+        "%s: Maximum is %d. Got %d."
+        description
+        maximum_size
+        got)
+    (obj2 (req "maximum_size" int31) (req "got" int31))
     (function
-      | Dal_endorsement_unexpected_size {expected; got} -> Some (expected, got)
+      | Dal_endorsement_size_limit_exceeded {maximum_size; got} ->
+          Some (maximum_size, got)
       | _ -> None)
-    (fun (expected, got) -> Dal_endorsement_unexpected_size {expected; got})
+    (fun (maximum_size, got) ->
+      Dal_endorsement_size_limit_exceeded {maximum_size; got})
 
 let validate_data_availability ctxt data_availability =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Constants in
   let Parametric.{dal = {number_of_slots; _}; _} = parametric ctxt in
-  let expected_size =
+  let maximum_size =
     Dal.Endorsement.expected_size_in_bits ~max_index:(number_of_slots - 1)
   in
   let size = Dal.Endorsement.occupied_size_in_bits data_availability in
   error_unless
-    Compare.Int.(size = expected_size)
-    (Dal_endorsement_unexpected_size {expected = expected_size; got = size})
+    Compare.Int.(size <= maximum_size)
+    (Dal_endorsement_size_limit_exceeded {maximum_size; got = size})
 
 let apply_data_availability ctxt data_availability ~endorser =
   assert_dal_feature_enabled ctxt >>?= fun () ->
@@ -131,7 +137,7 @@ let () =
   let open Data_encoding in
   let description = "Slot header with too low fees" in
   register_error_kind
-    `Permanent
+    `Branch
     ~id:"dal_publish_slot_header_with_low_fees"
     ~title:"DAL slot header with low fees"
     ~description

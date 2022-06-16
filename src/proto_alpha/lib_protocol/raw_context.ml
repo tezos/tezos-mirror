@@ -916,7 +916,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             feature_enable = false;
             number_of_slots = 256;
             number_of_shards = 2048;
-            endorsement_lag = 2;
+            endorsement_lag = 1;
             availability_threshold = 50;
           }
       in
@@ -1493,9 +1493,13 @@ module Dal = struct
     let threshold =
       ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
     in
+    let number_of_shards =
+      ctxt.back.constants.Constants_parametric_repr.dal.number_of_shards
+    in
     Dal_endorsement_repr.Accountability.is_slot_available
       ctxt.back.dal_endorsement_slot_accountability
       ~threshold
+      ~number_of_shards
 
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
 
@@ -1503,18 +1507,27 @@ module Dal = struct
      the consensus which is hackish and probably not what we want at
      the end. However, it should be enough for a prototype. This has a
      very bad complexity too. *)
-  let shards ctxt ~endorser =
+  let rec compute_shards ?(index = 0) ctxt ~endorser =
     let max_shards = ctxt.back.constants.dal.number_of_shards in
     Slot_repr.Map.fold_e
-      (fun slot (_, public_key_hash, _) shards ->
-        (* Early fail because 2048 < 7000 *)
-        if Compare.Int.(Slot_repr.to_int slot >= max_shards) then Error shards
+      (fun _ (_, public_key_hash, power) (index, shards) ->
+        let limit = Compare.Int.min (index + power) max_shards in
+        (* Early fail when we have reached the desired number of shards *)
+        if Compare.Int.(index >= max_shards) then Error shards
         else if Signature.Public_key_hash.(public_key_hash = endorser) then
-          Ok (Slot_repr.to_int slot :: shards)
-        else Ok shards)
+          let shards = Misc.(index --> (limit - 1)) in
+          Ok (index + power, shards)
+        else Ok (index + power, shards))
       ctxt.back.consensus.allowed_endorsements
-      []
+      (index, [])
     |> function
-    | Ok shards -> shards
+    | Ok (index, []) ->
+        (* This happens if the number of Tenderbake slots is below the
+           number of shards. Therefore, we reuse the committee using a
+           shift (index being the size of the committee). *)
+        compute_shards ~index ctxt ~endorser
+    | Ok (_index, shards) -> shards
     | Error shards -> shards
+
+  let shards ctxt ~endorser = compute_shards ~index:0 ctxt ~endorser
 end

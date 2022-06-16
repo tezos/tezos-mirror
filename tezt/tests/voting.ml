@@ -199,23 +199,13 @@ let check_current_proposal ?level client expected_proposal_hash =
     ~error_msg:"expected current_proposal = %R, got %L" ;
   unit
 
-type block_metadata = {protocol : string; next_protocol : string}
-
-let parse_block_metadata block_metadata =
-  {
-    protocol = JSON.(block_metadata |-> "protocol" |> as_string);
-    next_protocol = JSON.(block_metadata |-> "next_protocol" |> as_string);
-  }
-
 let check_protocols ?level client expected_protocols =
-  let open Lwt.Infix in
-  let* {protocol; next_protocol} =
+  let* block_metadata =
     RPC.Client.call client
     @@ RPC.get_chain_block_metadata ?block:(Option.map string_of_int level) ()
-    >|= parse_block_metadata
   in
-  Check.(
-    ((protocol, next_protocol) = expected_protocols) (tuple2 string string))
+  let protocols_got = (block_metadata.protocol, block_metadata.next_protocol) in
+  Check.((protocols_got = expected_protocols) (tuple2 string string))
     ~error_msg:"expected (protocol, next_protocol) = %R, got %L" ;
   unit
 

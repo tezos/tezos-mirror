@@ -2204,6 +2204,7 @@ let contents_and_result_encoding =
          make seed_nonce_revelation_case;
          make endorsement_case;
          make preendorsement_case;
+         make dal_slot_availability_case;
          make double_preendorsement_evidence_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
@@ -2224,6 +2225,7 @@ let contents_and_result_encoding =
          make tx_rollup_remove_commitment_case;
          make tx_rollup_rejection_case;
          make transfer_ticket_case;
+         make dal_publish_slot_header_case;
          make tx_rollup_dispatch_tickets_case;
          make sc_rollup_originate_case;
          make sc_rollup_add_messages_case;
@@ -2785,6 +2787,17 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Transfer_ticket _; _}, _ -> None
+  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+      Manager_operation_result
+        {operation_result = Applied (Dal_publish_slot_header_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Dal_publish_slot_header _; _},
+      Manager_operation_result
+        {
+          operation_result = Backtracked (Dal_publish_slot_header_result _, _);
+          _;
+        } ) ->
+      Some Eq
   | ( Manager_operation {operation = Dal_publish_slot_header _; _},
       Manager_operation_result
         {
