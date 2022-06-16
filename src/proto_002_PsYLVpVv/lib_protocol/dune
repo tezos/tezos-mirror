@@ -269,18 +269,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} .)))
 
-(rule
- (alias runtest_sandbox)
- (deps
-  .tezos_protocol_002_PsYLVpVv.objs/native/tezos_protocol_002_PsYLVpVv.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-002-PsYLVpVv)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_002_PsYLVpVv_functor)
  (libraries

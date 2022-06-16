@@ -22,11 +22,6 @@ It also includes tutorials for testing more specific parts such as protocol code
 .. toctree::
    :maxdepth: 2
 
-   flextesa
-
-.. toctree::
-   :maxdepth: 2
-
    python_testing_framework
 
 .. toctree::

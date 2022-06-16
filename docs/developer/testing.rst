@@ -78,16 +78,16 @@ in more detail.
 
 
 .. csv-table:: Testing frameworks and their applications in Tezos. PT:
-               :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, FT: :ref:`flextesa_section`, TZ: :ref:`tezt_section`
+               :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, TZ: :ref:`tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression"
 
-   "Node",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
+   "Node",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`"
    "-- Protocol",":ref:`AT <alcotest_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`",""
    "-- -- Michelson interpreter",":ref:`AT <alcotest_section>`","","",":ref:`PT <pytest_section>`",":ref:`PT <pytest_section>`"
-   "Client",":ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
-   "Networked nodes","--","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`","", ""
-   "Endorser","","","",":ref:`FT <flextesa_section>`"
-   "Baker","","","",":ref:`FT <flextesa_section>`"
+   "Client",":ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`"
+   "Networked nodes","--","",":ref:`PT <pytest_section>`","", ""
+   "Endorser","","","",""
+   "Baker","","","",""
 
 
 Testing frameworks
@@ -218,40 +218,13 @@ References:
  - `pytest-regtest pip package <https://pypi.org/project/pytest-regtest/>`_
  - :ref:`Section in Tezos Developer Documentation on pytest-regtest <pytest_regression_testing>`
 
-.. _flextesa_section:
-
-Flextesa
-~~~~~~~~
-
-Flextesa (Flexible Test Sandboxes) is an OCaml library for setting up
-configurable and scriptable sandboxes to meet specific testing
-needs. Flextesa can also be used for interactive tests. This is used,
-for instance, in some tests that require the user to interact with the
-Ledger application.
-
-Typical use cases:
- - In terms of use cases, Flextesa is similar to the :ref:`Python testing
-   and execution framework <pytest_section>`.
-
-Example test:
- - Testing double baking, accusations and double-baking accusation
-   scenarios (in :src:`src/bin_sandbox/command_accusations.ml`)
-
-References:
- - :doc:`Section in Tezos Developer Documentation on Flextesa <flextesa>`
- - `Blog post introducing Flextesa
-   <https://medium.com/@obsidian.systems/introducing-flextesa-robust-testing-tools-for-tezos-and-its-applications-edc1e336a209>`_
- - `GitLab repository <https://gitlab.com/tezos/flextesa>`_
- - `An example setting up a Babylon docker sandbox <https://assets.tqtezos.com/docs/setup/2-sandbox/>`_
- - `API documentation <https://tezos.gitlab.io/flextesa/lib-index.html>`_
-
 .. _tezt_section:
 
 Tezt
 ~~~~
 
 :doc:`Tezt <tezt>` is a system testing framework for Tezos. It is
-intended as a replacement to Flextesa and as an OCaml-based alternative
+intended as a replacement to `Flextesa <https://tezos.gitlab.io/flextesa/>`_ and as an OCaml-based alternative
 to :ref:`Python testing and execution framework
 <pytest_section>`. Like the latter, Tezt is also capable of regression
 testing. Tezt focuses on tests that run in the CI, although it is also
@@ -264,16 +237,14 @@ the Tezos binaries: the client, baker, etc.
 
 Typical use cases:
  - In terms of use cases, Tezt is similar to the :ref:`Python testing and
-   execution framework <pytest_section>` and :ref:`Flextesa
-   <flextesa_section>`. It can be used by authors that prefer OCaml
+   execution framework <pytest_section>` and `Flextesa <https://tezos.gitlab.io/flextesa/>`_.
+   It can be used by authors that prefer OCaml
    for writing system tests.
 
 Example tests:
  - Testing baking (in :src:`tezt/tests/basic.ml`)
  - Testing double baking and double endorsement scenarios (in
-   :src:`tezt/tests/double_bake.ml`). This test is a rewrite of the
-   Flextesa double baking scenario mentioned above, that demonstrates
-   the difference between the two frameworks.
+   :src:`tezt/tests/double_bake.ml`).
  - Testing absence of regressions in encodings (in :src:`tezt/tests/encoding.ml`)
 
 References:
@@ -410,7 +381,7 @@ developer utilities and old protocols. In particular:
 
  - benchmarks, e.g. ``src/lib_shell/bench/dune``
  - bindings, e.g. ``src/lib_sapling/bindings/dune``
- - test frameworks, e.g. ``src/bin_sandbox/dune``
+ - test frameworks, e.g. ``tezt/lib/dune``
  - test packages, e.g. ``src/*/test/dune``
  - old protocols, e.g. ``src/proto_00*/*/*dune``
  - helper utilities, e.g.:
@@ -555,9 +526,6 @@ The OCaml package tests (Alcotest & QCheck)
    one job per protocol package, in addition to one job regrouping
    tests for remaining packages.
 
-Flextesa
-   Flextesa tests run in one job per test.
-
 Adding tests to the CI
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -592,7 +560,7 @@ The OCaml package tests (Alcotest & QCheck)
   ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``
   ``make`` invocation.
 
-Other (including Flextesa)
+Other
   For other types of tests, you need to manually modify the
   :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
   Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for

@@ -280,7 +280,7 @@ actually listening on):
    :language: json
 
 The endpoints specifically required for baking can be found in
-:src:`vendors/flextesa-lib/tezos_node.ml`.
+`tezos_node.ml of Flextesa <https://gitlab.com/tezos/flextesa/-/blob/master/src/lib/tezos_node.ml>`_.
 
 .. _configure_p2p:
 

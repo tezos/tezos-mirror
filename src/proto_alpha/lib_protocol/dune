@@ -666,17 +666,6 @@
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(rule
- (alias runtest_sandbox)
- (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-alpha)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_alpha_functor)
  (libraries

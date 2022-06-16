@@ -67,17 +67,6 @@
  (deps main.ml main.mli (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
 
-(rule
- (alias runtest_sandbox)
- (deps .tezos_protocol_demo_noops.objs/native/tezos_protocol_demo_noops.cmx)
- (action (progn)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-demo-noops)
- (deps (alias runtest_sandbox))
- (action (progn)))
-
 (library
  (name tezos_protocol_demo_noops_functor)
  (libraries

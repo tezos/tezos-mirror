@@ -51,25 +51,6 @@ None
 
 ## Misc
 
-### flextesa-lib
-- This library has no tests here; they are in the `tezos/flextesa` and not reproduced here.
-- Flextesa was initially developed to test 3rd party tools (Kiln, Dapps, etc.).
-  It was then integrated into Tezos to improve the testing infrastructure and
-  later, its development was re-externalized to the `tezos/flextesa` repository
-  to be more flexible. It is the base for the `tezos-sandbox` executable in
-  `src/bin_sandbox` and all the test scenarios defined in that `dune` file.
-- Cloned from: [flextesa](https://gitlab.com/tezos/flextesa), just the `src/lib`
-  sub-directory.
-- It is vendored because it
-  depends on some Tezos libraries (e.g. `tezos-crypto`), and it obviously makes
-  some assumptions on how Tezos works hence using `opam` would be too cumbersome
-  w.r.t. to changes in the protocol or the shell.
-
-#### Differences with the initial library
-
-Changes to the vendored version are periodically proposed in the main repository
-as merge-requests.
-
 ### ocaml-ledger-wallet
 - Library used by `tezos-client` to interact with the Ledger family of hardware
   wallets.

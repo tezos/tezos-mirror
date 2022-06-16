@@ -137,11 +137,6 @@ coverage-report-cobertura:
 enable-time-measurement:
 	@$(MAKE) build PROFILE=dev DUNE_INSTRUMENT_WITH=tezos-time-measurement
 
-.PHONY: build-sandbox
-build-sandbox:
-	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) src/bin_sandbox/main.exe
-	@cp -f _build/default/src/bin_sandbox/main.exe tezos-sandbox
-
 .PHONY: test-protocol-compile
 test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_compile_protocol
@@ -185,10 +180,6 @@ test-python-alpha: all
 test-python-tenderbake: all
 	@$(MAKE) -C tests_python tenderbake
 
-.PHONY: test-flextesa
-test-flextesa:
-	@$(MAKE) -f sandbox.Makefile
-
 # TODO: https://gitlab.com/tezos/tezos/-/issues/3018
 # Disable verbose once the log file bug in Alcotest is fixed.
 .PHONY: test-js
@@ -214,11 +205,11 @@ test-tezt-coverage:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --keep-going --test-timeout 1800
 
 .PHONY: test-code
-test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt
+test-code: test-protocol-compile test-unit test-python test-tezt
 
-# This is `make test-code` except for flextesa (which doesn't
-# play well with coverage). We allow failure (prefix "-") because we still want
-# the coverage report even if an individual test happens to fail.
+# This is as `make test-code` except we allow failure (prefix "-")
+# because we still want the coverage report even if an individual
+# test happens to fail.
 .PHONY: test-coverage
 test-coverage:
 	-@$(MAKE) test-protocol-compile
@@ -394,7 +385,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f ${TEZOS_BIN} ${UNRELEASED_TEZOS_BIN} tezos-sandbox
+	@-rm -f ${TEZOS_BIN} ${UNRELEASED_TEZOS_BIN}
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html

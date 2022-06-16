@@ -7,7 +7,6 @@ set -euo pipefail
 # At least the following other jobs still compile with all protocols:
 # - Docker images (for master and releases)
 # - static binaries (only for releases)
-# Note: src/proto_000_Ps9mPmXa is needed by Flextesa
 
 all_protocols=$(find src -maxdepth 1 -type d -regex 'src/proto.*' | \
                 cut -d '_' -f2- | \
