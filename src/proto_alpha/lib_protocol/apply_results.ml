@@ -1147,7 +1147,7 @@ module Internal_result = struct
 end
 
 let internal_contents_encoding : packed_internal_contents Data_encoding.t =
-  def "apply_results.alpha.internal_operation_result"
+  def "apply_internal_results.alpha.operation_result"
   @@ conv
        (fun (Internal_contents {source; operation; nonce}) ->
          ((source, nonce), Manager operation))
@@ -1175,7 +1175,7 @@ module Internal_manager_result = struct
   let make ~op_case ~encoding ~kind ~select ~proj ~inj =
     let (Internal_result.MCase {name; _}) = op_case in
     let t =
-      def (Format.asprintf "operation.alpha.operation_result.%s" name)
+      def (Format.asprintf "operation.alpha.internal_operation_result.%s" name)
       @@ union
            ~tag_size:`Uint8
            [
@@ -1332,7 +1332,7 @@ let internal_manager_operation_result_encoding :
         let op = {source; operation = ires_case.inj op; nonce} in
         Internal_manager_operation_result (op, res))
   in
-  def "apply_results.alpha.operation_result"
+  def "apply_internal_results.alpha.operation_result"
   @@ union
        [
          make
