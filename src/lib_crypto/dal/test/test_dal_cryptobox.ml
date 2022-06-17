@@ -51,6 +51,15 @@ module Test = struct
           let precompute_pi_segments =
             DAL_crypto.precompute_slot_segments_proofs ()
           in
+          let () =
+            DAL_crypto.save_precompute_slot_segments_proofs
+              precompute_pi_segments
+              "slot_seg_proofs_precomp"
+          in
+          let precompute_pi_segments =
+            DAL_crypto.load_precompute_slot_segments_proofs
+              "slot_seg_proofs_precomp"
+          in
           let pis =
             DAL_crypto.prove_slot_segments p ~preprocess:precompute_pi_segments
           in

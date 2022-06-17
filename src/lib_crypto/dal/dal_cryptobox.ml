@@ -76,6 +76,12 @@ module type DAL_cryptobox_sig = sig
     val shard_encoding : shard Data_encoding.t
 
     val shards_encoding : shards_map Data_encoding.t
+
+    val shards_proofs_precomputation_encoding :
+      shards_proofs_precomputation Data_encoding.t
+
+    val slot_segments_proofs_precomputation_encoding :
+      slot_segments_proofs_precomputation Data_encoding.t
   end
 
   (** Length of the erasure-encoded slot in terms of scalar elements. *)
@@ -127,6 +133,11 @@ module type DAL_cryptobox_sig = sig
       shards. *)
   val precompute_shards_proofs : unit -> shards_proofs_precomputation
 
+  val save_precompute_shards_proofs :
+    shards_proofs_precomputation -> string -> unit
+
+  val load_precompute_shards_proofs : string -> shards_proofs_precomputation
+
   (** [prove_shards preprocess p] creates a proof of evaluation for each
       shard. *)
   val prove_shards :
@@ -151,6 +162,12 @@ module type DAL_cryptobox_sig = sig
       prove slot segments. *)
   val precompute_slot_segments_proofs :
     unit -> slot_segments_proofs_precomputation
+
+  val save_precompute_slot_segments_proofs :
+    slot_segments_proofs_precomputation -> string -> unit
+
+  val load_precompute_slot_segments_proofs :
+    string -> slot_segments_proofs_precomputation
 
   (** [prove_slot_segments p preprocess] where [p] is the output of
       [polynomial_from_bytes slot], returns proofs for all slot segments. *)
@@ -251,6 +268,12 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
         IntMap.bindings
         (fun bindings -> IntMap.of_seq (List.to_seq bindings))
         (list (tup2 int31 share_encoding))
+
+    let shards_proofs_precomputation_encoding =
+      tup2 (array fr_encoding) (array (array g1_encoding))
+
+    let slot_segments_proofs_precomputation_encoding =
+      tup2 (array fr_encoding) (array (array g1_encoding))
   end
 
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
@@ -627,6 +650,29 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       ~degree:k
       (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
 
+  let save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
+      filename =
+    let chan = Out_channel.open_bin filename in
+    Out_channel.output_bytes
+      chan
+      (Data_encoding.Binary.to_bytes_exn
+         Encoding.shards_proofs_precomputation_encoding
+         preprocess) ;
+    Out_channel.close_noerr chan
+
+  let load_precompute_shards_proofs filename =
+    let chan = In_channel.open_bin filename in
+    let len = Int64.to_int (In_channel.length chan) in
+    let data = Bytes.create len in
+    let _ = In_channel.really_input chan data 0 len in
+    let precomp =
+      Data_encoding.Binary.of_bytes_exn
+        Encoding.shards_proofs_precomputation_encoding
+        data
+    in
+    In_channel.close_noerr chan ;
+    precomp
+
   let prove_shards p ~preprocess =
     Kate_amortized.multiple_multi_reveals
       ~chunk_len:evaluations_per_proof_log
@@ -664,6 +710,29 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       ~chunk_len:Z.(log2up (of_int segment_len))
       ~degree:k
       (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
+
+  let save_precompute_slot_segments_proofs
+      (preprocess : slot_segments_proofs_precomputation) filename =
+    let chan = Out_channel.open_bin filename in
+    Out_channel.output_bytes
+      chan
+      (Data_encoding.Binary.to_bytes_exn
+         Encoding.slot_segments_proofs_precomputation_encoding
+         preprocess) ;
+    Out_channel.close_noerr chan
+
+  let load_precompute_slot_segments_proofs filename =
+    let chan = In_channel.open_bin filename in
+    let len = Int64.to_int (In_channel.length chan) in
+    let data = Bytes.create len in
+    let _ = In_channel.really_input chan data 0 len in
+    let precomp =
+      Data_encoding.Binary.of_bytes_exn
+        Encoding.slot_segments_proofs_precomputation_encoding
+        data
+    in
+    In_channel.close_noerr chan ;
+    precomp
 
   let prove_slot_segments p ~preprocess =
     Kate_amortized.multiple_multi_reveals
