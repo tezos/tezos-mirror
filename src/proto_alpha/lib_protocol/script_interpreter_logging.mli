@@ -79,6 +79,10 @@ val log_exit :
     protects us from calling this by mistake.*)
 val log_control : logger -> ('a, 'b, 'c, 'd) continuation -> unit
 
+(** [instrument_cont logger sty] creates a function instrumenting
+    continuations starting from the stack type described by [sty].
+    Instrumentation consists in wrapping inner continuations in
+    [KLog] continuation so that logging continues. *)
 val instrument_cont :
   logger ->
   ('a, 'b) stack_ty ->
@@ -112,11 +116,18 @@ val log_next_kinstr :
   ('a, 'b, 'c, 'd) kinstr ->
   ('a, 'b, 'c, 'd) kinstr tzresult
 
+(* [kinstr_final_stack_type sty instr] computes the stack type after
+   [instr] has been executed, assuming [sty] is the type of the stack
+   prior to execution. *)
 val kinstr_final_stack_type :
   ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd) stack_ty option tzresult
 
+(* The same as [kinstr_final_stack_type], but selects from multiple
+   possible execution branches. If the first instr ends with FAILWITH,
+   it will try the next and so on. Note that all instructions must
+   result in the same stack type. *)
 val branched_final_stack_type :
   ('r, 'f) ex_init_stack_ty list -> ('r, 'f) stack_ty option tzresult
 
