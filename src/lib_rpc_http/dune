@@ -61,5 +61,5 @@
   -open Tezos_stdlib_unix
   -open Tezos_rpc
   -open Tezos_rpc_http)
- (modules RPC_server RPC_logging)
+ (modules RPC_server RPC_logging RPC_middleware)
  (private_modules RPC_logging))

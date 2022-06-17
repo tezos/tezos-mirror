@@ -146,6 +146,8 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | ( `Conflict _ | `Error _ | `Forbidden _ | `Unauthorized _ | `Not_found _
       | `Gone _ ) as v ->
         return_ok v
+    | `Unexpected_status_code (`Moved_permanently, _) ->
+        request_failed meth uri Redirect_not_supported
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map Media_type.name media_type in
         let* content = Cohttp_lwt.Body.to_string content in

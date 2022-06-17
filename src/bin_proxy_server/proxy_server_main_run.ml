@@ -31,6 +31,7 @@ type args = {
   address : P2p_addr.t;
   port : int;
   tls_cert_and_key : (string * string) option;
+  forwarding_endpoint : Uri.t;
 }
 
 let () =
@@ -52,7 +53,8 @@ let () =
       | _ -> None)
     (fun addrlist -> Proxy_server_RPC_Port_already_in_use addrlist)
 
-let launch_rpc_server dir {address; port; tls_cert_and_key} =
+let launch_rpc_server dir {address; port; tls_cert_and_key; forwarding_endpoint}
+    =
   let open Lwt_result_syntax in
   let host = Ipaddr.V6.to_string address in
   let mode =
@@ -61,6 +63,9 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
     | Some (cert, key) ->
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
+  let middleware =
+    Tezos_rpc_http_server.RPC_middleware.query_forwarder forwarding_endpoint
+  in
   Lwt.catch
     (fun () ->
       Lwt_result.ok
@@ -68,6 +73,7 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
            ~host
            mode
            dir
+           ~middleware
            ~media_types:Tezos_rpc_http.Media_type.all_media_types)
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->

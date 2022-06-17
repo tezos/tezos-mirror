@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,35 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type rpc_error =
-  | Empty_answer
-  | Connection_failed of string
-  | Bad_request of string
-  | Forbidden
-  | Method_not_allowed of RPC_service.meth list
-  | Unsupported_media_type of string option
-  | Not_acceptable of {proposed : string; acceptable : string}
-  | Unexpected_status_code of {
-      code : Cohttp.Code.status_code;
-      content : string;
-      media_type : string option;
-    }
-  | Unexpected_content_type of {
-      received : string;
-      acceptable : string list;
-      body : string;
-    }
-  | Unexpected_content of {
-      content : string;
-      media_type : string;
-      error : string;
-    }
-  | OCaml_exception of string
-  | Unauthorized_host of string option
-  | Unauthorized_uri
-  | Redirect_not_supported
-      (** Indicates that the endpoint returned a redirect, which the client does
-        not yet know how to follow. *)
+let make_transform_callback forwarding_endpoint callback conn req body =
+  let open Lwt_syntax in
+  let* answer = callback conn req body in
+  let open Cohttp in
+  let uri = Request.uri req in
+  let answer_has_not_found_status = function
+    | `Expert (response, _) | `Response (response, _) ->
+        Cohttp.Response.status response = `Not_found
+  in
+  if answer_has_not_found_status answer then
+    let overriding = Uri.to_string forwarding_endpoint ^ Uri.path uri in
+    let headers = Cohttp.Header.of_list [("Location", overriding)] in
+    let response =
+      Cohttp.Response.make ~status:`Moved_permanently ~headers ()
+    in
+    Lwt.return (`Response (response, Cohttp_lwt.Body.empty))
+  else Lwt.return answer
 
-type error +=
-  | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}
+let query_forwarder forwarding_endpoint =
+  Resto_cohttp_server.Server.
+    {transform_callback = make_transform_callback forwarding_endpoint}
