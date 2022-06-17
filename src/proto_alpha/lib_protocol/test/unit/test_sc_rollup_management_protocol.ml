@@ -85,9 +85,8 @@ let test_encode_decode_internal_inbox_message () =
   let open WithExceptions in
   let open Lwt_result_syntax in
   let* ctxt = init_ctxt () in
-  let*? sender =
-    Environment.wrap_tzresult
-      (Contract.of_b58check "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc")
+  let sender =
+    Contract_hash.of_b58check_exn "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"
   in
   let source =
     Result.get_ok

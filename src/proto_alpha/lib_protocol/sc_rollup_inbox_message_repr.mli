@@ -49,7 +49,9 @@
 type internal_inbox_message = {
   payload : Script_repr.expr;
       (** A Micheline value containing the parameters passed to the rollup. *)
-  sender : Contract_repr.t;  (** The L1 caller contract. *)
+  sender : Contract_hash.t;
+      (** The contract hash of an Layer 1 originated contract sending a message
+          to the rollup. *)
   source : Signature.public_key_hash;
       (** The implicit account that originated the transaction. *)
 }

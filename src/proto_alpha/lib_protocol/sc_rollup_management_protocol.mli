@@ -67,7 +67,7 @@ val make_internal_inbox_message :
   context ->
   ('a, _) Script_typed_ir.ty ->
   payload:'a ->
-  sender:Contract.t ->
+  sender:Contract_hash.t ->
   source:public_key_hash ->
   (Sc_rollup.Inbox.Message.t * context) tzresult Lwt.t
 

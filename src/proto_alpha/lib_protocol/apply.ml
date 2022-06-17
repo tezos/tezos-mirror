@@ -127,6 +127,7 @@ type error +=
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
   | Incorrect_reveal_position
+  | Invalid_transfer_to_sc_rollup_from_implicit_account
 
 let () =
   register_error_kind
@@ -792,7 +793,22 @@ let () =
          position")
     Data_encoding.empty
     (function Incorrect_reveal_position -> Some () | _ -> None)
-    (fun () -> Incorrect_reveal_position)
+    (fun () -> Incorrect_reveal_position) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_transfer_to_sc_rollup_from_implicit_account"
+    ~title:"Invalid transfer to sc rollup"
+    ~description:"Invalid transfer to sc rollup from implicit account"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Invalid source for transfer operation to smart-contract rollup. Only \
+         originated accounts are allowed")
+    Data_encoding.empty
+    (function
+      | Invalid_transfer_to_sc_rollup_from_implicit_account -> Some ()
+      | _ -> None)
+    (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account)
 
 open Apply_results
 
@@ -1198,6 +1214,16 @@ let apply_internal_manager_operation_content :
         unparsed_parameters = payload;
       } ->
       assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
+      (* TODO: #3242
+         We could rather change the type of [source] in
+         {!Script_type_ir.internal_operation}. Only originated accounts should
+         be allowed anyway for internal operations.
+      *)
+      (match source with
+      | Contract.Implicit _ ->
+          error Invalid_transfer_to_sc_rollup_from_implicit_account
+      | Originated hash -> ok hash)
+      >>?= fun sender ->
       (* Adding the message to the inbox. Note that it is safe to ignore the
          size diff since only its hash and meta data are stored in the context.
          See #3232. *)
@@ -1205,7 +1231,7 @@ let apply_internal_manager_operation_content :
         ctxt
         destination
         ~payload
-        ~sender:source
+        ~sender
         ~source:payer
       >|=? fun (inbox_after, _size, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in

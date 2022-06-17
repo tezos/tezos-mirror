@@ -56,10 +56,8 @@ let () =
 
 type internal_inbox_message = {
   payload : Script_repr.expr;
-      (** A Micheline value containing the parameters passed to the rollup. *)
-  sender : Contract_repr.t;  (** The L1 caller contract. *)
+  sender : Contract_hash.t;
   source : Signature.public_key_hash;
-      (** The implicit account that originated the transaction. *)
 }
 
 type t = Internal of internal_inbox_message | External of string
@@ -73,7 +71,7 @@ let encoding =
         ~title:"Internal"
         (obj3
            (req "payload" Script_repr.expr_encoding)
-           (req "sender" Contract_repr.encoding)
+           (req "sender" Contract_hash.encoding)
            (req "source" Signature.Public_key_hash.encoding))
         (function
           | Internal {payload; sender; source} -> Some (payload, sender, source)
