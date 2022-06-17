@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -235,6 +235,7 @@ let random_connections ~rng pool n =
        between `min_threshold` and `max_threshold`. *)
 let rec do_maintain ~rng t =
   let open Lwt_result_syntax in
+  t.log P2p_connection.P2p_event.Maintenance_started ;
   let n_connected = P2p_pool.active_connections t.pool in
   if n_connected < t.bounds.min_threshold then
     match t.debug_config with
@@ -248,11 +249,13 @@ let rec do_maintain ~rng t =
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
     let*! () = Events.(emit maintenance_ended) () in
+    t.log P2p_connection.P2p_event.Maintenance_ended ;
     return_unit)
 
 and too_few_connections ~rng t n_connected =
   let open Lwt_result_syntax in
   (* try and contact new peers *)
+  t.log Too_few_connections ;
   let*! () = Events.(emit too_few_connections) n_connected in
   let min_to_contact = t.bounds.min_target - n_connected in
   let max_to_contact = t.bounds.max_target - n_connected in
@@ -263,6 +266,7 @@ and too_few_connections ~rng t n_connected =
 and too_many_connections ~rng t n_connected =
   let open Lwt_syntax in
   (* kill random connections *)
+  t.log Too_many_connections ;
   let n = n_connected - t.bounds.max_target in
   let* () = Events.(emit too_many_connections) n in
   let connections = random_connections ~rng t.pool n in
