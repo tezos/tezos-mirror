@@ -188,25 +188,21 @@ end) : S = struct
       aux 1 [] 0
     in
     let back_pointers =
-      FallbackArray.of_list ~fallback:None ~proj:(fun x -> Some x) back_pointers
+      FallbackArray.of_list ~fallback:None ~proj:Option.some back_pointers
     in
     {index; content; back_pointers}
 
   let best_skip cell target_index =
     let index = cell.index in
-    let rec aux idx pow best_idx best_skip =
+    let rec aux idx pow best_idx =
       if Compare.Int.(idx >= FallbackArray.length cell.back_pointers) then
         best_idx
       else
         let idx_index = index - (index mod pow) - 1 in
-        let skip = index - idx_index in
-        if
-          Compare.Int.(idx_index < target_index)
-          || Option.equal Compare.Int.equal (Some skip) best_skip
-        then best_idx
-        else aux (idx + 1) (basis * pow) (Some idx) (Some skip)
+        if Compare.Int.(idx_index < target_index) then best_idx
+        else aux (idx + 1) (basis * pow) (Some idx)
     in
-    aux 0 1 None None
+    aux 0 1 None
 
   let back_path ~deref ~cell_ptr ~target_index =
     let rec aux path ptr =

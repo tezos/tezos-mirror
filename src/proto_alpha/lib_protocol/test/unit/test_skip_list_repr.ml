@@ -162,6 +162,39 @@ let test_skip_list_nat_check_invalid_path (basis, i) =
   end) in
   M.check_invalid_paths i
 
+let test_minimal_back_path () =
+  let basis = 2 in
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  let l = M.nlist basis 20 in
+  let check_minimal_path = function
+    | None, _ -> failwith "empty path"
+    | Some path, expected_path ->
+        if path = expected_path then return ()
+        else
+          failwith
+            "non-minimal path:[%s] != expected_path:[%s]"
+            (M.show_path path)
+            (M.show_path expected_path)
+  in
+  let cases =
+    [
+      (6, 1, [6; 3; 1]);
+      (6, 3, [6; 3]);
+      (10, 3, [10; 7; 3]);
+      (10, 5, [10; 7; 5]);
+      (10, 7, [10; 7]);
+      (10, 9, [10; 9]);
+    ]
+  in
+  List.iter_es
+    check_minimal_path
+    (List.map
+       (fun (start, target, expected_path) ->
+         (M.back_path l start target, expected_path))
+       cases)
+
 let tests =
   [
     Tztest.tztest_qcheck2
@@ -181,4 +214,8 @@ let tests =
         let* i = 0 -- 100 in
         return (basis, i))
       test_skip_list_nat_check_invalid_path;
+    Tztest.tztest
+      "Skip list: check if the back_path is minimal"
+      `Quick
+      test_minimal_back_path;
   ]
