@@ -313,6 +313,30 @@ module P2p_connect_handler = struct
       ("addr", P2p_addr.encoding)
       ("port", Data_encoding.option Data_encoding.int16)
       ("peer", P2p_peer.Id.encoding)
+
+  let trigger_maintenance_too_many_connections =
+    declare_2
+      ~section
+      ~name:"trigger_maintenance_too_many_connections"
+      ~msg:
+        "Too many connections : trigger maintenance \
+         (active_connections={active_connections} / \
+         max_connections={max_connections})"
+      ~level:Debug
+      ("active_connections", Data_encoding.int16)
+      ("max_connections", Data_encoding.int16)
+
+  let trigger_maintenance_too_few_connections =
+    declare_2
+      ~section
+      ~name:"trigger_maintenance_too_few_connections"
+      ~msg:
+        "Too few connections : trigger maintenance \
+         (active_connections={active_connections} / \
+         min_connections={min_connections})"
+      ~level:Debug
+      ("active_connections", Data_encoding.int16)
+      ("min_connections", Data_encoding.int16)
 end
 
 module P2p_conn = struct

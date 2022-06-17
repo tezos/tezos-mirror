@@ -145,6 +145,7 @@ let config t = t.config
 
 let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
+  let open Lwt_syntax in
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
   let canceler = Lwt_canceler.create () in
   let bound =
@@ -186,7 +187,6 @@ let create_connection t p2p_conn id_point point_info peer_info
   P2p_pool.Peers.add_connected t.pool peer_id peer_info ;
   P2p_trigger.broadcast_new_connection t.triggers ;
   Lwt_canceler.on_cancel canceler (fun () ->
-      let open Lwt_syntax in
       let* () = Events.(emit disconnected) (peer_id, id_point) in
       let timestamp = Time.System.now () in
       Option.iter
@@ -200,16 +200,24 @@ let create_connection t p2p_conn id_point point_info peer_info
         (fun point_info -> P2p_pool.Points.remove_connected t.pool point_info)
         point_info ;
       P2p_pool.Peers.remove_connected t.pool peer_id ;
-      if P2p_pool.active_connections t.pool < t.config.min_connections then (
-        P2p_trigger.broadcast_too_few_connections t.triggers ;
-        t.log Too_few_connections) ;
+      let* () =
+        if P2p_pool.active_connections t.pool < t.config.min_connections then (
+          P2p_trigger.broadcast_too_few_connections t.triggers ;
+          Events.(emit trigger_maintenance_too_few_connections)
+            (P2p_pool.active_connections t.pool, t.config.min_connections))
+        else Lwt.return_unit
+      in
       Lwt_pipe.Maybe_bounded.close messages ;
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
-  if t.config.max_connections <= P2p_pool.active_connections t.pool then (
-    P2p_trigger.broadcast_too_many_connections t.triggers ;
-    t.log Too_many_connections) ;
-  conn
+  let* () =
+    if t.config.max_connections <= P2p_pool.active_connections t.pool then (
+      P2p_trigger.broadcast_too_many_connections t.triggers ;
+      Events.(emit trigger_maintenance_too_many_connections)
+        (P2p_pool.active_connections t.pool, t.config.max_connections))
+    else Lwt.return_unit
+  in
+  return conn
 
 let is_acceptable t connection_point_info peer_info incoming version =
   let open Result_syntax in
@@ -518,7 +526,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         | (addr, _), Some (_, port) -> (addr, Some port)
         | id_point, None -> id_point
       in
-      let conn =
+      let*! conn =
         create_connection
           t
           conn
