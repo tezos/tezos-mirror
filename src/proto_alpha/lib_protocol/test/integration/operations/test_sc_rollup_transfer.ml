@@ -66,6 +66,8 @@ let check_proto_error ~loc ~exp f trace =
       Error_monad.pp_print_trace
       trace
 
+let sc_originate = Test_sc_rollup.sc_originate
+
 (* A contract with one entrypoint:
     - [transfer_non_zero] takes a [contract int] and attempts to transfer with a
       non-zero amount to it. Expected to fail.
@@ -98,10 +100,11 @@ let contract_originate block account =
     ~storage:"Unit"
     block
 
-let context_init () =
+let context_init ty =
   let* b, c = Test_sc_rollup.context_init T1 in
   let* contract, _script, b = contract_originate b c in
-  return (b, c, contract)
+  let* b, rollup = sc_originate b c ty in
+  return (b, c, contract, rollup)
 
 let transfer ?expect_apply_failure b ~from ~to_ ~param ~entrypoint =
   let parameters = Script.lazy_expr (Expr.from_string param) in
@@ -123,7 +126,7 @@ let transfer ?expect_apply_failure b ~from ~to_ ~param ~entrypoint =
 
 (* Test parsing a [contract] with a badly formatted scr1 address. *)
 let test_transfer_to_bad_sc_rollup_address () =
-  let* b, c, contract = context_init () in
+  let* b, c, contract, _rollup = context_init "unit" in
   let not_an_sc_rollup_address = {|"scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyL"|} in
   let* _b =
     transfer
@@ -150,7 +153,7 @@ let test_transfer_to_bad_sc_rollup_address () =
 
 (* Now, the address is well-formatted but the rollup does not exist. *)
 let test_transfer_to_unknown_sc_rollup_address () =
-  let* b, c, contract = context_init () in
+  let* b, c, contract, _rollup = context_init "unit" in
   let unknown_sc_rollup_address = {|"scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"|} in
   let* _b =
     transfer
@@ -172,6 +175,30 @@ let test_transfer_to_unknown_sc_rollup_address () =
   in
   return_unit
 
+(* Now, let's originate an sc rollup, use its address but with a wrong type. *)
+let test_transfer_to_wrongly_typed_sc_rollup () =
+  let* b, c, contract, rollup = context_init "unit" in
+  let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
+  let* _b =
+    transfer
+      b
+      ~from:c
+      ~to_:contract
+      ~param
+      ~entrypoint:"transfer_non_zero"
+      ~expect_apply_failure:
+        (check_proto_error ~loc:__LOC__ ~exp:"Inconsistent_types" @@ function
+         | [
+             Script_interpreter.Bad_contract_parameter _;
+             Script_tc_errors.Invalid_constant _;
+             Script_tc_errors.Inconsistent_types _;
+             Script_tc_errors.Inconsistent_types _;
+           ] ->
+             return_unit
+         | _ -> raise Unexpected_error)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -182,4 +209,8 @@ let tests =
       "Transfer to an unknown rollup address"
       `Quick
       test_transfer_to_unknown_sc_rollup_address;
+    Tztest.tztest
+      "Transfer with a wrong type"
+      `Quick
+      test_transfer_to_wrongly_typed_sc_rollup;
   ]
