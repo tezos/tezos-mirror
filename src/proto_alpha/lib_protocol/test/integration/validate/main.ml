@@ -26,22 +26,25 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/precheck
-    Subject:      Integration > Precheck
+    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/validate
+    Subject:      Integration > Validate
 *)
 
 let () =
   Alcotest_lwt.run
-    "protocol > integration > precheck"
+    "protocol > integration > validate"
     [
-      ("sanity checks", Test_manager_operation_precheck.sanity_tests);
-      ("Single: gas checks", Test_manager_operation_precheck.gas_tests);
-      ("Single: storage checks", Test_manager_operation_precheck.storage_tests);
-      ("Single: fees checks", Test_manager_operation_precheck.fee_tests);
-      ("Single: contract checks", Test_manager_operation_precheck.contract_tests);
+      ("sanity checks", Test_manager_operation_validation.sanity_tests);
+      ("Single: gas checks", Test_manager_operation_validation.gas_tests);
+      ("Single: storage checks", Test_manager_operation_validation.storage_tests);
+      ("Single: fees checks", Test_manager_operation_validation.fee_tests);
+      ( "Single: contract checks",
+        Test_manager_operation_validation.contract_tests );
       ( "Batched: contract checks",
-        Test_batched_manager_operation_precheck.contract_tests );
-      ("Batched: gas checks", Test_batched_manager_operation_precheck.gas_tests);
-      ("Batched: fees checks", Test_batched_manager_operation_precheck.fee_tests);
+        Test_batched_manager_operation_validation.contract_tests );
+      ( "Batched: gas checks",
+        Test_batched_manager_operation_validation.gas_tests );
+      ( "Batched: fees checks",
+        Test_batched_manager_operation_validation.fee_tests );
     ]
   |> Lwt_main.run

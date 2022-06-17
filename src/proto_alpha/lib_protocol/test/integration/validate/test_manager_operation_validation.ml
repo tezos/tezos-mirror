@@ -25,26 +25,26 @@
 
 (** Testing
     -------
-    Component:  Protocol (precheck manager)
+    Component:  Protocol (validate manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/precheck/main.exe \
-                -- test "^Single$"
-    Subject:    Precheck manager operation.
+                src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
+                -- test "^Single"
+    Subject:    Validation of manager operation.
 *)
 
 open Protocol
 open Alpha_context
 open Manager_operation_helpers
 
-(* The goal of this test is to ensure that [select_op] generate the
+(** The goal of this test is to ensure that [select_op] generate the
    wanted kind of manager operation
 
-   Note: if a new manager operation kind is added in the protocol,
+    Note: if a new manager operation kind is added in the protocol,
    [Manager_operation_helpers.manager_operation_kind] should be
    extended. You will also have to extend
    [Manager_operation_helpers.select_op] with a new `mk` for this new
    operation. Finally the list [Manager_operation_helpers.subjects]
-   should also be extended to run the precheck test on the new manager
+   should also be extended to run the validate test on the new manager
    operation kind. *)
 let ensure_kind infos kind =
   let open Lwt_result_syntax in
@@ -108,15 +108,15 @@ let test_ensure_manager_operation_coverage () =
     `Quick
     (fun () -> ensure_manager_operation_coverage ())
 
-(* Negative tests assert the case where precheck must fail. *)
+(** {2 Negative tests assert the case where validate must fail} *)
 
-(* Precheck fails if the gas limit is too low.
+(** Validate fails if the gas limit is too low.
 
-   This test asserts that the precheck of a manager's operation
-   with a too low gas limit fails at precheck with an
-   [Gas_quota_exceeded_init_deserialize] error.
-   This test applies on manager operations that do not
-   consume gas in their specific part of precheck. *)
+    This test asserts that the validation of a manager operation
+    with a too low gas limit fails at validate with an
+    [Gas_quota_exceeded_init_deserialize] error.
+    This test applies on manager operations that do not
+    consume gas in their specific part of validate. *)
 let low_gas_limit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -132,7 +132,7 @@ let low_gas_limit_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_low_gas_limit kind () =
   let open Lwt_result_syntax in
@@ -147,13 +147,13 @@ let generate_low_gas_limit () =
   create_Tztest
     test_low_gas_limit
     "Gas_limit too low."
-    gas_consumer_in_precheck_subjects
+    gas_consumer_in_validate_subjects
 
-(* Precheck fails if the gas limit is too high.
+(** Validate fails if the gas limit is too high.
 
-   This test asserts that the precheck of a manager operation with
-   a gas limit too high fails at precheck with an [Gas_limit_too_high]
-   error. It applies on every kind of manager operation. *)
+    This test asserts that the validation of a manager operation with
+    a gas limit too high fails at validate with an [Gas_limit_too_high]
+    error. It applies on every kind of manager operation. *)
 let high_gas_limit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -164,7 +164,7 @@ let high_gas_limit_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_high_gas_limit kind () =
   let open Lwt_result_syntax in
@@ -178,11 +178,11 @@ let test_high_gas_limit kind () =
 let generate_high_gas_limit () =
   create_Tztest test_high_gas_limit "Gas_limit too high." subjects
 
-(* Precheck fails if the storage limit is too high.
+(** Validate fails if the storage limit is too high.
 
-   This test asserts that a manager operation with a storage limit
-   too high fails at precheck with [Storage_limit_too_high] error.
-   It applies to every kind of manager operation. *)
+    This test asserts that a manager operation with a storage limit
+    too high fails at validation with [Storage_limit_too_high] error.
+    It applies to every kind of manager operation. *)
 let high_storage_limit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -194,7 +194,7 @@ let high_storage_limit_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_high_storage_limit kind () =
   let open Lwt_result_syntax in
@@ -213,12 +213,13 @@ let test_high_storage_limit kind () =
 let generate_high_storage_limit () =
   create_Tztest test_high_gas_limit "Storage_limit too high." subjects
 
-(* Precheck fails if the counter is in the future.
+(** Validate fails if the counter is in the future.
 
-   This test asserts that a manager operation with a counter in the
-   future -- aka greater than the successor of the manager's counter
-   stored in the current context -- fails with [Counter_in_the_future] error.
-   It applies to every kind of manager operation. *)
+    This test asserts that the validation of
+    a manager operation with a counter in the
+    future -- aka greater than the successor of the manager counter
+    stored in the current context -- fails with [Counter_in_the_future] error.
+    It applies to every kind of manager operation. *)
 let high_counter_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -230,7 +231,7 @@ let high_counter_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_high_counter kind () =
   let open Lwt_result_syntax in
@@ -244,12 +245,13 @@ let test_high_counter kind () =
 let generate_high_counter () =
   create_Tztest test_high_counter "Counter too high." subjects
 
-(* Precheck fails if the counter is in the past.
+(** Validate fails if the counter is in the past.
 
-   This test asserts that a manager operation with a counter in the past -- aka
-   smaller than the successor of the manager's counter stored in the current
-   context -- fails with [Counter_in_the_past] error.
-   It applies to every kind of manager operation. *)
+    This test asserts that the validation of a manager operation with a
+    counter in the past -- aka smaller than the successor of the
+    manager counter stored in the current context -- fails with
+    [Counter_in_the_past] error. It applies to every kind of manager
+    operation. *)
 let low_counter_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -261,7 +263,7 @@ let low_counter_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_low_counter kind () =
   let open Lwt_result_syntax in
@@ -278,11 +280,12 @@ let test_low_counter kind () =
 let generate_low_counter () =
   create_Tztest test_low_counter "Counter too low." subjects
 
-(* Precheck fails if the source is not allocated.
+(** Validate fails if the source is not allocated.
 
-   This test asserts that a manager operation which manager's contract
-   is not allocated fails with [Empty_implicit_contract] error.
-   It applies on every kind of manager operation. *)
+    This test asserts that the validation of a manager operation which
+    manager contract is not allocated fails with
+    [Empty_implicit_contract] error. It applies on every kind of
+    manager operation. *)
 let not_allocated_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -295,7 +298,7 @@ let not_allocated_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_not_allocated kind () =
   let open Lwt_result_syntax in
@@ -306,13 +309,13 @@ let test_not_allocated kind () =
   not_allocated_diagnostic infos op
 
 let generate_not_allocated () =
-  create_Tztest test_not_allocated "not allocated source." subjects
+  create_Tztest test_not_allocated "Not allocated source." subjects
 
-(* Precheck fails if the source is unrevealed.
+(** Validate fails if the source is unrevealed.
 
-   This test asserts that a manager operation with an unrevealed source's
-   contract fails at precheck with [Unrevealed_manager_key].
-   It applies on every kind of manager operation except [Revelation]. *)
+    This test asserts that a manager operation with an unrevealed source
+    contract fails at validation with [Unrevealed_manager_key].
+    It applies on every kind of manager operation except [Revelation]. *)
 let unrevealed_key_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -327,7 +330,7 @@ let unrevealed_key_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_unrevealed_key kind () =
   let open Lwt_result_syntax in
@@ -338,14 +341,14 @@ let test_unrevealed_key kind () =
 let generate_unrevealed_key () =
   create_Tztest
     test_unrevealed_key
-    "unrevealed source (find_manager_public_key)."
+    "Unrevealed source (find_manager_public_key)."
     revealed_subjects
 
-(* Precheck fails if the source's balance is not enough to pay the fees.
+(** Validate fails if the source balance is not enough to pay the fees.
 
-   This test asserts that precheck of a manager operation fails if the
-   source's balance is lesser than the manager operation's fee.
-   It applies on every kind of manager operation. *)
+    This test asserts that validation of a manager operation fails if the
+    source balance is lesser than the manager operation fee.
+    It applies on every kind of manager operation. *)
 let high_fee_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -360,7 +363,7 @@ let high_fee_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_high_fee kind () =
   let open Lwt_result_syntax in
@@ -372,16 +375,16 @@ let test_high_fee kind () =
   high_fee_diagnostic infos op
 
 let generate_tests_high_fee () =
-  create_Tztest test_high_fee "not enough for fee payment." subjects
+  create_Tztest test_high_fee "Balance too low for fee payment." subjects
 
-(* Precheck fails if the fee payment empties the balance of a
-   delegated implicit contract.
+(** Validate fails if the fee payment empties the balance of a
+    delegated implicit contract.
 
-   This test asserts that in case that:
-   - the source is a delegated implicit contract, and
-   - the fee is the exact balance of source.
-   then, precheck fails with [Empty_implicit_delegated_contract] error.
-   It applies to every kind of manager operation except [Revelation].*)
+    This test asserts that in case that:
+    - the source is a delegated implicit contract, and
+    - the fee is the exact balance of source.
+    then, validate fails with [Empty_implicit_delegated_contract] error.
+    It applies to every kind of manager operation except [Revelation].*)
 let emptying_delegated_implicit_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -396,7 +399,7 @@ let emptying_delegated_implicit_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_emptying_delegated_implicit kind () =
   let open Lwt_result_syntax in
@@ -410,16 +413,16 @@ let test_emptying_delegated_implicit kind () =
 let generate_tests_emptying_delegated_implicit () =
   create_Tztest
     test_emptying_delegated_implicit
-    "just enough funds to empty a delegated source."
+    "Just enough funds to empty a delegated source."
     revealed_subjects
 
-(* Precheck fails if there is not enough available gas in the block.
+(** Validate fails if there is not enough available gas in the block.
 
-   This test asserts that precheck fails with:
+    This test asserts that validate fails with:
     - [Gas_limit_too_high;Block_quota_exceeded] in mempool mode,
-    | [Block_quota_exceeded] in other mode
-   with gas limit exceeds the available gas in the block.
-   It applies to every kind of manager operation. *)
+    - [Block_quota_exceeded] in other mode
+    with gas limit exceeds the available gas in the block.
+    It applies to every kind of manager operation. *)
 let exceeding_block_gas_diagnostic ~mempool_mode (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -443,7 +446,7 @@ let exceeding_block_gas_diagnostic ~mempool_mode (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure ~mempool_mode
+  validate_ko_diagnostic infos op expect_failure ~mempool_mode
 
 let test_exceeding_block_gas ~mempool_mode kind () =
   let open Lwt_result_syntax in
@@ -459,40 +462,41 @@ let test_exceeding_block_gas ~mempool_mode kind () =
 let generate_tests_exceeding_block_gas () =
   create_Tztest
     (test_exceeding_block_gas ~mempool_mode:false)
-    "too much gas consumption."
+    "Too much gas consumption."
     subjects
 
 let generate_tests_exceeding_block_gas_mp_mode () =
   create_Tztest
     (test_exceeding_block_gas ~mempool_mode:true)
-    "too much gas consumption in mempool mode."
+    "Too much gas consumption in mempool mode."
     subjects
 
-(* Positive tests.
+(** {2 Positive tests} *)
 
-   Tests that precheck succeeds when:
-   - it empties the balance of a self_delegated implicit source,
-   - it empties the balance of an undelegated implicit source, and
-   - in case:
-         - the counter is the successor of the one stored in the context,
-         - the fee is lesser than the balance,
-         - the storage limit is lesser than the maximum authorized storage,
-         - the gas limit is:
+(** Tests that validate succeeds when:
+     - it empties the balance of a self_delegated implicit source,
+     - it empties the balance of an undelegated implicit source, and
+     - in case:
+          - the counter is the successor of the one stored in the context,
+          - the fee is lesser than the balance,
+          - the storage limit is lesser than the maximum authorized storage,
+          - the gas limit is:
                 - lesser than the available gas in the block,
                 - less than the maximum gas consumable by an operation, and
                 - greater than the minimum gas consumable by an operation.
-   Notice that the first two only precheck succeeds while in the last case,
-   the full application also succeeds.
-   In the first 2 case, we observe in the output context that:
+
+    Notice that in the first two cases only validate succeeds while
+    in the last case, the full application also succeeds.
+    In the first 2 case, we observe in the output context that:
      - the counter is the successor of the one stored in the initial context,
      - the balance decreased by fee,
      - the available gas in the block decreased by gas limit.
-   In the last case, we observe in the output context that:
+    In the last case, we observe in the output context that:
      - the counter is the successor of the one stored in the initial context,
      - the balance is at least decreased by fee,
      - the available gas in the block decreased by gas limit. *)
 
-(* Fee payment that emptying a self_delegated implicit. *)
+(** Fee payment that emptying a self_delegated implicit. *)
 let test_emptying_self_delegated_implicit kind () =
   let open Lwt_result_syntax in
   let* infos = init_self_delegated_implicit () in
@@ -500,25 +504,25 @@ let test_emptying_self_delegated_implicit kind () =
   let* op =
     select_op ~fee ~force_reveal:false ~source:infos.contract1 kind infos
   in
-  only_precheck_diagnostic infos op
+  only_validate_diagnostic infos op
 
 let generate_tests_emptying_self_delegated_implicit () =
   create_Tztest
     test_emptying_self_delegated_implicit
-    "passes precheck and empties a self-delegated source."
+    "Validate and empties a self-delegated source."
     subjects
 
-(* Minimum gas cost to pass the precheck:
-   - cost_of_manager_operation for the generic part
-   - 100 (empiric) for the specific part (script decoding or hash costs) *)
-let empiric_minimal_gas_cost_for_precheck =
+(** Minimum gas cost to pass the validation:
+    - cost_of_manager_operation for the generic part
+    - 100 (empiric) for the specific part (script decoding or hash costs) *)
+let empiric_minimal_gas_cost_for_validate =
   Gas.Arith.integral_of_int_exn
     (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100)
 
 let test_emptying_undelegated_implicit kind () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
-  let gas_limit = Op.Custom_gas empiric_minimal_gas_cost_for_precheck in
+  let gas_limit = Op.Custom_gas empiric_minimal_gas_cost_for_validate in
   let* fee = Context.Contract.balance (B infos.block) infos.contract1 in
   let* op =
     select_op
@@ -529,28 +533,28 @@ let test_emptying_undelegated_implicit kind () =
       kind
       infos
   in
-  only_precheck_diagnostic infos op
+  only_validate_diagnostic infos op
 
 let generate_tests_emptying_undelegated_implicit () =
   create_Tztest
     test_emptying_undelegated_implicit
-    "passes precheck and empties an undelegated source."
+    "Validate and empties an undelegated source."
     subjects
 
-(* Fee payment.*)
-let test_precheck kind () =
+(** Fee payment.*)
+let test_validate kind () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
   let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
   let source = infos.contract1 in
   let* operation = select_op ~counter ~force_reveal:true ~source kind infos in
-  precheck_diagnostic infos operation
+  validate_diagnostic infos operation
 
-let generate_tests_precheck () =
-  create_Tztest test_precheck "passes precheck." subjects
+let generate_tests_validate () =
+  create_Tztest test_validate "Validate." subjects
 
 let sanity_tests =
-  test_ensure_manager_operation_coverage () :: generate_tests_precheck ()
+  test_ensure_manager_operation_coverage () :: generate_tests_validate ()
 
 let gas_tests =
   generate_low_gas_limit () @ generate_high_gas_limit ()

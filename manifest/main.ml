@@ -3256,11 +3256,11 @@ end = struct
               octez_base_test_helpers |> open_;
             ]
       in
-      let _integration_precheck =
+      let _integration_validate =
         only_if N.(number >= 014) @@ fun () ->
         test
           "main"
-          ~path:(path // "lib_protocol/test/integration/precheck")
+          ~path:(path // "lib_protocol/test/integration/validate")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [

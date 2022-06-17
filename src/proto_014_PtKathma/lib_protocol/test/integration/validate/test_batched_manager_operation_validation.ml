@@ -25,20 +25,20 @@
 
 (** Testing
     -------
-    Component:  Protocol (precheck manager)
+    Component:  Protocol (validate manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/precheck/main.exe \
+                src/proto_014_PtKathma/lib_protocol/test/integration/validate/main.exe \
                 -- test "^Batched"
-    Subject:    Precheck manager operation.
+    Subject:    Validation of batched manager operation.
 *)
 
 open Protocol
 open Alpha_context
 open Manager_operation_helpers
 
-(* Tests on operation batches. *)
+(** {2 Tests on operation batches} *)
 
-(* Revelation should not occur elsewhere than in first position
+(** Revelation should not occur elsewhere than in first position
    in a batch.*)
 let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
   let expect_failure errs =
@@ -54,7 +54,7 @@ let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_batch_reveal_in_the_middle kind1 kind2 () =
   let open Lwt_result_syntax in
@@ -84,10 +84,10 @@ let test_batch_reveal_in_the_middle kind1 kind2 () =
 let generate_batches_reveal_in_the_middle () =
   create_Tztest_batches
     test_batch_reveal_in_the_middle
-    "reveal should occur only at the beginning of a batch."
+    "Reveal should only occur at the beginning of a batch."
     revealed_subjects
 
-(* A batch of manager operation contains at most one Revelation.*)
+(** A batch of manager operation contains at most one Revelation.*)
 let batch_two_reveals_diagnostic (infos : infos) op =
   let expected_failure errs =
     match errs with
@@ -102,7 +102,7 @@ let batch_two_reveals_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expected_failure
+  validate_ko_diagnostic infos op expected_failure
 
 let test_batch_two_reveals kind () =
   let open Lwt_result_syntax in
@@ -133,7 +133,7 @@ let generate_tests_batches_two_reveals () =
     "Only one revelation per batch."
     revealed_subjects
 
-(* Every manager operation in a batch concerns the same source.*)
+(** Every manager operation in a batch concerns the same source.*)
 let batch_two_sources_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -147,7 +147,7 @@ let batch_two_sources_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_batch_two_sources kind1 kind2 () =
   let open Lwt_result_syntax in
@@ -175,7 +175,7 @@ let generate_batches_two_sources () =
     "Only one source per batch."
     revealed_subjects
 
-(* Counters in a batch should be a sequence from the successor of
+(** Counters in a batch should be a sequence from the successor of
    the stored counter associated to source in the initial context. *)
 let test_batch_inconsistent_counters kind1 kind2 () =
   let open Lwt_result_syntax in
@@ -266,7 +266,7 @@ let generate_batches_inconsistent_counters () =
     "Counters in a batch should be a sequence."
     revealed_subjects
 
-(* A batch that consumes all the balance for fees can only face the total
+(** A batch that consumes all the balance for fees can only face the total
    consumption at the end of the batch. *)
 let test_batch_emptying_balance_in_the_middle kind1 kind2 () =
   let open Lwt_result_syntax in
@@ -314,7 +314,7 @@ let generate_batches_emptying_balance_in_the_middle () =
     "Fee payment emptying balance should occurs at the end of the batch."
     revealed_subjects
 
-(* A batch of manager operation must not exceed the initial available gas in the block. *)
+(** A batch of manager operation must not exceed the initial available gas in the block. *)
 let test_batch_exceeding_block_gas ~mempool_mode kind1 kind2 () =
   let open Lwt_result_syntax in
   let* infos = init_context ~hard_gas_limit_per_block:gb_limit () in
@@ -408,8 +408,8 @@ let generate_batches_exceeding_block_gas_mp_mode () =
     "Too much gas consumption in mempool mode."
     revealed_subjects
 
-(* A batch that consumes all the balance for fees only at the end of
-   the batch passes precheck.*)
+(** A batch that consumes all the balance for fees only at the end of
+   the batch passes validate.*)
 let test_batch_balance_just_enough kind1 kind2 () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
@@ -445,16 +445,16 @@ let test_batch_balance_just_enough kind1 kind2 () =
       (Context.B infos.block)
       [reveal; op_case2; op2_case2]
   in
-  let* _ = precheck_diagnostic infos case2 in
-  precheck_diagnostic infos case3
+  let* _ = validate_diagnostic infos case2 in
+  validate_diagnostic infos case3
 
 let generate_batches_balance_just_enough () =
   create_Tztest_batches
     test_batch_balance_just_enough
-    "(Positive test) Fee payment emptying balance in a batch."
+    "Fee payment emptying balance in a batch."
     revealed_subjects
 
-(* Simple reveal followed by a transaction. *)
+(** Simple reveal followed by a transaction. *)
 let test_batch_reveal_transaction_ok () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
@@ -475,7 +475,7 @@ let test_batch_reveal_transaction_ok () =
       [reveal; transaction]
   in
   let* _i = Incremental.begin_construction infos.block in
-  precheck_diagnostic infos batch
+  validate_diagnostic infos batch
 
 let contract_tests =
   generate_batches_reveal_in_the_middle ()
@@ -484,7 +484,7 @@ let contract_tests =
   @ generate_batches_inconsistent_counters ()
   @ [
       Tztest.tztest
-        "Prechecked a batch with a reveal and a transaction."
+        "Validate a batch with a reveal and a transaction."
         `Quick
         test_batch_reveal_transaction_ok;
     ]

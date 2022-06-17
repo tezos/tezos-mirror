@@ -27,10 +27,14 @@ open Protocol
 open Alpha_context
 open Test_tez
 
-(* Hard gas limit *)
+(** {2 Constants} *)
+
+(** Hard gas limit *)
 let gb_limit = Gas.Arith.(integral_of_int_exn 100_000)
 
 let half_gb_limit = Gas.Arith.(integral_of_int_exn 50_000)
+
+(** {2 Context} *)
 
 type infos = {
   block : Block.t;
@@ -45,7 +49,7 @@ type infos = {
   sc_rollup : Sc_rollup.t;
 }
 
-(* Initialize an [infos] record with a context enabling tx and sc
+(** Initialize an [infos] record with a context enabling tx and sc
    rollup, funded accounts, tx_rollup, sc_rollup *)
 let init_context ?hard_gas_limit_per_block () =
   let open Lwt_result_syntax in
@@ -135,10 +139,12 @@ let init_context ?hard_gas_limit_per_block () =
       contract3
       Tez.one
   in
+  let counter = Z.succ counter in
   let* create_contract_hash, contract_hash =
     Op.contract_origination_hash
       (B b)
-      contract3
+      ~counter
+      bootstrap_contract
       ~fee:Tez.zero
       ~script:Op.dummy_script
   in
@@ -162,7 +168,7 @@ let init_context ?hard_gas_limit_per_block () =
     sc_rollup;
   }
 
-(* Same as [init_context] but [contract1] delegate to [contract2] *)
+(** Same as [init_context] but [contract1] delegate to [contract2]. *)
 let init_delegated_implicit () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
@@ -196,7 +202,7 @@ let init_delegated_implicit () =
   let+ _ = Assert.equal_pkh ~loc:__LOC__ del infos.account2.pkh in
   {infos with block}
 
-(* Same as [init_context] but [contract1] self delegate. *)
+(** Same as [init_context] but [contract1] self delegate. *)
 let init_self_delegated_implicit () =
   let open Lwt_result_syntax in
   let* infos = init_context () in
@@ -222,9 +228,9 @@ let init_self_delegated_implicit () =
   let+ _ = Assert.equal_pkh ~loc:__LOC__ del infos.account1.pkh in
   {infos with block}
 
-(* Local helpers for generating all kind of manager operations. *)
+(** {2 Local helpers for generating all kind of manager operations} *)
 
-(* Create a fresh account used for empty implicit account tests. *)
+(** Create a fresh account used for empty implicit account tests. *)
 let mk_fresh_contract () = Contract.Implicit Account.(new_account ()).pkh
 
 let get_pkh source = Context.Contract.pkh source
@@ -532,11 +538,6 @@ let mk_sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit
   op
 
 let sc_dummy_commitment =
-  let number_of_messages =
-    match Sc_rollup.Number_of_messages.of_int32 3l with
-    | None -> assert false
-    | Some x -> x
-  in
   let number_of_ticks =
     match Sc_rollup.Number_of_ticks.of_int32 3000l with
     | None -> assert false
@@ -546,7 +547,6 @@ let sc_dummy_commitment =
     {
       predecessor = Sc_rollup.Commitment.Hash.zero;
       inbox_level = Raw_level.of_int32_exn Int32.zero;
-      number_of_messages;
       number_of_ticks;
       compressed_state = Sc_rollup.State_hash.zero;
     }
@@ -592,8 +592,7 @@ let mk_sc_rollup_refute ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
     source
     infos.sc_rollup
     infos.account2.pkh
-    refutation
-    false
+    (Some refutation)
 
 let mk_sc_rollup_add_messages ?counter ?fee ?gas_limit ?storage_limit
     ?force_reveal ~source (infos : infos) =
@@ -606,7 +605,7 @@ let mk_sc_rollup_add_messages ?counter ?fee ?gas_limit ?storage_limit
     (B infos.block)
     source
     infos.sc_rollup
-    []
+    [""]
 
 let mk_sc_rollup_timeout ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
     ~source (infos : infos) =
@@ -633,10 +632,7 @@ let mk_sc_rollup_execute_outbox_message ?counter ?fee ?gas_limit ?storage_limit
     source
     infos.sc_rollup
     (Sc_rollup.Commitment.hash sc_dummy_commitment)
-    ~outbox_level:Raw_level.root
-    ~message_index:0
-    ~inclusion_proof:""
-    ~message:""
+    ~output_proof:""
 
 let mk_sc_rollup_return_bond ?counter ?fee ?gas_limit ?storage_limit
     ?force_reveal ~source (infos : infos) =
@@ -678,9 +674,13 @@ let mk_dal_publish_slot_header ?counter ?fee ?gas_limit ?storage_limit
     source
     slot
 
-(* Helpers for generation of generic check tests by manager operation. *)
-(* This type should be extended for each new manager_operation kind
-   added in the protocol. *)
+(** {2 Helpers for generation of generic check tests by manager operation.} *)
+
+(** This type should be extended for each new manager_operation kind
+    added in the protocol. See
+    [test_manager_operation_validation.ensure_kind] for more
+    information on how we ensure that this type is extended for each
+    new manager_operation kind. *)
 type manager_operation_kind =
   | K_Transaction
   | K_Origination
@@ -739,7 +739,7 @@ let select_op = function
   | K_Sc_rollup_recover_bond -> mk_sc_rollup_return_bond
   | K_Dal_publish_slot_header -> mk_dal_publish_slot_header
 
-let string_of_kind = function
+let kind_to_string = function
   | K_Transaction -> "Transaction"
   | K_Delegation -> "Delegation"
   | K_Undelegation -> "Undelegation"
@@ -765,12 +765,12 @@ let string_of_kind = function
   | K_Sc_rollup_refute -> "Sc_rollup_refute"
   | K_Sc_rollup_add_messages -> "Sc_rollup_add_messages"
   | K_Sc_rollup_execute_outbox_message -> "Sc_rollup_execute_outbox_message"
-  | K_Sc_rollup_recover_bond -> "Sc_rollup_return_bond"
+  | K_Sc_rollup_recover_bond -> "Sc_rollup_recover_bond"
   | K_Dal_publish_slot_header -> "Dal_publish_slot_header"
 
 let create_Tztest ?hd_msg test tests_msg operations =
   let hd_msg k =
-    let sk = string_of_kind k in
+    let sk = kind_to_string k in
     match hd_msg with
     | None -> sk
     | Some hd -> Format.sprintf "Batch: %s, %s" hd sk
@@ -784,7 +784,7 @@ let create_Tztest ?hd_msg test tests_msg operations =
     operations
 
 let rec create_Tztest_batches test tests_msg operations =
-  let hdmsg k = Format.sprintf "%s" (string_of_kind k) in
+  let hdmsg k = Format.sprintf "%s" (kind_to_string k) in
   let aux hd_msg test operations =
     create_Tztest ~hd_msg test tests_msg operations
   in
@@ -793,12 +793,13 @@ let rec create_Tztest_batches test tests_msg operations =
   | kop :: kops as ops ->
       aux (hdmsg kop) (test kop) ops @ create_Tztest_batches test tests_msg kops
 
-(* Diagnostic helpers. *)
-(* The purpose of diagnostic helpers is to state the correct observation
-   according to the precheck result of a test. *)
+(** {2 Diagnostic helpers.} *)
 
-(* For a manager operation a [probes] contains the values required for observing
-   its precheck success. Its source, fees (sum for a batch), gas_limit
+(** The purpose of diagnostic helpers is to state the correct observation
+   according to the validate result of a test. *)
+
+(** For a manager operation a [probes] contains the values required for observing
+   its validate success. Its source, fees (sum for a batch), gas_limit
    (sum of gas_limit of the batch), and the increment of the counters aka 1 for
    a single operation, n for a batch of n manager operations. *)
 type probes = {
@@ -823,26 +824,26 @@ let rec contents_infos :
       let _ = Assert.equal_pkh ~loc:__LOC__ manop.source probes.source in
       return {fee; source = probes.source; gas_limit; nb_counter}
 
-(* Computes a [probes] from a list of manager contents. *)
+(** Computes a [probes] from a list of manager contents. *)
 let manager_content_infos op =
   let (Operation_data {contents; _}) = op.protocol_data in
   match contents with
   | Single (Manager_operation _) as op -> contents_infos op
   | Cons (Manager_operation _, _) as op -> contents_infos op
-  | _ -> assert false
+  | _ -> failwith "Should only handle manager operation"
 
-(* [observe] asserts the success of precheck only.
+(** [observe] asserts the success of validate only.
    Given on one side, a [contract], its initial balance [b_in], its initial
-   counter [c_in] and potentially the initial gas [g_in] before its prechecking;
-   and, on the other side, its [probes] and the context after its precheck [i];
-   if precheck succeeds then we observe in [i] that:
-   - [contract] balance decreases by [probes.fee] when [only_precheck] marks that only the precheck
+   counter [c_in] and potentially the initial gas [g_in] before its validation;
+   and, on the other side, its [probes] and the context after its validate [i];
+   if validate succeeds then we observe in [i] that:
+   - [contract] balance decreases by [probes.fee] when [only_validate] marks that only the validate
      succeeds
-   - [contract] balance decreases at least by [probes.fee] when ![only_precheck] marks
+   - [contract] balance decreases at least by [probes.fee] when [not only_validate] marks
      that the application has succeeded,
    - its counter [c_in] increases by [probes.nb_counter], and
    - the available gas in the block in [i] decreases by [g_in].*)
-let observe ~only_precheck contract b_in c_in g_in probes i =
+let observe ~only_validate contract b_in c_in g_in probes i =
   let open Lwt_result_syntax in
   let* b_out = Context.Contract.balance (I i) contract in
   let g_out = Gas.block_level (Incremental.alpha_ctxt i) in
@@ -851,7 +852,7 @@ let observe ~only_precheck contract b_in c_in g_in probes i =
   let b_cmp =
     Assert.equal
       ~loc:__LOC__
-      (if only_precheck then Tez.( = ) else Tez.( <= ))
+      (if only_validate then Tez.( = ) else Tez.( <= ))
       "Balance update"
       Tez.pp
   in
@@ -875,7 +876,7 @@ let observe ~only_precheck contract b_in c_in g_in probes i =
     g_out
     g_expected
 
-let precheck_with_diagnostic ~only_precheck (infos : infos) op =
+let validate_with_diagnostic ~only_validate (infos : infos) op =
   let open Lwt_result_syntax in
   let* i = Incremental.begin_construction infos.block in
   let* prbs = manager_content_infos op in
@@ -883,38 +884,38 @@ let precheck_with_diagnostic ~only_precheck (infos : infos) op =
   let* b_in = Context.Contract.balance (I i) contract in
   let* c_in = Context.Contract.counter (I i) contract in
   let g_in = Gas.block_level (Incremental.alpha_ctxt i) in
-  let* i = Incremental.precheck_operation i op in
+  let* i = Incremental.validate_operation i op in
   let* _ = Incremental.finalize_block i in
-  observe ~only_precheck contract b_in c_in g_in prbs i
+  observe ~only_validate contract b_in c_in g_in prbs i
 
-(* If only the precheck of an operation succeed; e.g. the rest
+(** If only the validate of an operation succeed; e.g. the rest
    of the application failed:
    - the fees must be paid,
    - the block gas consumption should be decreased, and
    - the counter of operation should be incremented
-   as defined by [observe] with [only_precheck]. *)
-let only_precheck_diagnostic (infos : infos) op =
-  precheck_with_diagnostic ~only_precheck:true infos op
+   as defined by [observe] with [only_validate]. *)
+let only_validate_diagnostic (infos : infos) op =
+  validate_with_diagnostic ~only_validate:true infos op
 
-(* If an manager operation application succeed, the precheck
+(** If an manager operation application succeed, the validate
    effects must be observed:
    - the fees must be paid,
    - the block gas consumption should be decreased, and
    - the counter of operation should be incremented
-   as defined by [observe] with ![only_precheck]. *)
-let precheck_diagnostic (infos : infos) op =
-  precheck_with_diagnostic ~only_precheck:false infos op
+   as defined by [observe] with [not only_validate]. *)
+let validate_diagnostic (infos : infos) op =
+  validate_with_diagnostic ~only_validate:false infos op
 
-(* [precheck_ko_diagnostic] wraps the [expect_failure] when [op] precheck
-   failed. It is used in test that expects precheck [op] to fail. *)
-let precheck_ko_diagnostic ?(mempool_mode = false) (infos : infos) op
+(** [validate_ko_diagnostic] wraps the [expect_failure] when [op] validate
+   failed. It is used in test that expects validate [op] to fail. *)
+let validate_ko_diagnostic ?(mempool_mode = false) (infos : infos) op
     expect_failure =
   let open Lwt_result_syntax in
   let* i = Incremental.begin_construction infos.block ~mempool_mode in
   let* _ = Incremental.add_operation ~expect_failure i op in
   return_unit
 
-(* List of operation kind that must run on generic tests. This list
+(** List of operation kinds that must run on generic tests. This list
    should be extended for each new manager_operation kind. *)
 let subjects =
   [
@@ -961,7 +962,7 @@ let is_consumer = function
   | K_Tx_rollup_dispatch_tickets | K_Transfer_ticket ->
       true
 
-let gas_consumer_in_precheck_subjects, not_gas_consumer_in_precheck_subjects =
+let gas_consumer_in_validate_subjects, not_gas_consumer_in_validate_subjects =
   List.partition is_consumer subjects
 
 let revealed_subjects =
