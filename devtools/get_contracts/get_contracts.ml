@@ -28,6 +28,8 @@ module Config = struct
 
   let collect_lambdas = true
 
+  let measure_code_size = true
+
   let mainnet_genesis =
     {
       Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
@@ -360,7 +362,6 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     let* script_code =
       P.Translator.parse_code ctxt ~legacy:true @@ P.Script.lazy_expr script
     in
-    let size = Obj.(reachable_words @@ repr script_code) in
     File_helpers.print_expr_file
       ~dirname:output_dir
       ~ext:".tz"
@@ -374,7 +375,11 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       "%a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
       contracts ;
-    File_helpers.print_to_file (filename ~ext:"size") "%d words" size ;
+    File_helpers.print_to_file
+      (filename ~ext:"size")
+      "Expected: %d words@.Real: %d words"
+      (P.Translator.code_size script_code)
+      Obj.(reachable_words @@ repr script_code) ;
     return
     @@
     if Config.collect_storage then
