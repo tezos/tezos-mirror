@@ -1031,6 +1031,110 @@ module Internal_result = struct
         -> 'kind case
   [@@coq_force_gadt]
 
+  let[@coq_axiom_with_reason "gadt"] transaction_contract_variant_cases =
+    union
+      [
+        case
+          ~title:"To_contract"
+          (Tag 0)
+          (obj8
+             (opt "storage" Script.expr_encoding)
+             (dft "balance_updates" Receipt.balance_updates_encoding [])
+             (dft "originated_contracts" (list Contract.originated_encoding) [])
+             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+             (dft "storage_size" z Z.zero)
+             (dft "paid_storage_size_diff" z Z.zero)
+             (dft "allocated_destination_contract" bool false)
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+          (function
+            | Transaction_to_contract_result
+                {
+                  storage;
+                  lazy_storage_diff;
+                  balance_updates;
+                  originated_contracts;
+                  consumed_gas;
+                  storage_size;
+                  paid_storage_size_diff;
+                  allocated_destination_contract;
+                } ->
+                Some
+                  ( storage,
+                    balance_updates,
+                    originated_contracts,
+                    consumed_gas,
+                    storage_size,
+                    paid_storage_size_diff,
+                    allocated_destination_contract,
+                    lazy_storage_diff )
+            | _ -> None)
+          (fun ( storage,
+                 balance_updates,
+                 originated_contracts,
+                 consumed_gas,
+                 storage_size,
+                 paid_storage_size_diff,
+                 allocated_destination_contract,
+                 lazy_storage_diff ) ->
+            Transaction_to_contract_result
+              {
+                storage;
+                lazy_storage_diff;
+                balance_updates;
+                originated_contracts;
+                consumed_gas;
+                storage_size;
+                paid_storage_size_diff;
+                allocated_destination_contract;
+              });
+        case
+          ~title:"To_tx_rollup"
+          (Tag 1)
+          (obj4
+             (dft "balance_updates" Receipt.balance_updates_encoding [])
+             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+             (req "ticket_hash" Ticket_hash.encoding)
+             (req "paid_storage_size_diff" n))
+          (function
+            | Transaction_to_tx_rollup_result
+                {
+                  balance_updates;
+                  consumed_gas;
+                  ticket_hash;
+                  paid_storage_size_diff;
+                } ->
+                Some
+                  ( balance_updates,
+                    consumed_gas,
+                    ticket_hash,
+                    paid_storage_size_diff )
+            | _ -> None)
+          (fun ( balance_updates,
+                 consumed_gas,
+                 ticket_hash,
+                 paid_storage_size_diff ) ->
+            Transaction_to_tx_rollup_result
+              {
+                balance_updates;
+                consumed_gas;
+                ticket_hash;
+                paid_storage_size_diff;
+              });
+        case
+          ~title:"To_sc_rollup"
+          (Tag 2)
+          (obj2
+             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+             (req "inbox_after" Sc_rollup.Inbox.encoding))
+          (function
+            | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
+                Some (consumed_gas, inbox_after)
+            | _ -> None)
+          (function
+            | consumed_gas, inbox_after ->
+                Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
+      ]
+
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     MCase
       {
@@ -1228,7 +1332,7 @@ module Internal_manager_result = struct
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     make
       ~op_case:Internal_result.transaction_case
-      ~encoding:Manager_result.transaction_contract_variant_cases
+      ~encoding:Internal_result.transaction_contract_variant_cases
       ~select:(function
         | Successful_internal_manager_result (ITransaction_result _ as op) ->
             Some op
