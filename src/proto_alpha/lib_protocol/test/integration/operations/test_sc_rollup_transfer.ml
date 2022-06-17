@@ -148,10 +148,38 @@ let test_transfer_to_bad_sc_rollup_address () =
   in
   return_unit
 
+(* Now, the address is well-formatted but the rollup does not exist. *)
+let test_transfer_to_unknown_sc_rollup_address () =
+  let* b, c, contract = context_init () in
+  let unknown_sc_rollup_address = {|"scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"|} in
+  let* _b =
+    transfer
+      b
+      ~from:c
+      ~to_:contract
+      ~param:unknown_sc_rollup_address
+      ~entrypoint:"transfer_non_zero"
+      ~expect_apply_failure:
+        (check_proto_error ~loc:__LOC__ ~exp:"Sc_rollup_does_not_exist"
+         @@ function
+         | [
+             Script_interpreter.Bad_contract_parameter _;
+             Script_tc_errors.Invalid_constant _;
+             Sc_rollup_errors.Sc_rollup_does_not_exist _;
+           ] ->
+             return_unit
+         | _ -> raise Unexpected_error)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
       "Transfer to a bad sc rollup address"
       `Quick
       test_transfer_to_bad_sc_rollup_address;
+    Tztest.tztest
+      "Transfer to an unknown rollup address"
+      `Quick
+      test_transfer_to_unknown_sc_rollup_address;
   ]
