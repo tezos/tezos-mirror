@@ -1953,19 +1953,6 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
       [{Opam.package; version = True; with_test; optional = false}]
   | External {opam = Some opam; version; _}
   | Opam_only {name = opam; version; _} ->
-      let version =
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1453
-           Remove this once all packages (including protocol packages)
-           have been ported to the manifest.
-           "tezos-rust-libs" is an exception to the exception... *)
-        if
-          fix_version
-          && (has_prefix ~prefix:"tezos-" opam
-             || has_prefix ~prefix:"octez-" opam)
-          && opam <> "tezos-rust-libs" && opam <> "octez-rust-libs"
-        then Version.(Exactly Version)
-        else version
-      in
       [{Opam.package = opam; version; with_test; optional = false}]
   | Optional target | Select {package = target; _} ->
       List.map
