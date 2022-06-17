@@ -65,6 +65,16 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     storages : P.Script.expr ExprMap.t;
   }
 
+  type size_summary = {expected : int; actual : int}
+
+  let zero_size = {expected = 0; actual = 0}
+
+  let add_size ~expected_size ~actual_size summary =
+    {
+      expected = summary.expected + expected_size;
+      actual = summary.actual + actual_size;
+    }
+
   module File_helpers = struct
     let print_to_file ?err filename fmt =
       Format.kasprintf
@@ -361,7 +371,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     let* _ctxt, values = P.Storage.list_values ctxt_i in
     List.fold_left_es (fun acc v -> f v acc) init values
 
-  let output_contract_results ctxt output_dir hash ctr =
+  let output_contract_results ctxt output_dir hash ctr total_size =
     let open Lwt_result_syntax in
     let hash_string = P.Script.Hash.to_b58check hash in
     let* script_code =
@@ -380,17 +390,24 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       "%a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
       ctr.addresses ;
-    File_helpers.print_to_file
-      (filename ~ext:"size")
-      "Expected: %d bytes@.Real: %d bytes"
-      (P.Translator.code_size script_code)
-      (8 * Obj.(reachable_words @@ repr script_code)) ;
-    return
-    @@
-    if Config.collect_storage then
-      let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
-      File_helpers.print_expr_dir ~dirname ~ext:".storage" ctr.storages
-    else ()
+    let expected_size, actual_size =
+      if Config.measure_code_size then (
+        let expected = P.Translator.code_size script_code in
+        let actual = 8 * Obj.(reachable_words @@ repr script_code) in
+        File_helpers.print_to_file
+          (filename ~ext:"size")
+          "Expected: %d bytes@.Real: %d bytes@.%s@."
+          expected
+          actual
+          (if expected < actual then "WARNING: real size larger than expected!"
+          else "") ;
+        (expected, actual))
+      else (0, 0)
+    in
+    (if Config.collect_storage then
+     let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
+     File_helpers.print_expr_dir ~dirname ~ext:".storage" ctr.storages) ;
+    return @@ add_size ~expected_size ~actual_size total_size
 
   let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -488,10 +505,16 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty))
     in
     print_endline "Writing contract files..." ;
-    let* () =
-      ExprMap.iter_es (output_contract_results ctxt output_dir) contract_map
+    let* total_ir_size =
+      ExprMap.fold_es
+        (output_contract_results ctxt output_dir)
+        contract_map
+        zero_size
     in
     print_endline "Done writing contract files." ;
+    if Config.measure_code_size then (
+      Format.printf "Total measured IR size: %d bytes." total_ir_size.actual ;
+      Format.printf "Total expected IR size: %d bytes." total_ir_size.expected) ;
     let () =
       if not (ExprMap.is_empty lambda_map) then (
         print_endline "Writing lambda files..." ;
