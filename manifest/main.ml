@@ -1379,6 +1379,7 @@ let _octez_p2p_tests =
       (* See https://gitlab.com/tezos/tezos/-/issues/1184 *)
       (* "test_p2p_logging"; *)
       "test_p2p_connect_handler";
+      "test_p2p_maintenance";
     ]
     ~path:"src/lib_p2p/test"
     ~opam:"tezos-p2p"
@@ -1490,6 +1491,9 @@ let _octez_p2p_tests =
             "runtest_p2p_connect_handler"
             ~action:(run_exe "test_p2p_connect_handler" []);
           alias_rule
+            "runtest_p2p_maintenance"
+            ~action:(run_exe "test_p2p_maintenance" []);
+          alias_rule
             "runtest"
             ~package:"tezos-p2p"
             ~alias_deps:
@@ -1502,6 +1506,7 @@ let _octez_p2p_tests =
                 "runtest_p2p_banned_peers";
                 "runtest_p2p_node";
                 "runtest_p2p_connect_handler";
+                "runtest_p2p_maintenance";
               ];
         ])
 
