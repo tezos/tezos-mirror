@@ -102,6 +102,9 @@ let init_info_and_state ctxt mode chain_id =
   let vs = init_validate_operation_state ctxt in
   (vi, vs)
 
+(* See mli file. *)
+type stamp = Operation_validated_stamp
+
 module Manager = struct
   type error +=
     | Manager_restriction of Signature.Public_key_hash.t * Operation_hash.t
@@ -652,27 +655,37 @@ end
 let validate_operation (vi : validate_operation_info)
     (vs : validate_operation_state) oph (type kind) (operation : kind operation)
     =
-  match operation.protocol_data.contents with
-  | Single (Manager_operation {source; _}) ->
-      Manager.validate_manager_operation vi vs source oph operation
-  | Cons (Manager_operation {source; _}, _) ->
-      Manager.validate_manager_operation vi vs source oph operation
-  | Single (Preendorsement _)
-  | Single (Endorsement _)
-  | Single (Dal_slot_availability _)
-  | Single (Seed_nonce_revelation _)
-  | Single (Proposals _)
-  | Single (Ballot _)
-  | Single (Activate_account _)
-  | Single (Double_preendorsement_evidence _)
-  | Single (Double_endorsement_evidence _)
-  | Single (Double_baking_evidence _)
-  | Single (Failing_noop _) ->
-      (* There is no separate validation phase for non-manager
-         operations yet: all checks are done during application in
-         {!Apply}. *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603 *)
-      return vs
+  let open Lwt_result_syntax in
+  let* vs =
+    match operation.protocol_data.contents with
+    | Single (Manager_operation {source; _}) ->
+        Manager.validate_manager_operation vi vs source oph operation
+    | Cons (Manager_operation {source; _}, _) ->
+        Manager.validate_manager_operation vi vs source oph operation
+    | Single (Preendorsement _)
+    | Single (Endorsement _)
+    | Single (Dal_slot_availability _)
+    | Single (Seed_nonce_revelation _)
+    | Single (Proposals _)
+    | Single (Ballot _)
+    | Single (Activate_account _)
+    | Single (Double_preendorsement_evidence _)
+    | Single (Double_endorsement_evidence _)
+    | Single (Double_baking_evidence _)
+    | Single (Failing_noop _) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
+
+           There is no separate validation phase for non-manager
+           operations yet: all checks are currently done during
+           application in {!Apply}.
+
+           When the validation of other operations is implemented, we
+           should also update
+           {!TMP_for_plugin.precheck_manager__do_nothing_on_non_manager_op}
+           (if has not been removed yet). *)
+        return vs
+  in
+  return (vs, Operation_validated_stamp)
 
 module TMP_for_plugin = struct
   type 'a should_check_signature =
@@ -692,10 +705,33 @@ module TMP_for_plugin = struct
           Operation.check_signature source_pk vi.chain_id operation
       | Skip_signature_check -> ok ()
     in
-    return_unit
+    return Operation_validated_stamp
 
-  let precheck_manager_no_validation_state ctxt chain_id contents_list
-      should_check_signature =
-    let vi, vs = init_info_and_state ctxt Mempool chain_id in
-    precheck_manager vi vs contents_list should_check_signature
+  let precheck_manager__do_nothing_on_non_manager_op ctxt chain_id (type kind)
+      (contents_list : kind contents_list) should_check_signature =
+    let handle_manager (type a) (contents_list : a Kind.manager contents_list) =
+      let vi, vs = init_info_and_state ctxt Mempool chain_id in
+      precheck_manager vi vs contents_list should_check_signature
+    in
+    match contents_list with
+    | Single (Manager_operation _) -> handle_manager contents_list
+    | Cons (Manager_operation _, _) -> handle_manager contents_list
+    | Single (Preendorsement _)
+    | Single (Endorsement _)
+    | Single (Dal_slot_availability _)
+    | Single (Seed_nonce_revelation _)
+    | Single (Proposals _)
+    | Single (Ballot _)
+    | Single (Activate_account _)
+    | Single (Double_preendorsement_evidence _)
+    | Single (Double_endorsement_evidence _)
+    | Single (Double_baking_evidence _)
+    | Single (Failing_noop _) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
+
+           This should be updated when {!validate_operation} is
+           implemented on non-manager operations. (Alternatively, this
+           function might be removed first:
+           https://gitlab.com/tezos/tezos/-/issues/3245) *)
+        return Operation_validated_stamp
 end

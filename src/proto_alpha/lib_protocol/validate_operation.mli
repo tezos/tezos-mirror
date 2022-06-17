@@ -62,6 +62,14 @@ val init_info_and_state :
   Chain_id.t ->
   validate_operation_info * validate_operation_state
 
+(** A receipt to guarantee that an operation is always validated
+    before it is applied.
+
+    Indeed, some functions in {!Apply} require a value of this type,
+    which may only be created by calling {!validate_operation} (or a
+    function in {!TMP_for_plugin}). *)
+type stamp
+
 (** Errors that may arise while validating a manager operation. *)
 module Manager : sig
   type error +=
@@ -75,8 +83,9 @@ module Manager : sig
     | Sc_rollup_feature_disabled
 end
 
-(** Check the validity of the given operation and return an updated
-    {!validate_operation_state}.
+(** Check the validity of the given operation; return an updated
+    {!validate_operation_state}, and a {!stamp} attesting that the
+    operation has been validated.
 
     An operation is valid if it may be included in a block without
     causing the block's application to fail. The purpose of this
@@ -132,7 +141,7 @@ val validate_operation :
   validate_operation_state ->
   Operation_hash.t ->
   'kind Alpha_context.operation ->
-  validate_operation_state tzresult Lwt.t
+  (validate_operation_state * stamp) tzresult Lwt.t
 
 (** Functions for the plugin.
 
@@ -176,18 +185,27 @@ module TMP_for_plugin : sig
     validate_operation_state ->
     'a Alpha_context.Kind.manager Alpha_context.contents_list ->
     'a Alpha_context.Kind.manager should_check_signature ->
-    unit tzresult Lwt.t
+    stamp tzresult Lwt.t
 
-  (** Same as {!precheck_manager}, except that this function does not
-      require [validate_operation_info] and [validate_operation_state]
-      arguments. Instead, they are constructed internally from the given
-      context and chain_id.
+  (** Same as {!precheck_manager}, except that:
 
-      This function is called in [lib_plugin/RPC.ml]. *)
-  val precheck_manager_no_validation_state :
+      - This function does not require [validate_operation_info] and
+        [validate_operation_state] arguments. Instead, they are
+        constructed internally from the given context and chain_id.
+
+      - This function accepts any kind of operation as its
+        [contents_list] argument rather than just manager
+        operations. However, on non-manager operations, this function
+        does not check anything.
+
+      This function is called in [lib_plugin/RPC.ml], where we do not
+      have access to a {!Main.validation_state} containing
+      [validate_operation_info] and [_state], and where we need a
+      {!stamp} even for non-manager operations. *)
+  val precheck_manager__do_nothing_on_non_manager_op :
     Alpha_context.t ->
     Chain_id.t ->
-    'a Alpha_context.Kind.manager Alpha_context.contents_list ->
-    'a Alpha_context.Kind.manager should_check_signature ->
-    unit tzresult Lwt.t
+    'kind Alpha_context.contents_list ->
+    'kind should_check_signature ->
+    stamp tzresult Lwt.t
 end

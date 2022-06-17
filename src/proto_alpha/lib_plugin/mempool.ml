@@ -990,7 +990,7 @@ let precheck_manager :
     in
     Main.precheck_manager validation_state contents should_check_signature
     >|= function
-    | Ok () -> on_success
+    | Ok (_ : Validate_operation.stamp) -> on_success
     | Error err -> (
         let err = Environment.wrap_tztrace err in
         match classify_trace err with

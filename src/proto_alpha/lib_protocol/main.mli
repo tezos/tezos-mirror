@@ -124,7 +124,7 @@ val precheck_manager :
   'a Alpha_context.Kind.manager Alpha_context.contents_list ->
   'a Alpha_context.Kind.manager
   Validate_operation.TMP_for_plugin.should_check_signature ->
-  unit tzresult Lwt.t
+  Validate_operation.stamp tzresult Lwt.t
 
 include
   Updater.PROTOCOL

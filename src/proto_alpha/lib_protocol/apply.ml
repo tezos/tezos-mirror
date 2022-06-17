@@ -2255,9 +2255,12 @@ let rec mark_skipped :
     - consumption of each operation's [gas_limit] from the available
       block gas.
 
-    This function should never return an error when the operation has
-    passed {!Validate_operation.validate_operation}. *)
-let take_fees ctxt contents_list =
+    The {!type:Validate_operation.stamp} argument enforces that the
+    operation has already been validated by {!Validate_operation}. The
+    latter is responsible for ensuring that the operation is solvable,
+    i.e. its fees can be taken, i.e. [take_fees] cannot return an
+    error. *)
+let take_fees ctxt (_ : Validate_operation.stamp) contents_list =
   let open Lwt_result_syntax in
   let rec take_fees_rec :
       type kind.
@@ -2647,10 +2650,12 @@ let apply_manager_contents_list ctxt mode ~payload_producer chain_id
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
 let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
-    contents_list =
+    op_validated_stamp contents_list =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  let* ctxt, fees_updated_contents_list = take_fees ctxt contents_list in
+  let* ctxt, fees_updated_contents_list =
+    take_fees ctxt op_validated_stamp contents_list
+  in
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
       ctxt
@@ -2835,7 +2840,7 @@ let validate_grand_parent_endorsement ctxt chain_id
                }) )
 
 let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
-    ~payload_producer (operation : kind operation)
+    ~payload_producer op_validated_stamp (operation : kind operation)
     (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
@@ -2987,6 +2992,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         ~payload_producer
         chain_id
         ~mempool_mode
+        op_validated_stamp
         contents_list
   | Cons (Manager_operation _, _) ->
       apply_manager_operation
@@ -2995,10 +3001,11 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         ~payload_producer
         chain_id
         ~mempool_mode
+        op_validated_stamp
         contents_list
 
 let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
-    ~payload_producer hash operation =
+    ~payload_producer op_validated_stamp hash operation =
   let ctxt = Origination_nonce.init ctxt hash in
   let ctxt = record_operation ctxt hash operation in
   apply_contents_list
@@ -3007,6 +3014,7 @@ let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
     apply_mode
     mode
     ~payload_producer
+    op_validated_stamp
     operation
     operation.protocol_data.contents
   >|=? fun (ctxt, result) ->

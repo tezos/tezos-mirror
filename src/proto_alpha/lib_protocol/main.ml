@@ -380,13 +380,14 @@ let apply_operation_with_mode mode ctxt chain_id data op_count operation
     data.validate_operation_state
     oph
     operation
-  >>=? fun validate_operation_state ->
+  >>=? fun (validate_operation_state, op_validated_stamp) ->
   Apply.apply_operation
     ctxt
     chain_id
     mode
     Optimized
     ~payload_producer
+    op_validated_stamp
     oph
     operation
   >|=? fun (ctxt, result) ->

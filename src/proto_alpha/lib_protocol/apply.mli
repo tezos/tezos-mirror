@@ -111,15 +111,35 @@ type apply_mode =
       grand_parent_round : Round.t;
     }
 
+(** Apply an operation, i.e. update the given context in accordance
+    with the operation's semantic (or return an error if the operation
+    is not applicable).
+
+    The {!type:Validate_operation.stamp} argument enforces that an
+    operation needs to be validated by {!Validate_operation} before it
+    can be applied.
+
+    TODO: https://gitlab.com/tezos/tezos/-/issues/2603
+
+    Currently, {!Validate_operation.validate_operation} does nothing
+    on non-manager operations. The "validation" of these operations is
+    instead handled by [apply_operation], which may thus return an
+    error if the operation is ill-formed. Once [validate_operation] has
+    been extended to every kind of operation, [apply_operation] should
+    never return an error.
+
+    See {!apply_manager_operation} for additional information on the
+    application of manager operations. *)
 val apply_operation :
   context ->
   Chain_id.t ->
   apply_mode ->
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
-  Operation_list_hash.elt ->
+  Validate_operation.stamp ->
+  Operation_hash.t ->
   'a operation ->
-  (context * 'a operation_metadata, error trace) result Lwt.t
+  (context * 'a operation_metadata) tzresult Lwt.t
 
 type finalize_application_mode =
   | Finalize_full_construction of {
@@ -141,12 +161,15 @@ val finalize_application :
   migration_balance_updates:Receipt.balance_updates ->
   (context * Fitness.t * block_metadata, error trace) result Lwt.t
 
+(** Similar to {!apply_operation}, but a few initial and final steps
+    are skipped. This function is called in [lib_plugin/RPC.ml]. *)
 val apply_contents_list :
   context ->
   Chain_id.t ->
   apply_mode ->
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
+  Validate_operation.stamp ->
   'kind operation ->
   'kind contents_list ->
   (context * 'kind contents_result_list) tzresult Lwt.t
@@ -163,12 +186,14 @@ val apply_contents_list :
     - decrease of the available block gas by operation's [gas_limit].
 
     These updates are mandatory. In particular, taking the fees is
-    critically important. That's why [apply_manager_operation] **should
-    only be called after {!Validate_operation.validate_operation}**,
-    which is responsible for ensuring that the operation is solvable,
-    i.e. this first stage of [apply_manager_operation] will not
-    fail. If this stage fails nevertheless, the function returns an
-    error.
+    critically important. That's why [apply_manager_operation] takes a
+    [Validate_operation.stamp] argument, so that it may only be called
+    after having validated the operation by calling
+    {!Validate_operation}. Indeed, this module is responsible for
+    ensuring that the operation is solvable, i.e. that fees can be
+    taken, i.e. that the first stage of [apply_manager_operation]
+    cannot fail. If this stage fails nevertheless, the function returns
+    an error.
 
     The second stage of this function consists in applying all the
     other effects, in accordance with the semantic of the operation's
@@ -185,6 +210,7 @@ val apply_manager_operation :
   payload_producer:public_key_hash ->
   Chain_id.t ->
   mempool_mode:bool ->
+  Validate_operation.stamp ->
   'a Kind.manager contents_list ->
   (context * 'a Kind.manager contents_result_list) tzresult Lwt.t
 
