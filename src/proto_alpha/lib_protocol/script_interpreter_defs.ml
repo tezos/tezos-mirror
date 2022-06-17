@@ -365,15 +365,15 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   | KCons (_, _) -> Interp_costs.Control.cons
   | KReturn _ -> Interp_costs.Control.return
   | KMap_head (_, _) -> Interp_costs.Control.map_head
-  | KUndip (_, _) -> Interp_costs.Control.undip
+  | KUndip (_, _, _) -> Interp_costs.Control.undip
   | KLoop_in (_, _) -> Interp_costs.Control.loop_in
   | KLoop_in_left (_, _) -> Interp_costs.Control.loop_in_left
-  | KIter (_, _, _) -> Interp_costs.Control.iter
-  | KList_enter_body (_, xs, _, len, _) ->
+  | KIter (_, _, _, _) -> Interp_costs.Control.iter
+  | KList_enter_body (_, xs, _, _, len, _) ->
       Interp_costs.Control.list_enter_body xs len
-  | KList_exit_body (_, _, _, _, _) -> Interp_costs.Control.list_exit_body
-  | KMap_enter_body (_, _, _, _) -> Interp_costs.Control.map_enter_body
-  | KMap_exit_body (_, _, map, key, _) ->
+  | KList_exit_body (_, _, _, _, _, _) -> Interp_costs.Control.list_exit_body
+  | KMap_enter_body (_, _, _, _, _) -> Interp_costs.Control.map_enter_body
+  | KMap_exit_body (_, _, map, key, _, _) ->
       Interp_costs.Control.map_exit_body key map
   | KView_exit (_, _) -> Interp_costs.Control.view_exit
 
@@ -398,58 +398,10 @@ let consume_control local_gas_counter ks =
   consume_opt local_gas_counter cost
   [@@ocaml.inline always]
 
-(*
-
-   Auxiliary functions used by the instrumentation
-   ===============================================
-
-*)
-
-let log_entry logger ctxt gas k accu stack =
-  let kinfo = kinfo_of_kinstr k in
-  let ctxt = update_context gas ctxt in
-  logger.log_entry k ctxt kinfo.iloc kinfo.kstack_ty (accu, stack)
-
-let log_exit logger ctxt gas kinfo_prev k accu stack =
-  let kinfo = kinfo_of_kinstr k in
-  let ctxt = update_context gas ctxt in
-  logger.log_exit k ctxt kinfo_prev.iloc kinfo.kstack_ty (accu, stack)
-
-let log_control logger ks = logger.log_control ks
-
 let get_log = function
   | None -> Lwt.return (Ok None)
   | Some logger -> logger.get_log ()
   [@@ocaml.inline always]
-
-(* [log_kinstr logger i] emits an instruction to instrument the
-   execution of [i] with [logger]. *)
-let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
-
-(* [log_next_kinstr logger i] instruments the next instruction of [i]
-   with the [logger].
-
-   Notice that the instrumentation breaks the sharing of continuations
-   that is normally enforced between branches of conditionals. This
-   has a performance cost. Anyway, the instrumentation allocates many
-   new [ILog] instructions and [KLog] continuations which makes
-   the execution of instrumented code significantly slower than
-   non-instrumented code. "Zero-cost logging" means that the normal
-   non-instrumented execution is not impacted by the ability to
-   instrument it, not that the logging itself has no cost.
-*)
-let log_next_kinstr logger i =
-  let apply k =
-    ILog
-      ( kinfo_of_kinstr k,
-        LogExit (kinfo_of_kinstr i),
-        logger,
-        log_kinstr logger k )
-  in
-  kinstr_rewritek i {apply}
-
-(* We pass the identity function when no instrumentation is needed. *)
-let id x = x [@@inline]
 
 (*
 
@@ -469,8 +421,8 @@ let rec kundip :
     a * s * (e, z, b, t) kinstr =
  fun w accu stack k ->
   match w with
-  | KPrefix (kinfo, w) ->
-      let k = IConst (kinfo, accu, k) in
+  | KPrefix (loc, ty, w) ->
+      let k = IConst (loc, ty, accu, k) in
       let accu, stack = stack in
       kundip w accu stack k
   | KRest -> (accu, stack, k)
@@ -493,14 +445,11 @@ let apply ctxt gas capture_ty capture lam =
           kbef = arg_stack_ty;
           kaft = descr.kaft;
           kinstr =
-            (let kinfo_const = {iloc = descr.kloc; kstack_ty = arg_stack_ty} in
-             let kinfo_pair =
-               {
-                 iloc = descr.kloc;
-                 kstack_ty = Item_t (capture_ty, arg_stack_ty);
-               }
-             in
-             IConst (kinfo_const, capture, ICons_pair (kinfo_pair, descr.kinstr)));
+            IConst
+              ( descr.kloc,
+                capture_ty,
+                capture,
+                ICons_pair (descr.kloc, descr.kinstr) );
         }
       in
       let full_expr =
@@ -714,7 +663,7 @@ let rec interp_stack_prefix_preserving_operation :
     (d * w) * result =
  fun f n accu stk ->
   match (n, stk) with
-  | KPrefix (_, n), rest ->
+  | KPrefix (_, _, n), rest ->
       interp_stack_prefix_preserving_operation f n (fst rest) (snd rest)
       |> fun ((v, rest'), result) -> ((accu, (v, rest')), result)
   | KRest, v -> f accu v
@@ -726,7 +675,15 @@ let rec interp_stack_prefix_preserving_operation :
 
    To improve readibility, we introduce their types as abbreviations:
 
-*)
+ *)
+
+(* A function of this type either introduces type-preserving
+   instrumentation of a continuation for the purposes of logging
+   or returns given continuation unchanged. *)
+type ('a, 'b, 'c, 'd) cont_instrumentation =
+  ('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation
+
+let id x = x
 
 type ('a, 's, 'b, 't, 'r, 'f) step_type =
   outdated_context * step_constants ->
@@ -737,51 +694,55 @@ type ('a, 's, 'b, 't, 'r, 'f) step_type =
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'm, 'n, 'o) kmap_exit_type =
-  (('c, 'd, 'e, 'f) continuation -> ('a, 'b, 'g, 'h) continuation) ->
+type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
+  ('a, 'b, 'e, 'f) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr ->
+  ('m * 'n, 'a * 'b, 'o, 'a * 'b) kinstr ->
   ('m * 'n) list ->
+  (('m, 'o) map, 'c) ty ->
   ('m, 'o) map ->
   'm ->
-  (('m, 'o) map, 'c * 'd, 'e, 'f) continuation ->
+  (('m, 'o) map, 'a * 'b, 'e, 'f) continuation ->
   'o ->
   'a * 'b ->
-  ('g * 'h * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
-  (('a, 'b * 'c, 'd, 'e) continuation -> ('a, 'b * 'c, 'd, 'e) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
+  ('a, 'b * 'c, 'd, 'e) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
   ('j * 'k) list ->
+  (('j, 'a) map, 'f) ty ->
   ('j, 'a) map ->
   (('j, 'a) map, 'b * 'c, 'd, 'e) continuation ->
   'b ->
   'c ->
   ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
   'i list ->
   'j list ->
+  ('j boxed_list, 'e) ty ->
   int ->
   ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
-  (('b, 'a * 'c, 'd, 'e) continuation -> ('b, 'a * 'c, 'd, 'e) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
+  ('b, 'a * 'c, 'd, 'e) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
   'j list ->
   'b list ->
+  ('b boxed_list, 'f) ty ->
   int ->
   ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
   'a ->
@@ -808,33 +769,36 @@ type ('a, 'b, 'c, 'r, 'f, 's) kloop_in_type =
   'a * 's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 's, 'r, 'f) kiter_type =
-  (('a, 's, 'r, 'f) continuation -> ('a, 's, 'r, 'f) continuation) ->
+type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
+  ('a, 's, 'r, 'f) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('b, 'a * 's, 'a, 's) kinstr ->
+  ('b, 'c) ty ->
   'b list ->
   ('a, 's, 'r, 'f) continuation ->
   'a ->
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) ilist_map_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
   ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
+  ('f boxed_list, 'i) ty ->
   'e boxed_list ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g) ilist_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
+  ('e, 'cmp) ty ->
   ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
   'e boxed_list ->
@@ -842,32 +806,35 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) ilist_iter_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
+  'e comparable_ty ->
   ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
   'e set ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) imap_map_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
   (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
   ('h, 'i, 'c, 'd) continuation ->
+  (('e, 'g) map, 'j) ty ->
   ('e, 'f) map ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) imap_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'cmp) imap_iter_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'a, 'b) kinstr ->
+  ('e * 'f, 'cmp) ty ->
   ('a, 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
   ('e, 'f) map ->
@@ -878,7 +845,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Tez.t, 'a) kinfo ->
+  Script.location ->
   (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Tez.t ->
@@ -889,7 +856,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
+  Script.location ->
   (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
@@ -900,7 +867,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
+  Script.location ->
   (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
@@ -911,7 +878,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
+  Script.location ->
   (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
@@ -932,11 +899,25 @@ type ifailwith_type = {
 [@@unboxed]
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
+  ('a, end_of_stack, 'e, 'f) cont_instrumentation ->
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
+  ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   'g ->
   ('g, 'a) lambda * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type =
+  ('o, end_of_stack, 'e, 'f) cont_instrumentation ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  ('i, 'o) view_signature ->
+  ('o, 'a * 'b) stack_ty ->
+  ('o option, 'a * 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  'i ->
+  address * ('a * 'b) ->
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t

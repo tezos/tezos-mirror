@@ -26,10 +26,10 @@ trace
     [ (Pair { "abc" ; "xyz" } {}) ]
     - log/LOOP_LEFT (exit) @ location: 14
       [ (Left (Pair { "abc" ; "xyz" } {})) ]
-  - LOOP_LEFT (entry) @ location: 17
+  - LOOP_LEFT (entry) @ location: 41
     [ (Left (Pair { "abc" ; "xyz" } {})) ]
     - control: KLoop_in_left
-    - log/DUP (exit) @ location: 17
+    - log/DUP (exit) @ location: 41
       [ (Pair { "abc" ; "xyz" } {}) ]
   - DUP (entry) @ location: 19
     [ (Pair { "abc" ; "xyz" } {}) ]
@@ -101,15 +101,15 @@ trace
     [ (Pair { "xyz" } { "abc" }) ]
     - log/[halt] (exit) @ location: 31
       [ (Left (Pair { "xyz" } { "abc" })) ]
-  - [halt] (entry) @ location: 17
+  - [halt] (entry) @ location: 41
     [ (Left (Pair { "xyz" } { "abc" })) ]
     - control: KCons
     - log/[halt] (exit) @ location: 24
       [ (Left (Pair { "xyz" } { "abc" })) ]
-  - [halt] (entry) @ location: 17
+  - [halt] (entry) @ location: 41
     [ (Left (Pair { "xyz" } { "abc" })) ]
     - control: KLoop_in_left
-    - log/DUP (exit) @ location: 17
+    - log/DUP (exit) @ location: 41
       [ (Pair { "xyz" } { "abc" }) ]
   - DUP (entry) @ location: 19
     [ (Pair { "xyz" } { "abc" }) ]
@@ -181,15 +181,15 @@ trace
     [ (Pair {} { "xyz" ; "abc" }) ]
     - log/[halt] (exit) @ location: 31
       [ (Left (Pair {} { "xyz" ; "abc" })) ]
-  - [halt] (entry) @ location: 17
+  - [halt] (entry) @ location: 41
     [ (Left (Pair {} { "xyz" ; "abc" })) ]
     - control: KCons
     - log/[halt] (exit) @ location: 24
       [ (Left (Pair {} { "xyz" ; "abc" })) ]
-  - [halt] (entry) @ location: 17
+  - [halt] (entry) @ location: 41
     [ (Left (Pair {} { "xyz" ; "abc" })) ]
     - control: KLoop_in_left
-    - log/DUP (exit) @ location: 17
+    - log/DUP (exit) @ location: 41
       [ (Pair {} { "xyz" ; "abc" }) ]
   - DUP (entry) @ location: 19
     [ (Pair {} { "xyz" ; "abc" }) ]
@@ -227,16 +227,16 @@ trace
     [ { "xyz" ; "abc" } ]
     - log/[halt] (exit) @ location: 35
       [ (Right { "xyz" ; "abc" }) ]
-  - [halt] (entry) @ location: 17
+  - [halt] (entry) @ location: 41
     [ (Right { "xyz" ; "abc" }) ]
     - control: KCons
     - log/[halt] (exit) @ location: 24
       [ (Right { "xyz" ; "abc" }) ]
-  - [halt] (entry) @ location: 17
+  - [halt] (entry) @ location: 41
     [ (Right { "xyz" ; "abc" }) ]
     - control: KLoop_in_left
     - control: KCons
-    - log/NIL (exit) @ location: 17
+    - log/NIL (exit) @ location: 41
       [ { "xyz" ; "abc" } ]
   - NIL (entry) @ location: 41
     [ { "xyz" ; "abc" } ]

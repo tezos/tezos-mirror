@@ -67,13 +67,13 @@ trace
         {}
         8
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       {}
       8
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ {}
         8
         {} ]
@@ -100,7 +100,7 @@ trace
         {}
         8
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       {}
       8
@@ -111,14 +111,14 @@ trace
         {}
         8
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       {}
       8
       {} ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ {}
         8
         {} ]
@@ -199,13 +199,13 @@ trace
         { 8 }
         3
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 8 }
       3
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 8 }
         3
         {} ]
@@ -405,7 +405,7 @@ trace
         { 8 }
         3
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 8 }
       3
@@ -416,7 +416,7 @@ trace
         { 8 }
         3
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 8 }
       3
@@ -427,14 +427,14 @@ trace
         { 8 }
         3
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 8 }
       3
       {} ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 8 }
         3
         {} ]
@@ -515,13 +515,13 @@ trace
         { 3 ; 8 }
         2
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 3 ; 8 }
       2
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 3 ; 8 }
         2
         {} ]
@@ -721,7 +721,7 @@ trace
         { 3 ; 8 }
         2
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 3 ; 8 }
       2
@@ -732,7 +732,7 @@ trace
         { 3 ; 8 }
         2
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 3 ; 8 }
       2
@@ -743,14 +743,14 @@ trace
         { 3 ; 8 }
         2
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 3 ; 8 }
       2
       {} ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 3 ; 8 }
         2
         {} ]
@@ -831,13 +831,13 @@ trace
         { 2 ; 3 ; 8 }
         7
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 2 ; 3 ; 8 }
       7
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 2 ; 3 ; 8 }
         7
         {} ]
@@ -1063,7 +1063,7 @@ trace
         { 3 ; 8 }
         7
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 8 }
       7
@@ -1074,7 +1074,7 @@ trace
         { 3 ; 8 }
         7
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 8 }
       7
@@ -1085,13 +1085,13 @@ trace
         { 3 ; 8 }
         7
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 8 }
       7
       { 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 3 ; 8 }
         7
         { 2 } ]
@@ -1317,7 +1317,7 @@ trace
         { 8 }
         7
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 8 }
       7
@@ -1328,7 +1328,7 @@ trace
         { 8 }
         7
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 8 }
       7
@@ -1339,13 +1339,13 @@ trace
         { 8 }
         7
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 8 }
       7
       { 3 ; 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 8 }
         7
         { 3 ; 2 } ]
@@ -1545,7 +1545,7 @@ trace
         { 8 }
         7
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 8 }
       7
@@ -1556,7 +1556,7 @@ trace
         { 8 }
         7
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 8 }
       7
@@ -1567,14 +1567,14 @@ trace
         { 8 }
         7
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 8 }
       7
       { 3 ; 2 } ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 8 }
         7
         { 3 ; 2 } ]
@@ -1677,13 +1677,13 @@ trace
         { 2 ; 3 ; 7 ; 8 }
         6
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 2 ; 3 ; 7 ; 8 }
       6
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 2 ; 3 ; 7 ; 8 }
         6
         {} ]
@@ -1909,7 +1909,7 @@ trace
         { 3 ; 7 ; 8 }
         6
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 7 ; 8 }
       6
@@ -1920,7 +1920,7 @@ trace
         { 3 ; 7 ; 8 }
         6
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 7 ; 8 }
       6
@@ -1931,13 +1931,13 @@ trace
         { 3 ; 7 ; 8 }
         6
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 7 ; 8 }
       6
       { 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 3 ; 7 ; 8 }
         6
         { 2 } ]
@@ -2163,7 +2163,7 @@ trace
         { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 7 ; 8 }
       6
@@ -2174,7 +2174,7 @@ trace
         { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 7 ; 8 }
       6
@@ -2185,13 +2185,13 @@ trace
         { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 7 ; 8 }
       6
       { 3 ; 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 7 ; 8 }
         6
         { 3 ; 2 } ]
@@ -2391,7 +2391,7 @@ trace
         { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 7 ; 8 }
       6
@@ -2402,7 +2402,7 @@ trace
         { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 7 ; 8 }
       6
@@ -2413,14 +2413,14 @@ trace
         { 7 ; 8 }
         6
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 7 ; 8 }
       6
       { 3 ; 2 } ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 7 ; 8 }
         6
         { 3 ; 2 } ]
@@ -2523,13 +2523,13 @@ trace
         { 2 ; 3 ; 6 ; 7 ; 8 }
         9
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 2 ; 3 ; 6 ; 7 ; 8 }
       9
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 2 ; 3 ; 6 ; 7 ; 8 }
         9
         {} ]
@@ -2755,7 +2755,7 @@ trace
         { 3 ; 6 ; 7 ; 8 }
         9
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 6 ; 7 ; 8 }
       9
@@ -2766,7 +2766,7 @@ trace
         { 3 ; 6 ; 7 ; 8 }
         9
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 6 ; 7 ; 8 }
       9
@@ -2777,13 +2777,13 @@ trace
         { 3 ; 6 ; 7 ; 8 }
         9
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 6 ; 7 ; 8 }
       9
       { 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 3 ; 6 ; 7 ; 8 }
         9
         { 2 } ]
@@ -3009,7 +3009,7 @@ trace
         { 6 ; 7 ; 8 }
         9
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 6 ; 7 ; 8 }
       9
@@ -3020,7 +3020,7 @@ trace
         { 6 ; 7 ; 8 }
         9
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 6 ; 7 ; 8 }
       9
@@ -3031,13 +3031,13 @@ trace
         { 6 ; 7 ; 8 }
         9
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 6 ; 7 ; 8 }
       9
       { 3 ; 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 6 ; 7 ; 8 }
         9
         { 3 ; 2 } ]
@@ -3263,7 +3263,7 @@ trace
         { 7 ; 8 }
         9
         { 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 7 ; 8 }
       9
@@ -3274,7 +3274,7 @@ trace
         { 7 ; 8 }
         9
         { 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 7 ; 8 }
       9
@@ -3285,13 +3285,13 @@ trace
         { 7 ; 8 }
         9
         { 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 7 ; 8 }
       9
       { 6 ; 3 ; 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 7 ; 8 }
         9
         { 6 ; 3 ; 2 } ]
@@ -3517,7 +3517,7 @@ trace
         { 8 }
         9
         { 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 8 }
       9
@@ -3528,7 +3528,7 @@ trace
         { 8 }
         9
         { 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 8 }
       9
@@ -3539,13 +3539,13 @@ trace
         { 8 }
         9
         { 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 8 }
       9
       { 7 ; 6 ; 3 ; 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 8 }
         9
         { 7 ; 6 ; 3 ; 2 } ]
@@ -3771,7 +3771,7 @@ trace
         {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       {}
       9
@@ -3782,7 +3782,7 @@ trace
         {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       {}
       9
@@ -3793,13 +3793,13 @@ trace
         {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       {}
       9
       { 8 ; 7 ; 6 ; 3 ; 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
@@ -3826,7 +3826,7 @@ trace
         {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       {}
       9
@@ -3837,14 +3837,14 @@ trace
         {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       {}
       9
       { 8 ; 7 ; 6 ; 3 ; 2 } ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ {}
         9
         { 8 ; 7 ; 6 ; 3 ; 2 } ]
@@ -3980,13 +3980,13 @@ trace
         { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
         5
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
       5
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 2 ; 3 ; 6 ; 7 ; 8 ; 9 }
         5
         {} ]
@@ -4212,7 +4212,7 @@ trace
         { 3 ; 6 ; 7 ; 8 ; 9 }
         5
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 6 ; 7 ; 8 ; 9 }
       5
@@ -4223,7 +4223,7 @@ trace
         { 3 ; 6 ; 7 ; 8 ; 9 }
         5
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 6 ; 7 ; 8 ; 9 }
       5
@@ -4234,13 +4234,13 @@ trace
         { 3 ; 6 ; 7 ; 8 ; 9 }
         5
         { 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 6 ; 7 ; 8 ; 9 }
       5
       { 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 3 ; 6 ; 7 ; 8 ; 9 }
         5
         { 2 } ]
@@ -4466,7 +4466,7 @@ trace
         { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 6 ; 7 ; 8 ; 9 }
       5
@@ -4477,7 +4477,7 @@ trace
         { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 6 ; 7 ; 8 ; 9 }
       5
@@ -4488,13 +4488,13 @@ trace
         { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 6 ; 7 ; 8 ; 9 }
       5
       { 3 ; 2 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
@@ -4694,7 +4694,7 @@ trace
         { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 6 ; 7 ; 8 ; 9 }
       5
@@ -4705,7 +4705,7 @@ trace
         { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 6 ; 7 ; 8 ; 9 }
       5
@@ -4716,14 +4716,14 @@ trace
         { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 6 ; 7 ; 8 ; 9 }
       5
       { 3 ; 2 } ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 6 ; 7 ; 8 ; 9 }
         5
         { 3 ; 2 } ]
@@ -4826,13 +4826,13 @@ trace
         { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       1
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
@@ -5032,7 +5032,7 @@ trace
         { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       1
@@ -5043,7 +5043,7 @@ trace
         { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       1
@@ -5054,14 +5054,14 @@ trace
         { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       1
       {} ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         1
         {} ]
@@ -5142,13 +5142,13 @@ trace
         { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 1 ; 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         {} ]
@@ -5374,7 +5374,7 @@ trace
         { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -5385,7 +5385,7 @@ trace
         { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -5396,13 +5396,13 @@ trace
         { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 1 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 2 ; 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 1 } ]
@@ -5628,7 +5628,7 @@ trace
         { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -5639,7 +5639,7 @@ trace
         { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -5650,13 +5650,13 @@ trace
         { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 2 ; 1 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 3 ; 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 2 ; 1 } ]
@@ -5882,7 +5882,7 @@ trace
         { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -5893,7 +5893,7 @@ trace
         { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -5904,13 +5904,13 @@ trace
         { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ True
       { 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 3 ; 2 ; 1 } ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
@@ -6110,7 +6110,7 @@ trace
         { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -6121,7 +6121,7 @@ trace
         { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 5 ; 6 ; 7 ; 8 ; 9 }
       4
@@ -6132,14 +6132,14 @@ trace
         { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 5 ; 6 ; 7 ; 8 ; 9 }
       4
       { 3 ; 2 ; 1 } ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 5 ; 6 ; 7 ; 8 ; 9 }
         4
         { 3 ; 2 ; 1 } ]
@@ -6253,13 +6253,13 @@ trace
         { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]
-  - LOOP (entry) @ location: 24
+  - LOOP (entry) @ location: 66
     [ True
       { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
       0
       {} ]
     - control: KLoop_in
-    - log/IF_CONS (exit) @ location: 24
+    - log/IF_CONS (exit) @ location: 66
       [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]
@@ -6459,7 +6459,7 @@ trace
         { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
       0
@@ -6470,7 +6470,7 @@ trace
         { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
       0
@@ -6481,14 +6481,14 @@ trace
         { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]
-  - [halt] (entry) @ location: 24
+  - [halt] (entry) @ location: 66
     [ False
       { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
       0
       {} ]
     - control: KLoop_in
     - control: KCons
-    - log/SWAP (exit) @ location: 24
+    - log/SWAP (exit) @ location: 66
       [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 }
         0
         {} ]

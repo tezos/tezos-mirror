@@ -214,6 +214,7 @@
   Ticket_accounting
   Tx_rollup_ticket
   Script_interpreter_defs
+  Script_interpreter_logging
   Script_interpreter
   Sc_rollup_management_protocol
   Sc_rollup_operations
@@ -436,6 +437,7 @@
   ticket_accounting.ml ticket_accounting.mli
   tx_rollup_ticket.ml tx_rollup_ticket.mli
   script_interpreter_defs.ml
+  script_interpreter_logging.ml script_interpreter_logging.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
@@ -644,6 +646,7 @@
   ticket_accounting.ml ticket_accounting.mli
   tx_rollup_ticket.ml tx_rollup_ticket.mli
   script_interpreter_defs.ml
+  script_interpreter_logging.ml script_interpreter_logging.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
@@ -861,6 +864,7 @@
   ticket_accounting.ml ticket_accounting.mli
   tx_rollup_ticket.ml tx_rollup_ticket.mli
   script_interpreter_defs.ml
+  script_interpreter_logging.ml script_interpreter_logging.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
@@ -1082,6 +1086,7 @@
   ticket_accounting.ml ticket_accounting.mli
   tx_rollup_ticket.ml tx_rollup_ticket.mli
   script_interpreter_defs.ml
+  script_interpreter_logging.ml script_interpreter_logging.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli

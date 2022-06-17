@@ -1153,23 +1153,23 @@ let extract_ir_sized_step :
   | IDrop (_, _), _ -> Instructions.drop
   | IDup (_, _), _ -> Instructions.dup
   | ISwap (_, _), _ -> Instructions.swap
-  | IConst (_, _, _), _ -> Instructions.const
+  | IConst (_, _, _, _), _ -> Instructions.const
   | ICons_pair (_, _), _ -> Instructions.cons_pair
   | ICar (_, _), _ -> Instructions.car
   | ICdr (_, _), _ -> Instructions.cdr
   | IUnpair (_, _), _ -> Instructions.unpair
   | ICons_some (_, _), _ -> Instructions.cons_some
-  | ICons_none (_, _), _ -> Instructions.cons_none
+  | ICons_none (_, _, _), _ -> Instructions.cons_none
   | IIf_none _, _ -> Instructions.if_none
   | IOpt_map _, _ -> Instructions.opt_map
-  | ICons_left (_, _), _ -> Instructions.left
-  | ICons_right (_, _), _ -> Instructions.right
+  | ICons_left (_, _, _), _ -> Instructions.left
+  | ICons_right (_, _, _), _ -> Instructions.right
   | IIf_left _, _ -> Instructions.if_left
   | ICons_list (_, _), _ -> Instructions.cons_list
-  | INil (_, _), _ -> Instructions.nil
+  | INil (_, _, _), _ -> Instructions.nil
   | IIf_cons _, _ -> Instructions.if_cons
-  | IList_iter (_, _, _), _ -> Instructions.list_iter
-  | IList_map (_, _, _), _ -> Instructions.list_map
+  | IList_iter (_, _, _, _), _ -> Instructions.list_iter
+  | IList_map (_, _, _, _), _ -> Instructions.list_map
   | IList_size (_, _), (list, _) -> Instructions.list_size (Size.list list)
   | IEmpty_set (_, _, _), _ -> Instructions.empty_set
   | ISet_iter _, (set, _) -> Instructions.set_iter (Size.set set)
@@ -1182,7 +1182,7 @@ let extract_ir_sized_step :
       let sz = S.OPS.elt_size v in
       Instructions.set_update sz (Size.set set)
   | ISet_size (_, _), (set, _) -> Instructions.set_size (Size.set set)
-  | IEmpty_map (_, _, _), _ -> Instructions.empty_map
+  | IEmpty_map (_, _, _, _), _ -> Instructions.empty_map
   | IMap_map _, (map, _) -> Instructions.map_map (Size.map map)
   | IMap_iter _, (map, _) -> Instructions.map_iter (Size.map map)
   | IMap_mem (_, _), (v, (map, _)) ->
@@ -1305,11 +1305,11 @@ let extract_ir_sized_step :
   | IIf _, _ -> Instructions.if_
   | ILoop (_, _, _), _ -> Instructions.loop
   | ILoop_left (_, _, _), _ -> Instructions.loop_left
-  | IDip (_, _, _), _ -> Instructions.dip
-  | IExec (_, _), _ -> Instructions.exec
+  | IDip (_, _, _, _), _ -> Instructions.dip
+  | IExec (_, _, _), _ -> Instructions.exec
   | IApply (_, _, _), _ -> Instructions.apply
   | ILambda (_, _, _), _ -> Instructions.lambda
-  | IFailwith (_, _, _), _ -> Instructions.failwith_
+  | IFailwith (_, _), _ -> Instructions.failwith_
   | ICompare (_, cmp_ty, _), (a, (b, _)) ->
       extract_compare_sized_step cmp_ty a b
   | IEq (_, _), _ -> Instructions.eq
@@ -1321,7 +1321,7 @@ let extract_ir_sized_step :
   | IAddress (_, _), _ -> Instructions.address
   | IContract (_, _, _, _), _ -> Instructions.contract
   | ITransfer_tokens (_, _), _ -> Instructions.transfer_tokens
-  | IView (_, _, _), _ -> Instructions.view
+  | IView (_, _, _, _), _ -> Instructions.view
   | IImplicit_account (_, _), _ -> Instructions.implicit_account
   | ICreate_contract _, _ -> Instructions.create_contract
   | ISet_delegate (_, _), _ -> Instructions.set_delegate
@@ -1406,8 +1406,8 @@ let extract_ir_sized_step :
   | IComb_get (_, n, _, _), _ -> Instructions.comb_get (Size.of_int n)
   | IComb_set (_, n, _, _), _ -> Instructions.comb_set (Size.of_int n)
   | IDup_n (_, n, _, _), _ -> Instructions.dupn (Size.of_int n)
-  | ITicket (_, _), _ -> Instructions.ticket
-  | IRead_ticket (_, _), _ -> Instructions.read_ticket
+  | ITicket (_, _, _), _ -> Instructions.ticket
+  | IRead_ticket (_, _, _), _ -> Instructions.read_ticket
   | ISplit_ticket (_, _), (_ticket, ((amount_a, amount_b), _)) ->
       Instructions.split_ticket (Size.integer amount_a) (Size.integer amount_b)
   | IJoin_tickets (_, cmp_ty, _), ((ticket1, ticket2), _) ->
@@ -1436,15 +1436,15 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KUndip _ -> Control.undip
   | KLoop_in _ -> Control.loop_in
   | KLoop_in_left _ -> Control.loop_in_left
-  | KIter (_, xs, _) -> Control.iter (Size.of_int (List.length xs))
-  | KList_enter_body (_, xs, ys, _, _) ->
+  | KIter (_, _, xs, _) -> Control.iter (Size.of_int (List.length xs))
+  | KList_enter_body (_, xs, ys, _, _, _) ->
       Control.list_enter_body
         (Size.of_int (List.length xs))
         (Size.of_int (List.length ys))
-  | KList_exit_body (_, _, _, _, _) -> Control.list_exit_body
-  | KMap_enter_body (_, xs, _, _) ->
+  | KList_exit_body (_, _, _, _, _, _) -> Control.list_exit_body
+  | KMap_enter_body (_, xs, _, _, _) ->
       Control.map_enter_body (Size.of_int (List.length xs))
-  | KMap_exit_body (_, _, map, k, _) ->
+  | KMap_exit_body (_, _, map, k, _, _) ->
       let (module Map) = Script_map.get_module map in
       let key_size = Map.OPS.key_size k in
       Control.map_exit_body key_size (Size.map map)
@@ -1463,6 +1463,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
 exception Stop_bench
 
 let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
+    (sty : (bef_top, bef) Script_typed_ir.stack_ty)
     (kinstr : (bef_top, bef, aft_top, aft) Script_typed_ir.kinstr)
     (stack : bef_top * bef) =
   let trace = ref [] in
@@ -1485,6 +1486,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
            (Some logger)
            ctxt
            step_constants
+           sty
            kinstr
            (fst stack)
            (snd stack))
@@ -1499,6 +1501,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
   with Stop_bench -> List.rev !trace
 
 let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
+    (stack_type : (bef_top, bef) stack_ty)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation)
     (stack : bef_top * bef) =
   let trace = ref [] in
@@ -1524,6 +1527,7 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
            (Some logger)
            (outdated_ctxt, step_constants)
            (Local_gas_counter 0xFF_FF_FF_FF)
+           stack_type
            cont
            (fst stack)
            (snd stack))

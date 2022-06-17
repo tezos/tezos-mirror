@@ -36,7 +36,6 @@
 open Protocol
 open Alpha_context
 open Script_interpreter
-open Error_monad_operators
 
 let test_context () =
   Context.init3 () >>=? fun (b, _cs) ->
@@ -102,6 +101,8 @@ let test_multiplication_close_to_overflow_passes () =
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
+let dummy_loc = -1
+
 (** The purpose of these two tests is to check that the Michelson interpreter is
     stack-safe (because it is tail-recursive).
 
@@ -123,14 +124,13 @@ let test_stack_overflow () =
   in
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
-  let kinfo = {iloc = -1; kstack_ty = stack} in
-  let kinfo' = {iloc = -1; kstack_ty = Item_t (bool_t, stack)} in
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
-      else aux (n - 1) (IConst (kinfo, true, IDrop (kinfo', acc)))
+      else
+        aux (n - 1) (IConst (dummy_loc, Bool_t, true, IDrop (dummy_loc, acc)))
     in
-    aux n (IHalt kinfo)
+    aux n (IHalt dummy_loc)
   in
   run_step ctxt (descr (enorme_et_seq 1_000_000)) EmptyCell EmptyCell
   >>= function
@@ -153,16 +153,8 @@ let test_stack_overflow_in_lwt () =
     @@ Gas.fp_of_milligas_int (Saturation_repr.saturated :> int)
   in
   let stack = Bot_t in
-  let item ty s = Item_t (ty, s) in
-  let bool_t = bool_t in
-  big_map_t (-1) unit_t unit_t >>??= fun big_map_t ->
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
-  let kinfo s = {iloc = -1; kstack_ty = s} in
-  let stack1 = item big_map_t Bot_t in
-  let stack2 = item big_map_t (item big_map_t Bot_t) in
-  let stack3 = item unit_t stack2 in
-  let stack4 = item bool_t stack1 in
-  let push_empty_big_map k = IEmpty_big_map (kinfo stack, unit_t, unit_t, k) in
+  let push_empty_big_map k = IEmpty_big_map (dummy_loc, unit_t, unit_t, k) in
   let large_mem_seq n =
     let rec aux n acc =
       if n = 0 then acc
@@ -170,13 +162,14 @@ let test_stack_overflow_in_lwt () =
         aux
           (n - 1)
           (IDup
-             ( kinfo stack1,
+             ( dummy_loc,
                IConst
-                 ( kinfo stack2,
+                 ( dummy_loc,
+                   Unit_t,
                    (),
-                   IBig_map_mem (kinfo stack3, IDrop (kinfo stack4, acc)) ) ))
+                   IBig_map_mem (dummy_loc, IDrop (dummy_loc, acc)) ) ))
     in
-    aux n (IDrop (kinfo stack1, IHalt (kinfo stack)))
+    aux n (IDrop (dummy_loc, IHalt dummy_loc))
   in
   let script = push_empty_big_map (large_mem_seq 1_000_000) in
   run_step ctxt (descr script) EmptyCell EmptyCell >>= function

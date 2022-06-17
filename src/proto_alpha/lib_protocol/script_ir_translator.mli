@@ -134,10 +134,10 @@ type 'storage typed_view_map =
 type ('a, 's, 'b, 'u) cinstr = {
   apply :
     'r 'f.
-    ('a, 's) Script_typed_ir.kinfo ->
     ('b, 'u, 'r, 'f) Script_typed_ir.kinstr ->
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr;
 }
+[@@ocaml.unboxed]
 
 type ('a, 's, 'b, 'u) descr = {
   loc : Script.location;
