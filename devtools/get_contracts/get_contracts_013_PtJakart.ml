@@ -67,8 +67,12 @@ module Proto = struct
 
     type ex_code = Script_ir_translator.ex_code
 
-    let code_size Script_ir_translator.(Ex_code (Code {code_size; _})) =
+    let expected_code_size Script_ir_translator.(Ex_code (Code {code_size; _}))
+        =
       Obj.magic code_size
+
+    let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
+      8 * Obj.(reachable_words @@ repr code)
 
     let parse_ty (ctxt : Raw_context.t) ~legacy ~allow_lazy_storage
         ~allow_operation ~allow_contract ~allow_ticket script =

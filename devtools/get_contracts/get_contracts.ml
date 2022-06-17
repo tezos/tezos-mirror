@@ -65,16 +65,6 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     storages : P.Script.expr ExprMap.t;
   }
 
-  type size_summary = {expected : int; actual : int}
-
-  let zero_size = {expected = 0; actual = 0}
-
-  let add_size ~expected_size ~actual_size summary =
-    {
-      expected = summary.expected + expected_size;
-      actual = summary.actual + actual_size;
-    }
-
   module File_helpers = struct
     let print_to_file ?err filename fmt =
       Format.kasprintf
@@ -374,9 +364,6 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   let output_contract_results ctxt output_dir hash ctr total_size =
     let open Lwt_result_syntax in
     let hash_string = P.Script.Hash.to_b58check hash in
-    let* script_code =
-      P.Translator.parse_code ctxt ~legacy:true @@ P.Script.lazy_expr ctr.script
-    in
     File_helpers.print_expr_file
       ~dirname:output_dir
       ~ext:".tz"
@@ -390,24 +377,31 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       "%a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
       ctr.addresses ;
-    let expected_size, actual_size =
+    let* contract_size =
       if Config.measure_code_size then (
-        let expected = P.Translator.code_size script_code in
-        let actual = 8 * Obj.(reachable_words @@ repr script_code) in
+        let* script_code =
+          P.Translator.parse_code ctxt ~legacy:true
+          @@ P.Script.lazy_expr ctr.script
+        in
+        let size =
+          Contract_size.
+            {
+              expected = P.Translator.expected_code_size script_code;
+              actual = P.Translator.actual_code_size script_code;
+            }
+        in
         File_helpers.print_to_file
           (filename ~ext:"size")
-          "Expected: %d bytes@.Real: %d bytes@.%s@."
-          expected
-          actual
-          (if expected < actual then "WARNING: real size larger than expected!"
-          else "") ;
-        (expected, actual))
-      else (0, 0)
+          "%a"
+          Contract_size.pp
+          size ;
+        return size)
+      else return Contract_size.zero
     in
     (if Config.collect_storage then
      let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
      File_helpers.print_expr_dir ~dirname ~ext:".storage" ctr.storages) ;
-    return @@ add_size ~expected_size ~actual_size total_size
+    return @@ Contract_size.add contract_size total_size
 
   let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -509,12 +503,14 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       ExprMap.fold_es
         (output_contract_results ctxt output_dir)
         contract_map
-        zero_size
+        Contract_size.zero
     in
     print_endline "Done writing contract files." ;
-    if Config.measure_code_size then (
-      Format.printf "Total measured IR size: %d bytes." total_ir_size.actual ;
-      Format.printf "Total expected IR size: %d bytes." total_ir_size.expected) ;
+    if Config.measure_code_size then
+      Format.printf
+        "@[<v 2>Total IR size:@;%a@]@."
+        Contract_size.pp
+        total_ir_size ;
     let () =
       if not (ExprMap.is_empty lambda_map) then (
         print_endline "Writing lambda files..." ;

@@ -96,7 +96,9 @@ module type PROTOCOL = sig
 
     type ex_code
 
-    val code_size : ex_code -> int
+    val actual_code_size : ex_code -> int
+
+    val expected_code_size : ex_code -> int
 
     val parse_ty :
       context ->
