@@ -2735,7 +2735,8 @@ are capitalized.
 
 All domain specific constants are Micheline constants with specific
 formats. Some have two variants accepted by the data type checker: a
-readable one in a string and an optimized.
+readable one in a string, and an optimized one using a more compact
+encoding.
 
 -  ``mutez`` amounts are written as naturals.
 -  ``timestamp``\ s are written either using ``RFC3339`` notation
