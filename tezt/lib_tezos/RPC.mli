@@ -222,6 +222,13 @@ val post_injection_operation : ?async:bool -> JSON.u -> JSON.t t
 (** RPC: [POST /private/injection/operation] *)
 val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
 
+(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/scripts/run_operation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val post_run_operation :
+  ?chain:string -> ?block:string -> ?async:bool -> JSON.u -> JSON.t t
+
 (** RPC: [GET /chains/[chain]/chain_id]
 
     Returns the chain ID. *)

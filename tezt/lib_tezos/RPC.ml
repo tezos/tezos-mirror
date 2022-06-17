@@ -191,6 +191,15 @@ let post_private_injection_operation ?(async = false) data =
     ~data
     Fun.id
 
+let post_run_operation ?(chain = "main") ?(block = "head") ?(async = false) data
+    =
+  make
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "run_operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
+
 let get_chain_chain_id ?(chain = "main") () =
   make GET ["chains"; chain; "chain_id"] JSON.as_string
 
