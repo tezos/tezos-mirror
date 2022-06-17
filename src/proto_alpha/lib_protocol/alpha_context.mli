@@ -968,6 +968,7 @@ module Constants : sig
   val encoding : t Data_encoding.t
 end
 
+(** See the definitions inside the module. *)
 module Global_constants_storage : sig
   type error += Expression_too_deep
 
@@ -1488,6 +1489,7 @@ module Lazy_storage : sig
   val apply : t -> diffs -> (t * Z.t) tzresult Lwt.t
 end
 
+(** See the definitions inside the module. *)
 module Origination_nonce : sig
   (** See {!Raw_context.init_origination_nonce}. *)
   val init : context -> Operation_hash.t -> context
