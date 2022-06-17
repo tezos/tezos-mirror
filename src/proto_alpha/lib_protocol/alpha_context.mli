@@ -1025,6 +1025,8 @@ module Global_constants_storage : sig
     the table. *)
   val expand : t -> Script.expr -> (t * Script.expr) tzresult Lwt.t
 
+  (** This module discloses definitions that are only useful for tests and must
+      not be used otherwise. *)
   module Internal_for_tests : sig
     (** [node_too_large node] returns true if:
       - The number of sub-nodes in the [node]
@@ -1065,6 +1067,8 @@ module Global_constants_storage : sig
   end
 end
 
+(** This module discloses definitions that are only useful for tests and must
+    not be used otherwise. *)
 module Internal_for_tests : sig
   val to_raw : context -> Raw_context.t
 end
@@ -1491,8 +1495,8 @@ module Origination_nonce : sig
   (** See {!Raw_context.unset_origination_nonce}. *)
   val unset : context -> context
 
-  (** This module disclose a type and a function that are only useful for
-      tests. See {!Origination_nonce} for documentation. *)
+  (** This module discloses definitions that are only useful for tests and must
+      not be used otherwise. See {!Origination_nonce}. *)
   module Internal_for_tests : sig
     type t
 
@@ -1536,6 +1540,8 @@ module Ticket_hash : sig
     owner:Script.node ->
     (t * context) tzresult
 
+  (** This module discloses definitions that are only useful for tests and must
+      not be used otherwise. *)
   module Internal_for_tests : sig
     val make_uncarbonated :
       ticketer:Script.node ->
@@ -1663,8 +1669,10 @@ module Contract : sig
     script:Script.t * Lazy_storage.diffs option ->
     context tzresult Lwt.t
 
+  (** This module discloses definitions that are only useful for tests and must
+      not be used otherwise. *)
   module Internal_for_tests : sig
-    (** see [Contract_repr.originated_contract] for documentation *)
+    (** See {!Contract_repr.originated_contract}. *)
     val originated_contract : Origination_nonce.Internal_for_tests.t -> t
 
     val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
@@ -1715,8 +1723,10 @@ module Tx_rollup : sig
 
   module Set : Set.S with type elt = t
 
+  (** This module discloses definitions that are only useful for tests and must
+      not be used otherwise. *)
   module Internal_for_tests : sig
-    (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
+    (** See {!Tx_rollup_repr.originated_tx_rollup}. *)
     val originated_tx_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
 end
@@ -1806,6 +1816,8 @@ module Tx_rollup_state : sig
 
   val adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult
 
+  (** This module discloses definitions that are only useful for tests and must
+      not be used otherwise. *)
   module Internal_for_tests : sig
     val make :
       ?burn_per_byte:Tez.t ->
@@ -2237,6 +2249,8 @@ module Bond_id : sig
 
   val compare : t -> t -> int
 
+  (** This module discloses definitions that are only useful for tests and must
+      not be used otherwise. *)
   module Internal_for_tests : sig
     val fold_on_bond_ids :
       context ->
@@ -2608,6 +2622,8 @@ module Sc_rollup : sig
 
       val of_bytes : string -> t tzresult
 
+      (** This module discloses definitions that are only useful for tests and
+          must not be used otherwise. *)
       module Internal_for_tests : sig
         val to_bytes : t -> string tzresult
       end
@@ -2855,6 +2871,8 @@ module Sc_rollup : sig
 
       val to_bytes : t -> serialized tzresult
 
+      (** This module discloses definitions that are only useful for tests and
+          must not be used otherwise. *)
       module Internal_for_tests : sig
         val of_bytes : string -> t tzresult
       end
@@ -3119,6 +3137,8 @@ module Sc_rollup : sig
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
 
+  (** This module discloses definitions that are only useful for tests and
+      must not be used otherwise. *)
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
@@ -4065,6 +4085,8 @@ module Ticket_balance : sig
   val get_balance :
     context -> Ticket_hash.t -> (Z.t option * context) tzresult Lwt.t
 
+  (** This module discloses definitions that are only useful for tests and
+      must not be used otherwise. *)
   module Internal_for_tests : sig
     val used_storage_space : context -> Z.t tzresult Lwt.t
 
