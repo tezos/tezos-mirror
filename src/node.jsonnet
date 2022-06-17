@@ -4,7 +4,7 @@ local template = grafana.template;
 local singlestat = grafana.singlestat;
 local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
-local heatmapPanel = grafana.heatmapPanel;
+local tablePanel = grafana.tablePanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
 local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
@@ -137,7 +137,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
               text: 'Sync',
             },
             '2': {
-              color: 'green',
+              color: 'red',
               index: 2,
               text: 'Stuck',
             },
@@ -226,6 +226,35 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       )
     ),
 
+  levelsTable:
+    tablePanel.new(
+      title='Chain levels',
+      datasource='Prometheus',
+      transform=('timeseries_to_rows'),
+    ).addTargets([
+      prometheus.target(
+        namespace + '_validator_chain_head_cycle' + node_instance,
+        legendFormat='Current cycle',
+        instant=true
+      ),
+      prometheus.target(
+        namespace + '_store_caboose_level' + node_instance,
+        legendFormat='Current caboose',
+        instant=true
+      ),
+      prometheus.target(
+        namespace + '_store_checkpoint_level' + node_instance,
+        legendFormat='Current checkpoint',
+        instant=true
+      ),
+      prometheus.target(
+        namespace + '_store_savepoint_level' + node_instance,
+        legendFormat='Current savepoint',
+        instant=true
+      ),
+    ]).hideColumn('Time'),
+
+
   headCycleLevel:
     singlestat.new(
       title='Current cycle',
@@ -308,13 +337,13 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       },
     ).addTarget(
       prometheus.target(
-        namespace + '_store_alternate_heads_count',
+        namespace + '_store_alternate_heads_count' + node_instance,
         legendFormat=alternateHeads,
       )
     ),
 
   gasConsumedHistory:
-    local blocks = 'Gas consumed';
+    local gas = 'Gas consumed';
     graphPanel.new(
       title='Gas consumed history',
       datasource='Prometheus',
@@ -328,17 +357,17 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       legend_total=true,
       legend_values=true,
       aliasColors={
-        [blocks]: 'light-green',
+        [gas]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
         namespace + '_validator_chain_head_consumed_gas' + node_instance,
-        legendFormat=blocks,
+        legendFormat=gas,
       )
     ),
 
   roundHistory:
-    local blocks = 'Round';
+    local round = 'Round';
     graphPanel.new(
       title='Round history',
       datasource='Prometheus',
@@ -348,12 +377,33 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       legend_alignAsTable=true,
       legend_values=true,
       aliasColors={
-        [blocks]: 'light-green',
+        [round]: 'light-green',
       },
     ).addTarget(
       prometheus.target(
         namespace + '_validator_chain_head_round' + node_instance,
-        legendFormat=blocks,
+        legendFormat=round,
+      )
+    ),
+
+  maxRound:
+    statPanel.new(
+      title='Max round',
+      datasource='Prometheus',
+      reducerFunction='max',
+    ).addTarget(
+      prometheus.target(
+        namespace + '_validator_chain_head_round' + node_instance,
+      )
+    ),
+
+  branchSwitchCount:
+    statPanel.new(
+      title='Branch switch count',
+      datasource='Prometheus',
+    ).addTarget(
+      prometheus.target(
+        namespace + '_validator_chain_branch_switch_count' + node_instance,
       )
     ),
 
@@ -449,7 +499,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
     )
   ,
 
-  storeMergeTime:
+  storeMergeTimeGraph:
     local mergeTime = 'Merge time';
     graphPanel.new(
       title='Store merge time',
@@ -463,6 +513,19 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       aliasColors={
         [mergeTime]: 'light-blue',
       },
+    ).addTarget(
+      prometheus.target(
+        namespace + '_store_last_merge_time' + node_instance,
+        legendFormat=mergeTime,
+      )
+    )
+  ,
+
+  storeMergeTime:
+    local mergeTime = 'Merge time';
+    statPanel.new(
+      title='Store merge time',
+      datasource='Prometheus',
     ).addTarget(
       prometheus.target(
         namespace + '_store_last_merge_time' + node_instance,

@@ -2,6 +2,7 @@ local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local singlestat = grafana.singlestat;
 local statPanel = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
+local tablePanel = grafana.tablePanel;
 local prometheus = grafana.prometheus;
 local namespace = 'octez';
 local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instance"}';
@@ -143,16 +144,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       prometheus.target(
         namespace + '_p2p_connections_incoming' + node_instance
       )
-    ).addThresholds([
-      {
-        color: 'green',
-        value: 0,
-      },
-      {
-        color: 'red',
-        value: 1,
-      },
-    ]),
+    ),
 
   mempoolPending:
     local applied = 'Applied';
@@ -216,5 +208,28 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
         legendFormat=unprocessed,
       )
     ),
+
+  connectionsTable:
+    tablePanel.new(
+      title='Connections',
+      datasource='Prometheus',
+      transform=('timeseries_to_rows'),
+    ).addTargets([
+      prometheus.target(
+        namespace + '_p2p_connections_incoming' + node_instance,
+        legendFormat='Incomming connections',
+        instant=true
+      ),
+      prometheus.target(
+        namespace + '_p2p_points_trusted' + node_instance,
+        legendFormat='Trusted points',
+        instant=true
+      ),
+      prometheus.target(
+        namespace + '_p2p_connections_private' + node_instance,
+        legendFormat='Private points',
+        instant=true
+      ),
+    ]).hideColumn('Time'),
 
 }
