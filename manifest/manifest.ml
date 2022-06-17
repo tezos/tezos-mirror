@@ -194,6 +194,7 @@ module Dune = struct
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?link_flags ?(inline_tests = false)
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
+      ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
       ?(wrapped = true) ?modules ?modules_without_implementation ?modes
       ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
       ?js_of_ocaml (names : string list) =
@@ -214,6 +215,7 @@ module Dune = struct
           | [name] -> [S "public_name"; S name]
           | _ :: _ -> S "public_names" :: of_atom_list public_names);
           opt package (fun x -> [S "package"; S x]);
+          opt implements (fun x -> [S "implements"; S x]);
           (match instrumentation with
           | [] -> E
           | _ ->
@@ -259,6 +261,11 @@ module Dune = struct
           opt link_flags (fun l -> [V (of_list (List.cons (S "link_flags") l))]);
           opt flags (fun l -> [V (of_list (List.cons (S "flags") l))]);
           (if not wrapped then [S "wrapped"; S "false"] else E);
+          (match virtual_modules with
+          | [] -> E
+          | _ -> S "virtual_modules" :: of_atom_list virtual_modules);
+          opt default_implementation (fun x ->
+              [S "default_implementation"; S x]);
           opt modules (fun x -> S "modules" :: x);
           opt modules_without_implementation (fun x ->
               S "modules_without_implementation" :: x);
@@ -907,6 +914,7 @@ module Target = struct
     dune : Dune.s_expr;
     flags : Flags.t option;
     foreign_stubs : Dune.foreign_stubs option;
+    implements : t option;
     inline_tests : bool;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
@@ -929,6 +937,8 @@ module Target = struct
     static : bool;
     synopsis : string option;
     description : string option;
+    virtual_modules : string list;
+    default_implementation : string option;
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
@@ -1001,19 +1011,21 @@ module Target = struct
     registered := internal :: !registered ;
     Some (Internal internal)
 
+  let kind_name_for_errors kind =
+    match kind with
+    | Public_library {public_name = name; _}
+    | Private_library name
+    | Public_executable ({public_name = name; _}, _)
+    | Private_executable (name, _)
+    | Test_executable {names = name, _; _} ->
+        name
+
   (* Note: this function is redefined below for the version with optional targets. *)
   let rec name_for_errors = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
     | Optional target | Select {package = target; _} | Open (target, _) ->
         name_for_errors target
-    | Internal {kind; _} -> (
-        match kind with
-        | Public_library {public_name = name; _}
-        | Private_library name
-        | Public_executable ({public_name = name; _}, _)
-        | Private_executable (name, _)
-        | Test_executable {names = name, _; _} ->
-            name)
+    | Internal {kind; _} -> kind_name_for_errors kind
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
@@ -1055,6 +1067,7 @@ module Target = struct
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
     ?foreign_stubs:Dune.foreign_stubs ->
+    ?implements:t option ->
     ?inline_tests:inline_tests ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
@@ -1077,6 +1090,24 @@ module Target = struct
     ?synopsis:string ->
     ?description:string ->
     ?time_measurement_ppx:bool ->
+    ?virtual_modules:string list ->
+    (* A note on [default_implementation]. In the .mli,  this argument is
+       given type [string] instead of [target]. This is because one can't
+       have mutually recursive target definitions, as in:
+
+       let rec virtual_package =
+          ... ~virtual_modules:"Foo" ~default_implementation:implem
+       and implem = ... ~implements:virtual_package
+
+       A solution would be to declare [default_implementation]
+       in [implem]:
+
+       let virtual_package = ... ~virtual_modules:"Foo"
+       let implem = ... ~implements_default:virtual_package
+
+       But that would be more complex to implement.
+    *)
+    ?default_implementation:string ->
     ?wrapped:bool ->
     ?cram:bool ->
     ?license:string ->
@@ -1120,17 +1151,24 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
-      ?(dune = Dune.[]) ?flags ?foreign_stubs ?inline_tests ?js_compatible
-      ?js_of_ocaml ?documentation ?(linkall = false) ?modes ?modules
-      ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml ?opam
-      ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
+      ?(dune = Dune.[]) ?flags ?foreign_stubs ?implements ?inline_tests
+      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
+      ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
+      ?opam ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(wrapped = true) ?(cram = false) ?license ?(extra_authors = []) ~path
-      names =
+      ?(virtual_modules = []) ?default_implementation ?(wrapped = true)
+      ?(cram = false) ?license ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
+    let implements =
+      match implements with
+      | None -> None
+      | Some None ->
+          invalid_arg "Target.internal: cannot pass no_target to ~implements"
+      | Some (Some _ as x) -> x
+    in
     let opens =
       let rec get_opens acc = function
         | Internal _ | Vendored _ | External _ | Opam_only _ -> acc
@@ -1243,6 +1281,62 @@ module Target = struct
                 name)
     in
     let () =
+      (* Sanity checks around virtual packages.
+         - If a target [X] [implements] another target [Y], [X] must specify its opam file
+         - [Y] must be an internal target
+         - [Y] must be virtual, ie specify virtual modules
+         - [Y] must specify an opam package
+         - If [Y] specifies [X] as default implementation, [X] and [Y] must live in the
+           same package.
+      *)
+      match (implements, opam) with
+      | None, _ -> ()
+      | Some _, None ->
+          error
+            "Target %s implements a virtual target, it must specify its opam \
+             package"
+            (kind_name_for_errors kind)
+      | Some target, Some opam -> (
+          match get_internal target with
+          | None ->
+              error
+                "The `implements` directive of %s specifies %s which is a \
+                 non-internal target"
+                (kind_name_for_errors kind)
+                (name_for_errors target)
+          | Some internal -> (
+              (match internal.virtual_modules with
+              | [] ->
+                  error
+                    "A target can only implement a virtual internal target, \
+                     but %s claims to implement %s which declares no virtual \
+                     modules"
+                    (kind_name_for_errors kind)
+                    (name_for_errors target)
+              | _ -> ()) ;
+              match internal.opam with
+              | None ->
+                  error
+                    "While processing %s: virtual target %s must specify its \
+                     opam package"
+                    (kind_name_for_errors kind)
+                    (name_for_errors target)
+              | Some internal_opam -> (
+                  match (internal.default_implementation, kind) with
+                  | None, _ -> ()
+                  | Some default_impl, Public_library {public_name; _}
+                    when default_impl = public_name ->
+                      if not (String.equal opam internal_opam) then
+                        let name = name_for_errors target in
+                        error
+                          "%s specifies %s as default implementation but these \
+                           do not live in the same package"
+                          name
+                          public_name
+                      else ()
+                  | _ -> ())))
+    in
+    let () =
       match kind with
       | Public_library {public_name; _} -> (
           match
@@ -1344,6 +1438,7 @@ module Target = struct
         dune;
         flags;
         foreign_stubs;
+        implements;
         inline_tests;
         js_compatible;
         js_of_ocaml;
@@ -1367,6 +1462,8 @@ module Target = struct
         synopsis;
         description;
         npm_deps;
+        virtual_modules;
+        default_implementation;
         wrapped;
         cram;
         license;
@@ -1835,6 +1932,14 @@ let generate_dune (internal : Target.internal) =
     | Private_executable (head, tail) -> (Executable, head :: tail, [])
     | Test_executable {names = head, tail; _} -> (Executable, head :: tail, [])
   in
+  let get_virtual_target_name target =
+    match Target.library_name_for_dune target with
+    | Ok name -> name
+    | Error name ->
+        invalid_arg
+          ("unsupported: ~implements on a target that is not a library (" ^ name
+         ^ ")")
+  in
   let documentation =
     match internal.documentation with
     | None -> Dune.E
@@ -1854,6 +1959,9 @@ let generate_dune (internal : Target.internal) =
       ~inline_tests:internal.inline_tests
       ~preprocess
       ~preprocessor_deps
+      ~virtual_modules:internal.virtual_modules
+      ?default_implementation:internal.default_implementation
+      ?implements:(Option.map get_virtual_target_name internal.implements)
       ~wrapped:internal.wrapped
       ?modules
       ?modules_without_implementation
