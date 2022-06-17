@@ -563,7 +563,9 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   let proofs_log = evaluations_log - evaluations_per_proof_log
 
   (* Mock SRS, TODO: import srs files *)
-  let secret = Scalar.random ()
+  let secret =
+    Scalar.of_string
+      "43455265682179153414401896409006117694844195495630810185710628957923813326493"
 
   let kate_amortized_srs_g1 = Kate_amortized.gen_srs_g1 ~size:k secret
 

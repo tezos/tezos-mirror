@@ -48,14 +48,14 @@ module Test = struct
           let* p = DAL_crypto.polynomial_from_bytes msg in
 
           let* cm = DAL_crypto.commit p in
-          let precompute_pi_segments =
+          (*let precompute_pi_segments =
             DAL_crypto.precompute_slot_segments_proofs ()
           in
           let () =
             DAL_crypto.save_precompute_slot_segments_proofs
               precompute_pi_segments
               "slot_seg_proofs_precomp"
-          in
+          in*)
           let precompute_pi_segments =
             DAL_crypto.load_precompute_slot_segments_proofs
               "slot_seg_proofs_precomp"
@@ -96,7 +96,15 @@ module Test = struct
 
           let* comm = DAL_crypto.commit p in
 
-          let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in
+          (*let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in
+          let () =
+            DAL_crypto.save_precompute_shards_proofs
+              precompute_pi_shards
+              "shard_proofs_precomp"
+          in*)
+          let precompute_pi_shards =
+            DAL_crypto.load_precompute_shards_proofs "shard_proofs_precomp"
+          in
           let shard_proofs =
             DAL_crypto.prove_shards p ~preprocess:precompute_pi_shards
           in
