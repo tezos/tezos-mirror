@@ -1,7 +1,7 @@
 Ppx_expect
 ==========
 
-:ref:`Ppx_expect :ref:<ppx_expect_section>` is a framework for writing tests for OCaml
+:ref:`Ppx_expect<ppx_expect_section>` is a framework for writing tests for OCaml
 code printing textual output.
 
 There is pretty comprehensive documentation about ``Inline expectation tests`` and the ``ppx_expect`` tool for writing them:

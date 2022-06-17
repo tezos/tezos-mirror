@@ -134,5 +134,5 @@ allows a user to create chests and chest keys to interact with a smart contract.
 Example
 -------
 
-The Raffle contract on Open Tezos (look for "raffle contract" using the search engine on ``https://opentezos.com/``)
+The raffle contract on Open Tezos `here <https://opentezos.com/archetype/raffle-example/raffle-contract/>`__
 gives a concrete example of using time-lock.
