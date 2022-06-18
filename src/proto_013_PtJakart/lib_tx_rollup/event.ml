@@ -72,14 +72,6 @@ let node_is_ready =
     ~level:Notice
     ()
 
-let node_is_shutting_down =
-  declare_1
-    ~section
-    ~name:"tx_rollup_node_shutting_down"
-    ~msg:"the transaction rollup node is shutting down with code {exit_code}"
-    ~level:Notice
-    ("exit_code", Data_encoding.int31)
-
 let cannot_connect =
   declare_1
     ~section

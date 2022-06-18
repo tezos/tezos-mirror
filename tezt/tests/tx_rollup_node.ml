@@ -2923,7 +2923,7 @@ let register ~protocols =
   test_ticket_deposit_from_l1_to_l2 protocols ;
   test_l2_to_l2_transaction protocols ;
   test_batcher ~test_persistence:false protocols ;
-  test_batcher ~test_persistence:true [Alpha] ;
+  test_batcher ~test_persistence:true protocols ;
   test_reorganization protocols ;
   test_l2_proof_rpc_position protocols ;
   test_reject_bad_commitment protocols ;
