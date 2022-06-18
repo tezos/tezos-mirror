@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "ppx_expect"
   "tezos-base"
+  "tezos-stdlib-unix"
   "tezos-crypto"
   "tezos-protocol-013-PtJakart"
   "tezos-micheline"
