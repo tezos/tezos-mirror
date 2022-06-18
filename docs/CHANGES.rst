@@ -124,6 +124,8 @@ Client
   cast invalid ballots (unexpected voting period, missing voting
   rights, ...)
 
+.. _changes_13_0_rc1_baker:
+
 Baker
 -----
 

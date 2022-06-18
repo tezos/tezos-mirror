@@ -178,6 +178,7 @@ baking for user *bob*::
 
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
+Note also that since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
 
 .. warning::
 
@@ -203,7 +204,7 @@ chains and looks for:
 
 Upon finding such irregularity, it will emit respectively a
 double-baking, double-pre-endorsing, or double-endorsing denunciation operation, which will
-cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its security deposit. 
+cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its security deposit.
 
 ::
 
