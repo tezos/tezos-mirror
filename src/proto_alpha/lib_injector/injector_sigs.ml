@@ -119,6 +119,7 @@ module type S = sig
       queue of operations to inject. *)
   val init :
     #Protocol_client_context.full ->
+    data_dir:string ->
     rollup_node_state ->
     signers:(public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t

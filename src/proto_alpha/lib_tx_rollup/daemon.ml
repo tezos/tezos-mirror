@@ -932,6 +932,7 @@ let run configuration cctxt =
   let* () =
     Injector.init
       state.cctxt
+      ~data_dir:configuration.data_dir
       state
       ~signers:
         (List.filter_map
