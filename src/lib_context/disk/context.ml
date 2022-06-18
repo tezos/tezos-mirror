@@ -317,7 +317,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     ["predecessor_ops_metadata_hash"]
 
   let sync index =
-    if index.readonly then Store.sync index.repo ;
+    if index.readonly then Store.reload index.repo ;
     Lwt.return ()
 
   let exists index key =
