@@ -247,3 +247,99 @@ module Make_table (H : H) = struct
     let+ () = browse () in
     t
 end
+
+module Make_queue (N : sig
+  val name : string
+end)
+(K : S.HASH) (V : sig
+  type t
+
+  val encoding : t Data_encoding.t
+end) =
+struct
+  module Q = Hash_queue.Make (K) (V)
+
+  type t = {path : string; metadata_path : string; queue : Q.t}
+
+  let counter = ref min_int
+
+  let filedata q k = Filename.concat q.path (K.to_b58check k)
+
+  let filemetadata q k = Filename.concat q.metadata_path (K.to_b58check k)
+
+  let create ~data_dir n =
+    let open Lwt_result_syntax in
+    let queue = Q.create n in
+    let path = Filename.concat data_dir N.name in
+    let metadata_path = Filename.concat path "metadata" in
+    let* () = create_dir path in
+    let+ () = create_dir metadata_path in
+    {path; metadata_path; queue}
+
+  let remove q k =
+    let open Lwt_result_syntax in
+    Q.remove q.queue k ;
+    let* () = delete_file (filedata q k)
+    and* () = delete_file (filemetadata q k) in
+    return_unit
+
+  let create_metadata () =
+    let time = Time.System.now () in
+    let d, ps = Ptime.to_span time |> Ptime.Span.to_d_ps in
+    let c = !counter in
+    incr counter ;
+    (d, ps, c)
+
+  let metadata_encoding =
+    let open Data_encoding in
+    conv
+      (fun (d, ps, c) -> (Int64.of_int d, ps, Int64.of_int c))
+      (fun (d, ps, c) -> (Int64.to_int d, ps, Int64.to_int c))
+    @@ tup3 int64 int64 int64
+
+  let replace q k v =
+    let open Lwt_result_syntax in
+    Q.replace q.queue k v ;
+    let* () = write_value (filedata q k) V.encoding v
+    and* () =
+      write_value (filemetadata q k) metadata_encoding (create_metadata ())
+    in
+    return_unit
+
+  let fold f q = Q.fold f q.queue
+
+  let load_from_disk ~capacity ~data_dir =
+    let open Lwt_result_syntax in
+    let* q = create ~data_dir capacity in
+    let*! d = Lwt_unix.opendir q.path in
+    let rec browse acc =
+      let*! filename =
+        let open Lwt_syntax in
+        Lwt.catch
+          (fun () ->
+            let+ f = Lwt_unix.readdir d in
+            Some f)
+          (function End_of_file -> return_none | e -> raise e)
+      in
+      match filename with
+      | None -> return acc
+      | Some filename ->
+          let* acc =
+            match K.of_b58check_opt filename with
+            | None -> return acc
+            | Some k ->
+                let* v = read_value (filedata q k) V.encoding
+                and* meta = read_value (filemetadata q k) metadata_encoding in
+                return ((k, v, meta) :: acc)
+          in
+          browse acc
+    in
+    let* list = browse [] in
+    let list =
+      List.fast_sort
+        (fun (_, _, meta1) (_, _, meta2) -> Stdlib.compare meta1 meta2)
+        list
+    in
+    List.iter (fun (k, v, _) -> Q.replace q.queue k v) list ;
+    return q
+end

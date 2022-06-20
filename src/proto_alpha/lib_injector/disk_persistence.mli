@@ -85,3 +85,36 @@ module Make_table (H : H) : sig
       in [data_dir/H.name] (the directory is created if it does not exist). *)
   val load_from_disk : initial_size:int -> data_dir:string -> t tzresult Lwt.t
 end
+
+(** Create an on-disk persistent version of the {!Hash_queue} data structure. *)
+module Make_queue (N : sig
+  (** Name used to derive a path (relative to [data_dir] in [load_from_disk]) of where
+      to store the persistent information for this queue. *)
+  val name : string
+end)
+(K : S.HASH) (V : sig
+  type t
+
+  val encoding : t Data_encoding.t
+end) : sig
+  type t
+
+  (** [remove q k] removes the binding from [k] in [q]. If [k] is not bound in
+      [c], it does nothing. The removal is persisted on disk. *)
+  val remove : t -> K.t -> unit tzresult Lwt.t
+
+  (** [replace q k v] binds the key [k] to the value [v] in the queue [q]. This
+      may or may not cause another binding to be removed, depending on the
+      number of bindings already present in [q]. The addition (or replacement)
+      is persisted on disk. *)
+  val replace : t -> K.t -> V.t -> unit tzresult Lwt.t
+
+  (** [fold f q init] folds the function [f] over the bindings
+      of [q] (in memory). The elements are iterated from oldest to newest. *)
+  val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  (** [load_from_disk ~capacity ~data_dir] creates a bounded hash queue of
+      capacity [capacity]. The queue is populated by persistent elements present
+      in [data_dir/N.name] (the directory is created if it does not exist). *)
+  val load_from_disk : capacity:int -> data_dir:string -> t tzresult Lwt.t
+end
