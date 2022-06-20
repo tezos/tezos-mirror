@@ -166,6 +166,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
         config.shell.block_validator_limits.operation_metadata_size_limit;
     }
   in
+  let readonly = true in
   let* validator_process, store =
     if singleprocess then
       let* store =
@@ -173,6 +174,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:false
+          ~readonly
           genesis
       in
       let main_chain_store = Store.main_chain_store store in
@@ -187,6 +189,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           (External
              {
                data_dir = config.data_dir;
+               readonly;
                genesis;
                context_root;
                protocol_root;
@@ -202,6 +205,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:false
+          ~readonly
           ~commit_genesis
           genesis
       in
