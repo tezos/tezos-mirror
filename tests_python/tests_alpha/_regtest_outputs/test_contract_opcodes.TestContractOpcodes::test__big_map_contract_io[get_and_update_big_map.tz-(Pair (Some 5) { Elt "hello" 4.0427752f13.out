@@ -8,28 +8,28 @@ big_map diff
   New map(4) of type (big_map string nat)
   Set map(4)["hello"] to 5
 trace
-  - location: 13 (remaining gas: 1039990.121 units remaining)
+  - location: 13 (remaining gas: 1039990.166 units remaining)
     [ (Pair "hello" (Some 5) { Elt "hello" 4 }) ]
-  - location: 13 (remaining gas: 1039990.111 units remaining)
+  - location: 13 (remaining gas: 1039990.156 units remaining)
     [ "hello"
       (Pair (Some 5) { Elt "hello" 4 }) ]
-  - location: 14 (remaining gas: 1039990.111 units remaining)
+  - location: 14 (remaining gas: 1039990.156 units remaining)
     [ (Pair (Some 5) { Elt "hello" 4 }) ]
-  - location: 16 (remaining gas: 1039990.101 units remaining)
+  - location: 16 (remaining gas: 1039990.146 units remaining)
     [ (Some 5)
       { Elt "hello" 4 } ]
-  - location: 14 (remaining gas: 1039990.081 units remaining)
+  - location: 14 (remaining gas: 1039990.126 units remaining)
     [ "hello"
       (Some 5)
       { Elt "hello" 4 } ]
-  - location: 17 (remaining gas: 1039989.064 units remaining)
+  - location: 17 (remaining gas: 1039989.109 units remaining)
     [ (Some 4)
       { Elt "hello" 5 } ]
-  - location: 18 (remaining gas: 1039989.054 units remaining)
+  - location: 18 (remaining gas: 1039989.099 units remaining)
     [ (Pair (Some 4) { Elt "hello" 5 }) ]
-  - location: 19 (remaining gas: 1039989.044 units remaining)
+  - location: 19 (remaining gas: 1039989.089 units remaining)
     [ {}
       (Pair (Some 4) { Elt "hello" 5 }) ]
-  - location: 21 (remaining gas: 1039989.034 units remaining)
+  - location: 21 (remaining gas: 1039989.079 units remaining)
     [ (Pair {} (Some 4) { Elt "hello" 5 }) ]
 
