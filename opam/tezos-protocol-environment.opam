@@ -16,6 +16,7 @@ depends: [
   "tezos-scoru-wasm"
   "data-encoding" { >= "0.5.3" & < "0.6" }
   "bls12-381" { >= "4.0.0" & < "4.1.0" }
+  "tezos-plonk" { >= "0.1.0" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "ringo" { >= "0.9" }

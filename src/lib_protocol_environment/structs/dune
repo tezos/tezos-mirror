@@ -11,4 +11,5 @@
   tezos-lwt-result-stdlib
   tezos-scoru-wasm
   data-encoding
-  bls12-381))
+  bls12-381
+  tezos-plonk))

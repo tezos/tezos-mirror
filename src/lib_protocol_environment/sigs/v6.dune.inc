@@ -77,8 +77,12 @@
    v6/updater.mli
    v6/RPC_context.mli
 
-  ;; SCORU
-  v6/wasm_2_0_0.mli
+   ;; SCORU
+   v6/wasm_2_0_0.mli
+
+   ;; ZKRU
+   v6/plonk.mli
+
  )
  (action (with-stdout-to %{targets} (chdir %{workspace_root}}
           (run %{libexec:tezos-protocol-environment:s_packer} "sigs" %{deps})))))

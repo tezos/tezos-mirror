@@ -9,6 +9,7 @@
   zarith
   zarith_stubs_js
   bls12-381
+  tezos-plonk
   ringo
   ringo-lwt
   tezos-base
