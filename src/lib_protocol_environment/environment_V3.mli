@@ -144,7 +144,6 @@ module MakeV3 (Param : sig
 end)
 () :
   V3
-    with type Context.t = Context.t
-     and type Updater.validation_result = validation_result
+    with type Updater.validation_result = validation_result
      and type Updater.quota = quota
      and type Updater.rpc_context = rpc_context
