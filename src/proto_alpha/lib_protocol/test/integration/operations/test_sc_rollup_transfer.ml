@@ -68,19 +68,23 @@ let check_proto_error ~loc ~exp f trace =
 
 let sc_originate = Test_sc_rollup.sc_originate
 
-(* A contract with two entrypoints:
+(* A contract with three entrypoints:
     - [transfer_non_zero] takes a [contract int] and attempts to transfer with a
       non-zero amount to it. Expected to fail.
 
     - [transfer_int] takes a [contract int] and transfers an int to it. Expected
       to succeed.
+
+    - [transfer_zero_ticket] takes a [contract (ticket string)] and transfers a
+      zero-amount ticket to it. Expected to fail.
 *)
 let contract_originate block account =
   let script =
     {|
         parameter (or (contract %transfer_non_zero int)
                       (or (contract %transfer_int int)
-                          never));
+                          (or (contract %transfer_zero_ticket (ticket string))
+                              never)));
         storage unit;
         code {
           UNPAIR;
@@ -88,16 +92,26 @@ let contract_originate block account =
             # transfer_non_zero
             PUSH mutez 1;
             PUSH int 42;
+            TRANSFER_TOKENS;
           } {
             IF_LEFT {
               # transfer_int
               PUSH mutez 0;
               PUSH int 42;
+              TRANSFER_TOKENS;
             } {
-              NEVER
+              IF_LEFT {
+                # transfer_zero_ticket
+                PUSH mutez 0;
+                PUSH nat 0;
+                PUSH string "ticket payload";
+                TICKET;
+                TRANSFER_TOKENS;
+              } {
+                NEVER
+              }
             }
           };
-          TRANSFER_TOKENS;
           NIL operation;
           SWAP;
           CONS;
@@ -295,6 +309,25 @@ let test_transfer_works () =
     inbox_after
     expected_inbox_after
 
+(* Transfer of zero-amount ticket fails. *)
+let test_transfer_zero_amount_ticket () =
+  let* b, c, contract, rollup = context_init "ticket string" in
+  let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
+  let* _b =
+    transfer
+      b
+      ~from:c
+      ~to_:contract
+      ~param
+      ~entrypoint:"transfer_zero_ticket"
+      ~expect_apply_failure:
+        (check_proto_error ~loc:__LOC__ ~exp:"Forbidden_zero_ticket_quantity"
+         @@ function
+         | [Ticket_scanner.Forbidden_zero_ticket_quantity] -> return_unit
+         | _ -> raise Unexpected_error)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -314,4 +347,8 @@ let tests =
       `Quick
       test_transfer_non_zero_amount_via_entrypoint;
     Tztest.tztest "Transfer works" `Quick test_transfer_works;
+    Tztest.tztest
+      "Transfer of zero-amount ticket"
+      `Quick
+      test_transfer_zero_amount_ticket;
   ]
