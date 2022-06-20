@@ -129,7 +129,6 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       match
         P.Translator.parse_ty
           ctxt
-          ~legacy:true
           ~allow_lazy_storage:true
           ~allow_operation:true
           ~allow_contract:true
@@ -141,7 +140,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
 
     let get_script_storage_type ctxt script_expr =
       let open Lwt_syntax in
-      let+ result = P.Translator.parse_toplevel ctxt ~legacy:true script_expr in
+      let+ result = P.Translator.parse_toplevel ctxt script_expr in
       match result with
       | Ok code ->
           let storage_type_expr =
@@ -380,8 +379,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     let* contract_size =
       if Config.measure_code_size then (
         let* script_code =
-          P.Translator.parse_code ctxt ~legacy:true
-          @@ P.Script.lazy_expr ctr.script
+          P.Translator.parse_code ctxt @@ P.Script.lazy_expr ctr.script
         in
         let size =
           Contract_size.
