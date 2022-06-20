@@ -68,7 +68,7 @@ let check_proto_error ~loc ~exp f trace =
 
 let sc_originate = Test_sc_rollup.sc_originate
 
-(* A contract with three entrypoints:
+(* A contract with four entrypoints:
     - [transfer_non_zero] takes a [contract int] and attempts to transfer with a
       non-zero amount to it. Expected to fail.
 
@@ -77,6 +77,9 @@ let sc_originate = Test_sc_rollup.sc_originate
 
     - [transfer_zero_ticket] takes a [contract (ticket string)] and transfers a
       zero-amount ticket to it. Expected to fail.
+
+    - [transfer_ticket] takes a [contract (ticket string)] and transfers a
+      ticket to it. Expected to succeed.
 *)
 let contract_originate block account =
   let script =
@@ -84,7 +87,8 @@ let contract_originate block account =
         parameter (or (contract %transfer_non_zero int)
                       (or (contract %transfer_int int)
                           (or (contract %transfer_zero_ticket (ticket string))
-                              never)));
+                              (or (contract %transfer_ticket (ticket string))
+                                  never))));
         storage unit;
         code {
           UNPAIR;
@@ -108,7 +112,16 @@ let contract_originate block account =
                 TICKET;
                 TRANSFER_TOKENS;
               } {
-                NEVER
+                IF_LEFT {
+                  # transfer ticket
+                  PUSH mutez 0;
+                  PUSH nat 137;
+                  PUSH string "G";
+                  TICKET;
+                  TRANSFER_TOKENS;
+                } {
+                  NEVER
+                }
               }
             }
           };
@@ -328,6 +341,15 @@ let test_transfer_zero_amount_ticket () =
   in
   return_unit
 
+(* Transfer of a non-zero-amount ticket works. *)
+let test_transfer_non_zero_amount_ticket () =
+  let* b, c, contract, rollup = context_init "ticket string" in
+  let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
+  let* _b =
+    transfer b ~from:c ~to_:contract ~param ~entrypoint:"transfer_ticket"
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -351,4 +373,8 @@ let tests =
       "Transfer of zero-amount ticket"
       `Quick
       test_transfer_zero_amount_ticket;
+    Tztest.tztest
+      "Transfer of non-zero-amount ticket"
+      `Quick
+      test_transfer_non_zero_amount_ticket;
   ]
