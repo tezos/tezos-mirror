@@ -2924,7 +2924,7 @@ end = struct
     let make name number =
       if
         not
-          (string_for_all
+          (String.for_all
              (function
                | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' -> true | _ -> false)
              name)
@@ -5068,7 +5068,7 @@ let _tezos_tps_evaluation =
      automatic opam releases.
    - ALWAYS add a comment to explain why a package is excluded. *)
 let exclude filename =
-  let is_proto_ name = has_prefix ~prefix:"proto_" name in
+  let is_proto_ name = String.starts_with ~prefix:"proto_" name in
   match String.split_on_char '/' filename with
   (* Dune files in src/proto_*/parameters only have a (copy_files) stanza
      (no library / executable / test). *)

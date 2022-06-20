@@ -25,14 +25,6 @@
 
 (** Generate dune and opam files from common definitions. *)
 
-(** Return whether [prefix] is a prefix of a string. *)
-val has_prefix : prefix:string -> string -> bool
-
-(* The function [String.for_all] is part of the stdlib starting with ocaml.4.13 *)
-
-(** [string_for_all p str] returns true if [p c] is true for all char [c] of [str] *)
-val string_for_all : (char -> bool) -> string -> bool
-
 (** Same as [Filename.concat]. *)
 val ( // ) : string -> string -> string
 
@@ -211,29 +203,29 @@ module Dune : sig
       Such stanzas are used at toplevel to include other dune files. *)
   val include_ : string -> s_expr
 
-  (* Makes a rule stanza to generate targets.
+  (** Makes a rule stanza to generate targets.
 
-     Example: [targets_rule ?deps targets ~action] results in:
+      Example: [targets_rule ?deps targets ~action] results in:
 
-     (rule
-       (targets <targets>)
-       (deps <deps>)
-       (action <action>)) *)
+      (rule
+        (targets <targets>)
+        (deps <deps>)
+        (action <action>)) *)
   val targets_rule : ?deps:s_expr list -> string list -> action:s_expr -> s_expr
 
-  (* Makes an [install] stanza.
+  (** Makes an [install] stanza.
 
-     Example: [install files ~package ~section] creates a stanza of the form:
+      Example: [install files ~package ~section] creates a stanza of the form:
 
-     [(install
-       (package <package>)
-       (section <section>)
-       (files <files>))] *)
+      [(install
+        (package <package>)
+        (section <section>)
+        (files <files>))] *)
   val install : ?package:string -> s_expr list -> section:string -> s_expr
 
-  (* Makes an [as] expression.
+  (** Makes an [as] expression.
 
-     Example: [as_ "foo" "bar"] results in [(foo as bar)] *)
+      Example: [as_ "foo" "bar"] results in [(foo as bar)] *)
   val as_ : string -> string -> s_expr
 end
 
