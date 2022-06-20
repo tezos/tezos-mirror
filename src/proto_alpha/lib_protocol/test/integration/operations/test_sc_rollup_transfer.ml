@@ -341,12 +341,48 @@ let test_transfer_zero_amount_ticket () =
   in
   return_unit
 
-(* Transfer of a non-zero-amount ticket works. *)
+(* Transfer of a non-zero-amount ticket works and the balance table is correctly updated. *)
 let test_transfer_non_zero_amount_ticket () =
   let* b, c, contract, rollup = context_init "ticket string" in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
-  let* _b =
+  let* b =
     transfer b ~from:c ~to_:contract ~param ~entrypoint:"transfer_ticket"
+  in
+  let* ticket_key_for_contract, ticket_key_for_rollup, ctxt =
+    let* ticket_token =
+      Ticket_helpers.string_ticket_token
+        (Contract_hash.to_b58check contract)
+        "G"
+    in
+    let* inc = Incremental.begin_construction b in
+    let ctxt = Incremental.alpha_ctxt inc in
+    let* ticket_key_for_contract, ctxt =
+      Ticket_balance_key.of_ex_token
+        ctxt
+        ~owner:(Destination.Contract (Originated contract))
+        ticket_token
+      >|= Environment.wrap_tzresult
+    in
+    let* ticket_key_for_rollup, _ctxt =
+      Ticket_balance_key.of_ex_token
+        ctxt
+        ~owner:(Destination.Sc_rollup rollup)
+        ticket_token
+      >|= Environment.wrap_tzresult
+    in
+    return (ticket_key_for_contract, ticket_key_for_rollup, ctxt)
+  in
+  (* The rollup is the owner of the tickets *)
+  let* () =
+    Ticket_helpers.assert_balance
+      ctxt
+      ~loc:__LOC__
+      ticket_key_for_rollup
+      (Some 137)
+  in
+  (* The contract didn't retain any ticket in the operation *)
+  let* () =
+    Ticket_helpers.assert_balance ctxt ~loc:__LOC__ ticket_key_for_contract None
   in
   return_unit
 
