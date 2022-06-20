@@ -3101,7 +3101,7 @@ end = struct
     let ( == ) a b = compare_asymmetric a b == 0
   end
 
-  let some_if condition make = if condition then Some (make ()) else None
+  let only_if condition make = if condition then Some (make ()) else None
 
   let conditional_list =
     List.filter_map (fun (x, b) -> if b then Some x else None)
@@ -3686,7 +3686,7 @@ include Tezos_raw_protocol_%s.Main
       Lib_protocol.make ~name
     in
     let parameters =
-      some_if (N.(number >= 011) && not_overridden) @@ fun () ->
+      only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-protocol-%s.parameters" name_dash)
         ~path:(path // "lib_parameters")
@@ -3738,7 +3738,7 @@ include Tezos_raw_protocol_%s.Main
         ~bisect_ppx:false
     in
     let plugin =
-      some_if (N.(number >= 007) && not_overridden) @@ fun () ->
+      only_if (N.(number >= 007) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-protocol-plugin-%s" name_dash)
         ~path:(path // "lib_plugin")
@@ -3770,7 +3770,7 @@ include Tezos_raw_protocol_%s.Main
         ~bisect_ppx:N.(number >= 008)
     in
     let client =
-      some_if not_overridden @@ fun () ->
+      only_if not_overridden @@ fun () ->
       public_lib
         (sf "tezos-client-%s" name_dash)
         ~path:(path // "lib_client")
@@ -3797,7 +3797,7 @@ include Tezos_raw_protocol_%s.Main
         ~linkall:true
     in
     let test_helpers =
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         (sf "tezos-%s-test-helpers" name_dash)
         ~path:
@@ -3829,7 +3829,7 @@ include Tezos_raw_protocol_%s.Main
     in
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
-      some_if (active && N.(number <> 011)) @@ fun () ->
+      only_if (active && N.(number <> 011)) @@ fun () ->
       tests
         ["test_consensus_filter"; "test_filter_state"; "test_plugin"]
         ~path:(path // "lib_plugin/test")
@@ -3854,7 +3854,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let _client_tests =
-      some_if N.(number >= 011) @@ fun () ->
+      only_if N.(number >= 011) @@ fun () ->
       tests
         [
           "test_michelson_v1_macros";
@@ -3878,7 +3878,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let client_commands =
-      some_if (N.(number >= 001) && not_overridden) @@ fun () ->
+      only_if (N.(number >= 001) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-client-%s.commands" name_dash)
         ~path:(path // "lib_client_commands")
@@ -3908,7 +3908,7 @@ include Tezos_raw_protocol_%s.Main
         ~all_modules_except:["alpha_commands_registration"]
     in
     let client_sapling =
-      some_if (N.(number >= 011) && not_overridden) @@ fun () ->
+      only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-client-%s.sapling" name_dash)
         ~internal_name:(sf "tezos_client_sapling_%s" name_underscore)
@@ -3930,7 +3930,7 @@ include Tezos_raw_protocol_%s.Main
         ~linkall:true
     in
     let client_commands_registration =
-      some_if (N.(number >= 001) && not_overridden) @@ fun () ->
+      only_if (N.(number >= 001) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-client-%s.commands-registration" name_dash)
         ~path:(path // "lib_client_commands")
@@ -3956,7 +3956,7 @@ include Tezos_raw_protocol_%s.Main
         ~modules:["alpha_commands_registration"]
     in
     let baking =
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         ("tezos-baking-" ^ name_dash)
         ~path:(path // "lib_delegate")
@@ -3996,7 +3996,7 @@ include Tezos_raw_protocol_%s.Main
           else ["Baking_commands"; "Baking_commands_registration"])
     in
     let tenderbrute =
-      some_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013)) @@ fun () ->
       public_lib
         (sf "tezos-baking-%s.tenderbrute" name_dash)
         ~internal_name:(sf "tenderbrute_%s" name_underscore)
@@ -4015,7 +4015,7 @@ include Tezos_raw_protocol_%s.Main
         ~bisect_ppx:false
     in
     let _tenderbrute_exe =
-      some_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013)) @@ fun () ->
       test
         "tenderbrute_main"
         ~alias:""
@@ -4035,9 +4035,9 @@ include Tezos_raw_protocol_%s.Main
     in
     let _baking_tests =
       opt_map (both baking test_helpers) @@ fun (baking, test_helpers) ->
-      some_if N.(number >= 011) @@ fun () ->
+      only_if N.(number >= 011) @@ fun () ->
       let mockup_simulator =
-        some_if N.(number >= 012) @@ fun () ->
+        only_if N.(number >= 012) @@ fun () ->
         public_lib
           (sf "tezos-baking-%s.mockup-simulator" name_dash)
           ~internal_name:(sf "tezos_%s_mockup_simulator" name_underscore)
@@ -4087,7 +4087,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let baking_commands =
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         (sf "tezos-baking-%s-commands" name_dash)
         ~path:(path // "lib_delegate")
@@ -4115,7 +4115,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let baking_commands_registration =
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         (sf "tezos-baking-%s-commands.registration" name_dash)
         ~path:(path // "lib_delegate")
@@ -4140,7 +4140,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let daemon daemon =
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_exe
         (sf "tezos-%s-%s" daemon name_dash)
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
@@ -4160,9 +4160,9 @@ include Tezos_raw_protocol_%s.Main
     in
     let _baker = daemon "baker" in
     let _accuser = daemon "accuser" in
-    let _endorser = some_if N.(number <= 011) @@ fun () -> daemon "endorser" in
+    let _endorser = only_if N.(number <= 011) @@ fun () -> daemon "endorser" in
     let injector =
-      some_if N.(number >= 013) @@ fun () ->
+      only_if N.(number >= 013) @@ fun () ->
       public_lib
         (sf "tezos-injector-%s" name_dash)
         ~path:(path // "lib_injector")
@@ -4185,7 +4185,7 @@ include Tezos_raw_protocol_%s.Main
         ~linkall:true
     in
     let sc_rollup =
-      some_if N.(number >= 013) @@ fun () ->
+      only_if N.(number >= 013) @@ fun () ->
       public_lib
         (sf "tezos-sc-rollup-%s" name_dash)
         ~path:(path // "lib_sc_rollup")
@@ -4203,7 +4203,7 @@ include Tezos_raw_protocol_%s.Main
         ~linkall:true
     in
     let _sc_rollup_client =
-      some_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
         (sf "tezos-sc-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
@@ -4226,7 +4226,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let _sc_rollup_node =
-      some_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
         (sf "tezos-sc-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
@@ -4260,7 +4260,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let tx_rollup =
-      some_if N.(number >= 013) @@ fun () ->
+      only_if N.(number >= 013) @@ fun () ->
       public_lib
         (sf "tezos-tx-rollup-%s" name_dash)
         ~path:(path // "lib_tx_rollup")
@@ -4297,7 +4297,7 @@ include Tezos_raw_protocol_%s.Main
         ~linkall:true
     in
     let _tx_rollup_client =
-      some_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
         (sf "tezos-tx-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
@@ -4318,7 +4318,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let _tx_rollup_node =
-      some_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
         (sf "tezos-tx-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
@@ -4337,7 +4337,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let benchmark_type_inference =
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmark-type-inference-%s" name_dash)
         ~path:(path // "lib_benchmark/lib_benchmark_type_inference")
@@ -4354,7 +4354,7 @@ include Tezos_raw_protocol_%s.Main
           ]
     in
     let _benchmark_type_inference_tests =
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       tests
         ["test_uf"; "test_inference"]
         ~path:(path // "lib_benchmark/lib_benchmark_type_inference/test")
@@ -4371,7 +4371,7 @@ include Tezos_raw_protocol_%s.Main
     in
     let benchmark =
       opt_map test_helpers @@ fun test_helpers ->
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmark-%s" name_dash)
         ~path:(path // "lib_benchmark")
@@ -4401,7 +4401,7 @@ include Tezos_raw_protocol_%s.Main
     in
     let _benchmark_tests =
       opt_map (both benchmark test_helpers) @@ fun (benchmark, test_helpers) ->
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       (* Note: to enable gprof profiling,
          manually add the following stanza to lib_benchmark/test/dune:
          (ocamlopt_flags (:standard -p -ccopt -no-pie)) *)
@@ -4452,7 +4452,7 @@ include Tezos_raw_protocol_%s.Main
     let benchmarks_proto : Manifest.target option =
       Option.bind (both benchmark test_helpers)
       @@ fun (benchmark, test_helpers) ->
-      some_if active @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         (sf "tezos-benchmarks-proto-%s" name_dash)
         ~path:(path // "lib_benchmarks_proto")
