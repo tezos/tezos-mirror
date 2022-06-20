@@ -1423,7 +1423,7 @@ let test_valid_deposit_invalid_amount () =
     op
     ~expect_apply_failure:
       (check_runtime_error
-         Script_interpreter_defs.Tx_rollup_invalid_transaction_amount)
+         Script_interpreter_defs.Rollup_invalid_transaction_amount)
   >>=? fun _ -> return_unit
 
 (** [test_deposit_too_many_tickets] checks that a deposit of

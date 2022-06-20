@@ -38,24 +38,22 @@ open Script_typed_ir
 open Script_ir_translator
 open Local_gas_counter
 
-type error += Tx_rollup_invalid_transaction_amount
+type error += Rollup_invalid_transaction_amount
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"operation.tx_rollup_invalid_transaction_amount"
-    ~title:"Transaction amount to a transaction rollup must be zero"
+    ~id:"operation.rollup_invalid_transaction_amount"
+    ~title:"Transaction amount to a rollup must be zero"
     ~description:
-      "Because transaction rollups are outside of the delegation mechanism of \
-       Tezos, they cannot own Tez, and therefore transactions targeting a \
-       transaction rollup must have its amount field set to zero."
+      "Because rollups are outside of the delegation mechanism of Tezos, they \
+       cannot own Tez, and therefore transactions targeting a rollup must have \
+       its amount field set to zero."
     ~pp:(fun ppf () ->
-      Format.pp_print_string
-        ppf
-        "Transaction amount to a transaction rollup must be zero.")
+      Format.pp_print_string ppf "Transaction amount to a rollup must be zero.")
     Data_encoding.unit
-    (function Tx_rollup_invalid_transaction_amount -> Some () | _ -> None)
-    (fun () -> Tx_rollup_invalid_transaction_amount)
+    (function Rollup_invalid_transaction_amount -> Some () | _ -> None)
+    (fun () -> Rollup_invalid_transaction_amount)
 
 (*
 
@@ -498,7 +496,7 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
      rollup to inject the exact type of the entrypoint as used by
      the smart contract. This allows the transaction rollup to extract
      the type of the ticket. *)
-  error_unless Tez.(amount = zero) Tx_rollup_invalid_transaction_amount
+  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
   >>?= fun () ->
   error_unless
     Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint)
@@ -530,6 +528,26 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
          not enforced by the type system, which means we are one
          refactoring away to reach it. *)
       assert false
+
+let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
+    ~parameters_ty ~parameters =
+  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  >>?= fun () ->
+  unparse_data ctxt Optimized parameters_ty parameters
+  >>=? fun (unparsed_parameters, ctxt) ->
+  Lwt.return
+    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+    >|? fun ctxt ->
+      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
+      ( Transaction_to_sc_rollup
+          {
+            destination;
+            entrypoint;
+            parameters_ty;
+            parameters;
+            unparsed_parameters;
+          },
+        ctxt ) )
 
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to a destination and
@@ -568,10 +586,14 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~entrypoint
         ~parameters_ty
         ~parameters
-  | Sc_rollup _ ->
-      (* TODO #2801
-         Implement transfers to sc rollups. *)
-      failwith "Transferring to smart-contract rollups is not yet supported")
+  | Sc_rollup destination ->
+      make_transaction_to_sc_rollup
+        ctxt
+        ~destination
+        ~amount
+        ~entrypoint
+        ~parameters_ty
+        ~parameters)
   >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
