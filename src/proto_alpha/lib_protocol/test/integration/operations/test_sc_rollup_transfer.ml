@@ -199,6 +199,29 @@ let test_transfer_to_wrongly_typed_sc_rollup () =
   in
   return_unit
 
+(* Use the correct type but with a non-zero amount. *)
+let test_transfer_non_zero_amount () =
+  let* b, c, contract, rollup = context_init "int" in
+  let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
+  let* _b =
+    transfer
+      b
+      ~from:c
+      ~to_:contract
+      ~param
+      ~entrypoint:"transfer_non_zero"
+      ~expect_apply_failure:
+        (check_proto_error ~loc:__LOC__ ~exp:"Rollup_invalid_transaction_amount"
+         @@ function
+         | [
+             Script_interpreter.Runtime_contract_error _;
+             Script_interpreter_defs.Rollup_invalid_transaction_amount;
+           ] ->
+             return_unit
+         | _ -> raise Unexpected_error)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -213,4 +236,8 @@ let tests =
       "Transfer with a wrong type"
       `Quick
       test_transfer_to_wrongly_typed_sc_rollup;
+    Tztest.tztest
+      "Transfer with a non-zero amount"
+      `Quick
+      test_transfer_non_zero_amount;
   ]
