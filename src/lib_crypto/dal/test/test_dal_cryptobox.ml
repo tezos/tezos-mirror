@@ -34,9 +34,28 @@ module Test = struct
     for i = 0 to (msg_size / 8) - 1 do
       Bytes.set_int64_le msg (i * 8) (Random.int64 Int64.max_int)
     done ;
+    let project_root =
+      match Sys.getenv_opt "DUNE_SOURCEROOT" with
+      | Some x -> x
+      | None -> (
+          match Sys.getenv_opt "PWD" with
+          | Some x -> x
+          | None ->
+              (* For some reason, under [dune runtest], [PWD] and
+                 [getcwd] have different values. [getcwd] is in
+                 [_build/default], and [PWD] is where [dune runtest] was
+                 executed, which is closer to what we want. *)
+              Sys.getcwd ())
+    in
     let open Tezos_error_monad.Error_monad.Result_syntax in
     List.iter
       (fun redundancy_factor ->
+        let srs_g1 =
+          project_root // Filename.dirname __FILE__ // "srs_zcash_g1"
+        in
+        let srs_g2 =
+          project_root // Filename.dirname __FILE__ // "srs_zcash_g2"
+        in
         let module DAL_crypto = Dal_cryptobox.Make (struct
           let redundancy_factor = redundancy_factor
 
@@ -45,6 +64,10 @@ module Test = struct
           let slot_segment_size = slot_segment_size
 
           let shards_amount = shards_amount
+
+          let trusted_setup_g1_file = srs_g1
+
+          let trusted_setup_g2_file = srs_g2
         end) in
         match
           let* p = DAL_crypto.polynomial_from_bytes msg in
@@ -52,16 +75,16 @@ module Test = struct
           let* cm = DAL_crypto.commit p in
           (*let precompute_pi_segments =
               DAL_crypto.precompute_slot_segments_proofs ()
-            in
-            let () =
-              DAL_crypto.save_precompute_slot_segments_proofs
-                precompute_pi_segments
-                "slot_seg_proofs_precomp"
             in*)
           let filename =
-            Tezt.Base.project_root // Filename.dirname __FILE__
+            project_root // Filename.dirname __FILE__
             // "slot_seg_proofs_precomp"
           in
+          (*let () =
+              DAL_crypto.save_precompute_slot_segments_proofs
+                precompute_pi_segments
+                filename
+            in*)
           let precompute_pi_segments =
             DAL_crypto.load_precompute_slot_segments_proofs filename
           in
@@ -101,16 +124,16 @@ module Test = struct
 
           let* comm = DAL_crypto.commit p in
 
-          (*let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in
-            let () =
-              DAL_crypto.save_precompute_shards_proofs
-                precompute_pi_shards
-                "shard_proofs_precomp"
-            in*)
+          (*let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in*)
           let filename =
             Tezt.Base.project_root // Filename.dirname __FILE__
             // "shard_proofs_precomp"
           in
+          (*let () =
+              DAL_crypto.save_precompute_shards_proofs
+                precompute_pi_shards
+                filename
+            in*)
           let precompute_pi_shards =
             DAL_crypto.load_precompute_shards_proofs filename
           in

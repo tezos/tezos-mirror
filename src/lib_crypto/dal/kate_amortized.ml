@@ -67,7 +67,6 @@ module Kate_amortized = struct
   let commit p (srs1, _) =
     (* TODO remove these convertions *)
     let p = Array.of_list p in
-    let srs1 = Array.of_list srs1 in
     let commit_kate_amortized srs1 p =
       if p = [||] then G1.(copy zero)
       else if Array.(length p > length srs1) then
@@ -172,7 +171,6 @@ module Kate_amortized = struct
       if 1 lsl log_inf < m_sur_l then log_inf else log_inf + 1
     in
     let domain2m = Domain.build ~log:k in
-    let srs = Array.of_list srs1 in
     let precompute_srsj j =
       let quotient = (degree - j) / l in
       (*if quotient = 0 then None
@@ -182,12 +180,12 @@ module Kate_amortized = struct
         Array.init
           ((2 * quotient) + padding)
           (fun i ->
-            if i < quotient then srs.(degree - j - ((i + 1) * l))
+            if i < quotient then srs1.(degree - j - ((i + 1) * l))
             else G1.(copy zero))
       in
       build_srs_part_h_list srsj domain2m
     in
-    (domain2m, Array.init l (fun j -> precompute_srsj j))
+    (domain2m, Array.init l precompute_srsj)
 
   (** n, r are powers of two, m = 2^(log2(n)-1)
       coefs are f polynomial’s coefficients [f₀, f₁, f₂, …, fm-1]

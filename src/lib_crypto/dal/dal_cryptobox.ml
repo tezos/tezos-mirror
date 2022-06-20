@@ -200,6 +200,10 @@ module type Params_sig = sig
 
   (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
   val shards_amount : int
+
+  val trusted_setup_g1_file : string
+
+  val trusted_setup_g2_file : string
 end
 
 module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
@@ -560,37 +564,47 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   let proofs_log = evaluations_log - evaluations_per_proof_log
 
-  (* Mock SRS, TODO: import srs files *)
-  let secret =
-    Scalar.of_string
-      "43455265682179153414401896409006117694844195495630810185710628957923813326493"
+  let srs_g1 =
+    Bls12_381_polynomial.Srs.M.load_from_file
+      Params.trusted_setup_g1_file
+      (1 lsl 21)
+    |> Bls12_381_polynomial.Srs.M.to_array
 
-  let kate_amortized_srs_g1 = Kate_amortized.gen_srs_g1 ~size:k secret
+  let srs_g2 =
+    let import_srs_g2 d srsfile =
+      let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
+      let buf = Bytes.create g2_size_compressed in
+      let read ic =
+        Stdlib.really_input ic buf 0 g2_size_compressed ;
+        Bls12_381.G2.of_compressed_bytes_exn buf
+      in
+      let ic = open_in srsfile in
+      try
+        if in_channel_length ic < d * g2_size_compressed then
+          raise
+            (Failure (Printf.sprintf "SRS asked (%d) too big for %s" d srsfile)) ;
+        let res = Array.init d (fun _ -> read ic) in
+        close_in ic ;
+        res
+      with e ->
+        close_in ic ;
+        raise e
+    in
+    import_srs_g2 (1 lsl 16) Params.trusted_setup_g2_file
+
+  let kate_amortized_srs_g1 = Array.sub srs_g1 0 k
 
   let kate_amortized_srs_g2_shards =
-    Kate_amortized.gen_srs_g2 ~l:(1 lsl evaluations_per_proof_log) secret
+    Array.get srs_g2 (1 lsl evaluations_per_proof_log)
 
   let kate_amortized_srs_g2_segments =
-    Kate_amortized.gen_srs_g2 ~l:(1 lsl Z.(log2up (of_int segment_len))) secret
+    Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)))
 
   let kzg_srs_size = k
 
-  let build_array init next len =
-    let xi = ref init in
-    Array.init len (fun _ ->
-        let i = !xi in
-        xi := next !xi ;
-        i)
+  let kzg_srs_g2 = Array.sub srs_g2 0 k
 
-  let create_srs :
-      type t.
-      (module Bls12_381.CURVE with type t = t) -> int -> Scalar.t -> t array =
-   fun (module G) d x -> build_array G.(copy one) (fun g -> G.(mul g x)) d
-
-  (* Mock SRS, TODO: import srs files *)
-  let kzg_srs_g2 = create_srs (module Bls12_381.G2) kzg_srs_size secret
-
-  let kzg_srs = create_srs (module Bls12_381.G1) kzg_srs_size secret
+  let kzg_srs = Array.sub srs_g1 0 k
 
   let commit' :
       type t.
