@@ -1318,7 +1318,6 @@ let _tezos_tooling_opam_file_format =
     ~opam:"tezos-tooling"
     ~path:"src/tooling/opam-lint/opam-file-format-src"
     ~deps:[unix]
-    ~wrapped:false
     ~dune:Dune.[ocamllex "opamLexer"; ocamlyacc "opamBaseParser"]
 
 let _tezos_tooling_opam_lint =

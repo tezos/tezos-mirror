@@ -6,8 +6,7 @@
  (package tezos-tooling)
  (instrumentation (backend bisect_ppx))
  (libraries
-  unix)
- (wrapped false))
+  unix))
 
 (ocamllex opamLexer)
 

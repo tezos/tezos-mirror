@@ -9,6 +9,8 @@
    check that the content of the repo is the one we expect. The
    difference would result in a test failure in the CI *)
 
+open Opam_file_format
+
 let lint file orig =
   let s =
     try
