@@ -970,7 +970,7 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
   let entrypoint = action_to_entrypoint action in
   let input = Micheline.strip_locations (view_input ~loc:() action) in
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Plugin.RPC.Scripts.run_view
+  Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
     ~contract
