@@ -2924,7 +2924,7 @@ end = struct
     let make name number =
       if
         not
-          (string_for_all
+          (String.for_all
              (function
                | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' -> true | _ -> false)
              name)

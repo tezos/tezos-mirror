@@ -32,13 +32,6 @@ let has_prefix ~prefix string =
   let prefix_len = String.length prefix in
   String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
 
-let string_for_all p s =
-  let n = String.length s in
-  let rec loop i =
-    if i = n then true else if p (String.get s i) then loop (succ i) else false
-  in
-  loop 0
-
 let has_error = ref false
 
 let info fmt = Format.eprintf fmt
@@ -1225,7 +1218,7 @@ module Target = struct
               None)
       | Some opam as x ->
           if
-            string_for_all
+            String.for_all
               (function
                 | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' -> true
                 | _ -> false)
