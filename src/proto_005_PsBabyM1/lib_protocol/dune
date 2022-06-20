@@ -272,7 +272,12 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:tezos-protocol-compiler} .)))
+ (action
+  (run
+   %{bin:tezos-protocol-compiler}
+   -warning -6-7-9-16-29-32-51-68
+   -warn-error +a
+   .)))
 
 (library
  (name tezos_protocol_005_PsBabyM1_functor)
