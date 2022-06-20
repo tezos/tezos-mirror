@@ -36,7 +36,7 @@ of the merge coordinator include:
 * Make sure merge requests follow the :ref:`MR workflow <mr_workflow>`:
   the :ref:`assignee <assignee_field>` is correct, the :ref:`reviewers <reviewers_field>`
   are correct; and the :ref:`draft <draft_mode>` status is correct.
-* Supervise the ready (non-draft) MRs to ensure that the right actions are being taken;
+* Supervise ready MRs to ensure that the right actions are being taken;
   advise how to make them move forward.
 * Assist with removing blockers, organize the optimal sequencing of MRs.
 * Assist with notifying blocking persons that they are a bottleneck:

@@ -120,15 +120,15 @@ requirements (if responding to an issue), or to the stated reasons
 relationships to MRs, to issues, etc, should also be mentioned.
 
 While the code is still not ready to be peer reviewed, but it is
-merely a work in progress, the developer prefixes the MR with
-``Draft:`` and assigns it to themselves.  This will tell everybody
-they can look at the code, comment, but there is still work to be done
-and the branch can change and history be rewritten.
+merely a work in progress, the developer assigns it to themselves and
+prefixes the MR title with ``Draft:``. This will
+tell everybody they can look at the code, comment, but there is still
+work to be done and the branch can change and history be rewritten.
 
 Finally, when the code is ready for the :ref:`code review
-<code_review>`, the developer removes the Draft status
-of the MR and freezes the branch. From this moment on, the
-developer will refrain from rewriting history, but they can add new
+<code_review>`, the developer assigns the MR to a reviewer
+and freezes the branch. From this moment on, the
+developer will refrain from rewriting history, although they can add new
 commits and rebase the branch for syncing it with master (this can be
 done regularly to make sure the branch does not get stale). At this
 point the developer interacts with the reviewers to address their
@@ -140,6 +140,30 @@ can add additional commits to address each comment. This incremental
 approach will make it easier for the reviewer to keep interacting till
 each discussion is resolved. When the reviewer is satisfied, they
 will mark the discussion resolved.
+
+The `Draft: <https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
+status can be set at any time during the
+authoring/review process to signal that the MR is not yet ready for
+merge (for instance, the ``git`` history might not be clean). But, the
+``Draft`` status *does not* prohibit review -- this should be achieved by
+assigning the MR to the developer.
+
+You can refer to the following table that summarizes how assignee and
+``Draft`` status interact to decide whether an MR is open for review:
+
+.. table::
+
+    +-------+----------+-----------+------------+
+    | Draft | Assignee | Reviewers | Reviewable |
+    +=======+==========+===========+============+
+    | \-    | \-       | ∅         | No         |
+    +-------+----------+-----------+------------+
+    | Yes   | Author   | \-        | No         |
+    +-------+----------+-----------+------------+
+    | Yes   | Others   | Some      | Yes        |
+    +-------+----------+-----------+------------+
+    | No    | Author   | Some      | Yes        |
+    +-------+----------+-----------+------------+
 
 When all discussions are resolved, and the MR has got at least two
 approvals from Octez Merge Team members, the developer should squash
@@ -316,7 +340,7 @@ Therefore, when creating your MR, observe the following rules:
   of the :ref:`reviewer field <reviewers_field>` below.
 
 - *Check progress*:
-  It is important to maintain to a minimum the number of your MRs that are in Draft state,
+  It is important to maintain to a minimum the number of your open MRs,
   and to constantly check that the discussion is progressing.
 
 Example of an MR with a good, clean history (each bullet is a commit,
@@ -427,14 +451,41 @@ It causes GitLab to send a notification to them.
 Merge Request "Draft" Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A merge request that is not yet ready for review should be marked
-as `draft <https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
-by prefixing its title with ``Draft:``.
-On ``tezos/tezos`` draft merge requests that are assigned to their owners
-are ignored by reviewers.
-Marking merge requests as draft hence helps lower
-the number of merge requests that require attention from the
-:doc:`Octez merge team<merge_team>`.
+A merge request that is not yet ready to be merged should be marked as
+`draft
+<https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
+by prefixing its title with ``Draft:``. Typical reasons for this is
+that the author still has some minor tasks to accomplish, such as
+cleaning up the merge request's ``git`` history (e.g. squashing ``fixup!`` commits), even
+if the request is already reviewed and approved (and in this case, the draft status will prevent
+the request from being prematurely merged).
+
+Being in ``Draft:`` mode does not signal "not yet ready for
+review". Instead, MRs that should not be reviewed should be in the ``Draft`` state and
+assigned to the author, as it is the MR's assignee that should take action
+next.
+
+To decide the correct draft status with respect to whether the MR is
+ready for review, consider the following table:
+
+.. table::
+
+    +----------+-------------+----------------+
+    | Assignee | Has fixups? | Correct status |
+    +==========+=============+================+
+    | Other    | No          | \              |
+    +----------+-------------+----------------+
+    | Other    | Yes         | Draft          |
+    +----------+-------------+----------------+
+    | Author   | No          | Draft          |
+    +----------+-------------+----------------+
+    | Author   | Yes         | Draft          |
+    +----------+-------------+----------------+
+
+In sum: the correct status for an MR assigned to another person than
+the author should be ``Draft`` if its history contains ``fixup!`` or
+if other development tasks remain. If the MR is assigned to the
+author, then it should be ``Draft``.
 
 Merge Request's owner
 ~~~~~~~~~~~~~~~~~~~~~
@@ -524,7 +575,8 @@ Merge Request Approvals
 
 Two approvals from different Octez :doc:`Octez merge team <merge_team>` members are required for merge
 requests to be merged. Both approvals must result from independent, thorough
-reviews. After both reviews, the second approver will also typically merge.
+reviews. After both reviews, the second approver will also typically merge if the request is not a draft
+(which otherwise means that the author has still some cleaning up to do).
 
 However, for less critical parts of the code, an Octez merge team member may
 choose to trust the review of a developer who is not a member of the Octez
