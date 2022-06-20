@@ -413,9 +413,9 @@ end) : TestPVM = struct
 
   module Utils = struct
     let make_external_inbox_message str =
-      match Inbox.Message.(External str |> to_bytes) with
-      | Ok s -> s
-      | _ -> assert false
+      WithExceptions.Result.get_ok
+        ~loc:__LOC__
+        Inbox.Message.(External str |> to_bytes)
 
     let default_state =
       let promise =

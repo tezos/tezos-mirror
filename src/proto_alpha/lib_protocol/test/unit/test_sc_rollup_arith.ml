@@ -131,9 +131,9 @@ let test_boot () =
       failwith "After booting, the machine must be waiting for input."
 
 let make_external_inbox_message str =
-  match Sc_rollup_inbox_message_repr.(External str |> to_bytes) with
-  | Ok s -> s
-  | _ -> assert false
+  WithExceptions.Result.get_ok
+    ~loc:__LOC__
+    Sc_rollup_inbox_message_repr.(External str |> to_bytes)
 
 let test_input_message () =
   let open Sc_rollup_PVM_sem in
