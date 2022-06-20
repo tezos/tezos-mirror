@@ -222,6 +222,33 @@ let test_transfer_non_zero_amount () =
   in
   return_unit
 
+(* Use the correct type through an entrypoint but with a non-zero amount. *)
+let test_transfer_non_zero_amount_via_entrypoint () =
+  let* b, c, contract, rollup =
+    context_init "or (int %use_this_one) (unit %not_that_one)"
+  in
+  let param =
+    Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup ^ "%use_this_one")
+  in
+  let* _b =
+    transfer
+      b
+      ~from:c
+      ~to_:contract
+      ~param
+      ~entrypoint:"transfer_non_zero"
+      ~expect_apply_failure:
+        (check_proto_error ~loc:__LOC__ ~exp:"Rollup_invalid_transaction_amount"
+         @@ function
+         | [
+             Script_interpreter.Runtime_contract_error _;
+             Script_interpreter_defs.Rollup_invalid_transaction_amount;
+           ] ->
+             return_unit
+         | _ -> raise Unexpected_error)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -239,5 +266,5 @@ let tests =
     Tztest.tztest
       "Transfer with a non-zero amount"
       `Quick
-      test_transfer_non_zero_amount;
+      test_transfer_non_zero_amount_via_entrypoint;
   ]
