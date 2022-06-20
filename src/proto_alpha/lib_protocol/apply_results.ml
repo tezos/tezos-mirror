@@ -28,26 +28,6 @@ open Alpha_context
 open Data_encoding
 open Apply_operation_result
 
-let error_encoding =
-  def
-    "error"
-    ~description:
-      "The full list of RPC errors would be too long to include.\n\
-       It is available at RPC `/errors` (GET).\n\
-       Errors specific to protocol Alpha have an id that starts with \
-       `proto.alpha`."
-  @@ splitted
-       ~json:
-         (conv
-            (fun err ->
-              Data_encoding.Json.construct Error_monad.error_encoding err)
-            (fun json ->
-              Data_encoding.Json.destruct Error_monad.error_encoding json)
-            json)
-       ~binary:Error_monad.error_encoding
-
-let trace_encoding = make_trace_encoding error_encoding
-
 type 'kind internal_manager_operation =
   | Transaction : {
       amount : Tez.tez;
