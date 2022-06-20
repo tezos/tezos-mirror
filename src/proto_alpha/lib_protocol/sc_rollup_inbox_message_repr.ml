@@ -83,7 +83,7 @@ let encoding =
          case
            (Tag 1)
            ~title:"External"
-           string
+           Variable.string
            (function External msg -> Some msg | Internal _ -> None)
            (fun msg -> External msg);
        ])

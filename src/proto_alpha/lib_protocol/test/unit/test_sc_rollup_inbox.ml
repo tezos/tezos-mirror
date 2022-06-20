@@ -100,27 +100,11 @@ let test_consume_messages (payloads, nb_consumed_messages) =
            "Message consumption fails only when trying to consume more than \
             the number of available messages.")
 
-(* A message is tagged with a prefix. It consists of 5 bytes:
-   - Byte 0 is the tag (1 for external and 0 for internal).
-   - Bytes 1-4 is the length of the message encoded as:
-      [ prefix[1] * 256^3 + prefix[2] * 256^2 prefix[3] * 256^1 prefix[4]]
-*)
+(* An external message is prefixed with a tag whose length is one byte, and
+   whose value is 1. *)
 let encode_external_message message =
-  let length = String.length message in
-  let pow m n = Z.to_int @@ Z.(of_int m ** n) in
-  let prefix =
-    [
-      (* This is the tag of external messages. *)
-      1;
-      (* The length of the message encoded in base 256. *)
-      length / pow 256 3 mod 256;
-      length / pow 256 2 mod 256;
-      length / 256 mod 256;
-      length mod 256;
-    ]
-    |> List.map Char.chr |> List.to_seq |> String.of_seq
-  in
-  Bytes.of_string (Printf.sprintf "%s%s" prefix message)
+  let prefix = "\001" in
+  Bytes.of_string (prefix ^ message)
 
 let check_payload messages external_message =
   Environment.Context.Tree.find messages ["payload"] >>= function

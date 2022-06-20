@@ -89,6 +89,10 @@ module Int64 = struct
   let pp pp v = Format.pp_print_int pp (Int64.to_int v)
 end
 
+(* char *)
+let equal_char ~loc a b =
+  equal ~loc Char.equal "Characters aren't equal" Format.pp_print_char a b
+
 (* int *)
 let equal_int ~loc (a : int) (b : int) =
   equal ~loc Int.equal "Integers aren't equal" Format.pp_print_int a b
