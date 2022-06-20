@@ -25,9 +25,6 @@
 
 (** Generate dune and opam files from common definitions. *)
 
-(** Return whether [prefix] is a prefix of a string. *)
-val has_prefix : prefix:string -> string -> bool
-
 (** Same as [Filename.concat]. *)
 val ( // ) : string -> string -> string
 

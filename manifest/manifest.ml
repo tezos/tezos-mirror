@@ -28,10 +28,6 @@ module String_set = Set.Make (String)
 
 let ( // ) = Filename.concat
 
-let has_prefix ~prefix string =
-  let prefix_len = String.length prefix in
-  String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
-
 let has_error = ref false
 
 let info fmt = Format.eprintf fmt
