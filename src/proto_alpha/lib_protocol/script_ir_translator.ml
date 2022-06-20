@@ -2430,6 +2430,9 @@ and parse_instr :
     (a, s) stack_ty ->
     ((a, s) judgement * context) tzresult Lwt.t =
  fun ~elab_conf ~stack_depth tc_context ctxt script_instr stack_ty ->
+  let for_logging_only x =
+    if elab_conf.keep_extra_types_for_interpreter_logging then Some x else None
+  in
   let check_item_ty (type a ac b bc) ctxt (exp : (a, ac) ty) (got : (b, bc) ty)
       loc name n m : ((a, b) eq * context) tzresult =
     record_trace_eval (fun () ->
@@ -2863,7 +2866,10 @@ and parse_instr :
               let ibody = kibody.instr.apply (IHalt hloc) in
               list_t loc ret >>? fun ty ->
               let list_map =
-                {apply = (fun k -> IList_map (loc, ibody, ty, k))}
+                {
+                  apply =
+                    (fun k -> IList_map (loc, ibody, for_logging_only ty, k));
+                }
               in
               let stack = Item_t (ty, rest) in
               typed_no_lwt ctxt loc list_map stack )
@@ -2882,7 +2888,7 @@ and parse_instr :
             (fun k ->
               let hinfo = loc in
               let ibody = ibody.instr.apply (IHalt hinfo) in
-              IList_iter (loc, elt, ibody, k));
+              IList_iter (loc, for_logging_only elt, ibody, k));
         }
       in
       Lwt.return
@@ -2919,7 +2925,7 @@ and parse_instr :
             (fun k ->
               let hinfo = loc in
               let ibody = ibody.instr.apply (IHalt hinfo) in
-              ISet_iter (loc, elt, ibody, k));
+              ISet_iter (loc, for_logging_only elt, ibody, k));
         }
       in
       Lwt.return
@@ -2961,7 +2967,9 @@ and parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
       check_var_type_annot loc annot >>?= fun () ->
-      let instr = {apply = (fun k -> IEmpty_map (loc, tk, tv, k))} in
+      let instr =
+        {apply = (fun k -> IEmpty_map (loc, tk, for_logging_only tv, k))}
+      in
       map_t loc tk tv >>?= fun ty -> typed ctxt loc instr (Item_t (ty, stack))
   | Prim (loc, I_MAP, [body], annot), Item_t (Map_t (kt, elt, _), starting_rest)
     -> (
@@ -2988,7 +2996,7 @@ and parse_instr :
                     (fun k ->
                       let hinfo = loc in
                       let ibody = ibody.instr.apply (IHalt hinfo) in
-                      IMap_map (loc, ty, ibody, k));
+                      IMap_map (loc, for_logging_only ty, ibody, k));
                 }
               in
               let stack = Item_t (ty, rest) in
@@ -3010,7 +3018,7 @@ and parse_instr :
             (fun k ->
               let hinfo = loc in
               let ibody = ibody.instr.apply (IHalt hinfo) in
-              IMap_iter (loc, ty, ibody, k));
+              IMap_iter (loc, for_logging_only ty, ibody, k));
         }
       in
       Lwt.return
@@ -3308,7 +3316,7 @@ and parse_instr :
       check_item_ty ctxt arg param loc I_EXEC 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let stack = Item_t (ret, rest) in
-      let instr = {apply = (fun k -> IExec (loc, stack, k))} in
+      let instr = {apply = (fun k -> IExec (loc, for_logging_only stack, k))} in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, I_APPLY, [], annot),
       Item_t
@@ -3340,7 +3348,7 @@ and parse_instr :
               apply =
                 (fun k ->
                   let b = descr.instr.apply (IHalt descr.loc) in
-                  IDip (loc, b, v, k));
+                  IDip (loc, b, for_logging_only v, k));
             }
           in
           let stack = Item_t (v, descr.aft) in
@@ -3774,7 +3782,7 @@ and parse_instr :
               IView
                 ( loc,
                   View_signature {name; input_ty; output_ty},
-                  Item_t (output_ty, rest),
+                  for_logging_only rest,
                   k ));
         }
       in
@@ -4072,7 +4080,7 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       check_comparable loc t >>?= fun Eq ->
       ticket_t loc t >>?= fun res_ty ->
-      let instr = {apply = (fun k -> ITicket (loc, t, k))} in
+      let instr = {apply = (fun k -> ITicket (loc, for_logging_only t, k))} in
       let stack = Item_t (res_ty, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_READ_TICKET, [], annot),
@@ -4080,7 +4088,9 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       let () = check_dupable_comparable_ty t in
       opened_ticket_type loc t >>?= fun result ->
-      let instr = {apply = (fun k -> IRead_ticket (loc, t, k))} in
+      let instr =
+        {apply = (fun k -> IRead_ticket (loc, for_logging_only t, k))}
+      in
       let stack = Item_t (result, full_stack) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SPLIT_TICKET, [], annot),

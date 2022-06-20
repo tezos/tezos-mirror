@@ -795,17 +795,18 @@ let check_kinstr_size () =
               branch_if_nil = halt ();
               k = halt ();
             } );
-      Kinstr ("IList_map", IList_map (loc, halt (), str_list_t, halt ()));
-      Kinstr ("IList_iter", IList_iter (loc, str_list_t, drop (), halt ()));
+      Kinstr ("IList_map", IList_map (loc, halt (), Some str_list_t, halt ()));
+      Kinstr ("IList_iter", IList_iter (loc, Some str_list_t, drop (), halt ()));
       Kinstr ("IList_size", IList_size (loc, halt ()));
       Kinstr ("IEmpty_set", IEmpty_set (loc, String_t, halt ()));
-      Kinstr ("ISet_iter", ISet_iter (loc, String_t, drop (), halt ()));
+      Kinstr ("ISet_iter", ISet_iter (loc, Some String_t, drop (), halt ()));
       Kinstr ("ISet_mem", ISet_mem (loc, halt ()));
       Kinstr ("ISet_update", ISet_update (loc, halt ()));
       Kinstr ("ISet_size", ISet_size (loc, halt ()));
-      Kinstr ("IEmpty_map", IEmpty_map (loc, Nat_t, String_t, halt ()));
-      Kinstr ("IMap_map", IMap_map (loc, nat_str_map_t, cdr, halt ()));
-      Kinstr ("IMap_iter", IMap_iter (loc, nat_str_pair_t, drop (), halt ()));
+      Kinstr ("IEmpty_map", IEmpty_map (loc, Nat_t, Some String_t, halt ()));
+      Kinstr ("IMap_map", IMap_map (loc, Some nat_str_map_t, cdr, halt ()));
+      Kinstr
+        ("IMap_iter", IMap_iter (loc, Some nat_str_pair_t, drop (), halt ()));
       Kinstr ("IMap_mem", IMap_mem (loc, halt ()));
       Kinstr ("IMap_get", IMap_get (loc, halt ()));
       Kinstr ("IMap_update", IMap_update (loc, halt ()));
@@ -870,8 +871,8 @@ let check_kinstr_size () =
             } );
       Kinstr ("ILoop", ILoop (loc, const Bool_t true, halt ()));
       Kinstr ("ILoop_left", ILoop_left (loc, INever loc, halt ()));
-      Kinstr ("IDip", IDip (loc, halt (), String_t, halt ()));
-      Kinstr ("IExec", IExec (loc, Bot_t, halt ()));
+      Kinstr ("IDip", IDip (loc, halt (), Some String_t, halt ()));
+      Kinstr ("IExec", IExec (loc, Some Bot_t, halt ()));
       Kinstr ("IApply", IApply (loc, String_t, halt ()));
       Kinstr ("ILambda", ILambda (loc, id_lambda (), halt ()));
       Kinstr ("IFailwith", IFailwith (loc, String_t));
@@ -894,7 +895,7 @@ let check_kinstr_size () =
                   input_ty = unit_option_t ();
                   output_ty = unit_option_t ();
                 },
-              stack_type (),
+              Some (stack_type ()),
               halt () ) );
       Kinstr ("ITransfer_tokens", ITransfer_tokens (loc, halt ()));
       Kinstr ("IImplicit_account", IImplicit_account (loc, halt ()));
@@ -961,8 +962,8 @@ let check_kinstr_size () =
       Kinstr ("IComb_get", IComb_get (loc, 0, Comb_get_zero, halt ()));
       Kinstr ("IComb_set", IComb_set (loc, 0, Comb_set_zero, halt ()));
       Kinstr ("IDup_n", IDup_n (loc, 0, Dup_n_zero, halt ()));
-      Kinstr ("ITicket", ITicket (loc, Nat_t, halt ()));
-      Kinstr ("IRead_ticket", IRead_ticket (loc, Unit_t, halt ()));
+      Kinstr ("ITicket", ITicket (loc, Some Nat_t, halt ()));
+      Kinstr ("IRead_ticket", IRead_ticket (loc, Some Unit_t, halt ()));
       Kinstr ("ISplit_ticket", ISplit_ticket (loc, halt ()));
       Kinstr ("IJoin_tickets", IJoin_tickets (loc, Unit_t, halt ()));
       Kinstr ("IOpen_chest", IOpen_chest (loc, halt ()));

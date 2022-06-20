@@ -126,6 +126,10 @@ let rec stack_prefix_preservation_witness_split_output :
       Item_t (a, stack_prefix_preservation_witness_split_output w s)
   | KRest, s -> s
 
+(* We apply this function to optional type information which must be present
+   if functions from this module were called. Use with care. *)
+let assert_some = function None -> assert false | Some x -> x
+
 let kinstr_split :
     type a s r f.
     (a, s) stack_ty ->
@@ -358,7 +362,7 @@ let kinstr_split :
       ok
       @@ Ex_split_loop_may_fail
            {
-             body_init_stack = Item_t (a, s);
+             body_init_stack = Item_t (assert_some a, s);
              body;
              cont_init_stack = s;
              continuation = k;
@@ -391,7 +395,7 @@ let kinstr_split :
              reconstruct = (fun k -> ISet_size (loc, k));
            }
   | IEmpty_map (loc, cty, vty, k), s ->
-      map_t dummy cty vty >|? fun m ->
+      map_t dummy cty (assert_some vty) >|? fun m ->
       let s = Item_t (m, s) in
       Ex_split_kinstr
         {
@@ -400,7 +404,7 @@ let kinstr_split :
           reconstruct = (fun k -> IEmpty_map (loc, cty, vty, k));
         }
   | IMap_map (loc, ty, body, k), Item_t (Map_t (kty, vty, _meta), s) ->
-      let (Map_t (key_ty, _, _)) = ty in
+      let (Map_t (key_ty, _, _)) = assert_some ty in
       pair_t dummy key_ty vty >|? fun (Ty_ex_c p) ->
       Ex_split_loop_may_not_fail
         {
@@ -416,7 +420,7 @@ let kinstr_split :
       ok
       @@ Ex_split_loop_may_fail
            {
-             body_init_stack = Item_t (kvty, stack);
+             body_init_stack = Item_t (assert_some kvty, stack);
              body;
              cont_init_stack = stack;
              continuation = k;
@@ -1531,7 +1535,7 @@ let kinstr_split :
              reconstruct = (fun k -> IDup_n (loc, n, p, k));
            }
   | ITicket (loc, cty, k), Item_t (_, Item_t (_, s)) ->
-      ticket_t dummy cty >|? fun t ->
+      ticket_t dummy (assert_some cty) >|? fun t ->
       let s = Item_t (t, s) in
       Ex_split_kinstr
         {
@@ -1540,7 +1544,7 @@ let kinstr_split :
           reconstruct = (fun k -> ITicket (loc, cty, k));
         }
   | IRead_ticket (loc, a, k), s ->
-      pair_t dummy a nat_t >>? fun (Ty_ex_c p) ->
+      pair_t dummy (assert_some a) nat_t >>? fun (Ty_ex_c p) ->
       pair_t dummy address_t p >|? fun (Ty_ex_c t) ->
       let s = Item_t (t, s) in
       Ex_split_kinstr
@@ -1773,7 +1777,7 @@ let log_next_continuation :
       let (Item_t (Bool_t, sty)) = stack_ty in
       ok @@ KLoop_in (enable_log sty ki, instrument_cont logger sty k)
   | KReturn (stack, sty, k) ->
-      let k' = instrument_cont logger sty k in
+      let k' = instrument_cont logger (assert_some sty) k in
       ok @@ KReturn (stack, sty, k')
   | KLoop_in_left (ki, k) ->
       let (Item_t (Union_t (a_ty, b_ty, _, _), rest)) = stack_ty in
@@ -1781,25 +1785,25 @@ let log_next_continuation :
       let k' = instrument_cont logger (Item_t (b_ty, rest)) k in
       ok @@ KLoop_in_left (ki', k')
   | KUndip (x, ty, k) ->
-      let k' = instrument_cont logger (Item_t (ty, stack_ty)) k in
+      let k' = instrument_cont logger (Item_t (assert_some ty, stack_ty)) k in
       ok @@ KUndip (x, ty, k')
   | KIter (body, xty, xs, k) ->
-      let body' = enable_log (Item_t (xty, stack_ty)) body in
+      let body' = enable_log (Item_t (assert_some xty, stack_ty)) body in
       let k' = instrument_cont logger stack_ty k in
       ok @@ KIter (body', xty, xs, k')
   | KList_enter_body (body, xs, ys, ty, len, k) ->
-      let k' = instrument_cont logger (Item_t (ty, stack_ty)) k in
+      let k' = instrument_cont logger (Item_t (assert_some ty, stack_ty)) k in
       ok @@ KList_enter_body (body, xs, ys, ty, len, k')
   | KList_exit_body (body, xs, ys, ty, len, k) ->
       let (Item_t (_, sty)) = stack_ty in
-      let k' = instrument_cont logger (Item_t (ty, sty)) k in
+      let k' = instrument_cont logger (Item_t (assert_some ty, sty)) k in
       ok @@ KList_exit_body (body, xs, ys, ty, len, k')
   | KMap_enter_body (body, xs, ys, ty, k) ->
-      let k' = instrument_cont logger (Item_t (ty, stack_ty)) k in
+      let k' = instrument_cont logger (Item_t (assert_some ty, stack_ty)) k in
       ok @@ KMap_enter_body (body, xs, ys, ty, k')
   | KMap_exit_body (body, xs, ys, yk, ty, k) ->
       let (Item_t (_, sty)) = stack_ty in
-      let k' = instrument_cont logger (Item_t (ty, sty)) k in
+      let k' = instrument_cont logger (Item_t (assert_some ty, sty)) k in
       ok @@ KMap_exit_body (body, xs, ys, yk, ty, k')
   | KMap_head (_, _)
   | KView_exit (_, _)

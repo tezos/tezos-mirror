@@ -101,6 +101,10 @@ let ty_traverse_f =
 let ty_size : type a ac. (a, ac) ty -> nodes_and_size =
  fun ty -> ty_traverse ty zero ty_traverse_f
 
+(* Types stored for logging are optional and never present in the cache. Therefore
+   it's safe not to count them. *)
+let ty_for_logging_size : type a ac. (a, ac) ty option -> sint = fun _ty -> !!0
+
 let stack_ty_size s =
   let apply : type a s. nodes_and_size -> (a, s) stack_ty -> nodes_and_size =
    fun accu s ->
@@ -109,6 +113,12 @@ let stack_ty_size s =
     | Item_t (ty, _) -> ret_succ_adding (accu ++ ty_size ty) h2w
   in
   stack_ty_traverse s zero {apply}
+
+(* Stack types for logging are optional and never present in the cache. Therefore
+   it's safe not to count them. One word taken by the [None] tag is already
+   accounted for by the call-sites of this function. *)
+let stack_ty_for_logging_size : type a s. (a, s) stack_ty option -> sint =
+ fun _ -> !!0
 
 let script_nat_size n = Script_int.to_zint n |> z_size
 
@@ -423,25 +433,35 @@ and kinstr_size :
     | IIf_cons {loc; branch_if_nil = k1; branch_if_cons = k2; k = k3} ->
         ret_succ_adding accu (base3 loc k1 k2 k3)
     | IList_map (loc, k1, ty, k2) ->
-        ret_succ_adding (accu ++ ty_size ty) (base2 loc k1 k2 +! word_size)
+        ret_succ_adding
+          accu
+          (base2 loc k1 k2 +! ty_for_logging_size ty +! word_size)
     | IList_iter (loc, ty, k1, k2) ->
-        ret_succ_adding (accu ++ ty_size ty) (base2 loc k1 k2 +! word_size)
+        ret_succ_adding
+          accu
+          (base2 loc k1 k2 +! ty_for_logging_size ty +! word_size)
     | IList_size (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IEmpty_set (loc, cty, k) ->
         ret_succ_adding (accu ++ ty_size cty) (base1 loc k +! word_size)
     | ISet_iter (loc, ty, k1, k2) ->
-        ret_succ_adding (accu ++ ty_size ty) (base2 loc k1 k2 +! word_size)
+        ret_succ_adding
+          accu
+          (base2 loc k1 k2 +! ty_for_logging_size ty +! word_size)
     | ISet_mem (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ISet_update (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ISet_size (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IEmpty_map (loc, cty, vty, k) ->
         ret_succ_adding
-          (accu ++ ty_size cty ++ ty_size vty)
-          (base1 loc k +! (word_size *? 2))
+          (accu ++ ty_size cty)
+          (base1 loc k +! ty_for_logging_size vty +! (word_size *? 2))
     | IMap_map (loc, ty, k1, k2) ->
-        ret_succ_adding (accu ++ ty_size ty) (base2 loc k1 k2 +! word_size)
+        ret_succ_adding
+          accu
+          (base2 loc k1 k2 +! ty_for_logging_size ty +! word_size)
     | IMap_iter (loc, kvty, k1, k2) ->
-        ret_succ_adding (accu ++ ty_size kvty) (base2 loc k1 k2 +! word_size)
+        ret_succ_adding
+          accu
+          (base2 loc k1 k2 +! ty_for_logging_size kvty +! word_size)
     | IMap_mem (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IMap_get (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IMap_update (loc, k) -> ret_succ_adding accu (base1 loc k)
@@ -501,9 +521,13 @@ and kinstr_size :
     | ILoop (loc, k1, k2) -> ret_succ_adding accu (base2 loc k1 k2)
     | ILoop_left (loc, k1, k2) -> ret_succ_adding accu (base2 loc k1 k2)
     | IDip (loc, k1, ty, k2) ->
-        ret_succ_adding (accu ++ ty_size ty) (base2 loc k1 k2 +! word_size)
+        ret_succ_adding
+          accu
+          (base2 loc k1 k2 +! ty_for_logging_size ty +! word_size)
     | IExec (loc, sty, k) ->
-        ret_succ_adding (accu ++ stack_ty_size sty) (base1 loc k +! word_size)
+        ret_succ_adding
+          accu
+          (base1 loc k +! stack_ty_for_logging_size sty +! word_size)
     | IApply (loc, ty, k) ->
         ret_succ_adding (accu ++ ty_size ty) (base1 loc k +! word_size)
     | ILambda (loc, lambda, k) ->
@@ -526,8 +550,8 @@ and kinstr_size :
           (base1 loc k +! Entrypoint.in_memory_size s +! (word_size *? 2))
     | IView (loc, s, sty, k) ->
         ret_succ_adding
-          (accu ++ view_signature_size s ++ stack_ty_size sty)
-          (base1 loc k +! (word_size *? 2))
+          (accu ++ view_signature_size s)
+          (base1 loc k +! stack_ty_for_logging_size sty +! (word_size *? 2))
     | ITransfer_tokens (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IImplicit_account (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICreate_contract {loc; storage_type; code; k} ->
@@ -619,9 +643,11 @@ and kinstr_size :
           accu
           (base1 loc k +! (word_size *? 2) +! dup_n_gadt_witness_size n w)
     | ITicket (loc, cty, k) ->
-        ret_succ_adding (accu ++ ty_size cty) (base1 loc k +! word_size)
+        ret_succ_adding
+          accu
+          (base1 loc k +! ty_for_logging_size cty +! word_size)
     | IRead_ticket (loc, ty, k) ->
-        ret_succ_adding (accu ++ ty_size ty) (base1 loc k +! word_size)
+        ret_succ_adding accu (base1 loc k +! ty_for_logging_size ty +! word_size)
     | ISplit_ticket (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IJoin_tickets (loc, cty, k) ->
         ret_succ_adding (accu ++ ty_size cty) (base1 loc k +! word_size)

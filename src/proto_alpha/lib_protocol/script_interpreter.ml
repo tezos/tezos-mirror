@@ -568,6 +568,9 @@ and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
                   Contract.get_balance_carbonated ctxt c
                   >>=? fun (ctxt, balance) ->
                   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
+                  let sty =
+                    Option.map (fun t -> Item_t (output_ty, t)) stack_ty
+                  in
                   (step [@ocaml.tailcall])
                     ( ctxt,
                       {
@@ -585,8 +588,7 @@ and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
                       } )
                     gas
                     kinstr
-                    (instrument
-                    @@ KView_exit (sc, KReturn (stack, stack_ty, kcons)))
+                    (instrument @@ KView_exit (sc, KReturn (stack, sty, kcons)))
                     (input, storage)
                     (EmptyCell, EmptyCell))))
 
@@ -1786,6 +1788,17 @@ and klog :
     s ->
     (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
  fun logger g gas stack_ty k0 ks accu stack ->
+  let ty_for_logging_unsafe = function
+    (* This function is only called when logging is enabled.  If
+       that's the case, the elaborator must have been called with
+       [logging_enabled] option, which ensures that this will not be
+       [None]. Realistically, it can happen that the [logging_enabled]
+       option was omitted, resulting in a crash here. But this is
+       acceptable, because logging is never enabled during block
+       validation, so the layer 1 is safe. *)
+    | None -> assert false
+    | Some ty -> ty
+  in
   (match ks with
   | KLog _ -> ()
   | _ -> Script_interpreter_logging.log_control logger ks) ;
@@ -1802,8 +1815,9 @@ and klog :
         Script_interpreter_logging.instrument_cont logger stack_ty
       in
       (kiter [@ocaml.tailcall]) instrument g gas body xty xs k accu stack
-  | KList_enter_body (body, xs, ys, ty, len, k) ->
+  | KList_enter_body (body, xs, ys, ty_opt, len, k) ->
       let instrument =
+        let ty = ty_for_logging_unsafe ty_opt in
         let (List_t (vty, _)) = ty in
         let sty = Item_t (vty, stack_ty) in
         Script_interpreter_logging.instrument_cont logger sty
@@ -1815,7 +1829,7 @@ and klog :
         body
         xs
         ys
-        ty
+        ty_opt
         len
         k
         accu
@@ -1835,13 +1849,24 @@ and klog :
         k
         accu
         stack
-  | KMap_enter_body (body, xs, ys, ty, k) ->
+  | KMap_enter_body (body, xs, ys, ty_opt, k) ->
       let instrument =
+        let ty = ty_for_logging_unsafe ty_opt in
         let (Map_t (_, vty, _)) = ty in
         let sty = Item_t (vty, stack_ty) in
         Script_interpreter_logging.instrument_cont logger sty
       in
-      (kmap_enter [@ocaml.tailcall]) instrument g gas body xs ty ys k accu stack
+      (kmap_enter [@ocaml.tailcall])
+        instrument
+        g
+        gas
+        body
+        xs
+        ty_opt
+        ys
+        k
+        accu
+        stack
   | KMap_exit_body (body, xs, ys, yk, ty_opt, k) ->
       let (Item_t (_, rest)) = stack_ty in
       let instrument = Script_interpreter_logging.instrument_cont logger rest in
