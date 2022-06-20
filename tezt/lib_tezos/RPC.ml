@@ -26,6 +26,8 @@
 include RPC_core
 include RPC_legacy
 
+let get_config = make GET ["config"] Fun.id
+
 let get_network_connections =
   make GET ["network"; "connections"] @@ fun json ->
   let decode_connection json =
@@ -71,6 +73,74 @@ let get_network_peer_banned peer_id =
 
 let get_network_peer_unban peer_id =
   make GET ["network"; "peers"; peer_id; "unban"] Fun.id
+
+let get_chain_blocks ?(chain = "main") () =
+  make GET ["chains"; chain; "blocks"] Fun.id
+
+let get_chain_invalid_blocks ?(chain = "main") () =
+  make GET ["chains"; chain; "invalid_blocks"] Fun.id
+
+let get_chain_block_header_raw ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "header"; "raw"] Fun.id
+
+let get_chain_block_live_blocks ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "live_blocks"] Fun.id
+
+let decode_operation_hashes json = JSON.(json |> as_list |> List.map as_string)
+
+let get_chain_block_operation_hashes ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "operation_hashes"] (fun json ->
+      JSON.(json |> as_list |> List.map @@ decode_operation_hashes))
+
+let get_chain_block_operation_hashes_of_validation_pass ?(chain = "main")
+    ?(block = "head") validation_pass =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operation_hashes";
+      string_of_int validation_pass;
+    ]
+    decode_operation_hashes
+
+let get_chain_block_operation_hash ?(chain = "main") ?(block = "head")
+    ~validation_pass ~operation_offset () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operation_hashes";
+      string_of_int validation_pass;
+      string_of_int operation_offset;
+    ]
+    JSON.as_string
+
+let get_chain_block_helper_complete ?(chain = "main") ?(block = "head") prefix =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "complete"; prefix]
+    Fun.id
+
+let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
+    block_level =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "nonces";
+      string_of_int block_level;
+    ]
+    Fun.id
 
 let get_network_peer_untrust peer_id =
   make GET ["network"; "peers"; peer_id; "untrust"] Fun.id
@@ -193,3 +263,39 @@ let get_chain_level_savepoint ?(chain = "main") () =
 
 let get_chain_level_caboose ?(chain = "main") () =
   make GET ["chains"; chain; "levels"; "caboose"] parse_block_descriptor
+
+let get_worker_block_validator = make GET ["workers"; "block_validator"] Fun.id
+
+let get_workers_chain_validators =
+  make GET ["workers"; "chain_validators"] Fun.id
+
+let get_worker_chain_validator ?(chain = "main") () =
+  make GET ["workers"; "chain_validators"; chain] Fun.id
+
+let get_worker_chain_validator_ddb ?(chain = "main") () =
+  make GET ["workers"; "chain_validators"; chain; "ddb"] Fun.id
+
+let get_worker_chain_validator_peers_validators ?(chain = "main") () =
+  make GET ["workers"; "chain_validators"; chain; "peers_validators"] Fun.id
+
+let get_workers_prevalidators = make GET ["workers"; "prevalidators"] Fun.id
+
+let get_worker_prevalidator ?(chain = "main") () =
+  make GET ["workers"; "prevalidators"; chain] Fun.id
+
+let get_errors = make GET ["errors"] Fun.id
+
+let get_protocol protocol_hash = make GET ["protocols"; protocol_hash] Fun.id
+
+let get_protocols =
+  make
+    GET
+    ["protocols"]
+    JSON.(fun json -> json |> as_list |> List.map as_string)
+
+let get_fetch_protocol protocol_hash =
+  make GET ["fetch_protocol"; protocol_hash] Fun.id
+
+let get_stats_gc = make GET ["stats"; "gc"] Fun.id
+
+let get_stats_memory = make GET ["stats"; "memory"] Fun.id

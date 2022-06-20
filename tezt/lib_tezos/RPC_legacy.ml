@@ -49,7 +49,8 @@ let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   Client.rpc ?endpoint ?hooks GET path client
 
 let get_operations_of_validation_pass ?endpoint ?hooks ?(chain = "main")
-    ?(block = "head") ?operation_offset ~validation_pass client =
+    ?(block = "head") ?(force_metadata = false) ?operation_offset
+    ~validation_pass client =
   let path =
     [
       "chains";
@@ -61,7 +62,8 @@ let get_operations_of_validation_pass ?endpoint ?hooks ?(chain = "main")
     ]
     @ match operation_offset with None -> [] | Some m -> [string_of_int m]
   in
-  Client.rpc ?endpoint ?hooks GET path client
+  let query_string = if force_metadata then [("force_metadata", "")] else [] in
+  Client.rpc ~query_string ?endpoint ?hooks GET path client
 
 let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
     ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
@@ -237,10 +239,6 @@ module Big_maps = struct
     in
     Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
 end
-
-let get_ddb ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["workers"; "chain_validators"; chain; "ddb"] in
-  Client.rpc ?endpoint ?hooks GET path client
 
 module Contracts = struct
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =

@@ -89,6 +89,7 @@ val get_operations_of_validation_pass :
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
+  ?force_metadata:bool ->
   ?operation_offset:int ->
   validation_pass:int ->
   Client.t ->
@@ -264,14 +265,6 @@ val get_levels_in_current_cycle :
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /workers/chain_validators/[chain]/ddb *)
-val get_ddb :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
   Client.t ->
   JSON.t Lwt.t
 
