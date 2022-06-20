@@ -36,8 +36,6 @@ open Injector_errors
    Centralize this and maybe make it configurable. *)
 let confirmations = 2
 
-module Op_queue = Hash_queue.Make (L1_operation.Hash) (L1_operation)
-
 type injection_strategy = [`Each_block | `Delay_block]
 
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2755
@@ -61,6 +59,14 @@ let injector_context (cctxt : #Protocol_client_context.full) =
 
 module Make (Rollup : PARAMETERS) = struct
   module Tags = Injector_tags.Make (Rollup.Tag)
+
+  module Op_queue =
+    Disk_persistence.Make_queue
+      (struct
+        let name = "operations_queue"
+      end)
+      (L1_operation.Hash)
+      (L1_operation)
 
   (** Information stored about an L1 operation that was injected on a Tezos
       node. *)
@@ -207,7 +213,7 @@ module Make (Rollup : PARAMETERS) = struct
     in
     let*! () = Lwt_utils_unix.create_dir data_dir0 in
     let*! () = Lwt_utils_unix.create_dir data_dir in
-    let queue = Op_queue.create 50_000 in
+    let* queue = Op_queue.load_from_disk ~capacity:50_000 ~data_dir in
     (* Very coarse approximation for the number of operation we expect for each
        block *)
     let n =
@@ -255,8 +261,8 @@ module Make (Rollup : PARAMETERS) = struct
   (** Add an operation to the pending queue corresponding to the signer for this
     operation.  *)
   let add_pending_operation state op =
-    let open Lwt_syntax in
-    let+ () = Event.(emit1 add_pending) state op in
+    let open Lwt_result_syntax in
+    let*! () = Event.(emit1 add_pending) state op in
     Op_queue.replace state.queue op.L1_operation.hash op
 
   (** Mark operations as injected (in [oph]). *)
@@ -649,15 +655,19 @@ module Make (Rollup : PARAMETERS) = struct
         match res with
         | `Injected (oph, injected_operations) ->
             (* Injection succeeded, remove from pending and add to injected *)
-            List.iter
-              (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
-              injected_operations ;
+            let* () =
+              List.iter_es
+                (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
+                injected_operations
+            in
             add_injected_operations state oph operations_to_inject
         | `Ignored operations_to_drop ->
             (* Injection failed but we ignore the failure. *)
-            List.iter
-              (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
-              operations_to_drop ;
+            let* () =
+              List.iter_es
+                (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
+                operations_to_drop
+            in
             return_unit)
 
   (** [register_included_operation state block level oph] marks the manager
@@ -695,19 +705,19 @@ module Make (Rollup : PARAMETERS) = struct
     typically in the case of a reorganization where [block] is on an alternative
     chain. The operations are put back in the pending queue. *)
   let revert_included_operations state block =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let* included_infos = remove_included_operation state block in
-    let* () =
+    let*! () =
       Event.(emit1 revert_operations)
         state
         (List.map (fun o -> o.op.hash) included_infos)
     in
     (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2814
        maybe put at the front of the queue for re-injection. *)
-    List.iter_s
+    List.iter_es
       (fun {op; _} ->
         let {L1_operation.manager_operation = Manager mop; _} = op in
-        let* requeue =
+        let*! requeue =
           Rollup.requeue_reverted_operation state.rollup_node_state mop
         in
         if requeue then add_pending_operation state op else return_unit)
@@ -747,8 +757,8 @@ module Make (Rollup : PARAMETERS) = struct
       (reorg : Alpha_block_services.block_info reorg) =
     let open Lwt_result_syntax in
     let*! () = Event.(emit1 new_tezos_head) state head.hash in
-    let*! () =
-      List.iter_s
+    let* () =
+      List.iter_es
         (fun removed_block ->
           revert_included_operations
             state
@@ -801,15 +811,12 @@ module Make (Rollup : PARAMETERS) = struct
         (r, request_error) Request.t ->
         (r, request_error) result Lwt.t =
      fun w request ->
-      let open Lwt_result_syntax in
       let state = Worker.state w in
       match request with
       | Request.Add_pending op ->
           (* The execution of the request handler is protected to avoid stopping the
              worker in case of an exception. *)
-          protect @@ fun () ->
-          let*! () = add_pending_operation state op in
-          return_unit
+          protect @@ fun () -> add_pending_operation state op
       | Request.New_tezos_head (head, reorg) ->
           protect @@ fun () -> on_new_tezos_head state head reorg
       | Request.Inject -> protect @@ fun () -> on_inject state
