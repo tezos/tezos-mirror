@@ -35,6 +35,7 @@ type validator_kind =
   | Internal : Store.Chain.chain_store -> validator_kind
   | External : {
       genesis : Genesis.t;
+      readonly : bool;
       data_dir : string;
       context_root : string;
       protocol_root : string;
@@ -503,8 +504,9 @@ module External_validator_process = struct
   type process_status = Uninitialized | Running of validator_process | Exiting
 
   type t = {
-    data_dir : string;
     genesis : Genesis.t;
+    readonly : bool;
+    data_dir : string;
     context_root : string;
     protocol_root : string;
     user_activated_upgrades : User_activated.upgrades;
@@ -536,9 +538,12 @@ module External_validator_process = struct
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one validation process per socket *)
     let socket_dir = get_temporary_socket_dir () in
+    let args =
+      ["tezos-validator"; "--socket-dir"; socket_dir]
+      @ match vp.readonly with true -> ["--readonly"] | false -> []
+    in
     let process =
-      Lwt_process.open_process_none
-        (vp.process_path, [|"tezos-validator"; "--socket-dir"; socket_dir|])
+      Lwt_process.open_process_none (vp.process_path, Array.of_list args)
     in
     let socket_path =
       External_validation.socket_path ~socket_dir ~pid:process#pid
@@ -713,13 +718,14 @@ module External_validator_process = struct
          operation_metadata_size_limit;
          _;
        } :
-        validator_environment) ~genesis ~data_dir ~context_root ~protocol_root
-      ~process_path ~sandbox_parameters =
+        validator_environment) ~genesis ~data_dir ~readonly ~context_root
+      ~protocol_root ~process_path ~sandbox_parameters =
     let open Lwt_result_syntax in
     let*! () = Events.(emit init ()) in
     let validator =
       {
         data_dir;
+        readonly;
         genesis;
         context_root;
         protocol_root;
@@ -883,6 +889,7 @@ let init validator_environment validator_kind =
   | External
       {
         genesis;
+        readonly;
         data_dir;
         context_root;
         protocol_root;
@@ -894,6 +901,7 @@ let init validator_environment validator_kind =
           validator_environment
           ~genesis
           ~data_dir
+          ~readonly
           ~context_root
           ~protocol_root
           ~process_path

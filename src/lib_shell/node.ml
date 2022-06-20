@@ -267,6 +267,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:start_testchain
+          ~readonly:false
           genesis
       in
       let main_chain_store = Store.main_chain_store store in
@@ -281,6 +282,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
           (External
              {
                data_dir;
+               readonly = false;
                genesis;
                context_root;
                protocol_root;
@@ -299,6 +301,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:start_testchain
+          ~readonly:false
           genesis
       in
       return (validator_process, store)

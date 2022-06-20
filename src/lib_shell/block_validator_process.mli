@@ -47,6 +47,7 @@ type validator_kind =
   | Internal : Store.Chain.chain_store -> validator_kind
   | External : {
       genesis : Genesis.t;
+      readonly : bool;
       data_dir : string;
       context_root : string;
       protocol_root : string;
