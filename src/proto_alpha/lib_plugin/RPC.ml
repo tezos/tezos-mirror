@@ -181,7 +181,9 @@ module Scripts = struct
           (storage, operations, lazy_storage_diff))
         (obj3
            (req "storage" Script.expr_encoding)
-           (req "operations" (list Apply_results.internal_contents_encoding))
+           (req
+              "operations"
+              (list Apply_internal_results.internal_contents_encoding))
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
     let trace_code_input_encoding = run_code_input_encoding
@@ -201,7 +203,9 @@ module Scripts = struct
           (storage, operations, trace, lazy_storage_diff))
         (obj4
            (req "storage" Script.expr_encoding)
-           (req "operations" (list Apply_results.internal_contents_encoding))
+           (req
+              "operations"
+              (list Apply_internal_results.internal_contents_encoding))
            (req "trace" trace_encoding)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
@@ -1042,7 +1046,8 @@ module Scripts = struct
                    },
                    _ ) ->
         ( storage,
-          Apply_results.contents_of_packed_internal_operations operations,
+          Apply_internal_results.contents_of_packed_internal_operations
+            operations,
           lazy_storage_diff )) ;
     Registration.register0
       ~chunked:true
@@ -1114,7 +1119,8 @@ module Scripts = struct
                      _ctxt ),
                    trace ) ->
         ( storage,
-          Apply_results.contents_of_packed_internal_operations operations,
+          Apply_internal_results.contents_of_packed_internal_operations
+            operations,
           trace,
           lazy_storage_diff )) ;
     Registration.register0

@@ -101,7 +101,7 @@ type error +=
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
   | Wrong_voting_period of {expected : int32; provided : int32}
-  | Internal_operation_replay of Apply_results.packed_internal_contents
+  | Internal_operation_replay of Apply_internal_results.packed_internal_contents
   | Invalid_denunciation of denunciation_kind
   | Inconsistent_denunciation of {
       kind : denunciation_kind;
@@ -571,12 +571,12 @@ let () =
     ~id:"internal_operation_replay"
     ~title:"Internal operation replay"
     ~description:"An internal operation was emitted twice by a script"
-    ~pp:(fun ppf (Apply_results.Internal_contents {nonce; _}) ->
+    ~pp:(fun ppf (Apply_internal_results.Internal_contents {nonce; _}) ->
       Format.fprintf
         ppf
         "Internal operation %d was emitted twice by a script"
         nonce)
-    Apply_results.internal_contents_encoding
+    Apply_internal_results.internal_contents_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
     (fun op -> Internal_operation_replay op) ;
   register_error_kind
@@ -811,6 +811,8 @@ let () =
     (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account)
 
 open Apply_results
+open Apply_operation_result
+open Apply_internal_results
 
 let assert_tx_rollup_feature_enabled ctxt =
   let level = (Level.current ctxt).level in
@@ -1929,7 +1931,9 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
     | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
       :: rest -> (
         (if internal_nonce_already_recorded ctxt nonce then
-         let op_res = Apply_results.contents_of_internal_operation op in
+         let op_res =
+           Apply_internal_results.contents_of_internal_operation op
+         in
          fail (Internal_operation_replay (Internal_contents op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in

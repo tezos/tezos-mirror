@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,15 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Data_encoding
 
-val tez_sym : string
+type ('kind, 'manager, 'successful) operation_result =
+  | Applied of 'successful
+  | Backtracked of 'successful * error trace option
+  | Failed :
+      'manager * error trace
+      -> ('kind, 'manager, 'successful) operation_result
+  | Skipped : 'manager -> ('kind, 'manager, 'successful) operation_result
+[@@coq_force_gadt]
 
-val pp_internal_operation :
-  Format.formatter -> Apply_internal_results.packed_internal_contents -> unit
+let error_encoding =
+  def
+    "error"
+    ~description:
+      "The full list of RPC errors would be too long to include.\n\
+       It is available at RPC `/errors` (GET).\n\
+       Errors specific to protocol Alpha have an id that starts with \
+       `proto.alpha`."
+  @@ splitted
+       ~json:
+         (conv
+            (fun err ->
+              Data_encoding.Json.construct Error_monad.error_encoding err)
+            (fun json ->
+              Data_encoding.Json.destruct Error_monad.error_encoding json)
+            json)
+       ~binary:Error_monad.error_encoding
 
-val pp_operation_result :
-  Format.formatter ->
-  'kind contents_list * 'kind Apply_results.contents_result_list ->
-  unit
+let trace_encoding = make_trace_encoding error_encoding

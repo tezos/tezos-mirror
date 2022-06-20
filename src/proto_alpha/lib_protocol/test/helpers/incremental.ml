@@ -125,6 +125,8 @@ let detect_script_failure :
   let rec detect_script_failure :
       type kind. kind Apply_results.contents_result_list -> _ =
     let open Apply_results in
+    let open Apply_operation_result in
+    let open Apply_internal_results in
     let detect_script_failure_single (type kind)
         (Manager_operation_result
            {operation_result; internal_operation_results; _} :

@@ -182,6 +182,8 @@
         "Michelson_v1_gas",
         "Script_list",
         "Script_tc_context",
+        "Apply_operation_result",
+        "Apply_internal_results",
         "Apply_results",
         "Script_ir_translator",
         "Script_big_map",

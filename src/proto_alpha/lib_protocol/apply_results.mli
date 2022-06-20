@@ -33,40 +33,8 @@
  *)
 
 open Alpha_context
-
-type 'kind internal_manager_operation =
-  | Transaction : {
-      amount : Tez.tez;
-      parameters : Script.lazy_expr;
-      entrypoint : Entrypoint.t;
-      destination : Destination.t;
-    }
-      -> Kind.transaction internal_manager_operation
-  | Origination : {
-      delegate : Signature.Public_key_hash.t option;
-      script : Script.t;
-      credit : Tez.tez;
-    }
-      -> Kind.origination internal_manager_operation
-  | Delegation :
-      Signature.Public_key_hash.t option
-      -> Kind.delegation internal_manager_operation
-
-type 'kind internal_contents = {
-  source : Contract.t;
-  operation : 'kind internal_manager_operation;
-  nonce : int;
-}
-
-type packed_internal_contents =
-  | Internal_contents : 'kind internal_contents -> packed_internal_contents
-
-val contents_of_packed_internal_operation :
-  Script_typed_ir.packed_internal_operation -> packed_internal_contents
-
-val contents_of_packed_internal_operations :
-  Script_typed_ir.packed_internal_operation list ->
-  packed_internal_contents list
+open Apply_operation_result
+open Apply_internal_results
 
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
 type 'kind operation_metadata = {contents : 'kind contents_result_list}
@@ -133,68 +101,19 @@ and 'kind contents_result =
 and packed_contents_result =
   | Contents_result : 'kind contents_result -> packed_contents_result
 
-(** The result of an operation in the queue. [Skipped] ones should
-    always be at the tail, and after a single [Failed].
-    * The ['kind] parameter is the operation kind (a transaction, an
-      origination, etc.).
-    * The ['manager] parameter is the type of manager kinds.
-    * The ['successful] parameter is the type of successful operations.
-    The ['kind] parameter is used to make the type a GADT, but ['manager] and
-    ['successful] are used to share [operation_result] between internal and
-    external operation results, and are instantiated for each case. *)
-and ('kind, 'manager, 'successful) operation_result =
-  | Applied of 'successful
-  | Backtracked of 'successful * error trace option
-  | Failed :
-      'manager * error trace
-      -> ('kind, 'manager, 'successful) operation_result
-  | Skipped : 'manager -> ('kind, 'manager, 'successful) operation_result
-[@@coq_force_gadt]
-
 and 'kind manager_operation_result =
   ( 'kind,
     'kind Kind.manager,
     'kind successful_manager_operation_result )
   operation_result
 
-and 'kind internal_manager_operation_result =
-  ( 'kind,
-    'kind Kind.manager,
-    'kind successful_internal_manager_operation_result )
-  operation_result
-
-(** Result of applying a transaction, either internal or external. *)
+(** Result of applying a transaction. *)
 and successful_transaction_result =
-  | Transaction_to_contract_result of {
-      storage : Script.expr option;
-      lazy_storage_diff : Lazy_storage.diffs option;
-      balance_updates : Receipt.balance_updates;
-      originated_contracts : Contract_hash.t list;
-      consumed_gas : Gas.Arith.fp;
-      storage_size : Z.t;
-      paid_storage_size_diff : Z.t;
-      allocated_destination_contract : bool;
-    }
-  | Transaction_to_tx_rollup_result of {
-      ticket_hash : Ticket_hash.t;
-      balance_updates : Receipt.balance_updates;
-      consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
-    }
-  | Transaction_to_sc_rollup_result of {
-      consumed_gas : Gas.Arith.fp;
-      inbox_after : Sc_rollup.Inbox.t;
-    }
+  Apply_internal_results.successful_transaction_result
 
-(** Result of applying an origination, either internal or external. *)
-and successful_origination_result = {
-  lazy_storage_diff : Lazy_storage.diffs option;
-  balance_updates : Receipt.balance_updates;
-  originated_contracts : Contract_hash.t list;
-  consumed_gas : Gas.Arith.fp;
-  storage_size : Z.t;
-  paid_storage_size_diff : Z.t;
-}
+(** Result of applying an origination. *)
+and successful_origination_result =
+  Apply_internal_results.successful_origination_result
 
 (** Result of applying an external {!manager_operation_content}. *)
 and _ successful_manager_operation_result =
@@ -338,38 +257,10 @@ and _ successful_manager_operation_result =
     }
       -> Kind.sc_rollup_recover_bond successful_manager_operation_result
 
-(** Result of applying a {!Script_typed_ir.internal_operation}. *)
-and _ successful_internal_manager_operation_result =
-  | ITransaction_result :
-      successful_transaction_result
-      -> Kind.transaction successful_internal_manager_operation_result
-  | IOrigination_result :
-      successful_origination_result
-      -> Kind.origination successful_internal_manager_operation_result
-  | IDelegation_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.delegation successful_internal_manager_operation_result
-
 and packed_successful_manager_operation_result =
   | Successful_manager_result :
       'kind successful_manager_operation_result
       -> packed_successful_manager_operation_result
-
-and packed_internal_manager_operation_result =
-  | Internal_manager_operation_result :
-      'kind internal_contents * 'kind internal_manager_operation_result
-      -> packed_internal_manager_operation_result
-
-val contents_of_internal_operation :
-  'kind Script_typed_ir.internal_operation -> 'kind internal_contents
-
-val pack_internal_manager_operation_result :
-  'kind Script_typed_ir.internal_operation ->
-  'kind internal_manager_operation_result ->
-  packed_internal_manager_operation_result
-
-val internal_contents_encoding : packed_internal_contents Data_encoding.t
 
 val pack_migration_operation_results :
   Migration.origination_result list ->
