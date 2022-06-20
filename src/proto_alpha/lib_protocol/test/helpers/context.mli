@@ -213,6 +213,10 @@ module Tx_rollup : sig
     Tx_rollup_commitment.Submitted_commitment.t option tzresult Lwt.t
 end
 
+module Sc_rollup : sig
+  val inbox : t -> Sc_rollup.t -> Sc_rollup.Inbox.t tzresult Lwt.t
+end
+
 type (_, _) tup =
   | T1 : ('a, 'a) tup
   | T2 : ('a, 'a * 'a) tup

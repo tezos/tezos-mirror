@@ -68,14 +68,19 @@ let check_proto_error ~loc ~exp f trace =
 
 let sc_originate = Test_sc_rollup.sc_originate
 
-(* A contract with one entrypoint:
+(* A contract with two entrypoints:
     - [transfer_non_zero] takes a [contract int] and attempts to transfer with a
       non-zero amount to it. Expected to fail.
+
+    - [transfer_int] takes a [contract int] and transfers an int to it. Expected
+      to succeed.
 *)
 let contract_originate block account =
   let script =
     {|
-        parameter (or (contract %transfer_non_zero int) never);
+        parameter (or (contract %transfer_non_zero int)
+                      (or (contract %transfer_int int)
+                          never));
         storage unit;
         code {
           UNPAIR;
@@ -84,7 +89,13 @@ let contract_originate block account =
             PUSH mutez 1;
             PUSH int 42;
           } {
-            NEVER
+            IF_LEFT {
+              # transfer_int
+              PUSH mutez 0;
+              PUSH int 42;
+            } {
+              NEVER
+            }
           };
           TRANSFER_TOKENS;
           NIL operation;
@@ -249,6 +260,19 @@ let test_transfer_non_zero_amount_via_entrypoint () =
   in
   return_unit
 
+(* Now, transfer with a zero-amount and check that the inbox has been updated. *)
+let test_transfer_works () =
+  let* b, c, contract, rollup = context_init "int" in
+  let* inbox_before = Context.Sc_rollup.inbox (B b) rollup in
+  let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
+  let* b = transfer b ~from:c ~to_:contract ~param ~entrypoint:"transfer_int" in
+  let* inbox_after = Context.Sc_rollup.inbox (B b) rollup in
+  Assert.not_equal_with_encoding
+    ~loc:__LOC__
+    Sc_rollup.Inbox.encoding
+    inbox_before
+    inbox_after
+
 let tests =
   [
     Tztest.tztest
@@ -267,4 +291,5 @@ let tests =
       "Transfer with a non-zero amount"
       `Quick
       test_transfer_non_zero_amount_via_entrypoint;
+    Tztest.tztest "Transfer works" `Quick test_transfer_works;
   ]
