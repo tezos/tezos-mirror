@@ -167,7 +167,8 @@ val withdraw_stake :
 module Internal_for_tests : sig
   (** [deposit_stake context rollup staker] stakes [staker] at the last
       cemented commitment, freezing [sc_rollup_stake_amount] from [staker]'s
-      account balance.
+      account balance. It also returns the last cemented commitment of the
+      [rollup] on which the staker just deposited.
 
       Warning: must be called only if [rollup] exists and [staker] is not to be
       found in {!Store.Stakers.}
@@ -186,13 +187,22 @@ module Internal_for_tests : sig
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->
-    (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
+    (Raw_context.t
+    * Receipt_repr.balance_updates
+    * Sc_rollup_commitment_repr.Hash.t)
+    tzresult
+    Lwt.t
 
-  (** [refine_stake context rollup staker commitment] moves the stake of
-      [staker] to [commitment]. Because we do not assume any form of coordination
-      between validators, we do not distinguish between {i adding new}
-      commitments and {i staking on existing commitments}.  The storage of
-      commitments is content-addressable to minimize storage duplication.
+  (** [refine_stake context rollup staker ?staked_on commitment] moves the stake
+      of [staker] on [?staked_on] to [commitment]. The function exposed
+      in [Internal_for_tests] allows [staked_on] to be [None] and fetches
+      the real value from the storage, but, the production code uses the
+      already existing commitment on which the staker is staked.
+
+      Because we do not assume any form of coordination between validators, we
+      do not distinguish between {i adding new} commitments and {i staking on
+      existing commitments}. The storage of commitments is content-addressable
+      to minimize storage duplication.
 
       Subsequent calls to [refine_stake] and [cement_commitment] must use
       a [context] with greater level, or this function call will fail.
@@ -223,6 +233,7 @@ module Internal_for_tests : sig
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->
+    ?staked_on:Sc_rollup_commitment_repr.Hash.t ->
     Sc_rollup_commitment_repr.t ->
     (Sc_rollup_commitment_repr.Hash.t * Raw_level_repr.t * Raw_context.t)
     tzresult
