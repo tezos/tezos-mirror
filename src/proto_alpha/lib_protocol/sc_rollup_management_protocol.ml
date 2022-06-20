@@ -94,7 +94,7 @@ let transactions_batch_of_internal ctxt transactions =
     let* parameters, ctxt =
       Script_ir_translator.parse_data
         ctxt
-        ~legacy:false
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
         ~allow_forged:true
         parameters_ty
         (Micheline.root unparsed_parameters)

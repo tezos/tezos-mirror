@@ -148,8 +148,6 @@ val unparse_contract :
     unparsing them requires extracting information from that code – that's
     why we depend on the parser here. *)
 module type MICHELSON_PARSER = sig
-  type type_logger
-
   val opened_ticket_type :
     Script.location ->
     'a comparable_ty ->
@@ -164,10 +162,9 @@ module type MICHELSON_PARSER = sig
     (ex_ty * context) tzresult
 
   val parse_data :
-    ?type_logger:type_logger ->
+    elab_conf:Script_ir_translator_config.elab_config ->
     stack_depth:int ->
     context ->
-    legacy:bool ->
     allow_forged:bool ->
     ('a, 'ac) ty ->
     Script.node ->

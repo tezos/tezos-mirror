@@ -42,7 +42,11 @@ let load_and_elaborate ctxt addr =
   | None -> return (ctxt, None)
   | Some script ->
       Script_ir_translator.(
-        parse_script ctxt script ~legacy:true ~allow_forged_in_storage:true
+        parse_script
+          ctxt
+          script
+          ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
+          ~allow_forged_in_storage:true
         >>=? fun (ex_script, ctxt) ->
         (* We consume gas after the fact in order to not have to instrument
            [script_size] (for efficiency).

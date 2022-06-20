@@ -528,7 +528,7 @@ module Ticket_collection = struct
           | Some id ->
               let accum (values, ctxt) (_key_hash, exp) =
                 Script_ir_translator.parse_data
-                  ~legacy:true
+                  ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
                   ctxt
                   ~allow_forged:true
                   value_type
@@ -582,7 +582,7 @@ let tickets_of_node ctxt ~include_lazy ~allow_zero_amount_tickets has_tickets
   | _ ->
       Script_ir_translator.parse_data
         ctxt
-        ~legacy:true
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
         ~allow_forged:true
         ty
         expr

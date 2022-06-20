@@ -83,7 +83,8 @@ let typecheck_by_tezos =
            Protocol.Script_ir_translator.parse_instr
              Protocol.Script_tc_context.data
              ctxt
-             ~legacy:false
+             ~elab_conf:
+               (Protocol.Script_ir_translator_config.make ~legacy:false ())
              (Micheline.root node)
              bef
            >|= Environment.wrap_tzresult

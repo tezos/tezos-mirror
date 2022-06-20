@@ -748,7 +748,7 @@ let init chain_id ctxt block_header =
     in
     Script_ir_translator.parse_script
       ctxt
-      ~legacy:true
+      ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
       ~allow_forged_in_storage
       script
     >>=? fun (Ex_script (Script parsed_script), ctxt) ->

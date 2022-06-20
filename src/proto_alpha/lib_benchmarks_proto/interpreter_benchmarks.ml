@@ -747,7 +747,8 @@ module Registration_section = struct
                  Script_ir_translator.parse_instr
                    Script_tc_context.data
                    ctxt
-                   ~legacy:false
+                   ~elab_conf:
+                     (Script_ir_translator_config.make ~legacy:false ())
                    node
                    stack_ty
                  >|= Environment.wrap_tzresult

@@ -513,6 +513,7 @@ and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
     let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
     (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack
   in
+  let legacy = Script_ir_translator_config.make ~legacy:true () in
   match addr.destination with
   | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ ->
       (return_none [@ocaml.tailcall]) ctxt
@@ -521,7 +522,11 @@ and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
       match script_opt with
       | None -> (return_none [@ocaml.tailcall]) ctxt
       | Some script -> (
-          parse_script ~legacy:true ~allow_forged_in_storage:true ctxt script
+          parse_script
+            ~elab_conf:legacy
+            ~allow_forged_in_storage:true
+            ctxt
+            script
           >>=? fun (Ex_script (Script {storage; storage_type; views; _}), ctxt)
             ->
           Gas.consume ctxt (Interp_costs.view_get name views) >>?= fun ctxt ->
@@ -531,7 +536,7 @@ and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
               let view_result =
                 Script_ir_translator.parse_view
                   ctxt
-                  ~legacy:true
+                  ~elab_conf:legacy
                   storage_type
                   view
               in
@@ -1798,9 +1803,11 @@ and klog :
       in
       (kiter [@ocaml.tailcall]) instrument g gas body xty xs k accu stack
   | KList_enter_body (body, xs, ys, ty, len, k) ->
-      let (List_t (vty, _)) = ty in
-      let sty = Item_t (vty, stack_ty) in
-      let instrument = Script_interpreter_logging.instrument_cont logger sty in
+      let instrument =
+        let (List_t (vty, _)) = ty in
+        let sty = Item_t (vty, stack_ty) in
+        Script_interpreter_logging.instrument_cont logger sty
+      in
       (klist_enter [@ocaml.tailcall])
         instrument
         g
@@ -1829,9 +1836,11 @@ and klog :
         accu
         stack
   | KMap_enter_body (body, xs, ys, ty, k) ->
-      let (Map_t (_, vty, _)) = ty in
-      let sty = Item_t (vty, stack_ty) in
-      let instrument = Script_interpreter_logging.instrument_cont logger sty in
+      let instrument =
+        let (Map_t (_, vty, _)) = ty in
+        let sty = Item_t (vty, stack_ty) in
+        Script_interpreter_logging.instrument_cont logger sty
+      in
       (kmap_enter [@ocaml.tailcall]) instrument g gas body xs ty ys k accu stack
   | KMap_exit_body (body, xs, ys, yk, ty_opt, k) ->
       let (Item_t (_, rest)) = stack_ty in
@@ -1905,7 +1914,12 @@ let lift_execution_arg (type a ac) ctxt ~internal (entrypoint_ty : (a, ac) ty)
   (match arg with
   | Untyped_arg arg ->
       let arg = Micheline.root arg in
-      parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg
+      parse_data
+        ctxt
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+        ~allow_forged:internal
+        entrypoint_ty
+        arg
   | Typed_arg (loc, parsed_arg_ty, parsed_arg) ->
       Gas_monad.run
         ctxt
@@ -1930,13 +1944,15 @@ type execution_result = {
 
 let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
     unparsed_script cached_script arg =
+  let elab_conf =
+    Script_ir_translator_config.make
+      ~legacy:true
+      ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
+      ()
+  in
   (match cached_script with
   | None ->
-      parse_script
-        ctxt
-        unparsed_script
-        ~legacy:true
-        ~allow_forged_in_storage:true
+      parse_script ctxt unparsed_script ~elab_conf ~allow_forged_in_storage:true
   | Some ex_script -> return (ex_script, ctxt))
   >>=? fun ( Ex_script
                (Script

@@ -37,6 +37,8 @@ module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
 module Tc_context = Script_tc_context
 
+type elab_conf = Script_ir_translator_config.elab_config
+
 type ex_stack_ty = Ex_stack_ty : ('a, 's) stack_ty -> ex_stack_ty
 
 (* Equality witnesses *)
@@ -90,12 +92,6 @@ let compose_descr :
   }
 
 type tc_context = Tc_context.t
-
-type type_logger =
-  Script.location ->
-  stack_ty_before:Script.expr list ->
-  stack_ty_after:Script.expr list ->
-  unit
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -1882,25 +1878,23 @@ let parse_toplevel :
 
 let rec parse_data :
     type a ac.
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     stack_depth:int ->
     context ->
-    legacy:bool ->
     allow_forged:bool ->
     (a, ac) ty ->
     Script.node ->
     (a * context) tzresult Lwt.t =
- fun ?type_logger ~stack_depth ctxt ~legacy ~allow_forged ty script_data ->
+ fun ~elab_conf ~stack_depth ctxt ~allow_forged ty script_data ->
   Gas.consume ctxt Typecheck_costs.parse_data_cycle >>?= fun ctxt ->
-  let non_terminal_recursion ?type_logger ctxt ~legacy ty script_data =
+  let non_terminal_recursion ctxt ty script_data =
     if Compare.Int.(stack_depth > 10_000) then
       fail Typechecking_too_many_recursive_calls
     else
       parse_data
-        ?type_logger
+        ~elab_conf
         ~stack_depth:(stack_depth + 1)
         ctxt
-        ~legacy
         ~allow_forged
         ty
         script_data
@@ -1913,19 +1907,16 @@ let rec parse_data :
   let traced_no_lwt body = record_trace_eval parse_data_error body in
   let traced body = trace_eval parse_data_error body in
   let traced_fail err = Lwt.return @@ traced_no_lwt (error err) in
-  let parse_items ?type_logger ctxt expr key_type value_type items item_wrapper
-      =
+  let parse_items ctxt expr key_type value_type items item_wrapper =
     List.fold_left_es
       (fun (last_value, map, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
-            (if legacy then Result.return_unit
+            (if elab_conf.legacy then Result.return_unit
             else error_unexpected_annot loc annot)
             >>?= fun () ->
-            non_terminal_recursion ?type_logger ctxt ~legacy key_type k
-            >>=? fun (k, ctxt) ->
-            non_terminal_recursion ?type_logger ctxt ~legacy value_type v
-            >>=? fun (v, ctxt) ->
+            non_terminal_recursion ctxt key_type k >>=? fun (k, ctxt) ->
+            non_terminal_recursion ctxt value_type v >>=? fun (v, ctxt) ->
             Lwt.return
               ( (match last_value with
                 | Some value ->
@@ -1963,20 +1954,18 @@ let rec parse_data :
     |> traced
     >|=? fun (_, items, ctxt) -> (items, ctxt)
   in
-  let parse_big_map_items (type t) ?type_logger ctxt expr
-      (key_type : t comparable_ty) value_type items item_wrapper =
+  let parse_big_map_items (type t) ctxt expr (key_type : t comparable_ty)
+      value_type items item_wrapper =
     List.fold_left_es
       (fun (last_key, {map; size}, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
-            (if legacy then Result.return_unit
+            (if elab_conf.legacy then Result.return_unit
             else error_unexpected_annot loc annot)
             >>?= fun () ->
-            non_terminal_recursion ?type_logger ctxt ~legacy key_type k
-            >>=? fun (k, ctxt) ->
+            non_terminal_recursion ctxt key_type k >>=? fun (k, ctxt) ->
             hash_comparable_data ctxt key_type k >>=? fun (key_hash, ctxt) ->
-            non_terminal_recursion ?type_logger ctxt ~legacy value_type v
-            >>=? fun (v, ctxt) ->
+            non_terminal_recursion ctxt value_type v >>=? fun (v, ctxt) ->
             Lwt.return
               ( (match last_key with
                 | Some last_key ->
@@ -2024,6 +2013,7 @@ let rec parse_data :
     |> traced
     >|=? fun (_, map, ctxt) -> (map, ctxt)
   in
+  let legacy = elab_conf.legacy in
   match (ty, script_data) with
   | Unit_t, expr ->
       Lwt.return @@ traced_no_lwt
@@ -2042,7 +2032,7 @@ let rec parse_data :
       Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
   | Operation_t, _ ->
       (* operations cannot appear in parameters or storage,
-         the protocol should never parse the bytes of an operation *)
+          the protocol should never parse the bytes of an operation *)
       assert false
   | Chain_id_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | Address_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
@@ -2063,31 +2053,22 @@ let rec parse_data :
   (* Pairs *)
   | Pair_t (tl, tr, _, _), expr ->
       let r_witness = comb_witness1 tr in
-      let parse_l ctxt v =
-        non_terminal_recursion ?type_logger ctxt ~legacy tl v
-      in
-      let parse_r ctxt v =
-        non_terminal_recursion ?type_logger ctxt ~legacy tr v
-      in
+      let parse_l ctxt v = non_terminal_recursion ctxt tl v in
+      let parse_r ctxt v = non_terminal_recursion ctxt tr v in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
   (* Unions *)
   | Union_t (tl, tr, _, _), expr ->
-      let parse_l ctxt v =
-        non_terminal_recursion ?type_logger ctxt ~legacy tl v
-      in
-      let parse_r ctxt v =
-        non_terminal_recursion ?type_logger ctxt ~legacy tr v
-      in
+      let parse_l ctxt v = non_terminal_recursion ctxt tl v in
+      let parse_r ctxt v = non_terminal_recursion ctxt tr v in
       traced @@ parse_union parse_l parse_r ctxt ~legacy expr
   (* Lambdas *)
   | Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr) ->
       traced
       @@ parse_returning
            Tc_context.data
-           ?type_logger
+           ~elab_conf
            ~stack_depth:(stack_depth + 1)
            ctxt
-           ~legacy
            ta
            tr
            script_instr
@@ -2095,17 +2076,15 @@ let rec parse_data :
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Options *)
   | Option_t (t, _, _), expr ->
-      let parse_v ctxt v =
-        non_terminal_recursion ?type_logger ctxt ~legacy t v
-      in
+      let parse_v ctxt v = non_terminal_recursion ctxt t v in
       traced @@ parse_option parse_v ctxt ~legacy expr
   (* Lists *)
   | List_t (t, _ty_name), Seq (_loc, items) ->
       traced
       @@ List.fold_right_es
            (fun v (rest, ctxt) ->
-             non_terminal_recursion ?type_logger ctxt ~legacy t v
-             >|=? fun (v, ctxt) -> (Script_list.cons v rest, ctxt))
+             non_terminal_recursion ctxt t v >|=? fun (v, ctxt) ->
+             (Script_list.cons v rest, ctxt))
            items
            (Script_list.empty, ctxt)
   | List_t _, expr ->
@@ -2114,7 +2093,7 @@ let rec parse_data :
   | Ticket_t (t, _ty_name), expr ->
       if allow_forged then
         opened_ticket_type (location expr) t >>?= fun ty ->
-        non_terminal_recursion ?type_logger ctxt ~legacy ty expr
+        non_terminal_recursion ctxt ty expr
         >>=? fun (({destination; entrypoint = _}, (contents, amount)), ctxt) ->
         match destination with
         | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
@@ -2126,8 +2105,7 @@ let rec parse_data :
       traced
       @@ List.fold_left_es
            (fun (last_value, set, ctxt) v ->
-             non_terminal_recursion ?type_logger ctxt ~legacy t v
-             >>=? fun (v, ctxt) ->
+             non_terminal_recursion ctxt t v >>=? fun (v, ctxt) ->
              Lwt.return
                ( (match last_value with
                  | Some value ->
@@ -2157,7 +2135,7 @@ let rec parse_data :
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Maps *)
   | Map_t (tk, tv, _ty_name), (Seq (_, vs) as expr) ->
-      parse_items ?type_logger ctxt expr tk tv vs (fun x -> x)
+      parse_items ctxt expr tk tv vs (fun x -> x)
   | Map_t _, expr ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   | Big_map_t (tk, tv, _ty_name), expr ->
@@ -2165,12 +2143,12 @@ let rec parse_data :
       | Int (loc, id) ->
           return (Some (id, loc), {map = Big_map_overlay.empty; size = 0}, ctxt)
       | Seq (_, vs) ->
-          parse_big_map_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
+          parse_big_map_items ctxt expr tk tv vs (fun x -> Some x)
           >|=? fun (diff, ctxt) -> (None, diff, ctxt)
       | Prim (loc, D_Pair, [Int (loc_id, id); Seq (_, vs)], annot) ->
           error_unexpected_annot loc annot >>?= fun () ->
           option_t loc tv >>?= fun tv_opt ->
-          parse_big_map_items ?type_logger ctxt expr tk tv_opt vs (fun x -> x)
+          parse_big_map_items ctxt expr tk tv_opt vs (fun x -> x)
           >|=? fun (diff, ctxt) -> (Some (id, loc_id), diff, ctxt)
       | Prim (_, D_Pair, [Int _; expr], _) ->
           traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
@@ -2240,9 +2218,9 @@ let rec parse_data :
   | Bls12_381_fr_t, expr ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   (*
-    /!\ When adding new lazy storage kinds, you may want to guard the parsing
-    of identifiers with [allow_forged].
-  *)
+        /!\ When adding new lazy storage kinds, you may want to guard the parsing
+        of identifiers with [allow_forged].
+    *)
   (* Sapling *)
   | Sapling_transaction_t memo_size, Bytes (_, bytes) -> (
       match
@@ -2296,7 +2274,7 @@ let rec parse_data :
       return (Sapling.empty_state ~memo_size (), ctxt)
   | Sapling_state_t _, expr ->
       (* Do not allow to input diffs as they are untrusted and may not be the
-         result of a verify_update. *)
+          result of a verify_update. *)
       traced_fail
         (Invalid_kind (location expr, [Int_kind; Seq_kind], kind expr))
   (* Time lock*)
@@ -2324,13 +2302,13 @@ let rec parse_data :
 
 and parse_view :
     type storage storagec.
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     context ->
-    legacy:bool ->
     (storage, storagec) ty ->
     view ->
     (storage typed_view * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy storage_type {input_ty; output_ty; view_code} ->
+ fun ~elab_conf ctxt storage_type {input_ty; output_ty; view_code} ->
+  let legacy = elab_conf.legacy in
   let input_ty_loc = location input_ty in
   record_trace_eval
     (fun () ->
@@ -2347,11 +2325,10 @@ and parse_view :
   >>?= fun (Ex_ty output_ty, ctxt) ->
   pair_t input_ty_loc input_ty storage_type >>?= fun (Ty_ex_c pair_ty) ->
   parse_instr
-    ?type_logger
+    ~elab_conf
     ~stack_depth:0
     Tc_context.view
     ctxt
-    ~legacy
     view_code
     (Item_t (pair_ty, Bot_t))
   >>=? fun (judgement, ctxt) ->
@@ -2388,38 +2365,35 @@ and parse_view :
 
 and parse_views :
     type storage storagec.
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     context ->
-    legacy:bool ->
     (storage, storagec) ty ->
     view_map ->
     (storage typed_view_map * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy storage_type views ->
+ fun ~elab_conf ctxt storage_type views ->
   let aux ctxt name cur_view =
     Gas.consume
       ctxt
       (Michelson_v1_gas.Cost_of.Interpreter.view_update name views)
-    >>?= fun ctxt -> parse_view ?type_logger ctxt ~legacy storage_type cur_view
+    >>?= fun ctxt -> parse_view ~elab_conf ctxt storage_type cur_view
   in
   Script_map.map_es_in_context aux ctxt views
 
 and parse_returning :
     type arg argc ret retc.
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     stack_depth:int ->
     tc_context ->
     context ->
-    legacy:bool ->
     (arg, argc) ty ->
     (ret, retc) ty ->
     Script.node ->
     ((arg, ret) lambda * context) tzresult Lwt.t =
- fun ?type_logger ~stack_depth tc_context ctxt ~legacy arg ret script_instr ->
+ fun ~elab_conf ~stack_depth tc_context ctxt arg ret script_instr ->
   parse_instr
-    ?type_logger
+    ~elab_conf
     tc_context
     ctxt
-    ~legacy
     ~stack_depth:(stack_depth + 1)
     script_instr
     (Item_t (arg, Bot_t))
@@ -2448,15 +2422,14 @@ and parse_returning :
 
 and parse_instr :
     type a s.
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     stack_depth:int ->
     tc_context ->
     context ->
-    legacy:bool ->
     Script.node ->
     (a, s) stack_ty ->
     ((a, s) judgement * context) tzresult Lwt.t =
- fun ?type_logger ~stack_depth tc_context ctxt ~legacy script_instr stack_ty ->
+ fun ~elab_conf ~stack_depth tc_context ctxt script_instr stack_ty ->
   let check_item_ty (type a ac b bc) ctxt (exp : (a, ac) ty) (got : (b, bc) ty)
       loc name n m : ((a, b) eq * context) tzresult =
     record_trace_eval (fun () ->
@@ -2469,7 +2442,7 @@ and parse_instr :
            eq >|? fun Eq -> ((Eq : (a, b) eq), ctxt) )
   in
   let log_stack loc stack_ty aft =
-    match (type_logger, script_instr) with
+    match (elab_conf.type_logger, script_instr) with
     | None, _ | Some _, (Int _ | String _ | Bytes _) -> ()
     | Some log, (Prim _ | Seq _) ->
         (* Unparsing for logging is not carbonated as this
@@ -2487,17 +2460,15 @@ and parse_instr :
     Lwt.return @@ typed_no_lwt ctxt loc instr aft
   in
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
-  let non_terminal_recursion ?type_logger tc_context ctxt ~legacy script_instr
-      stack_ty =
+  let non_terminal_recursion tc_context ctxt script_instr stack_ty =
     if Compare.Int.(stack_depth > 10000) then
       fail Typechecking_too_many_recursive_calls
     else
       parse_instr
-        ?type_logger
+        ~elab_conf
         tc_context
         ctxt
         ~stack_depth:(stack_depth + 1)
-        ~legacy
         script_instr
         stack_ty
   in
@@ -2505,6 +2476,7 @@ and parse_instr :
     let whole_stack = serialize_stack_for_error ctxt stack_ty in
     error (Bad_stack (loc, prim, relevant_stack_portion, whole_stack))
   in
+  let legacy = elab_conf.legacy in
   match (script_instr, stack_ty) with
   (* stack ops *)
   | Prim (loc, I_DROP, [], annot), Item_t (_, rest) ->
@@ -2627,10 +2599,9 @@ and parse_instr :
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
       parse_data
-        ?type_logger
+        ~elab_conf
         ~stack_depth:(stack_depth + 1)
         ctxt
-        ~legacy
         ~allow_forged:false
         t
         d
@@ -2657,13 +2628,7 @@ and parse_instr :
   | Prim (loc, I_MAP, [body], annot), Item_t (Option_t (t, _, _), rest) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_type_annot loc annot >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        ~legacy
-        tc_context
-        ctxt
-        body
-        (Item_t (t, rest))
+      non_terminal_recursion tc_context ctxt body (Item_t (t, rest))
       >>=? fun (judgement, ctxt) ->
       Lwt.return
       @@
@@ -2690,11 +2655,9 @@ and parse_instr :
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bt rest
-      >>=? fun (btr, ctxt) ->
+      non_terminal_recursion tc_context ctxt bt rest >>=? fun (btr, ctxt) ->
       let stack_ty = Item_t (t, rest) in
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bf stack_ty
-      >>=? fun (bfr, ctxt) ->
+      non_terminal_recursion tc_context ctxt bf stack_ty >>=? fun (bfr, ctxt) ->
       let branch ibt ibf =
         let ifnone =
           {
@@ -2821,21 +2784,9 @@ and parse_instr :
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        bt
-        (Item_t (tl, rest))
+      non_terminal_recursion tc_context ctxt bt (Item_t (tl, rest))
       >>=? fun (btr, ctxt) ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        bf
-        (Item_t (tr, rest))
+      non_terminal_recursion tc_context ctxt bf (Item_t (tr, rest))
       >>=? fun (bfr, ctxt) ->
       let branch ibt ibf =
         let instr =
@@ -2870,16 +2821,9 @@ and parse_instr :
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        bt
-        (Item_t (t, bef))
+      non_terminal_recursion tc_context ctxt bt (Item_t (t, bef))
       >>=? fun (btr, ctxt) ->
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bf rest
-      >>=? fun (bfr, ctxt) ->
+      non_terminal_recursion tc_context ctxt bf rest >>=? fun (bfr, ctxt) ->
       let branch ibt ibf =
         let instr =
           {
@@ -2902,13 +2846,7 @@ and parse_instr :
     -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_type_annot loc annot >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        body
-        (Item_t (elt, starting_rest))
+      non_terminal_recursion tc_context ctxt body (Item_t (elt, starting_rest))
       >>=? fun (judgement, ctxt) ->
       Lwt.return
       @@
@@ -2936,13 +2874,7 @@ and parse_instr :
   | Prim (loc, I_ITER, [body], annot), Item_t (List_t (elt, _), rest) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        body
-        (Item_t (elt, rest))
+      non_terminal_recursion tc_context ctxt body (Item_t (elt, rest))
       >>=? fun (judgement, ctxt) ->
       let mk_list_iter ibody =
         {
@@ -2979,13 +2911,7 @@ and parse_instr :
   | Prim (loc, I_ITER, [body], annot), Item_t (Set_t (elt, _), rest) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        body
-        (Item_t (elt, rest))
+      non_terminal_recursion tc_context ctxt body (Item_t (elt, rest))
       >>=? fun (judgement, ctxt) ->
       let mk_iset_iter ibody =
         {
@@ -3042,13 +2968,7 @@ and parse_instr :
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_type_annot loc annot >>?= fun () ->
       pair_t loc kt elt >>?= fun (Ty_ex_c ty) ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        body
-        (Item_t (ty, starting_rest))
+      non_terminal_recursion tc_context ctxt body (Item_t (ty, starting_rest))
       >>=? fun (judgement, ctxt) ->
       Lwt.return
       @@
@@ -3082,13 +3002,7 @@ and parse_instr :
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
       pair_t loc key element_ty >>?= fun (Ty_ex_c ty) ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        body
-        (Item_t (ty, rest))
+      non_terminal_recursion tc_context ctxt body (Item_t (ty, rest))
       >>=? fun (judgement, ctxt) ->
       let make_instr ibody =
         {
@@ -3247,18 +3161,16 @@ and parse_instr :
       let instr = {apply = (fun k -> k)} in
       typed ctxt loc instr stack
   | Seq (_, [single]), stack ->
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy single stack
+      non_terminal_recursion tc_context ctxt single stack
   | Seq (loc, hd :: tl), stack -> (
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy hd stack
+      non_terminal_recursion tc_context ctxt hd stack
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Failed _ -> fail (Fail_not_in_tail_position (Micheline.location hd))
       | Typed ({aft = middle; _} as ihd) ->
           non_terminal_recursion
-            ?type_logger
             tc_context
             ctxt
-            ~legacy
             (Seq (Micheline.dummy_location, tl))
             middle
           >|=? fun (judgement, ctxt) ->
@@ -3274,10 +3186,8 @@ and parse_instr :
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bt rest
-      >>=? fun (btr, ctxt) ->
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy bf rest
-      >>=? fun (bfr, ctxt) ->
+      non_terminal_recursion tc_context ctxt bt rest >>=? fun (btr, ctxt) ->
+      non_terminal_recursion tc_context ctxt bf rest >>=? fun (bfr, ctxt) ->
       let branch ibt ibf =
         let instr =
           {
@@ -3295,7 +3205,7 @@ and parse_instr :
   | Prim (loc, I_LOOP, [body], annot), (Item_t (Bool_t, rest) as stack) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy body rest
+      non_terminal_recursion tc_context ctxt body rest
       >>=? fun (judgement, ctxt) ->
       Lwt.return
       @@
@@ -3335,13 +3245,7 @@ and parse_instr :
       (Item_t (Union_t (tl, tr, _, _), rest) as stack) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_annot loc annot >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        tc_context
-        ctxt
-        ~legacy
-        body
-        (Item_t (tl, rest))
+      non_terminal_recursion tc_context ctxt body (Item_t (tl, rest))
       >>=? fun (judgement, ctxt) ->
       Lwt.return
       @@
@@ -3388,10 +3292,9 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       parse_returning
         (Tc_context.add_lambda tc_context)
-        ?type_logger
+        ~elab_conf
         ~stack_depth:(stack_depth + 1)
         ctxt
-        ~legacy
         arg
         ret
         code
@@ -3428,7 +3331,7 @@ and parse_instr :
   | Prim (loc, I_DIP, [code], annot), Item_t (v, rest) -> (
       error_unexpected_annot loc annot >>?= fun () ->
       check_kind [Seq_kind] code >>?= fun () ->
-      non_terminal_recursion ?type_logger tc_context ctxt ~legacy code rest
+      non_terminal_recursion tc_context ctxt code rest
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Typed descr ->
@@ -3452,13 +3355,7 @@ and parse_instr :
        fun n stk ->
         match (Compare.Int.(n = 0), stk) with
         | true, rest -> (
-            non_terminal_recursion
-              ?type_logger
-              tc_context
-              ctxt
-              ~legacy
-              code
-              rest
+            non_terminal_recursion tc_context ctxt code rest
             >>=? fun (judgement, ctxt) ->
             Lwt.return
             @@
@@ -3870,12 +3767,15 @@ and parse_instr :
       >>?= fun (Ex_ty output_ty, ctxt) ->
       option_t output_ty_loc output_ty >>?= fun res_ty ->
       check_var_annot loc annot >>?= fun () ->
-      let sty = Item_t (output_ty, rest) in
       let instr =
         {
           apply =
             (fun k ->
-              IView (loc, View_signature {name; input_ty; output_ty}, sty, k));
+              IView
+                ( loc,
+                  View_signature {name; input_ty; output_ty},
+                  Item_t (output_ty, rest),
+                  k ));
         }
       in
       let stack = Item_t (res_ty, rest) in
@@ -3939,8 +3839,7 @@ and parse_instr :
         (parse_returning
            (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
            ctxt
-           ~legacy
-           ?type_logger
+           ~elab_conf
            ~stack_depth:(stack_depth + 1)
            arg_type_full
            ret_type_full
@@ -3949,9 +3848,7 @@ and parse_instr :
                    ( {kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _},
                      _ ),
                  ctxt ) ->
-      let views_result =
-        parse_views ctxt ?type_logger ~legacy storage_type views
-      in
+      let views_result = parse_views ctxt ~elab_conf storage_type views in
       trace (Ill_typed_contract (canonical_code, [])) views_result
       >>=? fun (_typed_views, ctxt) ->
       (let error_details = Informative loc in
@@ -4639,17 +4536,17 @@ let code_size ctxt code views =
   >|? fun ctxt -> (code_size, ctxt)
 
 let parse_code :
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     context ->
-    legacy:bool ->
     code:lazy_expr ->
     (ex_code * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~code ->
+ fun ~elab_conf ctxt ~code ->
   Script.force_decode_in_context
     ~consume_deserialization_gas:When_needed
     ctxt
     code
   >>?= fun (code, ctxt) ->
+  let legacy = elab_conf.legacy in
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
@@ -4671,10 +4568,9 @@ let parse_code :
     (Ill_typed_contract (code, []))
     (parse_returning
        Tc_context.(toplevel ~storage_type ~param_type:arg_type ~entrypoints)
+       ~elab_conf
        ctxt
-       ~legacy
        ~stack_depth:0
-       ?type_logger
        arg_type_full
        ret_type_full
        code_field)
@@ -4687,14 +4583,13 @@ let parse_code :
           ctxt ) )
 
 let parse_storage :
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     context ->
-    legacy:bool ->
     allow_forged:bool ->
     ('storage, _) ty ->
     storage:lazy_expr ->
     ('storage * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~allow_forged storage_type ~storage ->
+ fun ~elab_conf ctxt ~allow_forged storage_type ~storage ->
   Script.force_decode_in_context
     ~consume_deserialization_gas:When_needed
     ctxt
@@ -4705,31 +4600,28 @@ let parse_storage :
       let storage_type = serialize_ty_for_error storage_type in
       Ill_typed_data (None, storage, storage_type))
     (parse_data
-       ?type_logger
+       ~elab_conf
        ~stack_depth:0
        ctxt
-       ~legacy
        ~allow_forged
        storage_type
        (root storage))
 
 let parse_script :
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     context ->
-    legacy:bool ->
     allow_forged_in_storage:bool ->
     Script.t ->
     (ex_script * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
-  parse_code ~legacy ctxt ?type_logger ~code
+ fun ~elab_conf ctxt ~allow_forged_in_storage {code; storage} ->
+  parse_code ~elab_conf ctxt ~code
   >>=? fun ( Ex_code
                (Code
                  {code; arg_type; storage_type; views; entrypoints; code_size}),
              ctxt ) ->
   parse_storage
-    ?type_logger
+    ~elab_conf
     ctxt
-    ~legacy
     ~allow_forged:allow_forged_in_storage
     storage_type
     ~storage
@@ -4781,19 +4673,19 @@ let typecheck_code :
     type_map := (loc, (stack_ty_before, stack_ty_after)) :: !type_map
   in
   let type_logger = if show_types then Some type_logger else None in
+  let elab_conf = Script_ir_translator_config.make ~legacy ?type_logger () in
   let result =
     parse_returning
       (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
       ctxt
-      ~legacy
+      ~elab_conf
       ~stack_depth:0
-      ?type_logger
       arg_type_full
       ret_type_full
       code_field
   in
   trace (Ill_typed_contract (code, !type_map)) result >>=? fun (Lam _, ctxt) ->
-  let views_result = parse_views ctxt ?type_logger ~legacy storage_type views in
+  let views_result = parse_views ctxt ~elab_conf storage_type views in
   trace (Ill_typed_contract (code, !type_map)) views_result
   >|=? fun (typed_views, ctxt) ->
   ( Typechecked_code_internal
@@ -4855,8 +4747,6 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
   fold_tree full entrypoints.root [] reachable ([], init)
 
 include Data_unparser (struct
-  type nonrec type_logger = type_logger
-
   let opened_ticket_type = opened_ticket_type
 
   let parse_packable_ty = parse_packable_ty
@@ -4889,8 +4779,8 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
                },
              ctxt ) ->
   parse_storage
+    ~elab_conf:(Script_ir_translator_config.make ~legacy ())
     ctxt
-    ~legacy
     ~allow_forged:allow_forged_in_storage
     storage_type
     ~storage
@@ -5341,26 +5231,21 @@ let list_of_big_map_ids ids =
 
 let parse_data = parse_data ~stack_depth:0
 
-let parse_comparable_data = parse_data ~legacy:false ~allow_forged:false
+let parse_comparable_data ?type_logger =
+  parse_data
+    ~elab_conf:Script_ir_translator_config.(make ~legacy:false ?type_logger ())
+    ~allow_forged:false
 
 let parse_instr :
     type a s.
-    ?type_logger:type_logger ->
+    elab_conf:elab_conf ->
     tc_context ->
     context ->
-    legacy:bool ->
     Script.node ->
     (a, s) stack_ty ->
     ((a, s) judgement * context) tzresult Lwt.t =
- fun ?type_logger tc_context ctxt ~legacy script_instr stack_ty ->
-  parse_instr
-    ~stack_depth:0
-    ?type_logger
-    tc_context
-    ctxt
-    ~legacy
-    script_instr
-    stack_ty
+ fun ~elab_conf tc_context ctxt script_instr stack_ty ->
+  parse_instr ~elab_conf ~stack_depth:0 tc_context ctxt script_instr stack_ty
 
 let unparse_data = unparse_data ~stack_depth:0
 

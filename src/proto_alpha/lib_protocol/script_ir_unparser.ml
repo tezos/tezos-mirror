@@ -448,8 +448,6 @@ let rec unparse_comparable_data :
 (* -- Unparsing data of any type -- *)
 
 module type MICHELSON_PARSER = sig
-  type type_logger
-
   val opened_ticket_type :
     Script.location ->
     'a comparable_ty ->
@@ -464,10 +462,9 @@ module type MICHELSON_PARSER = sig
     (ex_ty * context) tzresult
 
   val parse_data :
-    ?type_logger:type_logger ->
+    elab_conf:Script_ir_translator_config.elab_config ->
     stack_depth:int ->
     context ->
-    legacy:bool ->
     allow_forged:bool ->
     ('a, 'ac) ty ->
     Script.node ->
@@ -475,6 +472,8 @@ module type MICHELSON_PARSER = sig
 end
 
 module Data_unparser (P : MICHELSON_PARSER) = struct
+  open Script_tc_errors
+
   let rec unparse_data :
       type a ac.
       context ->
@@ -682,16 +681,20 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
       items
 
   and unparse_code ctxt ~stack_depth mode code =
-    let legacy = true in
+    let elab_conf = Script_ir_translator_config.make ~legacy:true () in
     Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>?= fun ctxt ->
     let non_terminal_recursion ctxt mode code =
       if Compare.Int.(stack_depth > 10_000) then
-        fail Script_tc_errors.Unparsing_too_many_recursive_calls
+        fail Unparsing_too_many_recursive_calls
       else unparse_code ctxt ~stack_depth:(stack_depth + 1) mode code
     in
     match code with
     | Prim (loc, I_PUSH, [ty; data], annot) ->
-        P.parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
+        P.parse_packable_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy:elab_conf.legacy
+          ty
         >>?= fun (Ex_ty t, ctxt) ->
         let allow_forged =
           false
@@ -701,9 +704,9 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
              as all packable values are also forgeable. *)
         in
         P.parse_data
+          ~elab_conf
           ctxt
           ~stack_depth:(stack_depth + 1)
-          ~legacy
           ~allow_forged
           t
           data
