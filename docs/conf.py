@@ -212,6 +212,28 @@ linkcheck_ignore = [
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',
 ]
+linkcheck_allowed_redirects = dict(
+    [
+        # 1. inocuous redirections (redirected with See Other / Found)
+        (
+            r'https://www\.sphinx-doc\.org/.*',
+            r'https://www\.sphinx-doc\.org/en/master/.*',
+        ),
+        (r'https://docs\.pytest\.org/', r'https://docs\.pytest\.org/en/.*'),
+        (
+            r'https://tools\.ietf\.org/html/.*',
+            r'https://datatracker\.ietf\.org/doc/.*',
+        ),
+        (r'https://ocaml\.org/.*', r'https://v2\.ocaml\.org/.*'),
+        (
+            r'https://github\.com/serokell/tezos-packaging/releases/latest',
+            r'https://github\.com/serokell/tezos-packaging/releases/tag/.*',
+        ),
+        # 2. permanent redidections, maybe fix one day
+        (r'https://bitheap\.org/cram/', r'https://github\.com/aiiie/cram'),
+    ]
+)
+
 
 # Python module index generation is broken, deactivate it.
 html_domain_indices = False
