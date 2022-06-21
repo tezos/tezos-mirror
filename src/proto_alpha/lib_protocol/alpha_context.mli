@@ -2792,22 +2792,30 @@ module Sc_rollup : sig
 
     val encoding : t Data_encoding.t
 
-    val empty : Address.t -> Raw_level.t -> t
-
     val inbox_level : t -> Raw_level.t
 
     val number_of_available_messages : t -> Z.t
 
     val consume_n_messages : int32 -> t -> t option tzresult
 
-    module Hash : S.HASH
+    type history_proof
+
+    module Hash : sig
+      include S.HASH
+
+      val of_context_hash : Context_hash.t -> t
+
+      val to_context_hash : t -> Context_hash.t
+    end
 
     module type MerkelizedOperations = sig
       type tree
 
-      type message = tree
+      type inbox_context
 
-      type messages = tree
+      val hash_level_tree : tree -> Hash.t
+
+      val new_level_tree : inbox_context -> Raw_level.t -> tree Lwt.t
 
       type history
 
@@ -2818,23 +2826,33 @@ module Sc_rollup : sig
       val history_at_genesis : bound:int64 -> history
 
       val add_messages :
+        inbox_context ->
         history ->
         t ->
         Raw_level.t ->
         Message.serialized list ->
-        messages ->
-        (messages * history * t) tzresult Lwt.t
+        tree option ->
+        (tree * history * t) tzresult Lwt.t
 
       val add_messages_no_history :
+        inbox_context ->
         t ->
         Raw_level.t ->
         Message.serialized list ->
-        messages ->
-        (messages * t, error trace) result Lwt.t
+        tree option ->
+        (tree * t) tzresult Lwt.t
 
-      val get_message : messages -> Z.t -> message option Lwt.t
+      val get_message_payload :
+        tree -> Z.t -> Sc_rollup_inbox_message_repr.serialized option Lwt.t
 
-      val get_message_payload : messages -> Z.t -> string option Lwt.t
+      val form_history_proof :
+        inbox_context ->
+        history ->
+        t ->
+        tree option ->
+        (history * history_proof) Lwt.t
+
+      val take_snapshot : t -> history_proof
 
       type inclusion_proof
 
@@ -2844,35 +2862,69 @@ module Sc_rollup : sig
 
       val number_of_proof_steps : inclusion_proof -> int
 
-      val produce_inclusion_proof : history -> t -> t -> inclusion_proof option
+      val produce_inclusion_proof :
+        history -> history_proof -> history_proof -> inclusion_proof option
 
-      val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
+      val verify_inclusion_proof :
+        inclusion_proof -> history_proof -> history_proof -> bool
+
+      type proof
+
+      val pp_proof : Format.formatter -> proof -> unit
+
+      val proof_encoding : proof Data_encoding.t
+
+      val verify_proof :
+        Raw_level.t * Z.t ->
+        history_proof ->
+        proof ->
+        Sc_rollup_PVM_sem.input option tzresult Lwt.t
+
+      val produce_proof :
+        inbox_context ->
+        history ->
+        history_proof ->
+        Raw_level.t * Z.t ->
+        (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
+
+      val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
     end
 
-    include MerkelizedOperations with type tree = Context.tree
+    include
+      MerkelizedOperations
+        with type tree = Context.tree
+         and type inbox_context = Context.t
 
-    module type TREE = sig
-      type t
+    module type P = sig
+      module Tree :
+        Context.TREE with type key = string list and type value = bytes
 
-      type tree
+      type t = Tree.t
 
-      type key = string list
+      type tree = Tree.tree
 
-      type value = bytes
+      val commit_tree : t -> string list -> tree -> unit Lwt.t
 
-      val find : tree -> key -> value option Lwt.t
+      val lookup_tree : t -> Hash.t -> tree option Lwt.t
 
-      val find_tree : tree -> key -> tree option Lwt.t
+      type proof
 
-      val add : tree -> key -> value -> tree Lwt.t
+      val proof_encoding : proof Data_encoding.t
 
-      val is_empty : tree -> bool
+      val proof_before : proof -> Hash.t
 
-      val hash : tree -> Context_hash.t
+      val verify_proof :
+        proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+      val produce_proof :
+        Tree.t ->
+        tree ->
+        (tree -> (tree * 'a) Lwt.t) ->
+        (proof * 'a) option Lwt.t
     end
 
-    module MakeHashingScheme (Tree : TREE) :
-      MerkelizedOperations with type tree = Tree.tree
+    module MakeHashingScheme (P : P) :
+      MerkelizedOperations with type tree = P.tree and type inbox_context = P.t
 
     val add_external_messages :
       context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
@@ -2886,10 +2938,6 @@ module Sc_rollup : sig
       (t * Z.t * context) tzresult Lwt.t
 
     val inbox : context -> rollup -> (t * context) tzresult Lwt.t
-
-    module Proof : sig
-      type t
-    end
   end
 
   type input = {
@@ -3180,7 +3228,7 @@ module Sc_rollup : sig
            with type proof = Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof)
 
   module Proof : sig
-    type t = {pvm_step : wrapped_proof; inbox : Inbox.Proof.t option}
+    type t = {pvm_step : wrapped_proof; inbox : Inbox.proof option}
 
     module type PVM_with_context_and_state = sig
       include PVM.S
@@ -3192,9 +3240,11 @@ module Sc_rollup : sig
 
     val produce :
       (module PVM_with_context_and_state) ->
-      Sc_rollup_inbox_repr.t ->
-      Raw_level_repr.t ->
-      (t, error) result Lwt.t
+      Inbox.inbox_context ->
+      Inbox.history ->
+      Inbox.history_proof ->
+      Raw_level.t ->
+      t tzresult Lwt.t
   end
 
   module Game : sig
@@ -3206,7 +3256,7 @@ module Sc_rollup : sig
 
     type t = {
       turn : player;
-      inbox_snapshot : Inbox.t;
+      inbox_snapshot : Inbox.history_proof;
       level : Raw_level.t;
       pvm_name : string;
       dissection : dissection_chunk list;
@@ -3249,7 +3299,7 @@ module Sc_rollup : sig
     val outcome_encoding : outcome Data_encoding.t
 
     val initial :
-      Inbox.t ->
+      Inbox.history_proof ->
       pvm_name:string ->
       parent:Commitment.t ->
       child:Commitment.t ->
@@ -3263,7 +3313,7 @@ module Sc_rollup : sig
       State_hash.t option ->
       Tick.t ->
       dissection_chunk list ->
-      (unit, error) result Lwt.t
+      (unit, reason) result Lwt.t
 
     val play : t -> refutation -> (outcome, t) Either.t Lwt.t
   end

@@ -1441,9 +1441,7 @@ module Sc_rollup_in_memory_inbox = struct
         rollup
         ctxt.back.sc_rollup_current_messages
     in
-    match messages with
-    | None -> (Tree.empty ctxt, ctxt)
-    | Some tree -> (tree, ctxt)
+    (messages, ctxt)
 
   let set_current_messages ctxt rollup tree =
     let open Tzresult_syntax in

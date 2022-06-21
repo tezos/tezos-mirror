@@ -229,7 +229,7 @@ let init_game ctxt rollup ~refuter ~defender =
       let* kind = Store.PVM_kind.get ctxt rollup in
       let game =
         Sc_rollup_game_repr.initial
-          inbox
+          (Sc_rollup_inbox_repr.take_snapshot inbox)
           ~pvm_name:(Sc_rollups.Kind.name_of kind)
           ~parent:parent_info
           ~child:child_info

@@ -168,7 +168,7 @@ module V1 : sig
   *)
   type t = {
     turn : player;
-    inbox_snapshot : Sc_rollup_inbox_repr.t;
+    inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
     level : Raw_level_repr.t;
     pvm_name : string;
     dissection : dissection_chunk list;
@@ -241,7 +241,7 @@ end
     blocked state by immediately providing a proof of a single tick
     increment from that state to its successor. *)
 val initial :
-  Sc_rollup_inbox_repr.t ->
+  Sc_rollup_inbox_repr.history_proof ->
   pvm_name:string ->
   parent:Sc_rollup_commitment_repr.t ->
   child:Sc_rollup_commitment_repr.t ->
@@ -308,7 +308,7 @@ val find_choice :
     * Sc_rollup_tick_repr.t
     * Sc_rollup_repr.State_hash.t option
     * Sc_rollup_tick_repr.t,
-    error )
+    reason )
   result
   Lwt.t
 
@@ -335,7 +335,7 @@ val check_dissection :
   Sc_rollup_repr.State_hash.t option ->
   Sc_rollup_tick_repr.t ->
   dissection_chunk list ->
-  (unit, error) result Lwt.t
+  (unit, reason) result Lwt.t
 
 (** Applies the move [refutation] to the game. Checks the move is
     valid and returns an [Invalid_move] outcome if not.

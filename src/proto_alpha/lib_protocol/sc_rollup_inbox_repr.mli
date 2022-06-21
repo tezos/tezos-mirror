@@ -132,13 +132,47 @@ module V1 : sig
 
   val encoding : t Data_encoding.t
 
-  (** [empty level] is an inbox started at some given [level] with no
-    message at all. *)
-  val empty : Sc_rollup_repr.t -> Raw_level_repr.t -> t
-
   (** [inbox_level inbox] returns the maximum level of message insertion in
     [inbox] or its initial level. *)
   val inbox_level : t -> Raw_level_repr.t
+
+  (** A [history_proof] is a [Skip_list.cell] that stores multiple
+    hashes. [Skip_list.content history_proof] gives the hash of the
+    level tree for this cell, while [Skip_list.back_pointers
+    history_proof] is an array of hashes of earlier [history_proof]s
+    in the inbox.
+
+    On the one hand, we think of this type as representing the whole
+    Merkle structure of an inbox at a given level---it is the part of
+    {!t} above that can actually be used to prove things (it cannot be
+    forged by a malicious node because it much match the hash stored by
+    the L1).
+
+    On the other hand, we think of this type as representing a single
+    proof-step back through the history of the inbox; given a hash that
+    appears at some point later in the inbox this type proves that that
+    hash points to this particular combination of a level tree and
+    further back-pointers.
+
+    In terms of size, this type is a small set of hashes; one for the
+    current level tree and `O(log2(ix))` in the back-pointers, where
+    [ix] is the index of the cell in the skip list. That is, [ix] is the
+    number of non-empty levels between now and the origination level of
+    the rollup.
+  *)
+  type history_proof
+
+  val pp_history_proof : Format.formatter -> history_proof -> unit
+
+  val history_proof_encoding : history_proof Data_encoding.t
+
+  val equal_history_proof : history_proof -> history_proof -> bool
+
+  (** [old_levels_messages inbox] returns the skip list of the inbox
+    history. How much data there actually is depends on the context---in
+    the L1 most of the history is forgotten and just a root hash of the
+    skip list is kept. *)
+  val old_levels_messages : t -> history_proof
 
   (** [number_of_available_messages inbox] returns the number of
     messages that can be consumed in [inbox]. *)
@@ -168,7 +202,19 @@ include Sc_rollup_data_version_sig.S with type t = V1.t
 
 include module type of V1 with type t = V1.t
 
-module Hash : S.HASH
+module Hash : sig
+  include S.HASH
+
+  val of_context_hash : Context_hash.t -> t
+
+  val to_context_hash : t -> Context_hash.t
+end
+
+(** This extracts the current level hash from the inbox. Note: the
+    current level hash is stored lazily as [fun () -> ...], and this
+    function will call that function. So don't use this if you want to
+    preserve the laziness. *)
+val current_level_hash : t -> Hash.t
 
 (** The following operations are subject to cross-validation between
     rollup nodes and the layer 1. *)
@@ -176,79 +222,121 @@ module type MerkelizedOperations = sig
   (** The type for the Merkle trees used in this module. *)
   type tree
 
-  (** A merkelized message. *)
-  type message = tree
+  (** The context used by the trees. *)
+  type inbox_context
 
-  (** A merkelized sequence of messages. *)
-  type messages = tree
+  (** Standard hashing function used for trees in this module. *)
+  val hash_level_tree : tree -> Hash.t
 
-  (** The history is a merkelized sequence of [messages], one per
-      level. The history is typically used by the rollup node to
-      produce inclusion proofs. The protocol only manipulates an empty
-      history as it does not remember previous messages and only keeps
-      a witness of the latest state of the history. *)
+  (** Initialise a new level. [new_level_tree ctxt level] is a merkle
+      tree with no messages yet, but has the [level] stored so we can
+      check that in proofs. *)
+  val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
+
+  (** A [history] is basically a lookup table of {!history_proof}s. We
+      need this if we want to produce inbox proofs because it allows us
+      to dereference the 'pointer' hashes in any of the
+      [history_proof]s. This [deref] function is passed to
+      [Skip_list.back_path] or [Skip_list.search] to allow these
+      functions to construct valid paths back through the skip list.
+
+      A subtlety of this [history] type is that it is customizable
+      depending on how much of the inbox history you actually want to
+      remember, using the [bound] parameter. In the L1 we use this with
+      [bound] set to zero, which makes it immediately forget an old
+      level as soon as we move to the next. By contrast, the rollup node
+      uses a history that is sufficiently large to be able to take part
+      in all potential refutation games occurring during the challenge
+      period.  *)
   type history
 
   val history_encoding : history Data_encoding.t
 
   val pp_history : Format.formatter -> history -> unit
 
-  (** The beginning of the history is an empty sequence of [messages].
-      Fail with {!Invalid_bound_on_history} if [bound] is not strictly
-      positive. *)
+  (** Construct an empty initial [history] with a given [bound]. If you
+      are running a rollup node, [bound] needs to be large enough to
+      remember any levels for which you may need to produce proofs. *)
   val history_at_genesis : bound:int64 -> history
 
-  (** [add_messages history inbox level payloads messages] inserts a list of
-      [payloads] as new messages in the [messages] of the current [level] of the
-      [inbox]. This function returns the new sequence of messages as well as
-      updated [inbox] and [history].
+  (** [add_messages ctxt history inbox level payloads level_tree] inserts
+      a list of [payloads] as new messages in the [level_tree] of the
+      current [level] of the [inbox]. This function returns the new level
+      tree as well as updated [inbox] and [history].
 
-      If the [inbox]'s level is older than [level], the [inbox] is updated
-      so that the messages of the levels older than [level] are archived.
-      To archive a sequence of [messages] for a given [level], we push
-      it at the end of the [history] and update the witness of this
-      history in the [inbox]. The [inbox]'s messages for the current
-      level are also emptied to insert the [payloads] in a fresh sequence
-      of [messages] for [level].
+      If the [inbox]'s level is older than [level], the [inbox] is
+      updated so that the level trees of the levels older than [level]
+      are archived.  To archive a [level_tree] for a given [level], we
+      push it at the end of the [history] and update the witness of this
+      history in the [inbox]. The [inbox]'s level tree for the current
+      level is emptied to insert the [payloads] in a fresh [level_tree]
+      for [level].
 
       This function fails if [level] is older than [inbox]'s [level].
   *)
   val add_messages :
+    inbox_context ->
     history ->
     t ->
     Raw_level_repr.t ->
     Sc_rollup_inbox_message_repr.serialized list ->
-    messages ->
-    (messages * history * t) tzresult Lwt.t
+    tree option ->
+    (tree * history * t) tzresult Lwt.t
 
-  (** [add_messages_no_history inbox level payloads messages] behaves as
-      {!add_messages} except that it does not remember the inbox history. *)
+  (** [add_messages_no_history ctxt inbox level payloads level_tree] behaves
+      as {!add_external_messages} except that it does not remember the inbox
+      history. *)
   val add_messages_no_history :
+    inbox_context ->
     t ->
     Raw_level_repr.t ->
     Sc_rollup_inbox_message_repr.serialized list ->
-    messages ->
-    (messages * t, error trace) result Lwt.t
+    tree option ->
+    (tree * t, error trace) result Lwt.t
 
-  (** [get_message messages idx] returns [Some message] if the
-      sequence of [messages] has a more than [idx] messages and
-      [message] is at position [idx] in this sequence.
-      Returns [None] otherwise. *)
-  val get_message : messages -> Z.t -> message option Lwt.t
+  (** [get_message_payload level_tree idx] returns [Some payload] if the
+      [level_tree] has more than [idx] messages, and [payload] is at
+      position [idx]. Returns [None] otherwise. *)
+  val get_message_payload :
+    tree -> Z.t -> Sc_rollup_inbox_message_repr.serialized option Lwt.t
 
-  (** [get_message_payload messages idx] returns [Some payload] if the
-      sequence of [messages] has a more than [idx] messages,
-      [message] is at position [idx] in this sequence, and is defined
-      by [payload]. Returns [None] otherwise. *)
-  val get_message_payload : messages -> Z.t -> string option Lwt.t
+  (** [form_history_proof ctxt history inbox level_tree] creates the
+      skip list structure that includes the current inbox level, while
+      also updating the [history] and making sure the [level_tree] has
+      been committed to the [ctxt].
+
+      This is used in [archive_if_needed] to produce the
+      [old_levels_messages] value for the next level of the inbox. It is
+      also needed if you want to produce a fully-up-to-date skip list
+      for proof production. Just taking the skip list stored in the
+      inbox at [old_levels_messages] will not include the current level
+      (and that current level could be quite far back in terms of blocks
+      if the inbox hasn't been added to for a while). *)
+  val form_history_proof :
+    inbox_context ->
+    history ->
+    t ->
+    tree option ->
+    (history * history_proof) Lwt.t
+
+  (** This is similar to {!form_history_proof} except that it is just to
+      be used on the protocol side because it doesn't ensure the history
+      is remembered or the trees are committed in the context. Used at
+      the beginning of a refutation game to create the snapshot against
+      which proofs in that game must be valid.
+
+      This will however produce a [history_proof] with exactly the same
+      hash as the one produced by [form_history_proof], run on a node
+      with a complete [inbox_context]. *)
+  val take_snapshot : t -> history_proof
 
   (** Given a inbox [A] at some level [L] and another inbox [B] at
       some level [L' >= L], an [inclusion_proof] guarantees that [A] is
       an older version of [B].
 
       To be more precise, an [inclusion_proof] guarantees that the
-      previous levels messages of [A] are included in the previous
-      levels messages of [B]. The current messages of [A] and [B]
+      previous levels [level_tree]s of [A] are included in the previous
+      levels [level_tree]s of [B]. The current [level_tree] of [A] and [B]
       are not considered.
 
       The size of this proof is O(log_basis (L' - L)). *)
@@ -261,35 +349,90 @@ module type MerkelizedOperations = sig
   (** [number_of_proof_steps proof] returns the length of [proof]. *)
   val number_of_proof_steps : inclusion_proof -> int
 
-  (** [produce_inclusion_proof history inboxA inboxB] exploits
-      [history] to produce a self-contained proof that [inboxA] is an
-      older version of [inboxB]. *)
-  val produce_inclusion_proof : history -> t -> t -> inclusion_proof option
+  (** [produce_inclusion_proof history a b] exploits [history] to produce 
+      a self-contained proof that [a] is an older version of [b]. *)
+  val produce_inclusion_proof :
+    history -> history_proof -> history_proof -> inclusion_proof option
 
-  (** [verify_inclusion_proof proof inboxA inboxA] returns [true] iff
-      [proof] is a minimal and valid proof that [inboxA] is included in
-      [inboxB]. *)
-  val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
+  (** [verify_inclusion_proof proof a b] returns [true] iff [proof] is a
+      minimal and valid proof that [a] is included in [b]. *)
+  val verify_inclusion_proof :
+    inclusion_proof -> history_proof -> history_proof -> bool
+
+  (** An inbox proof has three parameters:
+
+      - the [starting_point], of type [Raw_level_repr.t * Z.t], specifying
+        a location in the inbox ;
+
+      - the [message], of type [Sc_rollup_PVM_sem.input option] ;
+
+      - and a reference [snapshot] inbox.
+
+      A valid inbox proof implies the following semantics: beginning at
+      [starting_point] and reading forward through [snapshot], the first
+      message you reach will be [message].
+
+      Usually this is fairly simple because there will actually be a
+      message at the location specified by [starting_point]. But in some
+      cases [starting_point] is past the last message within a level,
+      and then the inbox proof must prove that and also provide another
+      proof about the message at the beginning of the next non-empty
+      level. *)
+  type proof
+
+  val pp_proof : Format.formatter -> proof -> unit
+
+  val proof_encoding : proof Data_encoding.t
+
+  (** See the docstring for the [proof] type for details of proof semantics.
+
+      [verify_proof starting_point inbox proof] will return the third
+      parameter of the proof, [message], iff the proof is valid. *)
+  val verify_proof :
+    Raw_level_repr.t * Z.t ->
+    history_proof ->
+    proof ->
+    Sc_rollup_PVM_sem.input option tzresult Lwt.t
+
+  (** [produce_proof ctxt history inbox (level, counter)] creates an
+      inbox proof proving the first message after the index [counter] at
+      location [level]. This will fail if the [ctxt] given doesn't have
+      sufficient data (it needs to be run on an [inbox_context] with the
+      full history). *)
+  val produce_proof :
+    inbox_context ->
+    history ->
+    history_proof ->
+    Raw_level_repr.t * Z.t ->
+    (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
+
+  (** [empty ctxt level] is an inbox started at some given [level] with no
+      message at all. *)
+  val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level_repr.t -> t Lwt.t
 end
 
-module type TREE = sig
-  type t
+module type P = sig
+  module Tree : Context.TREE with type key = string list and type value = bytes
 
-  type tree
+  type tree = Tree.tree
 
-  type key = string list
+  type t = Tree.t
 
-  type value = bytes
+  val commit_tree : t -> string list -> tree -> unit Lwt.t
 
-  val find : tree -> key -> value option Lwt.t
+  val lookup_tree : t -> Hash.t -> tree option Lwt.t
 
-  val find_tree : tree -> key -> tree option Lwt.t
+  type proof
 
-  val add : tree -> key -> value -> tree Lwt.t
+  val proof_encoding : proof Data_encoding.t
 
-  val is_empty : tree -> bool
+  val proof_before : proof -> Hash.t
 
-  val hash : tree -> Context_hash.t
+  val verify_proof :
+    proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+  val produce_proof :
+    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
 end
 
 (**
@@ -305,71 +448,12 @@ end
    implementation of the {!MerkelizedOperations}.
 
 *)
-module MakeHashingScheme (Tree : TREE) :
-  MerkelizedOperations with type tree = Tree.tree
+module MakeHashingScheme (P : P) :
+  MerkelizedOperations with type tree = P.tree and type inbox_context = P.t
 
-include MerkelizedOperations with type tree = Context.tree
+include
+  MerkelizedOperations
+    with type tree = Context.tree
+     and type inbox_context = Context.t
 
 type inbox = t
-
-(** The [Proof] module wraps the more specific proof types provided
-    earlier in this file into the inbox proof as it is required by a
-    refutation. *)
-module Proof : sig
-  type starting_point = {inbox_level : Raw_level_repr.t; message_counter : Z.t}
-
-  (** An inbox proof has three parameters:
-
-      - the {!starting_point} specifying a location in the inbox ;
-
-      - the [message], of type [Sc_rollup_PVM_sem.input option] ;
-
-      - and a reference [inbox].
-
-      A valid inbox proof implies the following semantics: beginning at
-      [starting_point] and reading forward through [inbox], the first
-      message you reach will be [message].
-
-      Usually this is very simple because there will actually be a
-      message at the location specified by [starting_point]. But in some
-      cases [starting_point] is past the last message within a level,
-      and then the inbox proof must prove that and also provide another
-      proof starting at the beginning of the next level. This can in
-      theory happen across multiple levels if they are empty, which is
-      why we need a list [skips] of sub-inboxes.
-
-      TODO #2997: an issue to fix the problem of unbounded inbox proofs
-      if the list below can be arbitrarily long (if there are many
-      consecutive empty levels). *)
-  type t = {
-    skips : (inbox * inclusion_proof) list;
-    level : inbox;
-    inc : inclusion_proof;
-    message_proof : Context.Proof.tree Context.Proof.t;
-  }
-
-  val pp : Format.formatter -> t -> unit
-
-  val encoding : t Data_encoding.t
-
-  (** See the docstring for {t} for details of proof semantics.
-
-      [valid starting_point inbox proof] will return the third parameter
-      of the proof, [message], iff the proof is valid. *)
-  val valid :
-    starting_point ->
-    inbox ->
-    t ->
-    (Sc_rollup_PVM_sem.input option, error) result Lwt.t
-
-  (** TODO #2997 Currently a placeholder, needs implementation.
-
-      [produce_proof inbox (level, counter)] creates an inbox proof
-      proving the first message after the index [counter] at location
-      [level]. This will fail if the inbox given doesn't have sufficient
-      data (it needs to be run on an inbox with the full history). *)
-  val produce_proof :
-    inbox ->
-    Raw_level_repr.t * Z.t ->
-    (t * Sc_rollup_PVM_sem.input option, error) result Lwt.t
-end

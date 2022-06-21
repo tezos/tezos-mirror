@@ -44,9 +44,6 @@ open Lib_test.Qcheck2_helpers
 
 *)
 
-let zero_level =
-  Raw_level.of_int32 0l |> function Ok x -> x | _ -> assert false
-
 let hash_state state number =
   Digest.bytes @@ Bytes.of_string @@ state ^ string_of_int number
 
@@ -538,7 +535,9 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
               (fun tick ->
                 let hash =
                   Lwt_main.run
-                  @@ let* state, _ = state_at tick start_state start_tick in
+                  @@ let* state, (_ : Tick.t) =
+                       state_at tick start_state start_tick
+                     in
                      match state with
                      | None -> return None
                      | Some s ->
@@ -570,8 +569,12 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     | Game.Alice -> if alice_is_refuter then Defender_wins else Refuter_wins
 
   let run ~inbox ~refuter_client ~defender_client =
-    let refuter, _, _ = Signature.generate_key () in
-    let defender, _, _ = Signature.generate_key () in
+    let refuter, (_ : public_key), (_ : Signature.secret_key) =
+      Signature.generate_key ()
+    in
+    let defender, (_ : public_key), (_ : Signature.secret_key) =
+      Signature.generate_key ()
+    in
     let alice_is_refuter = Staker.(refuter < defender) in
     let* start_hash = PVM.state_hash PVM.Utils.default_state in
     let* initial_data = defender_client.initial in
@@ -615,7 +618,9 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
    evaluation.
   *)
   let conflicting_section tick state =
-    let* new_state, _ = state_at tick PVM.Utils.default_state Tick.initial in
+    let* new_state, (_ : Tick.t) =
+      state_at tick PVM.Utils.default_state Tick.initial
+    in
     let* new_hash =
       match new_state with
       | None -> return None
@@ -644,7 +649,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
       | Some Game.{state_hash = Some s; tick = t} -> (s, t)
       | _ -> assert false
     in
-    let _, stop =
+    let (_ : State_hash.t option), stop =
       match List.nth d (x + 1) with
       | Some Game.{state_hash; tick} -> (state_hash, tick)
       | None -> assert false
@@ -710,7 +715,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
 
     match conflict with
     | Some ((_, start_tick), (_, next_tick)) ->
-        let* start_state, _ =
+        let* start_state, (_ : Tick.t) =
           state_at start_tick PVM.Utils.default_state Tick.initial
         in
         let* next_dissection =
@@ -718,7 +723,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
           | None -> return None
           | Some s -> dissection_of_section start_tick s next_tick
         in
-        let* stop_state, _ =
+        let* stop_state, (_ : Tick.t) =
           match start_state with
           | None -> return (None, next_tick)
           | Some s -> state_at next_tick s start_tick
@@ -823,7 +828,8 @@ let perfect_random (module P : TestPVM) inbox =
 
 (** This assembles a test from a RandomPVM and a function that chooses the
     type of strategies. *)
-let testing_randomPVM (f : (module TestPVM) -> Inbox.t -> bool Lwt.t) name =
+let testing_randomPVM
+    (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t) name =
   let open QCheck2 in
   Test.make
     ~name
@@ -831,32 +837,38 @@ let testing_randomPVM (f : (module TestPVM) -> Inbox.t -> bool Lwt.t) name =
     (fun initial_prog ->
       assume (initial_prog <> []) ;
       let rollup = Address.hash_string [""] in
-      let level = zero_level in
-      let inbox = Inbox.empty rollup level in
+      let level = Raw_level.root in
+      let context = Tezos_protocol_environment.Memory_context.empty in
       Lwt_main.run
-      @@ f
+      @@ let* inbox = Inbox.empty context rollup level in
+         let snapshot = Inbox.take_snapshot inbox in
+         f
            (module MakeRandomPVM (struct
              let initial_prog = initial_prog
            end))
-           inbox)
+           snapshot)
 
 (** This assembles a test from a CountingPVM and a function that
    chooses the type of strategies *)
-let testing_countPVM (f : (module TestPVM) -> Inbox.t -> bool Lwt.t) name =
+let testing_countPVM (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t)
+    name =
   let open QCheck2 in
   Test.make ~name Gen.small_int (fun target ->
       assume (target > 200) ;
       let rollup = Address.hash_string [""] in
-      let level = zero_level in
-      let inbox = Inbox.empty rollup level in
+      let level = Raw_level.root in
+      let context = Tezos_protocol_environment.Memory_context.empty in
       Lwt_main.run
-      @@ f
+      @@ let* inbox = Inbox.empty context rollup level in
+         let snapshot = Inbox.take_snapshot inbox in
+         f
            (module MakeCountingPVM (struct
              let target = target
            end))
-           inbox)
+           snapshot)
 
-let testing_arith (f : (module TestPVM) -> Inbox.t -> bool Lwt.t) name =
+let testing_arith (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t)
+    name =
   let open QCheck2 in
   Test.make
     ~name
@@ -864,16 +876,18 @@ let testing_arith (f : (module TestPVM) -> Inbox.t -> bool Lwt.t) name =
     (fun (inputs, evals) ->
       assume (evals > 1 && evals < List.length inputs - 1) ;
       let rollup = Address.hash_string [""] in
-      let level = zero_level in
-      let inbox = Inbox.empty rollup level in
+      let level = Raw_level.root in
+      let context = Tezos_protocol_environment.Memory_context.empty in
       Lwt_main.run
-      @@ f
+      @@ let* inbox = Inbox.empty context rollup level in
+         let snapshot = Inbox.take_snapshot inbox in
+         f
            (module TestArith (struct
              let inputs = String.concat " " inputs
 
              let evals = evals
            end))
-           inbox)
+           snapshot)
 
 let test_random_dissection (module P : TestPVM) start_at length =
   let open P in

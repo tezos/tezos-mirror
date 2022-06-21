@@ -110,9 +110,9 @@ end) : S = struct
        also ask the client to provide the index of the cell to be
        built, which can be error-prone.
 
-     - The back pointers of a node are chosen from the back pointers of
-       its predecessor (except for the genesis node) and a pointer to this
-       predecessor. This locality makes the insertion of new nodes very
+     - The back pointers of a cell are chosen from the back pointers of
+       its predecessor (except for the genesis cell) and a pointer to this
+       predecessor. This locality makes the insertion of new cell very
        efficient in practice.
 
   *)
@@ -282,7 +282,11 @@ end) : S = struct
         equal_ptr first_cell_ptr cell_ptr && valid_path cell_index cell_ptr path
 
   let search ~deref ~compare ~cell_ptr =
-    let ( let*? ) x f = match x with None -> Lwt.return None | Some y -> f y in
+    (* TODO: #3321 replace with Lwt_option_syntax when that's in the
+       environment V6 *)
+    let ( let*? ) x f =
+      match x with None -> Lwt.return None | Some y -> f y
+    in
     let ( let*! ) = Lwt.bind in
     let rec aux path ptr ix =
       let*? cell = deref ptr in
@@ -290,12 +294,12 @@ end) : S = struct
       let*? candidate_cell = deref candidate_ptr in
       let*! comparison = compare candidate_cell.content in
       if Compare.Int.(comparison = 0) then
-        (* In this case, we have reached our target node. *)
+        (* In this case, we have reached our target cell. *)
         Option.some_s (List.rev (candidate_ptr :: ptr :: path))
       else if Compare.Int.(comparison < 0) then
         if Compare.Int.(ix = 0) then
           (* If the first back pointer is 'too far' ([comparison < 0]),
-             that means we won't find a valid target node. *)
+             that means we won't find a valid target cell. *)
           Option.none_s
         else
           (* If a back pointer other than the first is 'too far'
@@ -305,7 +309,7 @@ end) : S = struct
       else if Compare.Int.(ix + 1 >= FallbackArray.length cell.back_pointers)
       then
         (* If we reach the final back pointer and still have
-           [comparison > 0], we should continue from that node. *)
+           [comparison > 0], we should continue from that cell. *)
         aux (ptr :: path) candidate_ptr 0
       else
         (* Final case, we just try the next back pointer. *)
@@ -313,7 +317,7 @@ end) : S = struct
     in
     let*? cell = deref cell_ptr in
     let*! comparison = compare cell.content in
-    (* We must check that we aren't already at the target node before
+    (* We must check that we aren't already at the target cell before
        starting the recursion. *)
     if Compare.Int.(comparison = 0) then Option.some_s [cell_ptr]
     else aux [] cell_ptr 0

@@ -118,9 +118,9 @@ module type S = sig
     'ptr list ->
     bool
 
-  (** [search ~deref ~compare ~cell_ptr] is similar to [back_path] except
+  (** [search ~deref ~compare ~cell_ptr] is similar to {!back_path} except
       that it will search through the skip list to find a cell at which
-      [compare content] is zero. This will only work is [compare] is a
+      [compare content] is zero. This will only work if [compare] is a
       function that returns a negative integer for cells before the
       target and a positive integer for cells after the target.
 

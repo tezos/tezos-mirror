@@ -59,7 +59,7 @@ open Sc_rollup_repr
     match up with [pvm_step] to give a valid refutation proof. *)
 type t = {
   pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.Proof.t option;
+  inbox : Sc_rollup_inbox_repr.proof option;
 }
 
 val encoding : t Data_encoding.t
@@ -90,11 +90,11 @@ val stop : t -> State_hash.t option
       - the [pvm_name], used to check that the proof given has the right
       PVM kind. *)
 val valid :
-  Sc_rollup_inbox_repr.t ->
+  Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   pvm_name:string ->
   t ->
-  (bool, error) result Lwt.t
+  bool tzresult Lwt.t
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S
@@ -104,22 +104,25 @@ module type PVM_with_context_and_state = sig
   val state : state
 end
 
-(** [produce pvm_and_state inbox commit_level] will construct a full
-    refutation game proof out of the [state] given in [pvm_and_state].
-    It uses the [inbox] if necessary to provide input in the proof. If
-    the input is above or at [commit_level] it will block it, and
-    produce a proof that the PVM is blocked.
+(** [produce pvm_and_state inbox_context inbox_history commit_level]
+    will construct a full refutation game proof out of the [state] given
+    in [pvm_and_state].  It uses the [inbox] if necessary to provide
+    input in the proof. If the input is above or at [commit_level] it
+    will block it, and produce a proof that the PVM is blocked.
 
-    This will fail if the [context] given doesn't have enough of the
-    [state] to make the proof. For example, the 'protocol
-    implementation' version of each PVM won't be able to run this
-    function.
+    This will fail if any of the [context], [inbox_context] or
+    [inbox_history] given don't have enough data to make the proof. For
+    example, the 'protocol implementation' version of each PVM won't be
+    able to run this function. Similarly, the version of the inbox
+    stored in the L1 won't be enough because it forgets old levels.
 
     This uses the [name] in the [pvm_and_state] module to produce an
     encodable [wrapped_proof] if possible. See the [wrap_proof] function
     in [Sc_rollups]. *)
 val produce :
   (module PVM_with_context_and_state) ->
-  Sc_rollup_inbox_repr.t ->
+  Sc_rollup_inbox_repr.inbox_context ->
+  Sc_rollup_inbox_repr.history ->
+  Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
-  (t, error) result Lwt.t
+  t tzresult Lwt.t

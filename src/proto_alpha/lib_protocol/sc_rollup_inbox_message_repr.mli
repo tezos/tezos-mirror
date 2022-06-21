@@ -63,10 +63,12 @@ type t = Internal of internal_inbox_message | External of string
 
 type serialized = private string
 
-val unsafe_of_string : string -> serialized
-
 (** [serialize msg] encodes the inbox message [msg] in binary format. *)
 val serialize : t -> serialized tzresult
 
 (** [deserialize bs] decodes [bs] as an inbox_message [t]. *)
 val deserialize : serialized -> t tzresult
+
+val unsafe_of_string : string -> serialized
+
+val unsafe_to_string : serialized -> string

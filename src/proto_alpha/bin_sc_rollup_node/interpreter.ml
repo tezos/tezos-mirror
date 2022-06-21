@@ -87,27 +87,39 @@ module Make (PVM : Pvm.S) : S = struct
     in
 
     (* Obtain inbox and its messages for this block. *)
-    let*! inbox = Store.Inboxes.get store hash in
-    let inbox_level = Inbox.inbox_level inbox in
-    let*! messages = Store.Messages.get store hash in
+    let*! inbox_opt = Store.Inboxes.find store hash in
 
     (* Iterate the PVM state with all the messages for this level. *)
-    let* state =
-      List.fold_left_i_es
-        (fun message_counter state external_message ->
-          let message = Sc_rollup.Inbox.Message.External external_message in
-          let*? payload =
-            Environment.wrap_tzresult
-              (Sc_rollup.Inbox.Message.serialize message)
+    let* state, messages =
+      match inbox_opt with
+      | Some inbox ->
+          let inbox_level = Inbox.inbox_level inbox in
+          let*! messages = Store.Messages.get store hash in
+          let* state =
+            List.fold_left_i_es
+              (fun message_counter state external_message ->
+                let message =
+                  Sc_rollup.Inbox.Message.External external_message
+                in
+                let*? payload =
+                  Environment.wrap_tzresult
+                    (Sc_rollup.Inbox.Message.serialize message)
+                in
+                let input =
+                  Sc_rollup.
+                    {
+                      inbox_level;
+                      message_counter = Z.of_int message_counter;
+                      payload;
+                    }
+                in
+                let*! state = feed_input state input in
+                return state)
+              predecessor_state
+              messages
           in
-          let input =
-            Sc_rollup.
-              {inbox_level; message_counter = Z.of_int message_counter; payload}
-          in
-          let*! state = feed_input state input in
-          return state)
-        predecessor_state
-        messages
+          return (state, messages)
+      | None -> return (predecessor_state, [])
     in
 
     (* Write final state to store. *)

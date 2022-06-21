@@ -36,7 +36,7 @@ type dissection_chunk = {
 module V1 = struct
   type t = {
     turn : player;
-    inbox_snapshot : Sc_rollup_inbox_repr.t;
+    inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
     level : Raw_level_repr.t;
     pvm_name : string;
     dissection : dissection_chunk list;
@@ -87,7 +87,7 @@ module V1 = struct
         dissection = dissection2;
       } =
     player_equal turn1 turn2
-    && Sc_rollup_inbox_repr.equal inbox_snapshot1 inbox_snapshot2
+    && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot1 inbox_snapshot2
     && Raw_level_repr.equal level1 level2
     && String.equal pvm_name1 pvm_name2
     && List.equal dissection_chunk_equal dissection1 dissection2
@@ -117,7 +117,7 @@ module V1 = struct
         {turn; inbox_snapshot; level; pvm_name; dissection})
       (obj5
          (req "turn" player_encoding)
-         (req "inbox_snapshot" Sc_rollup_inbox_repr.encoding)
+         (req "inbox_snapshot" Sc_rollup_inbox_repr.history_proof_encoding)
          (req "level" Raw_level_repr.encoding)
          (req "pvm_name" string)
          (req "dissection" dissection_encoding))
@@ -144,7 +144,7 @@ module V1 = struct
       game.dissection
       pp_player
       game.turn
-      Sc_rollup_inbox_repr.pp
+      Sc_rollup_inbox_repr.pp_history_proof
       game.inbox_snapshot
       Raw_level_repr.pp
       game.level
@@ -392,11 +392,9 @@ let outcome_encoding =
     (fun (loser, reason) -> {loser; reason})
     (obj2 (req "loser" player_encoding) (req "reason" reason_encoding))
 
-type error += Game_error of string
-
-let game_error reason =
+let invalid_move reason =
   let open Lwt_result_syntax in
-  fail (Game_error reason)
+  fail (Invalid_move reason)
 
 let find_choice game tick =
   let open Lwt_result_syntax in
@@ -408,31 +406,31 @@ let find_choice game tick =
         if Sc_rollup_tick_repr.(tick = state_tick) then
           return (state, tick, next_state, next_tick)
         else traverse (next :: others)
-    | _ -> game_error "This choice was not proposed"
+    | _ -> invalid_move "This choice was not proposed"
   in
   traverse game.dissection
 
 let check pred reason =
   let open Lwt_result_syntax in
-  if pred then return () else game_error reason
+  if pred then return () else invalid_move reason
 
 let check_dissection start start_tick stop stop_tick dissection =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let len = Z.of_int @@ List.length dissection in
   let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
   let should_be_equal_to what =
     Format.asprintf "The number of sections must be equal to %a" Z.pp_print what
   in
-  let* _ =
+  let* () =
     if Z.(geq dist (of_int 32)) then
       check Z.(equal len (of_int 32)) (should_be_equal_to (Z.of_int 32))
     else if Z.(gt dist one) then
       check Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
     else
-      game_error
+      invalid_move
         (Format.asprintf "Cannot have a dissection of only one section")
   in
-  let* _ =
+  let* () =
     match (List.hd dissection, List.last_opt dissection) with
     | Some {state_hash = a; tick = a_tick}, Some {state_hash = b; tick = b_tick}
       ->
@@ -472,21 +470,21 @@ let check_dissection start start_tick stop stop_tick dissection =
                b_tick
                pp
                stop_tick))
-    | _ -> game_error "Dissection should contain at least 2 elements"
+    | _ -> invalid_move "Dissection should contain at least 2 elements"
   in
   let rec traverse states =
     match states with
     | {state_hash = None; _} :: {state_hash = Some _; _} :: _ ->
-        game_error "Cannot return to a Some state after being at a None state"
+        invalid_move "Cannot return to a Some state after being at a None state"
     | {tick; _} :: ({tick = next_tick; state_hash = _} as next) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           let incr = Sc_rollup_tick_repr.distance tick next_tick in
           if Z.(leq incr (div dist (of_int 2))) then traverse (next :: others)
           else
-            game_error
+            invalid_move
               "Maximum tick increment in dissection must be less than half \
                total dissection length"
-        else game_error "Ticks should only increase in dissection"
+        else invalid_move "Ticks should only increase in dissection"
     | _ -> return ()
   in
   traverse dissection
@@ -503,10 +501,10 @@ let check_dissection start start_tick stop stop_tick dissection =
 let check_proof_start_stop start start_tick stop stop_tick proof =
   let open Lwt_result_syntax in
   let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
-  let* _ = check Z.(equal dist one) "dist should be equal to 1" in
+  let* () = check Z.(equal dist one) "dist should be equal to 1" in
   let start_proof = Sc_rollup_proof_repr.start proof in
   let stop_proof = Sc_rollup_proof_repr.stop proof in
-  let* _ =
+  let* () =
     check
       (Option.equal State_hash.equal start (Some start_proof))
       (match start with
@@ -540,7 +538,7 @@ let play game refutation =
     in
     match refutation.step with
     | Dissection states ->
-        let* _ = check_dissection start start_tick stop stop_tick states in
+        let* () = check_dissection start start_tick stop stop_tick states in
         return
           (Either.Right
              {
@@ -551,19 +549,23 @@ let play game refutation =
                dissection = states;
              })
     | Proof proof ->
-        let* _ = check_proof_start_stop start start_tick stop stop_tick proof in
+        let* () =
+          check_proof_start_stop start start_tick stop stop_tick proof
+        in
         let {inbox_snapshot; level; pvm_name; _} = game in
-        let* proof_valid =
+        let*! (proof_valid_tzresult : bool tzresult) =
           Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof
         in
-        let* _ = check proof_valid "Invalid proof" in
+        let* () =
+          match proof_valid_tzresult with
+          | Ok true -> return ()
+          | Ok false -> invalid_move "Invalid proof: no detail given"
+          | Error e ->
+              invalid_move (Format.asprintf "Invalid proof: %a" pp_trace e)
+        in
         return
           (Either.Left {loser = opponent game.turn; reason = Conflict_resolved})
   in
-  let game_over reason =
-    Either.Left {loser = game.turn; reason = Invalid_move reason}
-  in
   match result with
   | Ok x -> Lwt.return x
-  | Error (Game_error e) -> Lwt.return @@ game_over e
-  | Error _ -> Lwt.return @@ game_over "undefined"
+  | Error reason -> Lwt.return @@ Either.Left {loser = game.turn; reason}

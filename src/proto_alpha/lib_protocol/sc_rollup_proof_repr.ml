@@ -26,7 +26,7 @@
 
 type t = {
   pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.Proof.t option;
+  inbox : Sc_rollup_inbox_repr.proof option;
 }
 
 let encoding =
@@ -36,7 +36,7 @@ let encoding =
     (fun (pvm_step, inbox) -> {pvm_step; inbox})
     (obj2
        (req "pvm_step" Sc_rollups.wrapped_proof_encoding)
-       (req "inbox" (option Sc_rollup_inbox_repr.Proof.encoding)))
+       (req "inbox" (option Sc_rollup_inbox_repr.proof_encoding)))
 
 let pp ppf _ = Format.fprintf ppf "Refutation game proof"
 
@@ -62,16 +62,16 @@ let cut_at_level level input =
 type error += Sc_rollup_proof_check of string
 
 let proof_error reason =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   fail (Sc_rollup_proof_check reason)
 
 let check p reason =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   if p then return () else proof_error reason
 
 let valid snapshot commit_level ~pvm_name proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let input_requested = P.proof_input_requested P.proof in
   let input_given = P.proof_input_given P.proof in
@@ -79,13 +79,13 @@ let valid snapshot commit_level ~pvm_name proof =
     match (input_requested, proof.inbox) with
     | Sc_rollup_PVM_sem.No_input_required, None -> return None
     | Sc_rollup_PVM_sem.Initial, Some inbox_proof ->
-        Sc_rollup_inbox_repr.Proof.valid
-          {inbox_level = Raw_level_repr.root; message_counter = Z.zero}
+        Sc_rollup_inbox_repr.verify_proof
+          (Raw_level_repr.root, Z.zero)
           snapshot
           inbox_proof
     | Sc_rollup_PVM_sem.First_after (level, counter), Some inbox_proof ->
-        Sc_rollup_inbox_repr.Proof.valid
-          {inbox_level = level; message_counter = Z.succ counter}
+        Sc_rollup_inbox_repr.verify_proof
+          (level, Z.succ counter)
           snapshot
           inbox_proof
     | _ ->
@@ -94,10 +94,10 @@ let valid snapshot commit_level ~pvm_name proof =
              "input_requested is %a, inbox proof is %a"
              Sc_rollup_PVM_sem.pp_input_request
              input_requested
-             (Format.pp_print_option Sc_rollup_inbox_repr.Proof.pp)
+             (Format.pp_print_option Sc_rollup_inbox_repr.pp_proof)
              proof.inbox)
   in
-  let* _ =
+  let* () =
     check
       (Option.equal
          Sc_rollup_PVM_sem.input_equal
@@ -115,8 +115,13 @@ module type PVM_with_context_and_state = sig
   val state : state
 end
 
-let produce pvm_and_state inbox commit_level =
-  let open Lwt_result_syntax in
+let of_lwt_result result =
+  let open Lwt_tzresult_syntax in
+  let*! r = result in
+  match r with Ok x -> return x | Error e -> fail e
+
+let produce pvm_and_state inbox_context inbox_history inbox commit_level =
+  let open Lwt_tzresult_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
   let*! request = P.is_input_state P.state in
   let* inbox, input_given =
@@ -124,17 +129,27 @@ let produce pvm_and_state inbox commit_level =
     | Sc_rollup_PVM_sem.No_input_required -> return (None, None)
     | Sc_rollup_PVM_sem.Initial ->
         let* p, i =
-          Sc_rollup_inbox_repr.Proof.produce_proof
+          Sc_rollup_inbox_repr.produce_proof
+            inbox_context
+            inbox_history
             inbox
             (Raw_level_repr.root, Z.zero)
         in
         return (Some p, i)
     | Sc_rollup_PVM_sem.First_after (l, n) ->
-        let* p, i = Sc_rollup_inbox_repr.Proof.produce_proof inbox (l, n) in
+        let* p, i =
+          Sc_rollup_inbox_repr.produce_proof
+            inbox_context
+            inbox_history
+            inbox
+            (l, n)
+        in
         return (Some p, i)
   in
   let input_given = Option.bind input_given (cut_at_level commit_level) in
-  let* pvm_step_proof = P.produce_proof P.context input_given P.state in
+  let* pvm_step_proof =
+    of_lwt_result (P.produce_proof P.context input_given P.state)
+  in
   let module P_with_proof = struct
     include P
 

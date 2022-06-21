@@ -2358,7 +2358,12 @@ let test_carbonated_memory_inbox_set_messages () =
   let* current_messages, _ =
     lift
     @@ Sc_rollup_inbox_repr.(
-         add_messages_no_history inbox level messages_to_add current_messages)
+         add_messages_no_history
+           (Raw_context.recover ctxt)
+           inbox
+           level
+           messages_to_add
+           current_messages)
   in
   let*? ctxt' =
     Environment.wrap_tzresult
