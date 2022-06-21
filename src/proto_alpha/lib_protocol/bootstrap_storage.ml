@@ -23,6 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Unrevealed_public_key of Signature.Public_key_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"bootstrap.unrevealed_public_key"
+    ~title:"Forbidden delegation from unrevealed public key"
+    ~description:"Tried to delegate from an unrevealed public key"
+    ~pp:(fun ppf delegate ->
+      Format.fprintf
+        ppf
+        "Delegation from an unrevealed public key (for %a) is forbidden."
+        Signature.Public_key_hash.pp
+        delegate)
+    Data_encoding.(obj1 (req "delegator" Signature.Public_key_hash.encoding))
+    (function Unrevealed_public_key pkh -> Some pkh | _ -> None)
+    (fun pkh -> Unrevealed_public_key pkh)
+
 let init_account (ctxt, balance_updates)
     ({public_key_hash; public_key; amount; delegate_to} :
       Parameters_repr.bootstrap_account) =
@@ -45,7 +63,11 @@ let init_account (ctxt, balance_updates)
         ctxt
         contract
         (Some (Option.value ~default:public_key_hash delegate_to))
-  | None -> return ctxt)
+  | None ->
+      fail_when
+        (Option.is_some delegate_to)
+        (Unrevealed_public_key public_key_hash)
+      >>=? fun () -> return ctxt)
   >|=? fun ctxt -> (ctxt, new_balance_updates @ balance_updates)
 
 let init_contract ~typecheck (ctxt, balance_updates)
