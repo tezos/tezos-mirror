@@ -117,6 +117,22 @@ module type S = sig
     target_ptr:'ptr ->
     'ptr list ->
     bool
+
+  (** [search ~deref ~compare ~cell_ptr] is similar to [back_path] except
+      that it will search through the skip list to find a cell at which
+      [compare content] is zero. This will only work is [compare] is a
+      function that returns a negative integer for cells before the
+      target and a positive integer for cells after the target.
+
+      If [d] is the distance in the skip list between the original
+      [cell_ptr] and the final target cell, this function involves
+      [O(log_basis(d))] calls to [deref] and [compare] (the logarithm's
+      base is the [basis] parameter in the skip list). *)
+  val search :
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    compare:('content -> int Lwt.t) ->
+    cell_ptr:'ptr ->
+    'ptr list option Lwt.t
 end
 
 module Make (_ : sig
