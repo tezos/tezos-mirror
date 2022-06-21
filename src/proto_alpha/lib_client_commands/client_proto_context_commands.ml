@@ -2042,7 +2042,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Finalize a commitment of an transaction rollup."
+      ~desc:"Finalize a commitment of a transaction rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -2053,7 +2053,7 @@ let commands_rw () =
          counter_arg)
       (prefixes ["finalize"; "commitment"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have his commitment finalized."
+           ~usage:"Tx rollup that have its commitment finalized."
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2094,7 +2094,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Recover commitment bond from an transaction rollup."
+      ~desc:"Recover commitment bond from a transaction rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -2145,7 +2145,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Remove a commitment from an transaction rollup."
+      ~desc:"Remove a commitment from a transaction rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -2156,7 +2156,7 @@ let commands_rw () =
          counter_arg)
       (prefixes ["remove"; "commitment"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have his commitment removed."
+           ~usage:"Tx rollup that have its commitment removed."
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2197,7 +2197,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Reject a commitment of an transaction rollup."
+      ~desc:"Reject a commitment of a transaction rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -2208,7 +2208,7 @@ let commands_rw () =
          counter_arg)
       (prefixes ["reject"; "commitment"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have one of his commitment rejected."
+           ~usage:"Tx rollup that have one of its commitment rejected."
       @@ prefixes ["at"; "level"]
       @@ Tx_rollup.level_param ~usage:"Level of the commitment disputed."
       @@ prefixes ["with"; "result"; "hash"]
