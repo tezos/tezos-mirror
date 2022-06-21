@@ -45,6 +45,7 @@ type t =
   | Contract of Contract_repr.t
   | Tx_rollup of Tx_rollup_repr.t
   | Sc_rollup of Sc_rollup_repr.t
+  | Event of Contract_event_repr.t
 
 include Compare.S with type t := t
 

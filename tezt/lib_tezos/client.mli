@@ -1409,6 +1409,11 @@ val register_key : string -> t -> unit Lwt.t
 val contract_storage :
   ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
 
+(** Get contract code for a contract. Returns a Micheline expression
+    representing the code as a string. *)
+val contract_code :
+  ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
+
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
 

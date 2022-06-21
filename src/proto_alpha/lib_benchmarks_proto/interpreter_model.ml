@@ -454,7 +454,8 @@ let ir_model ?specialization instr_or_cont =
       | N_IHalt -> model_0 instr_or_cont (const1_model name)
       | N_IApply -> model_0 instr_or_cont (const1_model name)
       | N_ILog -> model_0 instr_or_cont (const1_model name)
-      | N_IOpen_chest -> model_2 instr_or_cont (open_chest_model name))
+      | N_IOpen_chest -> model_2 instr_or_cont (open_chest_model name)
+      | N_IEmit -> model_0 instr_or_cont (const1_model name))
   | Cont_name cont -> (
       match cont with
       | N_KNil -> model_0 instr_or_cont (const1_model name)

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
-    Subject:      Integration > Michelson
-*)
+type error += (* `Permanent *) Invalid_event_notation of string
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > michelson"
-    [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("ticket accounting", Test_ticket_accounting.tests);
-      ("ticket balance", Test_ticket_balance.tests);
-      ("ticket manager", Test_ticket_manager.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-      ("block time instructions", Test_block_time_instructions.tests);
-      ("annotations", Test_annotations.tests);
-      ("event logging", Test_contract_event.tests);
-    ]
-  |> Lwt_main.run
+module Hash = struct
+  let prefix = "\058\017\082" (* "ev1" (32) *)
+
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "Event"
+
+        let title = "Event sink"
+
+        let b58check_prefix = prefix
+
+        let size = None
+      end)
+
+  include H
+
+  let () = Base58.check_encoded_prefix b58check_encoding "ev1" 53
+
+  include Path_encoding.Make_hex (H)
+end
+
+type t = Hash.t
+
+let of_b58data = function Hash.Data hash -> Some hash | _ -> None
+
+let pp = Hash.pp
+
+let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
+
+let of_b58check s =
+  match of_b58check_opt s with
+  | Some hash -> ok hash
+  | None -> error (Invalid_event_notation s)
+
+let to_b58check hash = Hash.to_b58check hash
+
+let in_memory_size _ =
+  let open Cache_memory_helpers in
+  h1w +! string_size_gen Hash.size

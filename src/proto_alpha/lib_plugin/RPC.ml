@@ -459,6 +459,16 @@ module Scripts = struct
                 [])
              (req "entrypoints" (assoc Script.expr_encoding)))
         RPC_path.(path / "entrypoints")
+
+    (** [get_event_address] is a RPC service to compute the contract event address
+        for the input tag and Michelson event type definition. *)
+    let get_event_address =
+      RPC_service.post_service
+        ~description:"Return the event address for the given tag and data type"
+        ~input:(obj1 (req "type" Script.expr_encoding))
+        ~output:(obj1 (req "address" Contract_event.Hash.encoding))
+        ~query:RPC_query.empty
+        RPC_path.(path / "event_address")
   end
 
   module type UNPARSING_MODE = sig
@@ -805,6 +815,7 @@ module Scripts = struct
       | ISplit_ticket _ -> pp_print_string fmt "SPLIT_TICKET"
       | IJoin_tickets _ -> pp_print_string fmt "JOIN_TICKETS"
       | IOpen_chest _ -> pp_print_string fmt "OPEN_CHEST"
+      | IEmit _ -> pp_print_string fmt "EMIT"
       | IHalt _ -> pp_print_string fmt "[halt]"
       | ILog (_, _, _, _, instr) ->
           Format.fprintf fmt "log/%a" pp_instr_name instr
@@ -1492,7 +1503,14 @@ module Scripts = struct
                     Micheline.strip_locations original_type_expr )
                   :: acc)
                 map
-                [] ) ))
+                [] ) )) ;
+    Registration.register0
+      ~chunked:false
+      S.get_event_address
+      (fun ctxt () ty_node ->
+        let ctxt = Gas.set_unlimited ctxt in
+        Script_ir_translator.hash_event_ty ctxt (Micheline.root ty_node)
+        >>?= fun (address, _) -> return address)
 
   let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ?balance
       ~script ~storage ~input ~amount ~chain_id ~source ~payer ~self ~now ~level
@@ -1633,6 +1651,10 @@ module Scripts = struct
 
   let list_entrypoints ctxt block ~script =
     RPC_context.make_call0 S.list_entrypoints ctxt block () script
+
+  (** [get_event_address] makes a call to the service to compute an event address *)
+  let get_event_address ~ty ctxt block =
+    RPC_context.make_call0 S.get_event_address ctxt block () ty
 end
 
 module Contract = struct

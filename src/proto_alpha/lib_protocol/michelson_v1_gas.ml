@@ -962,6 +962,9 @@ module Cost_of = struct
     (* model SAPLING_DIFF_ENCODING *)
     let cost_SAPLING_DIFF_ENCODING ~nfs ~cms =
       S.safe_int ((nfs * 22) + (cms * 215))
+
+    (* model IEmit *)
+    let cost_N_IEmit = S.safe_int 30
   end
 
   module Interpreter = struct
@@ -1507,6 +1510,8 @@ module Cost_of = struct
       Gas.(
         contents_comparison +@ compare_address
         +@ add_nat ticket_a.amount ticket_b.amount)
+
+    let emit = atomic_step_cost cost_N_IEmit
 
     (* Continuations *)
     module Control = struct

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
-    Subject:      Integration > Michelson
-*)
+module Hash : sig
+  val prefix : string
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > michelson"
-    [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("ticket accounting", Test_ticket_accounting.tests);
-      ("ticket balance", Test_ticket_balance.tests);
-      ("ticket manager", Test_ticket_manager.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-      ("block time instructions", Test_block_time_instructions.tests);
-      ("annotations", Test_annotations.tests);
-      ("event logging", Test_contract_event.tests);
-    ]
-  |> Lwt_main.run
+  include S.HASH
+end
+
+type t = Hash.t
+
+(** [in_memory_size event_addr] returns the number of bytes [event_addr]
+    uses in RAM. *)
+val in_memory_size : t -> Cache_memory_helpers.sint
+
+(** [to_b58check addr] converts the event address [addr] to the Base58Check string representation *)
+val to_b58check : t -> string
+
+(** Pretty printer for contract events *)
+val pp : Format.formatter -> t -> unit
+
+(** [of_b58data data] tries to decode a contract event from a Base58 [data] and
+    return [None] if conversion fails *)
+val of_b58data : Base58.data -> t option
+
+(** [of_b58check addr] tries to decode a contract event from a Base58Check string [addr] *)
+val of_b58check : string -> t tzresult
+
+(** [of_b58check_opt addr] tries to
+    decode a contract event from a Base58Check string [addr]
+    and return [None] if conversion fails *)
+val of_b58check_opt : string -> t option

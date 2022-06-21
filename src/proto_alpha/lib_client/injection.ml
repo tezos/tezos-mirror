@@ -310,7 +310,8 @@ let estimated_gas_single (type kind)
         | Transaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
             | Transaction_to_tx_rollup_result {consumed_gas; _}
-            | Transaction_to_sc_rollup_result {consumed_gas; _} ) ->
+            | Transaction_to_sc_rollup_result {consumed_gas; _}
+            | Transaction_to_event_result {consumed_gas; _} ) ->
             Ok consumed_gas
         | Origination_result {consumed_gas; _} -> Ok consumed_gas
         | Reveal_result {consumed_gas} -> Ok consumed_gas
@@ -350,7 +351,8 @@ let estimated_gas_single (type kind)
         | ITransaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
             | Transaction_to_tx_rollup_result {consumed_gas; _}
-            | Transaction_to_sc_rollup_result {consumed_gas; _} ) ->
+            | Transaction_to_sc_rollup_result {consumed_gas; _}
+            | Transaction_to_event_result {consumed_gas; _} ) ->
             Ok consumed_gas
         | IOrigination_result {consumed_gas; _} -> Ok consumed_gas
         | IDelegation_result {consumed_gas} -> Ok consumed_gas)
@@ -385,7 +387,10 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
                We need to charge for newly allocated storage (as we do for
                Michelson’s big map). *)
             Ok Z.zero
-        | Transaction_result (Transaction_to_sc_rollup_result _) -> Ok Z.zero
+        | Transaction_result
+            (Transaction_to_sc_rollup_result _ | Transaction_to_event_result _)
+          ->
+            Ok Z.zero
         | Origination_result {paid_storage_size_diff; _} ->
             Ok (Z.add paid_storage_size_diff origination_size)
         | Reveal_result _ -> Ok Z.zero
@@ -441,7 +446,10 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
                We need to charge for newly allocated storage (as we do for
                Michelson’s big map). *)
             Ok Z.zero
-        | ITransaction_result (Transaction_to_sc_rollup_result _) -> Ok Z.zero
+        | ITransaction_result
+            (Transaction_to_sc_rollup_result _ | Transaction_to_event_result _)
+          ->
+            Ok Z.zero
         | IOrigination_result {paid_storage_size_diff; _} ->
             Ok (Z.add paid_storage_size_diff origination_size)
         | IDelegation_result _ -> Ok Z.zero)
@@ -488,7 +496,8 @@ let originated_contracts_single (type kind)
             Ok originated_contracts
         | Transaction_result
             ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _ ) ->
+            | Transaction_to_sc_rollup_result _ | Transaction_to_event_result _
+              ) ->
             Ok []
         | Origination_result {originated_contracts; _} ->
             Ok originated_contracts
@@ -527,7 +536,8 @@ let originated_contracts_single (type kind)
             Ok originated_contracts
         | ITransaction_result
             ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _ ) ->
+            | Transaction_to_sc_rollup_result _ | Transaction_to_event_result _
+              ) ->
             Ok []
         | IOrigination_result {originated_contracts; _} ->
             Ok originated_contracts

@@ -223,6 +223,8 @@ type instruction_name =
   | N_ILog
   (* Timelock*)
   | N_IOpen_chest
+  (* Event *)
+  | N_IEmit
 
 type continuation_name =
   | N_KNil
@@ -408,6 +410,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IHalt -> "N_IHalt"
   | N_ILog -> "N_ILog"
   | N_IOpen_chest -> "N_IOpen_chest"
+  | N_IEmit -> "N_IEmit"
 
 let string_of_continuation_name : continuation_name -> string =
  fun c ->
@@ -628,6 +631,7 @@ let all_instructions =
     N_IHalt;
     N_ILog;
     N_IOpen_chest;
+    N_IEmit;
   ]
 
 let all_continuations =
@@ -1093,6 +1097,9 @@ module Instructions = struct
 
   let open_chest log_time size =
     ir_sized_step N_IOpen_chest (binary "log_time" log_time "size" size)
+
+  (** cost model for the EMIT instruction *)
+  let emit = ir_sized_step N_IEmit nullary
 end
 
 module Control = struct
@@ -1425,6 +1432,7 @@ let extract_ir_sized_step :
       let log_time = Z.log2 Z.(one + Script_int.to_zint time) |> Size.of_int in
       Instructions.open_chest log_time plaintext_size
   | IMin_block_time _, _ -> Instructions.min_block_time
+  | IEmit _, _ -> Instructions.emit
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =
