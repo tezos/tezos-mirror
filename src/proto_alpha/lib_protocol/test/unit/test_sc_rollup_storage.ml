@@ -391,6 +391,11 @@ let number_of_ticks_exn n =
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
+let dal_slot_index_of_int_exn n =
+  match Dal_slot_repr.Index.of_int n with
+  | Some n -> n
+  | None -> Stdlib.failwith "Bad slot index"
+
 let valid_inbox_level ctxt =
   let root_level = Raw_level_repr.to_int32 Level_storage.(current ctxt).level in
   let commitment_freq =
@@ -2556,6 +2561,254 @@ let test_storage_outbox_size_diff () =
   let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) (-14) in
   return ()
 
+let test_subscribe_slot_to_rollup () =
+  let* ctxt = new_context () in
+  let level = (Raw_context.current_level ctxt).level in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_index = dal_slot_index_of_int_exn 0 in
+  let* index, subscribed_level, _ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index
+  in
+  let* () =
+    Assert.equal_int
+      ~loc:__LOC__
+      (Dal_slot_repr.Index.to_int index)
+      (Dal_slot_repr.Index.to_int slot_index)
+  in
+  Assert.equal_int32
+    ~loc:__LOC__
+    (Raw_level_repr.to_int32 subscribed_level)
+    (Raw_level_repr.to_int32 level)
+
+let test_subscribe_slot_twice_at_same_level () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_index = dal_slot_index_of_int_exn 0 in
+  let* _index, _subscribed_level, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index
+  in
+  assert_fails_with
+    ~loc:__LOC__
+    (Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index)
+    (Sc_rollup_errors.Sc_rollup_dal_slot_already_registered (rollup, slot_index))
+
+let test_subscribe_slot_twice_at_different_levels () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_index = dal_slot_index_of_int_exn 0 in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
+  let* _index, _subscribed_level, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index
+  in
+  assert_fails_with
+    ~loc:__LOC__
+    (Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index)
+    (Sc_rollup_errors.Sc_rollup_dal_slot_already_registered (rollup, slot_index))
+
+let test_subscribe_different_slots_at_same_level () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_0 = dal_slot_index_of_int_exn 0 in
+  let slot_1 = dal_slot_index_of_int_exn 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_0
+  in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_1
+  in
+  assert_true ctxt
+
+let test_subscribe_different_slots_at_different_levels () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_0 = dal_slot_index_of_int_exn 0 in
+  let slot_1 = dal_slot_index_of_int_exn 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_0
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_1
+  in
+  assert_true ctxt
+
+let test_subscribe_slot_to_missing_rollup () =
+  let slot_index = dal_slot_index_of_int_exn 0 in
+  assert_fails_with_missing_rollup
+    ~loc:__LOC__
+    (Sc_rollup_storage.Dal_slot.subscribe ~slot_index)
+
+let test_subscribe_to_slot_with_index_out_of_bounds () =
+  let* ctxt = new_context () in
+  (* Ensure that the maximum number of slots is not above the hard limit *)
+  let number_of_slots =
+    Dal_slot_repr.Index.to_int Dal_slot_repr.Index.max_value
+  in
+  let* ctxt =
+    Lwt.map (fun ctxt -> Ok ctxt)
+    @@ Raw_context.patch_constants ctxt (fun constants ->
+           {constants with dal = {constants.dal with number_of_slots}})
+  in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let out_of_bounds_index = dal_slot_index_of_int_exn number_of_slots in
+  let maximum = dal_slot_index_of_int_exn (number_of_slots - 1) in
+  assert_fails_with
+    ~loc:__LOC__
+    (Sc_rollup_storage.Dal_slot.subscribe
+       ctxt
+       rollup
+       ~slot_index:out_of_bounds_index)
+    (Dal_errors_repr.Dal_subscribe_rollup_invalid_slot_index
+       {given = out_of_bounds_index; maximum})
+
+let test_subscribed_slots_no_entries () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let* subscribed_slots =
+    lift
+    @@ Sc_rollup_storage.Dal_slot.subscribed_slot_indices
+         ctxt
+         rollup
+         current_level
+  in
+  Assert.assert_equal_list
+    ~loc:__LOC__
+    (fun lhs rhs ->
+      Dal_slot_repr.Index.to_int lhs = Dal_slot_repr.Index.to_int rhs)
+    "Unexpected slot indices"
+    Dal_slot_repr.Index.pp
+    subscribed_slots
+    []
+
+let test_subscribed_slots_returns_overall_slot_subscriptions () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_0 = dal_slot_index_of_int_exn 0 in
+  let slot_1 = dal_slot_index_of_int_exn 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_0
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_1
+  in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let* subscribed_slots =
+    lift
+    @@ Sc_rollup_storage.Dal_slot.subscribed_slot_indices
+         ctxt
+         rollup
+         current_level
+  in
+  Assert.assert_equal_list
+    ~loc:__LOC__
+    (fun lhs rhs ->
+      Dal_slot_repr.Index.to_int lhs = Dal_slot_repr.Index.to_int rhs)
+    "Unexpected slot indices"
+    Dal_slot_repr.Index.pp
+    subscribed_slots
+    [slot_0; slot_1]
+
+let test_subscribed_slots_no_entry_at_current_level () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_0 = dal_slot_index_of_int_exn 0 in
+  let slot_1 = dal_slot_index_of_int_exn 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_0
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_1
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let* subscribed_slots =
+    lift
+    @@ Sc_rollup_storage.Dal_slot.subscribed_slot_indices
+         ctxt
+         rollup
+         current_level
+  in
+  Assert.assert_equal_list
+    ~loc:__LOC__
+    (fun lhs rhs ->
+      Dal_slot_repr.Index.to_int lhs = Dal_slot_repr.Index.to_int rhs)
+    "Unexpected slot indices"
+    Dal_slot_repr.Index.pp
+    subscribed_slots
+    [slot_0; slot_1]
+
+let test_subscribed_slots_at_level_past_context_level () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_0 = dal_slot_index_of_int_exn 0 in
+  let slot_1 = dal_slot_index_of_int_exn 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_0
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_1
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let*? future_level =
+    Environment.wrap_tzresult @@ Raw_level_repr.of_int32
+    @@ Int32.succ (Raw_level_repr.to_int32 current_level)
+  in
+  assert_fails_with
+    ~loc:__LOC__
+    (Sc_rollup_storage.Dal_slot.subscribed_slot_indices
+       ctxt
+       rollup
+       future_level)
+    (Sc_rollup_errors.Sc_rollup_requested_dal_slot_subscriptions_of_future_level
+       (current_level, future_level))
+
+let test_subscribed_slots_entries_at_future_level () =
+  let* ctxt = new_context () in
+  let* rollup, ctxt = lift @@ new_sc_rollup ctxt in
+  let slot_0 = dal_slot_index_of_int_exn 0 in
+  let slot_1 = dal_slot_index_of_int_exn 1 in
+  let slot_2 = dal_slot_index_of_int_exn 2 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_0
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_1
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let query_level = (Raw_context.current_level ctxt).level in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
+  let* _, _, ctxt =
+    lift @@ Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index:slot_2
+  in
+  let* subscribed_slots =
+    lift
+    @@ Sc_rollup_storage.Dal_slot.subscribed_slot_indices
+         ctxt
+         rollup
+         query_level
+  in
+  Assert.assert_equal_list
+    ~loc:__LOC__
+    (fun lhs rhs ->
+      Dal_slot_repr.Index.to_int lhs = Dal_slot_repr.Index.to_int rhs)
+    "Unexpected slot indices"
+    Dal_slot_repr.Index.pp
+    subscribed_slots
+    [slot_0; slot_1]
+
+let test_subscribed_slots_of_missing_rollup () =
+  assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
+      Sc_rollup_storage.Dal_slot.subscribed_slot_indices
+        ctxt
+        rollup
+        (Raw_context.current_level ctxt).level)
+
 let tests =
   [
     Tztest.tztest
@@ -2792,6 +3045,59 @@ let tests =
       "Record messages size diffs"
       `Quick
       test_storage_outbox_size_diff;
+    Tztest.tztest
+      "Slot subscription to rollup is successful"
+      `Quick
+      test_subscribe_slot_to_rollup;
+    Tztest.tztest
+      "Subscribing twice to same slot at the same level fails"
+      `Quick
+      test_subscribe_slot_twice_at_same_level;
+    Tztest.tztest
+      "Subscribing to same slot at different levels fails"
+      `Quick
+      test_subscribe_slot_twice_at_different_levels;
+    Tztest.tztest
+      "Subscribe to different slots at same level is allowed"
+      `Quick
+      test_subscribe_different_slots_at_same_level;
+    Tztest.tztest
+      "Subscribe to different slots at different level is allowed"
+      `Quick
+      test_subscribe_different_slots_at_different_levels;
+    Tztest.tztest
+      "Subscribe missing rollup to slot fails"
+      `Quick
+      test_subscribe_slot_to_missing_rollup;
+    Tztest.tztest
+      "Subscribe to nonexisting slot fails"
+      `Quick
+      test_subscribe_to_slot_with_index_out_of_bounds;
+    Tztest.tztest
+      "Fetching slot subscriptions when there are no entries returns the empty \
+       list"
+      `Quick
+      test_subscribed_slots_no_entries;
+    Tztest.tztest
+      "Fetching slot subscriptions returns overall slot subscriptions"
+      `Quick
+      test_subscribed_slots_returns_overall_slot_subscriptions;
+    Tztest.tztest
+      "Fetching slot subscriptions returns information for most recent entry"
+      `Quick
+      test_subscribed_slots_no_entry_at_current_level;
+    Tztest.tztest
+      "Fetching slot subscriptions at level higher than current level fails"
+      `Quick
+      test_subscribed_slots_at_level_past_context_level;
+    Tztest.tztest
+      "Fetching slot subscriptions ignores entries at future levels"
+      `Quick
+      test_subscribed_slots_entries_at_future_level;
+    Tztest.tztest
+      "Fetching slot subscriptions of missing rollup fails"
+      `Quick
+      test_subscribed_slots_of_missing_rollup;
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460

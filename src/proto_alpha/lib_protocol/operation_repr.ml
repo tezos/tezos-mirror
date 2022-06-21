@@ -113,6 +113,8 @@ module Kind = struct
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
+  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -142,6 +144,8 @@ module Kind = struct
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
+    | Sc_rollup_dal_slot_subscribe_manager_kind
+        : sc_rollup_dal_slot_subscribe manager
 end
 
 type 'a consensus_operation_type =
@@ -440,6 +444,11 @@ and _ manager_operation =
       sc_rollup : Sc_rollup_repr.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
+  | Sc_rollup_dal_slot_subscribe : {
+      rollup : Sc_rollup_repr.t;
+      slot_index : Dal_slot_repr.Index.t;
+    }
+      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
 
 and counter = Z.t
 
@@ -472,6 +481,8 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_execute_outbox_message _ ->
       Kind.Sc_rollup_execute_outbox_message_manager_kind
   | Sc_rollup_recover_bond _ -> Kind.Sc_rollup_recover_bond_manager_kind
+  | Sc_rollup_dal_slot_subscribe _ ->
+      Kind.Sc_rollup_dal_slot_subscribe_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -562,6 +573,9 @@ let sc_rollup_operation_timeout_tag = sc_rollup_operation_tag_offset + 5
 let sc_rollup_execute_outbox_message_tag = sc_rollup_operation_tag_offset + 6
 
 let sc_rollup_operation_recover_bond_tag = sc_rollup_operation_tag_offset + 7
+
+let sc_rollup_operation_dal_slot_subscribe_tag =
+  sc_rollup_operation_tag_offset + 8
 
 let dal_offset = 230
 
@@ -1165,6 +1179,28 @@ module Encoding = struct
           proj = (function Sc_rollup_recover_bond {sc_rollup} -> sc_rollup);
           inj = (fun sc_rollup -> Sc_rollup_recover_bond {sc_rollup});
         }
+
+    let[@coq_axiom_with_reason "gadt"] sc_rollup_dal_slot_subscribe_case =
+      MCase
+        {
+          tag = sc_rollup_operation_dal_slot_subscribe_tag;
+          name = "sc_rollup_dal_slot_subscribe";
+          encoding =
+            obj2
+              (req "rollup" Sc_rollup_repr.encoding)
+              (req "slot_index" Dal_slot_repr.Index.encoding);
+          select =
+            (function
+            | Manager (Sc_rollup_dal_slot_subscribe _ as op) -> Some op
+            | _ -> None);
+          proj =
+            (function
+            | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
+                (rollup, slot_index));
+          inj =
+            (fun (rollup, slot_index) ->
+              Sc_rollup_dal_slot_subscribe {rollup; slot_index});
+        }
   end
 
   type 'b case =
@@ -1585,6 +1621,11 @@ module Encoding = struct
       sc_rollup_operation_recover_bond_tag
       Manager_operations.sc_rollup_recover_bond_case
 
+  let sc_rollup_dal_slot_subscribe_case =
+    make_manager_case
+      sc_rollup_operation_dal_slot_subscribe_tag
+      Manager_operations.sc_rollup_dal_slot_subscribe_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -1633,6 +1674,7 @@ module Encoding = struct
            make sc_rollup_timeout_case;
            make sc_rollup_execute_outbox_message_case;
            make sc_rollup_recover_bond_case;
+           make sc_rollup_dal_slot_subscribe_case;
          ]
 
   let contents_list_encoding =
@@ -1863,6 +1905,8 @@ let equal_manager_operation_kind :
   | Sc_rollup_execute_outbox_message _, _ -> None
   | Sc_rollup_recover_bond _, Sc_rollup_recover_bond _ -> Some Eq
   | Sc_rollup_recover_bond _, _ -> None
+  | Sc_rollup_dal_slot_subscribe _, Sc_rollup_dal_slot_subscribe _ -> Some Eq
+  | Sc_rollup_dal_slot_subscribe _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =

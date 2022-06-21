@@ -53,11 +53,11 @@ val empty : t
 (** [is_available slot_endorsement ~index] returns [true] if the
    [slot_endorsement] commits that the slot at [index] is
    available. *)
-val is_available : t -> Dal_slot_repr.index -> bool
+val is_available : t -> Dal_slot_repr.Index.t -> bool
 
 (** [commit slot_endorsement index] commits into [slot_endorsement]
    that the [index] is available. *)
-val commit : t -> Dal_slot_repr.index -> t
+val commit : t -> Dal_slot_repr.Index.t -> t
 
 (** [occupied_size_in_bits slot_endorsement] returns the size in bits of an endorsement. *)
 val occupied_size_in_bits : t -> int
@@ -65,7 +65,7 @@ val occupied_size_in_bits : t -> int
 (** [expected_size_in_bits ~max_index] returns the expected size (in
    bits) of an endorsement considering the maximum index for a slot is
    [max_index]. *)
-val expected_size_in_bits : max_index:Dal_slot_repr.index -> int
+val expected_size_in_bits : max_index:Dal_slot_repr.Index.t -> int
 
 (** This module is used to record the various data-availability
    endorsements.
@@ -107,5 +107,5 @@ module Accountability : sig
      the [index] is out of the interval [0;length] where [length] is
      the value provided to the [init] function. *)
   val is_slot_available :
-    t -> threshold:int -> number_of_shards:int -> Dal_slot_repr.index -> bool
+    t -> threshold:int -> number_of_shards:int -> Dal_slot_repr.Index.t -> bool
 end

@@ -301,6 +301,12 @@ let check_constants constants =
        "The smart contract rollup max lookahead in blocks must be greater than \
         [sc_rollup_commitment_period_in_blocks] and \
         [sc_rollup_challenge_window_in_blocks].")
+  >>? fun () ->
+  error_unless
+    Compare.Int.(
+      constants.dal.number_of_slots > 0 && constants.dal.number_of_slots <= 256)
+    (Invalid_protocol_constants
+       "The number of data availability slot must be between 1 and 256")
   >>? fun () -> Result.return_unit
 
 module Generated = struct

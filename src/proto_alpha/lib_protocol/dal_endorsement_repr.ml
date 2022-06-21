@@ -48,7 +48,8 @@ let encoding = Bitset.encoding
 let empty = Bitset.empty
 
 let is_available t index =
-  match Bitset.mem t index with
+  let open Dal_slot_repr.Index in
+  match Bitset.mem t (to_int index) with
   | Ok b -> b
   | Error _ ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3104
@@ -57,7 +58,8 @@ let is_available t index =
       false
 
 let commit t index =
-  match Bitset.add t index with
+  let open Dal_slot_repr.Index in
+  match Bitset.add t (to_int index) with
   | Ok t -> t
   | Error _ ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3104
@@ -71,7 +73,8 @@ let expected_size_in_bits ~max_index =
   (* We compute an encoding of the data-availability endorsements
      which is a (tight) upper bound of what we expect. *)
   let open Bitset in
-  match add empty max_index with
+  let open Dal_slot_repr.Index in
+  match add empty @@ to_int max_index with
   | Error _ -> (* Happens if max_index < 1 *) 0
   | Ok t -> occupied_size_in_bits t
 
@@ -116,7 +119,7 @@ module Accountability = struct
 
   let is_slot_available shard_bitset_per_slot ~threshold ~number_of_shards index
       =
-    match List.nth shard_bitset_per_slot index with
+    match List.nth shard_bitset_per_slot (Dal_slot_repr.Index.to_int index) with
     | None -> false
     | Some bitset ->
         let acc = ref 0 in

@@ -820,3 +820,28 @@ val sc_rollup_recover_bond :
   * Kind.sc_rollup_recover_bond Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
+
+val sc_rollup_dal_slot_subscribe :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  ?counter:counter ->
+  source:public_key_hash ->
+  rollup:Alpha_context.Sc_rollup.t ->
+  slot_index:int ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  (Operation_hash.t
+  * Kind.sc_rollup_dal_slot_subscribe Kind.manager contents
+  * Kind.sc_rollup_dal_slot_subscribe Kind.manager Apply_results.contents_result)
+  tzresult
+  Lwt.t

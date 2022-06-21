@@ -971,6 +971,8 @@ module Constants : sig
 
   val sc_rollup_enable : context -> bool
 
+  val dal_enable : context -> bool
+
   val sc_rollup_origination_size : context -> int
 
   val sc_rollup_max_available_messages : context -> int
@@ -2633,6 +2635,82 @@ module Vote : sig
   val clear_current_proposal : context -> context tzresult Lwt.t
 end
 
+module Dal : sig
+  module Slot_index : sig
+    type t
+
+    val pp : Format.formatter -> t -> unit
+
+    val zero : t
+
+    val encoding : t Data_encoding.t
+
+    val of_int : int -> t option
+
+    val compare : t -> t -> int
+  end
+
+  module Endorsement : sig
+    type t
+
+    val encoding : t Data_encoding.t
+
+    val empty : t
+
+    val occupied_size_in_bits : t -> int
+
+    val expected_size_in_bits : max_index:Slot_index.t -> int
+
+    val shards : context -> endorser:Signature.Public_key_hash.t -> int list
+
+    val record_available_shards : context -> t -> int list -> context
+  end
+
+  module Slot : sig
+    type header
+
+    type t = private {
+      level : Raw_level.t;
+      index : Slot_index.t;
+      header : header;
+    }
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+
+    val register_slot : context -> t -> (context * bool) tzresult
+
+    val find : context -> Raw_level.t -> t list option tzresult Lwt.t
+
+    val finalize_current_slots : context -> context Lwt.t
+
+    val finalize_pending_slots :
+      context -> (context * Endorsement.t) tzresult Lwt.t
+  end
+end
+
+module Dal_errors : sig
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3168
+     do not expose these errors and return them in functions
+     from Dal_slot_repr or Dal_endorsement_repr. *)
+  type error +=
+    | Dal_feature_disabled
+    | Dal_slot_index_above_hard_limit
+    | Dal_subscribe_rollup_invalid_slot_index of {
+        given : Dal.Slot_index.t;
+        maximum : Dal.Slot_index.t;
+      }
+    | Dal_endorsement_unexpected_size of {expected : int; got : int}
+    | Dal_publish_slot_header_invalid_index of {
+        given : Dal.Slot_index.t;
+        maximum : Dal.Slot_index.t;
+      }
+    | Dal_publish_slot_header_candidate_with_low_fees of {proposed_fees : Tez.t}
+    | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
+    | Dal_publish_slot_header_duplicate of {slot : Dal.Slot.t}
+end
+
 (** This module re-exports definitions from {!Sc_rollup_storage} and
     {!Sc_rollup_repr}. *)
 module Sc_rollup : sig
@@ -3217,8 +3295,19 @@ module Sc_rollup : sig
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
 
+  module Dal_slot : sig
+    val subscribe :
+      context ->
+      t ->
+      slot_index:Dal.Slot_index.t ->
+      (Dal.Slot_index.t * Raw_level.t * context) tzresult Lwt.t
+
+    val subscribed_slot_indices :
+      context -> t -> Raw_level.t -> Dal.Slot_index.t list tzresult Lwt.t
+  end
+
   (** This module discloses definitions that are only useful for tests and
-      must not be used otherwise. *)
+    must not be used otherwise. *)
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
@@ -3249,48 +3338,6 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
-module Dal : sig
-  (** This module re-exports definitions from {!Dal_endorsement_repr} and
-      {!Raw_context.Dal}. *)
-  module Endorsement : sig
-    type t
-
-    val encoding : t Data_encoding.t
-
-    val empty : t
-
-    val occupied_size_in_bits : t -> int
-
-    val expected_size_in_bits : max_index:int -> int
-
-    val shards : context -> endorser:Signature.Public_key_hash.t -> int list
-
-    val record_available_shards : context -> t -> int list -> context
-  end
-
-  (** This module re-exports definitions from {!Dal_slot_repr},
-      {!Dal_slot_storage} and {!Raw_context.Dal}. *)
-  module Slot : sig
-    type header
-
-    type t = private {level : Raw_level.t; index : int; header : header}
-
-    val encoding : t Data_encoding.t
-
-    val pp : Format.formatter -> t -> unit
-
-    val register_slot : context -> t -> (context * bool) tzresult
-
-    val find : context -> Raw_level.t -> t list option tzresult Lwt.t
-
-    val finalize_current_slots : context -> context Lwt.t
-
-    val finalize_pending_slots :
-      context -> (context * Endorsement.t) tzresult Lwt.t
-  end
-end
-
-(** This module re-exports definitions from {!Block_payload_repr}. *)
 module Block_payload : sig
   val hash :
     predecessor:Block_hash.t ->
@@ -3490,6 +3537,8 @@ module Kind : sig
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
+  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -3519,6 +3568,8 @@ module Kind : sig
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
+    | Sc_rollup_dal_slot_subscribe_manager_kind
+        : sc_rollup_dal_slot_subscribe manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -3749,6 +3800,11 @@ and _ manager_operation =
       sc_rollup : Sc_rollup.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
+  | Sc_rollup_dal_slot_subscribe : {
+      rollup : Sc_rollup.t;
+      slot_index : Dal.Slot_index.t;
+    }
+      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
 
 and counter = Z.t
 
@@ -3929,6 +3985,9 @@ module Operation : sig
     val sc_rollup_recover_bond_case :
       Kind.sc_rollup_recover_bond Kind.manager case
 
+    val sc_rollup_dal_slot_subscribe_case :
+      Kind.sc_rollup_dal_slot_subscribe Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -3991,6 +4050,9 @@ module Operation : sig
         Kind.sc_rollup_execute_outbox_message case
 
       val sc_rollup_recover_bond_case : Kind.sc_rollup_recover_bond case
+
+      val sc_rollup_dal_slot_subscribe_case :
+        Kind.sc_rollup_dal_slot_subscribe case
     end
   end
 

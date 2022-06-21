@@ -259,6 +259,12 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.sc_rollup_recover_bond successful_manager_operation_result
+  | Sc_rollup_dal_slot_subscribe_result : {
+      consumed_gas : Gas.Arith.fp;
+      slot_index : Dal.Slot_index.t;
+      level : Raw_level.t;
+    }
+      -> Kind.sc_rollup_dal_slot_subscribe successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

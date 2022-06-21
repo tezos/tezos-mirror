@@ -62,6 +62,14 @@ type error +=
       staker_balance : Tez_repr.t;
       min_expected_balance : Tez_repr.t;
     }
+  | (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3169
+       Move the errors below to Dal_errors_repr. *)
+    (* `Permanent *)
+      Sc_rollup_dal_slot_already_registered of
+      (Sc_rollup_repr.t * Dal_slot_repr.Index.t)
+  | (* ` Temporary *)
+      Sc_rollup_requested_dal_slot_subscriptions_of_future_level of
+      (Raw_level_repr.t * Raw_level_repr.t)
 
 let () =
   register_error_kind
@@ -392,4 +400,53 @@ let () =
     (fun (staker, sc_rollup, staker_balance, min_expected_balance) ->
       Sc_rollup_staker_funds_too_low
         {staker; sc_rollup; staker_balance; min_expected_balance}) ;
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_dal_slot_already_registered"
+    ~title:"DAL slot already registered for rollup"
+    ~description
+    ~pp:(fun ppf (rollup, slot_index) ->
+      Format.fprintf
+        ppf
+        "Rollup %a is already subscribed to data availability slot %a"
+        Sc_rollup_repr.pp
+        rollup
+        Dal_slot_repr.Index.pp
+        slot_index)
+    Data_encoding.(
+      obj2
+        (req "rollup" Sc_rollup_repr.encoding)
+        (req "slot_index" Dal_slot_repr.Index.encoding))
+    (function
+      | Sc_rollup_dal_slot_already_registered (rollup, slot_index) ->
+          Some (rollup, slot_index)
+      | _ -> None)
+    (fun (rollup, slot_index) ->
+      Sc_rollup_dal_slot_already_registered (rollup, slot_index)) ;
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_requested_dal_slot_subscriptions_at_future_level"
+    ~title:"Requested list of subscribed dal slots at a future level"
+    ~description
+    ~pp:(fun ppf (current_level, future_level) ->
+      Format.fprintf
+        ppf
+        "The list of subscribed dal slot indices has been requested for level \
+         %a, but the current level is %a"
+        Raw_level_repr.pp
+        future_level
+        Raw_level_repr.pp
+        current_level)
+    Data_encoding.(
+      obj2
+        (req "current_level" Raw_level_repr.encoding)
+        (req "future_level" Raw_level_repr.encoding))
+    (function
+      | Sc_rollup_requested_dal_slot_subscriptions_of_future_level
+          (current_level, future_level) ->
+          Some (current_level, future_level)
+      | _ -> None)
+    (fun (current_level, future_level) ->
+      Sc_rollup_requested_dal_slot_subscriptions_of_future_level
+        (current_level, future_level)) ;
   ()

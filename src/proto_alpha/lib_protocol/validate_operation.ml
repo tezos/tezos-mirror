@@ -403,6 +403,9 @@ module Manager = struct
   let assert_sc_rollup_feature_enabled vi =
     error_unless (Constants.sc_rollup_enable vi.ctxt) Sc_rollup_feature_disabled
 
+  let assert_dal_feature_enabled vi =
+    error_unless (Constants.dal_enable vi.ctxt) Dal_errors.Dal_feature_disabled
+
   let consume_decoding_gas ctxt lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
     @@ (* Fail early if the operation does not have enough gas to
@@ -568,6 +571,10 @@ module Manager = struct
              the operations Branch_delayed if they cannot be successfully
              prechecked? *)
           let* () = assert_sc_rollup_feature_enabled vi in
+          return remaining_gas
+      | Sc_rollup_dal_slot_subscribe _ ->
+          let* () = assert_sc_rollup_feature_enabled vi in
+          let* () = assert_dal_feature_enabled vi in
           return remaining_gas
       | Dal_publish_slot_header {slot} ->
           let* () = Dal_apply.validate_publish_slot_header vi.ctxt slot in

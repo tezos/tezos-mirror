@@ -1834,6 +1834,30 @@ module Sc_rollup = struct
         let name = ["applied_outbox_messages"]
       end)
       (Bitset_and_level)
+
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3172.
+     Implement support for unsubscribing from a slot. *)
+  (* We map levels into (non-empty) list of slots. If a rollup is subscribed to a slot
+     index s at level l, then the slot index s will appear in the map entry for level l.
+  *)
+  module Dal_level_index =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["dal"; "level"]
+         end))
+         (Make_index (Raw_level_repr.Index))
+
+  module Slot_subscriptions =
+    Dal_level_index.Make_map
+      (struct
+        let name = ["slot_subscriptions"]
+      end)
+      (struct
+        type t = Bitset.t
+
+        let encoding = Bitset.encoding
+      end)
 end
 
 module Dal = struct

@@ -342,6 +342,15 @@ let pp_manager_operation_content (type kind) source ppf
         sc_rollup
         Contract.pp
         source
+  | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
+      Format.fprintf
+        ppf
+        "Register data availability slot number %a for smart contract rollup \
+         address %a"
+        Dal.Slot_index.pp
+        slot_index
+        Sc_rollup.Address.pp
+        rollup
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -691,6 +700,16 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates ppf balance_updates
   in
+  let pp_sc_rollup_dal_slot_subscribe_result
+      (Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}) =
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf
+      ppf
+      "@,Registered slot index: %a"
+      Dal.Slot_index.pp
+      slot_index ;
+    Format.fprintf ppf "@,Registered level %a" Raw_level.pp level
+  in
   let pp_sc_rollup_recover_bond_result
       (Sc_rollup_recover_bond_result {balance_updates; consumed_gas}) =
     pp_balance_updates ppf balance_updates ;
@@ -728,6 +747,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_execute_outbox_message_result _ ->
         "smart contract output message execution"
     | Sc_rollup_recover_bond_result _ -> "smart contract bond retrieval"
+    | Sc_rollup_dal_slot_subscribe_result _ -> "subscription to dal slot"
     | Dal_publish_slot_header_result _ -> "slot header publishing"
   in
   let pp_manager_operation_contents_result (type kind) ppf
@@ -765,6 +785,8 @@ let pp_manager_operation_contents_result ppf op_result =
         pp_sc_rollup_execute_outbox_message_result op
     | Sc_rollup_recover_bond_result _ as op ->
         pp_sc_rollup_recover_bond_result op
+    | Sc_rollup_dal_slot_subscribe_result _ as op ->
+        pp_sc_rollup_dal_slot_subscribe_result op
     | Dal_publish_slot_header_result _ as op ->
         pp_dal_publish_slot_header_result op
   in
