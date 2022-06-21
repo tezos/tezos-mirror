@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Protocol_client_context
 
 type block_info = {
   hash : Block_hash.t;
@@ -175,7 +176,7 @@ type error +=
     }
 
 let () =
-  Error_monad.register_error_kind
+  register_error_kind
     `Permanent
     ~id:"Client_baking_blocks.unexpected_empty_block_list"
     ~title:"Unexpected empty blocklist"
