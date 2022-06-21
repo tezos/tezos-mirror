@@ -1,8 +1,8 @@
 diff --git a/src/lib_protocol_environment/environment_V3.ml b/src/lib_protocol_environment/environment_V3.ml
-index e7d2f1496..3f4c51434 100644
+index c7d73dca78..b4af18ab90 100644
 --- a/src/lib_protocol_environment/environment_V3.ml
 +++ b/src/lib_protocol_environment/environment_V3.ml
-@@ -619,6 +619,11 @@ struct
+@@ -756,4 +756,9 @@ struct
    module RPC_arg = RPC_arg
    module RPC_path = RPC_path
    module RPC_query = RPC_query
@@ -14,18 +14,19 @@ index e7d2f1496..3f4c51434 100644
    module RPC_service = RPC_service
 
    module RPC_answer = struct
-diff --git a/src/lib_protocol_environment/sigs/v3.dune.inc b/src/lib_protocol_environment/sigs/v3.dune.inc
-index 55ff27a2f2..bebc1c17d5 100644
---- a/src/lib_protocol_environment/sigs/v3.dune.inc
-+++ b/src/lib_protocol_environment/sigs/v3.dune.inc
-@@ -25,6 +25,7 @@
-    v3/bits.mli
-    v3/equality_witness.mli
-    v3/fallbackArray.mli
-+   v3/hack.mli
+diff --git a/src/lib_protocol_environment/sigs/v3.in.ml b/src/lib_protocol_environment/sigs/v3.in.ml
+index 9122fe44aa..b38ae9c127 100644
+--- a/src/lib_protocol_environment/sigs/v3.in.ml
++++ b/src/lib_protocol_environment/sigs/v3.in.ml
+@@ -42,6 +42,8 @@ module type T = sig
  
-    ;; Part of Error_monad/Lwtreslib
-    v3/error_monad.mli
+   module FallbackArray : [%sig "v3/fallbackArray.mli"] [@@coq_plain_module]
+ 
++  module Hack : [%sig "v3/hack.mli"] [@@coq_plain_module]
++
+   module Error_monad : [%sig "v3/error_monad.mli"] [@@coq_plain_module]
+ 
+   open Error_monad
 diff --git a/src/lib_protocol_environment/sigs/v3/hack.mli b/src/lib_protocol_environment/sigs/v3/hack.mli
 new file mode 100644
 index 000000000..625eeafbf

@@ -373,6 +373,9 @@ and ``executable(s)`` stanzas in all ``dune`` files, e.g.:
    (instrumentation
      (backend bisect_ppx)))
 
+The manifest will add this stanza automatically unless
+``~bisect_ppx:false`` is specified.
+
 This enables the conditional instrumentation of the compilation unit
 through the ``./scripts/with_coverage.sh`` helper as described above.
 
@@ -391,7 +394,7 @@ developer utilities and old protocols. In particular:
    - ``src/lib_protocol_compiler/dune`` (executable name ``replace``)
    - ``src/proto_alpha/lib_parameters/dune`` (executable name ``gen``)
    - ``src/proto_011_PtHangz2/lib_parameters/dune`` (executable name ``gen``)
-   - ``src/lib_protocol_environment/s_packer/dune`` (executable name ``s_packer``)
+   - ``src/lib_protocol_environment/ppinclude/dune`` (executable name ``ppinclude``)
    - ``src/lib_store/legacy_store/dune`` (executable name ``legacy_store_builder``)
 
 
