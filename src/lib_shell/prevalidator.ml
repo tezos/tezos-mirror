@@ -181,7 +181,7 @@ type ('protocol_data, 'a) types_state_shell = {
   worker : Tools.worker_tools;
 }
 
-let metrics = Shell_metrics.Mempool.init Name.base
+let metrics = Shell_metrics.Mempool.init ["mempool"]
 
 (** The concrete production instance of {!block_tools} *)
 let block_tools : Store.Block.t Classification.block_tools =
