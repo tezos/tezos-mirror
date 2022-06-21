@@ -23,12 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type seed_computation_status =
+  | Nonce_revelation_stage
+  | Vdf_revelation_stage of {
+      seed_discriminant : Seed_repr.seed;
+      seed_challenge : Seed_repr.seed;
+    }
+  | Computation_finished
+
 type error +=
   | Unknown of {
       oldest : Cycle_repr.t;
       cycle : Cycle_repr.t;
       latest : Cycle_repr.t;
     }
+  | Already_accepted
+  | Unverified_vdf
+  | Too_early_revelation
 
 (* `Permanent *)
 
@@ -37,12 +48,26 @@ type error +=
 val init :
   ?initial_seed:State_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+(** Verifies if a VDF (result, proof) is valid, if so updates the seed with a
+   function of the VDF result. *)
+val check_vdf_and_update_seed :
+  Raw_context.t -> Seed_repr.vdf_solution -> Raw_context.t tzresult Lwt.t
+
 val for_cycle : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
-(** If it is the end of the cycle, computes and stores the seed of cycle at
-    distance [preserved_cycle+2] in the future using the seed of the previous
-    cycle and the revelations of the current one.  *)
+(** Computes RANDAO output for cycle #(current_cycle + preserved + 1) *)
+val compute_randao : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+(** Must be run at the end of the cycle, resets the VDF state and returns
+    unrevealed nonces to know which party has to forfeit its endorsing
+    rewards for that cycle.  *)
 val cycle_end :
   Raw_context.t ->
   Cycle_repr.t ->
   (Raw_context.t * Nonce_storage.unrevealed list) tzresult Lwt.t
+
+(** Return the random seed computation status, that is whether the VDF
+  computation period has started, and if so the information needed, or if it has
+  finished for the current cycle. *)
+val get_seed_computation_status :
+  Raw_context.t -> seed_computation_status tzresult Lwt.t

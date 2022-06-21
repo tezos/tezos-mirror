@@ -849,6 +849,14 @@ let pp_contents_and_result :
         (Nonce.hash nonce)
         pp_balance_updates
         bus
+  | Vdf_revelation {solution}, Vdf_revelation_result bus ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Vdf revelation:@,Solution: %a@,Balance updates:@,%a@]"
+        Seed.pp_solution
+        solution
+        pp_balance_updates
+        bus
   | Double_baking_evidence {bh1; bh2}, Double_baking_evidence_result bus ->
       Format.fprintf
         ppf

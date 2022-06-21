@@ -1,3 +1,37 @@
+sc_rollup_commitment_of_rollup_node_first_published_at_level_global.out
+
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith booting with  --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1600.696 units (will add 100 for safety)
+Estimated storage: 6534 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000402
+    Expected counter: 1
+    Gas limit: 1701
+    Storage limit: 6554 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000402
+      payload fees(the block proposer) ....... +ꜩ0.000402
+    Originate smart contract rollup of kind arith with boot sector ''
+      This smart contract rollup origination was successfully applied
+      Consumed gas: 1600.696
+      Storage size: 6534 bytes
+      Address: [SC_ROLLUP_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.6335
+        storage fees ........................... +ꜩ1.6335
+
+
+./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/initial_level'
+2
 
 ./tezos-client rpc get /chains/main/blocks/head/context/constants
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
@@ -5,8 +39,7 @@
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
   "max_micheline_bytes_limit": 50000,
   "max_allowed_global_constants_depth": 10000, "cache_layout_size": 3,
-  "michelson_maximum_type_size": 2001,
-  "max_wrapped_proof_binary_size": 30000, "preserved_cycles": 2,
+  "michelson_maximum_type_size": 2001, "preserved_cycles": 2,
   "blocks_per_cycle": 8, "blocks_per_commitment": 4,
   "nonce_revelation_threshold": 4, "blocks_per_stake_snapshot": 4,
   "cycles_per_voting_period": 8, "hard_gas_limit_per_operation": "1040000",
@@ -42,49 +75,31 @@
   "tx_rollup_cost_per_byte_ema_factor": 120,
   "tx_rollup_max_ticket_payload_size": 2048,
   "tx_rollup_rejection_max_proof_size": 30000,
-  "tx_rollup_sunset_level": 3473409,
-  "dal_parametric":
-    { "feature_enable": false, "number_of_slots": 16,
-      "number_of_shards": 256, "endorsement_lag": 1,
-      "availability_threshold": 50 }, "sc_rollup_enable": false,
+  "tx_rollup_sunset_level": 3473409, "sc_rollup_enable": true,
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 20160,
   "sc_rollup_max_available_messages": 1000000,
-  "sc_rollup_stake_amount": "32000000",
+  "sc_rollup_stake_amount_in_mutez": 32000000,
   "sc_rollup_commitment_period_in_blocks": 30,
-  "sc_rollup_max_lookahead_in_blocks": 30000,
-  "sc_rollup_max_active_outbox_levels": 20160,
-  "sc_rollup_max_outbox_messages_per_level": 100 }
+  "sc_rollup_commitment_storage_size_in_bytes": 84,
+  "sc_rollup_max_lookahead_in_blocks": 30000 }
 
-./tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights
-[ { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",
-    "round": 0, "estimated_time": "[TIMESTAMP]" },
-  { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",
-    "round": 1, "estimated_time": "[TIMESTAMP]" },
-  { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",
-    "round": 2, "estimated_time": "[TIMESTAMP]" },
-  { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",
-    "round": 3, "estimated_time": "[TIMESTAMP]" },
-  { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",
-    "round": 4, "estimated_time": "[TIMESTAMP]" } ]
+./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+{ "commitment":
+    { "compressed_state":
+        "[SC_ROLLUP_STATE_HASH]",
+      "inbox_level": 32,
+      "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
+      "number_of_messages": 0, "number_of_ticks": 0 },
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
+  "published_at_level": 35 }
 
-./tezos-client rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
-{ "level": 2, "level_position": 1, "cycle": 0, "cycle_position": 1,
-  "expected_commitment": false }
-
-./tezos-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
-[ { "level": 2,
-    "delegates":
-      [ { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 10, "endorsing_power": 50 },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 3, "endorsing_power": 50 },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 2, "endorsing_power": 65 },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 1, "endorsing_power": 50 },
-        { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 0, "endorsing_power": 41 } ] } ]
-
-./tezos-client rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
-{ "first": 1, "last": 8 }
+./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+{ "commitment":
+    { "compressed_state":
+        "[SC_ROLLUP_STATE_HASH]",
+      "inbox_level": 32,
+      "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
+      "number_of_messages": 0, "number_of_ticks": 0 },
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
+  "published_at_level": 35 }

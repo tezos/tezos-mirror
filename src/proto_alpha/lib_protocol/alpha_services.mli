@@ -35,6 +35,13 @@
 
 open Alpha_context
 
+module Seed_computation : sig
+  val get :
+    'a #RPC_context.simple ->
+    'a ->
+    Seed.seed_computation_status shell_tzresult Lwt.t
+end
+
 module Seed : sig
   val get : 'a #RPC_context.simple -> 'a -> Seed.seed shell_tzresult Lwt.t
 end

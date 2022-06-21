@@ -28,6 +28,56 @@ open Alpha_context
 
 let custom_root = RPC_path.open_root
 
+module Seed_computation = struct
+  module S = struct
+    let seed_computation_status_encoding =
+      let open Seed in
+      Data_encoding.(
+        union
+          [
+            case
+              (Tag 0)
+              ~title:"Nonce revelation stage"
+              (obj1 (req "nonce_revelation_stage" unit))
+              (function Nonce_revelation_stage -> Some () | _ -> None)
+              (fun () -> Nonce_revelation_stage);
+            case
+              (Tag 1)
+              ~title:"VDF revelation stage"
+              (obj2
+                 (req "seed_discriminant" Seed.seed_encoding)
+                 (req "seed_challenge" Seed.seed_encoding))
+              (function
+                | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
+                    Some (seed_discriminant, seed_challenge)
+                | _ -> None)
+              (fun (seed_discriminant, seed_challenge) ->
+                Vdf_revelation_stage {seed_discriminant; seed_challenge});
+            case
+              (Tag 2)
+              ~title:"Computation finished"
+              (obj1 (req "computation_finished" unit))
+              (function Computation_finished -> Some () | _ -> None)
+              (fun () -> Computation_finished);
+          ])
+
+    let seed_computation =
+      RPC_service.get_service
+        ~description:"Seed computation status"
+        ~query:RPC_query.empty
+        ~output:seed_computation_status_encoding
+        RPC_path.(custom_root / "context" / "seed_computation")
+  end
+
+  let () =
+    let open Services_registration in
+    register0 ~chunked:false S.seed_computation (fun ctxt () () ->
+        Seed.get_seed_computation_status ctxt)
+
+  let get ctxt block =
+    RPC_context.make_call0 S.seed_computation ctxt block () ()
+end
+
 module Seed = struct
   module S = struct
     open Data_encoding

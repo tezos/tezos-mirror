@@ -10,6 +10,7 @@
   zarith_stubs_js
   bls12-381
   tezos-plonk
+  class_group_vdf
   ringo
   ringo-lwt
   tezos-base

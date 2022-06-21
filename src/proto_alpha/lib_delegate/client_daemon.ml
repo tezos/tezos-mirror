@@ -148,3 +148,41 @@ module Accuser = struct
     >>=? fun () ->
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
+
+module VDF = struct
+  let run (cctxt : Protocol_client_context.full) ~chain ~keep_alive =
+    let open Lwt_result_syntax in
+    let process () =
+      cctxt#message
+        "VDF daemon v%a (%s) for %a started."
+        Tezos_version.Version.pp
+        Tezos_version.Current_git_info.version
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
+      let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+      let* constants =
+        Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+      in
+      let* block_stream =
+        Client_baking_blocks.monitor_valid_blocks
+          ~next_protocols:(Some [Protocol.hash])
+          cctxt
+          ~chains:[chain]
+          ()
+      in
+      let canceler = Lwt_canceler.create () in
+      let _ =
+        Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+            cctxt#message "Shutting down the VDF daemon..." >>= fun () ->
+            Lwt_canceler.cancel canceler >>= fun _ -> Lwt.return_unit)
+      in
+      Baking_vdf.start_vdf_worker cctxt ~canceler constants block_stream
+    in
+    Client_confirmations.wait_for_bootstrapped
+      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+      cctxt
+    >>=? fun () ->
+    if keep_alive then retry_on_disconnection cctxt process else process ()
+end

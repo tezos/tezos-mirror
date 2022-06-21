@@ -77,6 +77,9 @@ and 'kind contents_result =
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
+  | Vdf_revelation_result :
+      Receipt.balance_updates
+      -> Kind.vdf_revelation contents_result
   | Double_endorsement_evidence_result :
       Receipt.balance_updates
       -> Kind.double_endorsement_evidence contents_result

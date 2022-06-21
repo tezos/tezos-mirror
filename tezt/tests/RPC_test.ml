@@ -1236,13 +1236,25 @@ let register protocols =
       ~test_function:test_votes
       ~parameter_overrides:(fun protocol ->
         (* reduced periods duration to get to testing vote period faster *)
-        let cycles_per_voting_period =
-          if Protocol.number protocol >= 013 then
-            (["cycles_per_voting_period"], Some "1")
-          else (["blocks_per_voting_period"], Some "4")
-        in
-        [(["blocks_per_cycle"], Some "4"); cycles_per_voting_period]
-        @ consensus_threshold protocol) ;
+        if Protocol.number protocol >= 14 then
+          (* We need nonce_revelation_threshold < blocks_per_cycle for sanity
+             checks *)
+          [
+            (["blocks_per_cycle"], Some "4");
+            (["cycles_per_voting_period"], Some "1");
+            (["nonce_revelation_threshold"], Some "3");
+          ]
+        else if Protocol.number protocol >= 13 then
+          [
+            (["blocks_per_cycle"], Some "4");
+            (["cycles_per_voting_period"], Some "1");
+          ]
+        else
+          [
+            (["blocks_per_cycle"], Some "4");
+            (["blocks_per_voting_period"], Some "4");
+          ]
+          @ consensus_threshold protocol) ;
     check_rpc_regression
       "misc_protocol"
       ~test_function:test_misc_protocol

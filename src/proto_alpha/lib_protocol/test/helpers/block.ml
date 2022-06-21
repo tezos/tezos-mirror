@@ -257,12 +257,23 @@ let protocol_param_key = ["protocol_parameters"]
 
 let check_constants_consistency constants =
   let open Constants.Parametric in
-  let {blocks_per_cycle; blocks_per_commitment; blocks_per_stake_snapshot; _} =
+  let {
+    blocks_per_cycle;
+    blocks_per_commitment;
+    nonce_revelation_threshold;
+    blocks_per_stake_snapshot;
+    _;
+  } =
     constants
   in
   Error_monad.unless (blocks_per_commitment <= blocks_per_cycle) (fun () ->
       failwith
         "Inconsistent constants : blocks per commitment must be less than \
+         blocks per cycle")
+  >>=? fun () ->
+  Error_monad.unless (nonce_revelation_threshold <= blocks_per_cycle) (fun () ->
+      failwith
+        "Inconsistent constants : blocks per reveal period must be less than \
          blocks per cycle")
   >>=? fun () ->
   Error_monad.unless (blocks_per_cycle >= blocks_per_stake_snapshot) (fun () ->
@@ -423,7 +434,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
-    ?dal_enable ?hard_gas_limit_per_block initial_accounts =
+    ?dal_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
+    initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -490,6 +502,11 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~default:constants.hard_gas_limit_per_block
       hard_gas_limit_per_block
   in
+  let nonce_revelation_threshold =
+    Option.value
+      ~default:constants.nonce_revelation_threshold
+      nonce_revelation_threshold
+  in
   let constants =
     {
       constants with
@@ -513,6 +530,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       sc_rollup = {constants.sc_rollup with enable = sc_rollup_enable};
       dal = {constants.dal with feature_enable = dal_enable};
       hard_gas_limit_per_block;
+      nonce_revelation_threshold;
     }
   in
   (* Check there is at least one roll *)
@@ -561,7 +579,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
     ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
-    ?hard_gas_limit_per_block
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold
     (initial_accounts :
       (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
   prepare_initial_context_params
@@ -582,6 +600,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?sc_rollup_enable
     ?dal_enable
     ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context

@@ -260,6 +260,7 @@ let context_init =
     ~endorsing_reward_per_slot:Tez.zero
     ~baking_reward_bonus_per_slot:Tez.zero
     ~baking_reward_fixed_portion:Tez.zero
+    ~nonce_revelation_threshold:2l
 
 (** A normal and successful vote sequence. *)
 let test_successful_vote num_delegates () =

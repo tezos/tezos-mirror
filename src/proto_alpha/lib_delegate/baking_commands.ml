@@ -369,6 +369,14 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
           ~context_path
           ~keep_alive
           delegates);
+    command
+      ~group
+      ~desc:"Launch the VDF daemon"
+      (* no_options *)
+      (args1 keep_alive_arg)
+      (prefixes ["run"; "vdf"] @@ stop)
+      (fun keep_alive cctxt ->
+        Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive);
   ]
 
 let accuser_commands () =

@@ -35,6 +35,8 @@ val blocks_per_cycle : Raw_context.t -> int32
 
 val blocks_per_commitment : Raw_context.t -> int32
 
+val nonce_revelation_threshold : Raw_context.t -> int32
+
 val blocks_per_stake_snapshot : Raw_context.t -> int32
 
 val cycles_per_voting_period : Raw_context.t -> int32
@@ -51,6 +53,8 @@ val hard_storage_limit_per_operation : Raw_context.t -> Z.t
 val proof_of_work_threshold : Raw_context.t -> int64
 
 val tokens_per_roll : Raw_context.t -> Tez_repr.t
+
+val vdf_difficulty : Raw_context.t -> int64
 
 val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
 

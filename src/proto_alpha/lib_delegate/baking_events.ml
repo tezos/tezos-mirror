@@ -667,6 +667,61 @@ module Actions = struct
         .liquidity_baking_toggle_vote_encoding )
 end
 
+module VDF = struct
+  include Internal_event.Simple
+
+  let section = section @ ["vdf"]
+
+  let vdf_revelation_injected =
+    declare_3
+      ~section
+      ~name:"vdf_revelation_injected"
+      ~level:Notice
+      ~msg:
+        "injected VDF revelation for cycle {cycle} (chain {chain} with \
+         operation {ophash})"
+      ~pp1:pp_int32
+      ("cycle", Data_encoding.int32)
+      ~pp2:Format.pp_print_string
+      ("chain", Data_encoding.string)
+      ~pp3:Operation_hash.pp
+      ("ophash", Operation_hash.encoding)
+
+  let vdf_daemon_start =
+    declare_1
+      ~section
+      ~level:Info
+      ~name:"vdf_daemon_start"
+      ~msg:"starting {worker} VDF daemon"
+      ("worker", Data_encoding.string)
+
+  let vdf_daemon_error =
+    declare_2
+      ~section
+      ~level:Error
+      ~name:"vdf_daemon_error"
+      ~msg:"{worker}: error while running VDF daemon: {errors}"
+      ~pp2:pp_print_top_error_of_trace
+      ("worker", Data_encoding.string)
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let vdf_daemon_connection_lost =
+    declare_1
+      ~section
+      ~level:Error
+      ~name:"vdf_daemon_connection_lost"
+      ~msg:"connection to node lost, VDF daemon {worker} exiting"
+      ("worker", Data_encoding.string)
+
+  let vdf_info =
+    declare_1
+      ~section
+      ~name:"vdf_internal"
+      ~level:Debug
+      ~msg:"{msg}"
+      ("msg", Data_encoding.string)
+end
+
 module Nonces = struct
   include Internal_event.Simple
 

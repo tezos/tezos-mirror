@@ -466,11 +466,21 @@ module type FOR_CYCLE = sig
 
   val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
+  val update :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Seed_repr.seed ->
+    Seed_repr.seed_status ->
+    Raw_context.t tzresult Lwt.t
+
   val remove_existing :
     Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 end
 
 (** Seed *)
+
+module Seed_status :
+  Simple_single_data_storage with type value = Seed_repr.seed_status
 
 module Seed : sig
   (** Storage from this submodule must only be accessed through the
@@ -491,7 +501,14 @@ module Seed : sig
        and type value := nonce_status
        and type t := Raw_context.t
 
+  module VDF_setup :
+    Single_data_storage
+      with type value = Seed_repr.vdf_setup
+       and type t := Raw_context.t
+
   module For_cycle : FOR_CYCLE
+
+  val get_status : Raw_context.t -> Seed_repr.seed_status tzresult Lwt.t
 end
 
 (** Commitments *)

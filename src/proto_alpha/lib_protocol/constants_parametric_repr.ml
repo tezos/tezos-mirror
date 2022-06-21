@@ -110,12 +110,14 @@ type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
+  nonce_revelation_threshold : int32;
   blocks_per_stake_snapshot : int32;
   cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
+  vdf_difficulty : int64;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
   baking_reward_fixed_portion : Tez_repr.t;
@@ -271,13 +273,15 @@ let encoding =
       ( ( c.preserved_cycles,
           c.blocks_per_cycle,
           c.blocks_per_commitment,
+          c.nonce_revelation_threshold,
           c.blocks_per_stake_snapshot,
           c.cycles_per_voting_period,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
           c.tokens_per_roll ),
-        ( ( c.seed_nonce_revelation_tip,
+        ( ( c.vdf_difficulty,
+            c.seed_nonce_revelation_tip,
             c.origination_size,
             c.baking_reward_fixed_portion,
             c.baking_reward_bonus_per_slot,
@@ -308,13 +312,15 @@ let encoding =
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
+             nonce_revelation_threshold,
              blocks_per_stake_snapshot,
              cycles_per_voting_period,
              hard_gas_limit_per_operation,
              hard_gas_limit_per_block,
              proof_of_work_threshold,
              tokens_per_roll ),
-           ( ( seed_nonce_revelation_tip,
+           ( ( vdf_difficulty,
+               seed_nonce_revelation_tip,
                origination_size,
                baking_reward_fixed_portion,
                baking_reward_bonus_per_slot,
@@ -346,12 +352,14 @@ let encoding =
         preserved_cycles;
         blocks_per_cycle;
         blocks_per_commitment;
+        nonce_revelation_threshold;
         blocks_per_stake_snapshot;
         cycles_per_voting_period;
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         proof_of_work_threshold;
         tokens_per_roll;
+        vdf_difficulty;
         seed_nonce_revelation_tip;
         origination_size;
         baking_reward_fixed_portion;
@@ -384,10 +392,11 @@ let encoding =
         sc_rollup;
       })
     (merge_objs
-       (obj9
+       (obj10
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
+          (req "nonce_revelation_threshold" int32)
           (req "blocks_per_stake_snapshot" int32)
           (req "cycles_per_voting_period" int32)
           (req
@@ -399,7 +408,8 @@ let encoding =
           (req "proof_of_work_threshold" int64)
           (req "tokens_per_roll" Tez_repr.encoding))
        (merge_objs
-          (obj8
+          (obj9
+             (req "vdf_difficulty" int64)
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)
              (req "origination_size" int31)
              (req "baking_reward_fixed_portion" Tez_repr.encoding)

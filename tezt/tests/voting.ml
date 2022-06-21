@@ -285,6 +285,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
     if Protocol.number from_protocol >= 013 then
       [
         (["blocks_per_cycle"], Some "4");
+        (["nonce_revelation_threshold"], Some "2");
         (["cycles_per_voting_period"], Some "1");
       ]
     else

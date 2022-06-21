@@ -812,12 +812,14 @@ module Constants : sig
       preserved_cycles : int;
       blocks_per_cycle : int32;
       blocks_per_commitment : int32;
+      nonce_revelation_threshold : int32;
       blocks_per_stake_snapshot : int32;
       cycles_per_voting_period : int32;
       hard_gas_limit_per_operation : Gas.Arith.integral;
       hard_gas_limit_per_block : Gas.Arith.integral;
       proof_of_work_threshold : int64;
       tokens_per_roll : Tez.t;
+      vdf_difficulty : int64;
       seed_nonce_revelation_tip : Tez.t;
       origination_size : int;
       baking_reward_fixed_portion : Tez.t;
@@ -877,6 +879,8 @@ module Constants : sig
 
   val blocks_per_commitment : context -> int32
 
+  val nonce_revelation_threshold : context -> int32
+
   val blocks_per_stake_snapshot : context -> int32
 
   val cycles_per_voting_period : context -> int32
@@ -892,6 +896,8 @@ module Constants : sig
   val proof_of_work_threshold : context -> int64
 
   val tokens_per_roll : context -> Tez.t
+
+  val vdf_difficulty : context -> int64
 
   val seed_nonce_revelation_tip : context -> Tez.t
 
@@ -1207,6 +1213,8 @@ module Level : sig
   val dawn_of_a_new_cycle : context -> Cycle.t option
 
   val may_snapshot_rolls : context -> bool
+
+  val may_compute_randao : context -> bool
 end
 
 (** This module re-exports definitions from {!Fitness_repr}. *)
@@ -1277,14 +1285,43 @@ end
 module Seed : sig
   type seed
 
-  type error += Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
+  val seed_encoding : seed Data_encoding.t
 
-  val for_cycle : context -> Cycle.t -> seed tzresult Lwt.t
+  type vdf_solution = Vdf.result * Vdf.proof
+
+  val vdf_solution_encoding : vdf_solution Data_encoding.t
+
+  val pp_solution : Format.formatter -> vdf_solution -> unit
+
+  type vdf_setup = Vdf.discriminant * Vdf.challenge
+
+  type error +=
+    | Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
+    | Already_accepted
+    | Unverified_vdf
+    | Too_early_revelation
+
+  val generate_vdf_setup :
+    seed_discriminant:seed -> seed_challenge:seed -> vdf_setup
+
+  val check_vdf_and_update_seed :
+    context -> vdf_solution -> context tzresult Lwt.t
+
+  val compute_randao : context -> context tzresult Lwt.t
 
   val cycle_end :
     context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t
 
-  val seed_encoding : seed Data_encoding.t
+  (* RPC *)
+  type seed_computation_status =
+    | Nonce_revelation_stage
+    | Vdf_revelation_stage of {seed_discriminant : seed; seed_challenge : seed}
+    | Computation_finished
+
+  val for_cycle : context -> Cycle.t -> seed tzresult Lwt.t
+
+  val get_seed_computation_status :
+    context -> seed_computation_status tzresult Lwt.t
 end
 
 module Big_map : sig
@@ -3383,6 +3420,8 @@ module Kind : sig
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
+  type vdf_revelation = Vdf_revelation_kind
+
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
@@ -3532,6 +3571,10 @@ and _ contents =
       nonce : Nonce.t;
     }
       -> Kind.seed_nonce_revelation contents
+  | Vdf_revelation : {
+      solution : Seed.vdf_solution;
+    }
+      -> Kind.vdf_revelation contents
   | Double_preendorsement_evidence : {
       op1 : Kind.preendorsement operation;
       op2 : Kind.preendorsement operation;
@@ -3809,6 +3852,8 @@ module Operation : sig
     val dal_slot_availability_case : Kind.dal_slot_availability case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
+
+    val vdf_revelation_case : Kind.vdf_revelation case
 
     val double_preendorsement_evidence_case :
       Kind.double_preendorsement_evidence case

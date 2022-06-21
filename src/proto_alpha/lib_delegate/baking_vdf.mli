@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,43 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Daemons directly supported by lib_delegate *)
+open Protocol.Alpha_context
 
-(** {1 Baker daemon} *)
-module Baker : sig
-  val run :
-    Protocol_client_context.full ->
-    ?minimal_fees:Protocol.Alpha_context.Tez.t ->
-    ?minimal_nanotez_per_gas_unit:Q.t ->
-    ?minimal_nanotez_per_byte:Q.t ->
-    liquidity_baking_toggle_vote:
-      Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote ->
-    ?per_block_vote_file:string ->
-    ?extra_operations:Baking_configuration.Operations_source.t ->
-    chain:Shell_services.chain ->
-    context_path:string ->
-    keep_alive:bool ->
-    Baking_state.delegate list ->
-    unit tzresult Lwt.t
-end
-
-(** {1 Accuser daemon} *)
-
-module Accuser : sig
-  val run :
-    #Protocol_client_context.full ->
-    chain:Chain_services.chain ->
-    preserved_levels:int ->
-    keep_alive:bool ->
-    unit tzresult Lwt.t
-end
-
-(** {1 VDF computation daemon} *)
-
-module VDF : sig
-  val run :
-    Protocol_client_context.full ->
-    chain:Chain_services.chain ->
-    keep_alive:bool ->
-    unit tzresult Lwt.t
-end
+val start_vdf_worker :
+  Protocol_client_context.full ->
+  canceler:Lwt_canceler.t ->
+  Constants.t ->
+  Client_baking_blocks.block_info tzresult Lwt_stream.t ->
+  unit tzresult Lwt.t

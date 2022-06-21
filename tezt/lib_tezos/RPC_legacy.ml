@@ -462,6 +462,20 @@ module Delegates = struct
     get_sub ?endpoint ?hooks ~chain ~block ~pkh "voting_power" client
 end
 
+module Seed = struct
+  let get_seed ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
+    let path = ["chains"; chain; "blocks"; block; "context"; "seed"] in
+    let* json = Client.rpc ?endpoint ?hooks POST path client in
+    return (JSON.as_string json)
+
+  let get_seed_status ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      client =
+    let path =
+      ["chains"; chain; "blocks"; block; "context"; "seed_computation"]
+    in
+    Client.rpc ?endpoint ?hooks GET path client
+end
+
 module Votes = struct
   let sub_path ~chain ~block sub =
     ["chains"; chain; "blocks"; block; "votes"; sub]

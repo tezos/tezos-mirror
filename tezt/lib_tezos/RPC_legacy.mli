@@ -689,6 +689,24 @@ module Delegates : sig
     Process.t
 end
 
+module Seed : sig
+  val get_seed :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    string Lwt.t
+
+  val get_seed_status :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+end
+
 module Votes : sig
   (** Common protocol RPSs for votes (i.e. under [/votes]). *)
 

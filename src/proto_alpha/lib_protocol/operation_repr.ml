@@ -43,6 +43,8 @@ module Kind = struct
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
+  type vdf_revelation = Vdf_revelation_kind
+
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
@@ -260,6 +262,10 @@ and _ contents =
       nonce : Seed_repr.nonce;
     }
       -> Kind.seed_nonce_revelation contents
+  | Vdf_revelation : {
+      solution : Seed_repr.vdf_solution;
+    }
+      -> Kind.vdf_revelation contents
   | Double_preendorsement_evidence : {
       op1 : Kind.preendorsement operation;
       op2 : Kind.preendorsement operation;
@@ -1297,6 +1303,18 @@ module Encoding = struct
         inj = (fun (level, nonce) -> Seed_nonce_revelation {level; nonce});
       }
 
+  let[@coq_axiom_with_reason "gadt"] vdf_revelation_case =
+    Case
+      {
+        tag = 8;
+        name = "vdf_revelation";
+        encoding = obj1 (req "solution" Seed_repr.vdf_solution_encoding);
+        select =
+          (function Contents (Vdf_revelation _ as op) -> Some op | _ -> None);
+        proj = (function Vdf_revelation {solution} -> solution);
+        inj = (fun solution -> Vdf_revelation {solution});
+      }
+
   let[@coq_axiom_with_reason "gadt"] double_preendorsement_evidence_case :
       Kind.double_preendorsement_evidence case =
     Case
@@ -1583,6 +1601,7 @@ module Encoding = struct
            make preendorsement_case;
            make dal_slot_availability_case;
            make seed_nonce_revelation_case;
+           make vdf_revelation_case;
            make double_endorsement_evidence_case;
            make double_preendorsement_evidence_case;
            make double_baking_evidence_case;
@@ -1677,6 +1696,7 @@ let acceptable_passes (op : packed_operation) =
   | Single (Proposals _) -> [1]
   | Single (Ballot _) -> [1]
   | Single (Seed_nonce_revelation _) -> [2]
+  | Single (Vdf_revelation _) -> [2]
   | Single (Double_endorsement_evidence _) -> [2]
   | Single (Double_preendorsement_evidence _) -> [2]
   | Single (Double_baking_evidence _) -> [2]
@@ -1759,9 +1779,9 @@ let check_signature (type kind) key chain_id
             signature
       | Single
           ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-          | Double_endorsement_evidence _ | Double_preendorsement_evidence _
-          | Double_baking_evidence _ | Activate_account _ | Manager_operation _
-            ) ->
+          | Vdf_revelation _ | Double_endorsement_evidence _
+          | Double_preendorsement_evidence _ | Double_baking_evidence _
+          | Activate_account _ | Manager_operation _ ) ->
           check
             ~watermark:Generic_operation
             (Contents_list protocol_data.contents)
@@ -1856,6 +1876,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Dal_slot_availability _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
+  | Vdf_revelation _, Vdf_revelation _ -> Some Eq
+  | Vdf_revelation _, _ -> None
   | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq
   | Double_endorsement_evidence _, _ -> None
   | Double_preendorsement_evidence _, Double_preendorsement_evidence _ ->

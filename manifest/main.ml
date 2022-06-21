@@ -330,6 +330,9 @@ let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
 let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos"
 
+let vdf =
+  external_lib ~js_compatible:true "class_group_vdf" V.(at_least "0.0.2")
+
 (* INTERNAL LIBS *)
 
 let tezos_test_helpers =
@@ -1811,6 +1814,7 @@ protocols.|}
         zarith_stubs_js;
         bls12_381;
         plonk;
+        vdf;
         ringo;
         ringo_lwt;
         tezos_base |> open_ ~m:"TzPervasives";
