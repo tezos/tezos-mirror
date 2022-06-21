@@ -192,10 +192,15 @@ let number_of_ticks (_hash, (commitment : Sc_rollup_client.commitment), _level)
     =
   commitment.number_of_ticks
 
-let last_cemented_commitment_hash_with_level json =
+let last_cemented_commitment_hash_with_level ~sc_rollup_address client =
+  let* json =
+    RPC.Client.call client
+    @@ RPC.Sc_rollup.get_last_cemented_commitment_hash_with_level
+         sc_rollup_address
+  in
   let hash = JSON.(json |-> "hash" |> as_string) in
   let level = JSON.(json |-> "level" |> as_int) in
-  (hash, level)
+  return (hash, level)
 
 let get_staked_on_commitment ~sc_rollup_address ~staker client =
   let* json =
@@ -222,6 +227,29 @@ let cement_commitment client ~sc_rollup_address ~hash =
       client
   in
   Client.bake_for_and_wait client
+
+let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
+    client sc_rollup =
+  let ({
+         compressed_state;
+         inbox_level;
+         predecessor;
+         number_of_messages;
+         number_of_ticks;
+       }
+        : Sc_rollup_client.commitment) =
+    commitment
+  in
+  Client.Sc_rollup.publish_commitment
+    ~hooks
+    ~src
+    ~sc_rollup
+    ~compressed_state
+    ~inbox_level
+    ~predecessor
+    ~number_of_messages
+    ~number_of_ticks
+    client
 
 (*
 
@@ -434,13 +462,8 @@ let test_rollup_get_last_cemented_commitment_hash_with_level =
         (* Bake 10 blocks to be sure that the origination_level of rollup is different
            from the level of the head node. *)
         let* () = repeat 10 (fun () -> Client.bake_for_and_wait client) in
-        let* lcc_info_json =
-          RPC.Client.call client
-          @@ RPC.Sc_rollup.get_last_cemented_commitment_hash_with_level
-               sc_rollup_address
-        in
-        let hash, level =
-          last_cemented_commitment_hash_with_level lcc_info_json
+        let* hash, level =
+          last_cemented_commitment_hash_with_level ~sc_rollup_address client
         in
         (* The hardcoded value of `Sc_rollup.Commitment.zero` is
            "scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG". *)
@@ -1936,6 +1959,80 @@ let test_rollup_client_list_keys =
           pp
           maybe_keys)
 
+let publish_dummy_commitment ~inbox_level ~predecessor ~sc_rollup ~src client =
+  let commitment : Sc_rollup_client.commitment =
+    {
+      compressed_state = Constant.sc_rollup_compressed_state;
+      inbox_level;
+      predecessor;
+      number_of_messages = 0;
+      number_of_ticks = 0;
+    }
+  in
+
+  let*! () = publish_commitment ~src ~commitment client sc_rollup in
+  Client.bake_for_and_wait client
+
+let test_consecutive_commitments =
+  regression_test
+    ~__FILE__
+    ~tags:["l1"; "commitment"]
+    "consecutive commitments"
+    (fun protocol ->
+      setup ~protocol @@ fun _node client bootstrap1_key ->
+      let* sc_rollup =
+        Client.Sc_rollup.originate
+          ~hooks
+          ~burn_cap:Tez.(of_int 9999999)
+          ~src:bootstrap1_key
+          ~kind:"arith"
+          ~parameters_ty:"unit"
+          ~boot_sector:""
+          client
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let* inbox_level = Client.level client in
+      let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
+      let* () = Client.bake_for_and_wait client in
+      (* As we did no publish any commitment yet, this is supposed to fail. *)
+      let*? process =
+        RPC.Client.spawn client
+        @@ RPC.Sc_rollup.get_staked_on_commitment
+             ~sc_rollup_address:sc_rollup
+             operator
+      in
+      let* () = Process.check_error ~msg:(rex "Unknown staker") process in
+      let* predecessor, _ =
+        last_cemented_commitment_hash_with_level
+          ~sc_rollup_address:sc_rollup
+          client
+      in
+      let* () =
+        publish_dummy_commitment
+          ~inbox_level:(inbox_level + commitment_period_in_blocks + 1)
+          ~predecessor
+          ~sc_rollup
+          ~src:operator
+          client
+      in
+      (* We get the predecessor's hash by getting the commitment on which
+         the operator just staked on. *)
+      let* predecessor =
+        get_staked_on_commitment
+          ~sc_rollup_address:sc_rollup
+          ~staker:operator
+          client
+      in
+      let* () =
+        publish_dummy_commitment
+          ~inbox_level:(inbox_level + (2 * commitment_period_in_blocks) + 1)
+          ~predecessor
+          ~sc_rollup
+          ~src:operator
+          client
+      in
+      unit)
+
 let register ~protocols =
   test_origination protocols ;
   test_rollup_node_configuration protocols ;
@@ -1979,6 +2076,7 @@ let register ~protocols =
     "first_published_at_level_global"
     first_published_level_is_global
     protocols ;
+  test_consecutive_commitments protocols ;
   test_rollup_origination_boot_sector protocols ;
   test_rollup_node_uses_boot_sector protocols ;
   test_rollup_client_show_address protocols ;
