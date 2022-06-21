@@ -211,14 +211,12 @@ cd lib_protocol
 sed -i.old -e 's/"hash": "[^"]*",/"hash": "'$long_hash'",/' \
     TEZOS_PROTOCOL
 
-# We use -exec instead of just passing the result of find to sed in order
-# to support spaces in filenames.
-find . -type f -exec \
+# We use `--print0` and `xargs -0` instead of just passing the result
+# of find to sed in order to support spaces in filenames.
+find . -type f -print0 | xargs -0 \
   sed -i.old -e s/protocol_alpha/protocol_${version}_${short_hash}/ \
              -e s/protocol-alpha/protocol-${version}-${short_hash}/ \
-             -e s/protocol-functor-alpha/protocol-functor-${version}-${short_hash}/ \
-             {} \;
-
+             -e s/protocol-functor-alpha/protocol-functor-${version}-${short_hash}/
 # add this protocol to the immutable list
 printf \\n$long_hash >> ../../lib_protocol_compiler/final_protocol_versions
 
