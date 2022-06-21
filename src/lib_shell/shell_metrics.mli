@@ -23,8 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Worker : sig
+  type timestamps
+
+  type counters = {
+    worker_request_count : Prometheus.Counter.t;
+    worker_completion_count : Prometheus.Counter.t;
+    worker_error_count : Prometheus.Counter.t;
+  }
+
+  val update_timestamps : timestamps -> Worker_types.request_status -> unit
+end
+
 (** Metrics associated to the mempool *)
 module Mempool : sig
+  type t = {worker_counters : Worker.counters}
+
+  val init : string list -> t
+
   val set_applied_collector : (unit -> float) -> unit
 
   val set_prechecked_collector : (unit -> float) -> unit
@@ -38,12 +54,6 @@ module Mempool : sig
   val set_outdated_collector : (unit -> float) -> unit
 
   val set_unprocessed_collector : (unit -> float) -> unit
-end
-
-module Worker : sig
-  type t
-
-  val update : t -> Worker_types.request_status -> unit
 end
 
 module Distributed_db : sig
@@ -64,10 +74,11 @@ module Block_validator : sig
     preapplication_errors_count : Prometheus.Counter.t;
     validation_errors_after_precheck_count : Prometheus.Counter.t;
     precheck_failed_count : Prometheus.Counter.t;
-    validation_worker_metrics : Worker.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
 
-  val init : string trace -> t
+  val init : string list -> t
 
   val set_operation_per_pass_collector : (unit -> float list) -> unit
 end
@@ -110,11 +121,12 @@ module Chain_validator : sig
     branch_switch_count : Prometheus.Counter.t;
     head_increment_count : Prometheus.Counter.t;
     head_round : Prometheus.Gauge.t;
-    validation_worker_metrics : Worker.t;
     head_cycle : Prometheus.Gauge.t;
     consumed_gas : Prometheus.Gauge.t;
     is_bootstrapped : Prometheus.Gauge.t;
     sync_status : Prometheus.Gauge.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
 
   val update_bootstrapped : metrics:t -> bool -> unit
@@ -124,7 +136,7 @@ module Chain_validator : sig
     Chain_validator_worker_state.Event.synchronisation_status ->
     unit
 
-  val init : string trace -> Chain_id.t -> t
+  val init : string list -> Chain_id.t -> t
 
   val update_proto_metrics_callback :
     metrics:t -> cycle:float -> consumed_gas:float -> round:float -> unit
@@ -154,5 +166,5 @@ module Peer_validator : sig
     connections : Prometheus.Counter.t;
   }
 
-  val init : string trace -> t
+  val init : string list -> t
 end
