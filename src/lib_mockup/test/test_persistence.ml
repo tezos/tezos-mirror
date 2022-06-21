@@ -88,7 +88,8 @@ let test_classify_is_empty =
           check_base_dir "An empty directory" Base_dir_is_empty bd))
 
 module Mock_protocol : Registration.PROTOCOL = struct
-  include Environment_protocol_T_test.Internal_for_tests.Mock_all_unit
+  open Tezos_protocol_environment.Internal_for_tests
+  include Environment_protocol_T_test.Mock_all_unit
 
   let hash = Protocol_hash.hash_string [""]
 end

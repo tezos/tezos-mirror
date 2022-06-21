@@ -630,10 +630,6 @@ type with_test = Always | Never | Only_on_64_arch
       The user should give the name of e.g. the public library that serves as default
       implementation.
 
-    - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
-      This causes the library to not come with a toplevel module with aliases to
-      all other modules. Not recommended (according to the dune documentation).
-
     - [license]: specific license to use for that target. If omitted it will
       default to MIT.
 
@@ -673,7 +669,6 @@ type 'a maker =
   ?time_measurement_ppx:bool ->
   ?virtual_modules:string list ->
   ?default_implementation:string ->
-  ?wrapped:bool ->
   ?cram:bool ->
   ?license:string ->
   ?extra_authors:string list ->

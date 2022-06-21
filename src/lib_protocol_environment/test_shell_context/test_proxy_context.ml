@@ -59,7 +59,7 @@ let init_contexts (f : Context.t -> unit Lwt.t) _ () : 'a Lwt.t =
   let ctxt = Tezos_context_memory.make_empty_context () in
   let* ctxt = create_block ctxt in
   let proxy : Context.t =
-    Proxy_context.empty
+    Tezos_protocol_environment.Proxy_context.empty
       (Some (Tezos_shell_context.Proxy_delegate_maker.of_memory_context ctxt))
   in
   f proxy

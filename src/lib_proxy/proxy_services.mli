@@ -42,7 +42,9 @@ type mode =
       sleep : float -> unit Lwt.t;
       sym_block_caching_time : Ptime.span option;
       on_disk_proxy_builder :
-        (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option;
+        (Context_hash.t ->
+        Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
+        option;
     }
       (** [tezos-proxy-server] is running. The [sleep] field is implemented
           by {!Lwt_unix.sleep}. We don't want to depend on it directly

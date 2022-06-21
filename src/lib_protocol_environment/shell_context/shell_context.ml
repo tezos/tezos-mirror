@@ -32,7 +32,7 @@ module C = struct
   let set_protocol = add_protocol
 end
 
-include Environment_context.Register (C)
+include Register (C)
 
 let impl_name = "shell"
 
@@ -55,6 +55,4 @@ let wrap_disk_context ctxt =
 let unwrap_disk_context : t -> Tezos_context.Context.t = function
   | Context.Context {ctxt; kind = Context; _} -> ctxt
   | Context.Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:impl_name
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:impl_name ~got:t.impl_name

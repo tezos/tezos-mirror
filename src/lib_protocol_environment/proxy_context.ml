@@ -395,7 +395,7 @@ module C = struct
   let equal_config = Local.equal_config
 end
 
-open Tezos_protocol_environment
+open Environment_context
 include Environment_context.Register (C)
 
 let proxy_impl_name = "proxy"

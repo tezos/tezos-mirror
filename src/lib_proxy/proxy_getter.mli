@@ -95,7 +95,9 @@ type proxy_m = (module M)
 type proxy_builder =
   | Of_rpc of (Proxy_proto.proto_rpc -> proxy_m Lwt.t)
       (** Build a proxy that uses network requests for all data. *)
-  | Of_data_dir of (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t)
+  | Of_data_dir of
+      (Context_hash.t ->
+      Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
       (** Build a proxy that looks up data in a running node's data dir. *)
 
 (** Input data required by the proxy mode to build a
@@ -124,7 +126,7 @@ val make_delegate :
   rpc_context_args ->
   (module Proxy_proto.PROTO_RPC) ->
   Context_hash.t ->
-  Proxy_delegate.t tzresult Lwt.t
+  Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t
 
 (** Functor to obtain the implementation of [M] for the proxy
     mode (as opposed to the light mode implementation) *)

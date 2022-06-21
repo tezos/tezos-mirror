@@ -126,7 +126,10 @@ type result = {
   ops_metadata : ops_metadata;
 }
 
-type apply_result = {result : result; cache : Environment_context.Context.cache}
+type apply_result = {
+  result : result;
+  cache : Tezos_protocol_environment.Context.cache;
+}
 
 let check_proto_environment_version_increasing block_hash before after =
   let open Result_syntax in
@@ -235,7 +238,9 @@ let may_force_protocol_upgrade ~user_activated_upgrades ~level
   | None -> return validation_result
   | Some hash ->
       let* context =
-        Environment_context.Context.set_protocol validation_result.context hash
+        Tezos_protocol_environment.Context.set_protocol
+          validation_result.context
+          hash
       in
       return {validation_result with context}
 
@@ -259,7 +264,7 @@ let may_patch_protocol ~user_activated_upgrades
         validation_result
   | Some replacement_protocol ->
       let* context =
-        Environment_context.Context.set_protocol
+        Tezos_protocol_environment.Context.set_protocol
           validation_result.context
           replacement_protocol
       in
@@ -551,7 +556,7 @@ module Make (Proto : Registered_protocol.T) = struct
 
   let may_init_new_protocol chain_id new_protocol
       (block_header : Proto.block_header) block_hash
-      (validation_result : Environment_context.validation_result) =
+      (validation_result : Tezos_protocol_environment.validation_result) =
     let open Lwt_result_syntax in
     if Protocol_hash.equal new_protocol Proto.hash then
       return (validation_result, Proto.environment_version)
@@ -984,7 +989,7 @@ module Make (Proto : Registered_protocol.T) = struct
         validation_result
     in
     let*! protocol =
-      Environment_context.Context.get_protocol validation_result.context
+      Tezos_protocol_environment.Context.get_protocol validation_result.context
     in
     let proto_level =
       if Protocol_hash.equal protocol Proto.hash then
@@ -996,7 +1001,7 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     let* validation_result, cache, new_protocol_env_version =
       if Protocol_hash.equal protocol Proto.hash then
-        let (Environment_context.Context.Context {cache; _}) =
+        let (Tezos_protocol_environment.Context.Context {cache; _}) =
           validation_result.context
         in
         return (validation_result, cache, Proto.environment_version)
@@ -1018,7 +1023,7 @@ module Make (Proto : Registered_protocol.T) = struct
             let* validation_result =
               NewProto.init chain_id validation_result.context shell_header
             in
-            let (Environment_context.Context.Context {cache; _}) =
+            let (Tezos_protocol_environment.Context.Context {cache; _}) =
               validation_result.context
             in
             let*! () =
@@ -1169,7 +1174,7 @@ type apply_environment = {
   max_operations_ttl : int;
   chain_id : Chain_id.t;
   predecessor_block_header : Block_header.t;
-  predecessor_context : Environment_context.Context.t;
+  predecessor_context : Tezos_protocol_environment.Context.t;
   predecessor_block_metadata_hash : Block_metadata_hash.t option;
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   user_activated_upgrades : User_activated.upgrades;
@@ -1278,7 +1283,7 @@ let apply ?cached_result c ~cache block_header operations =
             "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
         in
         if protocol_hash = hangzhou_hash then (
-          Environment_context.Context
+          Tezos_protocol_environment.Context
           .reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing
             () ;
           Lwt.return r)

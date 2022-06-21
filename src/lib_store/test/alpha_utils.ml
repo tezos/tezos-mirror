@@ -506,7 +506,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       ~timestamp:shell.timestamp
   in
   let* predecessor_context =
-    Environment_context.Context.load_cache
+    Tezos_protocol_environment.Context.load_cache
       (Store.Block.hash pred)
       predecessor_context
       `Lazy
@@ -628,7 +628,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         {
           context_hash;
           timestamp = block_header.shell.timestamp;
-          message = validation.Environment_context.message;
+          message = validation.Tezos_protocol_environment.message;
           max_operations_ttl = validation.max_operations_ttl;
           last_allowed_fork_level = validation.last_allowed_fork_level;
         };

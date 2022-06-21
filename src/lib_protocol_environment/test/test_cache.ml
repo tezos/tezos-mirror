@@ -32,7 +32,8 @@
     Subject:      Low-level operations on protocol cache
 *)
 
-open Environment_cache
+open Tezos_protocol_environment.Internal_for_tests.Environment_cache
+
 open Lib_test.Qcheck2_helpers
 open QCheck2
 module Test = QCheck2.Test
@@ -653,8 +654,6 @@ let check_from_cache_with_same_domain_copies =
    implemented in {!Environment_context}.
 
 *)
-open Environment_context
-
 type Context.cache_value += Int of int
 
 let load_cache_correctly_restores_cache_in_memory builder mode

@@ -35,7 +35,8 @@ module Mock_protocol :
     with type operation_data = unit
      and type operation_receipt = unit
      and type validation_state = unit = struct
-  include Environment_protocol_T_test.Internal_for_tests.Mock_all_unit
+  open Tezos_protocol_environment.Internal_for_tests
+  include Environment_protocol_T_test.Mock_all_unit
 
   let begin_construction ~chain_id:_ ~predecessor_context:_
       ~predecessor_timestamp:_ ~predecessor_level:_ ~predecessor_fitness:_

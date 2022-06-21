@@ -1829,7 +1829,6 @@ protocols.|}
         octez_scoru_wasm;
         octez_event_logging;
       ]
-    ~wrapped:false
 
 let octez_shell_context =
   public_lib

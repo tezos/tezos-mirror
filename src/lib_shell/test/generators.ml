@@ -104,9 +104,9 @@ let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
     speaking. One can make sure that this generator generates
     parsable operations by assuming a protocol and using a custom [proto_gen].
     As an example this is the case when using
-    {!Environment_protocol_T_test.Internal_for_tests.Mock_all_unit} as the
-    protocol and specifying [proto_gen] to be [string_size (return 0)] i.e.
-    to have both [operation_data = unit] and strings generated for
+    {!Tezos_protocol_environment.Internal_for_tests.Environment_protocol_T_test.Mock_all_unit}
+    as the protocol and specifying [proto_gen] to be [string_size (return 0)]
+    i.e. to have both [operation_data = unit] and strings generated for
     [operation_data] always empty. *)
 let operation_with_hash_gen ?proto_gen ?block_hash_t () :
     unit Prevalidation.operation QCheck2.Gen.t =

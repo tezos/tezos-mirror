@@ -25,7 +25,7 @@
 
 (** Representation of a block in the simulator. *)
 type block = {
-  rpc_context : Environment_context.rpc_context;
+  rpc_context : Tezos_protocol_environment.rpc_context;
   protocol_data : Protocol.Alpha_context.Block_header.protocol_data;
   raw_protocol_data : Bytes.t;
   operations : Mockup.M.Block_services.operation list list;
