@@ -34,29 +34,6 @@ say () {
 }
 
 
-make_dot_ocamlformat () {
-    local path="$1"
-    cat > "$path" <<EOF
-version=0.21.0
-ocaml-version=4.12.1
-wrap-fun-args=false
-let-binding-spacing=compact
-field-space=loose
-break-separators=after
-space-around-arrays=false
-space-around-lists=false
-space-around-records=false
-space-around-variants=false
-dock-collection-brackets=true
-space-around-records=false
-sequence-style=separator
-doc-comments=before
-margin=80
-module-item-spacing=sparse
-parens-tuple=always
-EOF
-}
-
 declare -a source_directories
 
 source_directories=(src docs/doc_gen tezt devtools)
@@ -78,7 +55,7 @@ update_all_dot_ocamlformats () {
     interesting_directories=$(find "${source_directories[@]}" -name "dune-project" -type f -print | sed 's:/[^/]*$::' | LC_COLLATE=C sort -u)
     for d in $interesting_directories ; do
         ofmt=$d/.ocamlformat
-        make_dot_ocamlformat "$ofmt"
+        cp .ocamlformat "$ofmt"
         git add "$ofmt"
     done
     # we don't want to reformat protocols (but alpha) because it would alter its hash
