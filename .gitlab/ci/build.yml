@@ -59,6 +59,7 @@ build_arm64:
 build_get_contracts:
   extends:
     - .build_template
+    - .rules_template__development
   script:
     - dune build @devtools/get_contracts/check
 
