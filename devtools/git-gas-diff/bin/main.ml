@@ -274,7 +274,7 @@ module Synth = struct
       str;
     }
 
-  let show
+  let show_it
       {
         old;
         new_;
@@ -322,6 +322,8 @@ module Synth = struct
       (string_of_max_pct max_gain_pct)
       total
       degradations
+
+  let show synth = if synth.total <> 0 then show_it synth
 
   let get_diff = function '-' -> Some Removed | '+' -> Some Added | _ -> None
 
@@ -702,7 +704,25 @@ module Synths = struct
     Printf.printf
       "Total number of lines with a degradation: %d.\n\n"
       total_degradations ;
-    Printf.printf "Lines with the following strings were ignored:\n%!" ;
+    Printf.printf "Lines with the following strings have not changed:\n%!" ;
+    List.iter
+      (fun synth ->
+        if synth.Synth.total = 0 then Printf.printf "  `%s`\n%!" synth.Synth.str)
+      [
+        estimated;
+        estimated_storage;
+        consumed;
+        gas_remaining;
+        storage_size;
+        gas_limit;
+        storage_limit;
+        remaining_gas;
+        baker_fee;
+        payload_fee;
+        storage_fee;
+        fee;
+      ] ;
+    Printf.printf "\nLines with the following strings were ignored:\n%!" ;
     List.iter
       (Printf.printf "  `%s`\n%!")
       (hash_strs @ tezos_client_strs @ operation_hash_strs @ new_contract_strs
