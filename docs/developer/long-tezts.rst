@@ -84,7 +84,7 @@ previous runs, and send an alert if the difference is too large.
 The ``Long_test`` module also provides function
 ``update_grafana_dashboard`` called in
 :src:`tezt/long_tests/main.ml` with a specification to create/overwrite a dashboard
-in `Nomadic Labs' Grafana <https://grafana.nomadic-labs.com/d/longtezts>`_.
+in `Nomadic Labs' Grafana <https://grafana.nomadic-labs.cloud/d/longtezts>`_.
 Default is named `Long Tezts` but you can add additional dashboards using the
 `Long_test.update_grafana_dashboard` function. To add a dashboard for your tests, define
 it next to your test (in the same file), and declare it in the call to
@@ -100,9 +100,9 @@ functions that are also provided and which you can combine to fit your
 needs. And of course you can contribute to improve them.
 
 Automated long tezts logs are available in `Nomadic Labs' public S3 bucket browser
-<https://logs.nomadic-labs.com/#PRT/master/>`_. In case of InfluxDB issues, you can
+<https://logs.nomadic-labs.cloud/#PRT/master/>`_. In case of InfluxDB issues, you can
 also inspect the time series stored with `Nomadic Labs' private Chronograf
-<https://chronograf.nomadic-labs.com/>`_, but access is restricted to administrators.
+<https://chronograf.nomadic-labs.cloud/>`_, but access is restricted to administrators.
 
 Example
 -------
