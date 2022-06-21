@@ -1240,7 +1240,25 @@ module Sc_rollup : sig
     t ->
     Process.t
 
-  (** Run [tezos-client cemment commitment <hash> from <src> for sc rollup <rollup>]. *)
+  (** Run [tezos-client publish commitment from <src> for sc rollup <sc_rollup>
+      with compressed state <compressed_state> at inbox level <inbox_level>
+      and predecessor <predecessor> and number of messages <number_of_messages>
+      and number of ticks <number_of_ticks>. *)
+  val publish_commitment :
+    ?hooks:Process.hooks ->
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    src:string ->
+    sc_rollup:string ->
+    compressed_state:string ->
+    inbox_level:int ->
+    predecessor:string ->
+    number_of_messages:int ->
+    number_of_ticks:int ->
+    t ->
+    unit Runnable.process
+
+  (** Run [tezos-client cement commitment <hash> from <src> for sc rollup <rollup>]. *)
   val cement_commitment :
     ?hooks:Process.hooks ->
     ?wait:string ->
