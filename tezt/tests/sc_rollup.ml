@@ -162,7 +162,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address
   in
-  let* () = Client.bake_for tezos_client in
+  let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
@@ -304,7 +304,7 @@ let with_fresh_rollup ?(boot_sector = "") f tezos_node tezos_client
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address
   in
-  let* () = Client.bake_for tezos_client in
+  let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
 let with_fresh_rollups n f node client bootstrap1 =
