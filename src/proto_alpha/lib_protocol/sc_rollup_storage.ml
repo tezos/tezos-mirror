@@ -131,6 +131,8 @@ let parameters_type ctxt rollup =
   (res, ctxt)
 
 module Dal_slot = struct
+  open Dal_errors_repr
+
   let slot_of_int_e n =
     let open Tzresult_syntax in
     match Dal_slot_repr.Index.of_int n with
@@ -161,9 +163,7 @@ module Dal_slot = struct
     let open Lwt_tzresult_syntax in
     let current_level = (Raw_context.current_level ctxt).level in
     if Raw_level_repr.(level > current_level) then
-      fail
-        (Sc_rollup_requested_dal_slot_subscriptions_of_future_level
-           (current_level, level))
+      fail (Dal_requested_subscriptions_at_future_level (current_level, level))
     else
       let*! subscription_levels =
         Store.Slot_subscriptions.keys (ctxt, rollup)
@@ -203,7 +203,7 @@ module Dal_slot = struct
       Bitset.mem subscribed_slots (Dal_slot_repr.Index.to_int slot_index)
     in
     if slot_already_subscribed then
-      fail (Sc_rollup_dal_slot_already_registered (rollup, slot_index))
+      fail (Dal_rollup_already_registered_to_slot (rollup, slot_index))
     else
       let*? subscribed_slots =
         Bitset.add subscribed_slots (Dal_slot_repr.Index.to_int slot_index)

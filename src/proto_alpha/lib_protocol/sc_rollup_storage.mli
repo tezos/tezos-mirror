@@ -78,8 +78,8 @@ module Dal_slot : sig
        {li [Dal_subscribe_rollup_invalid_slot_index of {given=slot_index; maximum}] if
          the slot_index is either negative or above [maximum], which is the maximum
        slot index (inclusive) allowed}
-       {li [Sc_rollup_dal_slot_already_registered slot_index] if [rollup] is
-         already subscribed to [slot_index]}
+       {li [Dal_errors_repr.Dal_rollup_already_registered_to_slot (rollup, slot_index)]
+         if [rollup] is already subscribed to [slot_index]}
      }
   *)
   val subscribe :
@@ -94,7 +94,7 @@ module Dal_slot : sig
       May fail with:
      {ul
        {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-       {li [Sc_rollup_requested_dal_slot_subscriptions_of_future_level (current, level)]
+       {li [Dal_errors_repr.Dal_requested_subscriptions_at_future_level (current_level, level)]
        if [level] is above the current elvel, i.e.
        [current] = [Raw_context.current_level ctxt] and [level] > [current]}
      }
