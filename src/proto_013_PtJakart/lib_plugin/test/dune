@@ -13,7 +13,6 @@
   tezos-stdlib-unix
   tezos-micheline
   tezos-protocol-plugin-013-PtJakart
-  tezos-protocol-013-PtJakart.environment
   tezos-protocol-013-PtJakart
   tezos-protocol-013-PtJakart.parameters
   tezos-013-PtJakart-test-helpers)
@@ -24,7 +23,6 @@
   -open Tezos_base_test_helpers
   -open Tezos_micheline
   -open Tezos_protocol_plugin_013_PtJakart
-  -open Tezos_protocol_environment_013_PtJakart
   -open Tezos_protocol_013_PtJakart
   -open Tezos_protocol_013_PtJakart.Protocol
   -open Tezos_protocol_013_PtJakart_parameters

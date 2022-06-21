@@ -13,8 +13,7 @@
   tezos-signer-backends
   tezos-client-011-PtHangz2
   tezos-client-011-PtHangz2.commands
-  tezos-protocol-011-PtHangz2
-  tezos-protocol-011-PtHangz2.environment)
+  tezos-protocol-011-PtHangz2)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -24,5 +23,4 @@
   -open Tezos_client_base
   -open Tezos_client_011_PtHangz2
   -open Tezos_client_011_PtHangz2_commands
-  -open Tezos_protocol_011_PtHangz2
-  -open Tezos_protocol_environment_011_PtHangz2))
+  -open Tezos_protocol_011_PtHangz2))

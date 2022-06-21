@@ -26,6 +26,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_protocol_012_Psithaca
   -open Tezos_protocol_012_Psithaca.Protocol
   -open Tezos_client_012_Psithaca)
  (modules get_contracts_012_Psithaca))
@@ -40,6 +41,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_protocol_013_PtJakart
   -open Tezos_protocol_013_PtJakart.Protocol
   -open Tezos_client_013_PtJakart)
  (modules get_contracts_013_PtJakart))
@@ -54,6 +56,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha
   -open Tezos_protocol_alpha.Protocol
   -open Tezos_client_alpha)
  (modules get_contracts_alpha))

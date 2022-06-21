@@ -14,7 +14,6 @@
   tezos-client-013-PtJakart
   tezos-client-013-PtJakart.commands
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart.environment
   tezos-protocol-plugin-013-PtJakart)
  (library_flags (:standard -linkall))
  (flags
@@ -26,5 +25,4 @@
   -open Tezos_client_013_PtJakart
   -open Tezos_client_013_PtJakart_commands
   -open Tezos_protocol_013_PtJakart
-  -open Tezos_protocol_environment_013_PtJakart
   -open Tezos_protocol_plugin_013_PtJakart))

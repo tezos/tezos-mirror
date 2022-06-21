@@ -10,7 +10,6 @@
   tezos-base
   tezos-crypto
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart.environment
   tezos-client-013-PtJakart
   tezos-client-commands
   tezos-context.encoding
@@ -38,7 +37,6 @@
   -open Tezos_base
   -open Tezos_crypto
   -open Tezos_protocol_013_PtJakart
-  -open Tezos_protocol_environment_013_PtJakart
   -open Tezos_client_013_PtJakart
   -open Tezos_client_commands
   -open Tezos_baking_013_PtJakart_commands

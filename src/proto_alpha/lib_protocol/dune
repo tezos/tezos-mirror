@@ -249,7 +249,7 @@
  (flags
   (:standard)
   -nopervasives)
- (modules Protocol))
+ (modules Protocol Tezos_protocol_alpha))
 
 (install
  (package tezos-protocol-alpha)
@@ -262,6 +262,13 @@
   (write-file
    %{targets}
    "module Environment = Tezos_protocol_environment_alpha.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_alpha\ninclude Tezos_raw_protocol_alpha.Main\n")))
+
+(rule
+ (targets tezos_protocol_alpha.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nmodule Environment = Tezos_protocol_environment_alpha.Environment\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

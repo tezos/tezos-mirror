@@ -13,7 +13,6 @@
   tezos-stdlib-unix
   tezos-micheline
   tezos-protocol-plugin-alpha
-  tezos-protocol-alpha.environment
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   tezos-alpha-test-helpers)
@@ -24,7 +23,6 @@
   -open Tezos_base_test_helpers
   -open Tezos_micheline
   -open Tezos_protocol_plugin_alpha
-  -open Tezos_protocol_environment_alpha
   -open Tezos_protocol_alpha
   -open Tezos_protocol_alpha.Protocol
   -open Tezos_protocol_alpha_parameters
