@@ -30,12 +30,18 @@ module Commitment_storage = Sc_rollup_commitment_storage
 module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
-let find_staker ctxt rollup staker =
+let find_staker_unsafe ctxt rollup staker =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
   match res with
   | None -> fail Sc_rollup_not_staked
   | Some branch -> return (branch, ctxt)
+
+let find_staker ctxt rollup staker =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, res = Store.Last_cemented_commitment.mem ctxt rollup in
+  if not res then fail (Sc_rollup_does_not_exist rollup)
+  else find_staker_unsafe ctxt rollup staker
 
 let modify_staker_count ctxt rollup f =
   let open Lwt_tzresult_syntax in
@@ -243,7 +249,7 @@ let commitment_storage_size_in_bytes = 85
 let refine_stake ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  let* staked_on, ctxt = find_staker ctxt rollup staker in
+  let* staked_on, ctxt = find_staker_unsafe ctxt rollup staker in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
   let new_hash = Commitment.hash commitment in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559

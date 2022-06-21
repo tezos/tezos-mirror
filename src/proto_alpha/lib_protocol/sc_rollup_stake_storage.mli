@@ -113,14 +113,26 @@ val cement_commitment :
   Sc_rollup_commitment_repr.Hash.t ->
   Raw_context.t tzresult Lwt.t
 
-(** [find_staker ctxt rollup staker] returns the branch on which the stake
+(** [find_staker_unsafe ctxt rollup staker] returns the branch on which the stake
     is deposited for the [rollup]'s [staker].
+    This function *must* be called only after they have checked for the existence
+    of the rollup, and therefore it is not necessary for it to check for the
+    existence of the rollup again. Otherwise, use the safe function
+    {!find_staker}.
 
     May fail with [Sc_rollup_not_staked] if [staker] is not staked. *)
+val find_staker_unsafe :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_repr.Staker.t ->
+  (Sc_rollup_commitment_repr.Hash.t * Raw_context.t) tzresult Lwt.t
+
+(** Same as {!find_staker_unsafe} but checks for the existence of the [rollup]
+    before. *)
 val find_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Signature.public_key_hash ->
+  Sc_rollup_repr.Staker.t ->
   (Sc_rollup_commitment_repr.Hash.t * Raw_context.t) tzresult Lwt.t
 
 (** The storage size requirement (in bytes) of a commitment *)
