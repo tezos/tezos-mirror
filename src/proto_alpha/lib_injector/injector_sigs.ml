@@ -144,4 +144,7 @@ module type S = sig
       inject their pending operations. *)
   val inject :
     ?tags:tag list -> ?strategy:injection_strategy -> unit -> unit Lwt.t
+
+  (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
+  val shutdown : unit -> unit Lwt.t
 end

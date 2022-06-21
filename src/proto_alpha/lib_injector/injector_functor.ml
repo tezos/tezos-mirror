@@ -958,4 +958,8 @@ module Make (Rollup : PARAMETERS) = struct
           return_unit
         else Lwt.return_unit)
       workers
+
+  let shutdown () =
+    let workers = Worker.list table in
+    List.iter_p (fun (_signer, w) -> Worker.shutdown w) workers
 end
