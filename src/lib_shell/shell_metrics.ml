@@ -25,6 +25,75 @@
 
 let namespace = Tezos_version.Node_version.namespace
 
+module Worker = struct
+  type t = {
+    last_finished_request_push_timestamp : Prometheus.Gauge.t;
+    last_finished_request_treatment_timestamp : Prometheus.Gauge.t;
+    last_finished_request_completion_timestamp : Prometheus.Gauge.t;
+  }
+
+  let declare ~label_names ~namespace ?subsystem () =
+    let last_finished_request_push_timestamp =
+      let help =
+        "Reception timestamp of the latest request handled by the worker"
+      in
+      Prometheus.Gauge.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "last_finished_request_push_timestamp"
+    in
+    let last_finished_request_treatment_timestamp =
+      let help =
+        "Timestamp at which the worker started processing of the latest \
+         request it handled"
+      in
+      Prometheus.Gauge.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "last_finished_request_treatment_timestamp"
+    in
+    let last_finished_request_completion_timestamp =
+      let help =
+        "Timestamp at which the latest request handled by the worker was \
+         completed"
+      in
+      Prometheus.Gauge.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "last_finished_request_completion_timestamp"
+    in
+    fun labels ->
+      {
+        last_finished_request_push_timestamp =
+          Prometheus.Gauge.labels last_finished_request_push_timestamp labels;
+        last_finished_request_treatment_timestamp =
+          Prometheus.Gauge.labels
+            last_finished_request_treatment_timestamp
+            labels;
+        last_finished_request_completion_timestamp =
+          Prometheus.Gauge.labels
+            last_finished_request_completion_timestamp
+            labels;
+      }
+
+  let update metrics Worker_types.{pushed; treated; completed} =
+    Prometheus.Gauge.set
+      metrics.last_finished_request_push_timestamp
+      (Ptime.to_float_s pushed) ;
+    Prometheus.Gauge.set
+      metrics.last_finished_request_treatment_timestamp
+      (Ptime.to_float_s treated) ;
+    Prometheus.Gauge.set
+      metrics.last_finished_request_completion_timestamp
+      (Ptime.to_float_s completed)
+end
+
 module Mempool = struct
   open Prometheus
 
@@ -138,75 +207,6 @@ module Mempool = struct
       CollectorRegistry.(register default info collector)
     in
     List.iter add metrics
-end
-
-module Worker = struct
-  type t = {
-    last_finished_request_push_timestamp : Prometheus.Gauge.t;
-    last_finished_request_treatment_timestamp : Prometheus.Gauge.t;
-    last_finished_request_completion_timestamp : Prometheus.Gauge.t;
-  }
-
-  let declare ~label_names ~namespace ?subsystem () =
-    let last_finished_request_push_timestamp =
-      let help =
-        "Reception timestamp of the latest request handled by the worker"
-      in
-      Prometheus.Gauge.v_labels
-        ~label_names
-        ~help
-        ~namespace
-        ?subsystem
-        "last_finished_request_push_timestamp"
-    in
-    let last_finished_request_treatment_timestamp =
-      let help =
-        "Timestamp at which the worker started processing of the latest \
-         request it handled"
-      in
-      Prometheus.Gauge.v_labels
-        ~label_names
-        ~help
-        ~namespace
-        ?subsystem
-        "last_finished_request_treatment_timestamp"
-    in
-    let last_finished_request_completion_timestamp =
-      let help =
-        "Timestamp at which the latest request handled by the worker was \
-         completed"
-      in
-      Prometheus.Gauge.v_labels
-        ~label_names
-        ~help
-        ~namespace
-        ?subsystem
-        "last_finished_request_completion_timestamp"
-    in
-    fun labels ->
-      {
-        last_finished_request_push_timestamp =
-          Prometheus.Gauge.labels last_finished_request_push_timestamp labels;
-        last_finished_request_treatment_timestamp =
-          Prometheus.Gauge.labels
-            last_finished_request_treatment_timestamp
-            labels;
-        last_finished_request_completion_timestamp =
-          Prometheus.Gauge.labels
-            last_finished_request_completion_timestamp
-            labels;
-      }
-
-  let update metrics Worker_types.{pushed; treated; completed} =
-    Prometheus.Gauge.set
-      metrics.last_finished_request_push_timestamp
-      (Ptime.to_float_s pushed) ;
-    Prometheus.Gauge.set
-      metrics.last_finished_request_treatment_timestamp
-      (Ptime.to_float_s treated) ;
-    Prometheus.Gauge.set
-      metrics.last_finished_request_completion_timestamp
-      (Ptime.to_float_s completed)
 end
 
 module Distributed_db = struct
