@@ -952,6 +952,47 @@ module Sc_rollup_params = struct
         | Some hash -> return hash)
 
   let unchecked_payload_parameter = file_or_text_parameter ~from_text:return ()
+
+  let compressed_state_parameter =
+    Clic.parameter (fun _ state_hash ->
+        match Sc_rollup.State_hash.of_b58check_opt state_hash with
+        | None ->
+            failwith
+              "Parameter '%s' is not a valid B58-encoded compressed state"
+              state_hash
+        | Some hash -> return hash)
+
+  let number_of_messages_parameter =
+    Clic.parameter (fun _ nb_of_messages ->
+        match Int32.of_string_opt nb_of_messages with
+        | Some nb_of_messages -> (
+            match Sc_rollup.Number_of_messages.of_int32 nb_of_messages with
+            | None ->
+                failwith
+                  "Parameter '%ld' is out of bounds, it should be between %ld \
+                   and %ld"
+                  nb_of_messages
+                  Sc_rollup.Number_of_messages.min_int
+                  Sc_rollup.Number_of_messages.max_int
+            | Some nb_of_messages -> return nb_of_messages)
+        | None ->
+            failwith "'%s' is not valid, should be a int32 value" nb_of_messages)
+
+  let number_of_ticks_parameter =
+    Clic.parameter (fun _ nb_of_ticks ->
+        match Int32.of_string_opt nb_of_ticks with
+        | Some nb_of_ticks -> (
+            match Sc_rollup.Number_of_ticks.of_int32 nb_of_ticks with
+            | None ->
+                failwith
+                  "Parameter '%ld' is out of bounds, it should be between %ld \
+                   and %ld"
+                  nb_of_ticks
+                  Sc_rollup.Number_of_ticks.min_int
+                  Sc_rollup.Number_of_ticks.max_int
+            | Some nb_of_ticks -> return nb_of_ticks)
+        | None ->
+            failwith "'%s' is not valid, should be a int32 value" nb_of_ticks)
 end
 
 let fee_parameter_args =

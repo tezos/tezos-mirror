@@ -2640,6 +2640,104 @@ let commands_rw () =
         >>=? fun _res -> return_unit);
     command
       ~group
+      ~desc:"Publish a commitment for a sc rollup"
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         storage_limit_arg
+         counter_arg
+         fee_parameter_args)
+      (prefixes ["publish"; "commitment"]
+      @@ prefixes ["from"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"Name of the source contract."
+      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ param
+           ~name:"sc_rollup"
+           ~desc:
+             "The address of the sc rollup where the commitment will be \
+              published."
+           Sc_rollup_params.sc_rollup_address_parameter
+      @@ prefixes ["with"; "compressed"; "state"]
+      @@ param
+           ~name:"compressed_state"
+           ~desc:"The compressed state of the sc rollup for the commitment."
+           Sc_rollup_params.compressed_state_parameter
+      @@ prefixes ["at"; "inbox"; "level"]
+      @@ param
+           ~name:"inbox_level"
+           ~desc:"The inbox level for the commitment."
+           raw_level_parameter
+      @@ prefixes ["and"; "predecessor"]
+      @@ param
+           ~name:"predecessor"
+           ~desc:"The hash of the commitment's predecessor"
+           Sc_rollup_params.commitment_hash_parameter
+      @@ prefixes ["and"; "number"; "of"; "messages"]
+      @@ param
+           ~name:"number_of_messages"
+           ~desc:"The number of messages for the commitment."
+           Sc_rollup_params.number_of_messages_parameter
+      @@ prefixes ["and"; "number"; "of"; "ticks"]
+      @@ param
+           ~name:"number_of_ticks"
+           ~desc:"The number of ticks for the commitment."
+           Sc_rollup_params.number_of_ticks_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             storage_limit,
+             counter,
+             fee_parameter )
+           source
+           rollup
+           compressed_state
+           inbox_level
+           predecessor
+           number_of_messages
+           number_of_ticks
+           cctxt ->
+        (match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can publish commitments"
+        | Implicit source -> return source)
+        >>=? fun source ->
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        let commitment : Alpha_context.Sc_rollup.Commitment.t =
+          {
+            compressed_state;
+            inbox_level;
+            predecessor;
+            number_of_messages;
+            number_of_ticks;
+          }
+        in
+        sc_rollup_publish
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~rollup
+          ~commitment
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
+    command
+      ~group
       ~desc:"Cement a commitment for a sc rollup."
       (args7
          fee_arg
