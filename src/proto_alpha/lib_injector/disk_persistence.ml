@@ -213,6 +213,8 @@ module Make_table (H : H) = struct
 
   let iter_es f t = H.iter_es f t.table
 
+  let length t = H.length t.table
+
   let replace_seq t seq =
     H.replace_seq t.table seq ;
     Seq.iter_es
@@ -307,6 +309,8 @@ struct
     return_unit
 
   let fold f q = Q.fold f q.queue
+
+  let length q = Q.length q.queue
 
   let load_from_disk ~capacity ~data_dir =
     let open Lwt_result_syntax in

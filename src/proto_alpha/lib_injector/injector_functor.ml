@@ -203,6 +203,16 @@ module Make (Rollup : PARAMETERS) = struct
         (** The state of the rollup node. *)
   }
 
+  module Event = struct
+    include Injector_events.Make (Rollup)
+
+    let emit1 e state x = emit e (state.signer.pkh, state.tags, x)
+
+    let emit2 e state x y = emit e (state.signer.pkh, state.tags, x, y)
+
+    let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
+  end
+
   let init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
@@ -214,6 +224,10 @@ module Make (Rollup : PARAMETERS) = struct
     let*! () = Lwt_utils_unix.create_dir data_dir0 in
     let*! () = Lwt_utils_unix.create_dir data_dir in
     let* queue = Op_queue.load_from_disk ~capacity:50_000 ~data_dir in
+    let*! () =
+      Event.(emit loaded_from_disk)
+        (signer.pkh, tags, Op_queue.length queue, "operations_queue")
+    in
     (* Very coarse approximation for the number of operation we expect for each
        block *)
     let n =
@@ -222,18 +236,43 @@ module Make (Rollup : PARAMETERS) = struct
     let* injected_operations =
       Injected_operations.load_from_disk ~initial_size:n ~data_dir
     in
+    let*! () =
+      Event.(emit loaded_from_disk)
+        ( signer.pkh,
+          tags,
+          Injected_operations.length injected_operations,
+          "injected_operations" )
+    in
     let* injected_ophs =
       Injected_ophs.load_from_disk ~initial_size:n ~data_dir
+    in
+    let*! () =
+      Event.(emit loaded_from_disk)
+        (signer.pkh, tags, Injected_ophs.length injected_ophs, "injected_ophs")
     in
     let* included_operations =
       Included_operations.load_from_disk
         ~initial_size:(confirmations * n)
         ~data_dir
     in
+    let*! () =
+      Event.(emit loaded_from_disk)
+        ( signer.pkh,
+          tags,
+          Included_operations.length included_operations,
+          "included_operations" )
+    in
     let* included_in_blocks =
       Included_in_blocks.load_from_disk
         ~initial_size:(confirmations * n)
         ~data_dir
+    in
+    let*! () =
+      Event.(emit loaded_from_disk)
+        ( signer.pkh,
+          tags,
+          Included_in_blocks.length included_in_blocks,
+          "included_in_blocks" )
     in
     return
       {
@@ -247,16 +286,6 @@ module Make (Rollup : PARAMETERS) = struct
         included = {included_operations; included_in_blocks};
         rollup_node_state;
       }
-
-  module Event = struct
-    include Injector_events.Make (Rollup)
-
-    let emit1 e state x = emit e (state.signer.pkh, state.tags, x)
-
-    let emit2 e state x y = emit e (state.signer.pkh, state.tags, x, y)
-
-    let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
-  end
 
   (** Add an operation to the pending queue corresponding to the signer for this
     operation.  *)

@@ -77,6 +77,9 @@ module Make_table (H : H) : sig
   val iter_es :
     (key -> value -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t
 
+  (** Same as {!H.length} *)
+  val length : t -> int
+
   (** Persistent version of {!H.replace_seq} *)
   val replace_seq : t -> (key * value) Seq.t -> unit tzresult Lwt.t
 
@@ -112,6 +115,9 @@ end) : sig
   (** [fold f q init] folds the function [f] over the bindings
       of [q] (in memory). The elements are iterated from oldest to newest. *)
   val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  (** [length q] is the number of bindings held by [q]. *)
+  val length : t -> int
 
   (** [load_from_disk ~capacity ~data_dir] creates a bounded hash queue of
       capacity [capacity]. The queue is populated by persistent elements present

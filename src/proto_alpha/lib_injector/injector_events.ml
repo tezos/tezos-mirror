@@ -211,4 +211,12 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ("level", Data_encoding.int32)
       ("operations", Data_encoding.list L1_operation.Hash.encoding)
       ~pp2:pp_operations_hash_list
+
+  let loaded_from_disk =
+    declare_2
+      ~name:"loaded_from_disk"
+      ~msg:"Loaded {nb} elements in {kind} from disk"
+      ~level:Notice
+      ("nb", Data_encoding.int31)
+      ("kind", Data_encoding.string)
 end
