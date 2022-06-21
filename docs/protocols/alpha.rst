@@ -28,6 +28,14 @@ Breaking Changes
   application will fail so the operation will have no effect, but its
   fees will still be taken. (MR :gl:`!5506`)
 
+- The one-operation-per-manager-per-block restriction (1M) is now
+  enforced in blocks. It was previously (optionally) enforced by the
+  prevalidator using the plugin mempool filters. This meant that a
+  baker could still include several operations from the same manager
+  in its own block. This is no longer possible: the application of a
+  block containing more than one operation from the same manager will
+  now fail. (MR :gl:`!5557`)
+
 RPC Changes
 -----------
 
@@ -68,6 +76,9 @@ Bug Fixes
 - Emptying an implicit account does not cost extra-gas anymore. (MR
   :gl:`!5566`)
 
+- The ``helpers/scripts/run_operation`` RPC now checks whether all
+  operations in a batch have the same source. (MR :gl:`!5557`)
+
 Minor Changes
 -------------
 
@@ -97,3 +108,32 @@ Internal
   that the operation has enough gas for these deserializations (by
   consuming an estimated gas cost based on the bytes size: this has
   not changed). (MR :gl:`!5506`)
+
+- Split precheck into two parts: checks and effects. The checks part
+  is effect-free. The effects part consists of the modifications of
+  the context that happen regardless of whether the application of the
+  operation succeeds: take the fees, increment the account's counter,
+  and remove the operation's gas limit from the available block
+  gas. The checks part must ensure that the effects part cannot
+  fail. (MR :gl:`!5557`)
+
+- Move the checks part of precheck (see above) to a new file
+  ``validate_operation.ml``. The effects part remains in
+  ``apply_operation`` and is renamed to ``take_fees``. The new
+  ``Validate_operation.validate_operation`` function is called before
+  ``Apply.apply_operation`` in ``Main``. It stores its own state in
+  ``Main.validation_state`` and works with the context from the
+  beginning of the block (which is fine thanks to the 1M restriction).
+  For now, ``validate_operation`` does nothing for non-manager
+  operations, but we plan to extend it to all operations in the
+  future. (MR :gl:`!5557`)
+
+- Remove ``Main.check_manager_signature``. Instead,
+  ``Main.precheck_manager`` now takes an additional argument that
+  indicates whether it should check the signature. (MR :gl:`!5557`)
+
+- Add a type ``Validate_operation.stamp`` in order to guarantee that
+  an operation is always validated before it is applied. Indeed, a
+  value of this type may only be created in ``Validate_operation``,
+  and is required by ``Apply.apply_operation`` and a few other
+  functions in ``Apply``. (MR :gl:`!5557`)

@@ -319,7 +319,8 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         else Format.fprintf ppf "Ill typed contract." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Environment.Ecoproto_error Apply.Gas_quota_exceeded_init_deserialize
+    | Environment.Ecoproto_error
+        Validate_operation.Manager.Gas_quota_exceeded_init_deserialize
       :: rest ->
         Format.fprintf
           ppf

@@ -918,9 +918,8 @@ module Interpreter_tests = struct
       (Contract.Originated dst)
       amount_tez
       ~parameters:parameters_1
-    >>=? fun operation ->
+    >>=? fun operation1 ->
     Incremental.begin_construction block_start >>=? fun incr ->
-    Incremental.add_operation incr operation >>=? fun incr ->
     (* We need to manually get the counter here *)
     let ctx = Incremental.alpha_ctxt incr in
     let pkh = Context.Contract.pkh src in
@@ -934,6 +933,12 @@ module Interpreter_tests = struct
       (Contract.Originated dst)
       Tez.zero
       ~parameters:parameters_2
+    >>=? fun operation2 ->
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:src
+      (I incr)
+      [operation1; operation2]
     >>=? fun operation ->
     Incremental.add_operation incr operation >>=? fun incr ->
     Incremental.finalize_block incr >>=? fun block_2 ->

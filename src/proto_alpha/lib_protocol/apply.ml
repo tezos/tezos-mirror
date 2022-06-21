@@ -94,12 +94,12 @@ type error +=
     }
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
+  | Error_while_taking_fees
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
-  | Inconsistent_counters
   | Wrong_voting_period of {expected : int32; provided : int32}
   | Internal_operation_replay of Apply_internal_results.packed_internal_contents
   | Invalid_denunciation of denunciation_kind
@@ -121,12 +121,8 @@ type error +=
     }
   | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
   | Multiple_revelation
-  | Gas_quota_exceeded_init_deserialize
-  | Insufficient_gas_for_manager
-  | Inconsistent_sources
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
-  | Incorrect_reveal_position
   | Invalid_transfer_to_sc_rollup_from_implicit_account
 
 let () =
@@ -472,6 +468,22 @@ let () =
       | Set_deposits_limit_too_high {limit; max_limit} -> Some (limit, max_limit)
       | _ -> None)
     (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit}) ;
+
+  let error_while_taking_fees_description =
+    "There was an error while taking the fees, which should not happen and \
+     means that the operation's validation was faulty."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operation.error_while_taking_fees"
+    ~title:"Error while taking the fees of a manager operation"
+    ~description:error_while_taking_fees_description
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "%s" error_while_taking_fees_description)
+    Data_encoding.unit
+    (function Error_while_taking_fees -> Some () | _ -> None)
+    (fun () -> Error_while_taking_fees) ;
+
   register_error_kind
     `Branch
     ~id:"contract.empty_transaction"
@@ -537,21 +549,6 @@ let () =
     (function Sc_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Sc_rollup_feature_disabled) ;
 
-  register_error_kind
-    `Permanent
-    ~id:"operation.inconsistent_counters"
-    ~title:"Inconsistent counters in operation"
-    ~description:
-      "Inconsistent counters in operation. Counters of an operation must be \
-       successive."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Inconsistent counters in operation. Counters of an operation must be \
-         successive.")
-    Data_encoding.empty
-    (function Inconsistent_counters -> Some () | _ -> None)
-    (fun () -> Inconsistent_counters) ;
   register_error_kind
     `Temporary
     ~id:"operation.wrong_voting_period"
@@ -717,43 +714,6 @@ let () =
     (fun () -> Multiple_revelation) ;
   register_error_kind
     `Permanent
-    ~id:"gas_exhausted.init_deserialize"
-    ~title:"Not enough gas for initial deserialization of script expressions"
-    ~description:
-      "Gas limit was not high enough to deserialize the transaction parameters \
-       or origination script code or initial storage, making the operation \
-       impossible to parse within the provided gas bounds."
-    Data_encoding.empty
-    (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
-    (fun () -> Gas_quota_exceeded_init_deserialize) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.insufficient_gas_for_manager"
-    ~title:"Not enough gas for initial manager cost"
-    ~description:
-      (Format.asprintf
-         "Gas limit was not high enough to cover the initial cost of manager \
-          operations. At least %a expected."
-         Gas.pp_cost
-         Michelson_v1_gas.Cost_of.manager_operation)
-    Data_encoding.empty
-    (function Insufficient_gas_for_manager -> Some () | _ -> None)
-    (fun () -> Insufficient_gas_for_manager) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.inconsistent_sources"
-    ~title:"Inconsistent sources in operation pack"
-    ~description:
-      "The operation pack includes operations from different sources."
-    ~pp:(fun ppf () ->
-      Format.pp_print_string
-        ppf
-        "The operation pack includes operations from different sources.")
-    Data_encoding.empty
-    (function Inconsistent_sources -> Some () | _ -> None)
-    (fun () -> Inconsistent_sources) ;
-  register_error_kind
-    `Permanent
     ~id:"operation.failing_noop"
     ~title:"Failing_noop operations are not executed by the protocol"
     ~description:
@@ -783,19 +743,6 @@ let () =
     (fun delegate -> Zero_frozen_deposits delegate) ;
   register_error_kind
     `Permanent
-    ~id:"operations.incorrect_reveal_position"
-    ~title:"Incorrect reveal position"
-    ~description:"Incorrect reveal position in batch"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Incorrect reveal operation position in batch: only allowed in first \
-         position")
-    Data_encoding.empty
-    (function Incorrect_reveal_position -> Some () | _ -> None)
-    (fun () -> Incorrect_reveal_position) ;
-  register_error_kind
-    `Permanent
     ~id:"operations.invalid_transfer_to_sc_rollup_from_implicit_account"
     ~title:"Invalid transfer to sc rollup"
     ~description:"Invalid transfer to sc rollup from implicit account"
@@ -815,14 +762,14 @@ open Apply_operation_result
 open Apply_internal_results
 
 let assert_tx_rollup_feature_enabled ctxt =
+  let open Result_syntax in
   let level = (Level.current ctxt).level in
-  Raw_level.of_int32 @@ Constants.tx_rollup_sunset_level ctxt >>?= fun sunset ->
-  fail_when Raw_level.(sunset <= level) Tx_rollup_feature_disabled
-  >>=? fun () ->
-  fail_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_feature_disabled
+  let* sunset = Raw_level.of_int32 @@ Constants.tx_rollup_sunset_level ctxt in
+  let* () = error_when Raw_level.(sunset <= level) Tx_rollup_feature_disabled in
+  error_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_feature_disabled
 
 let assert_sc_rollup_feature_enabled ctxt =
-  fail_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
+  error_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
 let update_script_storage_and_ticket_balances ctxt ~self storage
     lazy_storage_diff ticket_diffs operations =
@@ -1007,7 +954,7 @@ let ex_ticket_size :
 
 let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
     ~dst_rollup ~since =
-  assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+  assert_tx_rollup_feature_enabled ctxt >>?= fun () ->
   (* If the ticket deposit fails on L2 for some reason
      (e.g. [Balance_overflow] in the recipient), then it is
      returned to [payer]. As [payer] is implicit, it cannot own
@@ -1215,7 +1162,7 @@ let apply_internal_manager_operation_content :
         parameters = _;
         unparsed_parameters = payload;
       } ->
-      assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
+      assert_sc_rollup_feature_enabled ctxt >>?= fun () ->
       (* TODO: #3242
          We could rather change the type of [source] in
          {!Script_type_ir.internal_operation}. Only originated accounts should
@@ -1969,148 +1916,6 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   in
   apply ctxt [] ops
 
-let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
-    ~(only_batch : bool) : (context * Receipt.balance_updates) tzresult Lwt.t =
-  let[@coq_match_with_default] (Manager_operation
-                                 {
-                                   source;
-                                   fee;
-                                   counter;
-                                   operation;
-                                   gas_limit;
-                                   storage_limit;
-                                 }) =
-    op
-  in
-  (if only_batch then
-   (* Gas.consume_limit_in_block will only raise a "temporary" error, however
-      when the precheck is called on a batch in isolation (like e.g. in the
-      mempool) it must "refuse" operations whose total gas_limit (the sum of
-      the gas_limits of each operation) is already above the block limit. We
-      add the "permanent" error Gas.Gas_limit_too_high on top of the trace to
-      this effect. *)
-   record_trace Gas.Gas_limit_too_high
-  else fun errs -> errs)
-  @@ Gas.consume_limit_in_block ctxt gas_limit
-  >>?= fun ctxt ->
-  let ctxt = Gas.set_limit ctxt gas_limit in
-  record_trace
-    Insufficient_gas_for_manager
-    (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation)
-  >>?= fun ctxt ->
-  Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
-  let source_contract = Contract.Implicit source in
-  Contract.must_be_allocated ctxt source_contract >>=? fun () ->
-  Contract.check_counter_increment ctxt source counter >>=? fun () ->
-  let consume_decoding_gas ctxt lexpr =
-    record_trace Gas_quota_exceeded_init_deserialize
-    @@ (* Fail early if the operation does not have enough gas to
-          cover the deserialization cost. We always consider the full
-          deserialization cost, independently from the internal state
-          of the lazy_expr. Otherwise we might risk getting different
-          results if the operation has already been deserialized
-          before (e.g. when retrieved in JSON format). Note that the
-          lazy_expr is not actually decoded here; its deserialization
-          cost is estimated from the size of its bytes. *)
-    Script.consume_decoding_gas ctxt lexpr
-  in
-  (match operation with
-  | Reveal pk -> Contract.check_public_key pk source >>?= fun () -> return ctxt
-  | Transaction {parameters; _} ->
-      Lwt.return @@ consume_decoding_gas ctxt parameters
-  | Origination {script; _} ->
-      Lwt.return
-        ( consume_decoding_gas ctxt script.code >>? fun ctxt ->
-          consume_decoding_gas ctxt script.storage )
-  | Register_global_constant {value} ->
-      Lwt.return @@ consume_decoding_gas ctxt value
-  | Delegation _ | Set_deposits_limit _ -> return ctxt
-  | Tx_rollup_origination ->
-      assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
-  | Tx_rollup_submit_batch {content; _} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      let size_limit = Constants.tx_rollup_hard_size_limit_per_message ctxt in
-      let _message, message_size = Tx_rollup_message.make_batch content in
-      Tx_rollup_gas.hash_cost message_size >>?= fun cost ->
-      Gas.consume ctxt cost >>?= fun ctxt ->
-      fail_unless
-        Compare.Int.(message_size <= size_limit)
-        Tx_rollup_errors.Message_size_exceeds_limit
-      >>=? fun () -> return ctxt
-  | Tx_rollup_commit _ | Tx_rollup_return_bond _
-  | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () -> return ctxt
-  | Transfer_ticket {contents; ty; _} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      Lwt.return
-      @@ ( consume_decoding_gas ctxt contents >>? fun ctxt ->
-           consume_decoding_gas ctxt ty )
-  | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      let Constants.Parametric.
-            {max_messages_per_inbox; max_withdrawals_per_batch; _} =
-        Constants.tx_rollup ctxt
-      in
-      Tx_rollup_errors.check_path_depth
-        `Commitment
-        (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-        ~count_limit:max_messages_per_inbox
-      >>?= fun () ->
-      error_when
-        Compare.List_length_with.(tickets_info = 0)
-        Tx_rollup_errors.No_withdrawals_to_dispatch
-      >>?= fun () ->
-      error_when
-        Compare.List_length_with.(tickets_info > max_withdrawals_per_batch)
-        Tx_rollup_errors.Too_many_withdrawals
-      >>?= fun () ->
-      record_trace Gas_quota_exceeded_init_deserialize
-      @@ List.fold_left_e
-           (fun ctxt Tx_rollup_reveal.{contents; ty; _} ->
-             Script.consume_decoding_gas ctxt contents >>? fun ctxt ->
-             Script.consume_decoding_gas ctxt ty)
-           ctxt
-           tickets_info
-      >>?= fun ctxt -> return ctxt
-  | Tx_rollup_rejection
-      {message_path; message_result_path; previous_message_result_path; _} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      let Constants.Parametric.{max_messages_per_inbox; _} =
-        Constants.tx_rollup ctxt
-      in
-      Tx_rollup_errors.check_path_depth
-        `Inbox
-        (Tx_rollup_inbox.Merkle.path_depth message_path)
-        ~count_limit:max_messages_per_inbox
-      >>?= fun () ->
-      Tx_rollup_errors.check_path_depth
-        `Commitment
-        (Tx_rollup_commitment.Merkle.path_depth message_result_path)
-        ~count_limit:max_messages_per_inbox
-      >>?= fun () ->
-      Tx_rollup_errors.check_path_depth
-        `Commitment
-        (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
-        ~count_limit:max_messages_per_inbox
-      >>?= fun () -> return ctxt
-  | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
-  | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
-  | Sc_rollup_execute_outbox_message _ ->
-      assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
-  | Sc_rollup_recover_bond _ ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
-         should we successfully precheck Sc_rollup_recover_bond and any
-         (simple) Sc rollup operation, or should we add some some checks to make
-         the operations Branch_delayed if they cannot be successfully
-         prechecked. *)
-      assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt
-  | Dal_publish_slot_header {slot} ->
-      Dal_apply.validate_publish_slot_header ctxt slot >>?= fun () ->
-      return ctxt)
-  >>=? fun ctxt ->
-  Contract.increment_counter ctxt source >>=? fun ctxt ->
-  Token.transfer ctxt (`Contract source_contract) `Block_fees fee
-
 let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
   match trr with
   | Transaction_to_contract_result payload ->
@@ -2395,15 +2200,32 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   | Error errors ->
       Lwt.return (Failure, Failed (manager_kind operation, errors), [])
 
+(** An individual manager operation (either standalone or inside a
+    batch) together with the balance update corresponding to the
+    transfer of its fee. *)
+type 'kind fees_updated_contents = {
+  contents : 'kind contents;
+  balance_updates : Receipt.balance_updates;
+}
+
+type _ fees_updated_contents_list =
+  | FeesUpdatedSingle :
+      'kind fees_updated_contents
+      -> 'kind fees_updated_contents_list
+  | FeesUpdatedCons :
+      'kind Kind.manager fees_updated_contents
+      * 'rest Kind.manager fees_updated_contents_list
+      -> ('kind * 'rest) Kind.manager fees_updated_contents_list
+
 let rec mark_skipped :
     type kind.
     payload_producer:Signature.Public_key_hash.t ->
     Level.t ->
-    kind Kind.manager prechecked_contents_list ->
+    kind Kind.manager fees_updated_contents_list ->
     kind Kind.manager contents_result_list =
- fun ~payload_producer level prechecked_contents_list ->
-  match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle
+ fun ~payload_producer level fees_updated_contents_list ->
+  match[@coq_match_with_default] fees_updated_contents_list with
+  | FeesUpdatedSingle
       {contents = Manager_operation {operation; _}; balance_updates} ->
       Single_result
         (Manager_operation_result
@@ -2412,7 +2234,7 @@ let rec mark_skipped :
              operation_result = Skipped (manager_kind operation);
              internal_operation_results = [];
            })
-  | PrecheckedCons
+  | FeesUpdatedCons
       ({contents = Manager_operation {operation; _}; balance_updates}, rest) ->
       Cons_result
         ( Manager_operation_result
@@ -2423,114 +2245,53 @@ let rec mark_skipped :
             },
           mark_skipped ~payload_producer level rest )
 
-(** Check that counters are consistent, i.e. that they are successive within a
-    batch. Fail with a {b permanent} error otherwise.
-    TODO: https://gitlab.com/tezos/tezos/-/issues/2301
-    Remove when format of operation is changed to save space.
- *)
-let check_counters_consistency contents_list =
-  let check_counter ~previous_counter counter =
-    match previous_counter with
-    | None -> return_unit
-    | Some previous_counter ->
-        let expected = Z.succ previous_counter in
-        if Compare.Z.(expected = counter) then return_unit
-        else fail Inconsistent_counters
-  in
-  let rec check_counters_rec :
-      type kind.
-      counter option -> kind Kind.manager contents_list -> unit tzresult Lwt.t =
-   fun previous_counter contents_list ->
-    match[@coq_match_with_default] contents_list with
-    | Single (Manager_operation {counter; _}) ->
-        check_counter ~previous_counter counter
-    | Cons (Manager_operation {counter; _}, rest) ->
-        check_counter ~previous_counter counter >>=? fun () ->
-        check_counters_rec (Some counter) rest
-  in
-  check_counters_rec None contents_list
+(** Return balance updates for fees, and an updated context that
+    accounts for:
 
-(** Returns an updated context, and a list of prechecked contents containing
-    balance updates for fees related to each manager operation in
-    [contents_list]. *)
-let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
-  let rec rec_precheck_manager_contents_list :
+    - fees spending,
+
+    - counter incrementation,
+
+    - consumption of each operation's [gas_limit] from the available
+      block gas.
+
+    The {!type:Validate_operation.stamp} argument enforces that the
+    operation has already been validated by {!Validate_operation}. The
+    latter is responsible for ensuring that the operation is solvable,
+    i.e. its fees can be taken, i.e. [take_fees] cannot return an
+    error. *)
+let take_fees ctxt (_ : Validate_operation.stamp) contents_list =
+  let open Lwt_result_syntax in
+  let rec take_fees_rec :
       type kind.
       context ->
       kind Kind.manager contents_list ->
-      (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
+      (context * kind Kind.manager fees_updated_contents_list) tzresult Lwt.t =
    fun ctxt contents_list ->
+    let contents_effects contents =
+      let (Manager_operation {source; fee; gas_limit; _}) = contents in
+      let*? ctxt = Gas.consume_limit_in_block ctxt gas_limit in
+      let* ctxt = Contract.increment_counter ctxt source in
+      let+ ctxt, balance_updates =
+        Token.transfer
+          ctxt
+          (`Contract (Contract.Implicit source))
+          `Block_fees
+          fee
+      in
+      (ctxt, {contents; balance_updates})
+    in
     match contents_list with
     | Single contents ->
-        precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        >>=? fun (ctxt, balance_updates) ->
-        return (ctxt, PrecheckedSingle {contents; balance_updates})
+        let+ ctxt, fees_updated_contents = contents_effects contents in
+        (ctxt, FeesUpdatedSingle fees_updated_contents)
     | Cons (contents, rest) ->
-        precheck_manager_contents ctxt contents ~only_batch:mempool_mode
-        >>=? fun (ctxt, balance_updates) ->
-        rec_precheck_manager_contents_list ctxt rest
-        >>=? fun (ctxt, results_rest) ->
-        return (ctxt, PrecheckedCons ({contents; balance_updates}, results_rest))
+        let* ctxt, fees_updated_contents = contents_effects contents in
+        let+ ctxt, result_rest = take_fees_rec ctxt rest in
+        (ctxt, FeesUpdatedCons (fees_updated_contents, result_rest))
   in
-  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  check_counters_consistency contents_list >>=? fun () ->
-  rec_precheck_manager_contents_list ctxt contents_list
-
-let find_manager_public_key ctxt (op : _ Kind.manager contents_list) =
-  (* Currently, the [op] batch contains only one signature, so all
-     operations in the batch are required to originate from the same
-     manager. This may change in the future, in order to allow several
-     managers to group-sign a sequence of operations. *)
-  (* Invariants checked:
-
-     - Reveal operations are only authorized in the first position element of a batch.
-
-     - All sources in a batch must be equal. *)
-  (* Performs a sanity check and return the operation's (single)
-     source and a potential public key if the batch contains a reveal
-     operation in the head position. *)
-  let rec check_batch_tail_sanity :
-      type kind.
-      public_key_hash -> kind Kind.manager contents_list -> unit tzresult =
-   fun expected_source -> function
-    | Single (Manager_operation {operation = Reveal _key; _}) ->
-        error Incorrect_reveal_position
-    | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
-        error Incorrect_reveal_position
-    | Single (Manager_operation {source; _}) ->
-        error_unless
-          (Signature.Public_key_hash.equal expected_source source)
-          Inconsistent_sources
-    | Cons (Manager_operation {source; _}, rest) ->
-        error_unless
-          (Signature.Public_key_hash.equal expected_source source)
-          Inconsistent_sources
-        >>? fun () -> check_batch_tail_sanity source rest
-  in
-  let check_batch :
-      type kind.
-      kind Kind.manager contents_list ->
-      (public_key_hash * public_key option) tzresult =
-   fun op ->
-    match op with
-    | Single (Manager_operation {source; operation = Reveal key; _}) ->
-        ok (source, Some key)
-    | Single (Manager_operation {source; _}) -> ok (source, None)
-    | Cons (Manager_operation {source; operation = Reveal key; _}, rest) ->
-        check_batch_tail_sanity source rest >>? fun () -> ok (source, Some key)
-    | Cons (Manager_operation {source; _}, rest) ->
-        check_batch_tail_sanity source rest >>? fun () -> ok (source, None)
-  in
-  check_batch op >>?= fun (source, revealed_key) ->
-  Contract.must_be_allocated ctxt (Contract.Implicit source) >>=? fun () ->
-  match revealed_key with
-  | None -> Contract.get_manager_key ctxt source
-  | Some pk -> return pk
-
-let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
-    raw_operation =
-  find_manager_public_key ctxt op >>=? fun public_key ->
-  Lwt.return (Operation.check_signature public_key chain_id raw_operation)
+  let*! result = take_fees_rec ctxt contents_list in
+  Lwt.return (record_trace Error_while_taking_fees result)
 
 let rec apply_manager_contents_list_rec :
     type kind.
@@ -2538,12 +2299,12 @@ let rec apply_manager_contents_list_rec :
     Script_ir_translator.unparsing_mode ->
     payload_producer:public_key_hash ->
     Chain_id.t ->
-    kind Kind.manager prechecked_contents_list ->
+    kind Kind.manager fees_updated_contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
- fun ctxt mode ~payload_producer chain_id prechecked_contents_list ->
+ fun ctxt mode ~payload_producer chain_id fees_updated_contents_list ->
   let level = Level.current ctxt in
-  match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle {contents = Manager_operation _ as op; balance_updates} ->
+  match[@coq_match_with_default] fees_updated_contents_list with
+  | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates} ->
       apply_manager_contents ctxt mode chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
@@ -2551,7 +2312,7 @@ let rec apply_manager_contents_list_rec :
           {balance_updates; operation_result; internal_operation_results}
       in
       (ctxt_result, Single_result result)
-  | PrecheckedCons
+  | FeesUpdatedCons
       ({contents = Manager_operation _ as op; balance_updates}, rest) -> (
       apply_manager_contents ctxt mode chain_id op >>= function
       | Failure, operation_result, internal_operation_results ->
@@ -2875,18 +2636,35 @@ let validate_consensus_contents (type kind) ctxt chain_id
       return (ctxt, delegate_pkh, voting_power)
 
 let apply_manager_contents_list ctxt mode ~payload_producer chain_id
-    prechecked_contents_list =
+    fees_updated_contents_list =
   apply_manager_contents_list_rec
     ctxt
     mode
     ~payload_producer
     chain_id
-    prechecked_contents_list
+    fees_updated_contents_list
   >>= fun (ctxt_result, results) ->
   match ctxt_result with
   | Failure -> Lwt.return (ctxt (* backtracked *), mark_backtracked results)
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
+
+let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
+    op_validated_stamp contents_list =
+  let open Lwt_result_syntax in
+  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+  let* ctxt, fees_updated_contents_list =
+    take_fees ctxt op_validated_stamp contents_list
+  in
+  let*! ctxt, contents_result_list =
+    apply_manager_contents_list
+      ctxt
+      mode
+      ~payload_producer
+      chain_id
+      fees_updated_contents_list
+  in
+  return (ctxt, contents_result_list)
 
 let check_denunciation_age ctxt kind given_level =
   let max_slashing_period = Constants.max_slashing_period ctxt in
@@ -3062,7 +2840,7 @@ let validate_grand_parent_endorsement ctxt chain_id
                }) )
 
 let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
-    ~payload_producer (operation : kind operation)
+    ~payload_producer op_validated_stamp (operation : kind operation)
     (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
@@ -3207,37 +2985,27 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
   | Single (Failing_noop _) ->
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
-  | Single (Manager_operation _) as op ->
-      (* Use the initial context, the contract may be deleted by the
-         fee transfer in [precheck_manager_contents] *)
-      find_manager_public_key ctxt op >>=? fun public_key ->
-      precheck_manager_contents_list ctxt op ~mempool_mode
-      >>=? fun (ctxt, prechecked_contents_list) ->
-      Operation.check_signature public_key chain_id operation >>?= fun () ->
-      apply_manager_contents_list
+  | Single (Manager_operation _) ->
+      apply_manager_operation
         ctxt
         mode
         ~payload_producer
         chain_id
-        prechecked_contents_list
-      >|= ok
-  | Cons (Manager_operation _, _) as op ->
-      (* Use the initial context, the contract may be deleted by the
-         fee transfer in [precheck_manager_contents] *)
-      find_manager_public_key ctxt op >>=? fun public_key ->
-      precheck_manager_contents_list ctxt op ~mempool_mode
-      >>=? fun (ctxt, prechecked_contents_list) ->
-      Operation.check_signature public_key chain_id operation >>?= fun () ->
-      apply_manager_contents_list
+        ~mempool_mode
+        op_validated_stamp
+        contents_list
+  | Cons (Manager_operation _, _) ->
+      apply_manager_operation
         ctxt
         mode
         ~payload_producer
         chain_id
-        prechecked_contents_list
-      >|= ok
+        ~mempool_mode
+        op_validated_stamp
+        contents_list
 
 let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
-    ~payload_producer hash operation =
+    ~payload_producer op_validated_stamp hash operation =
   let ctxt = Origination_nonce.init ctxt hash in
   let ctxt = record_operation ctxt hash operation in
   apply_contents_list
@@ -3246,6 +3014,7 @@ let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
     apply_mode
     mode
     ~payload_producer
+    op_validated_stamp
     operation
     operation.protocol_data.contents
   >|=? fun (ctxt, result) ->

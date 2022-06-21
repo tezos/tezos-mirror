@@ -2242,7 +2242,8 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
         signature
         (JSON.encode_u (`String chain_id))
     in
-    RPC.post_run_operation ~data:(Ezjsonm.from_string op_runnable) client
+    RPC.Client.call client
+    @@ RPC.post_run_operation (Ezjsonm.from_string op_runnable)
   in
   let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
   let signed_op = op_str_hex ^ signature in

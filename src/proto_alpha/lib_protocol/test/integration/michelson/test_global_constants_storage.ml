@@ -101,22 +101,22 @@ let test_registration_of_bad_expr_fails () =
 
 (* You cannot register the same expression twice. *)
 let test_no_double_register () =
-  Context.init1 () >>=? fun (b, alice) ->
-  Incremental.begin_construction b >>=? fun b ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (b, alice) ->
   let expr = Expr.from_string "Pair 1 2" in
   Op.register_global_constant
-    (I b)
+    (B b)
     ~source:alice
     ~value:(Script_repr.lazy_expr expr)
-  >>=? fun op ->
-  Incremental.add_operation b op >>=? fun b ->
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   (* Register the same expression again *)
   Op.register_global_constant
-    (I b)
+    (B b)
     ~source:alice
     ~value:(Script_repr.lazy_expr expr)
   >>=? fun op ->
-  Incremental.add_operation b op
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation i op
   >>= assert_proto_error_id __LOC__ "Expression_already_registered"
 
 let tests =

@@ -819,29 +819,34 @@ module Scripts = struct
     let hash = Operation.hash {shell; protocol_data} in
     let ctxt = Origination_nonce.init ctxt hash in
     let payload_producer = Signature.Public_key_hash.zero in
+    Validate_operation.TMP_for_plugin
+    .precheck_manager__do_nothing_on_non_manager_op
+      ctxt
+      chain_id
+      protocol_data.contents
+      Skip_signature_check
+    >>=? fun op_validated_stamp ->
     match protocol_data.contents with
     | Single (Manager_operation _) as op ->
-        Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-        >>=? fun (ctxt, prechecked_contents_list) ->
-        (* removed signature check here *)
-        Apply.apply_manager_contents_list
+        Apply.apply_manager_operation
           ctxt
           Optimized
           ~payload_producer
           chain_id
-          prechecked_contents_list
-        >|= fun (_ctxt, result) -> ok @@ ret result
+          ~mempool_mode:true
+          op_validated_stamp
+          op
+        >|=? fun (_ctxt, result) -> ret result
     | Cons (Manager_operation _, _) as op ->
-        Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-        >>=? fun (ctxt, prechecked_contents_list) ->
-        (* removed signature check here *)
-        Apply.apply_manager_contents_list
+        Apply.apply_manager_operation
           ctxt
           Optimized
           ~payload_producer
           chain_id
-          prechecked_contents_list
-        >|= fun (_ctxt, result) -> ok @@ ret result
+          ~mempool_mode:true
+          op_validated_stamp
+          op
+        >|=? fun (_ctxt, result) -> ret result
     | _ ->
         let predecessor_level =
           match
@@ -862,6 +867,7 @@ module Scripts = struct
              })
           Optimized
           ~payload_producer
+          op_validated_stamp
           operation
           operation.protocol_data.contents
         >|=? fun (_ctxt, result) -> ret result

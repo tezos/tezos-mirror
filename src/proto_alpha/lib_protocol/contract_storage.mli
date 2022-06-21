@@ -87,6 +87,17 @@ val get_balance_carbonated :
   Contract_repr.t ->
   (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
+(** Return the balance of spendable tez owned by the Implicit contract
+    of the given [public_key_hash].
+
+    @return [Error Empty_implicit_contract] if the contract is not
+    allocated in {!Storage.Contract.Spendable_balance}.
+
+    This function is a fusion of {!must_be_allocated} and
+    {!get_balance} for Implicit contracts exclusively. *)
+val check_allocated_and_get_balance :
+  Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+
 val get_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
 
@@ -275,3 +286,32 @@ val fold_on_bond_ids :
     full balance is zero, and it does not delegate. *)
 val ensure_deallocated_if_empty :
   Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [simulate_spending ctxt ~balance ~amount source] removes [amount]
+    from [balance] as if it were the balance of the implicit contract
+    associated with [source]. It returns the resulting [new_balance],
+    and a boolean [still_allocated] that indicates whether this
+    contract would still exist.
+
+    [still_allocated] is always [true] when [new_balance] is
+    positive. When [new_balance] is zero, it depends on the contract's
+    delegated status and frozen bonds (cf {!spend_only_call_from_token}
+    and {!ensure_deallocated_if_empty}).
+
+    Note that this function does not retrieve the actual balance of
+    the contract, nor does it update or delete it. Indeed, its purpose
+    is to simulate the spending of fees when validating operations,
+    without actually spending them.
+
+    @return [Error Balance_too_low] if [balance] is smaller than
+    [amount].
+
+    @return [Error Empty_implicit_delegated_contract] if [new_balance]
+    would be zero and the contract has a delegate that is not the
+    contract's own manager. *)
+val simulate_spending :
+  Raw_context.t ->
+  balance:Tez_repr.t ->
+  amount:Tez_repr.t ->
+  Signature.public_key_hash ->
+  (Tez_repr.t * bool) tzresult Lwt.t

@@ -375,11 +375,6 @@ module Gas : sig
 
   val pp : Format.formatter -> t -> unit
 
-  (** [check_limit_is_valid ctxt limit] checks that the given gas
-     [limit] is well-formed, i.e., it does not exceed the hard gas
-     limit per operation as defined in [ctxt] and it is positive. *)
-  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
-
   (** [set_limit ctxt limit] returns a context with a given
      [limit] level of gas allocated for an operation. *)
   val set_limit : context -> 'a Arith.t -> context
@@ -426,25 +421,45 @@ module Gas : sig
 
   val pp_cost : Format.formatter -> cost -> unit
 
+  type error += Operation_quota_exceeded (* `Temporary *)
+
   (** [consume ctxt cost] subtracts [cost] to the current operation
      gas level in [ctxt]. This operation may fail with
      [Operation_quota_exceeded] if the operation gas level would
      go below zero. *)
   val consume : context -> cost -> context tzresult
 
-  type error += Operation_quota_exceeded (* `Temporary *)
+  (** [consume_from available_gas cost] subtracts [cost] from
+      [available_gas] and returns the remaining gas.
 
-  (** [consume_limit_in_block ctxt limit] consumes [limit] in
-     the current block gas level of the context. This operation may
-     fail with error [Block_quota_exceeded] if not enough gas remains
-     in the block. This operation may also fail with
-     [Gas_limit_too_high] if [limit] is greater than the allowed
-     limit for operation gas level. *)
-  val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
+      @return [Error Operation_quota_exceeded] if the remaining gas
+      would fall below [0]. *)
+  val consume_from : Arith.fp -> cost -> Arith.fp tzresult
 
   type error += Block_quota_exceeded (* `Temporary *)
 
   type error += Gas_limit_too_high (* `Permanent *)
+
+  (** See {!Raw_context.consume_gas_limit_in_block}. *)
+  val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
+
+  (** Check that [gas_limit] is a valid operation gas limit (at most
+      [hard_gas_limit_per_operation] and nonnegative), then subtract it
+      from [remaining_block_gas] and return the difference.
+
+      @return [Error Gas_limit_too_high] if [gas_limit] is greater
+      than [hard_gas_limit_per_operation] or negative.
+
+      @return [Error Block_quota_exceeded] if [gas_limit] is greater
+      than [remaining_block_gas].
+
+      This function mimics {!consume_limit_in_block} but bypasses the
+      context. *)
+  val check_limit_and_consume_from_block_gas :
+    hard_gas_limit_per_operation:Arith.integral ->
+    remaining_block_gas:Arith.fp ->
+    gas_limit:Arith.integral ->
+    Arith.fp tzresult
 
   (** The cost of free operation is [0]. *)
   val free : cost
@@ -710,17 +725,16 @@ module Script : sig
   val force_bytes_in_context :
     context -> lazy_expr -> (bytes * context) tzresult
 
-  (** [consume_decoding_gas ctxt lexpr] substracts (a lower bound on)
-      the cost to deserialize [lexpr] from the current operation gas
-      level in [ctxt]. The cost does not depend on the internal state
-      of the lazy_expr.
+  (** [consume_decoding_gas available_gas lexpr] subtracts (a lower
+      bound on) the cost to deserialize [lexpr] from [available_gas].
+      The cost does not depend on the internal state of the lazy_expr.
 
-      @return [Error Operation_quota_exceeded] if the operation gas
-      level would fall below [0].
+      @return [Error Operation_quota_exceeded] if the remaining gas
+      would fall below [0].
 
       This mimics the gas consuming part of {!force_decode_in_context}
       called with [consume_deserialization_gas:Always]. *)
-  val consume_decoding_gas : context -> lazy_expr -> context tzresult
+  val consume_decoding_gas : Gas.Arith.fp -> lazy_expr -> Gas.Arith.fp tzresult
 
   val unit_parameter : lazy_expr
 
@@ -1615,9 +1629,14 @@ module Contract : sig
 
   val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
 
+  (** See {Contract_storage.get_balance}. *)
   val get_balance : context -> t -> Tez.t tzresult Lwt.t
 
   val get_balance_carbonated : context -> t -> (context * Tez.t) tzresult Lwt.t
+
+  (** See {Contract_storage.check_allocated_and_get_balance}. *)
+  val check_allocated_and_get_balance :
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val fresh_contract_from_current_nonce :
     context -> (context * Contract_hash.t) tzresult
@@ -1663,6 +1682,14 @@ module Contract : sig
 
   val check_counter_increment :
     context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
+
+  (** See {Contract_storage.simulate_spending}. *)
+  val simulate_spending :
+    context ->
+    balance:Tez.t ->
+    amount:Tez.t ->
+    public_key_hash ->
+    (Tez.t * bool) tzresult Lwt.t
 
   val raw_originate :
     context ->

@@ -223,6 +223,7 @@
   Dal_apply
   Baking
   Amendment
+  Validate_operation
   Apply
   Services_registration
   Constants_services
@@ -448,6 +449,7 @@
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
+  validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -659,6 +661,7 @@
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
+  validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -879,6 +882,7 @@
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
+  validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -1103,6 +1107,7 @@
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
+  validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli

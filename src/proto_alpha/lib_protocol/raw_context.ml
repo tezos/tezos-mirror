@@ -496,19 +496,6 @@ let get_origination_nonce ctxt =
 
 let unset_origination_nonce ctxt = update_origination_nonce ctxt None
 
-type error += Gas_limit_too_high (* `Permanent *)
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"gas_limit_too_high"
-    ~title:"Gas limit out of protocol hard bounds"
-    ~description:"A transaction tried to exceed the hard limit on gas"
-    empty
-    (function Gas_limit_too_high -> Some () | _ -> None)
-    (fun () -> Gas_limit_too_high)
-
 let gas_level ctxt =
   let open Gas_limit_repr in
   if unlimited_operation_gas ctxt then Unaccounted
@@ -516,19 +503,14 @@ let gas_level ctxt =
 
 let block_gas_level = remaining_block_gas
 
-let check_gas_limit_is_valid ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
-  if
-    Gas_limit_repr.Arith.(
-      remaining > (constants ctxt).hard_gas_limit_per_operation
-      || remaining < zero)
-  then error Gas_limit_too_high
-  else Result.return_unit
-
-let consume_gas_limit_in_block ctxt (limit : 'a Gas_limit_repr.Arith.t) =
+let consume_gas_limit_in_block ctxt gas_limit =
   let open Gas_limit_repr in
-  check_gas_limit_is_valid ctxt limit >>? fun () ->
+  check_gas_limit
+    ~hard_gas_limit_per_operation:(constants ctxt).hard_gas_limit_per_operation
+    ~gas_limit
+  >>? fun () ->
   let block_gas = block_gas_level ctxt in
-  let limit = Arith.fp limit in
+  let limit = Arith.fp gas_limit in
   if Arith.(limit > block_gas) then error Block_quota_exceeded
   else
     let level = Arith.sub (block_gas_level ctxt) limit in

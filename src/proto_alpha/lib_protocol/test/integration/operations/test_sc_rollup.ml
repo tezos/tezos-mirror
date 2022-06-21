@@ -92,7 +92,9 @@ let test_disable_feature_flag () =
     Op.sc_rollup_origination (I i) contract kind "" parameters_ty
   in
   let expect_apply_failure = function
-    | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->
+    | Environment.Ecoproto_error
+        (Validate_operation.Manager.Sc_rollup_feature_disabled as e)
+      :: _ ->
         Assert.test_error_encodings e ;
         return_unit
     | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"

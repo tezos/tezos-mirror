@@ -150,24 +150,26 @@ let test_pay_fee () =
 (** Create an originate contract where the contract does not have
     enough tez to pay for the fee. *)
 let test_not_tez_in_contract_to_pay_fee () =
-  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
-  Incremental.begin_construction b >>=? fun inc ->
+  Context.init2 ~consensus_threshold:0 ()
+  >>=? fun (b, (contract_1, contract_2)) ->
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
-  Context.Contract.balance (I inc) contract_1 >>=? fun balance ->
+  Context.Contract.balance (B b) contract_1 >>=? fun balance ->
   balance -? Tez.one >>?= fun amount ->
-  Op.transaction (I inc) contract_1 contract_2 amount >>=? fun operation ->
-  Incremental.add_operation inc operation >>=? fun inc ->
-  Assert.balance_was_debited ~loc:__LOC__ (I inc) contract_1 balance amount
+  Op.transaction (B b) contract_1 contract_2 amount >>=? fun operation ->
+  let pkh1 = Context.Contract.pkh contract_1 in
+  Block.bake ~policy:(Excluding [pkh1]) ~operation b >>=? fun b ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) contract_1 balance amount
   >>=? fun _ ->
   (* use this source contract to create an originate contract where it requires
      to pay a fee and add an amount of credit into this new contract *)
   Op.contract_origination
-    (I inc)
+    (B b)
     ~fee:ten_tez
     ~credit:Tez.one
     contract_1
     ~script:Op.dummy_script
   >>=? fun (op, _) ->
+  Incremental.begin_construction b >>=? fun inc ->
   Incremental.add_operation inc op >>= fun inc ->
   Assert.proto_error_with_info ~loc:__LOC__ inc "Balance too low"
 
@@ -195,21 +197,13 @@ let test_multiple_originations () =
 
 (** Cannot originate two contracts with the same context's counter. *)
 let test_counter () =
-  Context.init1 () >>=? fun (b, contract) ->
-  Incremental.begin_construction b >>=? fun inc ->
-  Op.contract_origination
-    (I inc)
-    ~credit:Tez.one
-    contract
-    ~script:Op.dummy_script
+  Context.init1 ~consensus_threshold:0 () >>=? fun (b, contract) ->
+  Op.contract_origination (B b) ~credit:Tez.one contract ~script:Op.dummy_script
   >>=? fun (op1, _) ->
-  Op.contract_origination
-    (I inc)
-    ~credit:Tez.one
-    contract
-    ~script:Op.dummy_script
+  Op.contract_origination (B b) ~credit:Tez.one contract ~script:Op.dummy_script
   >>=? fun (op2, _) ->
-  Incremental.add_operation inc op1 >>=? fun inc ->
+  Block.bake ~operation:op1 b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun inc ->
   Incremental.add_operation inc op2 >>= fun res ->
   Assert.proto_error_with_info
     ~loc:__LOC__

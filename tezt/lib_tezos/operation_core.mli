@@ -228,6 +228,9 @@ module Manager : sig
      provided, the same one as {!val:make} is used. *)
   val get_next_counter : ?source:Account.key -> Client.t -> int Lwt.t
 
+  (** [json t] gives the json representation of a manager operation. *)
+  val json : Client.t -> t -> JSON.u Lwt.t
+
   (** [operation ?branch t client] constructs an operation from a
      manager operation. [branch] can be used to set manually the
      branch. [client] can be used to get some meta information such as

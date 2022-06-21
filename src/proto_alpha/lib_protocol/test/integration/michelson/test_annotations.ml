@@ -121,6 +121,8 @@ let test_internal_origination () =
     ~parameters:lazy_none
     Tez.zero
   >>=? fun operation ->
+  Incremental.finalize_block inc >>=? fun b ->
+  Incremental.begin_construction b >>=? fun inc ->
   Incremental.add_operation inc operation >>=? fun inc ->
   get_address_from_storage inc factory >>=? fun addr ->
   assert_stored_script_equal inc addr contract_with_annotations

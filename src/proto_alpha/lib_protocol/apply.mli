@@ -39,14 +39,10 @@ open Apply_internal_results
 
 type error +=
   | Internal_operation_replay of packed_internal_contents
-  | Gas_quota_exceeded_init_deserialize
-  | Insufficient_gas_for_manager
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
-  | Inconsistent_counters
-  | Incorrect_reveal_position
-  | Inconsistent_sources
+  | Empty_transaction of Contract.t
 
 val begin_partial_construction :
   context ->
@@ -116,15 +112,35 @@ type apply_mode =
       grand_parent_round : Round.t;
     }
 
+(** Apply an operation, i.e. update the given context in accordance
+    with the operation's semantic (or return an error if the operation
+    is not applicable).
+
+    The {!type:Validate_operation.stamp} argument enforces that an
+    operation needs to be validated by {!Validate_operation} before it
+    can be applied.
+
+    TODO: https://gitlab.com/tezos/tezos/-/issues/2603
+
+    Currently, {!Validate_operation.validate_operation} does nothing
+    on non-manager operations. The "validation" of these operations is
+    instead handled by [apply_operation], which may thus return an
+    error if the operation is ill-formed. Once [validate_operation] has
+    been extended to every kind of operation, [apply_operation] should
+    never return an error.
+
+    See {!apply_manager_operation} for additional information on the
+    application of manager operations. *)
 val apply_operation :
   context ->
   Chain_id.t ->
   apply_mode ->
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
-  Operation_list_hash.elt ->
+  Validate_operation.stamp ->
+  Operation_hash.t ->
   'a operation ->
-  (context * 'a operation_metadata, error trace) result Lwt.t
+  (context * 'a operation_metadata) tzresult Lwt.t
 
 type finalize_application_mode =
   | Finalize_full_construction of {
@@ -146,39 +162,58 @@ val finalize_application :
   migration_balance_updates:Receipt.balance_updates ->
   (context * Fitness.t * block_metadata, error trace) result Lwt.t
 
-val apply_manager_contents_list :
-  context ->
-  Script_ir_translator.unparsing_mode ->
-  payload_producer:public_key_hash ->
-  Chain_id.t ->
-  'a Kind.manager prechecked_contents_list ->
-  (context * 'a Kind.manager contents_result_list) Lwt.t
-
+(** Similar to {!apply_operation}, but a few initial and final steps
+    are skipped. This function is called in [lib_plugin/RPC.ml]. *)
 val apply_contents_list :
   context ->
   Chain_id.t ->
   apply_mode ->
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
+  Validate_operation.stamp ->
   'kind operation ->
   'kind contents_list ->
   (context * 'kind contents_result_list) tzresult Lwt.t
 
-(** [precheck_manager_contents_list validation_state contents_list]
-   Returns an updated context, and a list of prechecked contents
-   containing balance updates for fees related to each manager
-   operation in [contents_list]
+(** Update the context to reflect the application of a manager
+    operation.
 
-   If [mempool_mode], the function checks whether the total gas limit
-   of this batch of operation is below the [gas_limit] of a block and
-   fails with a permanent error when above. Otherwise, the gas limit
-   of the batch is removed from the one of the block (when possible)
-   before moving on. *)
-val precheck_manager_contents_list :
+    This function first updates the context to:
+
+    - take the fees;
+
+    - increment the account's counter;
+
+    - decrease of the available block gas by operation's [gas_limit].
+
+    These updates are mandatory. In particular, taking the fees is
+    critically important. That's why [apply_manager_operation] takes a
+    [Validate_operation.stamp] argument, so that it may only be called
+    after having validated the operation by calling
+    {!Validate_operation}. Indeed, this module is responsible for
+    ensuring that the operation is solvable, i.e. that fees can be
+    taken, i.e. that the first stage of [apply_manager_operation]
+    cannot fail. If this stage fails nevertheless, the function returns
+    an error.
+
+    The second stage of this function consists in applying all the
+    other effects, in accordance with the semantic of the operation's
+    kind.
+
+    An error may happen during this second phase: in that case, the
+    function returns the context obtained at the end of the first
+    stage, and a [contents_result_list] that contains the error. This
+    means that the operation has no other effects than those described
+    above during the first phase. *)
+val apply_manager_operation :
   context ->
-  'kind Kind.manager contents_list ->
+  Script_ir_translator.unparsing_mode ->
+  payload_producer:public_key_hash ->
+  Chain_id.t ->
   mempool_mode:bool ->
-  (context * 'kind Kind.manager prechecked_contents_list) tzresult Lwt.t
+  Validate_operation.stamp ->
+  'a Kind.manager contents_list ->
+  (context * 'a Kind.manager contents_result_list) tzresult Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)
@@ -192,25 +227,3 @@ val are_endorsements_required :
 (** Check if a block's endorsing power is at least the minim required. *)
 val check_minimum_endorsements :
   endorsing_power:int -> minimum:int -> unit tzresult
-
-(** [check_manager_signature validation_state op raw_operation]
-    The function starts by retrieving the public key hash [pkh] of the manager
-    operation. In case the operation is batched, the function also checks that
-    the sources are all the same.
-    Once the [pkh] is retrieved, the function looks for its associated public
-    key. For that, the manager operation is inspected to check if it contains
-    a public key revelation. If not, the public key is searched in the context.
-
-    @return [Error Invalid_signature] if the signature check fails
-    @return [Error Unrevealed_manager_key] if the manager has not yet been
-    revealed
-    @return [Error Missing_manager_contract] if the key is not found in the
-    context
-    @return [Error Inconsistent_sources] if the operations in a batch are not
-    from the same manager *)
-val check_manager_signature :
-  context ->
-  Chain_id.t ->
-  'a Kind.manager contents_list ->
-  'b operation ->
-  (unit, error trace) result Lwt.t

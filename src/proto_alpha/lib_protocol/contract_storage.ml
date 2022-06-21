@@ -542,6 +542,15 @@ let get_balance_carbonated c contract =
   >>?= fun c ->
   get_balance c contract >>=? fun balance -> return (c, balance)
 
+let check_allocated_and_get_balance c pkh =
+  let open Lwt_result_syntax in
+  let* balance_opt =
+    Storage.Contract.Spendable_balance.find c (Contract_repr.Implicit pkh)
+  in
+  match balance_opt with
+  | None -> Error_monad.fail (Empty_implicit_contract pkh)
+  | Some balance -> return balance
+
 let update_script_storage c contract storage lazy_storage_diff =
   let storage = Script_repr.lazy_expr storage in
   update_script_lazy_storage c lazy_storage_diff
@@ -553,27 +562,38 @@ let update_script_storage c contract storage lazy_storage_diff =
   in
   Storage.Contract.Used_storage_space.update c contract new_size
 
+let spend_from_balance contract balance amount =
+  record_trace
+    (Balance_too_low (contract, balance, amount))
+    Tez_repr.(balance -? amount)
+
+let check_emptiable c contract =
+  let open Lwt_result_syntax in
+  match contract with
+  | Contract_repr.Originated _ -> return_unit
+  | Implicit pkh -> (
+      let* delegate = Contract_delegate_storage.find c contract in
+      match delegate with
+      | Some pkh' ->
+          if Signature.Public_key_hash.equal pkh pkh' then return_unit
+          else
+            (* Delegated implicit accounts cannot be emptied *)
+            Lwt.return (error (Empty_implicit_delegated_contract pkh))
+      | None -> return_unit)
+
 let spend_only_call_from_token c contract amount =
-  Storage.Contract.Spendable_balance.find c contract >>=? fun balance ->
+  let open Lwt_result_syntax in
+  let* balance = Storage.Contract.Spendable_balance.find c contract in
   let balance = Option.value balance ~default:Tez_repr.zero in
-  match Tez_repr.(balance -? amount) with
-  | Error _ -> fail (Balance_too_low (contract, balance, amount))
-  | Ok new_balance -> (
-      Storage.Contract.Spendable_balance.update c contract new_balance
-      >>=? fun c ->
-      Stake_storage.remove_contract_stake c contract amount >>=? fun c ->
-      if Tez_repr.(new_balance > Tez_repr.zero) then return c
-      else
-        match contract with
-        | Originated _ -> return c
-        | Implicit pkh -> (
-            Contract_delegate_storage.find c contract >>=? function
-            | Some pkh' ->
-                if Signature.Public_key_hash.equal pkh pkh' then return c
-                else
-                  (* Delegated implicit accounts cannot be emptied *)
-                  fail (Empty_implicit_delegated_contract pkh)
-            | None -> return c))
+  let*? new_balance = spend_from_balance contract balance amount in
+  let* c = Storage.Contract.Spendable_balance.update c contract new_balance in
+  let* c = Stake_storage.remove_contract_stake c contract amount in
+  let+ () =
+    when_
+      Tez_repr.(new_balance <= Tez_repr.zero)
+      (fun () -> check_emptiable c contract)
+  in
+  c
 
 (* [Tez_repr.(amount <> zero)] is a precondition of this function. It ensures that
    no entry associating a null balance to an implicit contract exists in the map
@@ -681,32 +701,55 @@ let has_frozen_bonds ctxt contract =
 let fold_on_bond_ids ctxt contract =
   Storage.Contract.fold_bond_ids (ctxt, contract)
 
+(** Indicate whether the given implicit contract should avoid deletion
+    when it is emptied. *)
+let should_keep_empty_implicit_contract ctxt contract =
+  let open Lwt_result_syntax in
+  let* has_frozen_bonds = has_frozen_bonds ctxt contract in
+  if has_frozen_bonds then return_true
+  else
+    (* full balance of contract is zero. *)
+    Contract_delegate_storage.find ctxt contract >>=? function
+    | Some _ ->
+        (* Here, we know that the contract delegates to itself.
+           Indeed, it does not delegate to a different one, because
+           the balance of such contracts cannot be zero (see
+           {!spend_only_call_from_token}), hence the stake of such
+           contracts cannot be zero either. *)
+        return_true
+    | None ->
+        (* Delete empty implicit contract. *)
+        return_false
+
 let ensure_deallocated_if_empty ctxt contract =
+  let open Lwt_result_syntax in
   match contract with
   | Contract_repr.Originated _ ->
       return ctxt (* Never delete originated contracts *)
   | Implicit _ -> (
-      Storage.Contract.Spendable_balance.find ctxt contract
-      >>=? fun balance_opt ->
+      let* balance_opt =
+        Storage.Contract.Spendable_balance.find ctxt contract
+      in
       match balance_opt with
       | None ->
           (* Nothing to do, contract is not allocated. *)
           return ctxt
-      | Some balance -> (
+      | Some balance ->
           if Tez_repr.(balance <> zero) then return ctxt
           else
-            has_frozen_bonds ctxt contract >>=? fun has_frozen_bonds ->
-            if has_frozen_bonds then return ctxt
-            else
-              (* full balance of contract is zero. *)
-              Contract_delegate_storage.find ctxt contract >>=? function
-              | Some _ ->
-                  (* Here, we know that the contract delegates to itself.
-                     Indeed, it does not delegate to a different one, because
-                     the balance of such contracts cannot be zero (see
-                     [spend_only_call_from_token]), hence the stake of such
-                     contracts cannot be zero either. *)
-                  return ctxt
-              | None ->
-                  (* Delete empty implicit contract. *)
-                  delete ctxt contract))
+            let* keep_contract =
+              should_keep_empty_implicit_contract ctxt contract
+            in
+            if keep_contract then return ctxt else delete ctxt contract)
+
+let simulate_spending ctxt ~balance ~amount source =
+  let open Lwt_result_syntax in
+  let contract = Contract_repr.Implicit source in
+  let*? new_balance = spend_from_balance contract balance amount in
+  let* still_allocated =
+    if Tez_repr.(new_balance > zero) then return_true
+    else
+      let* () = check_emptiable ctxt contract in
+      should_keep_empty_implicit_contract ctxt contract
+  in
+  return (new_balance, still_allocated)

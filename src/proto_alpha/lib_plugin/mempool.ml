@@ -980,18 +980,17 @@ let precheck_manager :
      ~gas_limit
      source ->
   let precheck_manager_and_check_signature ~on_success =
-    ( Main.precheck_manager validation_state contents >>=? fun () ->
-      let (raw_operation : t Kind.manager operation) =
-        Alpha_context.{shell; protocol_data}
-      in
+    let should_check_signature =
       if Compare.Int.(nb_successful_prechecks > 0) then
-        (* Signature succesfully checked at least once. *)
-        return_unit
+        (* Signature successfully checked at least once. *)
+        Validate_operation.TMP_for_plugin.Skip_signature_check
       else
         (* Signature probably never checked. *)
-        Main.check_manager_signature validation_state contents raw_operation )
+        Validate_operation.TMP_for_plugin.Check_signature {shell; protocol_data}
+    in
+    Main.precheck_manager validation_state contents should_check_signature
     >|= function
-    | Ok () -> on_success
+    | Ok (_ : Validate_operation.stamp) -> on_success
     | Error err -> (
         let err = Environment.wrap_tztrace err in
         match classify_trace err with

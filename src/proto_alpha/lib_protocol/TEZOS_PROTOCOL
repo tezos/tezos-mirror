@@ -212,6 +212,7 @@
 
         "Baking",
         "Amendment",
+        "Validate_operation",
         "Apply",
 
         "Services_registration",
