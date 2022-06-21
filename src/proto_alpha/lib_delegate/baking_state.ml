@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Protocol_client_context
 
 (** A delegate (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
@@ -462,7 +463,7 @@ let record_state (state : state) =
 type error += Broken_locked_values_invariant
 
 let () =
-  Error_monad.register_error_kind
+  register_error_kind
     `Permanent
     ~id:"Baking_state.broken_locked_values_invariant"
     ~title:"Broken locked values invariant"
