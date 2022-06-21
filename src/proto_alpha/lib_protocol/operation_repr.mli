@@ -458,9 +458,12 @@ and _ manager_operation =
       slot : Dal_slot_repr.t;
     }
       -> Kind.dal_publish_slot_header manager_operation
-  (* [Sc_rollup_originate] allows an implicit account to originate a new
-     smart contract rollup (initialized with a given boot
-     sector). *)
+      (** [Sc_rollup_originate] allows an implicit account to originate a new
+          smart contract rollup (initialized with a given boot sector).
+          The [parameters_ty] field allows to provide the expected interface
+          of the rollup being originated (i.e. its entrypoints with their
+          associated signatures) as a Michelson type.
+      *)
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;

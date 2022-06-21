@@ -2514,7 +2514,8 @@ let commands_rw () =
       @@ param
            ~name:"parameters_type"
            ~desc:
-             "The type of parameters that the smart-contract rollup accepts."
+             "The interface of the smart-contract rollup including its \
+              entrypoints and their signatures."
            data_parameter
       @@ prefixes ["booting"; "with"]
       @@ param

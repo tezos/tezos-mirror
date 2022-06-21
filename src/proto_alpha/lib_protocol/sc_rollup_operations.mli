@@ -40,8 +40,9 @@ type execute_outbox_message_result = {
 
 type origination_result = {address : Sc_rollup.Address.t; size : Z.t}
 
-(** [originate context ~kind ~boot_sector] adds a new rollup running in a
-    given [kind] initialized with a [boot_sector]. *)
+(** [originate context ~kind ~boot_sector ~parameters_ty] adds a new rollup
+    running in a given [kind], initialized with a [boot_sector], and whose
+    expected signature/interface is [parameters_ty]. *)
 val originate :
   context ->
   kind:Sc_rollup.Kind.t ->
