@@ -25,7 +25,7 @@ export full_opam_repository_tag=bf63beadbea0c69b499037cd707fd607ed844f0d
 ## opam_repository is an additional, tezos-specific opam repository.
 ## This value MUST be the same as `build_deps_image_version` in `.gitlab/ci/templates.yml
 export opam_repository_url=https://gitlab.com/tezos/opam-repository
-export opam_repository_tag=fba11a81e22ba2949ac9d7f5608966fdc5aa6712
+export opam_repository_tag=e32bc2375404721076cc9d2e7b3fa0fb8702628b
 export opam_repository_git=$opam_repository_url.git
 export opam_repository=$opam_repository_git\#$opam_repository_tag
 
