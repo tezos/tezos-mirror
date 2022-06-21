@@ -53,7 +53,6 @@
 
 (rule
  (targets protocol.ml)
- (deps main.ml main.mli)
  (action
   (write-file
    %{targets}

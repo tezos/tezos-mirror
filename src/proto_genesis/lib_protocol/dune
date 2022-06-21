@@ -53,9 +53,6 @@
 
 (rule
  (targets protocol.ml)
- (deps data.ml
-       services.ml
-       main.ml main.mli)
  (action
   (write-file
    %{targets}

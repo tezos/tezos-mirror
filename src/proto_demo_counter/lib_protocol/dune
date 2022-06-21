@@ -62,16 +62,6 @@
 
 (rule
  (targets protocol.ml)
- (deps
-  error.ml error.mli
-  proto_params.ml proto_params.mli
-  header.ml header.mli
-  state.ml state.mli
-  proto_operation.ml proto_operation.mli
-  receipt.ml receipt.mli
-  apply.ml apply.mli
-  services.ml services.mli
-  main.ml main.mli)
  (action
   (write-file
    %{targets}
