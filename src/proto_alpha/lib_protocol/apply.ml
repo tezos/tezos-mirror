@@ -2429,8 +2429,9 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Single (Dal_slot_availability _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-      | Double_endorsement_evidence _ | Double_preendorsement_evidence _
-      | Double_baking_evidence _ | Activate_account _ | Manager_operation _ )
+      | Vdf_revelation _ | Double_endorsement_evidence _
+      | Double_preendorsement_evidence _ | Double_baking_evidence _
+      | Activate_account _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
@@ -2941,6 +2942,13 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
+  | Single (Vdf_revelation {solution}) ->
+      Seed.check_vdf_and_update_seed ctxt solution >>=? fun ctxt ->
+      let tip = Constants.seed_nonce_revelation_tip ctxt in
+      let contract = Contract.Implicit payload_producer in
+      Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
+      >|=? fun (ctxt, balance_updates) ->
+      (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preendorsement_evidence {op1; op2}) ->
       punish_double_endorsement_or_preendorsement
         ctxt

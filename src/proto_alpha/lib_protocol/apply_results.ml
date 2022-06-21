@@ -925,6 +925,9 @@ type 'kind contents_result =
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
+  | Vdf_revelation_result :
+      Receipt.balance_updates
+      -> Kind.vdf_revelation contents_result
   | Double_endorsement_evidence_result :
       Receipt.balance_updates
       -> Kind.double_endorsement_evidence contents_result
@@ -1156,6 +1159,24 @@ module Encoding = struct
         inj = (fun bus -> Seed_nonce_revelation_result bus);
       }
 
+  let[@coq_axiom_with_reason "gadt"] vdf_revelation_case =
+    Case
+      {
+        op_case = Operation.Encoding.vdf_revelation_case;
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
+        select =
+          (function
+          | Contents_result (Vdf_revelation_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Vdf_revelation _ as op), res) -> Some (op, res)
+          | _ -> None);
+        proj = (fun (Vdf_revelation_result bus) -> bus);
+        inj = (fun bus -> Vdf_revelation_result bus);
+      }
+
   let[@coq_axiom_with_reason "gadt"] double_endorsement_evidence_case =
     Case
       {
@@ -1325,6 +1346,7 @@ module Encoding = struct
           | Contents_result (Dal_slot_availability_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
+          | Contents_result (Vdf_revelation_result _) -> None
           | Contents_result (Double_endorsement_evidence_result _) -> None
           | Contents_result (Double_preendorsement_evidence_result _) -> None
           | Contents_result (Double_baking_evidence_result _) -> None
@@ -1636,6 +1658,7 @@ let contents_result_encoding =
   @@ union
        [
          make seed_nonce_revelation_case;
+         make vdf_revelation_case;
          make endorsement_case;
          make preendorsement_case;
          make dal_slot_availability_case;
@@ -1696,6 +1719,7 @@ let contents_and_result_encoding =
   @@ union
        [
          make seed_nonce_revelation_case;
+         make vdf_revelation_case;
          make endorsement_case;
          make preendorsement_case;
          make dal_slot_availability_case;
@@ -1843,6 +1867,8 @@ let kind_equal :
   | Dal_slot_availability _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
+  | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq
+  | Vdf_revelation _, _ -> None
   | Double_preendorsement_evidence _, Double_preendorsement_evidence_result _ ->
       Some Eq
   | Double_preendorsement_evidence _, _ -> None

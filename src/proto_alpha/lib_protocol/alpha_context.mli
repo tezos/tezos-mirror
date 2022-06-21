@@ -1285,16 +1285,43 @@ end
 module Seed : sig
   type seed
 
-  type error += Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
+  val seed_encoding : seed Data_encoding.t
 
-  val for_cycle : context -> Cycle.t -> seed tzresult Lwt.t
+  type vdf_solution = Vdf.result * Vdf.proof
+
+  val vdf_solution_encoding : vdf_solution Data_encoding.t
+
+  val pp_solution : Format.formatter -> vdf_solution -> unit
+
+  type vdf_setup = Vdf.discriminant * Vdf.challenge
+
+  type error +=
+    | Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
+    | Already_accepted
+    | Unverified_vdf
+    | Too_early_revelation
+
+  val generate_vdf_setup :
+    seed_discriminant:seed -> seed_challenge:seed -> vdf_setup
+
+  val check_vdf_and_update_seed :
+    context -> vdf_solution -> context tzresult Lwt.t
 
   val compute_randao : context -> context tzresult Lwt.t
 
   val cycle_end :
     context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t
 
-  val seed_encoding : seed Data_encoding.t
+  (* RPC *)
+  type seed_computation_status =
+    | Nonce_revelation_stage
+    | Vdf_revelation_stage of {seed_discriminant : seed; seed_challenge : seed}
+    | Computation_finished
+
+  val for_cycle : context -> Cycle.t -> seed tzresult Lwt.t
+
+  val get_seed_computation_status :
+    context -> seed_computation_status tzresult Lwt.t
 end
 
 module Big_map : sig
@@ -3393,6 +3420,8 @@ module Kind : sig
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
+  type vdf_revelation = Vdf_revelation_kind
+
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
@@ -3542,6 +3571,10 @@ and _ contents =
       nonce : Nonce.t;
     }
       -> Kind.seed_nonce_revelation contents
+  | Vdf_revelation : {
+      solution : Seed.vdf_solution;
+    }
+      -> Kind.vdf_revelation contents
   | Double_preendorsement_evidence : {
       op1 : Kind.preendorsement operation;
       op2 : Kind.preendorsement operation;
@@ -3819,6 +3852,8 @@ module Operation : sig
     val dal_slot_availability_case : Kind.dal_slot_availability case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
+
+    val vdf_revelation_case : Kind.vdf_revelation case
 
     val double_preendorsement_evidence_case :
       Kind.double_preendorsement_evidence case

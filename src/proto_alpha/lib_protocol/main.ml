@@ -733,6 +733,9 @@ let relative_position_within_block op1 op2 =
   | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
   | _, Single (Seed_nonce_revelation _) -> 1
   | Single (Seed_nonce_revelation _), _ -> -1
+  | Single (Vdf_revelation _), Single (Vdf_revelation _) -> 0
+  | _, Single (Vdf_revelation _) -> 1
+  | Single (Vdf_revelation _), _ -> -1
   | ( Single (Double_preendorsement_evidence _),
       Single (Double_preendorsement_evidence _) ) ->
       0

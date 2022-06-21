@@ -84,11 +84,10 @@ let () =
    current context and that a nonce has not been already revealed for that level.
    Also checks that we are not past the nonce revelation period. *)
 let get_unrevealed ctxt (level : Level_repr.t) =
-  let cur_level = Level_storage.current ctxt in
-  match Cycle_repr.pred cur_level.cycle with
+  let current_level = Level_storage.current ctxt in
+  match Cycle_repr.pred current_level.cycle with
   | None -> fail Too_early_revelation (* no revelations during cycle 0 *)
   | Some revealed_cycle -> (
-      let current_level = Level_storage.current ctxt in
       if Cycle_repr.(revealed_cycle < level.Level_repr.cycle) then
         fail Too_early_revelation
       else if

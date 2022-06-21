@@ -43,6 +43,21 @@ type seed
 (** A random sequence, to derive random values from *)
 type sequence
 
+(** A VDF discriminant and challenge *)
+type vdf_setup = Vdf.discriminant * Vdf.challenge
+
+(** A VDF result, to derive a seed from *)
+type vdf_solution = Vdf.result * Vdf.proof
+
+val pp_solution : Format.formatter -> vdf_solution -> unit
+
+val generate_vdf_setup :
+  seed_discriminant:seed -> seed_challenge:seed -> vdf_setup
+
+val verify : vdf_setup -> Int64.t -> vdf_solution -> bool option
+
+val vdf_to_seed : seed -> vdf_solution -> seed
+
 (** [initialize_new state ident] returns a new generator *)
 val initialize_new : seed -> bytes list -> t
 
@@ -72,7 +87,7 @@ val take_int64 : sequence -> int64 -> int64 * sequence
 type nonce
 
 (** Add entropy to the seed generator *)
-val nonce : seed -> nonce -> seed
+val update_seed : seed -> nonce -> seed
 
 (** Use a byte sequence as a nonce *)
 val make_nonce : bytes -> nonce tzresult
@@ -85,10 +100,6 @@ val check_hash : nonce -> Nonce_hash.t -> bool
 
 (** For using nonce hashes as keys in the hierarchical database *)
 val nonce_hash_key_part : Nonce_hash.t -> string list -> string list
-
-(** {2 Predefined seeds} *)
-
-val empty : seed
 
 (** Returns a new seed by hashing the one passed with a constant. *)
 val deterministic_seed : seed -> seed
@@ -110,3 +121,11 @@ val initial_nonce_hash_0 : Nonce_hash.t
 val nonce_encoding : nonce Data_encoding.t
 
 val seed_encoding : seed Data_encoding.t
+
+val vdf_setup_encoding : vdf_setup Data_encoding.t
+
+val vdf_solution_encoding : vdf_solution Data_encoding.t
+
+type seed_status = RANDAO_seed | VDF_seed
+
+val seed_status_encoding : seed_status Data_encoding.t

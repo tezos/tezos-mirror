@@ -1197,11 +1197,29 @@ module type FOR_CYCLE = sig
 
   val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
+  val update :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Seed_repr.seed ->
+    Seed_repr.seed_status ->
+    Raw_context.t tzresult Lwt.t
+
   val remove_existing :
     Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 end
 
 (** Seed *)
+
+module Seed_status =
+  Make_single_data_storage (Registered) (Raw_context)
+    (struct
+      let name = ["seed_status"]
+    end)
+    (struct
+      type t = Seed_repr.seed_status
+
+      let encoding = Seed_repr.seed_status_encoding
+    end)
 
 module Seed = struct
   type unrevealed_nonce = Cycle.unrevealed_nonce = {
@@ -1247,7 +1265,36 @@ module Seed = struct
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
 
-  module For_cycle : FOR_CYCLE = Cycle.Seed
+  module VDF_setup =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["vdf_challenge"]
+      end)
+      (struct
+        type t = Seed_repr.vdf_setup
+
+        let encoding = Seed_repr.vdf_setup_encoding
+      end)
+
+  module For_cycle : FOR_CYCLE = struct
+    let init ctxt cycle seed =
+      let open Lwt_result_syntax in
+      let* ctxt = Cycle.Seed.init ctxt cycle seed in
+      let*! ctxt = Seed_status.add ctxt Seed_repr.RANDAO_seed in
+      return ctxt
+
+    let mem = Cycle.Seed.mem
+
+    let get = Cycle.Seed.get
+
+    let update ctxt cycle seed status =
+      Cycle.Seed.update ctxt cycle seed >>=? fun ctxt ->
+      Seed_status.update ctxt status
+
+    let remove_existing = Cycle.Seed.remove_existing
+  end
+
+  let get_status = Seed_status.get
 end
 
 (** Commitments *)

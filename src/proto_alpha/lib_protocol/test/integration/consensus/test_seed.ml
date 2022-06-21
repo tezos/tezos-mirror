@@ -85,7 +85,7 @@ let test_seed_no_commitment () =
   Context.init3
     ~blocks_per_cycle:8l
     ~consensus_threshold:0
-    ~blocks_per_reveal_period:2l
+    ~nonce_revelation_threshold:2l
     ()
   >>=? fun (b, _delegates) ->
   Context.get_constants (B b) >>=? fun _ ->

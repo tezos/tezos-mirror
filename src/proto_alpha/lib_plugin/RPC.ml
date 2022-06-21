@@ -2315,6 +2315,9 @@ module Forge = struct
   let seed_nonce_revelation ctxt block ~branch ~level ~nonce () =
     operation ctxt block ~branch (Seed_nonce_revelation {level; nonce})
 
+  let vdf_revelation ctxt block ~branch ~solution () =
+    operation ctxt block ~branch (Vdf_revelation {solution})
+
   let double_baking_evidence ctxt block ~branch ~bh1 ~bh2 () =
     operation ctxt block ~branch (Double_baking_evidence {bh1; bh2})
 
