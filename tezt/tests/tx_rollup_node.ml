@@ -1296,26 +1296,27 @@ let make_deposit ~source ~tx_rollup_hash ~tx_node ~client ?(dests = [])
 
 (* Checks that the rollup node can receive L2 transactions in its queue, batch
    them and inject them in the Tezos node. *)
-let test_batcher =
+let test_batcher ~test_persistence =
   Protocol.register_test
     ~__FILE__
-    ~title:"TX_rollup: L2 batcher"
-    ~tags:["tx_rollup"; "node"; "batcher"; "transaction"]
+    ~title:
+      (sf
+         "TX_rollup: L2 %s"
+         (if test_persistence then "persistent injector" else "batcher"))
+    ~tags:
+      (["tx_rollup"; "node"; "batcher"; "transaction"; "injector"]
+      @ if test_persistence then ["persistent"] else ["nostop"])
     (fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
       let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let operator = Constant.bootstrap1.public_key_hash in
       let originator = Constant.bootstrap2.public_key_hash in
       let* tx_rollup_hash, tx_node =
         init_and_run_rollup_node
           ~protocol
           ~originator
-          ~operator
           ~batch_signer:Constant.bootstrap5.public_key_hash
-          ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
-          ~remove_commitment_signer:Constant.bootstrap4.public_key_hash
           node
           client
       in
@@ -1501,8 +1502,28 @@ let test_batcher =
       Log.info "Waiting for batching on L1 to succeed" ;
       let* () = batch_success_promise in
       Log.info "Batching succeeded" ;
+      let* () =
+        if test_persistence then (
+          Log.info "Stopping node to prevent injection" ;
+          let* () = Node.terminate node in
+          (* We wait a bit to allow for the rollup node injector to write its
+             state on disk (if we kill it right away, we may end up with
+             corrupted files).
+             Note: This can be a source of flakiness. *)
+          let* () = Lwt_unix.sleep 2.0 in
+          Log.info "Stopping rollup node" ;
+          let* () = Rollup_node.terminate tx_node in
+          let* () =
+            Node.run node Node.[Connections 0; Synchronisation_threshold 0]
+          in
+          let* () = Node.wait_for_ready node in
+          let* () = Rollup_node.run tx_node in
+          let* () = Rollup_node.wait_for_ready tx_node in
+          Client.bake_for_and_wait client)
+        else unit
+      in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 9 in
+      let* _ = wait_tezos_node_level tx_node node in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       check_inbox_success inbox ;
       let* () =
@@ -2901,7 +2922,8 @@ let register ~protocols =
   test_node_disconnect protocols ;
   test_ticket_deposit_from_l1_to_l2 protocols ;
   test_l2_to_l2_transaction protocols ;
-  test_batcher protocols ;
+  test_batcher ~test_persistence:false protocols ;
+  test_batcher ~test_persistence:true [Alpha] ;
   test_reorganization protocols ;
   test_l2_proof_rpc_position protocols ;
   test_reject_bad_commitment protocols ;
