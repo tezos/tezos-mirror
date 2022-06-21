@@ -28,7 +28,9 @@
 # This script is a wrapper for git-gas-diff. See the README.md for more
 # information about the tool.
 
-# The script accepts one or two commit hash arguments.
+# The script accepts zero, one or two commit hash arguments.
+# If no commit is provided, the script will use git-gas-diff between the
+# last merge commit and HEAD.
 # If one commit is provided, the script will use git-gas-diff between this
 # commit and HEAD.
 # If two commits are provided, the script will use git-gas-diff between the
@@ -41,22 +43,29 @@
 # context around modified lines (option `U0`).
 
 case "$#" in
+  0)
+    OLD=$(git log --pretty=format:"%H" --merges -n 1)
+    NEW='HEAD'
+    ;;
+
   1)
+    OLD=$1
     NEW='HEAD'
     ;;
 
   2)
+    OLD=$1
     NEW=$2
     ;;
 
   *)
-    echo "** Error: wrong number of arguments (1 or 2 expected, found $#)."
-    echo 'Usage: ./git-gas-diff [commit] to use git-gas-diff between [commit] and HEAD;'
-    echo '       ./git-gas-diff [commit1] [commit2] to use git-gas-diff between [commit1] and [commit2].'
+    echo "** Error: wrong number of arguments (0, 1 or 2 expected, found $#)."
+    echo 'Usage: ./git-gas-diff.sh to use git-gas-diff between the last merge commit and HEAD;'
+    echo '       ./git-gas-diff.sh [commit] to use git-gas-diff between [commit] and HEAD;'
+    echo '       ./git-gas-diff.sh [commit1] [commit2] to use git-gas-diff between [commit1] and [commit2].'
     exit 1
-esac
 
-OLD=$1
+esac
 
 DIFF_FILE=$(mktemp)
 
