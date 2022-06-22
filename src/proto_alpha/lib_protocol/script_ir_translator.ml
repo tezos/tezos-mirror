@@ -959,7 +959,7 @@ and parse_big_map_value_ty ctxt ~stack_depth ~legacy value_ty =
     ~legacy
     ~allow_lazy_storage:false
     ~allow_operation:false
-    ~allow_contract:legacy
+    ~allow_contract:false
     ~allow_ticket:true
     ~ret:Don't_parse_entrypoints
     value_ty
