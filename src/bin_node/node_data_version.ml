@@ -26,8 +26,6 @@
 
 open Filename.Infix
 
-type t = string
-
 let store_dir data_dir = data_dir // "store"
 
 let context_dir data_dir = data_dir // "context"
@@ -44,16 +42,69 @@ let default_config_file_name = "config.json"
 
 let version_file_name = "version.json"
 
+module Version = struct
+  type t = {major : int; minor : int}
+
+  let compare v1 v2 =
+    let c = Int.compare v1.major v2.major in
+    if c <> 0 then c else Int.compare v1.minor v2.minor
+
+  let equal v1 v2 = compare v1 v2 = 0
+
+  let make ~major ~minor =
+    if major < 0 || minor < 0 then
+      invalid_arg
+        (Printf.sprintf
+           "Version.make: version number cannot be negative: %d.%d"
+           major
+           minor) ;
+    {major; minor}
+
+  let parse_version_item s =
+    match int_of_string_opt s with
+    | None ->
+        invalid_arg
+          ("Version.parse_version_item: invalid integer: " ^ String.escaped s)
+    | Some i -> i
+
+  let of_string s =
+    match String.split_on_char '.' s with
+    | [major; minor] ->
+        make ~major:(parse_version_item major) ~minor:(parse_version_item minor)
+    | [_major; minor; patch] ->
+        (* Allows a backward compatibility from the previous version schema,
+           represented by a triplet. It transforms version X.Y.Z to Y.Z.
+           Note that there were no version with X <> 0. *)
+        make ~major:(parse_version_item minor) ~minor:(parse_version_item patch)
+    | _ -> invalid_arg "Version.of_string: string is not of the form X.Y"
+
+  let to_string {major; minor} = Printf.sprintf "%d.%d" major minor
+
+  let pp fmt v = Format.pp_print_string fmt (to_string v)
+
+  let encoding =
+    let open Data_encoding in
+    conv to_string of_string (obj1 (req "version" string))
+end
+
 (* Data_version history:
- *  - 0.0.1 : original storage
- *  - 0.0.2 : never released
- *  - 0.0.3 : store upgrade (introducing history mode)
- *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2)
- *  - 0.0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
- *  - 0.0.6 : store upgrade (switching from LMDB)
- *  - 0.0.7 : new store metadata representation
- *  - 0.0.8 : context upgrade (upgrade to irmin.3.0) *)
-let data_version = "0.0.8"
+ *  - (0.)0.1 : original storage
+ *  - (0.)0.2 : never released
+ *  - (0.)0.3 : store upgrade (introducing history mode)
+ *  - (0.)0.4 : context upgrade (switching from LMDB to IRMIN v2)
+ *  - (0.)0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
+ *  - (0.)0.6 : store upgrade (switching from LMDB)
+ *  - (0.)0.7 : new store metadata representation
+ *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0) *)
+
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
+   We should enable the semantic versioning instead of applying
+   hardcoded rules.*)
+let current_version = Version.make ~major:0 ~minor:8
+
+let v_0_6 = Version.make ~major:0 ~minor:6
+
+let v_0_7 = Version.make ~major:0 ~minor:7
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -63,15 +114,11 @@ let data_version = "0.0.8"
 let upgradable_data_version =
   let open Lwt_result_syntax in
   [
-    ( "0.0.6",
-      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
-    ( "0.0.7",
-      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
+    (v_0_6, fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit);
+    (v_0_7, fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit);
   ]
 
-let version_encoding = Data_encoding.(obj1 (req "version" string))
-
-type error += Invalid_data_dir_version of t * t
+type error += Invalid_data_dir_version of Version.t * Version.t
 
 type error += Invalid_data_dir of {data_dir : string; msg : string option}
 
@@ -79,7 +126,8 @@ type error += Could_not_read_data_dir_version of string
 
 type error += Could_not_write_version_file of string
 
-type error += Data_dir_needs_upgrade of {expected : t; actual : t}
+type error +=
+  | Data_dir_needs_upgrade of {expected : Version.t; actual : Version.t}
 
 let () =
   register_error_kind
@@ -96,7 +144,9 @@ let () =
         got
         exp)
     Data_encoding.(
-      obj2 (req "expected_version" string) (req "actual_version" string))
+      obj2
+        (req "expected_version" Version.encoding)
+        (req "actual_version" Version.encoding))
     (function
       | Invalid_data_dir_version (expected, actual) -> Some (expected, actual)
       | _ -> None)
@@ -126,7 +176,7 @@ let () =
     ~pp:(fun ppf path ->
       Format.fprintf
         ppf
-        "Tried to read version file at '%s',  but the file could not be parsed."
+        "Tried to read version file at '%s', but the file could not be parsed."
         path)
     (function Could_not_read_data_dir_version path -> Some path | _ -> None)
     (fun path -> Could_not_read_data_dir_version path) ;
@@ -154,12 +204,16 @@ let () =
       Format.fprintf
         ppf
         "The data directory version is too old.@,\
-         Found '%s', expected '%s'.@,\
+         Found '%a', expected '%a'.@,\
          It needs to be upgraded with `tezos-node upgrade storage`."
+        Version.pp
         got
+        Version.pp
         exp)
     Data_encoding.(
-      obj2 (req "expected_version" string) (req "actual_version" string))
+      obj2
+        (req "expected_version" Version.encoding)
+        (req "actual_version" Version.encoding))
     (function
       | Data_dir_needs_upgrade {expected; actual} -> Some (expected, actual)
       | _ -> None)
@@ -184,10 +238,10 @@ module Events = struct
       ~level:Notice
       ~name:"upgrading_node"
       ~msg:"upgrading data directory from {old_version} to {new_version}"
-      ~pp1:Format.pp_print_string
-      ("old_version", Data_encoding.string)
-      ~pp2:Format.pp_print_string
-      ("new_version", Data_encoding.string)
+      ~pp1:Version.pp
+      ("old_version", Version.encoding)
+      ~pp2:Version.pp
+      ("new_version", Version.encoding)
 
   let update_success =
     declare_0
@@ -214,10 +268,10 @@ module Events = struct
       ~msg:
         "current version: {current_version}, available version: \
          {available_version}"
-      ~pp1:Format.pp_print_string
-      ("current_version", Data_encoding.string)
-      ~pp2:Format.pp_print_string
-      ("available_version", Data_encoding.string)
+      ~pp1:Version.pp
+      ("current_version", Version.encoding)
+      ~pp2:Version.pp
+      ("available_version", Version.encoding)
 
   let emit = Internal_event.Simple.emit
 end
@@ -241,7 +295,7 @@ let write_version_file data_dir =
   let version_file = version_file data_dir in
   Lwt_utils_unix.Json.write_file
     version_file
-    (Data_encoding.Json.construct version_encoding data_version)
+    (Data_encoding.Json.construct Version.encoding current_version)
   |> trace (Could_not_write_version_file version_file)
 
 let read_version_file version_file =
@@ -251,13 +305,8 @@ let read_version_file version_file =
       (Could_not_read_data_dir_version version_file)
       (Lwt_utils_unix.Json.read_file version_file)
   in
-  try return (Data_encoding.Json.destruct version_encoding json)
-  with
-  | Data_encoding.Json.Cannot_destruct _ | Data_encoding.Json.Unexpected _
-  | Data_encoding.Json.No_case_matched _ | Data_encoding.Json.Bad_array_size _
-  | Data_encoding.Json.Missing_field _ | Data_encoding.Json.Unexpected_field _
-  ->
-    tzfail (Could_not_read_data_dir_version version_file)
+  try return (Data_encoding.Json.destruct Version.encoding json)
+  with _ -> tzfail (Could_not_read_data_dir_version version_file)
 
 let check_data_dir_version files data_dir =
   let open Lwt_result_syntax in
@@ -268,15 +317,15 @@ let check_data_dir_version files data_dir =
     tzfail (Invalid_data_dir {data_dir; msg})
   else
     let* version = read_version_file version_file in
-    if String.equal version data_version then return_none
+    if Version.(equal version current_version) then return_none
     else
       match
         List.find_opt
-          (fun (v, _) -> String.equal v version)
+          (fun (v, _) -> Version.equal v version)
           upgradable_data_version
       with
       | Some f -> return_some f
-      | None -> tzfail (Invalid_data_dir_version (data_version, version))
+      | None -> tzfail (Invalid_data_dir_version (current_version, version))
 
 let ensure_data_dir bare data_dir =
   let open Lwt_result_syntax in
@@ -321,7 +370,7 @@ let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
       let*! () = Events.(emit dir_is_up_to_date ()) in
       return_unit
   | Some (version, upgrade) -> (
-      let*! () = Events.(emit upgrading_node (version, data_version)) in
+      let*! () = Events.(emit upgrading_node (version, current_version)) in
       let*! r = upgrade ~data_dir genesis ~chain_name ~sandbox_parameters in
       match r with
       | Ok _success_message ->
@@ -337,18 +386,18 @@ let ensure_data_dir ?(bare = false) data_dir =
   let* o = ensure_data_dir bare data_dir in
   match o with
   | None -> return_unit
-  (* Here, we enable the automatic upgrade from "0.0.6" and "0.0.7" to
-     "0.0.8". This should be removed as soon as the "0.0.8" version or
+  (* Here, we enable the automatic upgrade from "0.6" and "0.7" to
+     "0.8". This should be removed as soon as the "0.8" version or
      above is mandatory. *)
-  | Some (v, _upgrade) when String.(equal "0.0.6" v) || String.(equal "0.0.7" v)
+  | Some (v, _upgrade) when Version.(equal v_0_6 v) || Version.(equal v_0_7 v)
     ->
       upgrade_data_dir ~data_dir () ~chain_name:() ~sandbox_parameters:()
   | Some (version, _) ->
       tzfail
-        (Data_dir_needs_upgrade {expected = data_version; actual = version})
+        (Data_dir_needs_upgrade {expected = current_version; actual = version})
 
 let upgrade_status data_dir =
   let open Lwt_result_syntax in
   let* data_dir_version = read_version_file (version_file data_dir) in
-  let*! () = Events.(emit upgrade_status (data_dir_version, data_version)) in
+  let*! () = Events.(emit upgrade_status (data_dir_version, current_version)) in
   return_unit
