@@ -95,16 +95,19 @@ end
  *  - (0.)0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
  *  - (0.)0.6 : store upgrade (switching from LMDB)
  *  - (0.)0.7 : new store metadata representation
- *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0) *)
+ *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0)
+ *  - 1.0     : context upgrade (upgrade to irmin.3.3) *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
    hardcoded rules.*)
-let current_version = Version.make ~major:0 ~minor:8
+let current_version = Version.make ~major:1 ~minor:0
 
 let v_0_6 = Version.make ~major:0 ~minor:6
 
 let v_0_7 = Version.make ~major:0 ~minor:7
+
+let v_0_8 = Version.make ~major:0 ~minor:8
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -113,9 +116,24 @@ let v_0_7 = Version.make ~major:0 ~minor:7
    statically. *)
 let upgradable_data_version =
   let open Lwt_result_syntax in
+  let v_1_0_upgrade ~data_dir =
+    let context_root = context_dir data_dir in
+    (* The upgrade function consist in letting irmin doing its own
+       file renaming. To do so, it must be done using a RW instance.*)
+    let*! ctxt = Context.init ~readonly:false context_root in
+    let*! () = Context.close ctxt in
+    return_unit
+  in
   [
-    (v_0_6, fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit);
-    (v_0_7, fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit);
+    ( v_0_6,
+      fun ~data_dir _ ~chain_name:_ ~sandbox_parameters:_ ->
+        v_1_0_upgrade ~data_dir );
+    ( v_0_7,
+      fun ~data_dir _ ~chain_name:_ ~sandbox_parameters:_ ->
+        v_1_0_upgrade ~data_dir );
+    ( v_0_8,
+      fun ~data_dir _ ~chain_name:_ ~sandbox_parameters:_ ->
+        v_1_0_upgrade ~data_dir );
   ]
 
 type error += Invalid_data_dir_version of Version.t * Version.t
@@ -390,12 +408,6 @@ let ensure_data_dir ?(bare = false) data_dir =
   let* o = ensure_data_dir bare data_dir in
   match o with
   | None -> return_unit
-  (* Here, we enable the automatic upgrade from "0.6" and "0.7" to
-     "0.8". This should be removed as soon as the "0.8" version or
-     above is mandatory. *)
-  | Some (v, _upgrade) when Version.(equal v_0_6 v) || Version.(equal v_0_7 v)
-    ->
-      upgrade_data_dir ~data_dir () ~chain_name:() ~sandbox_parameters:()
   | Some (version, _) ->
       tzfail
         (Data_dir_needs_upgrade {expected = current_version; actual = version})
