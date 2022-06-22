@@ -3544,9 +3544,7 @@ and parse_instr :
   | Prim (loc, I_FAILWITH, [], annot), Item_t (v, _rest) ->
       Lwt.return
         ( error_unexpected_annot loc annot >>? fun () ->
-          (if legacy then Result.return_unit
-          else check_packable ~allow_contract:false loc v)
-          >|? fun () ->
+          check_packable ~allow_contract:false loc v >|? fun () ->
           let instr = {apply = (fun _k -> IFailwith (loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
           log_stack loc stack_ty Bot_t ;
