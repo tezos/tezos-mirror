@@ -872,17 +872,19 @@ let create_mockup ?sync_mode ?parameter_file ~protocol client =
   |> Process.check
 
 let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ?(wait = "none")
-    ?proto_hash ?(proto_hashes = []) client =
+    ?proto_hash ?(proto_hashes = []) ?(force = false) client =
   let proto_hashes =
     match proto_hash with None -> proto_hashes | Some h -> h :: proto_hashes
   in
   spawn_command
     client
-    ("--wait" :: wait :: "submit" :: "proposals" :: "for" :: key :: proto_hashes)
+    ("--wait" :: wait :: "submit" :: "proposals" :: "for" :: key :: proto_hashes
+    @ optional_switch "force" force)
 
-let submit_proposals ?key ?wait ?proto_hash ?proto_hashes client =
-  spawn_submit_proposals ?key ?wait ?proto_hash ?proto_hashes client
-  |> Process.check
+let submit_proposals ?key ?wait ?proto_hash ?proto_hashes ?force ?expect_failure
+    client =
+  spawn_submit_proposals ?key ?wait ?proto_hash ?proto_hashes ?force client
+  |> Process.check ?expect_failure
 
 type ballot = Nay | Pass | Yay
 

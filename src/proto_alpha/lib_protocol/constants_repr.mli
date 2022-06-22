@@ -25,6 +25,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val mainnet_id : Chain_id.t
+
 val fitness_version_number : string
 
 val proof_of_work_nonce_size : int

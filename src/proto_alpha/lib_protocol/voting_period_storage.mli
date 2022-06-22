@@ -59,3 +59,13 @@ val get_rpc_current_info :
 
 (** Returns the voting period information for the next level. *)
 val get_rpc_succ_info : Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
+
+module Governance_dictator : sig
+  (** Overwrites the kind of the current voting period WITHOUT incrementing the index.
+      Must ONLY be called by the governance dictator on a testnet. *)
+  val overwrite_current_kind :
+    Raw_context.t ->
+    Chain_id.t ->
+    Voting_period_repr.kind ->
+    Raw_context.t tzresult Lwt.t
+end

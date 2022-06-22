@@ -947,6 +947,8 @@ let prepare_first_block ~level ~timestamp ctxt =
             double_baking_punishment = c.double_baking_punishment;
             ratio_of_frozen_deposits_slashed_per_double_endorsement =
               c.ratio_of_frozen_deposits_slashed_per_double_endorsement;
+            (* The `governance_dictator` should absolutely be None on mainnet *)
+            governance_dictator = None;
             initial_seed = c.initial_seed;
             cache_script_size = c.cache_script_size;
             cache_stake_distribution_cycles = c.cache_stake_distribution_cycles;

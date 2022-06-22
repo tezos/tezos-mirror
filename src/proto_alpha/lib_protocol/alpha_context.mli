@@ -754,6 +754,8 @@ module Constants : sig
 
   val fixed_encoding : fixed Data_encoding.t
 
+  val mainnet_id : Chain_id.t
+
   val proof_of_work_nonce_size : int
 
   val nonce_length : int
@@ -843,6 +845,7 @@ module Constants : sig
       frozen_deposits_percentage : int;
       double_baking_punishment : Tez.t;
       ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t;
+      governance_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
       cache_stake_distribution_cycles : int;
@@ -942,6 +945,8 @@ module Constants : sig
 
   val ratio_of_frozen_deposits_slashed_per_double_endorsement :
     context -> Ratio.t
+
+  val governance_dictator : context -> public_key_hash option
 
   val tx_rollup_enable : context -> bool
 
@@ -2550,6 +2555,11 @@ module Voting_period : sig
   val get_rpc_current_info : context -> info tzresult Lwt.t
 
   val get_rpc_succ_info : context -> info tzresult Lwt.t
+
+  module Governance_dictator : sig
+    val overwrite_current_kind :
+      context -> Chain_id.t -> Voting_period_repr.kind -> context tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Vote_repr} and {!Vote_storage}. *)

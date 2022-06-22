@@ -78,7 +78,11 @@ val may_start_new_voting_period : context -> context tzresult Lwt.t
     @raise Unexpected_proposal if [ctxt] is not in a proposal period.
     @raise Unauthorized_proposal if [delegate] is not in the listing. *)
 val record_proposals :
-  context -> public_key_hash -> Protocol_hash.t list -> context tzresult Lwt.t
+  context ->
+  Chain_id.t ->
+  public_key_hash ->
+  Protocol_hash.t list ->
+  context tzresult Lwt.t
 
 type error +=
   | Invalid_proposal

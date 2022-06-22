@@ -246,6 +246,28 @@ module Config_file = struct
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
+  let ghostnet_sandbox_network_config =
+    `O
+      [
+        ( "genesis",
+          `O
+            [
+              ("timestamp", `String "2022-01-25T15:00:00Z");
+              ( "block",
+                `String "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9" );
+              ("protocol", `String Protocol.genesis_hash);
+            ] );
+        ( "genesis_parameters",
+          `O
+            [
+              ( "values",
+                `O [("genesis_pubkey", `String Constant.activator.public_key)]
+              );
+            ] );
+        ("chain_name", `String "TEZOS");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
   let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
       =
     let network =
@@ -287,6 +309,14 @@ module Config_file = struct
                      overrides) )
     in
     JSON.put ("network", network) old_config
+
+  let set_ghostnet_sandbox_network old_config =
+    JSON.put
+      ( "network",
+        JSON.annotate
+          ~origin:"set_ghostnet_sandbox_network"
+          ghostnet_sandbox_network_config )
+      old_config
 end
 
 type snapshot_history_mode = Rolling_history | Full_history
