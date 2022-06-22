@@ -1848,7 +1848,6 @@ protocols.|}
         "Environment_protocol_T_V3";
         "Environment_protocol_T_V6";
         "Environment_protocol_T_test";
-        "Dummy_context";
         "Memory_context";
         "Proxy_context";
         "Proxy_delegate";
