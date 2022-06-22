@@ -833,18 +833,14 @@ module Scripts = struct
         | _ -> None)
       (fun () -> Run_operation_does_not_support_consensus_operations)
 
+  (** Validate and apply the operation but skip signature checks; do
+      not support consensus operations.
+
+      Return the unchanged operation protocol data, and the operation
+      receipt ie. metadata containing balance updates, consumed gas,
+      application success or failure, etc. *)
   let run_operation_service ctxt ()
       ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
-    (* this code is a duplicate of Apply without signature check *)
-    let operation : _ operation = {shell; protocol_data} in
-    let hash = Operation.hash operation in
-    Validate_operation.TMP_for_plugin
-    .precheck_manager__do_nothing_on_non_manager_op
-      ctxt
-      chain_id
-      protocol_data.contents
-      Skip_signature_check
-    >>=? fun op_validated_stamp ->
     (match protocol_data.contents with
     | Single (Preendorsement _)
     | Single (Endorsement _)
@@ -852,6 +848,21 @@ module Scripts = struct
         error Run_operation_does_not_support_consensus_operations
     | _ -> ok ())
     >>?= fun () ->
+    let operation : _ operation = {shell; protocol_data} in
+    let oph = Operation.hash operation in
+    let validate_operation_info, validate_operation_state =
+      Validate_operation.init_info_and_state
+        ctxt
+        Validate_operation.Mempool
+        chain_id
+    in
+    Validate_operation.validate_operation
+      validate_operation_info
+      validate_operation_state
+      ~should_check_signature:false
+      oph
+      operation
+    >>=? fun (_validate_operation_state, op_validated_stamp) ->
     let apply_mode =
       (* To simulate the injection of an operation in the mempool,
          we want a mode that behaves similarly to
@@ -867,7 +878,7 @@ module Scripts = struct
       apply_mode
       ~payload_producer:Signature.Public_key_hash.zero
       op_validated_stamp
-      hash
+      oph
       operation
     >|=? fun (_ctxt, op_metadata) ->
     (Operation_data protocol_data, Apply_results.Operation_metadata op_metadata)

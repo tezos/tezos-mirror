@@ -347,6 +347,16 @@ module Manager = struct
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
     let* pk =
+      (* Note that it is important to always retrieve the public
+         key. This includes the case where the key ends up not being
+         used because the signature check is skipped in
+         {!validate_manager_operation} called with
+         [~should_check_signature:false]. Indeed, the mempool may use
+         this argument when it has already checked the signature of
+         the operation in the past; but if there has been a branch
+         reorganization since then, the key might not be revealed in
+         the new branch anymore, in which case
+         {!Contract.get_manager_key} will return an error. *)
       match revealed_key with
       | Some pk -> return pk
       | None -> Contract.get_manager_key vi.ctxt source
@@ -632,8 +642,8 @@ module Manager = struct
     | Block -> batch_state.remaining_block_gas
     | Mempool -> vs.manager_state.remaining_block_gas
 
-  let validate_manager_operation vi vs source oph (type kind)
-      (operation : kind Kind.manager operation) =
+  let validate_manager_operation vi vs ~should_check_signature source oph
+      (type kind) (operation : kind Kind.manager operation) =
     let open Lwt_result_syntax in
     let*? () =
       (* One-operation-per-manager-per-block restriction (1M).
@@ -656,7 +666,11 @@ module Manager = struct
       check_sanity_and_find_public_key vi vs contents_list
     in
     let* batch_state = validate_contents_list vi batch_state contents_list in
-    let*? () = Operation.check_signature source_pk vi.chain_id operation in
+    let*? () =
+      if should_check_signature then
+        Operation.check_signature source_pk vi.chain_id operation
+      else ok ()
+    in
     let managers_seen =
       Signature.Public_key_hash.Map.add
         source
@@ -670,15 +684,27 @@ module Manager = struct
 end
 
 let validate_operation (vi : validate_operation_info)
-    (vs : validate_operation_state) oph (type kind) (operation : kind operation)
-    =
+    (vs : validate_operation_state) ?(should_check_signature = true) oph
+    (type kind) (operation : kind operation) =
   let open Lwt_result_syntax in
   let* vs =
     match operation.protocol_data.contents with
     | Single (Manager_operation {source; _}) ->
-        Manager.validate_manager_operation vi vs source oph operation
+        Manager.validate_manager_operation
+          vi
+          vs
+          ~should_check_signature
+          source
+          oph
+          operation
     | Cons (Manager_operation {source; _}, _) ->
-        Manager.validate_manager_operation vi vs source oph operation
+        Manager.validate_manager_operation
+          vi
+          vs
+          ~should_check_signature
+          source
+          oph
+          operation
     | Single (Preendorsement _)
     | Single (Endorsement _)
     | Single (Dal_slot_availability _)
@@ -724,33 +750,4 @@ module TMP_for_plugin = struct
       | Skip_signature_check -> ok ()
     in
     return Operation_validated_stamp
-
-  let precheck_manager__do_nothing_on_non_manager_op ctxt chain_id (type kind)
-      (contents_list : kind contents_list) should_check_signature =
-    let handle_manager (type a) (contents_list : a Kind.manager contents_list) =
-      let vi, vs = init_info_and_state ctxt Mempool chain_id in
-      precheck_manager vi vs contents_list should_check_signature
-    in
-    match contents_list with
-    | Single (Manager_operation _) -> handle_manager contents_list
-    | Cons (Manager_operation _, _) -> handle_manager contents_list
-    | Single (Preendorsement _)
-    | Single (Endorsement _)
-    | Single (Dal_slot_availability _)
-    | Single (Seed_nonce_revelation _)
-    | Single (Vdf_revelation _)
-    | Single (Proposals _)
-    | Single (Ballot _)
-    | Single (Activate_account _)
-    | Single (Double_preendorsement_evidence _)
-    | Single (Double_endorsement_evidence _)
-    | Single (Double_baking_evidence _)
-    | Single (Failing_noop _) ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
-
-           This should be updated when {!validate_operation} is
-           implemented on non-manager operations. (Alternatively, this
-           function might be removed first:
-           https://gitlab.com/tezos/tezos/-/issues/3245) *)
-        return Operation_validated_stamp
 end
