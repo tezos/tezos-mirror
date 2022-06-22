@@ -1009,7 +1009,7 @@ let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
     ~legacy
     ~allow_lazy_storage:true
     ~allow_operation:false
-    ~allow_contract:legacy
+    ~allow_contract:false
     ~allow_ticket:true
     ~ret:Don't_parse_entrypoints
     node
