@@ -447,18 +447,11 @@ let shutdown store =
     hash. Looks for the block in the blocks cache first, and fetches it from the
     L1 node otherwise. *)
 let fetch_tezos_block l1_ctxt hash =
-  let open Lwt_result_syntax in
-  let find_in_cache hash fetch =
-    let fetch hash =
-      let*! block = fetch hash in
-      Lwt.return @@ Result.to_option block
-    in
-    let*! block =
-      State.Blocks_cache.find_or_replace l1_ctxt.blocks_cache hash fetch
-    in
-    match block with Some b -> return b | _ -> tzfail (Cannot_find_block hash)
-  in
-  fetch_tezos_block ~find_in_cache l1_ctxt.cctxt hash
+  trace (Cannot_find_block hash)
+  @@ fetch_tezos_block
+       l1_ctxt.cctxt
+       hash
+       ~find_in_cache:(State.Blocks_cache.find_or_replace l1_ctxt.blocks_cache)
 
 (** Returns the reorganization of L1 blocks (if any) for [new_head]. *)
 let get_tezos_reorg_for_new_head l1_state store new_head_hash =
