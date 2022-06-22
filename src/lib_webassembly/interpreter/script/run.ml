@@ -139,26 +139,24 @@ let input_binary name buf run =
 let input_sexpr_file input file run =
   trace ("Loading (" ^ file ^ ")...");
   let ic = open_in file in
-  Lwt.try_bind
+  Lwt.finalize
     (fun () ->
        let lexbuf = Lexing.from_channel ic in
        trace "Parsing...";
        input file lexbuf run)
-    (fun success -> close_in ic; Lwt.return success)
-    (fun exn -> close_in ic; raise exn)
+    (fun () -> close_in ic; Lwt.return_unit)
 
 let input_binary_file file run =
   trace ("Loading (" ^ file ^ ")...");
   let ic = open_in_bin file in
-  Lwt.try_bind
+  Lwt.finalize
     (fun () ->
        let len = in_channel_length ic in
        let buf = Bytes.make len '\x00' in
        really_input ic buf 0 len;
        trace "Decoding...";
        input_binary file (Bytes.to_string buf) run)
-    (fun success -> close_in ic; Lwt.return success)
-    (fun exn -> close_in ic; raise exn)
+    (fun () -> close_in ic; Lwt.return_unit)
 
 let input_js_file file run =
   raise (Sys_error (file ^ ": unrecognized input file type"))
@@ -212,7 +210,7 @@ let input_stdin run =
         print_endline "";
         trace "Bye." ;
         Lwt.return_unit
-      | exn -> Lwt.fail exn)
+      | exn -> raise exn)
 
 
 (* Printing *)
