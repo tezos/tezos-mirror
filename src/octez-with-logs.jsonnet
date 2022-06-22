@@ -14,23 +14,22 @@ local delegate_hardware = import './delegate_hardware.jsonnet';
 local workers = import './workers.jsonnet';
 local logs = import './logs.jsonnet';
 
-local boardtitle = 'Tezos full dashboard - branch: ' + std.extVar('branch');
+local boardtitle = 'Tezos with logs dashboard - branch: ' + std.extVar('branch');
 
 
 //Position variables
-local node_hardware_y = 47;
-local p2p_y = 72;
-local worker_y = 89;
-local misc_y = 114;
-local delegate_hardware_y = 123;
-local logs_y = 132;
+local p2p_y = 47;
+local worker_y = 64;
+local misc_y = 89;
+local logs_y = 98;
+
 
 //###
 // Grafana main stuffs
 //##
 dashboard.new(
   title=boardtitle,
-  tags=['tezos', 'octez', 'hardware', 'logs'],
+  tags=['tezos', 'octez', 'logs'],
   schemaVersion=18,
   editable=true,
   time_from='now-3h',
@@ -81,22 +80,6 @@ dashboard.new(
     node.storeMergeTimeGraph { gridPos: { h: 8, w: 14, x: 0, y: 38 } },
     node.writtenBlockSize { gridPos: { h: 8, w: 10, x: 14, y: 38 } },
 
-    //#######
-    row.new(
-      title='Node Hardware stats',
-      repeat='',
-      showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: node_hardware_y } },
-    node_hardware.cpu { gridPos: { h: 8, w: 12, x: 0, y: node_hardware_y } },
-    node_hardware.memory { gridPos: { h: 8, w: 12, x: 12, y: node_hardware_y } },
-
-
-    node_hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: node_hardware_y + 8 } },
-    node_hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: node_hardware_y + 8 } },
-    node_hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: node_hardware_y + 8 } },
-
-    node_hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: node_hardware_y + 16 } },
-    node_hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: node_hardware_y + 16 } },
 
     //#######
     row.new(
@@ -130,16 +113,6 @@ dashboard.new(
     ) + { gridPos: { h: 8, w: 8, x: 0, y: misc_y } },
     node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: misc_y } },
     node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: misc_y } },
-
-    //#######
-    row.new(
-      title='Delegates Hardware stats',
-      repeat='',
-      showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: delegate_hardware_y } },
-    delegate_hardware.cpu { gridPos: { h: 8, w: 8, x: 0, y: delegate_hardware_y } },
-    delegate_hardware.memory { gridPos: { h: 8, w: 8, x: 8, y: delegate_hardware_y } },
-    delegate_hardware.ios { gridPos: { h: 8, w: 8, x: 16, y: delegate_hardware_y } },
 
     //#######
     row.new(

@@ -1,4 +1,4 @@
-all: basic full compact
+all: basic logs full compact
 
 BRANCH ?= master
 NODE_INSTANCE_LABEL ?= instance
@@ -18,6 +18,8 @@ fmt:
 	jsonnetfmt -i src/*.jsonnet
 
 basic: octez-basic.jsonnet
+
+logs : octez-with-logs.jsonnet
 
 full: octez-full.jsonnet
 

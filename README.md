@@ -26,13 +26,28 @@ a legacy branch is proposed. However, this branch is deprecated and not maintain
 
 ### Build
 
-To create a dashboard for branch `master` in the title (default)
+To create the dashboards for branch `master` in the title (default)
 
 ```sh
 make
 ```
 
-To create a dashboard for a different branch
+The dashboards will be availbale in the `output/` folder.
+
+You can also create a specific dashboard with
+
+```sh
+make dashboard_name
+```
+
+with `dashboard_name` one of:
+- `compact`: a single page compact dashboard which aims to give a
+  brief overview of the node's health,
+- `basic`: a simple dashboard displaying detailed node's metrics,
+- `logs`: same as `basic` but also displaying node's logs (thanks to [Loki and promtail](https://github.com/grafana/loki))
+- `full`: same as `logs` but also displaying hardware metrics (thanks to [netdata](https://www.netdata.cloud/))
+
+To create the dashboards for a different branch
 
 ```sh
 BRANCH=foo make
