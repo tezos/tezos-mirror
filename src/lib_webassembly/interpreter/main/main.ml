@@ -35,17 +35,18 @@ let argspec = Arg.align
 ]
 
 let () =
+  let open Lwt.Syntax in
   Printexc.record_backtrace true;
   try
     configure ();
     Arg.parse argspec
       (fun file -> add_arg ("(input " ^ quote file ^ ")")) usage;
-    List.iter (fun arg -> if not (Run.run_string arg) then exit 1) !args;
+    Lwt_main.run (Lwt_list.iter_s (fun arg -> let+ res = Run.run_string arg in if not res then exit 1) !args);
     if !args = [] then Flags.interactive := true;
     if !Flags.interactive then begin
       Flags.print_sig := true;
       banner ();
-      Run.run_stdin ()
+      Lwt_main.run (Run.run_stdin ())
     end
   with exn ->
     flush_all ();

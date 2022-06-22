@@ -98,28 +98,30 @@ let output_stdout get_module =
 let error at category msg =
   trace ("Error: ");
   prerr_endline (Source.string_of_region at ^ ": " ^ category ^ ": " ^ msg);
-  false
+  Lwt.return_false
 
 let input_from get_script run =
-  try
-    let script = get_script () in
-    trace "Running...";
-    run script;
-    true
-  with
-  | Decode.Code (at, msg) -> error at "decoding error" msg
-  | Parse.Syntax (at, msg) -> error at "syntax error" msg
-  | Valid.Invalid (at, msg) -> error at "invalid module" msg
-  | Import.Unknown (at, msg) -> error at "link failure" msg
-  | Eval.Link (at, msg) -> error at "link failure" msg
-  | Eval.Trap (at, msg) -> error at "runtime trap" msg
-  | Eval.Exhaustion (at, msg) -> error at "resource exhaustion" msg
-  | Eval.Crash (at, msg) -> error at "runtime crash" msg
-  | Encode.Code (at, msg) -> error at "encoding error" msg
-  | Script.Error (at, msg) -> error at "script error" msg
-  | IO (at, msg) -> error at "i/o error" msg
-  | Assert (at, msg) -> error at "assertion failure" msg
-  | Abort _ -> false
+  Lwt.catch
+    (fun () ->
+       let script = get_script () in
+       trace "Running...";
+       let+ () = run script in
+       true)
+    (function
+      | Decode.Code (at, msg) -> error at "decoding error" msg
+      | Parse.Syntax (at, msg) -> error at "syntax error" msg
+      | Valid.Invalid (at, msg) -> error at "invalid module" msg
+      | Import.Unknown (at, msg) -> error at "link failure" msg
+      | Eval.Link (at, msg) -> error at "link failure" msg
+      | Eval.Trap (at, msg) -> error at "runtime trap" msg
+      | Eval.Exhaustion (at, msg) -> error at "resource exhaustion" msg
+      | Eval.Crash (at, msg) -> error at "runtime crash" msg
+      | Encode.Code (at, msg) -> error at "encoding error" msg
+      | Script.Error (at, msg) -> error at "script error" msg
+      | IO (at, msg) -> error at "i/o error" msg
+      | Assert (at, msg) -> error at "assertion failure" msg
+      | Abort _ -> Lwt.return_false
+      | exn -> raise exn)
 
 let input_script start name lexbuf run =
   input_from (fun _ -> Parse.parse name lexbuf start) run
@@ -137,26 +139,24 @@ let input_binary name buf run =
 let input_sexpr_file input file run =
   trace ("Loading (" ^ file ^ ")...");
   let ic = open_in file in
-  try
-    let lexbuf = Lexing.from_channel ic in
-    trace "Parsing...";
-    let success = input file lexbuf run in
-    close_in ic;
-    success
-  with exn -> close_in ic; raise exn
+  Lwt.finalize
+    (fun () ->
+       let lexbuf = Lexing.from_channel ic in
+       trace "Parsing...";
+       input file lexbuf run)
+    (fun () -> close_in ic; Lwt.return_unit)
 
 let input_binary_file file run =
   trace ("Loading (" ^ file ^ ")...");
   let ic = open_in_bin file in
-  try
-    let len = in_channel_length ic in
-    let buf = Bytes.make len '\x00' in
-    really_input ic buf 0 len;
-    trace "Decoding...";
-    let success = input_binary file (Bytes.to_string buf) run in
-    close_in ic;
-    success
-  with exn -> close_in ic; raise exn
+  Lwt.finalize
+    (fun () ->
+       let len = in_channel_length ic in
+       let buf = Bytes.make len '\x00' in
+       really_input ic buf 0 len;
+       trace "Decoding...";
+       input_binary file (Bytes.to_string buf) run)
+    (fun () -> close_in ic; Lwt.return_unit)
 
 let input_js_file file run =
   raise (Sys_error (file ^ ": unrecognized input file type"))
@@ -198,15 +198,19 @@ let lexbuf_stdin buf len =
 let input_stdin run =
   let lexbuf = Lexing.from_function lexbuf_stdin in
   let rec loop () =
-    let success = input_script Parse.Script1 "stdin" lexbuf run in
+    let* success = input_script Parse.Script1 "stdin" lexbuf run in
     if not success then Lexing.flush_input lexbuf;
     if Lexing.(lexbuf.lex_curr_pos >= lexbuf.lex_buffer_len - 1) then
       continuing := false;
     loop ()
   in
-  try loop () with End_of_file ->
-    print_endline "";
-    trace "Bye."
+  Lwt.catch loop
+    (function
+      | End_of_file ->
+        print_endline "";
+        trace "Bye." ;
+        Lwt.return_unit
+      | exn -> raise exn)
 
 
 (* Printing *)
@@ -362,16 +366,14 @@ let run_action act : Values.value list Lwt.t =
     | None -> Assert.error act.at "undefined export"
     )
 
- | Get (x_opt, name) -> Lwt.return (
+ | Get (x_opt, name) ->
     trace ("Getting global \"" ^ Ast.string_of_name name ^ "\"...");
     let inst = lookup_instance x_opt act.at in
     (match Instance.export inst name with
-    | Some (Instance.ExternGlobal gl) -> [Global.load gl]
+    | Some (Instance.ExternGlobal gl) -> Lwt.return [Global.load gl]
     | Some _ -> Assert.error act.at "export is not a global"
     | None -> Assert.error act.at "undefined export"
     )
- )
-
 
 let assert_nan_pat n nan =
   let open Values in
@@ -439,30 +441,30 @@ let assert_message at name msg re =
     print_endline ("Result: \"" ^ msg ^ "\"");
     print_endline ("Expect: \"" ^ re ^ "\"");
     Assert.error at ("wrong " ^ name ^ " error")
-  end
+  end ;
+  Lwt.return_unit
 
 let run_assertion ass : unit Lwt.t =
   match ass.it with
-  | AssertMalformed (def, re) -> Lwt.return (
+  | AssertMalformed (def, re) ->
     trace "Asserting malformed...";
     (match ignore (run_definition def : Ast.module_) with
     | exception Decode.Code (_, msg) -> assert_message ass.at "decoding" msg re
     | exception Parse.Syntax (_, msg) -> assert_message ass.at "parsing" msg re
     | _ -> Assert.error ass.at "expected decoding/parsing error"
     )
-  )
 
-  | AssertInvalid (def, re) -> Lwt.return (
+  | AssertInvalid (def, re) ->
     trace "Asserting invalid...";
     (match
       let m = run_definition def in
-      Valid.check_module m
+      Valid.check_module m ;
+      Lwt.return_unit
     with
     | exception Valid.Invalid (_, msg) ->
       assert_message ass.at "validation" msg re
     | _ -> Assert.error ass.at "expected validation error"
     )
-  )
 
   | AssertUnlinkable (def, re) ->
     trace "Asserting unlinkable...";
@@ -475,8 +477,8 @@ let run_assertion ass : unit Lwt.t =
       (fun _ -> Assert.error ass.at "expected linking error")
       (function
       | Import.Unknown (_, msg) | Eval.Link (_, msg) ->
-        Lwt.return (assert_message ass.at "linking" msg re)
-      | exn -> Lwt.fail exn)
+        assert_message ass.at "linking" msg re
+      | exn -> raise exn)
 
   | AssertUninstantiable (def, re) ->
     trace "Asserting trap...";
@@ -489,8 +491,8 @@ let run_assertion ass : unit Lwt.t =
       (fun _ -> Assert.error ass.at "expected instantiation error")
       (function
       | Eval.Trap (_, msg) ->
-        Lwt.return (assert_message ass.at "instantiation" msg re)
-      | exn -> Lwt.fail exn)
+        assert_message ass.at "instantiation" msg re
+      | exn -> raise exn)
 
   | AssertReturn (act, rs) ->
     trace ("Asserting return...");
@@ -505,8 +507,8 @@ let run_assertion ass : unit Lwt.t =
       (fun _ -> Assert.error ass.at "expected runtime error")
       (function
       | Eval.Trap (_, msg) ->
-        Lwt.return (assert_message ass.at "runtime" msg re)
-      | exn -> Lwt.fail exn)
+        assert_message ass.at "runtime" msg re
+      | exn -> raise exn)
 
   | AssertExhaustion (act, re) ->
     trace ("Asserting exhaustion...");
@@ -515,8 +517,8 @@ let run_assertion ass : unit Lwt.t =
       (fun _ -> Assert.error ass.at "expected exhaustion error")
       (function
       | Eval.Exhaustion (_, msg) ->
-        Lwt.return (assert_message ass.at "exhaustion" msg re)
-      | exn -> Lwt.fail exn)
+        assert_message ass.at "exhaustion" msg re
+      | exn -> raise exn)
 
 let rec run_command cmd : unit Lwt.t =
   match cmd.it with
@@ -542,15 +544,15 @@ let rec run_command cmd : unit Lwt.t =
       Lwt.return_unit
     end
 
-  | Register (name, x_opt) -> Lwt.return (
+  | Register (name, x_opt) ->
     quote := cmd :: !quote;
     if not !Flags.dry then begin
       trace ("Registering module \"" ^ Ast.string_of_name name ^ "\"...");
       let inst = lookup_instance x_opt cmd.at in
       registry := Map.add (Utf8.encode name) inst !registry;
       Import.register name (lookup_registry (Utf8.encode name))
-    end
-  )
+    end ;
+    Lwt.return_unit
 
   | Action act ->
     quote := cmd :: !quote;
@@ -578,10 +580,16 @@ and run_meta cmd =
     let+ () = run_quote_script script in
     bind scripts x_opt (lookup_script None cmd.at)
 
-  | Input (x_opt, file) -> Lwt.return (
-    (try if not (input_file file run_quote_script) then
-      Abort.error cmd.at "aborting"
-    with Sys_error msg -> IO.error cmd.at msg);
+  | Input (x_opt, file) ->
+    let+ () =
+      Lwt.catch
+        (fun () ->
+          let+ res = input_file file run_quote_script in
+          if not res then
+            Abort.error cmd.at "aborting")
+        (function
+           | Sys_error msg -> IO.error cmd.at msg
+           | exn -> Lwt.fail exn) in
     bind scripts x_opt (lookup_script None cmd.at);
     if x_opt <> None then begin
       bind modules x_opt (lookup_module None cmd.at);
@@ -589,20 +597,19 @@ and run_meta cmd =
         bind instances x_opt (lookup_instance None cmd.at)
       end
     end
-  )
 
-  | Output (x_opt, Some file) -> Lwt.return (
+  | Output (x_opt, Some file) ->
     (try
       output_file file
         (fun () -> lookup_script x_opt cmd.at)
         (fun () -> lookup_module x_opt cmd.at)
-    with Sys_error msg -> IO.error cmd.at msg)
-  )
+    with Sys_error msg -> IO.error cmd.at msg);
+    Lwt.return_unit
 
-  | Output (x_opt, None) -> Lwt.return (
+  | Output (x_opt, None) ->
     (try output_stdout (fun () -> lookup_module x_opt cmd.at)
-    with Sys_error msg -> IO.error cmd.at msg)
-  )
+    with Sys_error msg -> IO.error cmd.at msg);
+    Lwt.return_unit
 
 and run_script script =
   TzStdLib.List.iter_s run_command script

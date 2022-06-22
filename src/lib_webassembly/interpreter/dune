@@ -15,7 +15,8 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-webassembly-interpreter)
+  tezos-webassembly-interpreter
+  lwt.unix)
  (flags
   (:standard)
   -open Tezos_webassembly_interpreter)

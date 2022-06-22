@@ -591,7 +591,7 @@ let _tezos_webassembly_repl =
     ~path:"src/lib_webassembly/interpreter"
     ~modules:["main"]
     ~opam:""
-    ~deps:[tezos_webassembly_interpreter |> open_]
+    ~deps:[tezos_webassembly_interpreter |> open_; lwt_unix]
 
 let _tezos_webassembly_test =
   test
